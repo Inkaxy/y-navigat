@@ -31,9 +31,14 @@ import {
   useSupplierSpend,
   useSupplierAliases,
   useUpdateSupplierNotes,
+  useTotalSpend,
+  useSupplierPriceIndex,
   type SupplierItemRow,
 } from "@/ravarer/hooks/useSupplierDetail";
 import { usePriceHistory } from "@/ravarer/hooks/useRmSuppliers";
+import { SupplierDialog } from "@/ravarer/components/NewSupplierDialog";
+import { AgreementDocumentLink } from "@/ravarer/components/AgreementDocumentLink";
+import { getAgreementStatus } from "@/ravarer/lib/agreementStatus";
 import {
   Select,
   SelectContent,
@@ -57,13 +62,16 @@ function EmptyTab({ icon: Icon, text }: { icon: typeof Package; text: string }) 
 export default function LeverandorDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { canWrite } = useRavarer();
+  const { canWrite, legalEntityId } = useRavarer();
+  const [editOpen, setEditOpen] = useState(false);
 
   const { data: supplier, isLoading } = useSupplier(id);
   const { data: items = [], isLoading: itemsLoading } = useSupplierItems(id);
   const [invoiceLimit, setInvoiceLimit] = useState(50);
   const { data: invoiceData, isLoading: invoicesLoading } = useSupplierInvoices(id, invoiceLimit);
   const { data: spend } = useSupplierSpend(id);
+  const { data: totalSpend } = useTotalSpend(legalEntityId);
+  const { data: priceIndex } = useSupplierPriceIndex(id);
   const linkIds = useMemo(() => items.map((i) => i.id), [items]);
   const { data: aliases = [], isLoading: aliasesLoading } = useSupplierAliases(linkIds);
 
@@ -91,6 +99,19 @@ export default function LeverandorDetailPage() {
     });
     return list;
   }, [items, itemSort]);
+
+  /** Avtaler som utløper innen 90 dager (inkludert de som ryker innen 30). */
+  const expiring90 = useMemo(
+    () =>
+      items.filter((i) => {
+        const st = getAgreementStatus(i.agreement_valid_from, i.agreement_valid_to);
+        return st === "expiring_30" || st === "expiring_90";
+      }).length,
+    [items],
+  );
+
+  const sharePct =
+    totalSpend && totalSpend > 0 && spend != null ? (spend / totalSpend) * 100 : null;
 
   const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const filteredAliases = useMemo(() => {
@@ -138,9 +159,16 @@ export default function LeverandorDetailPage() {
         title={supplier.name}
         subtitle="Leverandørkort — varer, fakturaer og aliaser"
         actions={
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => navigate("/ravarer/leverandorer")}>
-            <ArrowLeft className="h-4 w-4" /> Tilbake
-          </Button>
+          <div className="flex items-center gap-2">
+            {canWrite && (
+              <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
+                Rediger leverandør
+              </Button>
+            )}
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => navigate("/ravarer/leverandorer")}>
+              <ArrowLeft className="h-4 w-4" /> Tilbake
+            </Button>
+          </div>
         }
       />
 
@@ -236,6 +264,27 @@ export default function LeverandorDetailPage() {
         <Kpi label="Kjøpt siste 12 mnd (eks. mva)" value={formatNok(spend ?? 0)} hint="Fakturabeløp eks. mva, kreditnotaer trukket fra" />
       </div>
 
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Kpi
+          label="Andel av totalt innkjøp"
+          value={sharePct == null ? "—" : `${sharePct.toFixed(1)} %`}
+          hint="Leverandørens andel av alt innkjøp siste 12 måneder"
+        />
+        <Kpi label="Antall råvarer" value={String(items.length)} hint="Råvarer koblet til leverandøren" />
+        <Kpi
+          label="Avtaler som utløper ≤ 90 d"
+          value={String(expiring90)}
+          hint="Avtaler med sluttdato innen 90 dager"
+        />
+        <Kpi
+          label="Prisindeks"
+          value={priceIndex?.indexPct == null ? "—" : `${priceIndex.indexPct.toFixed(0)}`}
+          hint="Siste fakturapris mot 12-måneders snitt, snittet over råvarene. 100 = uendret"
+        />
+      </div>
+
+      <SupplierDialog open={editOpen} onOpenChange={setEditOpen} supplier={supplier} />
+
       <Tabs defaultValue="varer">
         <TabsList>
           <TabsTrigger value="varer">Varer ({items.length})</TabsTrigger>
@@ -329,6 +378,11 @@ export default function LeverandorDetailPage() {
                               </Badge>
                             ) : (
                               <Badge variant="outline" className="text-ink-secondary">Ingen avtale</Badge>
+                            )}
+                            {r.agreement_document_url && (
+                              <div className="mt-1">
+                                <AgreementDocumentLink path={r.agreement_document_url} label="Dokument" />
+                              </div>
                             )}
                           </td>
                         </tr>

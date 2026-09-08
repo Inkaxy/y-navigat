@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getSessionToken, baseUrl, authHeader } from "../_shared/tripletex.ts";
+import { normalizeSupplierName } from "../_shared/supplierName.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,7 +24,9 @@ interface TtSupplier {
   phoneNumber?: string | null;
 }
 
-const norm = (s: unknown) => String(s ?? "").trim().toLowerCase();
+// Navn sammenlignes normalisert («Bakeri AS» = «bakeri»), ellers ble samme
+// leverandør opprettet på nytt for hver skrivemåte.
+const norm = (s: unknown) => normalizeSupplierName(String(s ?? ""));
 const digits = (s: unknown) => String(s ?? "").replace(/\s+/g, "");
 const empty = (v: unknown) => v === null || v === undefined || String(v).trim() === "";
 
@@ -104,6 +107,7 @@ Deno.serve(async (req) => {
       if (n && !byName.has(n)) byName.set(n, r);
     }
 
+    const hoppet: { navn: string; grunn: string }[] = [];
     let opprettet = 0;
     let oppdatert = 0;
     let uendret = 0;
@@ -145,7 +149,11 @@ Deno.serve(async (req) => {
           "contact_phone" in patch;
 
         const { error: upErr } = await admin.from("suppliers").update(patch).eq("id", match.id);
-        if (upErr) return json({ error: upErr.message }, 500);
+        if (upErr) {
+          // Én rad som feiler skal ikke stoppe hele kjøringen.
+          hoppet.push({ navn: String(tt.name ?? ttId), grunn: upErr.message });
+          continue;
+        }
 
         // Unngå at samme rad matches på nytt av en annen Tripletex-leverandør:
         // fjern den fra ALLE oppslagene, ikke bare tripletex-id-oppslaget.
@@ -174,7 +182,14 @@ Deno.serve(async (req) => {
           })
           .select("id, name, org_number")
           .maybeSingle();
-        if (insErr) return json({ error: insErr.message }, 500);
+        if (insErr) {
+          const duplicate = (insErr as { code?: string }).code === "23505";
+          hoppet.push({
+            navn: String(tt.name ?? ttId),
+            grunn: duplicate ? "Finnes allerede med samme navn" : insErr.message,
+          });
+          continue;
+        }
         opprettet++;
         if (inserted) {
           byTtId.set(ttId, inserted);
@@ -184,7 +199,15 @@ Deno.serve(async (req) => {
       }
     }
 
-    return json({ ok: true, hentet: ttSuppliers.length, opprettet, oppdatert, uendret });
+    return json({
+      ok: true,
+      hentet: ttSuppliers.length,
+      opprettet,
+      oppdatert,
+      uendret,
+      hoppet: hoppet.length,
+      hoppet_navn: hoppet,
+    });
   } catch (err) {
     return json({ error: err instanceof Error ? err.message : String(err) }, 500);
   }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -61,9 +61,54 @@ export default function LiveForhandlingWorkspace() {
   const [pausing, setPausing] = useState(false);
   const [credentials, setCredentials] = useState<{ url: string; password: string; email: string | null } | null>(null);
 
+  // Alle mottakere vises — en live-forhandling kan ha flere leverandører i rommet.
   const supplierId = recipients[0]?.supplier_id ?? "";
-  const supplierName = suppliers.find((s) => s.id === supplierId)?.name ?? "—";
+  const supplierNames = recipients
+    .map((r) => suppliers.find((s) => s.id === r.supplier_id)?.name)
+    .filter((n): n is string => !!n);
+  const supplierName = supplierNames.length > 0 ? supplierNames.join(", ") : "—";
   const isPaused = !!neg?.live_session_paused;
+
+  /**
+   * Live-flaten må vise det andre i rommet gjør. Vi lytter på endringer i
+   * linjene og hendelsene, med en enkel oppfriskning hvert 5. sekund som
+   * reserve hvis realtime-forbindelsen faller ut.
+   */
+  const realtimeUp = useRef(false);
+  useEffect(() => {
+    if (!id) return;
+    const channel = supabase
+      .channel(`live-negotiation-${id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "negotiation_items", filter: `negotiation_id=eq.${id}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ["negotiation-items", id] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "negotiation_live_events", filter: `negotiation_id=eq.${id}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ["live-events", id] });
+          qc.invalidateQueries({ queryKey: ["negotiation", id] });
+        },
+      )
+      .subscribe((status) => {
+        realtimeUp.current = status === "SUBSCRIBED";
+      });
+
+    const fallback = window.setInterval(() => {
+      if (realtimeUp.current) return;
+      qc.invalidateQueries({ queryKey: ["negotiation-items", id] });
+      qc.invalidateQueries({ queryKey: ["negotiation", id] });
+    }, 5000);
+
+    return () => {
+      window.clearInterval(fallback);
+      supabase.removeChannel(channel);
+    };
+  }, [id, qc]);
 
   const itemsByStatus = useMemo(() => {
     const groups: Record<string, typeof items> = { pending: [], discussing: [], processed: [] };

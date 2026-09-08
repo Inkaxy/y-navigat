@@ -12,6 +12,8 @@ export interface AgreementRow {
   package_unit: string | null;
   agreement_valid_from: string | null;
   agreement_valid_to: string | null;
+  agreement_document_url: string | null;
+  agreed_price_set_at: string | null;
   is_primary: boolean;
   raw_material: { id: string; name: string; category: string | null; base_unit: string | null } | null;
   supplier: { id: string; name: string } | null;
@@ -25,11 +27,12 @@ export function useAgreements() {
       const { data, error } = await supabase
         .from("raw_material_suppliers")
         .select(
-          "id, raw_material_id, supplier_id, agreed_price, agreed_price_per_base_unit, package_size, package_unit, agreement_valid_from, agreement_valid_to, is_primary, raw_material:raw_materials!inner(id, name, category, base_unit, legal_entity_id), supplier:suppliers!inner(id, name)",
+          "id, raw_material_id, supplier_id, agreed_price, agreed_price_per_base_unit, package_size, package_unit, agreement_valid_from, agreement_valid_to, agreement_document_url, agreed_price_set_at, is_primary, raw_material:raw_materials!inner(id, name, category, base_unit, legal_entity_id), supplier:suppliers!inner(id, name)",
         )
         .eq("raw_material.legal_entity_id", legalEntityId)
         .or("agreed_price.not.is.null,agreed_price_per_base_unit.not.is.null")
         .order("agreement_valid_to", { ascending: true, nullsFirst: false });
+
       if (error) throw error;
       return (data ?? []) as unknown as AgreementRow[];
     },

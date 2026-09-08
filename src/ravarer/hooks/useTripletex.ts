@@ -11,6 +11,9 @@ export interface TripletexCredentialRow {
   last_synced_at: string | null;
   last_sync_status: string | null;
   last_sync_error: string | null;
+  last_supplier_sync_at: string | null;
+  last_invoice_synced_date: string | null;
+  initial_import_done: boolean | null;
 }
 
 export function useTripletexCredentials(legalEntityId: string | null | undefined) {
@@ -21,7 +24,7 @@ export function useTripletexCredentials(legalEntityId: string | null | undefined
       const { data, error } = await supabase
         .from("tripletex_credentials")
         .select(
-          "legal_entity_id, mode, sync_enabled, sync_frequency_minutes, last_synced_at, last_sync_status, last_sync_error",
+          "legal_entity_id, mode, sync_enabled, sync_frequency_minutes, last_synced_at, last_sync_status, last_sync_error, last_supplier_sync_at, last_invoice_synced_date, initial_import_done",
         )
         .eq("legal_entity_id", legalEntityId!)
         .maybeSingle();
@@ -43,6 +46,9 @@ export function useTripletexCredentials(legalEntityId: string | null | undefined
         last_synced_at: data.last_synced_at,
         last_sync_status: data.last_sync_status,
         last_sync_error: data.last_sync_error,
+        last_supplier_sync_at: data.last_supplier_sync_at,
+        last_invoice_synced_date: data.last_invoice_synced_date,
+        initial_import_done: data.initial_import_done,
       };
     },
   });

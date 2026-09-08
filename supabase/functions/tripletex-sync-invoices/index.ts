@@ -244,6 +244,8 @@ Deno.serve(async (req) => {
     let lastCompletedChunkTo: string | null = null;
     const chunkResults: ChunkResult[] = [];
     const failedSamples: string[] = [];
+    // Konkrete feil per faktura, slik at innstillingssiden kan vise hvilke som ryker.
+    const errors: { invoice_number: string; reason: string }[] = [];
     const conflicts: { invoice_id: string; invoice_number: string; fields: unknown[] }[] = [];
 
 
@@ -398,6 +400,10 @@ Deno.serve(async (req) => {
           failed++;
           const msg = e instanceof Error ? e.message : String(e);
           if (failedSamples.length < 5) failedSamples.push(msg);
+          if (errors.length < 50) {
+            const nr = inv?.invoiceNumber ?? inv?.number ?? inv?.id;
+            errors.push({ invoice_number: nr == null ? "ukjent" : String(nr), reason: msg });
+          }
           console.error("tripletex-sync-invoices: faktura feilet", msg);
         }
       }
@@ -467,6 +473,7 @@ Deno.serve(async (req) => {
       etterhenting: isBackfill ? body.supplier_id : null,
       biter: chunkResults,
       feil_eksempler: failedSamples,
+      feil: errors,
       konflikter: conflicts,
     };
 
@@ -510,6 +517,7 @@ Deno.serve(async (req) => {
       skipped,
       updated,
       failed,
+      errors,
       ufullstendig_henting: ufullstendig,
       konflikter: conflicts.length,
       hoppet_over_ikke_fulgt: hoppetOverIkkeFulgt,

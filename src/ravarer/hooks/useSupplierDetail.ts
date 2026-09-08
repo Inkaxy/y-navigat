@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { supplierSpendExclVat } from "@/ravarer/lib/purchaseTotals";
 import type { SupplierRow } from "@/ravarer/hooks/useSuppliers";
 import { osloDateISOPlusDays } from "@/lib/osloDate";
+import { fetchAllRows } from "@/lib/supabasePaging";
 
 export interface SupplierItemRow {
   id: string;
@@ -15,6 +16,7 @@ export interface SupplierItemRow {
   agreed_price_per_base_unit: number | null;
   agreement_valid_from: string | null;
   agreement_valid_to: string | null;
+  agreement_document_url: string | null;
   last_invoice_price: number | null;
   last_invoice_date: string | null;
   raw_material: { id: string; name: string; base_unit: string | null; item_type: string | null } | null;
@@ -61,7 +63,7 @@ export function useSupplierItems(supplierId: string | undefined) {
       const { data, error } = await supabase
         .from("raw_material_suppliers")
         .select(
-          "id, raw_material_id, supplier_sku, supplier_product_name, package_size, package_unit, agreed_price_per_base_unit, agreement_valid_from, agreement_valid_to, last_invoice_price, last_invoice_date, raw_material:raw_materials(id, name, base_unit, item_type)",
+          "id, raw_material_id, supplier_sku, supplier_product_name, package_size, package_unit, agreed_price_per_base_unit, agreement_valid_from, agreement_valid_to, agreement_document_url, last_invoice_price, last_invoice_date, raw_material:raw_materials(id, name, base_unit, item_type)",
         )
         .eq("supplier_id", supplierId!);
       if (error) throw error;
@@ -138,5 +140,98 @@ export function useUpdateSupplierNotes(supplierId: string | undefined) {
       toast.success("Notat lagret");
     },
     onError: (e: Error) => toast.error(`Kunne ikke lagre: ${e.message}`),
+  });
+}
+
+/** Totalt innkjøp fra alle leverandører siste 365 dager, eks. mva. */
+export function useTotalSpend(legalEntityId: string | undefined) {
+  return useQuery({
+    queryKey: ["total-supplier-spend", legalEntityId],
+    enabled: !!legalEntityId,
+    queryFn: async () => {
+      const since = osloDateISOPlusDays(-365);
+      const rows = await fetchAllRows<{ total_amount: number | null; total_vat: number | null; is_credit_note: boolean | null }>(
+        (from, to) =>
+          supabase
+            .from("invoices")
+            .select("total_amount, total_vat, is_credit_note")
+            .eq("legal_entity_id", legalEntityId!)
+            .gte("invoice_date", since)
+            .range(from, to),
+      );
+      return supplierSpendExclVat(rows);
+    },
+  });
+}
+
+export interface SupplierPriceIndex {
+  /** Snitt av (siste fakturapris / 12-måneders snittpris) per råvare, i prosent. */
+  indexPct: number | null;
+  /** Antall råvarer indeksen bygger på. */
+  materials: number;
+}
+
+/**
+ * Prisindeks for leverandøren: hvor mye siste fakturapris ligger over eller
+ * under snittet det siste året, snittet over råvarene.
+ */
+export function useSupplierPriceIndex(supplierId: string | undefined) {
+  return useQuery({
+    queryKey: ["supplier-price-index", supplierId],
+    enabled: !!supplierId,
+    queryFn: async (): Promise<SupplierPriceIndex> => {
+      const since = osloDateISOPlusDays(-365);
+      const invoices = await fetchAllRows<{ id: string }>((from, to) =>
+        supabase
+          .from("invoices")
+          .select("id")
+          .eq("supplier_id", supplierId!)
+          .eq("is_credit_note", false)
+          .gte("invoice_date", since)
+          .range(from, to),
+      );
+      if (invoices.length === 0) return { indexPct: null, materials: 0 };
+      const ids = invoices.map((i) => i.id);
+
+      const lines: { raw_material_id: string | null; price_per_base_unit: number | null; created_at: string | null }[] = [];
+      for (let i = 0; i < ids.length; i += 200) {
+        const chunk = ids.slice(i, i + 200);
+        const part = await fetchAllRows<{ raw_material_id: string | null; price_per_base_unit: number | null; created_at: string | null }>(
+          (from, to) =>
+            supabase
+              .from("invoice_lines")
+              .select("raw_material_id, price_per_base_unit, created_at")
+              .in("invoice_id", chunk)
+              .not("raw_material_id", "is", null)
+              .not("price_per_base_unit", "is", null)
+              .range(from, to),
+        );
+        lines.push(...part);
+      }
+
+      const byMaterial = new Map<string, { sum: number; n: number; latest: { at: string; price: number } | null }>();
+      for (const l of lines) {
+        const rm = l.raw_material_id;
+        const price = Number(l.price_per_base_unit);
+        if (!rm || !Number.isFinite(price) || price <= 0) continue;
+        const entry = byMaterial.get(rm) ?? { sum: 0, n: 0, latest: null };
+        entry.sum += price;
+        entry.n += 1;
+        const at = l.created_at ?? "";
+        if (!entry.latest || at > entry.latest.at) entry.latest = { at, price };
+        byMaterial.set(rm, entry);
+      }
+
+      const ratios: number[] = [];
+      for (const e of byMaterial.values()) {
+        if (e.n < 2 || !e.latest) continue;
+        const avg = e.sum / e.n;
+        if (avg <= 0) continue;
+        ratios.push(e.latest.price / avg);
+      }
+      if (ratios.length === 0) return { indexPct: null, materials: byMaterial.size };
+      const mean = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+      return { indexPct: mean * 100, materials: ratios.length };
+    },
   });
 }

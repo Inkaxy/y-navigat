@@ -157,18 +157,49 @@ Deno.serve(async (req) => {
           set_as_primary: false,
           apply_to_supplier: true,
         }));
+        // apply-negotiation-outcome krever en gyldig innlogget bruker eller et
+        // internt kall. Service-role-nøkkelen er ingen bruker, så det gamle
+        // kallet feilet stille. Vi bruker den delte hemmeligheten og sjekker svaret.
+        let applyError: string | null = null;
         try {
           const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-          await fetch(`${supabaseUrl}/functions/v1/apply-negotiation-outcome`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!}`,
-            },
-            body: JSON.stringify({ negotiation_id: negotiationId, outcomes }),
-          });
+          const internalSecret = Deno.env.get("CRON_SECRET");
+          if (!internalSecret) {
+            applyError = "Mangler intern hemmelighet (CRON_SECRET)";
+          } else {
+            const res = await fetch(`${supabaseUrl}/functions/v1/apply-negotiation-outcome`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-internal-secret": internalSecret,
+                Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!}`,
+              },
+              body: JSON.stringify({ negotiation_id: negotiationId, outcomes }),
+            });
+            const bodyText = await res.text();
+            let parsed: { error?: string; failures?: string[] } | null = null;
+            try {
+              parsed = JSON.parse(bodyText) as { error?: string; failures?: string[] };
+            } catch {
+              parsed = null;
+            }
+            if (!res.ok) {
+              applyError = parsed?.error ?? `HTTP ${res.status}`;
+            } else if (parsed?.failures?.length) {
+              applyError = parsed.failures.join("; ");
+            }
+          }
         } catch (e) {
-          console.error("auto-apply failed", e);
+          applyError = e instanceof Error ? e.message : String(e);
+        }
+        if (applyError) {
+          console.error("auto-apply failed", applyError);
+          await admin.from("negotiation_live_events").insert({
+            negotiation_id: negotiationId,
+            event_type: "apply_failed",
+            note: applyError.slice(0, 500),
+            event_data: { message: applyError },
+          });
         }
       }
     }

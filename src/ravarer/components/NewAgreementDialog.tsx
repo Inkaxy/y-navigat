@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
@@ -16,6 +16,7 @@ import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { osloTodayISO } from "@/lib/osloDate";
+import { parseDecimal } from "@/ravarer/lib/packageMath";
 
 interface Props {
   open: boolean;
@@ -26,7 +27,7 @@ interface Props {
 
 export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, defaultSupplierId }: Props) {
   const qc = useQueryClient();
-  const { legalEntityId } = useRavarer();
+  const { legalEntityId, user } = useRavarer();
   const { data: rms = [] } = useRawMaterials();
   const { data: suppliers = [] } = useSuppliers();
 
@@ -39,6 +40,8 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
   const [packageUnit, setPackageUnit] = useState<string>("kg");
   const [pricePerBaseUnit, setPricePerBaseUnit] = useState<string>("");
   const [pricePerBaseUnitTouched, setPricePerBaseUnitTouched] = useState(false);
+  /** Om prisen brukeren skriver inn gjelder hele pakningen eller én grunnenhet. */
+  const [priceBasis, setPriceBasis] = useState<"package" | "base">("package");
   const [validFrom, setValidFrom] = useState<string>(osloTodayISO());
   const [validTo, setValidTo] = useState<string>("");
   const [setPrimary, setSetPrimary] = useState(true);
@@ -50,7 +53,7 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
       setRawMaterialId(defaultRawMaterialId ?? "");
       setSupplierId(defaultSupplierId ?? "");
       setSupplierSku(""); setSupplierProductName("");
-      setAgreedPrice(""); setPackageSize(""); setPackageUnit("kg");
+      setAgreedPrice(""); setPackageSize(""); setPackageUnit("kg"); setPriceBasis("package");
       setPricePerBaseUnit(""); setPricePerBaseUnitTouched(false);
       setValidFrom(osloTodayISO()); setValidTo("");
       setSetPrimary(true); setDocFile(null);
@@ -60,23 +63,33 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
   const selectedRm = useMemo(() => rms.find((r) => r.id === rawMaterialId), [rms, rawMaterialId]);
   const activeRms = useMemo(() => rms.filter((r) => r.is_active), [rms]);
 
-  // Auto-beregn pris pr base unit
+  // Auto-beregn pris pr grunnenhet ut fra hva prisen gjelder.
   useEffect(() => {
     if (pricePerBaseUnitTouched) return;
-    const ap = parseFloat(agreedPrice.replace(",", "."));
-    const ps = parseFloat(packageSize.replace(",", "."));
-    if (Number.isFinite(ap) && Number.isFinite(ps) && ps > 0) {
-      setPricePerBaseUnit((ap / ps).toFixed(4));
+    const ap = parseDecimal(agreedPrice);
+    if (ap == null) return;
+    if (priceBasis === "base") {
+      setPricePerBaseUnit(String(ap));
+      return;
     }
-  }, [agreedPrice, packageSize, pricePerBaseUnitTouched]);
+    const ps = parseDecimal(packageSize);
+    if (ps != null && ps > 0) setPricePerBaseUnit((ap / ps).toFixed(4));
+  }, [agreedPrice, packageSize, priceBasis, pricePerBaseUnitTouched]);
 
   const create = useMutation({
     mutationFn: async () => {
       if (!rawMaterialId) throw new Error("Velg råvare");
       if (!supplierId) throw new Error("Velg leverandør");
-      const ap = agreedPrice ? parseFloat(agreedPrice.replace(",", ".")) : null;
-      const ps = packageSize ? parseFloat(packageSize.replace(",", ".")) : null;
-      const ppbu = pricePerBaseUnit ? parseFloat(pricePerBaseUnit.replace(",", ".")) : null;
+      const entered = parseDecimal(agreedPrice);
+      const ps = parseDecimal(packageSize);
+      const ppbu = parseDecimal(pricePerBaseUnit);
+      // Begge prisfeltene lagres konsistent: per pakning og per grunnenhet.
+      const ap =
+        priceBasis === "package"
+          ? entered
+          : entered != null && ps != null && ps > 0
+            ? entered * ps
+            : null;
 
       // Last opp dokument hvis valgt
       let docUrl: string | null = null;
@@ -95,7 +108,22 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
         .eq("supplier_id", supplierId)
         .maybeSingle();
 
-      const payload: any = {
+      const payload: {
+        raw_material_id: string;
+        supplier_id: string;
+        supplier_sku: string | null;
+        supplier_product_name: string | null;
+        agreed_price: number | null;
+        agreed_price_per_base_unit: number | null;
+        package_size: number | null;
+        package_unit: string | null;
+        agreement_valid_from: string | null;
+        agreement_valid_to: string | null;
+        agreed_price_set_at: string | null;
+        agreed_price_set_by: string | null;
+        is_primary: boolean;
+        agreement_document_url?: string;
+      } = {
         raw_material_id: rawMaterialId,
         supplier_id: supplierId,
         supplier_sku: supplierSku.trim() || null,
@@ -106,6 +134,8 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
         package_unit: packageUnit || null,
         agreement_valid_from: validFrom || null,
         agreement_valid_to: validTo || null,
+        agreed_price_set_at: ppbu == null && ap == null ? null : new Date().toISOString(),
+        agreed_price_set_by: ppbu == null && ap == null ? null : (user?.id ?? null),
         is_primary: setPrimary,
       };
       if (docUrl) payload.agreement_document_url = docUrl;
@@ -137,7 +167,7 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
       toast.success("Avtale lagret");
       onOpenChange(false);
     },
-    onError: (e: any) => toast.error(`Kunne ikke lagre: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Kunne ikke lagre: ${e instanceof Error ? e.message : String(e)}`),
   });
 
   return (
@@ -206,8 +236,15 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
             <Input value={supplierProductName} onChange={(e) => setSupplierProductName(e.target.value)} />
           </div>
           <div>
-            <Label>Avtalt pris pr pakning</Label>
-            <Input value={agreedPrice} onChange={(e) => setAgreedPrice(e.target.value)} placeholder="0.00" />
+            <Label>Avtalt pris</Label>
+            <Input value={agreedPrice} onChange={(e) => setAgreedPrice(e.target.value)} placeholder="0,00" />
+            <Select value={priceBasis} onValueChange={(v) => setPriceBasis(v === "base" ? "base" : "package")}>
+              <SelectTrigger className="mt-2" aria-label="Prisen gjelder"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="package">Per pakning</SelectItem>
+                <SelectItem value="base">Per {selectedRm?.base_unit ?? "grunnenhet"}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>

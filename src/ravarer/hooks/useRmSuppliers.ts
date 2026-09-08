@@ -24,6 +24,8 @@ export interface RmSupplierRow {
   agreement_valid_from: string | null;
   agreement_valid_to: string | null;
   agreement_document_url: string | null;
+  agreed_price_set_at: string | null;
+  agreed_price_set_by: string | null;
   is_primary: boolean;
   last_invoice_price: number | null;
   last_invoice_date: string | null;

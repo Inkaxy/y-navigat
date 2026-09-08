@@ -9,6 +9,7 @@ import { Check, Pause, X, TrendingUp, Loader2 } from "lucide-react";
 import { useRawMaterialPurchaseStats } from "@/ravarer/hooks/usePurchaseStats";
 import { useRawMaterialSuppliers } from "@/ravarer/hooks/useRmSuppliers";
 import { formatNok, formatNumber } from "@/ravarer/lib/constants";
+import { targetPctForItem } from "@/ravarer/lib/negotiationMatrix";
 import type { NegotiationItemRow } from "@/ravarer/hooks/useNegotiations";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 
@@ -29,7 +30,14 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
   const currentSupplier = rmSuppliers.find((s) => s.supplier_id === supplierId);
   const existingAgreedPrice = currentSupplier?.agreed_price_per_base_unit ?? null;
   const avgPrice = stats?.avg_price_per_base_unit_12m ?? null;
-  const suggested = avgPrice != null ? Number((avgPrice * 0.95).toFixed(2)) : null;
+  // Målnivået kommer fra linjens målpris når den er satt — ikke et fast 5 %-kutt.
+  const targetPct = targetPctForItem({ targetPrice: item.target_price, baselinePrice: avgPrice });
+  const suggested =
+    item.target_price != null
+      ? Number(item.target_price)
+      : avgPrice != null
+        ? Number((avgPrice * (1 - targetPct / 100)).toFixed(2))
+        : null;
   const yearlyVol = stats?.quantity_12m ?? null;
   const yearlySaving =
     suggested != null && avgPrice != null && yearlyVol
@@ -132,7 +140,7 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
       {suggested != null && yearlySaving != null && (
         <div className="flex items-center gap-2 rounded-md border border-success/30 bg-success/5 px-3 py-2 text-sm text-success">
           <TrendingUp className="h-4 w-4" />
-          Forslag: {formatNok(suggested)}/{baseUnit} = {formatNok(yearlySaving)}/år besparelse
+          Forslag ({targetPct.toFixed(0)} % under snitt): {formatNok(suggested)}/{baseUnit} = {formatNok(yearlySaving)}/år besparelse
         </div>
       )}
 

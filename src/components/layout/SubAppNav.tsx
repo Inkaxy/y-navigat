@@ -13,6 +13,7 @@ import { useInvoiceAccess } from "@/ravarer/hooks/useInvoiceAccess";
 import { useRavarerAccessLevel } from "@/ravarer/hooks/useRavarerAccessLevel";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -235,6 +236,7 @@ function RavarerNav() {
     refetchInterval: 60_000,
   });
   const canManage = accessLevel === "admin" || accessLevel === "approve";
+  const { data: isPlatformAdmin = false } = usePlatformAdmin();
 
   // Sju toppnivåpunkter. Alle ruter fra den gamle menyen finnes fortsatt —
   // de er bare gruppert. Aktiv-markering skjer på eksplisitte `matches`,
@@ -328,7 +330,8 @@ function RavarerNav() {
         { to: "/ravarer/innstillinger/match-toleranser", label: "Match-toleranser" },
         { to: "/ravarer/innstillinger/tripletex", label: "Tripletex-tilkobling" },
         { to: "/ravarer/innstillinger/kategorier", label: "Kategorier" },
-        { to: "/ravarer/innstillinger/ai-tjenester", label: "AI-tjenester" },
+        // AI-tjenester krever plattform-admin i backend; lenken skjules ellers.
+        ...(isPlatformAdmin ? [{ to: "/ravarer/innstillinger/ai-tjenester", label: "AI-tjenester" }] : []),
       ],
     });
   }

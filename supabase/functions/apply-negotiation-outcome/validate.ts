@@ -236,3 +236,17 @@ export function validateOutcomes(args: {
 
   return { errors, prepared };
 }
+
+/**
+ * Avtalens gyldighet følger forhandlingens kontraktsperiode når den finnes.
+ * Uten kontraktstart brukes dagens dato, og uten kontraktslutt er avtalen åpen.
+ */
+export function resolveAgreementValidity(args: {
+  contractStart: string | null | undefined;
+  contractEnd: string | null | undefined;
+  today: string;
+}): { validFrom: string; validTo: string | null } {
+  const start = typeof args.contractStart === "string" && args.contractStart ? args.contractStart : args.today;
+  const end = typeof args.contractEnd === "string" && args.contractEnd ? args.contractEnd : null;
+  return { validFrom: start, validTo: end && end >= start ? end : end };
+}

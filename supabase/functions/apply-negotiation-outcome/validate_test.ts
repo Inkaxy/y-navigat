@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
-import { pricePerBaseUnit, validateOutcomes, type NegotiationItemRow, type RecipientRow, type ResponseRow } from "./validate.ts";
+import { pricePerBaseUnit, resolveAgreementValidity, validateOutcomes, type NegotiationItemRow, type RecipientRow, type ResponseRow } from "./validate.ts";
 
 const negotiationId = "neg-1";
 const items: NegotiationItemRow[] = [
@@ -166,4 +166,16 @@ Deno.test("ukjent pakningsenhet gir ingen pris, ikke et gjett", () => {
     packageUnit: null,
   });
   assertEquals(r.value, null);
+});
+
+Deno.test("gyldighet: kontraktstart og -slutt vinner over dagens dato", () => {
+  const r = resolveAgreementValidity({ contractStart: "2026-10-01", contractEnd: "2027-03-31", today: "2026-09-08" });
+  assertEquals(r.validFrom, "2026-10-01");
+  assertEquals(r.validTo, "2027-03-31");
+});
+
+Deno.test("gyldighet: uten kontraktsperiode brukes dagens dato og åpen slutt", () => {
+  const r = resolveAgreementValidity({ contractStart: null, contractEnd: null, today: "2026-09-08" });
+  assertEquals(r.validFrom, "2026-09-08");
+  assertEquals(r.validTo, null);
 });
