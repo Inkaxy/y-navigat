@@ -533,6 +533,21 @@ export default function Recipes() {
                       <td className="px-4 py-2.5">
                         <Badge variant="outline">{RECIPE_STATUS_LABEL[r.status ?? "draft"] ?? r.status}</Badge>
                       </td>
+                      <td className="px-4 py-2.5">
+                        <Badge
+                          variant="outline"
+                          className={
+                            r.labeling === "approved"
+                              ? "border-emerald-500/50 text-emerald-700"
+                              : r.labeling === "stale"
+                                ? "border-amber-500/60 text-amber-700"
+                                : "border-destructive/50 text-destructive"
+                          }
+                        >
+                          {LABELING_STATUS_LABEL[r.labeling]}
+                        </Badge>
+                      </td>
+
                       <td className="px-4 py-2.5 text-xs text-muted-foreground">
                         {r.updated_at ? format(new Date(r.updated_at), "EEE d. MMM yyyy, HH:mm", { locale: nb }) : "—"}
                       </td>
