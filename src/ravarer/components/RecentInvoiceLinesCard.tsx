@@ -31,24 +31,21 @@ export function RecentInvoiceLinesCard({ rawMaterialId, baseUnit }: Props) {
   const query = useQuery({
     queryKey: ["rm-recent-invoice-lines", rawMaterialId],
     queryFn: async (): Promise<Row[]> => {
-      // PostgREST kan ikke sortere toppnivået på en kolonne fra den innbakte
-      // fakturaen. Et `.limit(5)` her ville derfor plukket fem VILKÅRLIGE
-      // linjer. Vi henter et rimelig vindu og velger de fem nyeste selv.
+      // PostgREST kan sortere toppnivået på en kolonne fra den innbakte
+      // fakturaen via `.order("invoices(invoice_date)", ...)`. Sekundær-
+      // sortering på created_at gir stabil rekkefølge når fakturadatoen er
+      // lik (eller mangler).
       const { data, error } = await supabase
         .from("invoice_lines")
         .select(
           "id, invoice_id, description, quantity, unit, price_per_base_unit, total_amount, invoices!inner(invoice_number, invoice_date, is_credit_note, supplier_id)",
         )
         .eq("raw_material_id", rawMaterialId)
+        .order("invoices(invoice_date)", { ascending: false })
         .order("created_at", { ascending: false })
-        .limit(200);
+        .limit(5);
       if (error) throw error;
-      const rows = (data ?? []) as unknown as Row[];
-      return [...rows]
-        .sort((a, b) =>
-          (b.invoices?.invoice_date ?? "").localeCompare(a.invoices?.invoice_date ?? ""),
-        )
-        .slice(0, 5);
+      return (data ?? []) as unknown as Row[];
     },
   });
 

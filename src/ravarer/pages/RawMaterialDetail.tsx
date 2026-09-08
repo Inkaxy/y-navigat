@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useGuardedNavigate } from "@/providers/UnsavedGuardProvider";
 import { QueryState } from "@/components/common/QueryState";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -66,9 +67,15 @@ export default function RawMaterialDetail() {
   }, [searchParams]);
 
   // Hele varelisten hentes KUN for «forrige/neste». Kom brukeren hit uten
-  // listekontekst (direktelenke, søk), er navigasjonen uaktuell og de tunge
-  // spørringene skal ikke kjøre.
-  const wantsListNav = listSearch.length > 0;
+  // listekontekst (direktelenke, søk) OG uten at varelisten allerede er
+  // hentet i cache, er navigasjonen uaktuell og de tunge spørringene skal
+  // ikke kjøre. Fra standardlisten er querystringen tom (Vareliste.tsx
+  // strippper alle standardparametre), så uten cache-sjekken ville
+  // forrige/neste og [ ]-hurtigtastene vært døde derfra.
+  const qc = useQueryClient();
+  const wantsListNav =
+    listSearch.length > 0 ||
+    qc.getQueryState(["raw_materials", legalEntityId])?.data != null;
   const { items } = useVarelisteItems({ enabled: wantsListNav });
   const tolerances = useMatchTolerances(legalEntityId);
   const tolerance = tolerances.defaultPct ?? DEFAULT_DEVIATION_TOLERANCE;

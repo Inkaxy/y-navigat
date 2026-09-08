@@ -33,6 +33,8 @@ export interface AliasValue {
 export interface AliasLearningInput {
   /** Varen linjen ble matchet mot. */
   rawMaterialId: string;
+  /** Leverandørkoblingen (raw_material_suppliers.id) linjen ble matchet mot — brukes til confirmRows. */
+  matchedSupplierLinkId: string;
   /** Alle koblinger leverandøren har, uansett vare. */
   supplierLinks: SupplierLinkRecord[];
   /** Alle alias på leverandørens koblinger. */
@@ -56,6 +58,16 @@ export interface AliasLearningPlan {
     alias_type: AliasType;
     alias_value: string;
   }>;
+  /**
+   * Aliasene som bekreftes i denne matchen, klare til å skrives (upsert) på
+   * den matchede koblingen. Speiler dagens `aliasInserts` i acceptMatch.ts,
+   * slik at selve skrivingen kan bygges av planen i stedet for å dupliseres.
+   */
+  confirmRows: Array<{
+    raw_material_supplier_id: string;
+    alias_type: AliasType;
+    alias_value: string;
+  }>;
 }
 
 const keyOf = (a: Pick<AliasRecord, "alias_value" | "alias_value_normalized">) =>
@@ -64,6 +76,7 @@ const keyOf = (a: Pick<AliasRecord, "alias_value" | "alias_value_normalized">) =
 export function planAliasLearning(input: AliasLearningInput): AliasLearningPlan {
   const {
     rawMaterialId,
+    matchedSupplierLinkId,
     supplierLinks,
     existingAliases,
     confirmedAliases,
@@ -75,6 +88,11 @@ export function planAliasLearning(input: AliasLearningInput): AliasLearningPlan 
     supersedeIds: [],
     rejectExistingIds: [],
     rejectNewRows: [],
+    confirmRows: confirmedAliases.map((a) => ({
+      raw_material_supplier_id: matchedSupplierLinkId,
+      alias_type: a.alias_type,
+      alias_value: a.alias_value,
+    })),
   };
 
   // 1) Pensjonér motstridende alias hos samme leverandør som peker på ANDRE varer.

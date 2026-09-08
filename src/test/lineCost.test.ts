@@ -189,6 +189,19 @@ describe("resolveLineCost", () => {
     expect(p).toEqual({ size: 3240, unit: "g", source: "line" });
   });
 
+  it("2 × «SALT 0.500 KG» gir 1 kg totalt via beskrivelsens pakning", () => {
+    const r = resolveLineCost({
+      quantity: 2,
+      unit: "stk",
+      unitPrice: 10,
+      totalAmount: 10,
+      description: "SALT 0.500 KG",
+      baseUnit: "kg",
+    });
+    expect(r.baseUnitsPerPackage).toBeCloseTo(0.5, 4);
+    expect(r.baseQuantity).toBeCloseTo(1, 4);
+  });
+
   it("nye enhetsaliaser er kjent", () => {
     expect(normalizeUnit("palleboks")).toBe("palleboks");
     expect(normalizeUnit("container")).toBe("konteiner");
@@ -309,6 +322,10 @@ describe("delte filer mot _shared", () => {
 describe("pakningsparser", () => {
   it("«N x SIZE» gir antall og størrelse", () => {
     expect(parsePackageFromDescription("HVETEMEL 36X90G")).toMatchObject({ size: 90, unit: "g", count: 36 });
+  });
+
+  it("«SALT 0.500 KG» tolkes som et halvt kilo, ikke 500", () => {
+    expect(parsePackageFromDescription("SALT 0.500 KG")).toMatchObject({ size: 0.5, unit: "kg" });
   });
 
   it("«SIZE x N» leses riktig vei — 1kg x 10", () => {

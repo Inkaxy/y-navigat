@@ -470,7 +470,7 @@ export function suggestFoods(
  * ------------------------------------------------------------------ */
 
 /** Minste avstand mellom forslag 1 og 2 før vi tør å koble automatisk. */
-export const AMBIGUITY_MARGIN = 0.08;
+export const AMBIGUITY_MARGIN = 0.03;
 /** Laveste tekstlikhet som kan kobles automatisk. */
 export const AUTO_LINK_MIN_CONFIDENCE = 0.8;
 

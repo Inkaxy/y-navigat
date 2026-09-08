@@ -471,16 +471,17 @@ export default function VarelistePage() {
 
   /** Neste vare i køen; er køen tom, ryddes utvalget. */
   const advancePackageQueue = useCallback(() => {
-    setPackageQueue((prev) => {
-      const rest = prev.slice(1);
-      if (rest.length === 0) {
-        setSelected(new Set());
-        toast.success("Pakningskøen er ferdig.");
-      }
-      return rest;
-    });
+    // Bivirkningene (toast, setSelected) må ligge UTENFOR updateren — i
+    // React StrictMode kjøres updateren to ganger, og en toast/setSelected
+    // inni den ville da trigget dobbelt.
+    const rest = packageQueue.slice(1);
+    setPackageQueue(rest);
+    if (rest.length === 0) {
+      setSelected(new Set());
+      toast.success("Pakningskøen er ferdig.");
+    }
     void qc.invalidateQueries({ queryKey: ["raw_material_package_worklist"] });
-  }, [qc]);
+  }, [packageQueue, qc]);
 
 
   const filterControls = (
