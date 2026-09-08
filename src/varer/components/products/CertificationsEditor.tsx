@@ -6,6 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Loader2, Save, Award, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { BrodskalanMark } from "@/varer/components/label/BrodskalanMark";
@@ -57,6 +62,9 @@ export function CertificationsEditor({ productId, canWrite }: Props) {
   const [norsk100, setNorsk100] = useState(false);
   const [showBreadscale, setShowBreadscale] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Nøkkelhullet kan ikke slås på uten bekreftelse og skriftlig grunnlag.
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [basis, setBasis] = useState("");
 
   useEffect(() => {
     if (data) {
@@ -126,12 +134,22 @@ export function CertificationsEditor({ productId, canWrite }: Props) {
                 </Label>
                 <p className="text-xs text-muted-foreground">Helsedirektoratets merke for sunnere matvarer.</p>
                 {inheritedNote}
+                {nokkelhull && !inherited && (
+                  <p className="mt-1 text-xs text-amber-600">
+                    Satt manuelt — bakeriet er ansvarlig for at kriteriene er dokumentert.
+                  </p>
+                )}
               </div>
               <Switch
                 id="cert-nokkelhull"
                 checked={nokkelhull}
                 disabled={!canWrite || inherited}
-                onCheckedChange={setNokkelhull}
+                onCheckedChange={(v) => {
+                  if (v) {
+                    setBasis("");
+                    setConfirmOpen(true);
+                  } else setNokkelhull(false);
+                }}
               />
             </div>
 
@@ -191,6 +209,41 @@ export function CertificationsEditor({ productId, canWrite }: Props) {
           </>
         )}
       </CardContent>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Merke produktet med Nøkkelhullet?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Nøkkelhullet settes normalt av oppskriftens beregning. Setter du det manuelt, må du oppgi
+              hvilket grunnlag påstanden hviler på. Mattilsynet fører tilsyn, og bakeriet er juridisk ansvarlig.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-1">
+            <Label htmlFor="keyhole-basis" className="text-sm">Grunnlag</Label>
+            <Textarea
+              id="keyhole-basis"
+              value={basis}
+              onChange={(e) => setBasis(e.target.value)}
+              placeholder="F.eks. analyse fra Eurofins 12.08.2026, fullkorn 42 % av tørrstoff"
+              rows={3}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={basis.trim().length < 10}
+              onClick={() => {
+                setNokkelhull(true);
+                setConfirmOpen(false);
+                toast.info("Husk å lagre. Grunnlaget må også dokumenteres i kvalitetspermen.");
+              }}
+            >
+              Bekreft merket
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

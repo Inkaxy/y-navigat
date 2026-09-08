@@ -38,8 +38,65 @@ export function grainLevelLabel(key: string | null | undefined): string {
   return GRAIN_LEVELS.find((l) => l.key === key)?.label ?? "Ukjent";
 }
 
-export const SIFTED_CLASSIFICATIONS = ["sifted_flour", "other_flour"];
-export const COARSE_CLASSIFICATIONS = ["whole_grain_flour", "whole_grains", "gluten_free_grain"];
+export const SIFTED_CLASSIFICATIONS = ["sifted_flour", "other_flour", "gluten_or_germ", "gluten_free_sifted"];
+export const COARSE_CLASSIFICATIONS = [
+  "whole_grain_flour",
+  "whole_grains",
+  "gluten_free_grain",
+  "gluten_free_whole",
+];
+export const BRAN_CLASSIFICATIONS = ["wheat_bran", "rye_bran", "oat_bran"];
+/** Malt og bakemidler står utenfor nevneren i Brødskala'n. */
+export const OUTSIDE_CLASSIFICATIONS = ["malt_or_improver", "not_grain"];
+
+/**
+ * Alle kornklasser som kan velges på en råvare, med BKLF-faktoren synlig.
+ * Kornklassene krever kornslag (cereal_type) for at rugandelen skal bli riktig.
+ */
+export const GRAIN_CLASSIFICATION_OPTIONS: Array<{
+  value: string;
+  label: string;
+  hint: string;
+  requiresCereal: boolean;
+}> = [
+  { value: "sifted_flour", label: "Siktet mel", hint: "teller i nevneren", requiresCereal: true },
+  { value: "whole_grain_flour", label: "Sammalt mel", hint: "faktor 1,0 — teller som grovt", requiresCereal: true },
+  { value: "whole_grains", label: "Hele korn", hint: "faktor 1,0 — teller som grovt", requiresCereal: true },
+  { value: "wheat_bran", label: "Hvetekli", hint: "faktor 4,5", requiresCereal: false },
+  { value: "rye_bran", label: "Rugkli", hint: "faktor 4,0", requiresCereal: false },
+  { value: "oat_bran", label: "Havrekli", hint: "faktor 2,0", requiresCereal: false },
+  { value: "gluten_or_germ", label: "Gluten eller kim", hint: "teller som siktet i nevneren", requiresCereal: false },
+  { value: "gluten_free_grain", label: "Glutenfritt korn", hint: "faktor 1,0 — teller som grovt", requiresCereal: true },
+  { value: "other_flour", label: "Annet mel", hint: "teller som siktet", requiresCereal: false },
+  { value: "malt_or_improver", label: "Malt eller bakemiddel", hint: "utenfor beregningen", requiresCereal: false },
+  { value: "not_grain", label: "Ikke korn", hint: "utenfor beregningen", requiresCereal: false },
+];
+
+/**
+ * Brødskala'n på klienten — speiler `computeBreadscale` i
+ * `_shared/declaration-core.ts`: kli uvektet i nevneren, vektet i telleren.
+ * Prosenten kan overstige 100 og rundes til én desimal ett sted.
+ */
+export function breadscalePct(
+  lines: Array<{ grams: number; classification: string | null }>,
+): { pct: number | null; totalFlourGrams: number; coarseWeightedGrams: number } {
+  let total = 0;
+  let coarse = 0;
+  for (const l of lines) {
+    const g = Number(l.grams) || 0;
+    const c = l.classification ?? "";
+    if (SIFTED_CLASSIFICATIONS.includes(c)) total += g;
+    else if (COARSE_CLASSIFICATIONS.includes(c)) {
+      total += g;
+      coarse += g;
+    } else if (BRAN_CLASSIFICATIONS.includes(c)) {
+      total += g;
+      coarse += g * (BRAN_FACTOR[c] ?? 1);
+    }
+  }
+  const pct = total > 0 ? Math.round((coarse / total) * 1000) / 10 : null;
+  return { pct, totalFlourGrams: total, coarseWeightedGrams: coarse };
+}
 
 export interface FlourLine {
   raw_material_id: string | null;

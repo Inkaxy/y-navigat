@@ -181,6 +181,8 @@ export interface BakersRawMaterial {
   name: string;
   category?: string | null;
   grain_classification?: string | null;
+  /** Kornslag (hvete, rug, havre …) — styrer klifaktor og Nøkkelhull-regler. */
+  cereal_type?: string | null;
   water_content_pct?: number | null;
   current_cost_price?: number | null;
   is_composite?: boolean | null;

@@ -82,7 +82,9 @@ function valueFor(
       const mark =
         brodskalanFor(data.felter?.brodskala_beregnet as string | null | undefined) ??
         brodskalanFor(grainCategoryFromBreadscaleValue(data.felter?.brodskala));
-      return { image: mark?.src ?? null, text: mark ? mark.label : "" };
+      // Grovhetsprosenten trykkes under merket (BKLF pkt. 4.4).
+      const pct = brodskalaPctText(data);
+      return { image: mark?.src ?? null, text: mark ? (pct ?? mark.label) : "" };
     }
     case "utskriftstidspunkt":
       return { text: new Date().toLocaleString("nb-NO") };
@@ -100,6 +102,14 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
 });
+
+/** Prosenten under Brødskala-merket — fra etikettdata, ellers beregningen. */
+export function brodskalaPctText(data: LabelPdfData): string | null {
+  const raw = data.felter?.brodskala_pct ?? data.felter?.brodskala_beregnet_pct;
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(n)) return null;
+  return `${n.toFixed(1).replace(".", ",")} %`;
+}
 
 function barcodeText(data: LabelPdfData): string {
   return (
@@ -199,7 +209,12 @@ function renderField(field: ProfileField, data: LabelPdfData, key: string) {
     >
       {field.field_type === "strekkode" ? (
         <BarcodeView value={barcodeText(data)} heightMm={field.height_mm} />
-      ) : (field.field_type === "logo" || field.field_type === "brodskala") && v.image ? (
+      ) : field.field_type === "brodskala" && v.image ? (
+        <View style={{ alignItems: "center", justifyContent: "center", height: "100%" }}>
+          <Image src={v.image} style={{ maxWidth: "100%", maxHeight: "80%", objectFit: "contain" }} />
+          {v.text ? <Text style={{ fontSize: 5, marginTop: 0.5 }}>{v.text}</Text> : null}
+        </View>
+      ) : field.field_type === "logo" && v.image ? (
         <Image
           src={v.image}
           style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}

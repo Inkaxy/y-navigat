@@ -1,4 +1,4 @@
-import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Circle, Document, Image, Page, Path, StyleSheet, Svg, Text, View } from "@react-pdf/renderer";
 
 export type LabelSizeKey = "60x40" | "100x70" | "a6";
 
@@ -37,7 +37,25 @@ export interface ConsumerLabelData {
   producerAddress: string | null;
   /** Data-URL-er for merker som er slått på og godkjent. */
   grainMarkImage: string | null;
+  /** Grovhetsprosenten trykkes under merket (BKLF pkt. 4.4). */
+  grainPctText: string | null;
   keyholeMark: boolean;
+}
+
+/**
+ * Offisiell Nøkkelhull-grafikk (vedlegg 1 til FOR-2015-02-18-139) tegnet med
+ * vektorprimitiver, slik at merket skrives ut skarpt i alle størrelser.
+ */
+function KeyholePdfMark({ size = 34 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 100 100">
+      <Circle cx="50" cy="50" r="50" fill="#00843D" />
+      <Path
+        fill="#FFFFFF"
+        d="M50 18a16 16 0 0 0-8.9 29.3L30.5 78a2 2 0 0 0 1.9 2.6h35.2a2 2 0 0 0 1.9-2.6L58.9 47.3A16 16 0 0 0 50 18z"
+      />
+    </Svg>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -49,6 +67,7 @@ const styles = StyleSheet.create({
   marks: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
   markBox: { borderWidth: 0.8, borderColor: "#111", borderRadius: 3, paddingHorizontal: 4, paddingVertical: 2, fontSize: 6.5 },
   small: { fontSize: 6, color: "#555" },
+  markPct: { fontSize: 6, marginTop: 1, textAlign: "center" },
 });
 
 /** Deler ingredienslisten opp slik at allergener kan settes i fet skrift. */
@@ -125,9 +144,12 @@ export function ConsumerLabelPDFDocument({
         {(data.grainMarkImage || data.keyholeMark) && (
           <View style={styles.marks}>
             {data.grainMarkImage ? (
-              <Image src={data.grainMarkImage} style={{ width: 34, height: 34, objectFit: "contain" }} />
+              <View style={{ alignItems: "center" }}>
+                <Image src={data.grainMarkImage} style={{ width: 34, height: 34, objectFit: "contain" }} />
+                {data.grainPctText && <Text style={styles.markPct}>{data.grainPctText}</Text>}
+              </View>
             ) : null}
-            {data.keyholeMark && <Text style={styles.markBox}>Nøkkelhullet</Text>}
+            {data.keyholeMark && <KeyholePdfMark />}
           </View>
         )}
       </Page>

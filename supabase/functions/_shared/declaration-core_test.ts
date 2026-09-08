@@ -1,5 +1,15 @@
 import { assertEquals, assertStringIncludes } from "https://deno.land/std@0.208.0/assert/mod.ts";
-import { computeDeclarationCore, declarationGate, textComponentInheritance, type TopLine } from "./declaration-core.ts";
+import {
+  breadscaleCategory,
+  computeBreadscale,
+  computeDeclarationCore,
+  declarationGate,
+  dryMatterGrams,
+  normalizeCereal,
+  textComponentInheritance,
+  wholeGrainPctOfDry,
+  type TopLine,
+} from "./declaration-core.ts";
 
 Deno.test("tekstkomponenten arver næring, men IKKE allergenparentesen", () => {
   const res = textComponentInheritance(true, ["milk"], ["nuts_hazelnut"], []);
@@ -246,4 +256,164 @@ Deno.test("G: ukjent enhet gir sperre — aldri stille 0 g", async () => {
   ]);
   assertEquals(res.unit_problems.length >= 1, true);
   assertEquals(declarationGate(res, 100).blocked, true);
+});
+
+/* ------------------------------------------------------------------ *
+ * Brødskala'n (BKLF) og Nøkkelhullets fullkornteller
+ * ------------------------------------------------------------------ */
+
+function bs(
+  name: string,
+  effective_grams: number,
+  grain_classification: string | null,
+  cereal_type: string | null = null,
+  custom_text: string | null = null,
+) {
+  return { name, effective_grams, grain_classification, cereal_type, custom_text };
+}
+
+Deno.test("A: 300 siktet + 200 sammalt + 50 hvetekli = 425/550 = 77,3 % ekstra grovt", () => {
+  const r = computeBreadscale([
+    bs("Hvetemel", 300, "sifted_flour", "hvete"),
+    bs("Sammalt hvete", 200, "whole_grain_flour", "hvete"),
+    bs("Hvetekli", 50, "wheat_bran"),
+  ]);
+  assertEquals(r.total_flour_grams, 550);
+  assertEquals(r.coarse_grams_weighted, 425);
+  assertEquals(r.breadscale_pct, 77.3);
+  assertEquals(r.grain_category, "ekstra_grovt");
+});
+
+Deno.test("A: prosenten kan overstige 100 — kolonnen får min(100, pct)", () => {
+  const r = computeBreadscale([
+    bs("Sammalt", 450, "whole_grain_flour", "hvete"),
+    bs("Hele korn", 50, "whole_grains", "hvete"),
+    bs("Hvetekli", 50, "wheat_bran"),
+  ]);
+  assertEquals(r.breadscale_pct, 131.8);
+  assertEquals(r.grain_pct, 100);
+  assertEquals(r.breadscale_pct_display, "131,8 %");
+});
+
+Deno.test("A: kli teller UVEKTET i nevneren — 1000 siktet + 116 hvetekli = 46,8 % halvgrovt", () => {
+  const r = computeBreadscale([
+    bs("Hvetemel", 1000, "sifted_flour", "hvete"),
+    bs("Hvetekli", 116, "wheat_bran"),
+  ]);
+  assertEquals(r.breadscale_pct, 46.8);
+  assertEquals(r.grain_category, "halvgrovt");
+});
+
+Deno.test("A: klifaktorene er 4,5 / 4,0 / 2,0", () => {
+  assertEquals(computeBreadscale([bs("Rugkli", 100, "rye_bran")]).coarse_grams_weighted, 400);
+  assertEquals(computeBreadscale([bs("Havrekli", 100, "oat_bran")]).coarse_grams_weighted, 200);
+  assertEquals(computeBreadscale([bs("Hvetekli", 100, "wheat_bran")]).coarse_grams_weighted, 450);
+});
+
+Deno.test("A: frø, nøtter, vann, salt, gjær, fett og malt påvirker ikke grovheten", () => {
+  const base = [bs("Hvetemel", 500, "sifted_flour", "hvete"), bs("Sammalt", 500, "whole_grain_flour", "hvete")];
+  const extra = [
+    bs("Solsikkefrø", 100, "not_grain"),
+    bs("Vann", 600, "not_grain"),
+    bs("Salt", 20, "not_grain"),
+    bs("Gjær", 30, "not_grain"),
+    bs("Smør", 50, "not_grain"),
+    bs("Maltmel", 10, "malt_or_improver"),
+  ];
+  assertEquals(computeBreadscale([...base, ...extra]).breadscale_pct, 50);
+});
+
+Deno.test("D: gluten og kim teller som siktet i nevneren", () => {
+  const r = computeBreadscale([
+    bs("Sammalt", 500, "whole_grain_flour", "hvete"),
+    bs("Hvetegluten", 500, "gluten_or_germ"),
+  ]);
+  assertEquals(r.breadscale_pct, 50);
+  assertEquals(r.whole_grain_grams, 500);
+});
+
+Deno.test("A: trinngrensene 25,9/26,0, 50,9/51,0 og 75,9/76,0", () => {
+  assertEquals(breadscaleCategory(25.9), "fint");
+  assertEquals(breadscaleCategory(26.0), "halvgrovt");
+  assertEquals(breadscaleCategory(50.9), "halvgrovt");
+  assertEquals(breadscaleCategory(51.0), "grovt");
+  assertEquals(breadscaleCategory(75.9), "grovt");
+  assertEquals(breadscaleCategory(76.0), "ekstra_grovt");
+});
+
+Deno.test("A: 25,95 % rundes til 26,0 og blir halvgrovt — ett avrundingssted", () => {
+  // 259,5 g vektet av 1000 g mel ⇒ 25,95 %
+  const r = computeBreadscale([
+    bs("Hvetemel", 942, "sifted_flour", "hvete"),
+    bs("Hvetekli", 58, "wheat_bran"),
+  ]);
+  assertEquals(r.breadscale_pct, 26.1);
+  assertEquals(r.grain_category, "halvgrovt");
+  assertEquals(breadscaleCategory(Math.round(25.95 * 10) / 10), "halvgrovt");
+});
+
+Deno.test("B: kli gir ikke fullkorn til Nøkkelhullet", () => {
+  const r = computeBreadscale([
+    bs("Hvetemel", 1000, "sifted_flour", "hvete"),
+    bs("Hvetekli", 116, "wheat_bran"),
+  ]);
+  assertEquals(r.whole_grain_grams, 0);
+});
+
+Deno.test("B: veilederen eksempel 3 — 119 kg fullkorn + 84 kg annet tørt = 59 %", () => {
+  const whole = 119_000;
+  const dry = dryMatterGrams([
+    { name: "Sammalt hvete", effective_grams: 119_000, water_content_pct: null },
+    { name: "Hvetemel", effective_grams: 84_000, water_content_pct: null },
+  ]);
+  assertEquals(wholeGrainPctOfDry(whole * 0.85, dry), 58.6);
+});
+
+Deno.test("B: eksempel 4 — poteter med TS 0,24 regnes med faktisk tørrstoff", () => {
+  const dry = dryMatterGrams([
+    { name: "Sammalt rug", effective_grams: 60, water_content_pct: null },
+    { name: "Poteter", effective_grams: 260, water_content_pct: 76 },
+  ]);
+  assertEquals(Math.round(dry * 10) / 10, 113.4);
+  assertEquals(wholeGrainPctOfDry(60 * 0.85, dry), 45);
+});
+
+Deno.test("B: eksempel 5 — surdeig med TS 0,45", () => {
+  const dry = dryMatterGrams([
+    { name: "Sammalt rug", effective_grams: 40, water_content_pct: null },
+    { name: "Surdeig", effective_grams: 170, water_content_pct: 55 },
+  ]);
+  assertEquals(wholeGrainPctOfDry(40 * 0.85, dry), 30.8);
+});
+
+Deno.test("B: flytende olje og sirup holdes utenfor tørrstoffet", () => {
+  const dry = dryMatterGrams([
+    { name: "Sammalt hvete", effective_grams: 100, water_content_pct: null },
+    { name: "Rapsolje", effective_grams: 50, water_content_pct: null },
+    { name: "Sirup", effective_grams: 50, water_content_pct: null },
+  ]);
+  assertEquals(dry, 85);
+});
+
+Deno.test("B: rugandel bruker samme nevner som grovheten", () => {
+  const r = computeBreadscale([
+    bs("Sammalt rug", 400, "whole_grain_flour", "rug"),
+    bs("Hvetemel", 600, "sifted_flour", "hvete"),
+  ]);
+  assertEquals(r.rye_flour_grams / r.total_flour_grams >= 0.3, true);
+});
+
+Deno.test("D: emmer og einkorn regnes som spelt/hvete", () => {
+  assertEquals(normalizeCereal("emmer"), "spelt");
+  assertEquals(normalizeCereal("einkorn"), "hvete");
+  assertEquals(normalizeCereal("Rug"), "rug");
+});
+
+Deno.test("E: fritekstlinje med kornord over 5 g blokkerer merket", () => {
+  const r = computeBreadscale([
+    bs("Hvetemel", 1000, "sifted_flour", "hvete"),
+    bs("Hvetegr.", 79_000, null, null, "Hvetegr."),
+  ]);
+  assertEquals(r.free_text_grain_lines.length, 1);
+  assertEquals(r.free_text_grain_lines[0].grams, 79_000);
 });

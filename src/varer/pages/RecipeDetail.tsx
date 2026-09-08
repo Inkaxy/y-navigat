@@ -32,7 +32,7 @@ import { ScalePanel } from "@/varer/components/recipes/ScalePanel";
 import { PrintRecipeCardDialog } from "@/varer/components/recipes/PrintRecipeCardDialog";
 import { ShareRecipeDialog } from "@/varer/components/recipes/ShareRecipeDialog";
 import {
-  RECIPE_STATUS_OPTIONS, computeTotalsForRecipe, roundBakerGrams, scaleLines, scaledSummary,
+  RECIPE_STATUS_OPTIONS, computeTotalsForRecipe, lineToGrams, roundBakerGrams, scaleLines, scaledSummary,
   type BakersRawMaterial,
 } from "@/varer/lib/bakers";
 import { computeRecipeCost } from "@/varer/lib/recipeCost";
@@ -51,7 +51,12 @@ import { UnsavedChangesDialog } from "@/varer/components/products/detail/Unsaved
 import { useComputeRecipeLabel } from "@/varer/hooks/useRecipeLabel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LabelTab } from "@/varer/components/recipes/label/LabelTab";
-import { COARSE_CLASSIFICATIONS, SIFTED_CLASSIFICATIONS, type FlourLine } from "@/varer/lib/breadscale";
+import {
+  BRAN_CLASSIFICATIONS,
+  COARSE_CLASSIFICATIONS,
+  SIFTED_CLASSIFICATIONS,
+  type FlourLine,
+} from "@/varer/lib/breadscale";
 import { SaveAsRawMaterialDialog, type CompositeRawMaterial } from "@/varer/components/recipes/SaveAsRawMaterialDialog";
 import { RecipeImageUpload } from "@/varer/components/recipes/RecipeImageUpload";
 import { BASE_RECIPE_CATEGORY, costPerKg, costPerKgBlockedReason } from "@/varer/lib/halvfabrikat";
@@ -93,7 +98,7 @@ export default function RecipeDetail() {
     queryFn: async () => {
       const { data } = await supabase
         .from("raw_materials")
-        .select("id, name, category, grain_classification, water_content_pct, unit_weight_grams, base_unit, current_cost_price, produced_by_recipe_id")
+        .select("id, name, category, grain_classification, cereal_type, water_content_pct, unit_weight_grams, base_unit, current_cost_price, produced_by_recipe_id")
         .limit(2000);
       const map: Record<string, BakersRawMaterial> = {};
       for (const r of (data ?? []) as BakersRawMaterial[]) map[r.id] = r;
@@ -211,14 +216,18 @@ export default function RecipeDetail() {
         .map((l) => ({
           raw_material_id: l.raw_material_id ?? null,
           name: l._rm?.name ?? l.ingredient_name ?? "Ukjent",
-          grams: Number(l.quantity) || 0,
+          // Samme enhetsmotor som resten av editoren — kg-linjer ble tidligere
+          // regnet som gram og ga altfor lav grovhet.
+          grams: lineToGrams(l).grams,
           classification: l._rm?.grain_classification ?? null,
-          cereal_type: null,
+          cereal_type: l._rm?.cereal_type ?? null,
         }))
         .filter(
           (l) =>
             l.classification &&
-            [...SIFTED_CLASSIFICATIONS, ...COARSE_CLASSIFICATIONS].includes(l.classification),
+            [...SIFTED_CLASSIFICATIONS, ...COARSE_CLASSIFICATIONS, ...BRAN_CLASSIFICATIONS].includes(
+              l.classification,
+            ),
         ),
     [hydratedLines],
   );

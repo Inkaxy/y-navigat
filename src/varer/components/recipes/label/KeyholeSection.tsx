@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -84,6 +85,20 @@ export function KeyholeSection({
   const criteria = keyhole?.criteria ?? [];
   const advice = keyhole?.advice ?? [];
   const locked = !coverageOk || keyhole?.status !== "oppfylt";
+  /** Påstanden står uten kvalifiserende beregning. */
+  const missingBasis = claimKeyhole && !!keyhole && keyhole.status !== "oppfylt";
+
+  // En ny beregning som ikke oppfyller kriteriene slår påstanden av automatisk —
+  // et produkt skal aldri bære merket uten grunnlag.
+  const autoOffDone = useRef(false);
+  useEffect(() => {
+    if (!missingBasis || !canWrite || saving || autoOffDone.current) return;
+    autoOffDone.current = true;
+    onToggleClaim(false);
+  }, [missingBasis, canWrite, saving, onToggleClaim]);
+  useEffect(() => {
+    if (!missingBasis) autoOffDone.current = false;
+  }, [missingBasis]);
   const approverName = useUserDisplayName(approvedBy).data;
 
   return (
@@ -191,6 +206,16 @@ export function KeyholeSection({
               onCheckedChange={onToggleClaim}
             />
           </div>
+
+          {missingBasis && (
+            <div className="rounded-md border border-destructive/50 bg-destructive/5 p-2 text-sm">
+              <b>Grunnlag mangler.</b>{" "}
+              {keyhole?.status === "ukjent"
+                ? "Beregningen kan ikke konkludere, så merket kan ikke stå på."
+                : "Den nye beregningen oppfyller ikke kriteriene."}{" "}
+              Påstanden er slått av automatisk.
+            </div>
+          )}
 
           {claimKeyhole && approvedAt && (
             <p className="text-xs text-muted-foreground">

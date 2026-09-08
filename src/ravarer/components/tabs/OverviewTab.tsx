@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { BASE_UNITS, formatDate } from "@/ravarer/lib/constants";
+import { GRAIN_CLASSIFICATION_OPTIONS } from "@/varer/lib/breadscale";
 import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
 import { categoryOptions } from "@/ravarer/lib/categories";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
@@ -28,19 +29,11 @@ import {
   usePackageWorklistRow,
   type PackageWorklistRow,
 } from "@/ravarer/hooks/usePackageSizes";
+import { toast } from "sonner";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
 
 /** Felt som redigeres i denne fanen. Lager styres i lagerkortet. */
-const GRAIN_CLASSIFICATIONS = [
-  { value: "sifted_flour", label: "Siktet mel" },
-  { value: "whole_grain_flour", label: "Sammalt mel" },
-  { value: "whole_grains", label: "Hele korn" },
-  { value: "wheat_bran", label: "Kli" },
-  { value: "other_flour", label: "Annet mel" },
-  { value: "not_grain", label: "Ikke korn" },
-] as const;
-
 const CEREAL_TYPES = [
   "hvete",
   "rug",
@@ -49,6 +42,8 @@ const CEREAL_TYPES = [
   "bygg",
   "mais",
   "ris",
+  "emmer",
+  "einkorn",
 ] as const;
 
 const EDITABLE_FIELDS = [
@@ -137,8 +132,18 @@ export function OverviewTab({ rm, registerSave }: Props) {
     } as PackageWorklistRow;
   }, [worklistRow, rm]);
 
+  /** Kornklasser krever kornslag — ellers blir rugandelen feil. */
+  const cerealMissing = useMemo(() => {
+    const opt = GRAIN_CLASSIFICATION_OPTIONS.find((o) => o.value === draft.grain_classification);
+    return !!opt?.requiresCereal && !draft.cereal_type;
+  }, [draft.grain_classification, draft.cereal_type]);
+
   const save = async () => {
     if (!dirty) return;
+    if (cerealMissing) {
+      toast.error("Velg kornslag for kornklassen før du lagrer.");
+      return;
+    }
     await update.mutateAsync({
       id: rm.id,
       ...patch,
@@ -384,15 +389,16 @@ export function OverviewTab({ rm, registerSave }: Props) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="_none">Ikke satt</SelectItem>
-                {GRAIN_CLASSIFICATIONS.map((g) => (
+                {GRAIN_CLASSIFICATION_OPTIONS.map((g) => (
                   <SelectItem key={g.value} value={g.value}>
-                    {g.label}
+                    {g.label} — {g.hint}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <p className="mt-1 text-xs text-ink-secondary">
-              Alt annet enn «ikke korn» teller som mel i bakerprosenten.
+              Kli teller uvektet i nevneren og med faktor i telleren (hvetekli 4,5,
+              rugkli 4,0, havrekli 2,0). Malt og bakemidler står utenfor.
             </p>
           </div>
           <div>
@@ -420,8 +426,11 @@ export function OverviewTab({ rm, registerSave }: Props) {
               </SelectContent>
             </Select>
             <p className="mt-1 text-xs text-ink-secondary">
-              Styrer nøkkelhullsvurdering og kornandel.
+              Styrer nøkkelhullsvurdering og rugandel. Påkrevd for kornklasser.
             </p>
+            {cerealMissing && (
+              <p className="mt-1 text-xs text-destructive">Kornslag er påkrevd for denne kornklassen.</p>
+            )}
           </div>
           <div>
             <Label>Vanninnhold (%)</Label>
