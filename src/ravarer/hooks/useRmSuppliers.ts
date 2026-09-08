@@ -1,7 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
+import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
+import type { RawMaterialSearchIndex } from "@/ravarer/hooks/useRawMaterialSearchIndex";
 
 
 function errText(e: unknown): string {
@@ -67,6 +71,12 @@ export function useRawMaterialSuppliers(rawMaterialId: string | undefined) {
   return useQuery(rmSuppliersQueryOptions(rawMaterialId));
 }
 
+/** Alias-nøkkelen brukes både av fakturamodulen og leverandørfanen. */
+function invalidateSupplierAliases(qc: QueryClient): void {
+  void qc.invalidateQueries({ queryKey: ["supplier-aliases"] });
+  void qc.invalidateQueries({ queryKey: ["supplier-aliases-all"] });
+}
+
 export function useUpsertRmSupplier() {
   const qc = useQueryClient();
   return useMutation({
@@ -92,14 +102,57 @@ export function useUpsertRmSupplier() {
           .update({ primary_supplier_id: row.supplier_id })
           .eq("id", row.raw_material_id);
         if (rmErr) throw rmErr;
+      } else if (input.is_primary === false) {
+        // Slås primær AV på raden som var primær, må råvaren slutte å peke på
+        // leverandøren — ellers viser varelisten en leverandør som ikke lenger
+        // er hovedleverandør.
+        const { error: rmErr } = await supabase
+          .from("raw_materials")
+          .update({ primary_supplier_id: null })
+          .eq("id", row.raw_material_id)
+          .eq("primary_supplier_id", row.supplier_id);
+        if (rmErr) throw rmErr;
       }
       return row;
     },
+    // Optimistisk: avtaleprisen i varelisten (søkeindeksen) oppdateres med én
+    // gang, og rulles tilbake dersom lagringen feiler.
+    onMutate: async (input) => {
+      if (input.agreed_price_per_base_unit === undefined) return { snapshots: [] as Array<[unknown[], RawMaterialSearchIndex | undefined]> };
+      await qc.cancelQueries({ queryKey: ["raw_material_search_index"] });
+      const entries = qc.getQueriesData<RawMaterialSearchIndex>({
+        queryKey: ["raw_material_search_index"],
+      });
+      const snapshots: Array<[unknown[], RawMaterialSearchIndex | undefined]> = [];
+      for (const [key, index] of entries) {
+        snapshots.push([key as unknown[], index]);
+        if (!index) continue;
+        const rows = index.linksByRawMaterial.get(input.raw_material_id);
+        if (!rows) continue;
+        const nextMap = new Map(index.linksByRawMaterial);
+        nextMap.set(
+          input.raw_material_id,
+          rows.map((r) =>
+            r.supplierId === input.supplier_id
+              ? { ...r, agreedPricePerBaseUnit: input.agreed_price_per_base_unit ?? null }
+              : r,
+          ),
+        );
+        qc.setQueryData(key, { ...index, linksByRawMaterial: nextMap });
+      }
+      return { snapshots };
+    },
+    onError: (e: unknown, _vars, context) => {
+      context?.snapshots.forEach(([key, index]) => qc.setQueryData(key, index));
+      toast.error(`Kunne ikke lagre: ${errText(e)}`);
+    },
     onSuccess: (d) => {
-      invalidateRawMaterial(qc, d.raw_material_id);
+      invalidateSupplierAliases(qc);
       toast.success("Lagret");
     },
-    onError: (e: unknown) => toast.error(`Kunne ikke lagre: ${errText(e)}`),
+    onSettled: (d, _e, vars) => {
+      invalidateRawMaterial(qc, d?.raw_material_id ?? vars.raw_material_id);
+    },
   });
 }
 
@@ -112,6 +165,7 @@ export function useDeleteRmSupplier() {
     },
     onSuccess: (_, vars) => {
       invalidateRawMaterial(qc, vars.raw_material_id);
+      invalidateSupplierAliases(qc);
       toast.success("Fjernet");
     },
     onError: (e: unknown) => toast.error(`Kunne ikke fjerne: ${errText(e)}`),
@@ -139,6 +193,9 @@ export const n = usePriceHistory;
 
 export function useAddPriceHistory() {
   const qc = useQueryClient();
+  // Innlogget bruker ligger allerede i konteksten — ingen ekstra rundtur
+  // til auth per lagring.
+  const { user } = useRavarer();
   return useMutation({
     mutationFn: async (input: {
       raw_material_id: string;
@@ -149,10 +206,9 @@ export function useAddPriceHistory() {
       notes?: string | null;
       set_as_current: boolean;
     }) => {
-      const { data: auth } = await supabase.auth.getUser();
       const { error: histErr } = await supabase.from("raw_material_price_history").insert({
         raw_material_id: input.raw_material_id,
-        created_by: auth.user?.id ?? null,
+        created_by: user?.id ?? null,
         supplier_id: input.supplier_id,
         price: input.price,
         effective_date: input.effective_date,
@@ -172,10 +228,53 @@ export function useAddPriceHistory() {
         if (rmErr) throw rmErr;
       }
     },
-    onSuccess: (_d, vars) => {
-      invalidateRawMaterial(qc, vars.raw_material_id);
+    // Optimistisk: kostprisen i listen og på detaljen oppdateres med én gang.
+    onMutate: async (input) => {
+      if (!input.set_as_current) {
+        return {
+          lists: [] as Array<[unknown[], RawMaterialRow[] | undefined]>,
+          detail: [] as Array<[unknown[], RawMaterialRow | null | undefined]>,
+        };
+      }
+      const id = input.raw_material_id;
+      await qc.cancelQueries({ queryKey: ["raw_materials"] });
+      await qc.cancelQueries({ queryKey: ["raw_material", id] });
+      const lists = qc
+        .getQueriesData<RawMaterialRow[]>({ queryKey: ["raw_materials"] })
+        .map(([key, rows]) => [key as unknown[], rows] as [unknown[], RawMaterialRow[] | undefined]);
+      const detail = qc
+        .getQueriesData<RawMaterialRow | null>({ queryKey: ["raw_material", id] })
+        .map(
+          ([key, row]) => [key as unknown[], row] as [unknown[], RawMaterialRow | null | undefined],
+        );
+      const patch = {
+        current_cost_price: input.price,
+        price_source: input.source,
+        price_updated_at: new Date().toISOString(),
+      };
+      for (const [key, rows] of lists) {
+        if (!Array.isArray(rows)) continue;
+        qc.setQueryData(
+          key,
+          rows.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+        );
+      }
+      for (const [key, row] of detail) {
+        if (!row) continue;
+        qc.setQueryData(key, { ...row, ...patch });
+      }
+      return { lists, detail };
+    },
+    onError: (e: unknown, _vars, context) => {
+      context?.lists.forEach(([key, rows]) => qc.setQueryData(key, rows));
+      context?.detail.forEach(([key, row]) => qc.setQueryData(key, row));
+      toast.error(`Kunne ikke registrere: ${errText(e)}`);
+    },
+    onSuccess: () => {
       toast.success("Pris registrert");
     },
-    onError: (e: unknown) => toast.error(`Kunne ikke registrere: ${errText(e)}`),
+    onSettled: (_d, _e, vars) => {
+      invalidateRawMaterial(qc, vars.raw_material_id);
+    },
   });
 }

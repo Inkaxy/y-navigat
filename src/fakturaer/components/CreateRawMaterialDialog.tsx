@@ -138,8 +138,10 @@ export function CreateRawMaterialDialog({ open, onOpenChange, line, onCreated }:
     if (!sku.trim()) { toast.error("Varenummer er påkrevd"); return; }
     setBusy(true);
     try {
+      const { data: auth } = await supabase.auth.getUser();
       const rawMaterialId = await createRawMaterialFromLine({
         line,
+        userId: auth.user?.id ?? null,
         name,
         sku,
         category,

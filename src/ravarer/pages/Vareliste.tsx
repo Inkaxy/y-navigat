@@ -61,6 +61,8 @@ interface SavedView {
   type: string;
   status: string;
   sort: string;
+  /** Hurtigvisningen (f.eks. «Avvik») — eldre lagrede visninger mangler den. */
+  view?: string;
 }
 
 const SORT_KEYS: ListSortKey[] = [
@@ -104,6 +106,15 @@ export default function VarelistePage() {
   const bulkMut = useBulkUpdateRawMaterials();
   const { data: packageWorklist = [] } = usePackageWorklist();
   const tolerances = useMatchTolerances(legalEntityId);
+
+  // `mutate` er stabil mellom rendringer; selve mutasjonsobjektet er det ikke.
+  // Callbackene nedenfor må avhenge av funksjonene, ellers bygges de på nytt
+  // ved hver statusendring og alle radene rendres om.
+  const updateMutate = updateMut.mutate;
+  const addPriceMutate = addPrice.mutate;
+  const upsertLinkMutate = upsertLink.mutate;
+  const bulkMutate = bulkMut.mutate;
+
 
   const [newOpen, setNewOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -200,19 +211,19 @@ export default function VarelistePage() {
         // Avtaleprisen hører til leverandørkoblingen når den finnes;
         // kun råvarer uten kobling faller tilbake til raw_materials.
         if (item.primaryLinkId && item.supplierId) {
-          upsertLink.mutate({
+          upsertLinkMutate({
             id: item.primaryLinkId,
             raw_material_id: item.id,
             supplier_id: item.supplierId,
             agreed_price_per_base_unit: value,
           });
         } else {
-          updateMut.mutate({ id: item.id, agreed_price: value });
+          updateMutate({ id: item.id, agreed_price: value });
         }
         return;
       }
       if (value === item.costPrice) return;
-      addPrice.mutate({
+      addPriceMutate({
         raw_material_id: item.id,
         supplier_id: item.supplierId,
         price: value,
@@ -222,7 +233,7 @@ export default function VarelistePage() {
         set_as_current: true,
       });
     },
-    [addPrice, updateMut, upsertLink],
+    [addPriceMutate, updateMutate, upsertLinkMutate],
   );
 
   const commitCategory = useCallback(
@@ -230,19 +241,19 @@ export default function VarelistePage() {
       setEditing(null);
       if (item.categories[0] === value) return;
       const rest = item.categories.slice(1).filter((c) => c !== value);
-      updateMut.mutate({ id: item.id, category: value, categories: [value, ...rest] });
+      updateMutate({ id: item.id, category: value, categories: [value, ...rest] });
     },
-    [updateMut],
+    [updateMutate],
   );
 
   const applyBulk = useCallback(
     (patch: BulkPatch) => {
-      bulkMut.mutate(
+      bulkMutate(
         { ids: Array.from(selected), patch },
         { onSuccess: () => setSelected(new Set()) },
       );
     },
-    [bulkMut, selected],
+    [bulkMutate, selected],
   );
 
   const exportCsv = useCallback(() => {
@@ -319,20 +330,23 @@ export default function VarelistePage() {
 
   const saveCurrentView = useCallback(
     (name: string) => {
-    const next: SavedView = {
-      id: `${Date.now()}`,
-      name: name.trim(),
-      q,
-      kat,
-      type,
-      status,
-      sort: `${sort.key}:${sort.dir}`,
-    };
+      const next: SavedView = {
+        id: `${Date.now()}`,
+        name: name.trim(),
+        q,
+        kat,
+        type,
+        status,
+        sort: `${sort.key}:${sort.dir}`,
+        // Hurtigvisningen er en del av visningen — uten den kom brukeren
+        // tilbake til «Alle» selv om visningen ble lagret fra «Avvik».
+        view,
+      };
       savedViewsPref.setValue([...savedViewsPref.value, next]);
       setSaveViewOpen(false);
       toast.success("Visning lagret");
     },
-    [q, kat, type, status, sort.key, sort.dir, savedViewsPref],
+    [q, kat, type, status, view, sort.key, sort.dir, savedViewsPref],
   );
 
   const deleteSavedView = useCallback(
@@ -345,7 +359,14 @@ export default function VarelistePage() {
 
   const applySavedView = useCallback(
     (v: SavedView) => {
-      setParam({ q: v.q, kat: v.kat, type: v.type, status: v.status, sort: v.sort, view: "all" });
+      setParam({
+        q: v.q,
+        kat: v.kat,
+        type: v.type,
+        status: v.status,
+        sort: v.sort,
+        view: v.view ?? "all",
+      });
     },
     [setParam],
   );
@@ -418,10 +439,18 @@ export default function VarelistePage() {
 
   /** Bulk «Bekreft pakning»: bare varer som faktisk står i pakningskøen. */
   const startPackageQueue = useCallback(() => {
-    const ids = Array.from(selected).filter((id) => packageWorklist.some((r) => r.id === id));
+    const chosen = Array.from(selected);
+    const ids = chosen.filter((id) => packageWorklist.some((r) => r.id === id));
     if (ids.length === 0) {
       toast.info("Ingen av de valgte varene mangler bekreftet pakning.");
       return;
+    }
+    const skipped = chosen.length - ids.length;
+    if (skipped > 0) {
+      // De hoppede varene må sies fra om — ellers ser det ut som køen «mistet» rader.
+      toast.info(
+        `${skipped} av ${chosen.length} valgte varer har allerede bekreftet pakning og hoppes over.`,
+      );
     }
     setPackageQueue(ids);
   }, [selected, packageWorklist]);
@@ -430,6 +459,28 @@ export default function VarelistePage() {
     () => packageWorklist.find((r) => r.id === packageQueue[0]) ?? null,
     [packageWorklist, packageQueue],
   );
+
+  // Blir en vare bekreftet (eller forsvinner den fra arbeidslisten av andre
+  // grunner), finnes ikke raden lenger og dialogen kan ikke vises. Uten dette
+  // ville køen stått bom fast på en usynlig rad.
+  useEffect(() => {
+    if (packageQueue.length === 0 || packageRow) return;
+    if (packageWorklist.length === 0) return;
+    setPackageQueue((prev) => prev.slice(1));
+  }, [packageQueue, packageRow, packageWorklist]);
+
+  /** Neste vare i køen; er køen tom, ryddes utvalget. */
+  const advancePackageQueue = useCallback(() => {
+    setPackageQueue((prev) => {
+      const rest = prev.slice(1);
+      if (rest.length === 0) {
+        setSelected(new Set());
+        toast.success("Pakningskøen er ferdig.");
+      }
+      return rest;
+    });
+    void qc.invalidateQueries({ queryKey: ["raw_material_package_worklist"] });
+  }, [qc]);
 
 
   const filterControls = (
@@ -607,10 +658,12 @@ export default function VarelistePage() {
               </div>
             }
           >
-            {/* Tabell fra md og opp */}
-            {/* Ingen overflow-container her: den ville klippet sticky thead. */}
-            <div className="hidden md:block">
-              <table className="w-full text-sm">
+            {/* Tabell fra md og opp.
+                Egen rullekasse med høydetak: brede tabeller kan rulles
+                vannrett, og `sticky` på thead fester seg til toppen av
+                kassen i stedet for å bli klippet bort. */}
+            <div className="hidden max-h-[70vh] overflow-auto md:block">
+              <table className="w-full min-w-[900px] text-sm">
                 <thead className="sticky top-0 z-20 bg-muted text-left text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="w-9 px-3 py-2">
@@ -722,10 +775,7 @@ export default function VarelistePage() {
           row={packageRow}
           open={packageQueue.length > 0 && !!packageRow}
           onOpenChange={(open) => {
-            if (!open) {
-              setPackageQueue((prev) => prev.slice(1));
-              void qc.invalidateQueries({ queryKey: ["raw_material_package_worklist"] });
-            }
+            if (!open) advancePackageQueue();
           }}
         />
       </div>

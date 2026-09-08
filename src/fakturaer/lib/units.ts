@@ -865,3 +865,18 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
 
   };
 }
+
+/**
+ * Innhold per pakning i basisenheter. Returnerer null når enhetene ikke kan
+ * regnes om (f.eks. stk mot kg) — da skal ingen pakningsstørrelse lagres.
+ */
+export function packageBaseUnits(
+  size: number | null,
+  packageUnit: string | null | undefined,
+  baseUnit: string | null | undefined,
+): number | null {
+  if (size == null || !(size > 0)) return null;
+  const factor = toBaseFactor(packageUnit, baseUnit);
+  if (factor == null) return null;
+  return size * factor;
+}

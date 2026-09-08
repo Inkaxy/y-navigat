@@ -11,6 +11,7 @@ export type ReviewReason =
   | "price_increase"
   | "price_drop"
   | "uncertain_cost"
+  | "unsupported_currency"
   | "no_baseline";
 
 export interface ReviewLineRow {
@@ -112,9 +113,14 @@ export function useReviewLines(filters: Filters) {
           // «Uten avtalepris», selv om de ikke er merket for gjennomgang.
           .or("requires_review.eq.true,variance_status.eq.no_baseline")
           .not("invoice.status", "in", `(${HIDDEN_INVOICE_STATUSES.join(",")})`)
+          // Nyeste faktura først — sorteringen MÅ skje i databasen. Med et tak
+          // på f.eks. 200 linjer ville en klientsortering bare sortert de
+          // vilkårlige 200 første radene.
+          .order("invoice(invoice_date)", { ascending: false })
           .order("invoice_id")
           .order("line_number", { nullsFirst: false })
           .range(from, to);
+
 
         if (filters.legalEntityId) q = q.eq("invoice.legal_entity_id", filters.legalEntityId);
         if (filters.supplierId) q = q.eq("invoice.supplier_id", filters.supplierId);
@@ -138,8 +144,8 @@ export function useReviewLines(filters: Filters) {
       }
 
       rows.forEach((r) => r.suggestions?.sort((a, b) => a.rank - b.rank));
-      // Nyeste faktura først. Sorteringen gjøres i klienten fordi PostgREST
-      // ikke kan sortere toppnivået på en kolonne fra den innbakte fakturaen.
+      // Databasen har allerede sortert; denne stabiliserer bare rekkefølgen
+      // innen samme fakturadato (faktura, deretter linjenummer).
       rows.sort((a, b) => {
         const d = (b.invoice?.invoice_date ?? "").localeCompare(a.invoice?.invoice_date ?? "");
         if (d !== 0) return d;

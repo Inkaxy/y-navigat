@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { normalizeMatchKey } from "@/fakturaer/lib/matchNormalize";
+import { planAliasLearning } from "@/fakturaer/lib/aliasLearning";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 
 export interface AcceptMatchOptions {
@@ -234,8 +234,6 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
     }
   }
 
-  const keyOf = (a: { alias_value_normalized: string | null; alias_value: string }) =>
-    normalizeMatchKey(a.alias_value_normalized ?? a.alias_value);
 
   // 2a) Bekreftede alias — én batch-upsert.
   if (aliasInserts.length > 0) {
@@ -247,98 +245,63 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
     }
   }
 
-  // 2b) Pensjonér motstridende alias hos samme leverandør som peker på ANDRE varer.
-  if (aliasInserts.length > 0 && supplierRmsRows.length > 0) {
-    const otherRmsIds = new Set(
-      supplierRmsRows.filter((r) => r.raw_material_id !== rawMaterialId).map((r) => r.id),
-    );
-    const supersedeIds = supplierAliases
-      .filter(
-        (a) =>
-          a.status === "confirmed" &&
-          otherRmsIds.has(a.raw_material_supplier_id) &&
-          aliasInserts.some((ins) => ins.alias_type === a.alias_type && normalizeMatchKey(ins.alias_value) === keyOf(a)),
-      )
-      .map((a) => a.id);
-    if (supersedeIds.length > 0) {
+  // 2b/2c) Selve læringen er ren logikk (se aliasLearning.ts): hvilke alias som
+  // skal pensjoneres, og hvilke som skal avvises fordi brukeren valgte varen bort.
+  if (needsAliasWork && supplierRmsRows.length > 0) {
+    const lineValues: Array<{ alias_type: "supplier_sku" | "product_name"; alias_value: string }> = [];
+    if (line.supplier_sku) lineValues.push({ alias_type: "supplier_sku", alias_value: line.supplier_sku });
+    if (line.description) lineValues.push({ alias_type: "product_name", alias_value: line.description });
+
+    const plan = planAliasLearning({
+      rawMaterialId,
+      supplierLinks: supplierRmsRows,
+      existingAliases: supplierAliases,
+      confirmedAliases: aliasInserts.map((a) => ({ alias_type: a.alias_type, alias_value: a.alias_value })),
+      rejectedRawMaterialIds,
+      lineValues,
+    });
+
+    if (plan.supersedeIds.length > 0) {
       const { error: supErr } = await supabase
         .from("raw_material_supplier_aliases")
         .update({ status: "superseded" })
-        .in("id", supersedeIds);
+        .in("id", plan.supersedeIds);
       if (supErr) {
-        console.warn(`acceptMatch: kunne ikke pensjonere ${supersedeIds.length} motstridende alias: ${supErr.message}`);
+        console.warn(
+          `acceptMatch: kunne ikke pensjonere ${plan.supersedeIds.length} motstridende alias: ${supErr.message}`,
+        );
       }
+    }
+
+    if (plan.rejectExistingIds.length > 0) {
+      const { error: rejUpdErr } = await supabase
+        .from("raw_material_supplier_aliases")
+        .update({
+          status: "rejected",
+          rejected_by: userId,
+          rejected_at: nowIso,
+          rejected_reason: "valgt annen råvare",
+        })
+        .in("id", plan.rejectExistingIds);
+      if (rejUpdErr) console.warn(`acceptMatch: kunne ikke avvise eksisterende alias: ${rejUpdErr.message}`);
+    }
+
+    if (plan.rejectNewRows.length > 0) {
+      const { error: rejInsErr } = await supabase.from("raw_material_supplier_aliases").upsert(
+        plan.rejectNewRows.map((r) => ({
+          ...r,
+          status: "rejected" as const,
+          rejected_by: userId,
+          rejected_at: nowIso,
+          rejected_reason: "valgt annen råvare",
+          first_seen_invoice_id: line.invoice_id,
+        })),
+        { onConflict: "alias_type,alias_value_normalized,raw_material_supplier_id" },
+      );
+      if (rejInsErr) console.warn(`acceptMatch: kunne ikke lagre avviste alias: ${rejInsErr.message}`);
     }
   }
 
-  // 2c) Lær av det brukeren valgte BORT: alias mot avviste varer merkes avvist.
-  //     Finnes ikke aliaset fra før, settes en avvist rad inn — ellers ville et
-  //     fuzzy-forslag på en umatchet linje aldri kunne avvises.
-  if (rejectedRawMaterialIds.length > 0 && supplierRmsRows.length > 0) {
-    const rejSet = new Set(rejectedRawMaterialIds);
-    const rejIds = supplierRmsRows.filter((r) => rejSet.has(r.raw_material_id)).map((r) => r.id);
-    if (rejIds.length > 0) {
-      const values: Array<{ type: "supplier_sku" | "product_name"; value: string }> = [];
-      if (line.supplier_sku) values.push({ type: "supplier_sku", value: line.supplier_sku });
-      if (line.description) values.push({ type: "product_name", value: line.description });
-
-      const existingIds: string[] = [];
-      const newRows: Array<{
-        raw_material_supplier_id: string;
-        alias_type: "supplier_sku" | "product_name";
-        alias_value: string;
-        status: "rejected";
-        rejected_by: string;
-        rejected_at: string;
-        rejected_reason: string;
-        first_seen_invoice_id: string;
-      }> = [];
-
-      for (const rmsRowId of rejIds) {
-        for (const v of values) {
-          const hit = supplierAliases.find(
-            (a) =>
-              a.raw_material_supplier_id === rmsRowId &&
-              a.alias_type === v.type &&
-              keyOf(a) === normalizeMatchKey(v.value),
-          );
-          if (hit) {
-            if (hit.status !== "rejected") existingIds.push(hit.id);
-          } else {
-            newRows.push({
-              raw_material_supplier_id: rmsRowId,
-              alias_type: v.type,
-              alias_value: v.value,
-              status: "rejected",
-              rejected_by: userId,
-              rejected_at: nowIso,
-              rejected_reason: "valgt annen råvare",
-              first_seen_invoice_id: line.invoice_id,
-            });
-          }
-        }
-      }
-
-      if (existingIds.length > 0) {
-        const { error: rejUpdErr } = await supabase
-          .from("raw_material_supplier_aliases")
-          .update({
-            status: "rejected",
-            rejected_by: userId,
-            rejected_at: nowIso,
-            rejected_reason: "valgt annen råvare",
-          })
-          .in("id", existingIds);
-        if (rejUpdErr) console.warn(`acceptMatch: kunne ikke avvise eksisterende alias: ${rejUpdErr.message}`);
-      }
-      if (newRows.length > 0) {
-        const { error: rejInsErr } = await supabase.from("raw_material_supplier_aliases").upsert(newRows, {
-          onConflict: "alias_type,alias_value_normalized,raw_material_supplier_id",
-        });
-        if (rejInsErr) console.warn(`acceptMatch: kunne ikke lagre avviste alias: ${rejInsErr.message}`);
-      }
-    }
-  }
 
   // 3) Skriv matchen på linjen (og evt. søsterlinjer)
   const lineIds: string[] = [line.id];

@@ -103,6 +103,26 @@ export function usePackageWorklist() {
   });
 }
 
+/**
+ * Pakningsarbeidslisten for ÉN råvare. Detaljsiden trenger bare sin egen rad —
+ * å hente hele selskapets liste (hundrevis av rader) for én rad er sløsing.
+ */
+export function usePackageWorklistRow(rawMaterialId: string | undefined) {
+  return useQuery({
+    queryKey: ["raw_material_package_worklist", "row", rawMaterialId],
+    enabled: !!rawMaterialId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("raw_material_package_worklist")
+        .select("*")
+        .eq("id", rawMaterialId!)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as PackageWorklistRow | null;
+    },
+  });
+}
+
 async function callSetPackage(input: SetPackageInput): Promise<PackageRpcResult> {
   const args: Record<string, unknown> = {
     p_raw_material_id: input.p_raw_material_id,

@@ -287,7 +287,9 @@ export function SuppliersTab({ rm }: Props) {
       <RmSupplierDialog
         key={linkOpen.existingId ?? "new"}
         open={linkOpen.open}
-        onOpenChange={(v: boolean) => setLinkOpen({ open: v })}
+        // `existingId` må overleve lukkingen — ellers bytter dialogens `key`
+        // til «new» i samme render som lukkeanimasjonen, og skjemaet blanker.
+        onOpenChange={(v: boolean) => setLinkOpen((prev) => ({ ...prev, open: v }))}
         rawMaterialId={rm.id}
         baseUnit={rm.base_unit}
         existing={links.find((l) => l.id === linkOpen.existingId) ?? null}

@@ -45,10 +45,12 @@ export interface RawMaterialRow {
   updated_at: string;
 }
 
-export function useRawMaterials() {
+export function useRawMaterials(options?: { enabled?: boolean }) {
   const { legalEntityId } = useRavarer();
+  const enabled = (options?.enabled ?? true) && !!legalEntityId;
   return useQuery({
     queryKey: ["raw_materials", legalEntityId],
+    enabled,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("raw_materials")

@@ -45,6 +45,15 @@ describe("invalidateRawMaterial", () => {
     expect(flat).toContain("raw-material-nutrition");
     expect(flat).toContain("rm-detail|rm-1");
     expect(flat).toContain("rms-link|rm-1");
+    // Nye nøkler fra 9b: detaljkortene og lagerreskontroen må også friskes opp.
+    expect(flat).toContain("rm-recent-invoice-lines|rm-1");
+    expect(flat).toContain("rm-product-link|rm-1");
+    expect(flat).toContain("rm-suggestion-links|rm-1");
+    expect(flat).toContain("stock-ledger");
+    expect(flat).toContain("reorder-suggestions");
+    expect(flat).toContain("nutrition-coverage");
+    expect(flat).toContain("recipes-using-raw-material");
+    expect(flat).toContain("raw_material_search_index");
     expect(calls).toHaveLength(rawMaterialQueryKeys("rm-1").length);
   });
 
@@ -69,6 +78,8 @@ describe("invalidateInvoice", () => {
     expect(flat).toContain("invoice-supplier-links");
     expect(flat).toContain("supplier-invoices");
     expect(flat).toContain("supplier-aliases");
+    expect(flat).toContain("supplier-aliases-all");
+    expect(flat).toContain("invoice-doc-url|inv-1");
     expect(calls).toHaveLength(invoiceQueryKeys("inv-1").length);
   });
 });

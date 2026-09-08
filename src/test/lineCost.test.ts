@@ -390,4 +390,65 @@ describe("kartong med stk-antall", () => {
     expect(r.baseQuantity).toBe(12);
     expect(r.pricePerBaseUnit).toBeCloseTo(10, 6);
   });
+
+  it("krever menneskelig input når enhetene ikke kan regnes om", () => {
+    const r = resolveLineCost({
+      quantity: 3,
+      unit: "kolli",
+      totalAmount: 900,
+      description: "DIVERSE",
+      baseUnit: "kg",
+    });
+    expect(r.needsInput).toBeTruthy();
+  });
+
+  it("negativ mengde krever menneskelig vurdering", () => {
+    const r = resolveLineCost({
+      quantity: -2,
+      unit: "kg",
+      totalAmount: -50,
+      baseUnit: "kg",
+    });
+    expect(r.needsInput).toBeTruthy();
+  });
+
+  it("null i mengde eller beløp gir ingen pris", () => {
+    expect(
+      resolveLineCost({ quantity: null, unit: "kg", totalAmount: 100, baseUnit: "kg" }).needsInput,
+    ).toBeTruthy();
+    expect(
+      resolveLineCost({ quantity: 5, unit: "kg", totalAmount: null, unitPrice: null, baseUnit: "kg" })
+        .needsInput,
+    ).toBeTruthy();
+  });
+
+  it("leverandørens BEKREFTEDE pakning slår beskrivelsen", () => {
+    const r = resolveLineCost({
+      quantity: 2,
+      unit: "sekk",
+      totalAmount: 500,
+      description: "HVETEMEL 10 kg",
+      baseUnit: "kg",
+      supplierPackage: {
+        packageSize: 25,
+        packageUnit: "kg",
+        packageConfirmedAt: "2026-01-01T00:00:00Z",
+      },
+    });
+    expect(r.needsInput).toBeNull();
+    expect(r.baseQuantity).toBe(50);
+    expect(r.pricePerBaseUnit).toBeCloseTo(10, 6);
+  });
+
+  it("ubekreftet pakning som motsier beskrivelsen krever avklaring", () => {
+    const r = resolveLineCost({
+      quantity: 2,
+      unit: "sekk",
+      totalAmount: 500,
+      description: "HVETEMEL 10 kg",
+      baseUnit: "kg",
+      supplierPackage: { packageSize: 25, packageUnit: "kg" },
+    });
+    expect(r.needsInput).toBeTruthy();
+  });
 });

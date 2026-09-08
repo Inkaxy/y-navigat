@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -19,9 +20,9 @@ import {
   deriveLinePackage,
   fmtNum,
   normalizeUnit,
+  packageBaseUnits,
   parseDecimal,
   resolveLineCost,
-  toBaseFactor,
 } from "@/fakturaer/lib/units";
 import { formatNok } from "@/fakturaer/lib/constants";
 
@@ -87,21 +88,6 @@ function draftFor(line: ReviewLineRow): Draft {
 }
 
 /**
- * Innhold per pakning i basisenheter. Returnerer null når enhetene ikke kan
- * regnes om (f.eks. stk mot kg) — da skal ingen pakningsstørrelse lagres.
- */
-export function packageBaseUnits(
-  size: number | null,
-  packageUnit: string | null | undefined,
-  baseUnit: string | null | undefined,
-): number | null {
-  if (size == null || !(size > 0)) return null;
-  const factor = toBaseFactor(packageUnit, baseUnit);
-  if (factor == null) return null;
-  return size * factor;
-}
-
-/**
  * Opprett flere varer på én gang fra valgte fakturalinjer. Hver linje får sin
  * egen rad som kan rettes eller hakes bort før alt lagres — ingenting
  * opprettes blindt.
@@ -114,11 +100,15 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
 
   const lineIds = useMemo(() => lines.map((l) => l.id).join(","), [lines]);
 
+  // Bevisst bare `open` og linje-ID-ene: en ny array-referanse med samme
+  // linjer skal ikke slette det brukeren har skrevet.
+  const linesRef = useRef(lines);
+  linesRef.current = lines;
   useEffect(() => {
     if (!open) return;
-    setDrafts(lines.map(draftFor));
+    setDrafts(linesRef.current.map(draftFor));
     setSharedCategory("");
-  }, [open, lineIds, lines]);
+  }, [open, lineIds]);
 
   function patch(lineId: string, p: Partial<Draft>) {
     setDrafts((d) => d.map((x) => (x.lineId === lineId ? { ...x, ...p } : x)));
@@ -133,8 +123,11 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
     setBusy(true);
     let ok = 0;
     const failed: string[] = [];
+    const createdIds = new Set<string>();
     const invoiceIds = new Set<string>();
     try {
+      const { data: auth } = await supabase.auth.getUser();
+      const userId = auth.user?.id ?? null;
       for (const d of included) {
         const line = lines.find((l) => l.id === d.lineId);
         if (!line) continue;
@@ -156,6 +149,7 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
         try {
           await createRawMaterialFromLine({
             line,
+            userId,
             name: d.name,
             sku: d.sku,
             category: d.category.trim() || sharedCategory.trim(),
@@ -168,6 +162,7 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
             pricePerBaseUnit: cost.needsInput ? null : Number(cost.pricePerBaseUnit.toFixed(4)),
             baseQuantity: cost.needsInput ? null : cost.baseQuantity,
           });
+          createdIds.add(d.lineId);
           invoiceIds.add(line.invoice_id);
           ok++;
         } catch (e) {
@@ -182,8 +177,9 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
         onDone?.();
         onOpenChange(false);
       } else {
-        // Radene som feilet blir stående, slik at brukeren kan rette og prøve igjen.
-        setDrafts((d) => d.map((x) => ({ ...x, include: failed.some((f) => f.startsWith(x.name)) })));
+        // Bare de opprettede radene fjernes. Utkastet til radene som feilet
+        // står urørt — navn, varenummer og pakning må ikke skrives på nytt.
+        setDrafts((d) => d.filter((x) => !createdIds.has(x.lineId)));
         toast.warning(`${ok} opprettet. Feilet: ${failed.join(" · ")}`);
         onDone?.();
       }

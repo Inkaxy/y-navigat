@@ -22,6 +22,12 @@ export interface CreateRawMaterialInput {
    * En pakning tolket fra fakturateksten er et forslag, ikke en bekreftelse.
    */
   confirmPackage?: boolean;
+  /**
+   * Innlogget bruker. Løftes ut av funksjonen slik at kalleren styrer hvem
+   * handlingen tilskrives — og slik at massedialogen slipper ett auth-kall
+   * per rad.
+   */
+  userId: string | null;
 }
 
 /**
@@ -31,9 +37,7 @@ export interface CreateRawMaterialInput {
  */
 export async function createRawMaterialFromLine(input: CreateRawMaterialInput): Promise<string> {
   const { line } = input;
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const userId = input.userId;
   const nowIso = new Date().toISOString();
 
   const { data: rm, error: rmErr } = await supabase
@@ -53,7 +57,7 @@ export async function createRawMaterialFromLine(input: CreateRawMaterialInput): 
       base_units_per_package: input.baseUnitsPerPackage,
       primary_supplier_id: line.invoice.supplier_id,
       is_active: true,
-      created_by: user?.id,
+      created_by: userId ?? undefined,
     } as never)
     .select()
     .single();
@@ -72,7 +76,7 @@ export async function createRawMaterialFromLine(input: CreateRawMaterialInput): 
       package_unit: input.packageUnit,
       base_units_per_package: input.baseUnitsPerPackage,
       ...(input.confirmPackage && input.packageSize != null
-        ? { package_confirmed_at: nowIso, package_confirmed_by: user?.id ?? null }
+        ? { package_confirmed_at: nowIso, package_confirmed_by: userId }
         : {}),
       last_invoice_price: input.pricePerBaseUnit,
       last_invoice_date: line.invoice.invoice_date,
@@ -96,7 +100,7 @@ export async function createRawMaterialFromLine(input: CreateRawMaterialInput): 
       alias_type: "supplier_sku",
       alias_value: input.supplierSku,
       status: "confirmed",
-      confirmed_by: user?.id,
+      confirmed_by: userId ?? undefined,
       confirmed_at: nowIso,
       first_seen_invoice_id: line.invoice_id,
     });
@@ -106,7 +110,7 @@ export async function createRawMaterialFromLine(input: CreateRawMaterialInput): 
       alias_type: "product_name",
       alias_value: line.description,
       status: "confirmed",
-      confirmed_by: user?.id,
+      confirmed_by: userId ?? undefined,
       confirmed_at: nowIso,
       first_seen_invoice_id: line.invoice_id,
     });
@@ -122,7 +126,7 @@ export async function createRawMaterialFromLine(input: CreateRawMaterialInput): 
       match_confidence: "manual",
       requires_review: false,
       review_reason: null,
-      resolved_by: user?.id,
+      resolved_by: userId ?? undefined,
       resolved_at: nowIso,
       price_per_base_unit: input.pricePerBaseUnit,
       base_quantity: input.baseQuantity,
@@ -144,7 +148,7 @@ export async function createRawMaterialFromLine(input: CreateRawMaterialInput): 
         effective_date: line.invoice.invoice_date,
         source: "invoice",
         invoice_id: line.invoice_id,
-        created_by: user?.id,
+        created_by: userId ?? undefined,
       });
     }
   }
