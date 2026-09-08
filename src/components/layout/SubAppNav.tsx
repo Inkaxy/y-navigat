@@ -283,7 +283,7 @@ function RavarerNav() {
     kind: "dropdown",
     label: "Datakvalitet",
     icon: FileText,
-    basePath: "/ravarer/pakninger",
+    basePath: "/ravarer/pakningsstorrelser",
     matches: [
       "/ravarer/pakninger",
       "/ravarer/pakningsstorrelser",
@@ -295,8 +295,7 @@ function RavarerNav() {
     ],
     badge: changelogCount,
     links: [
-      { to: "/ravarer/pakninger", label: "Pakninger" },
-      { to: "/ravarer/pakningsstorrelser", label: "Pakningsstørrelser" },
+      { to: "/ravarer/pakningsstorrelser", label: "Pakninger" },
       { to: "/ravarer/matvaretabellen", label: "Matvaretabellen" },
       { to: "/ravarer/koble-matvaretabellen", label: "Koble Matvaretabellen" },
       { to: "/ravarer/deklarasjonsnavn", label: "Deklarasjonsnavn" },

@@ -243,6 +243,11 @@ function SortableLine({
 
   /** Sann når linjens enhet faktisk kan regnes om til gram — begge veier. */
   const convertible = isLineConvertible(line);
+  // Advarselen hører hjemme på selve linja, ikke bare i totalsammendraget.
+  const conversion = lineToGrams(line);
+  const conversionWarning = conversion.exact
+    ? null
+    : conversion.reason ?? "Mengden kan ikke regnes om til gram";
 
   function setGrams(value: string) {
     const conv = lineToGrams({ ...line, quantity: value });
@@ -300,7 +305,9 @@ function SortableLine({
               raw_material_id: id,
               ...(id ? { sub_product_id: null } : {}),
               ingredient_name: opt?.name ?? line.ingredient_name,
-              unit: opt?.base_unit === "kg" || opt?.base_unit === "liter" ? line.unit : (opt?.base_unit ?? line.unit),
+            // Baseenheten heter «l» i den kanoniske lista — ikke «liter». Med
+            // feil navn her ble «l» kopiert inn som linjeenhet og gram forsvant.
+            unit: opt?.base_unit === "kg" || opt?.base_unit === "l" ? line.unit : (opt?.base_unit ?? line.unit),
               _rm: id ? (rmMap[id] ?? { id, name: opt?.name ?? "" }) : null,
             } as never);
           }}
@@ -334,8 +341,14 @@ function SortableLine({
           value={line.quantity}
           onChange={(e) => setGrams(e.target.value)}
           disabled={!canWrite} className="h-10 tabular-nums md:h-9"
+          title={conversionWarning ?? undefined}
         />
       </div>
+      {conversionWarning && (
+        <p className="order-11 basis-full text-xs text-warning md:col-span-9 md:order-none">
+          {conversionWarning}
+        </p>
+      )}
       <div className="order-6 w-[72px] md:order-none md:w-auto">
         <select
           value={line.unit}
