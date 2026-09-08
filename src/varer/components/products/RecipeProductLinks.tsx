@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAppContext } from "@/varer/context/AppContext";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +21,17 @@ import {
 import { Users, Plus, Trash2, ExternalLink, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { syncEffectiveDeclarationForRecipe } from "@/varer/lib/effectiveDeclaration";
 
 
 interface Props {
@@ -38,13 +49,15 @@ export function RecipeProductLinks({ recipeId, currentProductId, canWrite }: Pro
   const navigate = useNavigate();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [pendingRemove, setPendingRemove] = useState<{ id: string; name: string } | null>(null);
+  const qc = useQueryClient();
 
   const linksQuery = useQuery({
     queryKey: ["recipe-links", recipeId],
     queryFn: async () => {
       const { data } = await supabase
         .from("product_recipe_links")
-        .select("id, product_id, extra_lines, products(id, display_name, display_number, status)")
+        .select("id, product_id, is_primary, declaration_mode, extra_lines, products(id, display_name, display_number, status)")
         .eq("recipe_id", recipeId);
       return data ?? [];
     },
@@ -77,17 +90,40 @@ export function RecipeProductLinks({ recipeId, currentProductId, canWrite }: Pro
       : allCandidates
   ).slice(0, term ? 100 : 50);
 
+  async function afterLinkChange() {
+    try {
+      const n = await syncEffectiveDeclarationForRecipe(recipeId);
+      if (n > 0) toast.success(`Deklarasjonen er synket til ${n} produkt(er)`);
+    } catch (e) {
+      console.error("syncEffectiveDeclarationForRecipe", e);
+      toast.warning("Koblingen er lagret, men snapshotet ble ikke synket. Bruk «Synk nå».");
+    }
+    await linksQuery.refetch();
+    qc.invalidateQueries({ queryKey: ["recipe-linked-products", recipeId] });
+    qc.invalidateQueries({ queryKey: ["products"] });
+  }
+
   async function addLink(productId: string) {
+    // Har produktet ingen primæroppskrift fra før, blir denne primær.
+    const { data: existing, error: exErr } = await supabase
+      .from("product_recipe_links")
+      .select("id, is_primary")
+      .eq("product_id", productId);
+    if (exErr) {
+      toast.error(exErr.message);
+      return;
+    }
+    const hasPrimary = (existing ?? []).some((l) => l.is_primary === true);
     const { error } = await supabase
       .from("product_recipe_links")
-      .insert({ product_id: productId, recipe_id: recipeId, is_primary: false } as never);
+      .insert({ product_id: productId, recipe_id: recipeId, is_primary: !hasPrimary } as never);
     if (error) {
       toast.error(error.message);
       return;
     }
-    toast.success("Produkt koblet til oppskrift");
+    toast.success(hasPrimary ? "Produkt koblet til oppskrift" : "Produkt koblet — satt som primæroppskrift");
     setPickerOpen(false);
-    linksQuery.refetch();
+    await afterLinkChange();
   }
 
   async function removeLink(linkId: string, isCurrent: boolean) {
@@ -95,13 +131,12 @@ export function RecipeProductLinks({ recipeId, currentProductId, canWrite }: Pro
       toast.error("Du kan ikke koble fra produktet du er på nå.");
       return;
     }
-    if (!confirm("Koble fra dette produktet?")) return;
     const { error } = await supabase.from("product_recipe_links").delete().eq("id", linkId);
     if (error) {
       toast.error(error.message);
       return;
     }
-    linksQuery.refetch();
+    await afterLinkChange();
   }
 
   if (linksQuery.isLoading) return null;
@@ -130,12 +165,19 @@ export function RecipeProductLinks({ recipeId, currentProductId, canWrite }: Pro
                   title="Åpne deklarasjon for dette produktet"
                 >
                   {l.products?.display_name}
+                  {l.is_primary ? <span className="text-[10px] opacity-70">★ primær</span> : null}
+                  <span className="text-[10px] opacity-70">
+                    {l.declaration_mode === "manual" ? "overstyrt" : "arvet"}
+                  </span>
                   {extraCount > 0 && <span className="text-[10px] opacity-70">+{extraCount}</span>}
                   {!isCurrent && <ExternalLink className="h-2.5 w-2.5 opacity-60" />}
                 </button>
                 {canWrite && !isCurrent && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); removeLink(l.id, isCurrent); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPendingRemove({ id: l.id, name: l.products?.display_name ?? "produktet" });
+                    }}
                     className="hover:text-destructive"
                   >
                     <Trash2 className="h-2.5 w-2.5" />
@@ -177,6 +219,29 @@ export function RecipeProductLinks({ recipeId, currentProductId, canWrite }: Pro
           </Popover>
         )}
       </CardContent>
+
+      <AlertDialog open={!!pendingRemove} onOpenChange={(v) => !v && setPendingRemove(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Koble fra {pendingRemove?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Produktet mister deklarasjonen som arves fra denne oppskriften. Snapshotet synkes på nytt etterpå.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const id = pendingRemove?.id;
+                setPendingRemove(null);
+                if (id) void removeLink(id, false);
+              }}
+            >
+              Koble fra
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

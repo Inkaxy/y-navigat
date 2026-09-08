@@ -22,6 +22,7 @@ import { SetPackageDialog } from "@/ravarer/components/packages/SetPackageDialog
 import type { PackageWorklistRow } from "@/ravarer/hooks/usePackageSizes";
 import type { PackageFillSuggestion } from "@/ravarer/lib/packageMath";
 import { NUTRITION_LABELS, changePct } from "@/ravarer/lib/nutritionLabels";
+import { recomputeRecipesForRawMaterial } from "@/varer/lib/recomputeFanout";
 
 const ALLERGEN_LABEL_BY_CODE: Record<string, string> = Object.fromEntries(ALLERGENS.map((a) => [a.value, a.label]));
 
@@ -138,6 +139,8 @@ export function DatasheetSection({ rawMaterialId }: Props) {
       setDatasheetId(null);
       setAllowRemovals(false);
       invalidateRawMaterial(qc, rawMaterialId);
+      // Oppskriftene som bruker råvaren beregnes på nytt i bakgrunnen.
+      void recomputeRecipesForRawMaterial(rawMaterialId, qc);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Kunne ikke anvende databladet");
     }

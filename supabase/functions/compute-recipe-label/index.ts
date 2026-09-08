@@ -345,6 +345,7 @@ Deno.serve(async (req) => {
       lines_without_raw_material: core.sortedAgg.filter((a) => !a.raw_material_id).length,
       lines_without_nutrition_over_pct: core.lines_without_nutrition_over_pct,
       critical_missing_nutrition: core.critical_missing_nutrition,
+      allergens_unreviewed: core.missing_allergens,
       unit_problems: core.unit_problems,
       free_text_lines: core.free_text_lines,
       fiber_complete: core.fiber_complete,

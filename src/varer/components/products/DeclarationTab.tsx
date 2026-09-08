@@ -67,6 +67,24 @@ export function DeclarationTab({ productId, productName, canWrite }: Props) {
   if (!linkQuery.data) {
     return (
       <div className="space-y-4">
+        {canWrite && (
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+              <FileUp className="mr-1.5 h-4 w-4" /> Last opp PDF for AI-tolking
+            </Button>
+          </div>
+        )}
+        <PdfDeclarationImportDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          productId={productId}
+          productName={productName}
+          productRecipeLinkId={null}
+          onApproved={() => {
+            qc.invalidateQueries({ queryKey: ["product-recipe-link-decl", productId] });
+            qc.invalidateQueries({ queryKey: ["product-effective-decl", productId] });
+          }}
+        />
         <ManualDeclarationEditor productId={productId} productName={productName} canWrite={canWrite} />
         <BreadscaleSection productId={productId} canWrite={canWrite} />
         <CertificationsEditor productId={productId} canWrite={canWrite} />
@@ -170,7 +188,7 @@ function DeclarationView({ link, productName, canWrite, qc }: { link: any; produ
     if (error) { showError("DeclarationTab", error); return; }
     if (newMode !== "inherit") setMode(newMode);
     await logAudit({ action: "update", entity_type: "product_recipe_link", entity_id: link.id, entity_display_reference: productName, changes: { declaration_mode: newMode } });
-    qc.invalidateQueries({ queryKey: ["product-recipe-link-decl", link.id] });
+    qc.invalidateQueries({ queryKey: ["product-recipe-link-decl", link.product_id] });
     // products.manual_* er EFFEKTIV deklarasjon (snapshot) — synk etter modusbytte.
     try {
       await syncEffectiveDeclaration(link.id);
@@ -206,7 +224,7 @@ function DeclarationView({ link, productName, canWrite, qc }: { link: any; produ
     }
     qc.invalidateQueries({ queryKey: ["product-effective-decl", link.product_id] });
     toast.success("Manuell deklarasjon lagret");
-    qc.invalidateQueries({ queryKey: ["product-recipe-link-decl", link.id] });
+    qc.invalidateQueries({ queryKey: ["product-recipe-link-decl", link.product_id] });
     qc.invalidateQueries({ queryKey: ["compute-product-declaration", link.id] });
   }
 
@@ -421,13 +439,25 @@ const MODE_LABELS: Record<Mode, string> = {
 };
 
 /** Viser hva som faktisk følger produktet nå, og når det sist ble synket. */
-function EffectiveStatusCard({ productId, mode, isOverridden }: { productId: string; mode: Mode; isOverridden: boolean }) {
+function EffectiveStatusCard({
+  productId,
+  mode,
+  isOverridden,
+  onRecompute,
+  recomputing,
+}: {
+  productId: string;
+  mode: Mode;
+  isOverridden: boolean;
+  onRecompute?: () => void;
+  recomputing?: boolean;
+}) {
   const snapshot = useQuery({
     queryKey: ["product-effective-decl", productId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("manual_declaration_updated_at, manual_ingredient_declaration")
+        .select("manual_declaration_updated_at, manual_ingredient_declaration, declaration_needs_review")
         .eq("id", productId)
         .maybeSingle();
       if (error) throw error;
@@ -436,7 +466,23 @@ function EffectiveStatusCard({ productId, mode, isOverridden }: { productId: str
   });
 
   const updated = snapshot.data?.manual_declaration_updated_at;
+  const needsReview = snapshot.data?.declaration_needs_review === true;
   return (
+    <>
+    {needsReview && (
+      <div className="flex flex-wrap items-center gap-2 rounded-md border-2 border-amber-500/60 bg-amber-500/10 px-3 py-2 text-xs">
+        <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+        <span className="flex-1">
+          En råvare er endret siden sist — deklarasjonen bør gjennomgås.
+        </span>
+        {onRecompute && (
+          <Button size="sm" variant="outline" onClick={onRecompute} disabled={recomputing}>
+            {recomputing && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+            Beregn på nytt
+          </Button>
+        )}
+      </div>
+    )}
     <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs">
       <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground" />
       <span>
@@ -452,17 +498,19 @@ function EffectiveStatusCard({ productId, mode, isOverridden }: { productId: str
         <Badge variant="outline" className="gap-1"><AlertTriangle className="h-3 w-3" /> Ingen deklarasjon lagret</Badge>
       )}
     </div>
+    </>
   );
 }
+
 
 function ModeSelector({ mode, canWrite, saving, onChange }: { mode: Mode; canWrite: boolean; saving: boolean; onChange: (m: Mode | "inherit") => void }) {
   const items: { value: Mode; title: string; desc: string; icon: React.ReactNode }[] = [
     { value: "auto", title: "Automatisk", desc: "Beregnes fra råvarer + oppskrift + tillegg.", icon: <Sparkles className="h-4 w-4" /> },
-    { value: "auto_with_overrides", title: "Auto + overstyringer", desc: "Auto, med mulighet for å låse enkeltverdier.", icon: <ShieldCheck className="h-4 w-4" /> },
+    // «Auto + overstyringer» er skjult til det finnes et UI for å låse enkeltverdier.
     { value: "manual", title: "Manuell", desc: "Du fyller alt selv. Ingen auto-beregning.", icon: <FileText className="h-4 w-4" /> },
   ];
   return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 flex-1 min-w-[400px]">
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 flex-1 min-w-[400px]">
       {items.map((it) => (
         <button
           key={it.value}
@@ -519,11 +567,19 @@ function PreviewDialog({ open, onClose, productName, computed }: { open: boolean
   }
   function copyText() { navigator.clipboard.writeText(plainText()); toast.success("Kopiert til utklippstavle"); }
   function printNow() {
-    const w = window.open("", "_blank", "width=600,height=800");
-    if (!w) return;
-    w.document.write(`<pre style="font-family:Inter,system-ui;font-size:12px;white-space:pre-wrap;padding:16px">${plainText().replace(/</g, "&lt;")}</pre>`);
-    w.document.close();
-    w.print();
+    // Ingen document.write: vi bygger et blob-dokument og åpner det.
+    const html = `<!doctype html><html lang="nb"><head><meta charset="utf-8"><title>Deklarasjon</title></head><body><pre style="font-family:Inter,system-ui;font-size:12px;white-space:pre-wrap;padding:16px">${plainText().replace(/</g, "&lt;")}</pre></body></html>`;
+    const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+    const w = window.open(url, "_blank", "width=600,height=800");
+    if (!w) {
+      URL.revokeObjectURL(url);
+      toast.error("Nettleseren blokkerte utskriftsvinduet");
+      return;
+    }
+    w.addEventListener("load", () => {
+      w.print();
+      URL.revokeObjectURL(url);
+    });
   }
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>

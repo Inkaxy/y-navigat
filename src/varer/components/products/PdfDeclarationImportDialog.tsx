@@ -16,7 +16,8 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   productId: string;
   productName: string;
-  productRecipeLinkId: string;
+  /** Null når produktet ikke er koblet til en oppskrift — da skrives produktets egne manual_*-felt. */
+  productRecipeLinkId: string | null;
   onApproved: () => void;
 }
 
@@ -133,6 +134,41 @@ export function PdfDeclarationImportDialog({ open, onOpenChange, productId, prod
         const v = nutritionEdit[f.key];
         if (v !== "" && Number.isFinite(Number(v))) nut[f.key] = Number(v);
       }
+      const allergenSummary = {
+        contains: containsEdit.split(",").map((s) => s.trim()).filter(Boolean),
+        may_contain: mayContainEdit.split(",").map((s) => s.trim()).filter(Boolean),
+      };
+
+      if (!productRecipeLinkId) {
+        // Uten kobling skriver vi rett på produktets snapshotfelt.
+        const { error: pErr } = await supabase
+          .from("products")
+          .update({
+            declaration_mode: "manual",
+            manual_ingredient_declaration: ingredientEdit || null,
+            manual_nutrition: Object.keys(nut).length ? nut : null,
+            manual_allergen_summary: allergenSummary,
+            manual_declaration_updated_at: new Date().toISOString(),
+          } as never)
+          .eq("id", productId);
+        if (pErr) throw pErr;
+        await logAudit({
+          action: "ai_declaration_imported",
+          entity_type: "product",
+          entity_id: productId,
+          entity_display_reference: productName,
+          changes: { provider: meta?.provider, model: meta?.model, source_pdf: filePath },
+        });
+        if (filePath) {
+          await supabase.storage.from("declaration-uploads").remove([filePath]).catch(() => {});
+        }
+        toast.success("Deklarasjon godkjent og lagret på produktet");
+        onApproved();
+        onOpenChange(false);
+        reset();
+        return;
+      }
+
       const { error } = await supabase
         .from("product_recipe_links")
         .update({

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
+import { recomputeRecipesForRawMaterial } from "@/varer/lib/recomputeFanout";
 
 type AllergenCode = Database["public"]["Enums"]["allergen_type"];
 
@@ -73,6 +74,7 @@ export function useUpsertNutrition() {
     },
     onSuccess: (data: NutritionRow) => {
       qc.invalidateQueries({ queryKey: ["raw_material_nutrition", data.raw_material_id] });
+      void recomputeRecipesForRawMaterial(data.raw_material_id, qc);
       toast.success("Næringsinnhold lagret");
     },
     onError: (e: unknown) => toast.error(`Kunne ikke lagre: ${e instanceof Error ? e.message : String(e)}`),
@@ -133,6 +135,7 @@ export function useSetAllergen() {
     },
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ["raw_material_allergens", vars.raw_material_id] });
+      void recomputeRecipesForRawMaterial(vars.raw_material_id, qc, { silent: true });
     },
     onError: (e: unknown) =>
       toast.error(`Kunne ikke lagre allergen: ${e instanceof Error ? e.message : String(e)}`),

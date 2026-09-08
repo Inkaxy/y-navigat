@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Printer } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, Printer, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { fmtPct, grainCategoryFromPct, grainLevelLabel } from "@/varer/lib/breadscale";
 import { BRODSKALAN_MARKS } from "@/varer/lib/brodskalan";
@@ -12,6 +12,7 @@ import { LABEL_SIZES, type LabelSizeKey } from "../ConsumerLabelPDFDocument";
 import { NUT_ROWS, nutritionValueText } from "./labelShared";
 import { MarkedText } from "@/varer/components/label/MarkedText";
 import type { EffectiveDeclaration } from "@/varer/lib/effectiveDeclaration";
+import { buildLabelChecklist } from "@/varer/lib/labelChecklist";
 
 interface EntityInfo {
   name: string | null;
@@ -35,6 +36,14 @@ interface Props {
   countryOfOrigin: string | null;
   entity: EntityInfo | null;
   nutritionUsable: boolean;
+  /** Beregningen er sperret av kritiske mangler. */
+  blocked?: boolean;
+  /** Nøkkelhullberegningen konkluderer med «oppfylt». */
+  keyholeQualifies?: boolean;
+  /** Dekningsgrad — brukes i pliktfeltsjekken. */
+  coveragePct?: number | null;
+  /** Sjekklisten rapporteres opp slik at godkjenning kan sperres likt. */
+  onChecklistChange?: (blocked: boolean) => void;
 }
 
 async function toDataUrl(url: string): Promise<string | null> {
@@ -67,6 +76,10 @@ export function ConsumerLabelSection({
   countryOfOrigin,
   entity,
   nutritionUsable,
+  blocked,
+  keyholeQualifies,
+  coveragePct,
+  onChecklistChange,
 }: Props) {
   const [size, setSize] = useState<LabelSizeKey>("100x70");
   const [printing, setPrinting] = useState(false);
@@ -79,15 +92,41 @@ export function ConsumerLabelSection({
     : null;
 
   const nutritionRows = NUT_ROWS.map((r) => ({
+    key: r.key,
     label: r.indent ? `— ${r.label}` : r.label,
     value: nutritionValueText(r.key, effective.nutrition as Record<string, number | null> | null),
     indent: r.indent,
   }));
 
-  const canPrint = !!(effective.ingredientText && effective.ingredientText.trim());
+  // Pliktfeltene etter 1169/2011 — røde punkter sperrer utskrift og godkjenning.
+  const checklist = buildLabelChecklist({
+    productName: recipeName,
+    ingredientText: effective.ingredientText,
+    contains: effective.contains,
+    mayContain: effective.mayContain,
+    netWeightGrams: unitWeightGrams,
+    shelfLifeDays,
+    storageInstructions,
+    producerName: entity?.name ?? null,
+    producerAddress: producerAddress || null,
+    nutrition: nutritionUsable ? (effective.nutrition as Record<string, number | null> | null) : null,
+    coveragePct: declarationManual ? null : coveragePct ?? null,
+    blocked,
+    claimGrain,
+    grainPct: effectiveGrainPct,
+    claimKeyhole,
+    keyholeQualifies,
+  });
+  useEffect(() => {
+    onChecklistChange?.(checklist.blocked);
+  }, [checklist.blocked, onChecklistChange]);
+
+  const canPrint = !!(effective.ingredientText && effective.ingredientText.trim()) && !checklist.blocked;
 
   async function printLabel() {
     setPrinting(true);
+    // Fanen åpnes FØR await, ellers blokkerer nettleseren vinduet.
+    const win = window.open("", "_blank");
     try {
       const grainMarkSrc = claimGrain && grainCategory ? BRODSKALAN_MARKS[grainCategory].src : null;
       const grainMarkImage = grainMarkSrc ? await toDataUrl(grainMarkSrc) : null;
@@ -112,13 +151,15 @@ export function ConsumerLabelSection({
             producerAddress,
             grainMarkImage,
             // Grovhetsprosenten skal trykkes under merket (BKLF pkt. 4.4).
+            mayContain: effective.mayContain,
             grainPctText: effectiveGrainPct != null ? fmtPct(effectiveGrainPct) : null,
             keyholeMark: claimKeyhole,
           }}
         />,
       ).toBlob();
       const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
+      if (win) win.location.href = url;
+      else window.open(url, "_blank");
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e: unknown) {
       toast.error((e as Error)?.message ?? "Kunne ikke lage etiketten");
@@ -155,7 +196,9 @@ export function ConsumerLabelSection({
           </Button>
           {!canPrint && (
             <p className="text-xs text-amber-700">
-              Ingen effektiv deklarasjon ennå — beregn merkedata eller legg inn en manuell deklarasjon først.
+              {checklist.blocked
+                ? "Utskrift er sperret — pliktfelt mangler (se sjekklisten under)."
+                : "Ingen effektiv deklarasjon ennå — beregn merkedata eller legg inn en manuell deklarasjon først."}
             </p>
           )}
         </div>
@@ -200,7 +243,7 @@ export function ConsumerLabelSection({
                 <table className="w-full">
                   <tbody>
                     {nutritionRows.map((r) => (
-                      <tr key={r.label} className="border-b border-border/40 last:border-0">
+                      <tr key={r.key} className="border-b border-border/40 last:border-0">
                         <td className={r.indent ? "pl-3 text-muted-foreground" : ""}>{r.label}</td>
                         <td className="text-right tabular-nums">{r.value}</td>
                       </tr>
@@ -232,6 +275,29 @@ export function ConsumerLabelSection({
               {claimKeyhole && <Badge variant="outline">Nøkkelhullet</Badge>}
             </div>
           </div>
+        </div>
+
+        {/* Pliktfelt etter matinformasjonsforordningen */}
+        <div className="rounded-lg border p-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Pliktfelt etter 1169/2011
+          </div>
+          <ul className="mt-2 space-y-1">
+            {checklist.items.map((item) => (
+              <li key={item.key} className="flex items-start gap-2 text-xs">
+                {item.level === "ok" ? (
+                  <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                ) : item.level === "warn" ? (
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                ) : (
+                  <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
+                )}
+                <span>
+                  <b>{item.label}:</b> {item.detail}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
 
         <p className="text-xs text-muted-foreground">
