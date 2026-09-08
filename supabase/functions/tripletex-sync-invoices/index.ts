@@ -231,6 +231,10 @@ Deno.serve(async (req) => {
     const touchedSupplierIds = new Set<string>();
     const nowIso = new Date().toISOString();
     let lastCompletedChunkTo: string | null = null;
+    const chunkResults: ChunkResult[] = [];
+    const failedSamples: string[] = [];
+    const conflicts: { invoice_id: string; invoice_number: string; fields: unknown[] }[] = [];
+
 
     for (const chunk of chunks) {
       const invoices: any[] = [];
