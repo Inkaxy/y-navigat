@@ -423,6 +423,20 @@ function LiveConfirmationStatus({ neg, items, recipients, selectedRecipient, act
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-wide text-ink-secondary">Bekreftelses-status</p>
+          {recipients.length > 1 && (
+            <div className="mt-2 max-w-xs">
+              <Select value={activeRecipientId} onValueChange={onSelectRecipient}>
+                <SelectTrigger aria-label="Leverandør avtalen gjelder">
+                  <SelectValue placeholder="Velg leverandør" />
+                </SelectTrigger>
+                <SelectContent>
+                  {recipients.map((r: any) => (
+                    <SelectItem key={r.id} value={r.id}>{supName(r.supplier_id)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <p className="mt-1 text-lg font-semibold">
             {confirmed.length} av {total} bekreftet
             {disputed.length > 0 && <span className="ml-2 text-warning">· {disputed.length} med innsigelse</span>}
