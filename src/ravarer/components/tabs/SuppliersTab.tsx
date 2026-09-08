@@ -176,6 +176,7 @@ export function SuppliersTab({ rm }: Props) {
                     Siste fakturapris per {unitLabel}
                   </th>
                   <th className="pb-2">Avtale gyldig til</th>
+                  <th className="pb-2">Dokument</th>
                   <th className="pb-2"></th>
                 </tr>
               </thead>
@@ -235,6 +236,9 @@ export function SuppliersTab({ rm }: Props) {
                       </td>
                       <td className={`py-3 ${expiryClass}`}>
                         {formatDate(l.agreement_valid_to)}
+                      </td>
+                      <td className="py-3">
+                        <AgreementDocumentLink path={l.agreement_document_url} label="Åpne" />
                       </td>
                       <td className="py-3 text-right">
                         {canWrite && (
@@ -317,6 +321,7 @@ function RmSupplierDialog({
   existing,
 }: RmSupplierDialogProps) {
   const { data: suppliers = [] } = useSuppliers();
+  const { user } = useRavarer();
   const upsert = useUpsertRmSupplier();
   const del = useDeleteRmSupplier();
   const [supplierId, setSupplierId] = useState<string>(
@@ -336,6 +341,10 @@ function RmSupplierDialog({
   const [agreedPrice, setAgreedPrice] = useState(
     existing?.agreed_price?.toString() ?? "",
   );
+  /** Om den innskrevne prisen gjelder en hel pakning eller én grunnenhet. */
+  const [priceBasis, setPriceBasis] = useState<"package" | "base">(
+    existing?.agreed_price == null && existing?.agreed_price_per_base_unit != null ? "base" : "package",
+  );
   const [validFrom, setValidFrom] = useState(
     existing?.agreement_valid_from ?? "",
   );
@@ -347,7 +356,15 @@ function RmSupplierDialog({
   const agreedPriceNum = parseDecimal(agreedPrice);
   const baseUnitsNum = parseDecimal(baseUnitsPerPackage);
   const packageSizeNum = parseDecimal(packageSize);
-  const perBaseUnit = perBaseUnitFromPackage(agreedPriceNum, baseUnitsNum);
+  // Begge prisfeltene skrives konsistent, uansett hvilken av dem brukeren fyller inn.
+  const perBaseUnit =
+    priceBasis === "base" ? agreedPriceNum : perBaseUnitFromPackage(agreedPriceNum, baseUnitsNum);
+  const perPackage =
+    priceBasis === "package"
+      ? agreedPriceNum
+      : agreedPriceNum != null && baseUnitsNum != null && baseUnitsNum > 0
+        ? agreedPriceNum * baseUnitsNum
+        : null;
 
   const submit = async () => {
     if (!supplierId) return;
@@ -360,8 +377,10 @@ function RmSupplierDialog({
       package_size: packageSizeNum,
       base_units_per_package: baseUnitsNum,
       package_unit: packageUnit || null,
-      agreed_price: agreedPriceNum,
+      agreed_price: perPackage,
       agreed_price_per_base_unit: perBaseUnit,
+      agreed_price_set_at: agreedPriceNum == null ? null : new Date().toISOString(),
+      agreed_price_set_by: agreedPriceNum == null ? null : (user?.id ?? null),
       agreement_valid_from: validFrom || null,
       agreement_valid_to: validTo || null,
       is_primary: isPrimary,
@@ -447,18 +466,32 @@ function RmSupplierDialog({
               denne leverandøren.
             </p>
           </div>
-          <div>
-            <Label>Avtalt pris per pakning (kr)</Label>
-            <Input
-              type="text"
-              inputMode="decimal"
-              value={agreedPrice}
-              onChange={(e) => setAgreedPrice(e.target.value)}
-            />
-            <p className="mt-1 text-xs text-ink-secondary">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Avtalt pris (kr)</Label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={agreedPrice}
+                onChange={(e) => setAgreedPrice(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Prisen gjelder</Label>
+              <Select value={priceBasis} onValueChange={(v) => setPriceBasis(v === "base" ? "base" : "package")}>
+                <SelectTrigger aria-label="Prisen gjelder">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="package">Per pakning</SelectItem>
+                  <SelectItem value="base">Per {baseUnit}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="col-span-2 text-xs text-ink-secondary">
               {perBaseUnit == null
                 ? `Fyll inn antall baseenheter per pakning for å se prisen per ${baseUnit}.`
-                : `Tilsvarer ${formatNok(perBaseUnit)} per ${baseUnit}.`}
+                : `Tilsvarer ${formatNok(perBaseUnit)} per ${baseUnit}${perPackage == null ? "" : ` og ${formatNok(perPackage)} per pakning`}.`}
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
