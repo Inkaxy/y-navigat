@@ -87,7 +87,9 @@ export default function ProductDetail() {
   const qc = useQueryClient();
   const { canWrite, legalEntityId } = useAppContext();
   const [params, setParams] = useSearchParams();
-  const tab = params.get("tab") ?? "navn";
+  const rawTab = params.get("tab") ?? "navn";
+  // Gamle lenker til «Kalkyle» og «Priser» peker til den sammenslåtte fanen.
+  const tab = rawTab === "kalkyle" || rawTab === "priser" ? "kalkyle_pris" : rawTab;
   const [saving, setSaving] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
   const [keywords, setKeywords] = useState<string[]>([]);
@@ -170,19 +172,6 @@ export default function ProductDetail() {
         .select("id, display_name, variant_label, status, display_number")
         .eq("variant_of_product_id", id!)
         .order("display_number");
-      return data ?? [];
-    },
-  });
-
-  const pricesQuery = useQuery({
-    queryKey: ["product-prices", id],
-    enabled: !!id,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("price_list_items")
-        .select("id, price, valid_from, valid_to, price_lists(id, display_name, code)")
-        .eq("product_id", id!)
-        .order("valid_from", { ascending: false });
       return data ?? [];
     },
   });
