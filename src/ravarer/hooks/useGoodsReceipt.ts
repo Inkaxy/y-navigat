@@ -240,6 +240,10 @@ export interface ReceiveLineInput {
   quantity_base: number;
   invoice_number: string;
   occurred_at?: string;
+  /** Partinummer fra pakken, hvis leverandøren oppgir det. */
+  lot_number?: string | null;
+  /** Best før-dato på partiet. */
+  best_before?: string | null;
 }
 
 /**
