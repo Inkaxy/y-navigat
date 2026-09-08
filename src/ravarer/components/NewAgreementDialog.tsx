@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { osloTodayISO } from "@/lib/osloDate";
 import { parseDecimal } from "@/ravarer/lib/packageMath";
+import { rpcApplyAgreement } from "@/ravarer/lib/pendingRpc";
 
 interface Props {
   open: boolean;
@@ -98,6 +99,31 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
         const { error: upErr } = await supabase.storage.from("supplier-agreements").upload(path, docFile);
         if (upErr) throw upErr;
         docUrl = path;
+      }
+
+      // Én transaksjon i basen når RPC-en er rullet ut: da kan avtalen ikke bli
+      // halvveis lagret med to primærleverandører.
+      try {
+        await rpcApplyAgreement({
+          raw_material_id: rawMaterialId,
+          supplier_id: supplierId,
+          supplier_sku: supplierSku.trim() || null,
+          supplier_product_name: supplierProductName.trim() || null,
+          agreed_price: ap,
+          agreed_price_per_base_unit: ppbu,
+          package_size: ps,
+          package_unit: packageUnit || null,
+          agreement_valid_from: validFrom || null,
+          agreement_valid_to: validTo || null,
+          agreement_priority: null,
+          agreement_document_url: docUrl,
+          is_primary: setPrimary,
+        });
+        return;
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        // Bare «funksjonen finnes ikke» skal falle tilbake — alt annet er en reell feil.
+        if (!/could not find the function|does not exist/i.test(message)) throw e;
       }
 
       // Upsert raw_material_suppliers

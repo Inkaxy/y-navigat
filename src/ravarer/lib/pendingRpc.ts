@@ -92,3 +92,38 @@ export function rpcReceiveInvoiceLine(input: {
     p_note: input.note ?? null,
   });
 }
+
+export interface ApplyAgreementResult {
+  ok: boolean;
+  link_id?: string;
+  agreed_price?: number | null;
+  agreed_price_per_base_unit?: number | null;
+  is_primary?: boolean;
+}
+
+export interface AgreementPayload {
+  raw_material_id: string;
+  supplier_id: string;
+  supplier_sku: string | null;
+  supplier_product_name: string | null;
+  agreed_price: number | null;
+  agreed_price_per_base_unit: number | null;
+  package_size: number | null;
+  package_unit: string | null;
+  agreement_valid_from: string | null;
+  agreement_valid_to: string | null;
+  agreement_priority: number | null;
+  agreement_document_url: string | null;
+  is_primary: boolean;
+}
+
+/**
+ * F4: lagrer en leverandøravtale i én transaksjon.
+ *
+ * Uten dette lagres avtalen i tre separate kall, og feiler ett av dem kan råvaren
+ * stå igjen med to primærleverandører. RPC-en validerer også selskap, datoer og
+ * priser, og fører avtalen som en prishendelse — ikke som ny kostpris.
+ */
+export function rpcApplyAgreement(payload: AgreementPayload): Promise<ApplyAgreementResult> {
+  return callPendingRpc<ApplyAgreementResult>("rm_apply_agreement", { p_payload: payload });
+}

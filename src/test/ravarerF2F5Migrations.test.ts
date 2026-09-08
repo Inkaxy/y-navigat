@@ -115,3 +115,36 @@ describe("F5 — telling og varemottak", () => {
     expect(F5).toMatch(/ikke relevant og kan ikke mottas/);
   });
 });
+
+const F4 = readFileSync(resolve("supabase/migrations-pending/20260908_f4_agreements.sql"), "utf8");
+
+describe("F4 — avtaler", () => {
+  it("lagrer avtalen atomisk med kun én primærleverandør", () => {
+    expect(F4).toMatch(/on conflict \(raw_material_id, supplier_id\) do update/i);
+    expect(F4).toMatch(/set is_primary = false\s*\n\s*where raw_material_id = v_rm_id and id <> v_link_id/i);
+    expect(F4).toMatch(/set primary_supplier_id = v_sup_id/i);
+    expect(F4).toMatch(/set primary_supplier_id = null/i);
+  });
+
+  it("validerer selskap, datoer og priser", () => {
+    expect(F4).toMatch(/Leverandøren tilhører et annet selskap/);
+    expect(F4).toMatch(/kan ikke slutte før den starter/);
+    expect(F4).toMatch(/rm_is_finite\(v_ppbu\)/);
+  });
+
+  it("fører avtalen som prishendelse, ikke som ny kostpris", () => {
+    expect(F4).toMatch(/insert into public\.raw_material_price_history/i);
+    expect(F4).toMatch(/'agreement'/);
+    expect(F4).not.toMatch(/update public\.raw_materials\s*\n\s*set current_cost_price/i);
+  });
+
+  it("velger gyldig avtale etter prioritet og dato", () => {
+    expect(F4).toMatch(/create or replace function public\.rm_effective_agreement/i);
+    expect(F4).toMatch(/order by s\.is_primary desc, s\.agreement_priority asc/i);
+  });
+
+  it("gir ingen anonym kjøretilgang", () => {
+    expect(F4).toMatch(/revoke all on function public\.rm_apply_agreement\(jsonb\) from public, anon/i);
+    expect(F4).toMatch(/revoke all on function public\.rm_effective_agreement\(uuid, date\) from public, anon/i);
+  });
+});
