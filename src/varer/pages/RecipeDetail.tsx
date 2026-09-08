@@ -276,7 +276,7 @@ export default function RecipeDetail() {
     [hydratedLines, header.dough_piece_grams, header.dough_waste_pct, header.units_per_batch, scaleMode, scaleInput, rounding, scaleWaste],
   );
 
-  const factor = scaleFactor(desiredUnits, baseUnits) && scaleResult.factor;
+  const factor = scaleResult.factor;
   const isScaled = Math.abs(scaleResult.factor - 1) > 0.0001;
 
   const scaleSummary = useMemo(
