@@ -2,24 +2,44 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, Check, Loader2 } from "lucide-react";
+import { AlertTriangle, PackageCheck } from "lucide-react";
 import { formatNumber } from "@/ravarer/lib/constants";
-import { parseDecimal } from "@/fakturaer/lib/units";
-import {
-  useSuspiciousPackages,
-  useConfirmSuspiciousPackage,
-  type SuspiciousPackageRow,
-} from "@/ravarer/hooks/useSuspiciousPackages";
+import { useSuspiciousPackages, type SuspiciousPackageRow } from "@/ravarer/hooks/useSuspiciousPackages";
+import { SetPackageDialog } from "@/ravarer/components/packages/SetPackageDialog";
+import type { PackageWorklistRow } from "@/ravarer/hooks/usePackageSizes";
 
-function Row({ row }: { row: SuspiciousPackageRow }) {
-  const [value, setValue] = useState(String(row.suggested_base_units).replace(".", ","));
-  const confirm = useConfirmSuspiciousPackage();
-  const parsed = parseDecimal(value);
-  const valid = parsed != null && parsed > 0;
-  const busy = confirm.isPending;
+/** Pakningsdialogen forventer en arbeidslisterad; her har vi bare den mistenkelige koblingen. */
+function suspiciousRowAsWorklistRow(row: SuspiciousPackageRow): PackageWorklistRow {
+  return {
+    id: row.raw_material_id,
+    legal_entity_id: null,
+    name: row.raw_material_name,
+    base_unit: row.base_unit,
+    category: null,
+    current_cost_price: null,
+    pakningsfaktor: null,
+    faktor_kilde: null,
+    bekreftet_dato: null,
+    antall_fakturalinjer: null,
+    antall_leverandorer: null,
+    enheter_i_bruk: null,
+    linjer_uten_pris: null,
+    kjopt_kr_totalt: null,
+    siste_faktura: null,
+    pris_spredning: null,
+    implisert_mengde: null,
+    referansepris: null,
+    referansekilde: null,
+    referansedato: null,
+    referanse_faktor: null,
+    foreslatt_fra_navn: null,
+    foreslatt_fra_referanse: null,
+    status: "mangler_pakning",
+  };
+}
 
+function Row({ row, onOpen }: { row: SuspiciousPackageRow; onOpen: (row: SuspiciousPackageRow) => void }) {
   return (
     <tr className="border-t border-line-subtle align-top">
       <td className="px-3 py-2">
@@ -38,27 +58,13 @@ function Row({ row }: { row: SuspiciousPackageRow }) {
         </div>
       </td>
       <td className="px-3 py-2 text-sm text-ink-secondary">{row.explanation}</td>
-      <td className="px-3 py-2">
-        <div className="flex items-center gap-2">
-          <Input
-            className="w-24"
-            value={value}
-            onChange={e => setValue(e.target.value)}
-            aria-label={`Baseenheter per pakning for ${row.raw_material_name}`}
-          />
-          <span className="text-sm text-ink-secondary">{row.base_unit}</span>
-        </div>
+      <td className="px-3 py-2 whitespace-nowrap">
+        {formatNumber(row.suggested_base_units, 3)} {row.base_unit}
       </td>
       <td className="px-3 py-2 text-right">
-        <Button
-          size="sm"
-          disabled={!valid || busy}
-          onClick={() =>
-            confirm.mutate({ linkId: row.link_id, baseUnits: parsed!, rawMaterialId: row.raw_material_id })
-          }
-        >
-          {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Check className="mr-1 h-4 w-4" />}
-          Bekreft {valid ? `${formatNumber(parsed!, 3)} ${row.base_unit ?? ""}` : ""}
+        <Button size="sm" onClick={() => onOpen(row)}>
+          <PackageCheck className="mr-1 h-4 w-4" />
+          Sett pakning
         </Button>
       </td>
     </tr>
@@ -67,6 +73,7 @@ function Row({ row }: { row: SuspiciousPackageRow }) {
 
 export function SuspiciousPackagesCard() {
   const { data: rows = [], isLoading } = useSuspiciousPackages();
+  const [activeRow, setActiveRow] = useState<SuspiciousPackageRow | null>(null);
 
   if (!isLoading && rows.length === 0) return null;
 
@@ -79,7 +86,7 @@ export function SuspiciousPackagesCard() {
       </div>
       <p className="mb-3 text-sm text-ink-secondary">
         Pakningsstørrelse 1 med en pakke-enhet, eller en ubekreftet pakning som er uenig med varenavnet. Motorens
-        forslag er hentet fra varenavnet — bekreft, så er varen ferdig for godt.
+        forslag er hentet fra varenavnet — bekreft i pakningsdialogen, som også regner om kostpris.
       </p>
       {isLoading ? (
         <div className="space-y-2">
@@ -93,16 +100,30 @@ export function SuspiciousPackagesCard() {
                 <th className="px-3 py-2 text-left">Vare</th>
                 <th className="px-3 py-2 text-left">Registrert pakning</th>
                 <th className="px-3 py-2 text-left">Hvorfor</th>
-                <th className="px-3 py-2 text-left">Per pakning</th>
+                <th className="px-3 py-2 text-left">Forslag</th>
                 <th className="px-3 py-2 text-right">Handling</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map(r => <Row key={r.link_id} row={r} />)}
+              {rows.map(r => <Row key={r.link_id} row={r} onOpen={setActiveRow} />)}
             </tbody>
           </table>
         </div>
       )}
+
+      <SetPackageDialog
+        row={activeRow ? suspiciousRowAsWorklistRow(activeRow) : null}
+        open={!!activeRow}
+        onOpenChange={v => !v && setActiveRow(null)}
+        suggestion={
+          activeRow ? { size: activeRow.suggested_base_units, contentUnit: activeRow.base_unit } : null
+        }
+        initialSupplier={
+          activeRow?.supplier_id && activeRow.supplier_base_units != null
+            ? { supplierId: activeRow.supplier_id, supplierUnits: activeRow.supplier_base_units }
+            : null
+        }
+      />
     </Card>
   );
 }

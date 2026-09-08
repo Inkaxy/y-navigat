@@ -40,9 +40,13 @@ interface Props {
    * Kan alltid overstyres, og lagres aldri av seg selv.
    */
   suggestion?: PackageFillSuggestion | null;
+  /** Forhåndsvelg leverandørkoblingen, f.eks. fra en mistenkelig pakning som skal bekreftes. */
+  initialSupplier?: { supplierId: string; supplierUnits: number } | null;
+  /** Kalles etter en vellykket lagring, i tillegg til den vanlige suksessmeldingen. */
+  onApplied?: (res: PackageRpcResult) => void;
 }
 
-export function SetPackageDialog({ row, open, onOpenChange, suggestion }: Props) {
+export function SetPackageDialog({ row, open, onOpenChange, suggestion, initialSupplier, onApplied }: Props) {
   const [step, setStep] = useState<1 | 2>(1);
   const [units, setUnits] = useState("");
   const [packageUnit, setPackageUnit] = useState("");
@@ -76,6 +80,14 @@ export function SetPackageDialog({ row, open, onOpenChange, suggestion }: Props)
     setSupplierOpen(false);
     setFillNote(null);
   };
+
+  // Leverandørkoblingen forhåndsvelges når dialogen åpnes for en spesifikk kobling.
+  useEffect(() => {
+    if (!open || !initialSupplier) return;
+    setSupplierId(initialSupplier.supplierId);
+    setSupplierUnits(String(initialSupplier.supplierUnits));
+    setSupplierOpen(true);
+  }, [open, initialSupplier]);
 
   // Et forslag fylles inn når dialogen åpnes, men lagres aldri av seg selv.
   useEffect(() => {
@@ -134,6 +146,7 @@ export function SetPackageDialog({ row, open, onOpenChange, suggestion }: Props)
       toast.error("Pakningen ble ikke lagret. Prøv igjen eller kontroller tallene.");
       return;
     }
+    onApplied?.(res);
     const before = formatNumber(res.cost_before, 3);
     const after = formatNumber(res.cost_after, 3);
     toast.success(`Kostpris oppdatert fra ${before} til ${after} kr/${res.base_unit ?? baseUnit}`, {

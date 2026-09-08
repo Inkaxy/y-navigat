@@ -11,7 +11,8 @@ import { Check, Pause, X, TrendingUp, Loader2 } from "lucide-react";
 import { useRawMaterialPurchaseStats } from "@/ravarer/hooks/usePurchaseStats";
 import { useRawMaterialSuppliers } from "@/ravarer/hooks/useRmSuppliers";
 import { formatNok, formatNumber } from "@/ravarer/lib/constants";
-import { targetPctForItem } from "@/ravarer/lib/negotiationMatrix";
+import { offerPricePerBaseUnit, targetPctForItem } from "@/ravarer/lib/negotiationMatrix";
+import { toBaseFactor } from "@/fakturaer/lib/units";
 import type { NegotiationItemRow } from "@/ravarer/hooks/useNegotiations";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 
@@ -72,17 +73,42 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.id]);
 
+  const numOrNull = (s: string) => (s.trim() === "" ? null : Number(s));
+
+  /**
+   * Regner avtalt pris om til pris per grunnenhet med samme logikk som resten
+   * av forhandlingsmodulen (offerPricePerBaseUnit), i stedet for den gamle
+   * «/pakke»-heuristikken som aldri traff (enheten inneholdt aldri strengen
+   * «/pakke», bare kanoniske enheter som «kg» eller «sekk»).
+   */
+  function perBaseUnitResult(): { value: number | null; reason: string | null } {
+    const priceNum = numOrNull(price);
+    if (priceNum == null) return { value: null, reason: "Ingen pris" };
+    // Prisenheten er en baseenhet-kompatibel enhet (kg, g, l, ml …): prisen
+    // gjelder da direkte 1 av den enheten, uavhengig av pakningsfeltet.
+    if (toBaseFactor(priceUnit, baseUnit) != null) {
+      return offerPricePerBaseUnit({
+        offeredPrice: priceNum,
+        offeredPackageSize: 1,
+        offeredPackageUnit: priceUnit,
+        baseUnit,
+      });
+    }
+    // Prisenheten er en pakningsenhet (sekk, kartong …): bruk pakningsfeltet
+    // for å finne innholdet, med leverandørkoblingen som reserve.
+    return offerPricePerBaseUnit({
+      offeredPrice: priceNum,
+      offeredPackageSize: numOrNull(pkgSize),
+      offeredPackageUnit: pkgUnit,
+      baseUnit,
+      linkBaseUnitsPerPackage: currentSupplier?.base_units_per_package ?? null,
+    });
+  }
+
   function buildPatch() {
-    const numOrNull = (s: string) => (s.trim() === "" ? null : Number(s));
     const priceNum = numOrNull(price);
     const pkgSizeNum = numOrNull(pkgSize);
-    // simple per-base-unit calc: assume priceUnit matches base
-    let perBase: number | null = null;
-    if (priceNum != null) {
-      // If pkgSize given and pkgUnit equals baseUnit but priceUnit kr/<pkgUnit-of-package>, divide
-      if (pkgSizeNum && priceUnit.endsWith(`/pakke`)) perBase = priceNum / pkgSizeNum;
-      else perBase = priceNum;
-    }
+    const perBase = perBaseUnitResult().value;
     return {
       live_agreed_price: priceNum,
       live_agreed_price_unit: priceUnit || null,
@@ -118,6 +144,8 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
       status === "tentatively_agreed" ? "price_agreed" : status === "parked" ? "item_parked" : "item_declined";
     await onSave(patch, eventType, { price: patch.live_agreed_price, status }, finalNote || null);
   }
+
+  const perBaseResult = perBaseUnitResult();
 
   return (
     <Card className="space-y-5 p-5">
@@ -169,6 +197,17 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
                 </SelectContent>
               </Select>
             </div>
+            {price.trim() !== "" && (
+              perBaseResult.value != null ? (
+                <p className="mt-1 text-xs text-ink-muted">
+                  = {formatNok(perBaseResult.value)}/{baseUnit}
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-warning">
+                  Pris per {baseUnit} kan ikke regnes ut{perBaseResult.reason ? ` (${perBaseResult.reason})` : ""}.
+                </p>
+              )
+            )}
           </Field>
           <Field label="Pakning">
             <div className="flex gap-2">

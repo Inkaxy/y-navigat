@@ -39,6 +39,7 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
   const [agreedPrice, setAgreedPrice] = useState<string>("");
   const [packageSize, setPackageSize] = useState<string>("");
   const [packageUnit, setPackageUnit] = useState<string>("kg");
+  const [baseUnitsPerPackage, setBaseUnitsPerPackage] = useState<string>("");
   const [pricePerBaseUnit, setPricePerBaseUnit] = useState<string>("");
   const [pricePerBaseUnitTouched, setPricePerBaseUnitTouched] = useState(false);
   /** Om prisen brukeren skriver inn gjelder hele pakningen eller én grunnenhet. */
@@ -54,7 +55,7 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
       setRawMaterialId(defaultRawMaterialId ?? "");
       setSupplierId(defaultSupplierId ?? "");
       setSupplierSku(""); setSupplierProductName("");
-      setAgreedPrice(""); setPackageSize(""); setPackageUnit("kg"); setPriceBasis("package");
+      setAgreedPrice(""); setPackageSize(""); setPackageUnit("kg"); setPriceBasis("package"); setBaseUnitsPerPackage("");
       setPricePerBaseUnit(""); setPricePerBaseUnitTouched(false);
       setValidFrom(osloTodayISO()); setValidTo("");
       setSetPrimary(true); setDocFile(null);
@@ -84,6 +85,7 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
       const entered = parseDecimal(agreedPrice);
       const ps = parseDecimal(packageSize);
       const ppbu = parseDecimal(pricePerBaseUnit);
+      const bupp = parseDecimal(baseUnitsPerPackage);
       // Begge prisfeltene lagres konsistent: per pakning og per grunnenhet.
       const ap =
         priceBasis === "package"
@@ -113,6 +115,7 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
           agreed_price_per_base_unit: ppbu,
           package_size: ps,
           package_unit: packageUnit || null,
+          base_units_per_package: bupp,
           agreement_valid_from: validFrom || null,
           agreement_valid_to: validTo || null,
           agreement_priority: null,
@@ -148,6 +151,7 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
         agreed_price_set_at: string | null;
         agreed_price_set_by: string | null;
         is_primary: boolean;
+        base_units_per_package: number | null;
         agreement_document_url?: string;
       } = {
         raw_material_id: rawMaterialId,
@@ -158,6 +162,7 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
         agreed_price_per_base_unit: ppbu,
         package_size: ps,
         package_unit: packageUnit || null,
+        base_units_per_package: bupp,
         agreement_valid_from: validFrom || null,
         agreement_valid_to: validTo || null,
         agreed_price_set_at: ppbu == null && ap == null ? null : new Date().toISOString(),
@@ -288,6 +293,14 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="col-span-2">
+            <Label>Grunnenheter per pakning ({selectedRm?.base_unit ?? "grunnenhet"})</Label>
+            <Input
+              value={baseUnitsPerPackage}
+              onChange={(e) => setBaseUnitsPerPackage(e.target.value)}
+              placeholder="F.eks. 25 for en 25 kg sekk"
+            />
           </div>
           <div className="col-span-2">
             <Label>Pris pr {selectedRm?.base_unit ?? "base unit"} (auto)</Label>

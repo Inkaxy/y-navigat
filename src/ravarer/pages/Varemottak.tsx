@@ -371,8 +371,11 @@ function InvoiceReceiptDialog({
         row={packageLine ? receiptLineAsWorklistRow(packageLine) : null}
         onOpenChange={v => {
           if (v) return;
-          const line = packageLine;
           setPackageLine(null);
+        }}
+        onApplied={() => {
+          // Rematch skal bare kjøre når pakningen faktisk ble lagret, ikke ved avbrutt dialog.
+          const line = packageLine;
           if (line) void rematchLine(line);
         }}
       />

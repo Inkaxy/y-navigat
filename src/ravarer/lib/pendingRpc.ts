@@ -110,6 +110,7 @@ export interface AgreementPayload {
   agreed_price_per_base_unit: number | null;
   package_size: number | null;
   package_unit: string | null;
+  base_units_per_package: number | null;
   agreement_valid_from: string | null;
   agreement_valid_to: string | null;
   agreement_priority: number | null;

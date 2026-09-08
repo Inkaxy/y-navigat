@@ -66,6 +66,9 @@ export default function Varetelling() {
   const [pendingExpected, setPendingExpected] = useState<Record<string, number>>({});
   const [draftSource, setDraftSource] = useState<"lokalt" | "server">("lokalt");
   const [draftLoaded, setDraftLoaded] = useState(false);
+  // Autosave skal aldri kjøre før brukeren faktisk har gjort noe med tellingen —
+  // ellers sletter den tomme førstegangs-lagringen et allerede lagret utkast.
+  const [dirty, setDirty] = useState(false);
   // Operasjons-ID: følger tellingen til den er bokført, slik at et nytt forsøk
   // etter nettbrudd eller dobbeltklikk aldri fører tellingen to ganger.
   const [opId, setOpId] = useState<string>(() => newOpId());
@@ -101,9 +104,9 @@ export default function Varetelling() {
   }, [draftKey, legalEntityId]);
 
   useEffect(() => {
-    if (!draftLoaded) return;
+    if (!draftLoaded || !dirty) return;
     saveCountDraft(draftKey, { entries, lineNotes, note, opId });
-  }, [draftKey, draftLoaded, entries, lineNotes, note, opId]);
+  }, [draftKey, draftLoaded, dirty, entries, lineNotes, note, opId]);
 
   // Serverlagring er sekundær og skjer med ro: den skal ikke forstyrre tastingen.
   useEffect(() => {
@@ -201,6 +204,7 @@ export default function Varetelling() {
       setFrozen({});
       setNote("");
       setOpId(newOpId());
+      setDirty(false);
       clearCountDraft(draftKey);
     } catch {
       // Feilmeldingen vises av mutasjonen; utkastet og operasjons-ID-en beholdes,
@@ -211,6 +215,7 @@ export default function Varetelling() {
 
   /** Fyller 0 på alt som er synlig og ikke talt — «resten er tomt». */
   const setRestToZero = () => {
+    setDirty(true);
     setEntries(prev => {
       const next = { ...prev };
       for (const r of visible) {
@@ -246,6 +251,7 @@ export default function Varetelling() {
             <Button
               variant="outline"
               onClick={() => {
+                setDirty(false);
                 clearCountDraft(draftKey);
                 if (draftSource === "server") void discardCountSheet(pendingDraft.opId);
                 setPendingDraft(null);
@@ -256,6 +262,7 @@ export default function Varetelling() {
             </Button>
             <Button
               onClick={() => {
+                setDirty(true);
                 setEntries(pendingDraft.entries);
                 setLineNotes(pendingDraft.lineNotes);
                 setNote(pendingDraft.note);
@@ -343,9 +350,10 @@ export default function Varetelling() {
                     </p>
                     <Input
                       value={lineNotes[r.raw_material_id] ?? ""}
-                      onChange={e =>
-                        setLineNotes(prev => ({ ...prev, [r.raw_material_id]: e.target.value }))
-                      }
+                      onChange={e => {
+                        setDirty(true);
+                        setLineNotes(prev => ({ ...prev, [r.raw_material_id]: e.target.value }));
+                      }}
                       placeholder="Lokasjon eller notat"
                       className="mt-2 h-9 text-sm"
                     />
@@ -354,6 +362,7 @@ export default function Varetelling() {
                     <UnitAmountRows
                       rows={rowsFor(r.raw_material_id)}
                       onChange={next => {
+                        setDirty(true);
                         freeze(r);
                         setEntries(prev => ({ ...prev, [r.raw_material_id]: next }));
                       }}
@@ -382,7 +391,7 @@ export default function Varetelling() {
       <Card className="sticky bottom-4 space-y-3 p-4 shadow-lg">
         <div>
           <Label className="text-xs">Notat på tellingen</Label>
-          <Textarea value={note} onChange={e => setNote(e.target.value)} rows={2} placeholder="F.eks. «Månedstelling tørrvarelager»" />
+          <Textarea value={note} onChange={e => { setDirty(true); setNote(e.target.value); }} rows={2} placeholder="F.eks. «Månedstelling tørrvarelager»" />
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-ink-secondary">
