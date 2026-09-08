@@ -254,16 +254,20 @@ export function NewProductWizard({ open, onOpenChange, productOptions }: Props) 
     for (const l of lists) {
       let targetPct: number | null = null;
       if (l.price_level) {
-        const { data } = await supabase.rpc("resolve_margin_target", {
+        // Varen finnes ikke ennå — vi henter selskapets standardmål for nivået.
+        // Feiler kallet, viser vi bare «—» i stedet for å blokkere veiviseren.
+        const { data, error } = await supabase.rpc("resolve_margin_target", {
           p_product_id: null as unknown as string,
           p_price_level: l.price_level as never,
         });
-        const row = Array.isArray(data) ? data[0] : data;
-        const t = (row as { target_dg2_pct?: number | null } | null)?.target_dg2_pct;
-        targetPct = typeof t === "number" ? t : null;
+        if (!error) {
+          const row = Array.isArray(data) ? data[0] : data;
+          const t = (row as { target_dg2_pct?: number | null } | null)?.target_dg2_pct;
+          targetPct = typeof t === "number" ? t : null;
+        }
       }
       const required = requiredPriceForTarget(estimatedCost, targetPct);
-      const suggested = required != null ? roundPrice(required, null) : null;
+      const suggested = required != null ? roundPrice(required, 0.5) : null;
       lines.push({
         priceListId: l.id,
         name: l.display_name,
