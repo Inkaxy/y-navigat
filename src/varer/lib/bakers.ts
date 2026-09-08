@@ -86,74 +86,38 @@ export const BREAD_DEFAULT_STEPS: { step_type: StepType; title: string }[] = [
 ];
 
 // ===== Enheter =====
+// Enhetsmotoren bor i src/varer/lib/units-recipe.ts, som er byte-identisk med
+// supabase/functions/_shared/units-recipe.ts. Vi re-eksporterer den her slik at
+// alle gamle importer fra bakers.ts fortsatt virker — det finnes ÉN motor.
 
-/** Kanoniske enheter oppskriftslinjer kan bruke. */
-export type RecipeUnit = "g" | "kg" | "ml" | "cl" | "dl" | "l" | "stk";
+export {
+  RECIPE_UNIT_ALIASES,
+  ML_PER_UNIT,
+  normalizeRecipeUnit,
+  convertToGrams,
+  fromGrams,
+  toLitres,
+  computeUnitCount,
+  resolveFinalWeight,
+} from "./units-recipe";
+export type {
+  RecipeUnit,
+  GramsResult,
+  ConvertOptions,
+  UnitCountRecipe,
+  FinalWeightRecipe,
+} from "./units-recipe";
 
-const RECIPE_UNIT_ALIASES: Record<string, RecipeUnit> = {
-  g: "g", gr: "g", gram: "g", grm: "g",
-  kg: "kg", kilo: "kg", kilogram: "kg",
-  ml: "ml", milliliter: "ml",
-  cl: "cl", centiliter: "cl",
-  dl: "dl", desiliter: "dl", deciliter: "dl",
-  l: "l", lt: "l", ltr: "l", liter: "l", litre: "l",
-  stk: "stk", st: "stk", stykk: "stk", pcs: "stk", pc: "stk",
-};
+import {
+  computeUnitCount,
+  convertToGrams,
+  fromGrams,
+  type ConvertOptions,
+  type GramsResult,
+  type UnitCountRecipe,
+} from "./units-recipe";
 
-/** Normaliserer en enhetstekst. Returnerer null for ukjente enheter. */
-export function normalizeRecipeUnit(unit: string | null | undefined): RecipeUnit | null {
-  if (!unit) return null;
-  const k = String(unit).trim().toLowerCase().replace(/\.$/, "");
-  return RECIPE_UNIT_ALIASES[k] ?? null;
-}
 
-const ML_PER_UNIT: Record<string, number> = { ml: 1, cl: 10, dl: 100, l: 1000 };
-
-export interface GramsResult {
-  grams: number;
-  /** Usann når vekten er anslått eller ukjent — da er beregningen ufullstendig. */
-  exact: boolean;
-  /** Forklaring som kan vises i grensesnittet når `exact` er usann. */
-  reason?: string;
-}
-
-export interface ConvertOptions {
-  /**
-   * Tetthet i g/ml. Databasen har ingen tetthetskolonne på råvarer, så denne
-   * settes bare når vi faktisk vet den (rent vann) eller kalleren oppgir den.
-   */
-  densityGPerMl?: number | null;
-  /** Vekt per stykk i gram — `raw_materials.unit_weight_grams`. */
-  pieceWeightG?: number | null;
-}
-
-/**
- * Regner en mengde om til gram.
- * Volum uten kjent tetthet og «stk» uten stykkvekt gir aldri en stille nullvekt —
- * resultatet merkes som ufullstendig med en forklaring.
- */
-export function convertToGrams(
-  quantity: number | string,
-  unit: string,
-  opts: ConvertOptions = {},
-): GramsResult {
-  const q = Number(quantity) || 0;
-  const u = normalizeRecipeUnit(unit);
-  if (!u) return { grams: 0, exact: false, reason: `Ukjent enhet «${unit}»` };
-  if (u === "g") return { grams: q, exact: true };
-  if (u === "kg") return { grams: q * 1000, exact: true };
-  if (u === "stk") {
-    const w = Number(opts.pieceWeightG) || 0;
-    if (w > 0) return { grams: q * w, exact: true };
-    return { grams: 0, exact: false, reason: "Mangler vekt per stykk" };
-  }
-  const ml = q * ML_PER_UNIT[u];
-  const d = Number(opts.densityGPerMl) || 0;
-  if (d > 0) return { grams: ml * d, exact: true };
-  // Ingen kjent tetthet: vi antar IKKE vann. Vekten er ukjent, og beregningen
-  // merkes som ufullstendig i stedet for å levere et oppdiktet tall.
-  return { grams: 0, exact: false, reason: `Ukjent tetthet for ${u} — vekten kan ikke beregnes` };
-}
 
 /**
  * Konverterer en linjemengde til gram og mister `exact`-flagget. Brukes bare
@@ -165,24 +129,7 @@ export function toGrams(quantity: number | string, unit: string, opts: ConvertOp
   return convertToGrams(quantity, unit, opts).grams;
 }
 
-/**
- * Motsatt vei: gram → oppgitt enhet. Returnerer NaN når omregningen er ukjent
- * (volum uten tetthet, «stk» uten stykkvekt), slik at kalleren må ta stilling
- * til det i stedet for å få et tall som ser riktig ut.
- */
-export function fromGrams(grams: number, unit: string, opts: ConvertOptions = {}): number {
-  const u = normalizeRecipeUnit(unit);
-  if (!u) return NaN;
-  if (u === "kg") return grams / 1000;
-  if (u === "g") return grams;
-  if (u === "stk") {
-    const w = Number(opts.pieceWeightG) || 0;
-    return w > 0 ? grams / w : NaN;
-  }
-  const d = Number(opts.densityGPerMl) || 0;
-  if (d <= 0) return NaN;
-  return grams / d / ML_PER_UNIT[u];
-}
+
 
 /**
  * Rent vann er den ENESTE væsken vi kjenner tettheten til uten en tetthetskolonne.
@@ -241,6 +188,9 @@ export interface BakersRawMaterial {
   produced_by_recipe_id?: string | null;
   /** Vekt per stykk i gram — `raw_materials.unit_weight_grams`. Brukes for «stk». */
   unit_weight_grams?: number | null;
+  /** Grunnenheten kostprisen er oppgitt i — `raw_materials.base_unit` (kg, l, stk). */
+  base_unit?: string | null;
+
 }
 
 
@@ -349,6 +299,28 @@ export function computeTotals(lines: BakersLine[], unitWeightGrams?: number | nu
     incomplete: warnings.length > 0,
   };
 }
+
+/**
+ * Samme totaler, men antall emner regnes ut fra oppskriftens egne felter
+ * (emnevekt, deigsvinn, emner per batch) i stedet for bare `unit_weight_grams`.
+ * Dette er den formen alle listene og delesidene skal bruke, slik at antallet
+ * er det samme uansett hvor det vises.
+ */
+export function computeTotalsForRecipe(
+  lines: BakersLine[],
+  recipe: UnitCountRecipe | null | undefined,
+) {
+  const base = computeTotals(lines, Number(recipe?.unit_weight_grams) || null);
+  const count = base.warnings.length === 0 ? computeUnitCount(recipe, base.totalDoughG) : null;
+  const piece = Number(recipe?.dough_piece_grams) || 0;
+  return {
+    ...base,
+    unitCount: count,
+    doughPerUnitG: piece > 0 ? piece : base.doughPerUnitG,
+  };
+}
+
+
 
 /** Oppsummering for én del (typisk fordeig). */
 export function computePartSummary(partLines: BakersLine[], totalFlourG: number) {

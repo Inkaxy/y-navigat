@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,13 +10,25 @@ interface Props {
   frictionFactor: number | null;
   prefermentTemp?: number | null;
   canWrite: boolean;
+  /** Rom- og meltemperatur eies av siden, slik at PDF-en får de samme tallene. */
+  roomTemp: number;
+  flourTemp: number;
+  onRoomTempChange: (v: number) => void;
+  onFlourTempChange: (v: number) => void;
   onChange: (patch: { target_dough_temp_celsius?: number | null; friction_factor_celsius?: number | null }) => void;
 }
 
-export function DoughTempPanel({ targetDoughTemp, frictionFactor, prefermentTemp, canWrite, onChange }: Props) {
-  const [roomTemp, setRoomTemp] = useState(21);
-  const [flourTemp, setFlourTemp] = useState(21);
-
+export function DoughTempPanel({
+  targetDoughTemp,
+  frictionFactor,
+  prefermentTemp,
+  canWrite,
+  roomTemp,
+  flourTemp,
+  onRoomTempChange,
+  onFlourTempChange,
+  onChange,
+}: Props) {
   const res = calcWaterTemp({
     targetDoughTemp: targetDoughTemp ?? 24,
     roomTemp,
@@ -49,11 +60,11 @@ export function DoughTempPanel({ targetDoughTemp, frictionFactor, prefermentTemp
           </div>
           <div>
             <Label className="text-xs">Romtemp (°C)</Label>
-            <Input type="number" step="0.5" className="h-8" value={roomTemp} onChange={(e) => setRoomTemp(Number(e.target.value))} />
+            <Input type="number" step="0.5" className="h-8" value={roomTemp} onChange={(e) => onRoomTempChange(Number(e.target.value))} />
           </div>
           <div>
             <Label className="text-xs">Meltemp (°C)</Label>
-            <Input type="number" step="0.5" className="h-8" value={flourTemp} onChange={(e) => setFlourTemp(Number(e.target.value))} />
+            <Input type="number" step="0.5" className="h-8" value={flourTemp} onChange={(e) => onFlourTempChange(Number(e.target.value))} />
           </div>
           <div>
             <Label className="text-xs">Fordeig (°C)</Label>

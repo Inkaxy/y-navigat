@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { lineToGrams, type BakersLine } from "@/varer/lib/bakers";
+import { computeRecipeCost } from "@/varer/lib/recipeCost";
 
 /** Kategorien som markerer at en oppskrift er en grunnoppskrift. */
 export const BASE_RECIPE_CATEGORY = "Grunnoppskrift";
@@ -18,14 +19,6 @@ export function slugify(name: string): string {
 export function makeSku(name: string): string {
   const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
   return `${(slugify(name) || "halvfab").toUpperCase()}-${suffix}`;
-}
-
-/** Kostnad for én linje — samme formel som oppskriftskalkylen i PDF-en. */
-function lineCost(line: BakersLine, grams: number): number {
-  const price = Number(line._rm?.current_cost_price ?? NaN);
-  if (!Number.isFinite(price)) return 0;
-  if (line.unit === "stk") return (Number(line.quantity) || 0) * price;
-  return (grams / 1000) * price;
 }
 
 /** Linjer der mengden ikke kan regnes om til gram — de gjør prisen ubrukelig. */
@@ -47,17 +40,10 @@ export function costPerKgBlockedReason(lines: BakersLine[]): string | null {
  * tetthet ble tidligere talt som 0 g og 0 kr, og prisen ble dermed for høy.
  */
 export function costPerKg(lines: BakersLine[]): number | null {
-  if (unconvertibleLines(lines).length > 0) return null;
-  let totalGrams = 0;
-  let sum = 0;
-  for (const l of lines) {
-    const g = lineToGrams(l).grams;
-    totalGrams += g;
-    sum += lineCost(l, g);
-  }
-  if (totalGrams <= 0) return null;
-  if (sum <= 0) return null;
-  return sum / (totalGrams / 1000);
+  const res = computeRecipeCost(lines);
+  if (res.incomplete) return null;
+  if (!(res.totalCost > 0)) return null;
+  return res.costPerKg;
 }
 
 /**
