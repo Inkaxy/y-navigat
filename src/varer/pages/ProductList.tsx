@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/supabasePaging";
 import { AppHeaderBanner, NewProductActionButton } from "@/varer/components/layout/AppHeaderBanner";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,6 +16,7 @@ import { ColumnPicker, type ColumnOption } from "@/varer/components/products/Col
 import { Button } from "@/components/ui/button";
 import { Search, Loader2, Tag, Cake, Images, ImageIcon, Pencil, Check, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { calcQuality, CALC_QUALITY_LABEL } from "@/varer/lib/calcQuality";
 import { PRODUCT_STATUS_LABEL, ProductStatus, CAKE_ROLE_LABEL, CakeRole, LABEL_MODE_OPTIONS } from "@/varer/lib/constants";
 import { useAppContext } from "@/varer/context/AppContext";
 import { useUiPreference } from "@/hooks/useUiPreference";
@@ -80,6 +82,7 @@ type ColDef = ColumnOption & {
 };
 
 const COLUMN_PREF_SCOPE = "varer.product_list.columns.v1";
+const PRICE_LIST_PREF_KEY = "varer.product_list.price_list.v1";
 
 export default function ProductList() {
   const navigate = useNavigate();
@@ -161,35 +164,61 @@ export default function ProductList() {
     });
   }, [all, search, category, status, variantFilter, labelingFilter]);
 
-  const defaultPriceList = useQuery({
-    queryKey: ["default-pricelist", legalEntityId],
+  /** Prislista priskolonnen viser — huskes lokalt per bruker. */
+  const priceListsQuery = useQuery({
+    queryKey: ["product-list-price-lists", legalEntityId],
+    enabled: !!legalEntityId,
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("price_lists")
-        .select("id, display_name")
+        .select("id, display_name, code, is_default, status")
         .eq("legal_entity_id", legalEntityId!)
-        .eq("is_default", true)
-        .maybeSingle();
-      return data;
+        .order("display_name");
+      if (error) throw error;
+      return (data ?? []).filter((l) => l.status !== "archived");
     },
   });
 
+  const [priceListId, setPriceListId] = useState<string | null>(
+    () => localStorage.getItem(PRICE_LIST_PREF_KEY),
+  );
+
+  useEffect(() => {
+    const lists = priceListsQuery.data;
+    if (!lists || lists.length === 0) return;
+    if (priceListId && lists.some((l) => l.id === priceListId)) return;
+    const preferred =
+      lists.find((l) => l.code === "utsalg_base") ?? lists.find((l) => l.is_default) ?? lists[0];
+    setPriceListId(preferred.id);
+  }, [priceListsQuery.data, priceListId]);
+
+  useEffect(() => {
+    if (priceListId) localStorage.setItem(PRICE_LIST_PREF_KEY, priceListId);
+  }, [priceListId]);
+
   const priceItems = useQuery({
-    queryKey: ["pricelist-items", defaultPriceList.data?.id],
-    enabled: !!defaultPriceList.data?.id,
+    queryKey: ["pricelist-items", priceListId],
+    enabled: !!priceListId,
     queryFn: async () => {
-      const { data } = await supabase
-        .from("price_list_items")
-        .select("product_id, price, valid_from, valid_to")
-        .eq("price_list_id", defaultPriceList.data!.id);
-      return data ?? [];
+      return await fetchAllRows<{
+        product_id: string;
+        price: number;
+        valid_from: string;
+        valid_to: string | null;
+      }>((from, to) =>
+        supabase
+          .from("price_list_items")
+          .select("product_id, price, valid_from, valid_to")
+          .eq("price_list_id", priceListId!)
+          .range(from, to),
+      );
     },
   });
 
   const today = osloTodayISO();
   const priceMap = useMemo(() => {
     const m = new Map<string, number>();
-    (priceItems.data ?? []).forEach((it: any) => {
+    (priceItems.data ?? []).forEach((it) => {
       if (it.valid_from > today) return;
       if (it.valid_to && it.valid_to < today) return;
       m.set(it.product_id, Number(it.price));
@@ -362,6 +391,33 @@ export default function ProductList() {
         cellClassName: "text-right tabular-nums",
         render: (_p, ctx) =>
           ctx.price !== undefined ? `kr ${ctx.price.toFixed(2)}` : <span className="text-muted-foreground">—</span>,
+      },
+      {
+        key: "calc",
+        label: "Kalkyle",
+        render: (p) => {
+          const q = calcQuality({
+            hasCost: p.calc_type === "manuell" ? p.manual_cost_price != null : false,
+            costPrice: p.calc_type === "manuell" ? p.manual_cost_price : null,
+            hasRecipe: p.calc_type === "oppskrift",
+            calcType: p.calc_type,
+          });
+          return (
+            <Badge
+              variant="outline"
+              className={
+                q === "A"
+                  ? "border-success/40 bg-success/10 text-success"
+                  : q === "B"
+                    ? "border-warning/40 bg-warning/10 text-warning"
+                    : "text-muted-foreground"
+              }
+              title={CALC_QUALITY_LABEL[q]}
+            >
+              {q === "ukjent" ? "–" : q}
+            </Badge>
+          );
+        },
       },
       {
         key: "mva",
