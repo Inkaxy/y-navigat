@@ -122,7 +122,7 @@ describe("kost i editoren", () => {
   });
 
   it("melder fra i stedet for å regne 0 kr når kostprisen mangler", () => {
-    const line: BakersLine = { id: "x", recipe_part_id: "p", quantity: 1, unit: "kg", ingredient_name: "Ukjent" };
+    const line: BakersLine = { id: "x", recipe_part_id: "p", quantity: 1, unit: "kg", raw_material_id: null, ingredient_name: "Ukjent" };
     const res = lineCost(line, 1000);
     expect(res.cost).toBeNull();
     expect(res.reason).toBe("Mangler kostpris");
@@ -170,7 +170,7 @@ describe("samlet validering før lagring", () => {
     preferment_kind: null, target_temp_celsius: null, ripe_time_hours: null,
   };
   const line = (over: Partial<EditorLine>): EditorLine => ({
-    id: "l1", recipe_part_id: "p1", quantity: 1000, unit: "g",
+    id: "l1", recipe_part_id: "p1", quantity: 1000, unit: "g", raw_material_id: null,
     waste_percent: 0, sort_order: 0, ingredient_name: "Hvetemel", ...over,
   });
   const input = (over: Partial<Parameters<typeof validateRecipeSave>[0]> = {}) => ({
