@@ -1,14 +1,27 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, ArrowUp, ArrowDown } from "lucide-react";
+import { Search, ArrowUp, ArrowDown, Check } from "lucide-react";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
-import { formatNumber } from "@/ravarer/lib/constants";
+import { formatDate, formatNumber } from "@/ravarer/lib/constants";
 import { usePackageWorklist, type PackageWorklistRow } from "@/ravarer/hooks/usePackageSizes";
+import { usePackageSuggestions } from "@/ravarer/hooks/usePackageSuggestions";
+import { useSuspiciousPackages } from "@/ravarer/hooks/useSuspiciousPackages";
+import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { SetPackageDialog } from "@/ravarer/components/packages/SetPackageDialog";
 import { SuspiciousPackagesCard } from "@/ravarer/components/packages/SuspiciousPackagesCard";
+import {
+  PACKAGE_FILTERS,
+  PACKAGE_FILTER_LABEL,
+  matchesPackageFilter,
+  parsePackageFilter,
+} from "@/ravarer/lib/packageFilter";
+import type { PackageFillSuggestion } from "@/ravarer/lib/packageMath";
+
 
 
 type Tone = "red" | "yellow" | "grey" | "green";
@@ -114,11 +127,30 @@ function SuggestionCell({ navn, referanse }: { navn: number | null; referanse: n
 
 
 export default function PackageSizesPage() {
+  const { canWrite } = useRavarer();
   const { data: rows = [], isLoading } = usePackageWorklist();
+  const { data: suspicious = [] } = useSuspiciousPackages();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filter = parsePackageFilter(searchParams.get("filter"));
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "kjopt_kr_totalt", dir: "desc" });
   const [selected, setSelected] = useState<PackageWorklistRow | null>(null);
+  const [suggestionForDialog, setSuggestionForDialog] = useState<PackageFillSuggestion | null>(null);
+
+  const setFilter = (next: string) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("filter", next);
+    setSearchParams(params, { replace: true });
+  };
+
+  const suspiciousIds = useMemo(
+    () => new Set(suspicious.map(s => s.raw_material_id)),
+    [suspicious],
+  );
+
+  const suggestionIds = useMemo(() => rows.map(r => r.id), [rows]);
+  const { data: suggestions } = usePackageSuggestions(suggestionIds);
 
   const counts = useMemo(() => {
     const m: Record<string, number> = {};
@@ -126,10 +158,21 @@ export default function PackageSizesPage() {
     return m;
   }, [rows]);
 
+  const filterCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const f of PACKAGE_FILTERS) {
+      m[f] = rows.filter(r => matchesPackageFilter(r, f, suspiciousIds)).length;
+    }
+    return m;
+  }, [rows, suspiciousIds]);
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const arr = rows.filter(
-      r => (!statusFilter || r.status === statusFilter) && (!needle || (r.name ?? "").toLowerCase().includes(needle)),
+      r =>
+        matchesPackageFilter(r, filter, suspiciousIds) &&
+        (!statusFilter || r.status === statusFilter) &&
+        (!needle || (r.name ?? "").toLowerCase().includes(needle)),
     );
     const dir = sort.dir === "asc" ? 1 : -1;
     return [...arr].sort((a, b) => {
@@ -141,7 +184,39 @@ export default function PackageSizesPage() {
       if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
       return String(av).localeCompare(String(bv), "nb") * dir;
     });
-  }, [rows, q, statusFilter, sort]);
+  }, [rows, q, statusFilter, sort, filter, suspiciousIds]);
+
+  /**
+   * Bekreftelse går ALLTID via pakningsdialogen: den forhåndsviser omregningen
+   * og lagrer gjennom RPC-en som også oppdaterer kostprisen.
+   */
+  const openRow = useCallback(
+    (row: PackageWorklistRow) => {
+      const sug = suggestions?.get(row.id);
+      setSuggestionForDialog(
+        sug
+          ? { size: sug.package_size, contentUnit: sug.package_unit, count: sug.count_per_package ?? 1 }
+          : null,
+      );
+      setSelected(row);
+    },
+    [suggestions],
+  );
+
+  // Hurtigtast: Enter bekrefter øverste rad, slik at man kan jobbe seg nedover.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "Enter" || selected) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      const row = filtered[0];
+      if (!row || !canWrite) return;
+      e.preventDefault();
+      openRow(row);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [filtered, selected, canWrite, openRow]);
 
   const toggleSort = (key: SortKey) =>
     setSort(s => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }));
@@ -160,11 +235,27 @@ export default function PackageSizesPage() {
       <RavarerHeaderBanner />
 
       <div>
-        <h1 className="text-2xl font-semibold">Pakningsstørrelser</h1>
+        <h1 className="text-2xl font-semibold">Pakninger</h1>
         <p className="mt-1 text-sm text-ink-secondary">
           Hvor mange baseenheter det er i én pakning. Uten dette blir kostprisen feil.
         </p>
       </div>
+
+      <div className="flex flex-wrap gap-2">
+        {PACKAGE_FILTERS.map(f => (
+          <Button
+            key={f}
+            size="sm"
+            variant={filter === f ? "default" : "outline"}
+            onClick={() => setFilter(f)}
+          >
+            {PACKAGE_FILTER_LABEL[f]}
+            <span className="ml-1.5 tabular-nums opacity-70">{filterCounts[f] ?? 0}</span>
+          </Button>
+        ))}
+      </div>
+
+
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
         {STATUS_CARDS.map(c => {
@@ -219,14 +310,18 @@ export default function PackageSizesPage() {
                   <Th k="kjopt_kr_totalt" right>Kjøpt 12 mnd</Th>
                   <Th k="pris_spredning" right>Spredning</Th>
                   <Th k="status">Status</Th>
+                  <th className="px-3 py-2 text-left">Forslag fra siste faktura</th>
+                  <th className="px-3 py-2 text-right">Handling</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(r => (
+                {filtered.map(r => {
+                  const invoiceSuggestion = suggestions?.get(r.id) ?? null;
+                  return (
                   <tr
                     key={r.id}
                     className="cursor-pointer border-t border-line-subtle hover:bg-muted/40"
-                    onClick={() => setSelected(r)}
+                    onClick={() => openRow(r)}
                   >
                     <td className="px-3 py-2">
                       <div className="font-medium">{r.name}</div>
@@ -276,15 +371,47 @@ export default function PackageSizesPage() {
                       {r.pris_spredning == null ? "—" : `${formatNumber(r.pris_spredning, 2)}×`}
                     </td>
                     <td className="px-3 py-2">{statusBadge(r.status)}</td>
+                    <td className="px-3 py-2">
+                      {invoiceSuggestion ? (
+                        <div>
+                          <div className="font-medium tabular-nums">
+                            {formatNumber(invoiceSuggestion.package_size, 3)} {invoiceSuggestion.package_unit ?? ""}
+                            {invoiceSuggestion.count_per_package != null && ` × ${invoiceSuggestion.count_per_package}`}
+                          </div>
+                          <div className="text-xs text-ink-secondary">
+                            {formatDate(invoiceSuggestion.invoice_date)}
+                            {invoiceSuggestion.description ? ` · ${invoiceSuggestion.description}` : ""}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-ink-secondary">Ingen fakturalinje med pakning</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right" onClick={e => e.stopPropagation()}>
+                      <Button size="sm" variant="outline" disabled={!canWrite} onClick={() => openRow(r)}>
+                        <Check className="mr-1 h-3.5 w-3.5" /> Bekreft
+                      </Button>
+                    </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
       </Card>
 
-      <SetPackageDialog row={selected} open={!!selected} onOpenChange={v => !v && setSelected(null)} />
+      <SetPackageDialog
+        row={selected}
+        open={!!selected}
+        suggestion={suggestionForDialog}
+        onOpenChange={v => {
+          if (!v) {
+            setSelected(null);
+            setSuggestionForDialog(null);
+          }
+        }}
+      />
     </div>
   );
 }

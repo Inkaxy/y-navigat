@@ -391,6 +391,8 @@ export interface ResolveLineCostInput {
     baseUnitsPerPackage?: number | null;
     packageSize?: number | null;
     packageUnit?: string | null;
+    /** Bekreftet på selve varen. Gjelder også når koblingen mangler egen dato. */
+    packageConfirmedAt?: string | null;
   } | null;
   /** Historisk pris per baseenhet — brukes kun som rimelighetssjekk. */
   knownPricePerBaseUnit?: number | null;
@@ -509,7 +511,10 @@ export function resolvePackageContent(input: ResolveLineCostInput): PackageResol
   const spUnit = normalizeUnit(spUnitRaw) ?? (spUnitRaw ? String(spUnitRaw).toLowerCase() : null);
   const spSize = toNum(sp?.packageSize);
   const confirmed = toNum(sp?.baseUnitsPerPackage);
-  const isConfirmed = !!sp?.packageConfirmedAt;
+  // Bekreftelsen kan ligge på leverandørkoblingen ELLER på selve varen. Uten
+  // det siste ble en pakning bekreftet i Pakninger-lista fortsatt behandlet som
+  // gjetting av motoren.
+  const isConfirmed = !!sp?.packageConfirmedAt || !!input.rawMaterialPackage?.packageConfirmedAt;
 
   // Beskrivelsen tolkes alltid — den brukes både som fallback og som kontroll
   // mot en ubekreftet leverandørpakning.
@@ -553,7 +558,23 @@ export function resolvePackageContent(input: ResolveLineCostInput): PackageResol
       // Bekreftet størrelse oppgitt i en pakke-enhet: da er tallet innholdet i baseenheter.
       return { baseUnitsPerPackage: spSize, source: "rms_confirmed", packageUnitLabel: spUnit };
     }
+    // Bekreftelsen kan ligge på varen selv. Da teller varens egen pakning like
+    // mye som en bekreftet leverandørkobling.
+    const rmpConfirmed = input.rawMaterialPackage;
+    if (input.rawMaterialPackage?.packageConfirmedAt) {
+      const rmUnitsConfirmed = toNum(rmpConfirmed?.baseUnitsPerPackage);
+      if (rmUnitsConfirmed && rmUnitsConfirmed > 0) {
+        return {
+          baseUnitsPerPackage: rmUnitsConfirmed,
+          source: "raw_material",
+          packageUnitLabel: normalizeUnit(rmpConfirmed?.packageUnit) ?? rmpConfirmed?.packageUnit ?? null,
+        };
+      }
+      const rmSizeConfirmed = fromSizeUnit(toNum(rmpConfirmed?.packageSize), rmpConfirmed?.packageUnit, "raw_material");
+      if (rmSizeConfirmed) return rmSizeConfirmed;
+    }
   }
+
 
   // Regel 1: en UBEKREFTET `package_size = 1` med pakke-enhet er en selvmotsigelse
   // («én sekk er aldri ett kilo») — en gammel standardverdi, ikke data.

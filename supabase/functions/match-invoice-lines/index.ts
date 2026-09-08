@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
 
     // Raw materials in legal entity (active) — for fuzzy
     const { data: rmList } = await svc.from("raw_materials")
-      .select("id, name, sku, category, base_unit, current_cost_price, price_updated_at, primary_supplier_id, package_size, package_unit, base_units_per_package")
+      .select("id, name, sku, category, base_unit, current_cost_price, price_updated_at, primary_supplier_id, package_size, package_unit, base_units_per_package, package_confirmed_at")
       .eq("legal_entity_id", inv.legal_entity_id).eq("is_active", true);
     const rmById = new Map<string, AnyRec>((rmList ?? []).map((r: AnyRec) => [r.id, r]));
 
@@ -639,6 +639,7 @@ function costForLine(line: AnyRec, rm: AnyRec | undefined, rmsRow: AnyRec | unde
       baseUnitsPerPackage: rm.base_units_per_package ?? null,
       packageSize: rm.package_size ?? null,
       packageUnit: rm.package_unit ?? null,
+      packageConfirmedAt: rm.package_confirmed_at ?? null,
     },
     knownPricePerBaseUnit: rm.current_cost_price != null ? Number(rm.current_cost_price) : null,
   });

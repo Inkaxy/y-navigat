@@ -123,7 +123,7 @@ async function callSetPackage(input: SetPackageInput): Promise<PackageRpcResult>
 export function usePreviewPackage() {
   return useMutation({
     mutationFn: (input: Omit<SetPackageInput, "p_apply">) => callSetPackage({ ...input, p_apply: false }),
-    onError: (e: any) => toast.error(`Kunne ikke forhåndsvise: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Kunne ikke forhåndsvise: ${e instanceof Error ? e.message : String(e)}`),
   });
 }
 
@@ -139,7 +139,7 @@ export function useApplyPackage() {
   return useMutation({
     mutationFn: (input: Omit<SetPackageInput, "p_apply">) => callSetPackage({ ...input, p_apply: true }),
     onSuccess: (_res, vars) => invalidate(vars.p_raw_material_id),
-    onError: (e: any) => toast.error(`Kunne ikke lagre: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Kunne ikke lagre: ${e instanceof Error ? e.message : String(e)}`),
   });
 }
 
@@ -155,7 +155,7 @@ export function useUndoRecalc() {
       invalidate(vars.rawMaterialId);
       toast.success("Omregningen er angret");
     },
-    onError: (e: any) => toast.error(`Kunne ikke angre: ${e.message ?? e}`),
+    onError: (e: unknown) => toast.error(`Kunne ikke angre: ${e instanceof Error ? e.message : String(e)}`),
   });
 }
 

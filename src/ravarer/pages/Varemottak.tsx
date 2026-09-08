@@ -17,7 +17,13 @@ import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
 import { useRawMaterialUnits, useRawMaterialUnitsFor } from "@/ravarer/hooks/useRawMaterialUnits";
-import { useReceiptInvoices, useReceiptLines, useReceiptMovement, type ReceiptLine } from "@/ravarer/hooks/useGoodsReceipt";
+import {
+  useReceiptInvoices,
+  useReceiptLines,
+  useReceiptMovement,
+  useReceiveInvoiceLine,
+  type ReceiptLine,
+} from "@/ravarer/hooks/useGoodsReceipt";
 import { QueryState } from "@/components/common/QueryState";
 import { UnitAmountRows, emptyRow, rowsToBase, type UnitAmountRow } from "@/ravarer/components/stock/UnitAmountRows";
 import { formatDate, formatNok, formatNumber } from "@/ravarer/lib/constants";
@@ -205,6 +211,7 @@ function InvoiceReceiptDialog({
     void unitsQuery.refetch();
   };
   const [deviationLine, setDeviationLine] = useState<ReceiptLine | null>(null);
+  const receive = useReceiveInvoiceLine();
 
   const purchaseUnitText = (line: ReceiptLine) => {
     if (line.base_quantity == null || !line.raw_material_id) return null;
@@ -273,15 +280,44 @@ function InvoiceReceiptDialog({
                           <Badge variant="outline" className="text-success">
                             <Check className="mr-1 h-3 w-3" /> Inn på lager
                           </Badge>
+                        ) : l.base_quantity == null ? (
+                          <div className="space-y-1">
+                            <Badge variant="outline" className="border-warning/50 text-warning">
+                              Mangler omregning
+                            </Badge>
+                            <p className="text-xs text-ink-secondary">
+                              <Link to="/ravarer/pakningsstorrelser?filter=ubekreftet" className="text-primary hover:underline">
+                                Sett pakning
+                              </Link>{" "}
+                              så regnes linja om.
+                            </p>
+                          </div>
                         ) : (
-                          <Badge variant="outline" className="border-warning/50 text-warning">
-                            Mangler omregning
-                          </Badge>
+                          <Badge variant="outline" className="text-ink-secondary">Ikke mottatt</Badge>
                         )}
                       </td>
                       <td className="py-3 text-right">
                         {canWrite && l.stock_tracking && l.raw_material_id && (
-                          <Button size="sm" variant="ghost" onClick={() => setDeviationLine(l)}>Avvik</Button>
+                          <div className="flex justify-end gap-1">
+                            {!l.has_movement && l.base_quantity != null && l.base_quantity > 0 && invoiceId && (
+                              <Button
+                                size="sm"
+                                disabled={receive.isPending}
+                                onClick={() =>
+                                  void receive.mutate({
+                                    invoice_line_id: l.id,
+                                    invoice_id: invoiceId,
+                                    raw_material_id: l.raw_material_id!,
+                                    quantity_base: l.base_quantity!,
+                                    invoice_number: invoiceNumber,
+                                  })
+                                }
+                              >
+                                Motta
+                              </Button>
+                            )}
+                            <Button size="sm" variant="ghost" onClick={() => setDeviationLine(l)}>Avvik</Button>
+                          </div>
                         )}
                       </td>
                     </tr>

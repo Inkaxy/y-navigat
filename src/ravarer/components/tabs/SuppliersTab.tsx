@@ -11,6 +11,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { parseDecimal } from "@/ravarer/lib/packageMath";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -403,10 +404,11 @@ function RmSupplierDialog({
   const [isPrimary, setIsPrimary] = useState(existing?.is_primary ?? false);
 
   /** Avtaleprisen skrives inn per pakning og lagres også om til per grunnenhet. */
-  const perBaseUnit = perBaseUnitFromPackage(
-    agreedPrice ? Number(agreedPrice) : null,
-    baseUnitsPerPackage ? Number(baseUnitsPerPackage) : null,
-  );
+  // «2,5» skal bli 2,5 — Number("2,5") gir NaN og droppet pakningen stille.
+  const agreedPriceNum = parseDecimal(agreedPrice);
+  const baseUnitsNum = parseDecimal(baseUnitsPerPackage);
+  const packageSizeNum = parseDecimal(packageSize);
+  const perBaseUnit = perBaseUnitFromPackage(agreedPriceNum, baseUnitsNum);
 
   const submit = async () => {
     if (!supplierId) return;
@@ -416,12 +418,10 @@ function RmSupplierDialog({
       supplier_id: supplierId,
       supplier_sku: sku || null,
       supplier_product_name: productName || null,
-      package_size: packageSize ? Number(packageSize) : null,
-      base_units_per_package: baseUnitsPerPackage
-        ? Number(baseUnitsPerPackage)
-        : null,
+      package_size: packageSizeNum,
+      base_units_per_package: baseUnitsNum,
       package_unit: packageUnit || null,
-      agreed_price: agreedPrice ? Number(agreedPrice) : null,
+      agreed_price: agreedPriceNum,
       agreed_price_per_base_unit: perBaseUnit,
       agreement_valid_from: validFrom || null,
       agreement_valid_to: validTo || null,
@@ -473,8 +473,8 @@ function RmSupplierDialog({
             <div>
               <Label>Pakn. størrelse</Label>
               <Input
-                type="number"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={packageSize}
                 onChange={(e) => setPackageSize(e.target.value)}
               />
@@ -498,8 +498,8 @@ function RmSupplierDialog({
           <div>
             <Label>Antall baseenheter per pakning</Label>
             <Input
-              type="number"
-              step="0.001"
+              type="text"
+              inputMode="decimal"
               value={baseUnitsPerPackage}
               onChange={(e) => setBaseUnitsPerPackage(e.target.value)}
             />
@@ -511,8 +511,8 @@ function RmSupplierDialog({
           <div>
             <Label>Avtalt pris per pakning (kr)</Label>
             <Input
-              type="number"
-              step="0.01"
+              type="text"
+              inputMode="decimal"
               value={agreedPrice}
               onChange={(e) => setAgreedPrice(e.target.value)}
             />

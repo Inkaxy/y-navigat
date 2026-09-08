@@ -19,6 +19,7 @@ import { ReorderSuggestions } from "@/ravarer/components/stock/ReorderSuggestion
 import { MarginTable } from "@/ravarer/components/stock/MarginTable";
 import { formatDate, formatNumber } from "@/ravarer/lib/constants";
 import { AllStockTable } from "@/ravarer/components/stock/AllStockTable";
+import { StockLedger } from "@/ravarer/components/stock/StockLedger";
 
 const kr = (n: number | null) =>
   n == null ? "—" : new Intl.NumberFormat("nb-NO", { style: "currency", currency: "NOK", maximumFractionDigits: 0 }).format(n);
@@ -91,6 +92,7 @@ export default function LagerPage() {
           <TabsList>
             <TabsTrigger value="lager">Videresalg</TabsTrigger>
             <TabsTrigger value="alle">Alle lagerførte varer</TabsTrigger>
+            <TabsTrigger value="bevegelser">Bevegelser</TabsTrigger>
             <TabsTrigger value="fortjeneste">Fortjeneste</TabsTrigger>
           </TabsList>
 
@@ -286,6 +288,10 @@ export default function LagerPage() {
 
           <TabsContent value="alle">
             <AllStockTable />
+          </TabsContent>
+
+          <TabsContent value="bevegelser">
+            <StockLedger />
           </TabsContent>
 
           <TabsContent value="fortjeneste">

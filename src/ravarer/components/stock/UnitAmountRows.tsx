@@ -4,6 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, X } from "lucide-react";
 import type { RawMaterialUnitRow } from "@/ravarer/hooks/useRawMaterialUnits";
 import { formatNumber } from "@/ravarer/lib/constants";
+import { parseDecimal } from "@/ravarer/lib/packageMath";
 
 export interface UnitAmountRow {
   /** Fritekst slik brukeren skrev den (støtter komma). */
@@ -17,10 +18,7 @@ export const BASE_KEY = "__base";
 export const emptyRow = (): UnitAmountRow => ({ amount: "", unitKey: BASE_KEY });
 
 export function parseAmount(value: string): number | null {
-  const cleaned = value.replace(/\s/g, "").replace(",", ".");
-  if (!cleaned) return null;
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
+  return parseDecimal(value);
 }
 
 /** Regner delsummene om til baseenhet. Returnerer null når ingenting er tastet inn. */
@@ -60,9 +58,8 @@ export function UnitAmountRows({ rows, onChange, units, baseUnit, allowMultiple 
       {rows.map((row, i) => (
         <div key={i} className="flex items-center gap-2">
           <Input
-            type="number"
+            type="text"
             inputMode="decimal"
-            step="any"
             className={compact ? "h-11 w-28 text-right tabular-nums" : "h-11 text-right tabular-nums"}
             value={row.amount}
             placeholder="0"

@@ -18,7 +18,12 @@ export type PackageMathResult =
   | { ok: true; baseUnits: number; factor: number; size: number; count: number }
   | { ok: false; error: string };
 
-function parseNumber(v: string | number | null | undefined): number | null {
+/**
+ * Tolker et tall slik nordmenn skriver det: «2,5» er to og en halv, ikke NaN.
+ * Number("2,5") gir NaN og har tidligere ført til at pakninger ble droppet
+ * stille — bruk denne overalt der brukeren taster inn et tall.
+ */
+export function parseDecimal(v: string | number | null | undefined): number | null {
   if (v == null) return null;
   if (typeof v === "number") return Number.isFinite(v) ? v : null;
   const t = v.trim();
@@ -26,6 +31,8 @@ function parseNumber(v: string | number | null | undefined): number | null {
   const n = Number(t.replace(/\s/g, "").replace(",", "."));
   return Number.isFinite(n) ? n : null;
 }
+
+const parseNumber = parseDecimal;
 
 export function computeBaseUnitsPerPackage(input: PackageMathInput): PackageMathResult {
   const size = parseNumber(input.size);

@@ -1,6 +1,10 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { useAllStockStatus } from "@/ravarer/hooks/useAllStockStatus";
+import { fetchAllRows } from "@/lib/supabasePaging";
+import { packageBaseUnits, roundToPackages } from "@/ravarer/lib/reorder";
 
 export interface ResaleStockRow {
   raw_material_id: string;
@@ -76,8 +80,10 @@ export interface ReorderLine {
   behov: number;
   package_size: number | null;
   package_unit: string | null;
-  /** Antall hele innkjøpspakninger. */
-  packages: number;
+  /** Innhold per pakning i baseenhet — grunnlaget for opprundingen. */
+  base_units_per_package: number | null;
+  /** Antall hele innkjøpspakninger. Null når pakningen er ukjent. */
+  packages: number | null;
   /** Mengde i baseenhet etter opprunding. */
   order_base_qty: number;
   unit_cost: number | null;
@@ -92,47 +98,93 @@ export interface ReorderGroup {
   total_value: number;
 }
 
-/** Innkjøpsforslag gruppert per primærleverandør. */
+interface SupplierLink {
+  raw_material_id: string;
+  supplier_id: string | null;
+  supplier_sku: string | null;
+  package_size: number | null;
+  package_unit: string | null;
+  base_units_per_package: number | null;
+  agreed_price_per_base_unit: number | null;
+  is_primary: boolean;
+  supplier: { id: string; name: string } | null;
+}
+
+/**
+ * Innkjøpsforslag gruppert per primærleverandør.
+ *
+ * Gjelder ALLE lagerførte varer, ikke bare handelsvarer — mel og gjær går tomt
+ * like ofte som brus. Salgstall og reservasjoner finnes bare for handelsvarer,
+ * og legges på der de finnes.
+ */
 export function useReorderSuggestions() {
   const { legalEntityId } = useRavarer();
-  const status = useResaleStockStatus();
-  const rows = status.data ?? [];
+  const all = useAllStockStatus();
+  const resale = useResaleStockStatus();
 
-  const candidates = rows.filter(
-    (r) =>
-      (r.min_stock != null && r.disponibelt < r.min_stock) ||
-      (r.dager_igjen != null && r.dager_igjen < 10),
+  const resaleById = useMemo(
+    () => new Map((resale.data ?? []).map((r) => [r.raw_material_id, r])),
+    [resale.data],
   );
+
+  const candidates = useMemo(() => {
+    return (all.data ?? [])
+      .map((r) => {
+        const extra = resaleById.get(r.raw_material_id);
+        return {
+          raw_material_id: r.raw_material_id,
+          name: r.name,
+          sku: r.sku,
+          base_unit: r.base_unit,
+          disponibelt: extra ? extra.disponibelt : r.current_stock,
+          min_stock: r.min_stock,
+          solgt_30d: extra?.solgt_30d ?? 0,
+          dager_igjen: extra?.dager_igjen ?? null,
+          kostpris: r.current_cost_price,
+        };
+      })
+      .filter(
+        (r) =>
+          (r.min_stock != null && r.disponibelt < r.min_stock) ||
+          (r.dager_igjen != null && r.dager_igjen < 10) ||
+          r.disponibelt < 0,
+      );
+  }, [all.data, resaleById]);
+
   const ids = candidates.map((r) => r.raw_material_id).sort();
 
   const query = useQuery({
-    queryKey: ["resale-reorder", legalEntityId, ids.join(",")],
-    enabled: !!legalEntityId && status.isSuccess,
+    queryKey: ["reorder-suggestions", legalEntityId, ids.join(",")],
+    enabled: !!legalEntityId && all.isSuccess,
     queryFn: async (): Promise<ReorderGroup[]> => {
       if (ids.length === 0) return [];
-      const { data, error } = await supabase
-        .from("raw_material_suppliers")
-        .select(
-          "raw_material_id, supplier_id, supplier_sku, package_size, package_unit, agreed_price_per_base_unit, is_primary, supplier:suppliers(id, name)",
-        )
-        .in("raw_material_id", ids);
-      if (error) throw error;
+      const links = await fetchAllRows<SupplierLink>((from, to) =>
+        supabase
+          .from("raw_material_suppliers")
+          .select(
+            "raw_material_id, supplier_id, supplier_sku, package_size, package_unit, base_units_per_package, agreed_price_per_base_unit, is_primary, supplier:suppliers(id, name)",
+          )
+          .in("raw_material_id", ids)
+          .order("raw_material_id")
+          .range(from, to) as unknown as PromiseLike<{ data: SupplierLink[] | null; error: { message: string } | null }>,
+      );
 
-      const bySupplierLink = new Map<string, any>();
-      for (const link of (data ?? []) as any[]) {
+      // Primærleverandøren vinner alltid; ellers første kobling.
+      const bySupplierLink = new Map<string, SupplierLink>();
+      for (const link of links) {
         const prev = bySupplierLink.get(link.raw_material_id);
         if (!prev || (link.is_primary && !prev.is_primary)) bySupplierLink.set(link.raw_material_id, link);
       }
 
       const groups = new Map<string, ReorderGroup>();
       for (const r of candidates) {
-        const link = bySupplierLink.get(r.raw_material_id);
+        const link = bySupplierLink.get(r.raw_material_id) ?? null;
         const target = Math.max(r.min_stock ?? 0, r.solgt_30d > 0 ? (r.solgt_30d / 30) * 14 : 0);
         const behov = Math.max(target - r.disponibelt, r.disponibelt < 0 ? -r.disponibelt : 0);
         if (behov <= 0) continue;
-        const pkg = link?.package_size != null && Number(link.package_size) > 0 ? Number(link.package_size) : null;
-        const packages = pkg ? Math.ceil(behov / pkg) : Math.ceil(behov);
-        const orderQty = pkg ? packages * pkg : Math.ceil(behov);
+
+        const perPackage = packageBaseUnits(link, r.base_unit);
+        const rounded = roundToPackages(behov, perPackage);
         const unitCost =
           link?.agreed_price_per_base_unit != null ? Number(link.agreed_price_per_base_unit) : r.kostpris;
         const line: ReorderLine = {
@@ -144,12 +196,13 @@ export function useReorderSuggestions() {
           min_stock: r.min_stock,
           dager_igjen: r.dager_igjen,
           behov,
-          package_size: pkg,
+          package_size: link?.package_size == null ? null : Number(link.package_size),
           package_unit: link?.package_unit ?? null,
-          packages,
-          order_base_qty: orderQty,
+          base_units_per_package: rounded.baseUnitsPerPackage,
+          packages: rounded.packages,
+          order_base_qty: rounded.orderBaseQty,
           unit_cost: unitCost,
-          line_value: unitCost == null ? null : unitCost * orderQty,
+          line_value: unitCost == null ? null : unitCost * rounded.orderBaseQty,
           supplier_sku: link?.supplier_sku ?? null,
         };
         const key = link?.supplier?.id ?? "ukjent";
@@ -167,7 +220,7 @@ export function useReorderSuggestions() {
     },
   });
 
-  return { ...query, isLoading: status.isLoading || query.isLoading };
+  return { ...query, isLoading: all.isLoading || resale.isLoading || query.isLoading };
 }
 
 export interface MarginRow {
@@ -274,11 +327,47 @@ export function useResaleMargins() {
 export function reorderGroupToText(group: ReorderGroup): string {
   const lines = group.lines.map((l) => {
     const pkg =
-      l.package_size != null
-        ? `${l.packages} × ${l.package_size} ${l.package_unit ?? l.base_unit}`
+      l.packages != null && l.base_units_per_package != null
+        ? `${l.packages} × ${l.base_units_per_package} ${l.base_unit}`
         : `${l.order_base_qty} ${l.base_unit}`;
     const sku = l.supplier_sku ? ` (varenr ${l.supplier_sku})` : "";
     return `- ${l.name}${sku}: ${pkg}`;
   });
   return [`Bestilling til ${group.supplier_name}`, "", ...lines].join("\n");
+}
+
+/** Bestillingsforslaget som CSV — semikolon, slik Excel på norsk forventer. */
+export function reorderGroupToCsv(group: ReorderGroup): string {
+  const esc = (v: string | number | null) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const head = [
+    "Leverandør",
+    "Varenr",
+    "Vare",
+    "Disponibelt",
+    "Minimum",
+    "Behov",
+    "Pakninger",
+    "Innhold per pakning",
+    "Bestilles",
+    "Enhet",
+    "Verdi",
+  ];
+  const rows = group.lines.map((l) =>
+    [
+      group.supplier_name,
+      l.supplier_sku ?? l.sku,
+      l.name,
+      l.disponibelt,
+      l.min_stock,
+      Number(l.behov.toFixed(3)),
+      l.packages,
+      l.base_units_per_package,
+      l.order_base_qty,
+      l.base_unit,
+      l.line_value == null ? null : Number(l.line_value.toFixed(2)),
+    ]
+      .map(esc)
+      .join(";"),
+  );
+  return [head.map(esc).join(";"), ...rows].join("\n");
 }

@@ -2,10 +2,15 @@ import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Copy, PackagePlus, ShoppingCart } from "lucide-react";
+import { Copy, Download, PackagePlus, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { formatNumber } from "@/ravarer/lib/constants";
-import { reorderGroupToText, useReorderSuggestions } from "@/ravarer/hooks/useResaleStock";
+import {
+  reorderGroupToCsv,
+  reorderGroupToText,
+  useReorderSuggestions,
+  type ReorderGroup,
+} from "@/ravarer/hooks/useResaleStock";
 
 const kr = (n: number | null) =>
   n == null ? "—" : new Intl.NumberFormat("nb-NO", { style: "currency", currency: "NOK", maximumFractionDigits: 0 }).format(n);
@@ -28,6 +33,17 @@ export function ReorderSuggestions() {
     toast.success("Kopiert til utklippstavlen");
   };
 
+  const downloadCsv = (group: ReorderGroup) => {
+    // BOM slik at Excel viser æ, ø og å riktig.
+    const blob = new Blob(["\uFEFF" + reorderGroupToCsv(group)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `bestilling-${group.supplier_name.replace(/[^\wæøåÆØÅ-]+/g, "-").toLowerCase()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (isLoading || groups.length === 0) return null;
 
   return (
@@ -38,7 +54,7 @@ export function ReorderSuggestions() {
           <div>
             <p className="font-medium">Bør bestilles</p>
             <p className="text-sm text-ink-secondary">
-              {totals.items} varer under minimum eller med under 10 dager igjen · {kr(totals.value)} i innkjøpsverdi
+              {totals.items} lagerførte varer under minimum eller med under 10 dager igjen · {kr(totals.value)} i innkjøpsverdi
             </p>
           </div>
         </div>
@@ -62,6 +78,9 @@ export function ReorderSuggestions() {
                 </button>
                 <Button size="sm" variant="outline" onClick={() => copy(reorderGroupToText(g))}>
                   <Copy className="mr-1.5 h-3.5 w-3.5" /> Kopier liste
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => downloadCsv(g)}>
+                  <Download className="mr-1.5 h-3.5 w-3.5" /> CSV
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setOpen(isOpen ? null : key)}>
                   {isOpen ? "Skjul" : "Vis varer"}
@@ -96,9 +115,14 @@ export function ReorderSuggestions() {
                             {l.min_stock == null ? "—" : formatNumber(l.min_stock, 2)}
                           </td>
                           <td className="px-4 py-2 text-right tabular-nums font-medium">
-                            {l.package_size != null ? (
+                            {l.packages != null && l.base_units_per_package != null ? (
                               <>
-                                {l.packages} × {formatNumber(l.package_size, 2)} {l.package_unit ?? l.base_unit}
+                                {l.packages} × {formatNumber(l.base_units_per_package, 2)} {l.base_unit}
+                                {l.package_unit && (
+                                  <span className="ml-1 text-xs font-normal text-ink-secondary">
+                                    ({l.package_unit})
+                                  </span>
+                                )}
                                 <Badge variant="outline" className="ml-2">
                                   {formatNumber(l.order_base_qty, 2)} {l.base_unit}
                                 </Badge>

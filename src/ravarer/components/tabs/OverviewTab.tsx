@@ -325,7 +325,7 @@ export function OverviewTab({ rm, registerSave }: Props) {
             <p className="mt-2 text-xs text-ink-secondary">
               Pakningen endres i dialogen, som viser forhåndsvisning av
               omregnede priser og kan angres.{" "}
-              <Link to="/ravarer/pakninger" className="underline">
+              <Link to="/ravarer/pakningsstorrelser" className="underline">
                 Se alle pakninger
               </Link>
               .
@@ -459,7 +459,8 @@ export function OverviewTab({ rm, registerSave }: Props) {
               disabled={!canWrite}
             />
             <p className="mt-1 text-xs text-ink-secondary">
-              Brukes når råvaren måles i stk.
+              Brukes når råvaren måles i stk. Brukes når oppskrifter måler i
+              stk — uten vekt per stk kan mengden ikke regnes om til gram.
             </p>
           </div>
         </div>

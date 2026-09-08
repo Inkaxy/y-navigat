@@ -14,12 +14,21 @@ import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useAllStockStatus, type AllStockRow } from "@/ravarer/hooks/useAllStockStatus";
 import { useRawMaterialUnitsFor, type RawMaterialUnitRow } from "@/ravarer/hooks/useRawMaterialUnits";
 import { useApplyRmStockCount, type CountResult } from "@/ravarer/hooks/useStockCount";
-import { UnitAmountRows, emptyRow, rowsToBase, type UnitAmountRow } from "@/ravarer/components/stock/UnitAmountRows";
+import { BASE_KEY, UnitAmountRows, emptyRow, rowsToBase, type UnitAmountRow } from "@/ravarer/components/stock/UnitAmountRows";
 import { formatNok, formatNumber } from "@/ravarer/lib/constants";
 import { QueryState } from "@/components/common/QueryState";
+import { osloTodayISO } from "@/lib/osloDate";
+import {
+  clearCountDraft,
+  countDraftKey,
+  loadCountDraft,
+  saveCountDraft,
+  type CountDraft,
+} from "@/ravarer/lib/countDraft";
 
 export default function Varetelling() {
-  const { canWrite } = useRavarer();
+  const { canWrite, legalEntityId } = useRavarer();
+  const draftKey = countDraftKey(legalEntityId, osloTodayISO());
   const stockQuery = useAllStockStatus();
   const rows = useMemo(() => stockQuery.data ?? [], [stockQuery.data]);
   const unitsQuery = useRawMaterialUnitsFor(rows.map(r => r.raw_material_id));
@@ -37,7 +46,22 @@ export default function Varetelling() {
   const [itemType, setItemType] = useState("all");
   const [note, setNote] = useState("");
   const [entries, setEntries] = useState<Record<string, UnitAmountRow[]>>({});
+  const [lineNotes, setLineNotes] = useState<Record<string, string>>({});
   const [result, setResult] = useState<CountResult | null>(null);
+  // Et lagret utkast tas aldri i bruk uten at brukeren sier ja — ellers dukker
+  // gamle tall opp midt i en ny telling.
+  const [pendingDraft, setPendingDraft] = useState<CountDraft | null>(null);
+  const [draftLoaded, setDraftLoaded] = useState(false);
+
+  useEffect(() => {
+    setPendingDraft(loadCountDraft(draftKey));
+    setDraftLoaded(true);
+  }, [draftKey]);
+
+  useEffect(() => {
+    if (!draftLoaded) return;
+    saveCountDraft(draftKey, { entries, lineNotes, note });
+  }, [draftKey, draftLoaded, entries, lineNotes, note]);
 
   const categories = useMemo(
     () => Array.from(new Set(rows.map(r => r.category).filter((c): c is string => !!c))).sort((a, b) => a.localeCompare(b, "nb")),
@@ -91,14 +115,36 @@ export default function Varetelling() {
       .filter(l => Number.isFinite(l.counted_base));
     if (lines.length === 0) return;
     try {
-      const res = await apply.mutateAsync({ lines, note: note.trim() || "Varetelling" });
+      const details = filled
+        .map(r => {
+          const n = (lineNotes[r.raw_material_id] ?? "").trim();
+          return n ? `${r.name}: ${n}` : null;
+        })
+        .filter((x): x is string => !!x);
+      const fullNote = [note.trim() || "Varetelling", ...details].join(" | ");
+      const res = await apply.mutateAsync({ lines, note: fullNote });
       setResult(res);
       // Utkastet tømmes kun når tellingen faktisk ble bokført.
       setEntries({});
+      setLineNotes({});
       setNote("");
+      clearCountDraft(draftKey);
     } catch {
       // Feilmeldingen vises av mutasjonen; utkastet beholdes slik det var.
     }
+  };
+
+  /** Fyller 0 på alt som er synlig og ikke talt — «resten er tomt». */
+  const setRestToZero = () => {
+    setEntries(prev => {
+      const next = { ...prev };
+      for (const r of visible) {
+        const current = next[r.raw_material_id] ?? prev[r.raw_material_id];
+        const hasValue = (current ?? []).some(row => row.amount.trim() !== "");
+        if (!hasValue) next[r.raw_material_id] = [{ amount: "0", unitKey: BASE_KEY }];
+      }
+      return next;
+    });
   };
 
   const countUnitText = (r: AllStockRow) => {
@@ -111,6 +157,35 @@ export default function Varetelling() {
   return (
     <div className="space-y-5">
       <RavarerHeaderBanner />
+
+      {pendingDraft && (
+        <Card className="flex flex-wrap items-center justify-between gap-3 border-warning/50 p-4">
+          <p className="text-sm">
+            Du har en påbegynt telling fra i dag som ikke ble bokført.
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                clearCountDraft(draftKey);
+                setPendingDraft(null);
+              }}
+            >
+              Forkast
+            </Button>
+            <Button
+              onClick={() => {
+                setEntries(pendingDraft.entries);
+                setLineNotes(pendingDraft.lineNotes);
+                setNote(pendingDraft.note);
+                setPendingDraft(null);
+              }}
+            >
+              Fortsett tellingen
+            </Button>
+          </div>
+        </Card>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card className="p-4">
@@ -178,6 +253,14 @@ export default function Varetelling() {
                       Bokført: {formatNumber(r.current_stock, 2)} {r.base_unit}
                       {countUnitText(r) && <> · {countUnitText(r)}</>}
                     </p>
+                    <Input
+                      value={lineNotes[r.raw_material_id] ?? ""}
+                      onChange={e =>
+                        setLineNotes(prev => ({ ...prev, [r.raw_material_id]: e.target.value }))
+                      }
+                      placeholder="Lokasjon eller notat"
+                      className="mt-2 h-9 text-sm"
+                    />
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <UnitAmountRows
@@ -210,11 +293,14 @@ export default function Varetelling() {
           <Label className="text-xs">Notat på tellingen</Label>
           <Textarea value={note} onChange={e => setNote(e.target.value)} rows={2} placeholder="F.eks. «Månedstelling tørrvarelager»" />
         </div>
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-ink-secondary">
             {filled.length} varer talt opp. Varer uten tall hoppes over.
           </p>
-          <Button size="lg" disabled={!canWrite || filled.length === 0 || apply.isPending} onClick={submit}>
+          <Button variant="outline" className="w-full sm:w-auto" onClick={setRestToZero} disabled={!canWrite}>
+            Sett resten til 0
+          </Button>
+          <Button className="w-full sm:w-auto" size="lg" disabled={!canWrite || filled.length === 0 || apply.isPending} onClick={submit}>
             {apply.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ClipboardCheck className="mr-2 h-4 w-4" />}
             Bokfør telling
           </Button>

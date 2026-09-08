@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AlertTriangle, ArrowRight, ChevronDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { formatNumber, formatDate } from "@/ravarer/lib/constants";
+import { formatNumber, formatDate, PACKAGE_UNITS } from "@/ravarer/lib/constants";
 import { useRawMaterialSuppliers } from "@/ravarer/hooks/useRmSuppliers";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { RecalcHistory } from "@/ravarer/components/packages/RecalcHistory";
@@ -21,7 +21,9 @@ import {
 } from "@/ravarer/hooks/usePackageSizes";
 import { resolvePackageFill, type PackageFillSuggestion } from "@/ravarer/lib/packageMath";
 
-const PACKAGE_UNIT_OPTIONS = ["sekk", "kartong", "pall", "palleboks", "konteiner", "spann", "pakke", "flaske", "boks", "eske", "stk", "bulk"];
+// Én kilde til emballasjetypene: den kanoniske lista motoren selv kjenner.
+// En egen liste her ga typer som `normalizeUnit` ikke forsto.
+const PACKAGE_UNIT_OPTIONS: readonly string[] = PACKAGE_UNITS;
 
 const METHOD_LABEL: Record<string, string> = {
   ukjent_enhet: "Ukjent enhet",
