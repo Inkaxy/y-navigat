@@ -9,6 +9,7 @@ import {
   isFlourLine,
   lineDisplayName,
   roundBakerGrams,
+  fmtDuration,
   fmtNum,
   scaleLines,
   STEP_TYPE_LABEL,
@@ -48,6 +49,10 @@ export interface RecipePDFPart {
   targetTempCelsius: number | null;
   ripeTimeHours: number | null;
   instructions: string | null;
+  /** Kort forberedelsesnotat — f.eks. utledet av forberedelsestid, vises under deltittelen. */
+  prepNote?: string | null;
+  /** Hviletid i minutter, vises under deltittelen når den er satt. */
+  restMinutes?: number | null;
   lines: RecipePDFLine[];
   totalG: number;
   hydrationPct: number;
@@ -72,6 +77,12 @@ export interface RecipePDFData {
   description: string | null;
   imageUrl: string | null;
   printedAt: Date;
+  /** Batch-id skrevet inn i utskriftsdialogen, kun til bruk på produksjonsarket. */
+  batchId?: string | null;
+  /** Produksjonsdato (YYYY-MM-DD) valgt i utskriftsdialogen. */
+  productionDate?: string | null;
+  /** Allergener som skal fremheves på produksjonsarket, når kjent. */
+  allergens?: string[] | null;
 
   scaledUnits: number;
   scaleFactorValue: number;
@@ -100,6 +111,13 @@ export interface RecipePDFData {
   totalProcessMinutes: number;
 
   costs: { total: number; perUnit: number | null } | null;
+
+  /** Per-batch-oppstilling — satt når oppskriften er delt i flere fysiske batcher. */
+  batches?: {
+    count: number;
+    perBatchDoughG: number | null;
+    lines: { name: string; grams: number | null; unit: string; quantity: number }[];
+  } | null;
 }
 
 export interface BuildRecipePDFInput {
@@ -116,6 +134,11 @@ export interface BuildRecipePDFInput {
   flourTemp?: number;
   scaledUnits: number;
   factor: number;
+  /** Antall enheter per fysisk batch — brukes til å regne ut per-batch-vekter når satt. */
+  unitsPerBatch?: number | null;
+  batchId?: string | null;
+  productionDate?: string | null;
+  allergens?: string[] | null;
   parts: {
     id: string;
     name: string;
@@ -124,6 +147,9 @@ export interface BuildRecipePDFInput {
     target_temp_celsius: number | null;
     ripe_time_hours: number | null;
     instructions: string | null;
+    /** Finnes som kolonne på `recipe_parts`, men fritekst finnes ikke — brukes til å utlede et forberedelsesnotat. */
+    prep_time_minutes?: number | null;
+    rest_time_minutes?: number | null;
   }[];
   lines: BakersLine[];
   steps: {
