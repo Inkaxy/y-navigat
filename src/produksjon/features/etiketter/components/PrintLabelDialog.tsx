@@ -433,6 +433,11 @@ export function PrintLabelDialog({
                   {m.label} mangler for {m.who}
                 </li>
               ))}
+              {missingMandatory.map((m) => (
+                <li key={`plikt-${m.key}`}>
+                  Pliktfelt: {m.label} mangler for {m.who}
+                </li>
+              ))}
             </ul>
             <p className="ml-6 text-xs">
               Etiketten kan ikke skrives ut før dataene er på plass. Fyll ut
