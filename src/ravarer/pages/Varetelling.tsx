@@ -26,10 +26,16 @@ import {
   saveCountDraft,
   type CountDraft,
 } from "@/ravarer/lib/countDraft";
+import {
+  discardCountSheet,
+  fetchOpenCountSheet,
+  saveCountSheet,
+  type CountSheetPayload,
+} from "@/ravarer/lib/countSheets";
 
 
 export default function Varetelling() {
-  const { canWrite, legalEntityId } = useRavarer();
+  const { canWrite, legalEntityId, user } = useRavarer();
   const draftKey = countDraftKey(legalEntityId, osloTodayISO());
   const stockQuery = useAllStockStatus();
   const rows = useMemo(() => stockQuery.data ?? [], [stockQuery.data]);
@@ -49,24 +55,72 @@ export default function Varetelling() {
   const [note, setNote] = useState("");
   const [entries, setEntries] = useState<Record<string, UnitAmountRow[]>>({});
   const [lineNotes, setLineNotes] = useState<Record<string, string>>({});
+  // Forventet beholdning fryses ved første endring på linja. Uten dette ville
+  // et bakgrunnsoppdatert tall gjøre konfliktkontrollen verdiløs: serveren ville
+  // sammenlignet mot beholdningen i det øyeblikket brukeren trykket «Bokfør».
+  const [frozen, setFrozen] = useState<Record<string, number>>({});
   const [result, setResult] = useState<CountResult | null>(null);
   // Et lagret utkast tas aldri i bruk uten at brukeren sier ja — ellers dukker
   // gamle tall opp midt i en ny telling.
   const [pendingDraft, setPendingDraft] = useState<CountDraft | null>(null);
+  const [pendingExpected, setPendingExpected] = useState<Record<string, number>>({});
+  const [draftSource, setDraftSource] = useState<"lokalt" | "server">("lokalt");
   const [draftLoaded, setDraftLoaded] = useState(false);
   // Operasjons-ID: følger tellingen til den er bokført, slik at et nytt forsøk
   // etter nettbrudd eller dobbeltklikk aldri fører tellingen to ganger.
   const [opId, setOpId] = useState<string>(() => newOpId());
 
+  // Utkast hentes både lokalt og fra serveren; serverutkastet vinner når det er nyere,
+  // slik at en telling kan fortsette på et annet nettbrett.
   useEffect(() => {
-    setPendingDraft(loadCountDraft(draftKey));
+    let cancelled = false;
+    const local = loadCountDraft(draftKey);
+    if (local) {
+      setPendingDraft(local);
+      setDraftSource("lokalt");
+    }
     setDraftLoaded(true);
-  }, [draftKey]);
+    if (!legalEntityId) return () => { cancelled = true; };
+    void fetchOpenCountSheet(legalEntityId, osloTodayISO()).then(sheet => {
+      if (cancelled || !sheet) return;
+      const serverNewer = !local || (sheet.updated_at && sheet.updated_at > local.savedAt);
+      if (!serverNewer) return;
+      setPendingDraft({
+        entries: sheet.payload.entries,
+        lineNotes: sheet.payload.lineNotes,
+        note: sheet.payload.note,
+        opId: sheet.op_id,
+        savedAt: sheet.updated_at,
+      });
+      setPendingExpected(sheet.payload.expected);
+      setDraftSource("server");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [draftKey, legalEntityId]);
 
   useEffect(() => {
     if (!draftLoaded) return;
     saveCountDraft(draftKey, { entries, lineNotes, note, opId });
   }, [draftKey, draftLoaded, entries, lineNotes, note, opId]);
+
+  // Serverlagring er sekundær og skjer med ro: den skal ikke forstyrre tastingen.
+  useEffect(() => {
+    if (!draftLoaded || !legalEntityId || !user?.id) return;
+    if (Object.keys(entries).length === 0) return;
+    const payload: CountSheetPayload = { entries, lineNotes, expected: frozen, note };
+    const t = setTimeout(() => {
+      void saveCountSheet({
+        legalEntityId,
+        dateISO: osloTodayISO(),
+        opId,
+        payload,
+        createdBy: user.id,
+      });
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [draftLoaded, legalEntityId, user?.id, entries, lineNotes, frozen, note, opId]);
 
 
   const categories = useMemo(
@@ -86,6 +140,10 @@ export default function Varetelling() {
   }, [rows, q, category, itemType]);
 
   const unitsFor = (id: string): RawMaterialUnitRow[] => unitsQuery.data?.get(id) ?? [];
+  /** Beholdningen linja skal måles mot: frosset verdi hvis den finnes. */
+  const expectedFor = (r: AllStockRow) => frozen[r.raw_material_id] ?? r.current_stock;
+  const freeze = (r: AllStockRow) =>
+    setFrozen(prev => (r.raw_material_id in prev ? prev : { ...prev, [r.raw_material_id]: r.current_stock }));
   const rowsFor = (id: string) => entries[id] ?? [emptyRow()];
 
   const countedBase = (r: AllStockRow) => rowsToBase(rowsFor(r.raw_material_id), unitsFor(r.raw_material_id));
@@ -99,7 +157,7 @@ export default function Varetelling() {
   const diffValue = filled.reduce((sum, r) => {
     const counted = countedBase(r);
     if (counted == null) return sum;
-    return sum + (counted - r.current_stock) * (r.current_cost_price ?? 0);
+    return sum + (counted - expectedFor(r)) * (r.current_cost_price ?? 0);
   }, 0);
 
   // Lagrevakt: et påbegynt telleutkast skal ikke forsvinne ved en refresh.
@@ -120,8 +178,8 @@ export default function Varetelling() {
       .map(r => ({
         raw_material_id: r.raw_material_id,
         counted_base: countedBase(r) as number,
-        // Beholdningen telleren så: serveren avviser tellingen hvis den er endret av andre.
-        expected_base: r.current_stock,
+        // Beholdningen telleren så da linja ble talt — frosset, ikke hentet på nytt.
+        expected_base: expectedFor(r),
         line_note: (lineNotes[r.raw_material_id] ?? "").trim() || null,
       }))
       .filter(l => Number.isFinite(l.counted_base));
@@ -140,6 +198,7 @@ export default function Varetelling() {
       // får en ny operasjons-ID.
       setEntries({});
       setLineNotes({});
+      setFrozen({});
       setNote("");
       setOpId(newOpId());
       clearCountDraft(draftKey);
@@ -157,7 +216,10 @@ export default function Varetelling() {
       for (const r of visible) {
         const current = next[r.raw_material_id] ?? prev[r.raw_material_id];
         const hasValue = (current ?? []).some(row => row.amount.trim() !== "");
-        if (!hasValue) next[r.raw_material_id] = [{ amount: "0", unitKey: BASE_KEY }];
+        if (!hasValue) {
+          next[r.raw_material_id] = [{ amount: "0", unitKey: BASE_KEY }];
+          freeze(r);
+        }
       }
       return next;
     });
@@ -177,14 +239,17 @@ export default function Varetelling() {
       {pendingDraft && (
         <Card className="flex flex-wrap items-center justify-between gap-3 border-warning/50 p-4">
           <p className="text-sm">
-            Du har en påbegynt telling fra i dag som ikke ble bokført.
+            Du har en påbegynt telling fra i dag som ikke ble bokført
+            {draftSource === "server" ? " (lagret på serveren)" : ""}.
           </p>
           <div className="flex gap-2">
             <Button
               variant="outline"
               onClick={() => {
                 clearCountDraft(draftKey);
+                if (draftSource === "server") void discardCountSheet(pendingDraft.opId);
                 setPendingDraft(null);
+                setPendingExpected({});
               }}
             >
               Forkast
@@ -194,9 +259,13 @@ export default function Varetelling() {
                 setEntries(pendingDraft.entries);
                 setLineNotes(pendingDraft.lineNotes);
                 setNote(pendingDraft.note);
+                // Frosne forventede tall følger med, slik at konfliktkontrollen
+                // fortsatt måler mot beholdningen da varen faktisk ble talt.
+                setFrozen(pendingExpected);
                 // Samme telling fortsetter på samme operasjons-ID.
                 setOpId(pendingDraft.opId);
                 setPendingDraft(null);
+                setPendingExpected({});
               }}
 
             >
@@ -262,7 +331,7 @@ export default function Varetelling() {
         <div className="space-y-3">
           {visible.map(r => {
             const counted = countedBase(r);
-            const diff = counted == null ? null : counted - r.current_stock;
+            const diff = counted == null ? null : counted - expectedFor(r);
             return (
               <Card key={r.raw_material_id} className="p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -284,7 +353,10 @@ export default function Varetelling() {
                   <div className="flex flex-col items-end gap-2">
                     <UnitAmountRows
                       rows={rowsFor(r.raw_material_id)}
-                      onChange={next => setEntries(prev => ({ ...prev, [r.raw_material_id]: next }))}
+                      onChange={next => {
+                        freeze(r);
+                        setEntries(prev => ({ ...prev, [r.raw_material_id]: next }));
+                      }}
                       units={unitsFor(r.raw_material_id)}
                       baseUnit={r.base_unit}
                       compact

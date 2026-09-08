@@ -25,6 +25,7 @@ update public.raw_material_price_history h
    set is_credit = true,
        is_legacy = true,
        superseded_at = coalesce(h.superseded_at, now()),
+       superseded_reason = coalesce(h.superseded_reason, 'kreditnota'),
        notes = coalesce(h.notes, '') ||
                case when coalesce(h.notes, '') = '' then '' else ' | ' end ||
                'Merket som kredithendelse i F2b'
@@ -38,7 +39,8 @@ update public.raw_material_price_history h
 --     utdatert grunnlag: de beholdes, men teller ikke som gjeldende prishendelse.
 update public.raw_material_price_history h
    set is_legacy = true,
-       superseded_at = coalesce(h.superseded_at, now())
+       superseded_at = coalesce(h.superseded_at, now()),
+       superseded_reason = coalesce(h.superseded_reason, 'uten_linjegrunnlag')
  where h.source = 'invoice'
    and h.invoice_line_id is null
    and not exists (
@@ -55,7 +57,8 @@ update public.raw_material_price_history h
 --     fn_rm_price_history_upsert_line.
 update public.raw_material_price_history h
    set is_legacy = true,
-       superseded_at = coalesce(h.superseded_at, now())
+       superseded_at = coalesce(h.superseded_at, now()),
+       superseded_reason = coalesce(h.superseded_reason, 'flere_linjer')
  where h.source = 'invoice'
    and h.invoice_line_id is null
    and (
@@ -134,6 +137,9 @@ begin
        and coalesce(il.requires_review, false) = false
        -- Flagget faktura holdes utenfor til den er avklart.
        and i.flagged_at is null
+       -- Leverandøren må høre til fakturaens selskap.
+       and exists (select 1 from public.suppliers s
+                    where s.id = i.supplier_id and s.legal_entity_id = i.legal_entity_id)
      order by i.invoice_date, il.id
   loop
     v_n_total := v_n_total + 1;
@@ -231,7 +237,9 @@ begin
     if not v_manual and v_cost_after is not null and v_cost_after is distinct from v_cost_before then
       update public.raw_materials
          set current_cost_price = v_cost_after,
-             price_updated_at = now(), price_source = 'invoice'
+             -- Hendelsens dato, ikke now(): ellers ødelegges eldre/nyere-sammenligningen.
+             price_updated_at = coalesce(v_latest_date::timestamptz, now()),
+             price_source = 'invoice'
        where id = p_raw_material_id
          and coalesce(price_source, '') <> 'manual';
 
@@ -301,7 +309,8 @@ begin
   -- Historikken beholdes, men settes til side slik at den ikke teller.
   update public.raw_material_price_history
      set is_legacy = true,
-         superseded_at = coalesce(superseded_at, now())
+         superseded_at = coalesce(superseded_at, now()),
+         superseded_reason = coalesce(superseded_reason, 'angret_omregning')
    where source = 'recalc' and source_reference = p_recalc_id::text;
 
   update public.raw_material_cost_recalcs

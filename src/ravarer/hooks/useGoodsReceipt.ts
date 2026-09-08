@@ -240,6 +240,10 @@ export interface ReceiveLineInput {
   quantity_base: number;
   invoice_number: string;
   occurred_at?: string;
+  /** Partinummer fra pakken, hvis leverandøren oppgir det. */
+  lot_number?: string | null;
+  /** Best før-dato på partiet. */
+  best_before?: string | null;
 }
 
 /**
@@ -257,8 +261,13 @@ export function useReceiveInvoiceLine() {
   return useMutation({
     mutationFn: async (input: ReceiveLineInput): Promise<{ skipped: boolean }> => {
       try {
-        const res = await rpcReceiveInvoiceLine(input.invoice_line_id);
-        return { skipped: res.already_posted === true || !!res.skipped };
+        const res = await rpcReceiveInvoiceLine({
+          lineId: input.invoice_line_id,
+          lotNumber: input.lot_number ?? null,
+          bestBefore: input.best_before ?? null,
+          note: `Mottak faktura ${input.invoice_number}`,
+        });
+        return { skipped: res.already_received === true || !!res.skipped };
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         if (!/could not find the function|does not exist/i.test(message)) throw e;
