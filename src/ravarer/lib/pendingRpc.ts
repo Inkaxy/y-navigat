@@ -64,12 +64,31 @@ export function rpcApplyStockCount(input: {
 
 export interface ReceiveLineResult {
   ok: boolean;
-  already_posted?: boolean;
+  /** Sant når linja allerede er fysisk kvittert ut tidligere. */
+  already_received?: boolean;
   quantity_base?: number;
+  lot_id?: string | null;
+  movement_id?: string | null;
   skipped?: string;
 }
 
-/** F5: idempotent varemottak per fakturalinje. */
-export function rpcReceiveInvoiceLine(lineId: string): Promise<ReceiveLineResult> {
-  return callPendingRpc<ReceiveLineResult>("rm_receive_invoice_line", { p_line_id: lineId });
+/**
+ * F5: sporbart varemottak per fakturalinje.
+ *
+ * En bokført lagerbevegelse fra fakturatriggeren er ikke det samme som at varen
+ * fysisk er mottatt. RPC-en kvitterer derfor ut mottaket med hvem, når og mengde,
+ * og oppretter et parti (lot) med partinummer og holdbarhet når det er oppgitt.
+ */
+export function rpcReceiveInvoiceLine(input: {
+  lineId: string;
+  lotNumber?: string | null;
+  bestBefore?: string | null;
+  note?: string | null;
+}): Promise<ReceiveLineResult> {
+  return callPendingRpc<ReceiveLineResult>("rm_receive_invoice_line", {
+    p_line_id: input.lineId,
+    p_lot_number: input.lotNumber ?? null,
+    p_best_before: input.bestBefore ?? null,
+    p_note: input.note ?? null,
+  });
 }
