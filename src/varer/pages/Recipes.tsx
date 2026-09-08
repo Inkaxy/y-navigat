@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAppContext } from "@/varer/context/AppContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -203,6 +203,11 @@ export default function Recipes() {
         const d = asDepartment(r.department);
         return deptFilter === "none" ? d === null : d === deptFilter;
       })
+      .filter((r) => {
+        if (categoryFilter === "all") return true;
+        if (categoryFilter === "none") return !r.category;
+        return r.category === categoryFilter;
+      })
       .filter((r) =>
         !q ? true : `${r.name ?? ""} ${r.category ?? ""} ${r.products.join(" ")}`.toLowerCase().includes(q),
       )
@@ -225,11 +230,70 @@ export default function Recipes() {
             return (a.products.length - b.products.length) * dir;
           case "status":
             return txt(a.status ?? "draft").localeCompare(txt(b.status ?? "draft"), "nb") * dir;
+          case "updated":
+            return (
+              (a.updated_at ? new Date(a.updated_at).getTime() : 0) -
+              (b.updated_at ? new Date(b.updated_at).getTime() : 0)
+            ) * dir;
           default:
             return txt(a.name).localeCompare(txt(b.name), "nb") * dir;
         }
       });
-  }, [recipesQuery.data, rmMap, search, statusFilter, deptFilter, sort]);
+  }, [recipesQuery.data, rmMap, search, statusFilter, deptFilter, categoryFilter, sort]);
+
+  /** Distinkte kategorier som faktisk finnes i dataene, sortert på norsk. */
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of recipesQuery.data ?? []) {
+      if (r.category) set.add(r.category);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "nb"));
+  }, [recipesQuery.data]);
+
+  /** Oppskrifter markert som mal (kategori === RECIPE_TEMPLATE_CATEGORY). */
+  const templates = useMemo(
+    () => (recipesQuery.data ?? []).filter((r) => r.category === RECIPE_TEMPLATE_CATEGORY),
+    [recipesQuery.data],
+  );
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const pagedRows = useMemo(
+    () => rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [rows, page],
+  );
+
+  /** Nullstill sidetall når søk/filtre/sortering endres. */
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, deptFilter, categoryFilter, sort]);
+
+  /** Tøm alle filtre. */
+  function resetFilters() {
+    setSearch("");
+    setStatusFilter("all");
+    setDeptFilter("all");
+    setCategoryFilter("all");
+  }
+
+  /** Opprett en ny oppskrift fra en mal via kopiering, og gi den et beskrivende navn. */
+  async function createFromTemplate(templateId: string, templateName: string) {
+    setCreatingFromTemplate(true);
+    try {
+      const newId = await copyRecipe(templateId);
+      const { error } = await supabase
+        .from("recipes")
+        .update({ name: `Ny fra ${templateName}` } as never)
+        .eq("id", newId);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["recipes-list"] });
+      toast.success("Ny oppskrift opprettet fra mal");
+      navigate(`/varer/oppskrifter/${newId}?rename=1`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kunne ikke opprette fra mal");
+    } finally {
+      setCreatingFromTemplate(false);
+    }
+  }
 
   async function createRecipe() {
     setCreating(true);
@@ -268,7 +332,39 @@ export default function Recipes() {
             <option value="active">Aktiv</option>
             <option value="archived">Arkivert</option>
           </select>
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="all">Alle kategorier</option>
+            {categories.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+            <option value="none">Uten kategori</option>
+          </select>
           <div className="flex-1" />
+          {canWrite && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  disabled={templates.length === 0 || creatingFromTemplate}
+                  title={templates.length === 0 ? "Ingen maler ennå" : undefined}
+                >
+                  {creatingFromTemplate ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileStack className="mr-2 h-4 w-4" />}
+                  Ny fra mal
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {templates.map((t) => (
+                  <DropdownMenuItem key={t.id} onSelect={() => void createFromTemplate(t.id, t.name?.trim() || "Uten navn")}>
+                    {t.name?.trim() || "Uten navn"}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           {canWrite && (
             <Button onClick={createRecipe} disabled={creating}>
               {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
@@ -295,127 +391,182 @@ export default function Recipes() {
           ))}
         </div>
 
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            {rows.length} {rows.length === 1 ? "oppskrift" : "oppskrifter"}
+          </p>
+        </div>
+
         <Card className="overflow-hidden">
           {recipesQuery.isLoading ? (
             <div className="flex h-32 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : rows.length === 0 && (recipesQuery.data ?? []).length > 0 ? (
+            <div className="flex flex-col items-center gap-2 py-12 text-center">
+              <ChefHat className="h-8 w-8 text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">Ingen oppskrifter passer filtrene.</p>
+              <Button variant="outline" size="sm" onClick={resetFilters}>Nullstill filtre</Button>
+            </div>
           ) : rows.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-12 text-center">
               <ChefHat className="h-8 w-8 text-muted-foreground/50" />
               <p className="text-sm text-muted-foreground">Ingen oppskrifter ennå.</p>
             </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
-                <tr>
-                  <SortableTh label="Oppskrift" sortKey="name" sort={sort} onSort={toggleSort} />
-                  <SortableTh label="Kategori" sortKey="category" sort={sort} onSort={toggleSort} />
-                  <SortableTh label="Avdeling" sortKey="department" sort={sort} onSort={toggleSort} />
-                  <SortableTh label="Hydrering" sortKey="hydration" sort={sort} onSort={toggleSort} align="right" />
-                  <SortableTh label="Deigvekt" sortKey="dough" sort={sort} onSort={toggleSort} align="right" />
-                  <SortableTh label="Produkter" sortKey="products" sort={sort} onSort={toggleSort} />
-                  <SortableTh label="Status" sortKey="status" sort={sort} onSort={toggleSort} />
-                  <th className="w-10 px-2 py-2.5" />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r, i) => (
-                  <tr
-                    key={r.id}
-                    onClick={() => navigate(`/varer/oppskrifter/${r.id}`)}
-                    /* Zebra: annenhver rad får svak grå bakgrunn for lesbarhet */
-                    className={`cursor-pointer border-t border-border hover:bg-muted/40 ${i % 2 === 1 ? "bg-muted/20" : ""}`}
-                  >
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-2">
-                        {r.image_url && (
-                          <img
-                            src={r.image_url}
-                            alt={r.name || "Oppskrift"}
-                            className="h-8 w-8 shrink-0 rounded object-cover"
-                            loading="lazy"
-                          />
-                        )}
-                        <span className="font-medium">{r.name || "Uten navn"}</span>
-                        {shareCounts[r.id] > 0 && (
-                          <Badge variant="outline" className="gap-1 px-1.5 py-0 text-[11px] font-normal">
-                            <Link2 className="h-3 w-3" />
-                            {shareCounts[r.id]}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground">v{r.version}</div>
-                    </td>
+            <>
+              <table className="hidden w-full text-sm sm:table">
+                <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
+                  <tr>
+                    <SortableTh label="Oppskrift" sortKey="name" sort={sort} onSort={toggleSort} />
+                    <SortableTh label="Kategori" sortKey="category" sort={sort} onSort={toggleSort} />
+                    <SortableTh label="Avdeling" sortKey="department" sort={sort} onSort={toggleSort} />
+                    <SortableTh label="Hydrering" sortKey="hydration" sort={sort} onSort={toggleSort} align="right" />
+                    <SortableTh label="Deigvekt" sortKey="dough" sort={sort} onSort={toggleSort} align="right" />
+                    <SortableTh label="Produkter" sortKey="products" sort={sort} onSort={toggleSort} />
+                    <SortableTh label="Status" sortKey="status" sort={sort} onSort={toggleSort} />
+                    <SortableTh label="Oppdatert" sortKey="updated" sort={sort} onSort={toggleSort} />
+                    <th className="w-10 px-2 py-2.5" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagedRows.map((r, i) => (
+                    <tr
+                      key={r.id}
+                      onClick={() => navigate(`/varer/oppskrifter/${r.id}`)}
+                      /* Zebra: annenhver rad får svak grå bakgrunn for lesbarhet */
+                      className={`cursor-pointer border-t border-border hover:bg-muted/40 ${i % 2 === 1 ? "bg-muted/20" : ""}`}
+                    >
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-2">
+                          {r.image_url && (
+                            <img
+                              src={r.image_url}
+                              alt={r.name || "Oppskrift"}
+                              className="h-8 w-8 shrink-0 rounded object-cover"
+                              loading="lazy"
+                            />
+                          )}
+                          <span className="font-medium">{r.name || "Uten navn"}</span>
+                          {shareCounts[r.id] > 0 && (
+                            <Badge variant="outline" className="gap-1 px-1.5 py-0 text-[11px] font-normal">
+                              <Link2 className="h-3 w-3" />
+                              {shareCounts[r.id]}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">v{r.version}</div>
+                      </td>
 
-                    <td className="px-4 py-2.5">
-                      {r.category === BASE_RECIPE_CATEGORY ? (
-                        <Badge variant="outline" className="gap-1 border-app/50 text-app">
-                          <Wheat className="h-3.5 w-3.5" /> Grunnoppskrift
-                        </Badge>
-                      ) : (
-                        r.category ?? "—"
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      {(() => {
-                        const d = asDepartment(r.department);
-                        return d ? (
-                          <Badge variant="outline" className={`font-normal ${RECIPE_DEPARTMENT_BADGE[d]}`}>
-                            {RECIPE_DEPARTMENT_LABEL[d]}
+                      <td className="px-4 py-2.5">
+                        {r.category === BASE_RECIPE_CATEGORY ? (
+                          <Badge variant="outline" className="gap-1 border-app/50 text-app">
+                            <Wheat className="h-3.5 w-3.5" /> Grunnoppskrift
                           </Badge>
                         ) : (
+                          r.category ?? "—"
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        {(() => {
+                          const d = asDepartment(r.department);
+                          return d ? (
+                            <Badge variant="outline" className={`font-normal ${RECIPE_DEPARTMENT_BADGE[d]}`}>
+                              {RECIPE_DEPARTMENT_LABEL[d]}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{fmtPercent(r.totals.hydrationPct)}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{fmtG(r.totals.totalDoughG)} g</td>
+                      <td className="px-4 py-2.5">
+                        {r.products.length === 0 ? (
                           <span className="text-xs text-muted-foreground">—</span>
-                        );
-                      })()}
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{fmtPercent(r.totals.hydrationPct)}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{fmtG(r.totals.totalDoughG)} g</td>
-                    <td className="px-4 py-2.5">
-                      {r.products.length === 0 ? (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      ) : (
-                        <span className="text-xs">{r.products.slice(0, 2).join(", ")}{r.products.length > 2 ? ` +${r.products.length - 2}` : ""}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <Badge variant="outline">{RECIPE_STATUS_LABEL[r.status ?? "draft"] ?? r.status}</Badge>
-                    </td>
-                    <td className="px-2 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
-                      {canWrite && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Handlinger">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem disabled={copyingId === r.id} onSelect={() => void handleCopy(r.id)}>
-                              {copyingId === r.id ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              ) : (
-                                <Copy className="mr-2 h-4 w-4" />
-                              )}
-                              Lag kopi
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onSelect={() => {
-                                setDeleteConfirm("");
-                                setDeleting({ id: r.id, name: r.name?.trim() || "Uten navn" });
-                              }}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Slett
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        ) : (
+                          <span className="text-xs">{r.products.slice(0, 2).join(", ")}{r.products.length > 2 ? ` +${r.products.length - 2}` : ""}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <Badge variant="outline">{RECIPE_STATUS_LABEL[r.status ?? "draft"] ?? r.status}</Badge>
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                        {r.updated_at ? format(new Date(r.updated_at), "EEE d. MMM yyyy, HH:mm", { locale: nb }) : "—"}
+                      </td>
+                      <td className="px-2 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                        {canWrite && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Handlinger">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem disabled={copyingId === r.id} onSelect={() => void handleCopy(r.id)}>
+                                {copyingId === r.id ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Copy className="mr-2 h-4 w-4" />
+                                )}
+                                Lag kopi
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onSelect={() => {
+                                  setDeleteConfirm("");
+                                  setDeleting({ id: r.id, name: r.name?.trim() || "Uten navn" });
+                                }}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Slett
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
 
+              <div className="divide-y divide-border sm:hidden">
+                {pagedRows.map((r) => (
+                  <RecipeListCard
+                    key={r.id}
+                    recipe={r}
+                    shareCount={shareCounts[r.id] ?? 0}
+                    canWrite={canWrite}
+                    copyingId={copyingId}
+                    onOpen={() => navigate(`/varer/oppskrifter/${r.id}`)}
+                    onCopy={() => void handleCopy(r.id)}
+                    onDelete={() => {
+                      setDeleteConfirm("");
+                      setDeleting({ id: r.id, name: r.name?.trim() || "Uten navn" });
+                    }}
+                  />
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between gap-2 border-t border-border px-4 py-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                >
+                  <ChevronLeft className="mr-1 h-4 w-4" /> Forrige
+                </Button>
+                <span className="text-sm text-muted-foreground">Side {page} av {totalPages}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                >
+                  Neste <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
+              </div>
+            </>
           )}
         </Card>
       </div>
