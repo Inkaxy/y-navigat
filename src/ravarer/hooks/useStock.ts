@@ -281,7 +281,16 @@ export function useMissingBaseQuantityLines() {
         .limit(200);
       if (error) throw error;
 
-      return ((data ?? []) as any[]).map(l => ({
+      type LineRow = {
+        id: string;
+        invoice_id: string;
+        description: string | null;
+        quantity: number | null;
+        unit: string | null;
+        raw_material_id: string;
+        invoice: { invoice_number: string; invoice_date: string } | null;
+      };
+      return ((data ?? []) as unknown as LineRow[]).map(l => ({
         id: l.id,
         invoice_id: l.invoice_id,
         description: l.description,
