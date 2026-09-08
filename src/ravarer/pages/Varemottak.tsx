@@ -553,7 +553,7 @@ function ManualReceiptDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[380px] p-0" align="start">
-                <Command>
+                <Command shouldFilter={false}>
                   <CommandInput placeholder="Søk navn, varenummer eller alias…" value={search} onValueChange={setSearch} />
                   <CommandList>
                     <CommandEmpty>Ingen treff.</CommandEmpty>
