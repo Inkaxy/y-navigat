@@ -111,6 +111,8 @@ export function ConsumerLabelSection({
             producerName: entity?.name ?? null,
             producerAddress,
             grainMarkImage,
+            // Grovhetsprosenten skal trykkes under merket (BKLF pkt. 4.4).
+            grainPctText: effectiveGrainPct != null ? fmtPct(effectiveGrainPct) : null,
             keyholeMark: claimKeyhole,
           }}
         />,

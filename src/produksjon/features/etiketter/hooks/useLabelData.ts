@@ -38,10 +38,22 @@ function toMap(ids: string[], rows: unknown): LabelDataMap {
     out[id] = {
       // `brodskala_beregnet` beholdes som feltnøkkel for etikettmalen, men den
       // inneholder nå den effektive verdien fra produktet.
-      felter: kategori ? { ...safeFelter, brodskala_beregnet: kategori } : safeFelter,
+      felter: {
+        ...safeFelter,
+        ...(kategori ? { brodskala_beregnet: kategori } : {}),
+        brodskala_pct:
+          toNum(safeFelter.brodskala_pct) ??
+          toNum(safeFelter.brodskala_beregnet_pct) ??
+          toNum(safeFelter.grain_score_pct),
+      },
       mangler: (raw.mangler as string[] | null) ?? [],
       effektivGrovhet: kategori,
-      effektivGrovhetPct: toNum(safeFelter.brodskala_pct),
+      // `resolve_label_data` fyller ikke brodskala_pct ennå — fall tilbake til
+      // beregnet prosent slik at tallet kan trykkes under merket.
+      effektivGrovhetPct:
+        toNum(safeFelter.brodskala_pct) ??
+        toNum(safeFelter.brodskala_beregnet_pct) ??
+        toNum(safeFelter.grain_score_pct),
     };
   }
   return out;

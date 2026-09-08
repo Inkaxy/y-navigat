@@ -24,6 +24,179 @@ export const BRAN_FACTOR: Record<string, number> = {
   wheat_bran: 4.5, rye_bran: 4.0, oat_bran: 2.0,
 };
 
+/* ===================== Brødskala'n og Nøkkelhullet =====================
+ * BKLF (fellesmerkebestemmelser 03.10.2022):
+ *   prosent = (hele korn + kli × faktor + sammalt mel)
+ *           / (hele korn + kli + sammalt mel + siktet mel)
+ * Kli teller UVEKTET i nevneren og VEKTET i telleren. Gluten og kim regnes som
+ * siktet i nevneren. Malt/bakemidler, frø, nøtter, vann, salt, gjær og fett står
+ * helt utenfor. Prosenten kan overstige 100 og trykkes under merket (pkt. 4.4).
+ *
+ * Nøkkelhullet (FOR-2015-02-18-139, Mattilsynets veileder 4.2.1) bruker en helt
+ * annen teller: bare hele korn og sammalt mel — KLI TELLER IKKE og har ingen faktor.
+ */
+
+export type GrainBucket = "sifted" | "whole" | "bran" | "outside";
+
+/** Én kilde til hvilken bøtte en kornklasse havner i. */
+export const GRAIN_BUCKET: Record<string, GrainBucket> = {
+  sifted_flour: "sifted",
+  other_flour: "sifted",
+  gluten_or_germ: "sifted",
+  gluten_free_sifted: "sifted",
+  whole_grain_flour: "whole",
+  whole_grains: "whole",
+  gluten_free_grain: "whole",
+  gluten_free_whole: "whole",
+  wheat_bran: "bran",
+  rye_bran: "bran",
+  oat_bran: "bran",
+  // Utenfor nevneren: malt og bakemidler doserer i promille og er ikke mel.
+  malt_or_improver: "outside",
+  not_grain: "outside",
+};
+
+/** Emmer og einkorn er hvetearter — BKLF regner dem som spelt/hvete. */
+export function normalizeCereal(t: string | null | undefined): string | null {
+  const v = String(t ?? "").toLowerCase().trim();
+  if (!v) return null;
+  if (v === "emmer") return "spelt";
+  if (v === "einkorn") return "hvete";
+  return v;
+}
+
+/** Fritekstlinjer med korn-/melord kan ikke klassifiseres og blokkerer merket. */
+export const GRAIN_TEXT_RE = /\b(mel|gryn|kli|korn|havre|rug|hvete|spelt|bygg)/i;
+
+/** Fritekstlinjer under denne vekten er for små til å påvirke merket. */
+export const GRAIN_TEXT_MIN_GRAMS = 5;
+
+export type BreadscaleEntry = {
+  name: string;
+  effective_grams: number;
+  grain_classification: string | null;
+  cereal_type: string | null;
+  custom_text?: string | null;
+};
+
+export type BreadscaleResult = {
+  total_flour_grams: number;
+  coarse_grams_weighted: number;
+  /** BKLF-prosenten, kan overstige 100. Lagres i jsonb til CHECK utvides. */
+  breadscale_pct: number | null;
+  /** Samme tall som tekst-visning under merket. */
+  breadscale_pct_display: string | null;
+  /** Verdien som skrives i kolonnen — begrenset til 100 av dagens CHECK. */
+  grain_pct: number | null;
+  grain_category: string | null;
+  /** Nøkkelhullets fullkorn: hele korn + sammalt, UTEN kli og uten faktor. */
+  whole_grain_grams: number;
+  rye_flour_grams: number;
+  contributors: Array<{ name: string; grams: number; classification: string; weighted: number }>;
+  unclassified: string[];
+  free_text_grain_lines: Array<{ name: string; grams: number }>;
+};
+
+export function nbNum(n: number, decimals = 1): string {
+  return Number(n).toFixed(decimals).replace(".", ",");
+}
+
+/** Brødskala'n og fullkorn-telleren — én implementasjon for edge, klient og tester. */
+export function computeBreadscale(entries: BreadscaleEntry[]): BreadscaleResult {
+  let denominator = 0;
+  let coarseWeighted = 0;
+  let wholeGrain = 0;
+  let rye = 0;
+  const contributors: BreadscaleResult["contributors"] = [];
+  const unclassified: string[] = [];
+  const free_text_grain_lines: BreadscaleResult["free_text_grain_lines"] = [];
+
+  for (const e of entries) {
+    const g = Number(e.effective_grams) || 0;
+    const c = e.grain_classification;
+    const cereal = normalizeCereal(e.cereal_type);
+    const bucket = c ? GRAIN_BUCKET[c] : undefined;
+
+    if (e.custom_text && GRAIN_TEXT_RE.test(e.custom_text) && g > GRAIN_TEXT_MIN_GRAMS) {
+      free_text_grain_lines.push({ name: e.custom_text, grams: g });
+      continue;
+    }
+    if (!bucket) {
+      if (g > GRAIN_TEXT_MIN_GRAMS && !e.custom_text) unclassified.push(e.name);
+      continue;
+    }
+    if (bucket === "outside") continue;
+
+    if (bucket === "sifted") {
+      denominator += g;
+      contributors.push({ name: e.name, grams: g, classification: c!, weighted: 0 });
+      if (cereal === "rug") rye += g;
+    } else if (bucket === "whole") {
+      denominator += g;
+      coarseWeighted += g;
+      wholeGrain += g;
+      contributors.push({ name: e.name, grams: g, classification: c!, weighted: g });
+      if (cereal === "rug") rye += g;
+    } else {
+      // Kli: uvektet i nevneren, vektet i telleren. Aldri fullkorn.
+      const w = g * (BRAN_FACTOR[c!] ?? 1);
+      denominator += g;
+      coarseWeighted += w;
+      contributors.push({ name: e.name, grams: g, classification: c!, weighted: w });
+      if (cereal === "rug" || c === "rye_bran") rye += g;
+    }
+  }
+
+  // Rund til én desimal ETT sted — trinnoppslaget bruker samme tall som visningen.
+  const pct = denominator > 0 ? Math.round((coarseWeighted / denominator) * 1000) / 10 : null;
+  return {
+    total_flour_grams: denominator,
+    coarse_grams_weighted: coarseWeighted,
+    breadscale_pct: pct,
+    breadscale_pct_display: pct == null ? null : `${nbNum(pct)} %`,
+    grain_pct: pct == null ? null : Math.min(100, pct),
+    grain_category: pct == null ? null : breadscaleCategory(pct),
+    whole_grain_grams: wholeGrain,
+    rye_flour_grams: rye,
+    contributors,
+    unclassified,
+    free_text_grain_lines,
+  };
+}
+
+/** Flytende fett og sirup holdes utenfor tørrstoffet (veilederen 4.2.1). */
+export const LIQUID_EXCLUDED_RE = /(olje|sirup|flytende fett)/i;
+
+export type DryMatterEntry = {
+  name: string;
+  effective_grams: number;
+  water_content_pct: number | null;
+  water_content_source?: "override" | "raw_material" | "unknown";
+  grain_classification?: string | null;
+};
+
+/**
+ * Tørrstoff etter Nøkkelhull-veilederen: ukjent vanninnhold ⇒ × 0,85
+ * (ikke 0 % vann), kjent vanninnhold ⇒ faktisk tørrstoff, flytende
+ * olje/sirup utenfor.
+ */
+export function dryMatterGrams(entries: DryMatterEntry[]): number {
+  let dry = 0;
+  for (const e of entries) {
+    const g = Number(e.effective_grams) || 0;
+    if (LIQUID_EXCLUDED_RE.test(e.name ?? "")) continue;
+    const known = e.water_content_source ? e.water_content_source !== "unknown" : e.water_content_pct != null;
+    dry += known ? g * (1 - (e.water_content_pct ?? 0) / 100) : g * 0.85;
+  }
+  return dry;
+}
+
+/** Fullkornandel av tørrstoff — brukes bare av Nøkkelhullet. */
+export function wholeGrainPctOfDry(wholeGrainG: number, dryG: number): number | null {
+  if (!(dryG > 0)) return null;
+  return Math.round((wholeGrainG / dryG) * 1000) / 10;
+}
+
 /** Ingredienser som praktisk talt alltid finnes og som ALDRI skal antas å være 0. */
 export const CRITICAL_INGREDIENT_RE = /\b(salt|vann|gj(æ|ae)r)\b/i;
 
@@ -224,14 +397,7 @@ export type CoreResult = {
   fiber_complete: boolean;
   /** Sammensatte råvarer der komponentprosentene ikke summerer til 100. */
   composite_percent_residual: Array<{ name: string; residual_pct: number }>;
-  breadscale: {
-    total_flour_grams: number;
-    coarse_grams_weighted: number;
-    grain_pct: number | null;
-    grain_category: string | null;
-    contributors: Array<{ name: string; grams: number; classification: string; weighted: number }>;
-    unclassified: string[];
-  };
+  breadscale: BreadscaleResult;
   rye_flour_grams: number;
   composite_unreviewed: string[];
   composite_text_only: string[];
@@ -838,33 +1004,8 @@ export async function computeDeclarationCore(
   const lines_without_nutrition_over_pct = missing_nutrition.filter((m) => m.pct_of_weight > CRITICAL_LINE_PCT);
   const critical_missing_nutrition = missing_nutrition.filter((m) => m.critical).map((m) => m.name);
 
-  // Brødskala'n
-  let totalFlour = 0, coarseWeighted = 0, ryeFlour = 0;
-  const contributors: Array<{ name: string; grams: number; classification: string; weighted: number }> = [];
-  const unclassified: string[] = [];
-  for (const a of sortedAgg) {
-    const c = a.grain_classification;
-    const g = a.effective_grams;
-    if (c === "sifted_flour" || c === "other_flour") {
-      totalFlour += g;
-      contributors.push({ name: a.name, grams: g, classification: c, weighted: 0 });
-      if (a.cereal_type === "rug") ryeFlour += g;
-    } else if (c === "whole_grain_flour" || c === "whole_grains" || c === "gluten_free_grain") {
-      totalFlour += g; coarseWeighted += g;
-      contributors.push({ name: a.name, grams: g, classification: c, weighted: g });
-      if (a.cereal_type === "rug") ryeFlour += g;
-    } else if (c === "wheat_bran" || c === "rye_bran" || c === "oat_bran") {
-      const w = g * BRAN_FACTOR[c];
-      coarseWeighted += w;
-      contributors.push({ name: a.name, grams: g, classification: c, weighted: w });
-      if (a.cereal_type === "rug" || c === "rye_bran") ryeFlour += g;
-    } else if (c === "not_grain") {
-      // hopp over
-    } else if (g > 5 && !a.custom_text) {
-      unclassified.push(a.name);
-    }
-  }
-  const grainPct = totalFlour > 0 ? Math.round((coarseWeighted / totalFlour) * 1000) / 10 : null;
+  // Brødskala'n og Nøkkelhullets fullkornteller — felles motor.
+  const breadscale = computeBreadscale(sortedAgg);
 
   return {
     sortedAgg,
@@ -883,15 +1024,8 @@ export async function computeDeclarationCore(
     free_text_lines,
     fiber_complete: fiberComplete,
     composite_percent_residual,
-    breadscale: {
-      total_flour_grams: totalFlour,
-      coarse_grams_weighted: coarseWeighted,
-      grain_pct: grainPct,
-      grain_category: grainPct != null ? breadscaleCategory(grainPct) : null,
-      contributors,
-      unclassified,
-    },
-    rye_flour_grams: ryeFlour,
+    breadscale,
+    rye_flour_grams: breadscale.rye_flour_grams,
     composite_unreviewed,
     composite_text_only,
     missing_declaration_names: [...missingDeclMap.values()],

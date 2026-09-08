@@ -164,27 +164,6 @@ export type Database = {
         }
         Relationships: []
       }
-      _raw_material_category_backup: {
-        Row: {
-          gammel_categories: string[] | null
-          gammel_category: string | null
-          raw_material_id: string
-          sikkerhetskopiert_at: string
-        }
-        Insert: {
-          gammel_categories?: string[] | null
-          gammel_category?: string | null
-          raw_material_id: string
-          sikkerhetskopiert_at?: string
-        }
-        Update: {
-          gammel_categories?: string[] | null
-          gammel_category?: string | null
-          raw_material_id?: string
-          sikkerhetskopiert_at?: string
-        }
-        Relationships: []
-      }
       _x_audit: {
         Row: {
           result: Json | null
@@ -4743,8 +4722,51 @@ export type Database = {
         }
         Relationships: []
       }
+      nettside_sync_rejections: {
+        Row: {
+          created_at: string
+          detail: string | null
+          id: number
+          legal_entity_id: string
+          product_id: string
+          reason: string
+        }
+        Insert: {
+          created_at?: string
+          detail?: string | null
+          id?: never
+          legal_entity_id: string
+          product_id: string
+          reason: string
+        }
+        Update: {
+          created_at?: string
+          detail?: string | null
+          id?: never
+          legal_entity_id?: string
+          product_id?: string
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nettside_sync_rejections_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nettside_sync_rejections_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nettside_sync_settings: {
         Row: {
+          force_full_push: boolean
           id: number
           last_push_at: string | null
           last_push_request_id: number | null
@@ -4756,6 +4778,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          force_full_push?: boolean
           id?: number
           last_push_at?: string | null
           last_push_request_id?: number | null
@@ -4767,6 +4790,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          force_full_push?: boolean
           id?: number
           last_push_at?: string | null
           last_push_request_id?: number | null
@@ -4784,6 +4808,7 @@ export type Database = {
           delete_attempts: number
           first_pushed_at: string
           last_pushed_at: string
+          payload_hash: string | null
           product_id: string
           status: string
         }
@@ -4791,6 +4816,7 @@ export type Database = {
           delete_attempts?: number
           first_pushed_at?: string
           last_pushed_at?: string
+          payload_hash?: string | null
           product_id: string
           status?: string
         }
@@ -4798,6 +4824,7 @@ export type Database = {
           delete_attempts?: number
           first_pushed_at?: string
           last_pushed_at?: string
+          payload_hash?: string | null
           product_id?: string
           status?: string
         }
@@ -14877,10 +14904,35 @@ export type Database = {
       is_ordre_admin: { Args: never; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_platform_owner: { Args: { _user_id: string }; Returns: boolean }
-      is_ravarer_owner: { Args: { _user_id: string }; Returns: boolean }
+      is_ravarer_owner:
+        | { Args: { _user_id: string }; Returns: boolean }
+        | {
+            Args: { _legal_entity_id: string; _user_id: string }
+            Returns: boolean
+          }
       kiosk_session_rate_ok: { Args: { p_ip: string }; Returns: boolean }
+      label_declaration_html_from_version: {
+        Args: { p_product_id: string }
+        Returns: string
+      }
+      label_declaration_missing: {
+        Args: { p_felter: Json; p_wanted: string[] }
+        Returns: string[]
+      }
       label_field_for_role: { Args: { p_role: string }; Returns: string }
+      label_format_nutrient: {
+        Args: { p_kind: string; p_val: number }
+        Returns: string
+      }
+      label_format_nutrition: { Args: { p: Json }; Returns: string }
       label_format_qty: { Args: { p_qty: number }; Returns: string }
+      label_ingredients_html: { Args: { p_text: string }; Returns: string }
+      label_ingredients_plain: { Args: { p_text: string }; Returns: string }
+      label_jsonb_num: { Args: { p: Json; p_key: string }; Returns: number }
+      label_product_declaration: {
+        Args: { p_delivery_date?: string; p_product_id: string }
+        Returns: Json
+      }
       list_active_cake_categories: {
         Args: { p_legal_entity_id: string }
         Returns: {
@@ -15470,12 +15522,28 @@ export type Database = {
         Args: { p_product_id: string }
         Returns: number
       }
+      product_breadscale_claim_ok: {
+        Args: { p_product_id: string }
+        Returns: boolean
+      }
       product_breadscale_set: {
         Args: { p_manual_value?: number; p_mode: string; p_product_id: string }
         Returns: number
       }
       product_cost: {
         Args: { p_depth?: number; p_product_id: string }
+        Returns: Json
+      }
+      product_effective_recipe_id: {
+        Args: { p_product_id: string }
+        Returns: string
+      }
+      product_keyhole_qualifies: {
+        Args: { p_product_id: string }
+        Returns: boolean
+      }
+      product_label_preview: {
+        Args: { p_delivery_date?: string; p_product_id: string }
         Returns: Json
       }
       product_margins: {
