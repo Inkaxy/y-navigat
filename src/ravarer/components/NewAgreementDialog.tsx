@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { osloTodayISO } from "@/lib/osloDate";
 import { parseDecimal } from "@/ravarer/lib/packageMath";
+import { rpcApplyAgreement } from "@/ravarer/lib/pendingRpc";
 
 interface Props {
   open: boolean;
