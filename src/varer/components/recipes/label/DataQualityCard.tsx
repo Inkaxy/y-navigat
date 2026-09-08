@@ -3,7 +3,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { AlertTriangle, CheckCircle2, ChevronDown, FileText, Loader2, Pencil } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ExternalLink, FileText, Link2, Loader2, Pencil } from "lucide-react";
+import { Link } from "react-router-dom";
+import { FoodPickerDialog } from "@/ravarer/components/matvaretabellen/FoodPickerDialog";
 import { cn } from "@/lib/utils";
 import { fmtGrams, fmtPct } from "@/varer/lib/breadscale";
 import {
@@ -108,6 +110,7 @@ export function DataQualityCard({
   const datasheets = useDatasheetsFor(rmIds);
   const extract = useExtractNutritionFromDatasheet();
   const [manualFor, setManualFor] = useState<MissingNutritionRow | null>(null);
+  const [foodPickerFor, setFoodPickerFor] = useState<MissingNutritionRow | null>(null);
   const [busyRm, setBusyRm] = useState<string | null>(null);
 
   async function runExtract(row: MissingNutritionRow) {
@@ -252,7 +255,9 @@ export function DataQualityCard({
                   <p className="pb-1 text-xs text-muted-foreground">
                     Tyngste råvare først — den øverste gir størst utslag på dekningen.
                   </p>
-                  {missing.map((m, i) => {
+                  {[...missing]
+                    .sort((a, b) => (b.pct_of_dough ?? 0) - (a.pct_of_dough ?? 0))
+                    .map((m, i) => {
                     const ds = m.raw_material_id ? datasheets.data?.get(m.raw_material_id) : null;
                     const busy = busyRm === m.raw_material_id;
                     return (
@@ -279,10 +284,27 @@ export function DataQualityCard({
                             )}
                             Les ut fra datablad
                           </Button>
-                        ) : (
-                          <Button size="sm" variant="outline" disabled={!canWrite} onClick={() => setManualFor(m)}>
-                            <Pencil className="mr-1.5 h-4 w-4" /> Legg inn manuelt
-                          </Button>
+                        ) : null}
+                        {m.raw_material_id && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={!canWrite}
+                              onClick={() => setFoodPickerFor(m)}
+                            >
+                              <Link2 className="mr-1.5 h-4 w-4" /> Koble Matvaretabellen
+                            </Button>
+                            <Button size="sm" variant="outline" disabled={!canWrite} onClick={() => setManualFor(m)}>
+                              <Pencil className="mr-1.5 h-4 w-4" /> Legg inn manuelt
+                            </Button>
+                            <Link
+                              to={`/ravarer/${m.raw_material_id}?tab=nutrition`}
+                              className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
+                            >
+                              Åpne råvarekortet <ExternalLink className="h-3 w-3" />
+                            </Link>
+                          </>
                         )}
                       </div>
                     );
