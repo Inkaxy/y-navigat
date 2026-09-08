@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
     const { data: recipe, error: recErr } = await admin
       .from("recipes")
       .select(
-        "id, name, category, version, description, image_url, unit_weight_grams, units_per_batch, " +
+        "id, name, category, version, description, image_url, unit_weight_grams, units_per_batch, dough_piece_grams, dough_waste_pct, " +
           "target_dough_temp_celsius, friction_factor_celsius, mixing_speed1_minutes, mixing_speed2_minutes, autolyse_minutes",
       )
       .eq("id", link.recipe_id)
