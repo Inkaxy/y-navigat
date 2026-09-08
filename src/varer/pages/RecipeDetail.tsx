@@ -18,7 +18,7 @@ import { RecipeStatsBar } from "@/varer/components/recipes/RecipeStatsBar";
 import { DoughTempPanel } from "@/varer/components/recipes/DoughTempPanel";
 import { RecipeStepsEditor } from "@/varer/components/recipes/RecipeStepsEditor";
 import { StepTimeline } from "@/varer/components/recipes/StepTimeline";
-import { RecipePartCard, type EditorPart } from "@/varer/components/recipes/RecipePartCard";
+import { RecipePartCard, type EditorLine, type EditorPart } from "@/varer/components/recipes/RecipePartCard";
 import { RecipeWarningsBanner } from "@/varer/components/recipes/RecipeWarningsBanner";
 import { DraftRecoveryBanner } from "@/varer/components/recipes/DraftRecoveryBanner";
 import {
@@ -295,6 +295,23 @@ export default function RecipeDetail() {
   const displayTotals = isScaled ? scaleSummary.totals : totals;
   /** Skalert visning låser redigering — man skal ikke kunne lagre en skalert utgave. */
   const editable = canWrite && !isScaled;
+
+  /**
+   * Autolagret utkast i nettleseren. Uten dette forsvinner arbeidet ved en
+   * tilfeldig reload — og en oppskrift er mye skriving å gjøre om igjen.
+   */
+  const draft = useRecipeDraft<RecipeEditorState>({
+    recipeId: recipe?.id ?? null,
+    value: editor.state,
+    dirty,
+    baseUpdatedAt: recipe?.updated_at ?? null,
+  });
+
+  /** Live-advarsler: mangler som gjør oppskriften ubrukelig i produksjon eller på etikett. */
+  const warnings = useRecipeWarnings({
+    lines: hydratedLines,
+    status: String(header.status ?? "draft"),
+  });
 
   /**
    * Rom- og meltemperatur er arbeidsplassens verdier, ikke oppskriftens.
@@ -740,6 +757,20 @@ export default function RecipeDetail() {
             </Button>
           </div>
         )}
+        {draft.pending && editable && (
+          <DraftRecoveryBanner
+            savedAtLabel={draft.savedAtLabel}
+            conflict={draft.conflict}
+            onRestore={() => {
+              editor.restore(draft.pending!.data);
+              draft.accept();
+            }}
+            onDiscard={draft.discard}
+          />
+        )}
+
+        <RecipeWarningsBanner warnings={warnings.warnings} />
+
         <RecipeStatsBar totals={displayTotals} cost={isScaled ? undefined : cost} />
 
 
@@ -984,6 +1015,13 @@ export default function RecipeDetail() {
           )}
         </div>
 
+        <StepTimeline
+          steps={steps}
+          autolyseMinutes={Number(header.autolyse_minutes) || null}
+          mixingSpeed1Minutes={Number(header.mixing_speed1_minutes) || null}
+          mixingSpeed2Minutes={Number(header.mixing_speed2_minutes) || null}
+        />
+
         <RecipeStepsEditor
           steps={steps}
           canWrite={editable}
@@ -1111,6 +1149,21 @@ export default function RecipeDetail() {
               {deactivating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Deaktiver råvaren også
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={partToDelete !== null} onOpenChange={(open) => { if (!open) setPartToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slette «{partToDelete?.name}»?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delen og alle ingredienslinjene i den fjernes fra editoren. Ingenting slettes i basen før du lagrer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRemovePart}>Slett del</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
