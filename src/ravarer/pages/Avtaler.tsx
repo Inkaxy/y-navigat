@@ -7,30 +7,18 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Loader2, FileText, Plus } from "lucide-react";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
-import { useAgreements, type AgreementRow } from "@/ravarer/hooks/useAgreements";
+import { useAgreements } from "@/ravarer/hooks/useAgreements";
+import { AgreementDocumentLink } from "@/ravarer/components/AgreementDocumentLink";
+import {
+  getAgreementStatus,
+  AGREEMENT_STATUS_LABEL,
+  AGREEMENT_STATUS_CLASS,
+  AGREEMENT_STATUS_ORDER,
+  type AgreementStatus,
+} from "@/ravarer/lib/agreementStatus";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { NewAgreementDialog } from "@/ravarer/components/NewAgreementDialog";
 import { formatNok, formatDate } from "@/ravarer/lib/constants";
-
-type Status = "active" | "expiring_soon" | "expiring" | "expired";
-
-function getStatus(validTo: string | null): Status {
-  if (!validTo) return "active";
-  const now = new Date();
-  const end = new Date(validTo);
-  const days = Math.ceil((end.getTime() - now.getTime()) / 86400000);
-  if (days < 0) return "expired";
-  if (days < 30) return "expiring_soon";
-  if (days < 90) return "expiring";
-  return "active";
-}
-
-const STATUS_META: Record<Status, { label: string; className: string }> = {
-  active: { label: "Aktiv", className: "border-success/30 bg-success/10 text-success" },
-  expiring: { label: "Utløper snart", className: "border-warning/30 bg-warning/10 text-warning" },
-  expiring_soon: { label: "<30 dager", className: "border-destructive/40 bg-destructive/10 text-destructive" },
-  expired: { label: "Utløpt", className: "border-destructive/50 bg-destructive/15 text-destructive" },
-};
 
 export default function AvtalerPage() {
   const navigate = useNavigate();
@@ -40,7 +28,7 @@ export default function AvtalerPage() {
   const [search, setSearch] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState<Status | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<AgreementStatus | "all">("all");
 
   const suppliers = useMemo(() => {
     const m = new Map<string, string>();
@@ -54,7 +42,7 @@ export default function AvtalerPage() {
   }, [rows]);
 
   const enriched = useMemo(
-    () => rows.map((r) => ({ row: r, status: getStatus(r.agreement_valid_to) })),
+    () => rows.map((r) => ({ row: r, status: getAgreementStatus(r.agreement_valid_from, r.agreement_valid_to) })),
     [rows],
   );
   const filtered = useMemo(() => {
@@ -104,16 +92,24 @@ export default function AvtalerPage() {
               {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
-            <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Alle statuser</SelectItem>
-              <SelectItem value="active">Aktiv</SelectItem>
-              <SelectItem value="expiring">Utløper snart</SelectItem>
-              <SelectItem value="expiring_soon">{"<30 dager"}</SelectItem>
-              <SelectItem value="expired">Utløpt</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex flex-wrap items-center gap-1">
+            <Button size="sm" variant={statusFilter === "all" ? "default" : "outline"} onClick={() => setStatusFilter("all")}>
+              Alle statuser
+            </Button>
+            {AGREEMENT_STATUS_ORDER.map((st) => (
+              <Button
+                key={st}
+                size="sm"
+                variant={statusFilter === st ? "default" : "outline"}
+                onClick={() => setStatusFilter(st)}
+              >
+                {AGREEMENT_STATUS_LABEL[st]}
+                <span className="ml-1.5 text-xs opacity-70">
+                  {enriched.filter((e) => e.status === st).length}
+                </span>
+              </Button>
+            ))}
+          </div>
           <span className="text-sm text-ink-secondary">{filtered.length} avtaler</span>
         </div>
       </Card>
@@ -138,13 +134,21 @@ export default function AvtalerPage() {
                   <th className="px-4 py-3">Kategori</th>
                   <th className="px-4 py-3 text-right">Avtalt pris</th>
                   <th className="px-4 py-3 text-right">Pris per enhet</th>
+                  <th className="px-4 py-3">Gyldig fra</th>
                   <th className="px-4 py-3">Gyldig til</th>
+                  <th className="px-4 py-3">Dokument</th>
                   <th className="px-4 py-3">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(({ row, status }) => {
-                  const meta = STATUS_META[status];
+                  const baseUnit = row.raw_material?.base_unit ?? "enhet";
+                  const perPackage =
+                    row.agreed_price != null
+                      ? row.agreed_price
+                      : row.agreed_price_per_base_unit != null && row.package_size != null
+                        ? row.agreed_price_per_base_unit * row.package_size
+                        : null;
                   return (
                     <tr
                       key={row.id}
@@ -155,7 +159,7 @@ export default function AvtalerPage() {
                       <td className="px-4 py-3">{row.raw_material?.name ?? "—"}</td>
                       <td className="px-4 py-3 text-ink-secondary">{row.raw_material?.category ?? "—"}</td>
                       <td className="px-4 py-3 text-right tabular-nums">
-                        {formatNok(row.agreed_price)}
+                        {formatNok(perPackage)}
                         {row.package_size != null && row.package_unit ? (
                           <span className="ml-1 text-xs text-ink-secondary">
                             per {row.package_size} {row.package_unit}
@@ -168,14 +172,20 @@ export default function AvtalerPage() {
                         ) : (
                           <>
                             {formatNok(row.agreed_price_per_base_unit)}
-                            <span className="ml-1 text-xs text-ink-secondary">
-                              per {row.raw_material?.base_unit ?? "enhet"}
-                            </span>
+                            <span className="ml-1 text-xs text-ink-secondary">per {baseUnit}</span>
                           </>
                         )}
                       </td>
+                      <td className="px-4 py-3 text-ink-secondary">{formatDate(row.agreement_valid_from)}</td>
                       <td className="px-4 py-3 text-ink-secondary">{formatDate(row.agreement_valid_to)}</td>
-                      <td className="px-4 py-3"><Badge variant="outline" className={meta.className}>{meta.label}</Badge></td>
+                      <td className="px-4 py-3">
+                        <AgreementDocumentLink path={row.agreement_document_url} label="Åpne" />
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant="outline" className={AGREEMENT_STATUS_CLASS[status]}>
+                          {AGREEMENT_STATUS_LABEL[status]}
+                        </Badge>
+                      </td>
                     </tr>
                   );
                 })}

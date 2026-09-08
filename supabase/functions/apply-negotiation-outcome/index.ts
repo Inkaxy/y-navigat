@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
+  resolveAgreementValidity,
   validateOutcomes,
   type NegotiationItemRow,
   type PreparedOutcome,
@@ -24,38 +25,59 @@ const today = () => new Date().toISOString().slice(0, 10);
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
-
     const url = Deno.env.get("SUPABASE_URL")!;
-    const userClient = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: { user }, error: cErr } = await userClient.auth.getUser(authHeader.replace("Bearer ", ""));
-    if (cErr || !user) return json({ error: "Unauthorized" }, 401);
+    const adminKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // To lovlige inngangsdører:
+    //  1) En innlogget bruker (vanlig bruk fra NBhub). Tilgangen kontrolleres under.
+    //  2) Et internt kall fra submit-live-confirmation, som allerede har
+    //     verifisert leverandørens token. Det identifiseres med delt hemmelighet,
+    //     ikke med service-role-nøkkelen som bearer (den er ingen gyldig bruker).
+    const internalSecret = req.headers.get("x-internal-secret");
+    const expectedSecret = Deno.env.get("CRON_SECRET");
+    const isInternal = !!internalSecret && !!expectedSecret && internalSecret === expectedSecret;
+
+    const authHeader = req.headers.get("Authorization");
+    if (!isInternal && !authHeader?.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
+
+    // Interne kall leser med admin-klienten; brukerkall leser med brukerens egne
+    // rettigheter, slik at RLS fortsatt gjelder for lesingen.
+    const admin = createClient(url, adminKey);
+    const userClient = isInternal
+      ? admin
+      : createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, {
+          global: { headers: { Authorization: authHeader! } },
+        });
+
+    let actorId: string | null = null;
+    if (!isInternal) {
+      const { data: { user }, error: cErr } = await userClient.auth.getUser(authHeader!.replace("Bearer ", ""));
+      if (cErr || !user) return json({ error: "Unauthorized" }, 401);
+      actorId = user.id;
+    }
 
     const body = await req.json().catch(() => null);
     const negotiation_id = typeof body?.negotiation_id === "string" ? body.negotiation_id : null;
     if (!negotiation_id || !Array.isArray(body?.outcomes)) return json({ error: "invalid_payload" }, 400);
 
-    const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-
     const { data: neg, error: negErr } = await userClient
       .from("negotiations")
-      .select("id, legal_entity_id, status")
+      .select("id, legal_entity_id, status, contract_start, contract_end")
       .eq("id", negotiation_id)
       .maybeSingle();
     if (negErr || !neg) return json({ error: "not_found" }, 404);
 
     // Skrivetilgangen må bekreftes eksplisitt — leserettighet via RLS er ikke nok.
     // Fail closed: usikker tilgang = ingen skriving.
-    const { data: hasWrite, error: accessErr } = await userClient.rpc("has_ravarer_access", {
-      _user_id: user.id,
-      _legal_entity_id: neg.legal_entity_id,
-      _min_level: "write",
-    });
-    if (accessErr) return json({ error: "Kunne ikke kontrollere tilgang" }, 500);
-    if (hasWrite !== true) return json({ error: "Mangler skrivetilgang til råvarer" }, 403);
+    if (!isInternal) {
+      const { data: hasWrite, error: accessErr } = await userClient.rpc("has_ravarer_access", {
+        _user_id: actorId,
+        _legal_entity_id: neg.legal_entity_id,
+        _min_level: "write",
+      });
+      if (accessErr) return json({ error: "Kunne ikke kontrollere tilgang" }, 500);
+      if (hasWrite !== true) return json({ error: "Mangler skrivetilgang til råvarer" }, 403);
+    }
 
     // Alle ID-er valideres mot forhandlingen FØR første skriving.
     const [itemsRes, recRes, respRes] = await Promise.all([
@@ -115,6 +137,15 @@ Deno.serve(async (req) => {
 
     const failures: string[] = [];
 
+    // Avtalt oppstart følger forhandlingens kontraktsperiode når den er satt.
+    // Uten dette fikk alle avtaler dagens dato som start, selv når partene ble
+    // enige om en senere oppstart.
+    const { validFrom, validTo } = resolveAgreementValidity({
+      contractStart: neg.contract_start as string | null,
+      contractEnd: neg.contract_end as string | null,
+      today: today(),
+    });
+
     for (const o of prepared as PreparedOutcome[]) {
       const { error: outErr } = await admin.from("negotiation_outcomes").upsert(
         {
@@ -156,7 +187,10 @@ Deno.serve(async (req) => {
         supplier_id: o.supplier_id,
         agreed_price: o.agreed_price,
         agreed_price_per_base_unit: o.agreed_price_per_base_unit,
-        agreement_valid_from: today(),
+        agreement_valid_from: validFrom,
+        agreement_valid_to: validTo,
+        agreed_price_set_at: new Date().toISOString(),
+        agreed_price_set_by: actorId,
       };
       // set_as_primary = false skal ALDRI frata en eksisterende primærkobling
       // statusen. Bare nye rader får en eksplisitt verdi.
@@ -173,7 +207,7 @@ Deno.serve(async (req) => {
         row.package_size = o.agreed_package_size;
         row.package_unit = o.agreed_package_unit;
         row.package_confirmed_at = new Date().toISOString();
-        row.package_confirmed_by = user.id;
+        row.package_confirmed_by = actorId;
       }
 
       const { error: rmsErr } = await admin
@@ -190,6 +224,23 @@ Deno.serve(async (req) => {
           .update({ primary_supplier_id: o.supplier_id })
           .eq("id", o.raw_material_id);
         if (primErr) failures.push(`Kunne ikke sette primærleverandør: ${primErr.message}`);
+      }
+
+      // Avtalen skal være sporbar i prishistorikken. Prisen lagres per
+      // grunnenhet, med avtalens startdato. Kostprisen (current_cost_price)
+      // røres ikke her — den avledes av basen etter samme regler som for faktura.
+      if (o.agreed_price_per_base_unit != null) {
+        const { error: histErr } = await admin.from("raw_material_price_history").insert({
+          raw_material_id: o.raw_material_id,
+          supplier_id: o.supplier_id,
+          price: o.agreed_price_per_base_unit,
+          effective_date: validFrom,
+          source: "agreement",
+          source_reference: negotiation_id,
+          notes: `Forhandling ${negotiation_id}`,
+          created_by: actorId,
+        });
+        if (histErr) failures.push(`Kunne ikke lagre prishistorikk: ${histErr.message}`);
       }
     }
 

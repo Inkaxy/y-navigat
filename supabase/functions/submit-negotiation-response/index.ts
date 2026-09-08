@@ -1,4 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { validateSubmission } from "./validate.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,6 +24,32 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ result: row?.result ?? "invalid_token" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Forhandlingen må være åpen, fristen må ikke være passert, og hver
+    // varelinje må tilhøre nettopp denne forhandlingen. Uten dette godtar
+    // upserten hvilken som helst negotiation_item_id.
+    const [negRes, itemsRes] = await Promise.all([
+      admin
+        .from("negotiations")
+        .select("id, status, response_deadline")
+        .eq("id", row.negotiation_id)
+        .maybeSingle(),
+      admin.from("negotiation_items").select("id, negotiation_id").eq("negotiation_id", row.negotiation_id),
+    ]);
+    if (negRes.error || itemsRes.error) throw negRes.error ?? itemsRes.error;
+
+    const rejection = validateSubmission({
+      negotiation: negRes.data as { id: string; status: string | null; response_deadline: string | null } | null,
+      items: (itemsRes.data ?? []) as { id: string; negotiation_id: string }[],
+      responses,
+      now: new Date(),
+    });
+    if (rejection) {
+      return new Response(JSON.stringify({ result: rejection.code, error: rejection.message }), {
+        status: rejection.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Check if already submitted -> reject unless unlocked
     const { data: existing } = await admin
       .from("negotiation_responses")
@@ -34,6 +62,7 @@ Deno.serve(async (req) => {
 
     const status = finalize ? "submitted" : "draft";
     const submittedAt = finalize ? new Date().toISOString() : null;
+
 
     // Upsert each response
     for (const r of responses) {
