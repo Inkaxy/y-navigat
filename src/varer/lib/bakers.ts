@@ -370,22 +370,90 @@ export interface DoughTempResult {
   message: string;
 }
 
-export function calcWaterTemp(input: DoughTempInput): DoughTempResult {
-  const hasPreferment = input.prefermentTemp != null && !Number.isNaN(Number(input.prefermentTemp));
-  const factors = hasPreferment ? 4 : 3;
-  const sum =
-    (Number(input.roomTemp) || 0) +
-    (Number(input.flourTemp) || 0) +
-    (Number(input.frictionFactor) || 0) +
-    (hasPreferment ? Number(input.prefermentTemp) : 0);
-  const waterTemp = (Number(input.targetDoughTemp) || 0) * factors - sum;
-  const feasible = waterTemp >= 0 && waterTemp <= 60;
-  const message = feasible
-    ? `Bruk vann på ${waterTemp.toFixed(1)} °C for å treffe ${Number(input.targetDoughTemp).toFixed(1)} °C deigtemperatur.`
-    : waterTemp < 0
-      ? "Vanntemperaturen blir under 0 °C — ikke praktisk oppnåelig. Bruk isvann og senk romtemperaturen, eller juster ønsket deigtemperatur."
-      : "Vanntemperaturen blir over 60 °C — ikke praktisk oppnåelig. Varm opp melet eller rommet, eller juster ønsket deigtemperatur.";
-  return { factors, waterTemp, feasible, message };
+/**
+ * Nytt, vektet input-format for `calcWaterTemp`. Fordeigen påvirker
+ * vanntemperaturen proporsjonalt med hvor stor andel av deigen den utgjør —
+ * ikke som en fjerde faktor med lik vekt.
+ */
+export interface WaterTempInput {
+  targetDoughTempC: number;
+  roomTempC: number;
+  flourTempC: number;
+  /** Friksjonsfaktor fra elting. */
+  frictionC: number;
+  /** Fordeig: temperatur og masse i gram. Utelates når oppskriften ikke har fordeig. */
+  preferment?: { tempC: number; grams: number } | null;
+  /** Samlet deigvekt i gram — nevneren for fordeigens andel. */
+  totalDoughG?: number | null;
+}
+
+export interface WaterTempResult {
+  waterTempC: number;
+  prefermentSharePct: number;
+}
+
+/** Sjekker om en verdi er et endelig tall (ikke null/undefined/NaN/Infinity). */
+function isFiniteNumber(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v);
+}
+
+/**
+ * Beregner vanntemperatur for å treffe en ønsket deigtemperatur.
+ *
+ * Formel uten fordeig:
+ *   vann = 3 × mål − (rom + mel + friksjon)
+ *
+ * Med fordeig vektes fordeigens bidrag med dens andel `p` av deigvekten
+ * (`p = fordeigens gram / total deigvekt`, klemt til 0–1):
+ *   vann = 3 × mål − (rom + mel + friksjon) − 3 × p × (fordeigTemp − mål)
+ *
+ * Ved p = 0 er formelen identisk med formelen uten fordeig.
+ *
+ * Har det gamle signaturet (`DoughTempInput`) blitt brukt, beholdes den
+ * opprinnelige — ikke vektede — oppførselen uendret for bakoverkompatibilitet
+ * med kallsteder som ikke er del av denne leveransen.
+ */
+export function calcWaterTemp(input: DoughTempInput): DoughTempResult;
+export function calcWaterTemp(input: WaterTempInput): WaterTempResult | null;
+export function calcWaterTemp(
+  input: DoughTempInput | WaterTempInput,
+): DoughTempResult | WaterTempResult | null {
+  if ("targetDoughTemp" in input) {
+    // Gammelt kallsted (useRecipePDF.tsx / DoughTempPanel.tsx) — uendret oppførsel.
+    const hasPreferment = input.prefermentTemp != null && !Number.isNaN(Number(input.prefermentTemp));
+    const factors = hasPreferment ? 4 : 3;
+    const sum =
+      (Number(input.roomTemp) || 0) +
+      (Number(input.flourTemp) || 0) +
+      (Number(input.frictionFactor) || 0) +
+      (hasPreferment ? Number(input.prefermentTemp) : 0);
+    const waterTemp = (Number(input.targetDoughTemp) || 0) * factors - sum;
+    const feasible = waterTemp >= 0 && waterTemp <= 60;
+    const message = feasible
+      ? `Bruk vann på ${waterTemp.toFixed(1)} °C for å treffe ${Number(input.targetDoughTemp).toFixed(1)} °C deigtemperatur.`
+      : waterTemp < 0
+        ? "Vanntemperaturen blir under 0 °C — ikke praktisk oppnåelig. Bruk isvann og senk romtemperaturen, eller juster ønsket deigtemperatur."
+        : "Vanntemperaturen blir over 60 °C — ikke praktisk oppnåelig. Varm opp melet eller rommet, eller juster ønsket deigtemperatur.";
+    return { factors, waterTemp, feasible, message };
+  }
+
+  const { targetDoughTempC, roomTempC, flourTempC, frictionC, preferment, totalDoughG } = input;
+  if (![targetDoughTempC, roomTempC, flourTempC, frictionC].every(isFiniteNumber)) return null;
+
+  const hasPreferment = preferment != null;
+  let p = 0;
+  if (hasPreferment) {
+    if (!isFiniteNumber(preferment.tempC) || !isFiniteNumber(preferment.grams) || !isFiniteNumber(totalDoughG) || (totalDoughG as number) <= 0) {
+      return null;
+    }
+    p = Math.min(1, Math.max(0, preferment.grams / (totalDoughG as number)));
+  }
+
+  const base = 3 * targetDoughTempC - (roomTempC + flourTempC + frictionC);
+  const prefermentAdjustment = hasPreferment ? 3 * p * ((preferment as { tempC: number }).tempC - targetDoughTempC) : 0;
+  const waterTempC = Math.round((base - prefermentAdjustment) * 10) / 10;
+
+  return { waterTempC, prefermentSharePct: p * 100 };
 }
 
 // ===== Skalering =====

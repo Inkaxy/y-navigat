@@ -9,6 +9,7 @@ import {
   isFlourLine,
   lineDisplayName,
   roundBakerGrams,
+  fmtDuration,
   fmtNum,
   scaleLines,
   STEP_TYPE_LABEL,
@@ -48,6 +49,10 @@ export interface RecipePDFPart {
   targetTempCelsius: number | null;
   ripeTimeHours: number | null;
   instructions: string | null;
+  /** Kort forberedelsesnotat — f.eks. utledet av forberedelsestid, vises under deltittelen. */
+  prepNote?: string | null;
+  /** Hviletid i minutter, vises under deltittelen når den er satt. */
+  restMinutes?: number | null;
   lines: RecipePDFLine[];
   totalG: number;
   hydrationPct: number;
@@ -72,6 +77,12 @@ export interface RecipePDFData {
   description: string | null;
   imageUrl: string | null;
   printedAt: Date;
+  /** Batch-id skrevet inn i utskriftsdialogen, kun til bruk på produksjonsarket. */
+  batchId?: string | null;
+  /** Produksjonsdato (YYYY-MM-DD) valgt i utskriftsdialogen. */
+  productionDate?: string | null;
+  /** Allergener som skal fremheves på produksjonsarket, når kjent. */
+  allergens?: string[] | null;
 
   scaledUnits: number;
   scaleFactorValue: number;
@@ -100,6 +111,13 @@ export interface RecipePDFData {
   totalProcessMinutes: number;
 
   costs: { total: number; perUnit: number | null } | null;
+
+  /** Per-batch-oppstilling — satt når oppskriften er delt i flere fysiske batcher. */
+  batches?: {
+    count: number;
+    perBatchDoughG: number | null;
+    lines: { name: string; grams: number | null; unit: string; quantity: number }[];
+  } | null;
 }
 
 export interface BuildRecipePDFInput {
@@ -116,6 +134,11 @@ export interface BuildRecipePDFInput {
   flourTemp?: number;
   scaledUnits: number;
   factor: number;
+  /** Antall enheter per fysisk batch — brukes til å regne ut per-batch-vekter når satt. */
+  unitsPerBatch?: number | null;
+  batchId?: string | null;
+  productionDate?: string | null;
+  allergens?: string[] | null;
   parts: {
     id: string;
     name: string;
@@ -124,6 +147,9 @@ export interface BuildRecipePDFInput {
     target_temp_celsius: number | null;
     ripe_time_hours: number | null;
     instructions: string | null;
+    /** Finnes som kolonne på `recipe_parts`, men fritekst finnes ikke — brukes til å utlede et forberedelsesnotat. */
+    prep_time_minutes?: number | null;
+    rest_time_minutes?: number | null;
   }[];
   lines: BakersLine[];
   steps: {
@@ -196,6 +222,8 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
       targetTempCelsius: p.target_temp_celsius,
       ripeTimeHours: p.ripe_time_hours,
       instructions: p.instructions,
+      prepNote: p.prep_time_minutes != null ? `Forberedelse: ${fmtDuration(p.prep_time_minutes)}` : null,
+      restMinutes: p.rest_time_minutes ?? null,
       lines,
       totalG: summary.totalG * input.factor,
       hydrationPct: summary.hydrationPct,
@@ -207,6 +235,27 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
   const preferments = allParts.filter((p) => p.partType === "preferment");
   const mainParts = allParts.filter((p) => p.partType !== "preferment");
   const prefermentedFlourPct = preferments.reduce((s, p) => s + p.prefermentedFlourPct, 0);
+
+  // Per-batch-oppstilling — deler den skalerte oppskriften i fysiske batcher når
+  // antall enheter per batch er kjent. Baker-% er uendret; det som deles er gram/mengde.
+  let batches: RecipePDFData["batches"] = null;
+  const unitsPerBatch = Number(input.unitsPerBatch) || 0;
+  if (unitsPerBatch > 0) {
+    const count = Math.max(1, Math.round(input.scaledUnits / unitsPerBatch));
+    const batchLines = input.lines.map((l) => {
+      const s = byId.get(l.id);
+      const exact = s ? s.exact : false;
+      const exactGrams = s?.exactGrams ?? 0;
+      return {
+        name: lineDisplayName(l),
+        grams: exact ? roundBakerGrams(exactGrams / count) : null,
+        unit: l.unit,
+        quantity: (s?.scaledQuantity ?? Number(l.quantity) * input.factor) / count,
+      };
+    });
+    const doughG = allParts.reduce((s, p) => s + p.lines.reduce((ls, l) => ls + l.grams, 0), 0);
+    batches = { count, perBatchDoughG: count > 0 ? roundBakerGrams(doughG / count) : null, lines: batchLines };
+  }
 
   const steps: RecipePDFStep[] = input.steps.map((s, i) => ({
     index: i + 1,
@@ -239,6 +288,9 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
     description: input.description ?? null,
     imageUrl: input.imageUrl ?? null,
     printedAt: new Date(),
+    batchId: input.batchId ?? null,
+    productionDate: input.productionDate ?? null,
+    allergens: input.allergens ?? null,
     scaledUnits: Math.round(input.scaledUnits),
     scaleFactorValue: input.factor,
     unitWeightGrams: uw > 0 ? uw : null,
@@ -262,6 +314,7 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
     steps,
     totalProcessMinutes: steps.reduce((s, x) => s + (Number(x.durationMinutes) || 0), 0),
     costs,
+    batches,
   };
 }
 
