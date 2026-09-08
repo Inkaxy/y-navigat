@@ -84,13 +84,34 @@ describe("F5 — telling og varemottak", () => {
   });
 
   it("dobbeltfører ikke mottak og snur aldri kreditt til positivt", () => {
-    expect(F5).toMatch(/already_posted/);
+    expect(F5).toMatch(/already_received/);
+    expect(F5).toMatch(/create table if not exists public\.rm_goods_receipts/i);
     expect(F5).toMatch(/v_qty := -abs\(v_qty\)/);
     expect(F5).toMatch(/source_table = 'invoice_lines' and source_id = v_l\.id/i);
   });
 
   it("gir ikke anonyme kjøretilgang til de nye RPC-ene", () => {
     expect(F5).toMatch(/revoke all on function public\.rm_stock_count_apply_v2\(uuid, jsonb, text\) from public, anon/i);
-    expect(F5).toMatch(/revoke all on function public\.rm_receive_invoice_line\(uuid\) from public, anon/i);
+    expect(F5).toMatch(/revoke all on function public\.rm_receive_invoice_line\(uuid, text, date, text\) from public, anon/i);
+  });
+}
+  it("claimer telleark før arbeidet og avviser gjenbruk med annet innhold", () => {
+    expect(F5).toMatch(/on conflict \(op_id\) do nothing/i);
+    expect(F5).toMatch(/allerede brukt med et annet innhold/);
+    expect(F5).toMatch(/Tellingen blander varer fra flere selskaper/);
+    expect(F5).toMatch(/rm_is_finite/);
+    expect(F5).toMatch(/mangler forventet beholdning/);
+  });
+
+  it("låser faktura før linje i mottaket, som i avstemmingen", () => {
+    const inv = F5.search(/for update of i;/);
+    const line = F5.search(/from public\.invoice_lines where id = p_line_id for update/i);
+    expect(inv).toBeGreaterThan(-1);
+    expect(line).toBeGreaterThan(inv);
+  });
+
+  it("validerer linja også når triggeren allerede har bokført", () => {
+    expect(F5).toMatch(/venter på gjennomgang og kan ikke mottas/);
+    expect(F5).toMatch(/ikke relevant og kan ikke mottas/);
   });
 });
