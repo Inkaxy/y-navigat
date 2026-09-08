@@ -23,7 +23,7 @@ import {
 import { copyRecipe } from "@/varer/lib/copyRecipe";
 
 import {
-  computeTotals, fmtG, fmtPercent, RECIPE_STATUS_LABEL, type BakersLine, type BakersRawMaterial,
+  computeTotalsForRecipe, fmtG, fmtPercent, RECIPE_STATUS_LABEL, type BakersLine, type BakersRawMaterial,
 } from "@/varer/lib/bakers";
 import { BASE_RECIPE_CATEGORY } from "@/varer/lib/halvfabrikat";
 import {
@@ -50,6 +50,8 @@ type RecipeListRow = {
   version: number | null;
   unit_weight_grams: number | null;
   units_per_batch: number | null;
+  dough_piece_grams: number | null;
+  dough_waste_pct: number | null;
   product_id: string | null;
   recipe_lines: RecipeLineRow[] | null;
   product_recipe_links: { product_id: string; products: { display_name: string | null } | null }[] | null;
@@ -132,7 +134,7 @@ export default function Recipes() {
     queryFn: async () => {
       const { data } = await supabase
         .from("recipes")
-        .select("id, name, image_url, category, status, department, version, unit_weight_grams, units_per_batch, product_id, recipe_lines(id, quantity, unit, raw_material_id, is_flour_override, water_content_pct_override, ingredient_name), product_recipe_links(product_id, products(display_name))")
+        .select("id, name, image_url, category, status, department, version, unit_weight_grams, units_per_batch, dough_piece_grams, dough_waste_pct, product_id, recipe_lines(id, quantity, unit, raw_material_id, is_flour_override, water_content_pct_override, ingredient_name), product_recipe_links(product_id, products(display_name))")
         .is("valid_to", null)
         .order("created_at", { ascending: false });
       return (data ?? []) as unknown as RecipeListRow[];
@@ -169,7 +171,7 @@ export default function Recipes() {
           ...l,
           _rm: l.raw_material_id ? rmMap[l.raw_material_id] ?? null : null,
         }));
-        const totals = computeTotals(lines, r.unit_weight_grams);
+        const totals = computeTotalsForRecipe(lines, r);
         const products = (r.product_recipe_links ?? [])
           .map((l) => l.products?.display_name)
           .filter((n): n is string => !!n);
