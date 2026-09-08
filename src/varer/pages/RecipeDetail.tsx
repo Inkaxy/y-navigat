@@ -22,7 +22,7 @@ import { RecipePartCard, type EditorLine, type EditorPart } from "@/varer/compon
 import { RecipeWarningsBanner } from "@/varer/components/recipes/RecipeWarningsBanner";
 import { DraftRecoveryBanner } from "@/varer/components/recipes/DraftRecoveryBanner";
 import {
-  useRecipeEditor, type HeaderState, type RecipeDetailRow, type RecipeEditorState,
+  useRecipeEditor, type RecipeDetailRow, type RecipeEditorState,
 } from "@/varer/hooks/useRecipeEditor";
 import { useRecipeDraft } from "@/varer/hooks/useRecipeDraft";
 import { useRecipeWarnings } from "@/varer/hooks/useRecipeWarnings";
