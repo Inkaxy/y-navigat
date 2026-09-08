@@ -389,6 +389,8 @@ export type CoreResult = {
   missing_nutrition: MissingNutritionLine[];
   /** Kritiske ingredienser (salt/vann/gjær) uten næringsdata. */
   critical_missing_nutrition: string[];
+  /** Råvarer uten en eneste allergenrad — allergener er ikke gjennomgått. */
+  missing_allergens: Array<{ raw_material_id: string; name: string; grams: number; pct_of_weight: number }>;
   /** Linjer der enheten ikke kan regnes om til gram. */
   unit_problems: Array<{ name: string; unit: string; reason: string }>;
   /** Fritekstlinjer uten råvarekobling — hard sperre for auto-deklarasjon. */
@@ -997,6 +999,24 @@ export async function computeDeclarationCore(
   }
   missing_nutrition.sort((x, y) => y.grams - x.grams);
 
+  // Allergener: en råvare uten rader i raw_material_allergens er ikke gjennomgått.
+  const missing_allergens: Array<{ raw_material_id: string; name: string; grams: number; pct_of_weight: number }> = [];
+  const seenAllergenRm = new Set<string>();
+  for (const a of sortedAgg) {
+    const rmId = a.raw_material_id;
+    if (!rmId || seenAllergenRm.has(rmId)) continue;
+    seenAllergenRm.add(rmId);
+    if ((allergensByRm.get(rmId) ?? []).length > 0) continue;
+    if (isWaterRow(rmId, a.name)) continue;
+    missing_allergens.push({
+      raw_material_id: rmId,
+      name: a.name,
+      grams: Math.round(a.effective_grams * 10) / 10,
+      pct_of_weight: Math.round((a.effective_grams / totalForCoverage) * 10000) / 100,
+    });
+  }
+  missing_allergens.sort((x, y) => y.grams - x.grams);
+
   const coverage_by_nutrient: Record<string, number> = {};
   for (const f of NUT_FIELDS) {
     coverage_by_nutrient[f] = Math.round((coveredByField[f] / totalForCoverage) * 1000) / 10;
@@ -1019,6 +1039,7 @@ export async function computeDeclarationCore(
     coverage_by_nutrient,
     lines_without_nutrition_over_pct,
     missing_nutrition,
+    missing_allergens,
     critical_missing_nutrition,
     unit_problems,
     free_text_lines,
