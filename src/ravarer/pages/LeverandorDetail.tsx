@@ -379,6 +379,11 @@ export default function LeverandorDetailPage() {
                             ) : (
                               <Badge variant="outline" className="text-ink-secondary">Ingen avtale</Badge>
                             )}
+                            {r.agreement_document_url && (
+                              <div className="mt-1">
+                                <AgreementDocumentLink path={r.agreement_document_url} label="Dokument" />
+                              </div>
+                            )}
                           </td>
                         </tr>
                       );

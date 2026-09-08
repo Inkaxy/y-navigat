@@ -16,6 +16,7 @@ export interface SupplierItemRow {
   agreed_price_per_base_unit: number | null;
   agreement_valid_from: string | null;
   agreement_valid_to: string | null;
+  agreement_document_url: string | null;
   last_invoice_price: number | null;
   last_invoice_date: string | null;
   raw_material: { id: string; name: string; base_unit: string | null; item_type: string | null } | null;
@@ -62,7 +63,7 @@ export function useSupplierItems(supplierId: string | undefined) {
       const { data, error } = await supabase
         .from("raw_material_suppliers")
         .select(
-          "id, raw_material_id, supplier_sku, supplier_product_name, package_size, package_unit, agreed_price_per_base_unit, agreement_valid_from, agreement_valid_to, last_invoice_price, last_invoice_date, raw_material:raw_materials(id, name, base_unit, item_type)",
+          "id, raw_material_id, supplier_sku, supplier_product_name, package_size, package_unit, agreed_price_per_base_unit, agreement_valid_from, agreement_valid_to, agreement_document_url, last_invoice_price, last_invoice_date, raw_material:raw_materials(id, name, base_unit, item_type)",
         )
         .eq("supplier_id", supplierId!);
       if (error) throw error;
