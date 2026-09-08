@@ -515,7 +515,7 @@ function LineRow({
   return (
     <tr className="border-b last:border-0 hover:bg-muted/30">
       <td className="px-2 py-1.5">
-        <div className="font-medium">{line.products?.navn ?? "—"}</div>
+        <div className="font-medium">{line.products?.display_name ?? "—"}</div>
         <div className="text-xs text-muted-foreground">
           Varenr {line.products?.display_number ?? "—"}
           {overstyrt && (

@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Loader2, Save, X, Ban } from "lucide-react";
+import { ArrowLeft, Ban, Check, Loader2, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,7 @@ interface DetailLayoutProps {
   onSave: () => void;
   onCancel: () => void;
   onDeactivate: () => void;
+  onActivate: () => void;
   children: ReactNode;
 }
 
@@ -43,6 +44,7 @@ export function DetailLayout({
   onSave,
   onCancel,
   onDeactivate,
+  onActivate,
   children,
 }: DetailLayoutProps) {
   const navigate = useNavigate();
@@ -64,12 +66,23 @@ export function DetailLayout({
             <h1 className="text-2xl font-semibold tracking-tight truncate">
               {product.display_name}
             </h1>
-            <Badge variant="outline">{PRODUCT_STATUS_LABEL[product.status]}</Badge>
+            <Badge
+              variant="outline"
+              className={
+                product.status === "active"
+                  ? "border-success/40 bg-success/10 text-success"
+                  : product.status === "draft"
+                    ? "border-warning/40 bg-warning/10 text-warning"
+                    : undefined
+              }
+            >
+              {PRODUCT_STATUS_LABEL[product.status]}
+            </Badge>
             {product.variant_of_product_id && (
               <Badge className="bg-app/15 text-app-dark hover:bg-app/15">Variant</Badge>
             )}
             {isDirty && (
-              <span className="text-xs text-warning font-medium">• Usavete endringer</span>
+              <span className="text-xs text-warning font-medium">• Ulagrede endringer</span>
             )}
           </div>
           <div className="mt-1 text-sm text-muted-foreground font-mono">
@@ -79,6 +92,11 @@ export function DetailLayout({
 
         {canWrite && (
           <div className="flex flex-wrap gap-2">
+            {product.status !== "active" && (
+              <Button variant="default" size="sm" onClick={onActivate}>
+                <Check className="mr-1.5 h-4 w-4" /> Aktiver
+              </Button>
+            )}
             {product.status !== "discontinued" && (
               <Button
                 variant="outline"

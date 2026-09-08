@@ -1,4 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm, FormProvider } from "react-hook-form";
@@ -47,6 +57,7 @@ import { ReturTab } from "@/varer/components/products/detail/tabs/ReturTab";
 import { RecipeSummaryCard } from "@/varer/components/products/RecipeSummaryCard";
 import { SelvStekingCard } from "@/varer/components/products/detail/SelvStekingCard";
 import { DeclarationTab } from "@/varer/components/products/DeclarationTab";
+import { CostPriceTab } from "@/varer/components/products/CostPriceTab";
 import { CalculationTab } from "@/varer/components/products/CalculationTab";
 import { StockTab } from "@/varer/components/products/StockTab";
 import { useNavigate as useNav } from "react-router-dom";
@@ -64,8 +75,7 @@ const TABS: TabConfig[] = [
   { type: "tab", id: "varianter", label: "Varianter", icon: GitBranch },
   { type: "tab", id: "oppskrift", label: "Oppskrift", icon: ChefHat },
   { type: "tab", id: "deklarasjon", label: "Deklarasjon", icon: ScrollText },
-  { type: "tab", id: "kalkyle", label: "Kalkyle", icon: Receipt },
-  { type: "tab", id: "priser", label: "Priser", icon: Receipt },
+  { type: "tab", id: "kalkyle_pris", label: "Kalkyle & pris", icon: Receipt },
   { type: "separator", id: "sep2" },
   { type: "tab", id: "sortiment", label: "Sortiment", icon: ListChecks },
   { type: "tab", id: "avvik", label: "Avvik", icon: AlertTriangle },
@@ -77,8 +87,11 @@ export default function ProductDetail() {
   const qc = useQueryClient();
   const { canWrite, legalEntityId } = useAppContext();
   const [params, setParams] = useSearchParams();
-  const tab = params.get("tab") ?? "navn";
+  const rawTab = params.get("tab") ?? "navn";
+  // Gamle lenker til «Kalkyle» og «Priser» peker til den sammenslåtte fanen.
+  const tab = rawTab === "kalkyle" || rawTab === "priser" ? "kalkyle_pris" : rawTab;
   const [saving, setSaving] = useState(false);
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
   const [keywords, setKeywords] = useState<string[]>([]);
   const [salesGroupIds, setSalesGroupIds] = useState<string[]>([]);
   const [originalSalesGroupIds, setOriginalSalesGroupIds] = useState<string[]>([]);
@@ -159,19 +172,6 @@ export default function ProductDetail() {
         .select("id, display_name, variant_label, status, display_number")
         .eq("variant_of_product_id", id!)
         .order("display_number");
-      return data ?? [];
-    },
-  });
-
-  const pricesQuery = useQuery({
-    queryKey: ["product-prices", id],
-    enabled: !!id,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("price_list_items")
-        .select("id, price, valid_from, valid_to, price_lists(id, display_name, code)")
-        .eq("product_id", id!)
-        .order("valid_from", { ascending: false });
       return data ?? [];
     },
   });
@@ -396,9 +396,26 @@ export default function ProductDetail() {
     toast.info("Endringer forkastet");
   }
 
+  /** Setter status til Aktiv — brukes på utkast fra «Ny vare»-veiviseren. */
+  async function handleActivate() {
+    if (!product) return;
+    const { error } = await supabase.from("products").update({ status: "active" }).eq("id", product.id);
+    if (error) { toast.error(error.message); return; }
+    await logAudit({
+      action: "update",
+      entity_type: "product",
+      entity_id: product.id,
+      entity_display_reference: product.display_name,
+      changes: { status: { from: product.status, to: "active" } },
+    });
+    toast.success("Varen er aktiv");
+    qc.invalidateQueries({ queryKey: ["product", product.id] });
+    qc.invalidateQueries({ queryKey: ["products"] });
+  }
+
   async function handleDeactivate() {
     if (!product) return;
-    if (!confirm(`De-aktivere "${product.display_name}"? Status settes til Utgått.`)) return;
+    setConfirmDeactivate(false);
     const { error } = await supabase.from("products").update({ status: "discontinued" }).eq("id", product.id);
     if (error) { toast.error(error.message); return; }
     await logAudit({
@@ -410,12 +427,13 @@ export default function ProductDetail() {
     });
     toast.success("Vare de-aktivert");
     qc.invalidateQueries({ queryKey: ["product", product.id] });
+    qc.invalidateQueries({ queryKey: ["products"] });
   }
 
   // (Ctrl+S-handler ligger nå før early-return for å overholde Rules of Hooks)
 
   // Skjul Oppskrift for varianter
-  const visibleTabs = TABS.filter((t) => !(t.type === "tab" && (t.id === "oppskrift" || t.id === "deklarasjon" || t.id === "kalkyle") && product.variant_of_product_id));
+  const visibleTabs = TABS.filter((t) => !(t.type === "tab" && (t.id === "oppskrift" || t.id === "deklarasjon" || t.id === "kalkyle_pris") && product.variant_of_product_id));
 
   const lookups = lookupsQuery.data;
   const productOptions = lookups?.allProducts ?? [];
@@ -441,7 +459,8 @@ export default function ProductDetail() {
         canWrite={canWrite}
         onSave={handleSaveClick}
         onCancel={handleCancel}
-        onDeactivate={handleDeactivate}
+        onDeactivate={() => setConfirmDeactivate(true)}
+        onActivate={handleActivate}
       >
         {tab === "navn" && (
           <NavnOgNummerTab product={product} canWrite={canWrite} hasGs1Prefix={!!lookups?.hasGs1Prefix} />
@@ -515,36 +534,13 @@ export default function ProductDetail() {
         {tab === "deklarasjon" && !product.variant_of_product_id && (
           <DeclarationTab productId={product.id} productName={product.display_name} canWrite={canWrite} />
         )}
-        {tab === "kalkyle" && !product.variant_of_product_id && (
-          <CalculationTab productId={product.id} productName={product.display_name} canWrite={canWrite} />
-        )}
-        {tab === "priser" && (
-          <Card>
-            <CardHeader><CardTitle className="text-base">Priser</CardTitle></CardHeader>
-            <CardContent>
-              {(pricesQuery.data?.length ?? 0) === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Denne varen ligger ikke i noen prisliste ennå. Gå til <a href="/varer/priser" className="text-app underline">Priser</a> for å legge den til.
-                </p>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead className="text-xs uppercase text-muted-foreground">
-                    <tr><th className="py-2 text-left">Prisliste</th><th className="text-left">Gyldig fra</th><th className="text-left">Gyldig til</th><th className="text-right">Pris</th></tr>
-                  </thead>
-                  <tbody>
-                    {pricesQuery.data!.map((p: any) => (
-                      <tr key={p.id} className="border-t border-border">
-                        <td className="py-2">{p.price_lists?.display_name}</td>
-                        <td>{p.valid_from}</td>
-                        <td>{p.valid_to ?? "—"}</td>
-                        <td className="text-right tabular-nums">kr {Number(p.price).toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </CardContent>
-          </Card>
+        {tab === "kalkyle_pris" && !product.variant_of_product_id && (
+          <CostPriceTab
+            productId={product.id}
+            productName={product.display_name}
+            legalEntityId={legalEntityId}
+            canWrite={canWrite}
+          />
         )}
         {tab === "sortiment" && (
           <Card><CardContent className="py-12 text-center text-muted-foreground">Sortimentsstyring kommer når Kunder-appen er bygget.</CardContent></Card>
@@ -553,6 +549,21 @@ export default function ProductDetail() {
           <Card><CardContent className="py-12 text-center text-muted-foreground">Avviksregistrering kommer i fremtidig iterasjon.</CardContent></Card>
         )}
       </DetailLayout>
+
+      <AlertDialog open={confirmDeactivate} onOpenChange={setConfirmDeactivate}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>De-aktivere varen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              «{product?.display_name}» settes til Utgått og kan ikke bestilles. Du kan aktivere den igjen senere.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeactivate}>De-aktiver</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <UnsavedChangesDialog
         open={unsavedGuard.isBlocked}

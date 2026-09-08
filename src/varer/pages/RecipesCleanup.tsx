@@ -11,6 +11,22 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Loader2, AlertTriangle, Wrench, ArrowRight } from "lucide-react";
 
 
+interface CleanupRecipeRaw {
+  id: string;
+  name: string | null;
+  version: number | null;
+  yield_quantity: number | null;
+  yield_unit: string | null;
+  requires_cleanup: boolean | null;
+  recipe_lines: { id: string; raw_material_id: string | null; ingredient_name: string | null }[] | null;
+  product_recipe_links:
+    | {
+        is_primary: boolean | null;
+        products: { id: string; display_name: string; code: string; product_category: string | null } | null;
+      }[]
+    | null;
+}
+
 export default function RecipesCleanup() {
   const { legalEntityId } = useAppContext();
   const navigate = useNavigate();
@@ -19,18 +35,30 @@ export default function RecipesCleanup() {
   const query = useQuery({
     queryKey: ["recipes-cleanup", legalEntityId],
     queryFn: async () => {
+      // Oppskrifter eies av selskapet direkte — recipes.product_id er tom overalt,
+      // så produktet hentes via product_recipe_links (primærkoblingen først).
       const { data, error } = await supabase
         .from("recipes")
-        .select("id, version, yield_quantity, yield_unit, requires_cleanup, products!inner(id, display_name, code, product_category, legal_entity_id), recipe_lines(id, raw_material_id, ingredient_name)")
-        .eq("products.legal_entity_id", legalEntityId!)
+        .select(
+          "id, name, version, yield_quantity, yield_unit, requires_cleanup, recipe_lines(id, raw_material_id, ingredient_name), product_recipe_links(is_primary, products(id, display_name, code, product_category))",
+        )
+        .eq("legal_entity_id", legalEntityId!)
         .eq("requires_cleanup", true)
         .is("valid_to", null)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []).map((r: any) => {
-        const total = (r.recipe_lines ?? []).length;
-        const unmatched = (r.recipe_lines ?? []).filter((l: any) => !l.raw_material_id).length;
-        return { ...r, _total: total, _unmatched: unmatched };
+      return (data ?? []).map((r: CleanupRecipeRaw) => {
+        const lines = r.recipe_lines ?? [];
+        const total = lines.length;
+        const unmatched = lines.filter((l) => !l.raw_material_id).length;
+        const links = r.product_recipe_links ?? [];
+        const primary = links.find((l) => l.is_primary) ?? links[0] ?? null;
+        return {
+          ...r,
+          products: primary?.products ?? null,
+          _total: total,
+          _unmatched: unmatched,
+        };
       });
     },
   });
@@ -39,7 +67,9 @@ export default function RecipesCleanup() {
     const q = search.trim().toLowerCase();
     if (!q) return query.data ?? [];
     return (query.data ?? []).filter((r: any) =>
-      `${r.products?.display_name} ${r.products?.code}`.toLowerCase().includes(q),
+      `${r.products?.display_name ?? ""} ${r.products?.code ?? ""} ${r.name ?? ""}`
+        .toLowerCase()
+        .includes(q),
     );
   }, [query.data, search]);
 
@@ -87,8 +117,10 @@ export default function RecipesCleanup() {
                 {filtered.map((r: any) => (
                   <tr key={r.id} className="border-t border-border hover:bg-muted/30">
                     <td className="px-4 py-2.5">
-                      <div className="font-medium">{r.products?.display_name}</div>
-                      <div className="text-xs font-mono text-muted-foreground">{r.products?.code}</div>
+                      <div className="font-medium">{r.products?.display_name ?? r.name ?? "Uten navn"}</div>
+                      <div className="text-xs font-mono text-muted-foreground">
+                        {r.products?.code ?? "ikke koblet til vare"}
+                      </div>
                     </td>
                     <td className="px-4 py-2.5">{r.products?.product_category ?? "—"}</td>
                     <td className="px-4 py-2.5 tabular-nums">{r._total}</td>
@@ -98,7 +130,13 @@ export default function RecipesCleanup() {
                       </Badge>
                     </td>
                     <td className="px-4 py-2.5 text-right">
-                      <Button size="sm" variant="outline" onClick={() => navigate(`/varer/vareliste/${r.products.id}?tab=oppskrift`)}>
+                      <Button size="sm" variant="outline" onClick={() =>
+                          navigate(
+                            r.products
+                              ? `/varer/vareliste/${r.products.id}?tab=oppskrift`
+                              : `/varer/oppskrifter/${r.id}`,
+                          )
+                        }>
                         Rydd opp <ArrowRight className="ml-1 h-3.5 w-3.5" />
                       </Button>
                     </td>

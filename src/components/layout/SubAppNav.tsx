@@ -14,6 +14,7 @@ import { useInvoiceAccess } from "@/ravarer/hooks/useInvoiceAccess";
 import { useRavarerAccessLevel } from "@/ravarer/hooks/useRavarerAccessLevel";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import {
   DropdownMenu,
@@ -370,12 +371,13 @@ function VarerNav() {
   const { data: cleanupCount = 0 } = useQuery({
     queryKey: ["varer-cleanup-count"],
     queryFn: async () => {
+      // recipes.product_id er tom overalt — selskapet leses direkte på oppskriften.
       const { count, error } = await supabase
         .from("recipes")
-        .select("id, products!inner(legal_entity_id)", { count: "exact", head: true })
+        .select("id", { count: "exact", head: true })
         .eq("requires_cleanup", true)
         .is("valid_to", null)
-        .eq("products.legal_entity_id", "751709bc-04b3-4449-867d-b97faa9ab373");
+        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID);
       if (error) return 0;
       return count ?? 0;
     },

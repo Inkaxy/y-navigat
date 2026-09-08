@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/supabasePaging";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 
 import { logAudit } from "@/varer/lib/audit";
+import { writePriceForDate } from "@/varer/lib/priceWrite";
+import { supabasePriceStore, PRICE_QUERY_KEYS } from "@/varer/lib/supabasePriceStore";
+import { osloTodayISO } from "@/lib/osloDate";
 import { toast } from "sonner";
 import { useAppContext } from "@/varer/context/AppContext";
 
@@ -37,10 +41,11 @@ export default function PriceListDetail() {
     queryKey: ["price-list-items", id],
     enabled: !!id,
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("price_list_items")
         .select("id, price, valid_from, valid_to, product_id, products(id, display_name, code, display_number)")
         .eq("price_list_id", id!);
+      if (error) throw error;
       return data ?? [];
     },
   });
@@ -48,27 +53,48 @@ export default function PriceListDetail() {
   const productsQuery = useQuery({
     queryKey: ["products-min", legalEntityId],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("products")
-        .select("id, display_name, code")
-        .eq("legal_entity_id", legalEntityId!)
-        .order("display_name");
-      return data ?? [];
+      // Over 1 000 varer — PostgREST-taket krever paginering.
+      return await fetchAllRows<{ id: string; display_name: string; code: string }>((from, to) =>
+        supabase
+          .from("products")
+          .select("id, display_name, code")
+          .eq("legal_entity_id", legalEntityId!)
+          .order("display_name")
+          .range(from, to),
+      );
     },
   });
 
   const usedIds = useMemo(() => new Set((itemsQuery.data ?? []).map((i: any) => i.product_id)), [itemsQuery.data]);
   const availableProducts = (productsQuery.data ?? []).filter((p) => !usedIds.has(p.id));
 
-  async function savePrice(itemId: string, newPrice: string, displayName: string) {
+  async function savePrice(itemId: string, newPrice: string, displayName: string, productId: string) {
     const num = Number(newPrice);
-    if (isNaN(num) || num < 0) { toast.error("Ugyldig pris"); return; }
-    const { error } = await supabase.from("price_list_items").update({ price: num }).eq("id", itemId);
-    if (error) { toast.error(error.message); return; }
-    await logAudit({ action: "update", entity_type: "price_list_item", entity_id: itemId, entity_display_reference: displayName, changes: { price: num } });
-    qc.invalidateQueries({ queryKey: ["price-list-items", id] });
-    setEditing(null);
-    toast.success("Pris oppdatert");
+    if (!Number.isFinite(num) || num < 0) { toast.error("Ugyldig pris"); return; }
+    // Ny pris = ny periode. Forrige periode lukkes dagen før, slik at
+    // prishistorikken bevares og EXCLUDE-constrainten holder.
+    const today = osloTodayISO();
+    try {
+      const res = await writePriceForDate(supabasePriceStore, {
+        priceListId: id!,
+        productId,
+        price: num,
+        date: today,
+      });
+      await logAudit({
+        action: "update",
+        entity_type: "price_list_item",
+        entity_id: res.rowId,
+        entity_display_reference: displayName,
+        changes: { price: num, previous_price: res.previousPrice, valid_from: today },
+      });
+      for (const key of PRICE_QUERY_KEYS) qc.invalidateQueries({ queryKey: [...key] });
+      qc.invalidateQueries({ queryKey: ["price-list-items", id] });
+      setEditing(null);
+      toast.success(res.action === "insert" ? "Ny prisperiode opprettet" : "Pris oppdatert");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Kunne ikke lagre prisen");
+    }
   }
 
   async function addItem() {
@@ -155,8 +181,8 @@ export default function PriceListDetail() {
                       step="0.01"
                       value={editing!.price}
                       onChange={(e) => setEditing({ id: it.id, price: e.target.value })}
-                      onBlur={() => savePrice(it.id, editing!.price, it.products?.display_name)}
-                      onKeyDown={(e) => { if (e.key === "Enter") savePrice(it.id, editing!.price, it.products?.display_name); if (e.key === "Escape") setEditing(null); }}
+                      onBlur={() => savePrice(it.id, editing!.price, it.products?.display_name ?? "", it.product_id)}
+                      onKeyDown={(e) => { if (e.key === "Enter") savePrice(it.id, editing!.price, it.products?.display_name ?? "", it.product_id); if (e.key === "Escape") setEditing(null); }}
                       className="ml-auto w-28 text-right"
                     />
                   ) : (
