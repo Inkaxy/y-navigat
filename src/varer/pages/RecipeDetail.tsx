@@ -32,7 +32,7 @@ import { ScalePanel } from "@/varer/components/recipes/ScalePanel";
 import { PrintRecipeCardDialog } from "@/varer/components/recipes/PrintRecipeCardDialog";
 import { ShareRecipeDialog } from "@/varer/components/recipes/ShareRecipeDialog";
 import {
-  RECIPE_STATUS_OPTIONS, computeTotalsForRecipe, roundBakerGrams, scaleFactor, scaleLines, scaledSummary,
+  RECIPE_STATUS_OPTIONS, computeTotalsForRecipe, roundBakerGrams, scaleLines, scaledSummary,
   type BakersRawMaterial,
 } from "@/varer/lib/bakers";
 import { computeRecipeCost } from "@/varer/lib/recipeCost";
@@ -56,6 +56,7 @@ import { SaveAsRawMaterialDialog, type CompositeRawMaterial } from "@/varer/comp
 import { RecipeImageUpload } from "@/varer/components/recipes/RecipeImageUpload";
 import { BASE_RECIPE_CATEGORY, costPerKg, costPerKgBlockedReason } from "@/varer/lib/halvfabrikat";
 import { copyRecipe } from "@/varer/lib/copyRecipe";
+import { RECIPE_TEMPLATE_CATEGORY } from "@/varer/pages/Recipes";
 import { asDepartment, RECIPE_DEPARTMENT_LABEL, RECIPE_DEPARTMENTS } from "@/varer/lib/departments";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -578,6 +579,27 @@ export default function RecipeDetail() {
     }
   }
 
+  /** Lagre som mal: kopien merkes med malkategorien og kan brukes som startpunkt. */
+  async function handleSaveAsTemplate() {
+    if (!recipe) return;
+    setCopying(true);
+    try {
+      const newId = await copyRecipe(recipe.id);
+      const { error } = await supabase
+        .from("recipes")
+        .update({ category: RECIPE_TEMPLATE_CATEGORY } as never)
+        .eq("id", newId);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["recipes-list"] });
+      toast.success("Malen er lagret");
+      navigate(`/varer/oppskrifter/${newId}?rename=1`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kunne ikke lagre malen");
+    } finally {
+      setCopying(false);
+    }
+  }
+
   /** Bryteren «Grunnoppskrift»: setter kategori og tilbyr råvare-kobling. */
   function toggleBaseRecipe(on: boolean) {
     if (on) {
@@ -684,6 +706,11 @@ export default function RecipeDetail() {
             <Button variant="outline" onClick={handleCopy} disabled={copying}>
               {copying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Copy className="mr-2 h-4 w-4" />}
               Lag kopi
+            </Button>
+          )}
+          {canWrite && (
+            <Button variant="outline" onClick={handleSaveAsTemplate} disabled={copying}>
+              <FileText className="mr-2 h-4 w-4" /> Lagre som mal
             </Button>
           )}
 
