@@ -136,7 +136,7 @@ export default function Recipes() {
         supabase
           .from("raw_materials")
           .select("id, name, category, grain_classification, water_content_pct, unit_weight_grams, current_cost_price")
-          .eq("legal_entity_id", legalEntityId)
+          .eq("legal_entity_id", legalEntityId!)
           .eq("is_active", true)
           .range(from, to) as unknown as PromiseLike<{ data: BakersRawMaterial[] | null; error: { message: string } | null }>,
       );

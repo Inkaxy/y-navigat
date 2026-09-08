@@ -26,4 +26,7 @@ const PopoverContent = React.forwardRef<
 ));
 PopoverContent.displayName = PopoverPrimitive.Content.displayName;
 
-export { Popover, PopoverTrigger, PopoverContent };
+/** Forankringspunkt når popoveren skal ligge inntil et annet element enn utløseren. */
+const PopoverAnchor = PopoverPrimitive.Anchor;
+
+export { Popover, PopoverTrigger, PopoverContent, PopoverAnchor };

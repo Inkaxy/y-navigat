@@ -33,6 +33,11 @@ import {
   buildRecipePDFData, useRecipePDF, type BuildRecipePDFInput, type RecipeCardOptions,
 } from "@/varer/hooks/useRecipePDF";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { osloTodayISO } from "@/lib/osloDate";
+import { useRecipeLabelCalculated } from "@/varer/hooks/useRecipeLabel";
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { UnsavedChangesDialog } from "@/varer/components/products/detail/UnsavedChangesDialog";
 import { useComputeRecipeLabel } from "@/varer/hooks/useRecipeLabel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -398,9 +403,19 @@ export default function RecipeDetail() {
   const { generating, printProductionSheet, printRecipeCard } = useRecipePDF();
   const [cardDialogOpen, setCardDialogOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [productionDialogOpen, setProductionDialogOpen] = useState(false);
+  const [batchId, setBatchId] = useState("");
+  const [productionDate, setProductionDate] = useState(() => osloTodayISO());
   const [activeTab, setActiveTab] = useState(
     searchParams.get("tab") === "merking" ? "merking" : "oppskrift",
   );
+
+  const labelCalculated = useRecipeLabelCalculated(recipe?.id);
+  const allergens = useMemo(() => {
+    const a = labelCalculated.data?.allergens;
+    if (!a) return null;
+    return [...(a.contains ?? []), ...(a.may_contain ?? []).map((x) => `${x} (kan inneholde)`)];
+  }, [labelCalculated.data]);
 
   const buildPdfInput = useCallback(
     (includeCosts: boolean): BuildRecipePDFInput => ({
@@ -417,6 +432,10 @@ export default function RecipeDetail() {
       flourTemp,
       scaledUnits: scaleSummary.unitCount ?? desiredUnits ?? baseUnits,
       factor,
+      unitsPerBatch: Number(header.units_per_batch) || null,
+      batchId: batchId || null,
+      productionDate: productionDate || null,
+      allergens,
       parts: parts.map((p) => ({
         id: p.id,
         name: p.name,
@@ -425,6 +444,8 @@ export default function RecipeDetail() {
         target_temp_celsius: p.target_temp_celsius,
         ripe_time_hours: p.ripe_time_hours,
         instructions: p.instructions,
+        prep_time_minutes: p.prep_time_minutes,
+        rest_time_minutes: p.rest_time_minutes,
       })),
       lines: hydratedLines,
       steps: steps.map((s) => ({
@@ -437,7 +458,10 @@ export default function RecipeDetail() {
       })),
       includeCosts,
     }),
-    [header, recipe, parts, hydratedLines, steps, factor, scaleSummary.unitCount, desiredUnits, baseUnits, roomTemp, flourTemp],
+    [
+      header, recipe, parts, hydratedLines, steps, factor, scaleSummary.unitCount, desiredUnits, baseUnits,
+      roomTemp, flourTemp, batchId, productionDate, allergens,
+    ],
   );
 
   const unsavedGuard = useUnsavedChangesGuard(dirty && canWrite);
@@ -778,7 +802,7 @@ export default function RecipeDetail() {
 
           <Button
             variant="outline"
-            onClick={() => printProductionSheet(buildRecipePDFData(buildPdfInput(false)))}
+            onClick={() => setProductionDialogOpen(true)}
             disabled={generating !== null}
           >
             {generating === "production" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
@@ -1140,6 +1164,47 @@ export default function RecipeDetail() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog open={productionDialogOpen} onOpenChange={setProductionDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Skriv ut produksjonsark</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="production-batch-id">Batch-id</Label>
+              <Input
+                id="production-batch-id"
+                value={batchId}
+                onChange={(e) => setBatchId(e.target.value)}
+                placeholder="Valgfritt"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="production-date">Produksjonsdato</Label>
+              <Input
+                id="production-date"
+                type="date"
+                value={productionDate}
+                onChange={(e) => setProductionDate(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setProductionDialogOpen(false)}>Avbryt</Button>
+            <Button
+              onClick={() => {
+                printProductionSheet(buildRecipePDFData(buildPdfInput(false)));
+                setProductionDialogOpen(false);
+              }}
+              disabled={generating !== null}
+            >
+              {generating === "production" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
+              Skriv ut
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <PrintRecipeCardDialog
         open={cardDialogOpen}
