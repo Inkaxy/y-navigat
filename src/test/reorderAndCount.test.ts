@@ -7,6 +7,7 @@ import {
   countDraftKey,
   draftHasContent,
   loadCountDraft,
+  newOpId,
   saveCountDraft,
 } from "@/ravarer/lib/countDraft";
 import { MOVEMENT_TYPES, movementLabel } from "@/ravarer/lib/stock";
@@ -71,14 +72,14 @@ describe("telleutkast", () => {
   });
 
   it("lagrer og henter et påbegynt utkast", () => {
-    saveCountDraft(key, { entries: { rm1: [{ amount: "12,5", unitKey: "__base" }] }, lineNotes: { rm1: "Hylle 3" }, note: "" });
+    saveCountDraft(key, { opId: "op-1", entries: { rm1: [{ amount: "12,5", unitKey: "__base" }] }, lineNotes: { rm1: "Hylle 3" }, note: "" });
     const loaded = loadCountDraft(key);
     expect(loaded?.entries.rm1[0].amount).toBe("12,5");
     expect(loaded?.lineNotes.rm1).toBe("Hylle 3");
   });
 
   it("lagrer ikke et tomt utkast", () => {
-    saveCountDraft(key, { entries: { rm1: [{ amount: "", unitKey: "__base" }] }, lineNotes: {}, note: "" });
+    saveCountDraft(key, { opId: "op-1", entries: { rm1: [{ amount: "", unitKey: "__base" }] }, lineNotes: {}, note: "" });
     expect(loadCountDraft(key)).toBeNull();
     expect(draftHasContent(null)).toBe(false);
   });
@@ -89,7 +90,7 @@ describe("telleutkast", () => {
   });
 
   it("kan forkastes", () => {
-    saveCountDraft(key, { entries: { rm1: [{ amount: "3", unitKey: "__base" }] }, lineNotes: {}, note: "" });
+    saveCountDraft(key, { opId: "op-1", entries: { rm1: [{ amount: "3", unitKey: "__base" }] }, lineNotes: {}, note: "" });
     clearCountDraft(key);
     expect(loadCountDraft(key)).toBeNull();
   });
@@ -99,5 +100,30 @@ describe("bevegelsestyper", () => {
   it("har egen type for telling", () => {
     expect(MOVEMENT_TYPES).toContain("count_adjust");
     expect(movementLabel("count_adjust")).toBe("Telling");
+  });
+});
+
+describe("operasjons-ID på tellingen", () => {
+  const key = countDraftKey("firma-1", "2026-04-01");
+
+  beforeEach(() => localStorage.clear());
+
+  it("beholder samme ID gjennom utkastet", () => {
+    saveCountDraft(key, { opId: "op-42", entries: { rm1: [{ amount: "5", unitKey: "__base" }] }, lineNotes: {}, note: "" });
+    expect(loadCountDraft(key)?.opId).toBe("op-42");
+  });
+
+  it("gir eldre utkast uten ID en ny", () => {
+    localStorage.setItem(
+      key,
+      JSON.stringify({ entries: { rm1: [{ amount: "5", unitKey: "__base" }] }, lineNotes: {}, note: "" }),
+    );
+    const loaded = loadCountDraft(key);
+    expect(typeof loaded?.opId).toBe("string");
+    expect(loaded?.opId.length).toBeGreaterThan(10);
+  });
+
+  it("lager unike ID-er", () => {
+    expect(newOpId()).not.toBe(newOpId());
   });
 });

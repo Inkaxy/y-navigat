@@ -26,16 +26,22 @@ export function ConfirmReconcileDialog({ open, onOpenChange, invoiceId, invoiceN
         body: { invoice_id: invoiceId },
       });
       if (error) throw error;
-      if ((data as any)?.error) throw new Error((data as any).error);
-      toast.success("Prismatch bekreftet – prishistorikk oppdatert");
+      const res = (data ?? {}) as { error?: string; already_reconciled?: boolean; history_written?: number };
+      if (res.error) throw new Error(res.error);
+      toast.success(
+        res.already_reconciled
+          ? "Fakturaen var allerede bekreftet — ingenting ble ført på nytt."
+          : `Prismatch bekreftet — ${res.history_written ?? 0} prishendelser lagret.`,
+      );
       invalidateInvoice(qc, invoiceId);
       onOpenChange(false);
-    } catch (e: any) {
-      toast.error(e.message ?? "Kunne ikke bekrefte prismatch");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Kunne ikke bekrefte prismatch");
     } finally {
       setBusy(false);
     }
   }
+
 
   const blocked = reviewLineCount > 0;
 
