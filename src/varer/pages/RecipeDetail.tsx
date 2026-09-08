@@ -27,6 +27,7 @@ import {
 import { useRecipeDraft } from "@/varer/hooks/useRecipeDraft";
 import { useRecipeWarnings } from "@/varer/hooks/useRecipeWarnings";
 import { entryModeFor } from "@/varer/lib/percentFirst";
+import { scaleRecipe, type RoundingStep, type ScaleMode } from "@/varer/lib/scaling";
 import { ScalePanel } from "@/varer/components/recipes/ScalePanel";
 import { PrintRecipeCardDialog } from "@/varer/components/recipes/PrintRecipeCardDialog";
 import { ShareRecipeDialog } from "@/varer/components/recipes/ShareRecipeDialog";
@@ -247,16 +248,36 @@ export default function RecipeDetail() {
     return totals.unitCount && totals.unitCount > 0 ? totals.unitCount : 1;
   }, [header.units_per_batch, totals.unitCount]);
 
+  const [scaleMode, setScaleMode] = useState<ScaleMode>("units");
   const [scaleInput, setScaleInput] = useState("");
-  const [mixerCapacity, setMixerCapacity] = useState("");
+  const [rounding, setRounding] = useState<RoundingStep>(1);
+  const [scaleWaste, setScaleWaste] = useState("");
 
   useEffect(() => {
     setScaleInput(String(baseUnits));
+    setScaleMode("units");
   }, [baseUnits, recipe?.id]);
 
   const desiredUnits = Number(scaleInput) || 0;
-  const factor = scaleFactor(desiredUnits, baseUnits);
-  const isScaled = Math.abs(factor - 1) > 0.0001;
+
+  /** Skaleringsmotoren eier regnestykket — siden viser bare resultatet. */
+  const scaleResult = useMemo(
+    () =>
+      scaleRecipe(hydratedLines, {
+        dough_piece_grams: header.dough_piece_grams ?? null,
+        dough_waste_pct: header.dough_waste_pct ?? null,
+        units_per_batch: header.units_per_batch ?? null,
+      }, {
+        mode: scaleMode,
+        target: Number(scaleInput) || 0,
+        rounding,
+        wastePct: Number(scaleWaste) || 0,
+      }),
+    [hydratedLines, header.dough_piece_grams, header.dough_waste_pct, header.units_per_batch, scaleMode, scaleInput, rounding, scaleWaste],
+  );
+
+  const factor = scaleFactor(desiredUnits, baseUnits) && scaleResult.factor;
+  const isScaled = Math.abs(scaleResult.factor - 1) > 0.0001;
 
   const scaleSummary = useMemo(
     () =>
@@ -718,14 +739,27 @@ export default function RecipeDetail() {
 
           <TabsContent value="oppskrift" className="space-y-4">
         <ScalePanel
-          value={scaleInput}
-          onChange={setScaleInput}
+          mode={scaleMode}
+          onModeChange={(m) => {
+            setScaleMode(m);
+            setScaleInput(m === "units" ? String(baseUnits) : m === "batches" ? "60" : String(Math.round(totals.totalDoughG)));
+          }}
+          target={scaleInput}
+          onTargetChange={setScaleInput}
+          rounding={rounding}
+          onRoundingChange={setRounding}
+          waste={scaleWaste}
+          onWasteChange={setScaleWaste}
+          result={scaleResult}
           baseUnits={baseUnits}
-          mixerCapacity={mixerCapacity}
-          onMixerCapacityChange={setMixerCapacity}
-          summary={scaleSummary}
           isScaled={isScaled}
-          onReset={() => setScaleInput(String(baseUnits))}
+          onReset={() => {
+            setScaleMode("units");
+            setScaleInput(String(baseUnits));
+            setScaleWaste("");
+          }}
+          onSaveAsNew={canWrite ? handleCopy : undefined}
+          savingAsNew={copying}
         />
 
         {isScaled && (
@@ -1017,9 +1051,11 @@ export default function RecipeDetail() {
 
         <StepTimeline
           steps={steps}
-          autolyseMinutes={Number(header.autolyse_minutes) || null}
-          mixingSpeed1Minutes={Number(header.mixing_speed1_minutes) || null}
-          mixingSpeed2Minutes={Number(header.mixing_speed2_minutes) || null}
+          header={{
+            autolyse_minutes: header.autolyse_minutes ?? null,
+            mixing_speed1_minutes: header.mixing_speed1_minutes ?? null,
+            mixing_speed2_minutes: header.mixing_speed2_minutes ?? null,
+          }}
         />
 
         <RecipeStepsEditor

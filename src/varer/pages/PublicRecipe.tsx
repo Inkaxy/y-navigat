@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, FileText, Link2Off, Clock, HelpCircle } from "lucide-react";
 import { useRecipePDF, buildRecipePDFData } from "@/varer/hooks/useRecipePDF";
