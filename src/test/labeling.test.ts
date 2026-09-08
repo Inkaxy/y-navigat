@@ -139,11 +139,11 @@ describe("diff", () => {
   it("næringsdiff gir «Salt 1,1 → 1,3»", () => {
     const rows = nutritionDiff({ salt_g: 1.1, protein_g: 9 }, { salt_g: 1.3, protein_g: 9 });
     expect(rows.find((r) => r.key === "protein_g")?.changed).toBe(false);
-    expect(nutritionDiffSummary(rows)).toEqual(["Salt (g): 1,1 → 1,3"]);
+    expect(nutritionDiffSummary(rows)).toEqual(["Salt: 1,1 → 1,3"]);
   });
 
   it("manglende verdi vises som tankestrek", () => {
-    expect(nutritionDiffSummary(nutritionDiff({ salt_g: null }, { salt_g: 1.2 }))).toEqual(["Salt (g): — → 1,2"]);
+    expect(nutritionDiffSummary(nutritionDiff({ salt_g: null }, { salt_g: 1.2 }))).toEqual(["Salt: — → 1,2"]);
   });
 });
 
