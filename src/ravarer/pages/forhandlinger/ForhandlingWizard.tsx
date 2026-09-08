@@ -415,7 +415,7 @@ export default function ForhandlingWizard() {
           ) : (
             <>
               <div className="flex items-center gap-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
-                Passordene vises kun én gang og utløper om 5 minutter. Kopier e-postene nå.
+                Passordene vises kun én gang. Kopier e-postene nå — de kan ikke hentes fram igjen senere.
               </div>
               <div className="space-y-2">
                 {credentials.map((c) => (
