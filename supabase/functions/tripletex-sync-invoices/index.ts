@@ -234,13 +234,20 @@ Deno.serve(async (req) => {
 
     for (const chunk of chunks) {
       const invoices: any[] = [];
-      for (let page = 0; page < 20; page++) {
-        const res = await fetchPage(chunk.from, chunk.to, page * 1000);
+      let pagesRead = 0;
+      let lastPageSize = 0;
+      for (let page = 0; page < MAX_PAGES; page++) {
+        const res = await fetchPage(chunk.from, chunk.to, page * PAGE_SIZE);
         const values: any[] = res?.values ?? [];
         invoices.push(...values);
-        if (values.length < 1000) break;
+        pagesRead = page + 1;
+        lastPageSize = values.length;
+        if (values.length < PAGE_SIZE) break;
       }
+      const truncated = pagesTruncated(pagesRead, MAX_PAGES, lastPageSize, PAGE_SIZE);
+      const failedBefore = failed;
       fetched += invoices.length;
+
 
       for (const inv of invoices) {
         try {
