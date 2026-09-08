@@ -331,22 +331,28 @@ function InvoiceReceiptDialog({
                       <td className="py-3 text-right">
                         {canWrite && l.stock_tracking && l.raw_material_id && (
                           <div className="flex justify-end gap-1">
-                            {!l.has_movement && l.base_quantity != null && l.base_quantity > 0 && invoiceId && (
-                              <Button
-                                size="sm"
-                                disabled={receive.isPending}
-                                onClick={() =>
-                                  void receive.mutate({
-                                    invoice_line_id: l.id,
-                                    invoice_id: invoiceId,
-                                    raw_material_id: l.raw_material_id!,
-                                    quantity_base: l.base_quantity!,
-                                    invoice_number: invoiceNumber,
-                                  })
-                                }
-                              >
-                                Motta
+                            {l.has_movement ? (
+                              <Button size="sm" variant="outline" disabled>
+                                Mottatt
                               </Button>
+                            ) : (
+                              l.base_quantity != null && l.base_quantity > 0 && invoiceId && (
+                                <Button
+                                  size="sm"
+                                  disabled={receive.isPending}
+                                  onClick={() =>
+                                    void receive.mutate({
+                                      invoice_line_id: l.id,
+                                      invoice_id: invoiceId,
+                                      raw_material_id: l.raw_material_id!,
+                                      quantity_base: l.base_quantity!,
+                                      invoice_number: invoiceNumber,
+                                    })
+                                  }
+                                >
+                                  Motta
+                                </Button>
+                              )
                             )}
                             <Button size="sm" variant="ghost" onClick={() => setDeviationLine(l)}>Avvik</Button>
                           </div>

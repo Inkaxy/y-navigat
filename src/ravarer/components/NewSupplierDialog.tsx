@@ -68,10 +68,15 @@ export function SupplierDialog({ open, onOpenChange, onCreated, supplier = null 
           .from("suppliers")
           .select("id")
           .eq("legal_entity_id", legalEntityId)
-          .eq("org_number", orgClean);
+          .eq("org_number", orgClean)
+          .limit(1);
         if (supplier) q = q.neq("id", supplier.id);
-        const { data: existing } = await q.maybeSingle();
-        if (existing) {
+        const { data: existing, error: dupErr } = await q;
+        if (dupErr) {
+          toast.error(`Kunne ikke sjekke org.nr: ${dupErr.message}`);
+          throw new Error("Duplikatsjekk feilet");
+        }
+        if (existing && existing.length > 0) {
           setErrors({ org: "En leverandør med dette org.nr finnes allerede" });
           throw new Error("Duplikat");
         }
@@ -108,7 +113,7 @@ export function SupplierDialog({ open, onOpenChange, onCreated, supplier = null 
       if (!isEdit) onCreated?.(data.id);
     },
     onError: (e: Error) => {
-      if (e.message !== "Validering feilet" && e.message !== "Duplikat") {
+      if (e.message !== "Validering feilet" && e.message !== "Duplikat" && e.message !== "Duplikatsjekk feilet") {
         toast.error(`Kunne ikke lagre: ${e.message}`);
       }
     },

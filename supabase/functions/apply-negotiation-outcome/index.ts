@@ -230,6 +230,18 @@ Deno.serve(async (req) => {
       // grunnenhet, med avtalens startdato. Kostprisen (current_cost_price)
       // røres ikke her — den avledes av basen etter samme regler som for faktura.
       if (o.agreed_price_per_base_unit != null) {
+        // Idempotent: samme forhandling kan bli anvendt flere ganger (retry, dobbelklikk),
+        // og skal da oppdatere raden for denne råvaren/avtalen i stedet for å duplisere den.
+        const { error: delErr } = await admin
+          .from("raw_material_price_history")
+          .delete()
+          .eq("raw_material_id", o.raw_material_id)
+          .eq("source", "agreement")
+          .eq("source_reference", negotiation_id);
+        if (delErr) {
+          failures.push(`Kunne ikke oppdatere prishistorikk: ${delErr.message}`);
+          continue;
+        }
         const { error: histErr } = await admin.from("raw_material_price_history").insert({
           raw_material_id: o.raw_material_id,
           supplier_id: o.supplier_id,

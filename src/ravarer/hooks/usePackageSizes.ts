@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
+import type { Database } from "@/integrations/supabase/types";
 
 export type PackageStatus =
   | "mangler_pakning"
@@ -14,32 +15,12 @@ export type PackageStatus =
   | "ingen_fakturaer"
   | "ok";
 
-export interface PackageWorklistRow {
-  id: string;
-  legal_entity_id: string | null;
-  name: string | null;
-  base_unit: string | null;
-  category: string | null;
-  current_cost_price: number | null;
-  pakningsfaktor: number | null;
-  faktor_kilde: string | null;
-  bekreftet_dato: string | null;
-  antall_fakturalinjer: number | null;
-  antall_leverandorer: number | null;
-  enheter_i_bruk: string | null;
-  linjer_uten_pris: number | null;
-  kjopt_kr_totalt: number | null;
-  siste_faktura: string | null;
-  pris_spredning: number | null;
-  implisert_mengde: number | null;
-  referansepris: number | null;
-  referansekilde: string | null;
-  referansedato: string | null;
-  referanse_faktor: number | null;
-  foreslatt_fra_navn: number | null;
-  foreslatt_fra_referanse: number | null;
-  status: PackageStatus | string | null;
-}
+// Viewet markerer alle kolonner som nullable, men `id` er alltid satt siden
+// raden kommer fra en rad i raw_materials — appen kan derfor stole på det.
+export type PackageWorklistRow = Omit<
+  Database["public"]["Views"]["raw_material_package_worklist"]["Row"],
+  "id"
+> & { id: string };
 
 export interface PackageChangeRow {
   line_id: string;

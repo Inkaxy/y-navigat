@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/sheet";
 import { useAccessibleApps } from "@/hooks/useAccessibleApps";
 import { useReviewCount } from "@/fakturaer/hooks/useReviewCount";
+import { useExpiringAgreementsCount } from "@/ravarer/hooks/useAgreements";
 import { useInvoiceAccess } from "@/ravarer/hooks/useInvoiceAccess";
 import { useRavarerAccessLevel } from "@/ravarer/hooks/useRavarerAccessLevel";
 import { useQuery } from "@tanstack/react-query";
@@ -233,6 +234,7 @@ function RavarerNav() {
     },
     refetchInterval: 60_000,
   });
+  const { data: expiringAgreementsCount = 0 } = useExpiringAgreementsCount();
   const canManage = accessLevel === "admin" || accessLevel === "approve";
   const { data: isPlatformAdmin = false } = usePlatformAdmin();
 
@@ -267,9 +269,10 @@ function RavarerNav() {
     icon: Building2,
     basePath: "/ravarer/leverandorer",
     matches: ["/ravarer/leverandorer", "/ravarer/avtaler", "/ravarer/forhandlinger"],
+    badge: expiringAgreementsCount,
     links: [
       { to: "/ravarer/leverandorer", label: "Leverandører" },
-      { to: "/ravarer/avtaler", label: "Avtaler" },
+      { to: "/ravarer/avtaler", label: "Avtaler", badge: expiringAgreementsCount },
       ...(hasInvoiceAccess
         ? [
             { to: "/ravarer/forhandlinger", label: "Aktive forhandlinger" },

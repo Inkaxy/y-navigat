@@ -247,6 +247,8 @@ export const QUALIFIER_PENALTY = 0.12;
 export const DEFAULT_QUALIFIER_BONUS = 0.1;
 /** Tak for treff som bare kommer fra søkeord (search_keywords). */
 export const KEYWORD_MAX = 0.85;
+/** Poeng for søkeordtreff der matvarenavnet også har en kvalifikator («potetstivelse»). */
+export const KEYWORD_QUALIFIER_SCORE = 0.82;
 /** Poeng når fettprosenten i navnet avviker fra råvarens. */
 export const PERCENT_MISMATCH_SCORE = 0.86;
 
@@ -286,8 +288,8 @@ function keywordScore(query: string, food: FoodCandidate, foodHasQualifier: bool
     if (!k) continue;
     if (k === query) {
       // 1b: søkeordet ER hele søket, og navnet har ingen kvalifikator å ta feil av.
-      if (!foodHasQualifier) return 1;
-      s = Math.max(s, 0.78);
+      if (!foodHasQualifier) return KEYWORD_MAX;
+      s = Math.max(s, KEYWORD_QUALIFIER_SCORE);
     } else if (k.length >= 4 && qWords.includes(k)) s = Math.max(s, 0.7);
   }
   return Math.min(s, KEYWORD_MAX);
@@ -353,8 +355,11 @@ function scoreFood(query: Query, food: FoodCandidate, variantSpecified: boolean)
     const scorableQuals = quals.filter((q) => q !== UNIVERSAL_DEFAULT_QUALIFIER && !isBrandQualifier(q));
     if (scorableQuals.length > 0) {
       const uncovered = scorableQuals.filter((q) => !q.split(" ").every((w) => qWords.has(w)));
-      if (uncovered.length < scorableQuals.length) {
-        const score = uncovered.length === 0 ? 1 : Math.max(0, 0.88 - 0.05 * uncovered.length);
+      if (uncovered.length === 0) return { score: 1, percentMismatch: false };
+      // Søket nevner en ANNEN variant enn denne — jo mindre av kvalifikatoren
+      // som stemmer, jo lenger ned skal kandidaten falle.
+      if (variantSpecified) {
+        const score = Math.max(0, base - 0.1 * (uncovered.length / scorableQuals.length));
         return { score, percentMismatch: false };
       }
     }

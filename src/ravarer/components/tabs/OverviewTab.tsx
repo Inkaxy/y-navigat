@@ -458,8 +458,8 @@ export function OverviewTab({ rm, registerSave }: Props) {
               disabled={!canWrite}
             />
             <p className="mt-1 text-xs text-ink-secondary">
-              Brukes når råvaren måles i stk. Brukes når oppskrifter måler i
-              stk — uten vekt per stk kan mengden ikke regnes om til gram.
+              Brukes når oppskrifter måler i stk — uten vekt per stk kan
+              mengden ikke regnes om til gram.
             </p>
           </div>
         </div>

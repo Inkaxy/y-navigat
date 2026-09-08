@@ -22,8 +22,10 @@ import {
   clearCountDraft,
   countDraftKey,
   loadCountDraft,
+  loadLocations,
   newOpId,
   saveCountDraft,
+  saveLocation,
   type CountDraft,
 } from "@/ravarer/lib/countDraft";
 import {
@@ -55,6 +57,9 @@ export default function Varetelling() {
   const [note, setNote] = useState("");
   const [entries, setEntries] = useState<Record<string, UnitAmountRow[]>>({});
   const [lineNotes, setLineNotes] = useState<Record<string, string>>({});
+  // Lokasjon er egen, varig informasjon om varen — ikke en del av telleutkastet,
+  // og huskes derfor per selskap på tvers av datoer, ikke per telling.
+  const [locations, setLocations] = useState<Record<string, string>>({});
   // Forventet beholdning fryses ved første endring på linja. Uten dette ville
   // et bakgrunnsoppdatert tall gjøre konfliktkontrollen verdiløs: serveren ville
   // sammenlignet mot beholdningen i det øyeblikket brukeren trykket «Bokfør».
@@ -141,6 +146,16 @@ export default function Varetelling() {
         (itemType === "all" || r.item_type === itemType),
     );
   }, [rows, q, category, itemType]);
+
+  useEffect(() => {
+    setLocations(loadLocations(legalEntityId));
+  }, [legalEntityId]);
+
+  const locationFor = (id: string) => locations[id] ?? "";
+  const setLocationFor = (id: string, value: string) => {
+    setLocations(prev => ({ ...prev, [id]: value }));
+    saveLocation(legalEntityId, id, value);
+  };
 
   const unitsFor = (id: string): RawMaterialUnitRow[] => unitsQuery.data?.get(id) ?? [];
   /** Beholdningen linja skal måles mot: frosset verdi hvis den finnes. */
@@ -349,12 +364,18 @@ export default function Varetelling() {
                       {countUnitText(r) && <> · {countUnitText(r)}</>}
                     </p>
                     <Input
+                      value={locationFor(r.raw_material_id)}
+                      onChange={e => setLocationFor(r.raw_material_id, e.target.value)}
+                      placeholder="Lokasjon"
+                      className="mt-2 h-9 text-sm"
+                    />
+                    <Input
                       value={lineNotes[r.raw_material_id] ?? ""}
                       onChange={e => {
                         setDirty(true);
                         setLineNotes(prev => ({ ...prev, [r.raw_material_id]: e.target.value }));
                       }}
-                      placeholder="Lokasjon eller notat"
+                      placeholder="Notat"
                       className="mt-2 h-9 text-sm"
                     />
                   </div>

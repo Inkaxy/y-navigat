@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +33,10 @@ export default function LiveForhandlingSetup() {
   const [submitting, setSubmitting] = useState(false);
 
   const supplier = suppliers.find((s) => s.id === supplierId);
+  const hiddenSupplierCount = useMemo(
+    () => suppliers.filter((s) => s.is_active && !s.track_invoice_lines).length,
+    [suppliers],
+  );
 
   // Find raw materials linked to this supplier
   const supplierRawMaterials = useMemo(() => {
@@ -154,6 +158,15 @@ fakturahistorikk, og uten den finnes verken volum eller prisgrunnlag. */}
             Bare aktive leverandører merket med «Følg fakturalinjer» kan velges — forhandlingen
             trenger fakturahistorikken for å vise volum og priser.
           </p>
+          {hiddenSupplierCount > 0 && (
+            <p className="text-xs text-ink-secondary">
+              {hiddenSupplierCount} leverandører uten «Følg fakturalinjer» vises ikke – slå på under{" "}
+              <Link to="/ravarer/leverandorer" className="underline">
+                Leverandører
+              </Link>
+              .
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">

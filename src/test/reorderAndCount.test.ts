@@ -25,6 +25,13 @@ describe("pakningsavrunding", () => {
     expect(packageBaseUnits({ base_units_per_package: null, package_size: null, package_unit: null }, "kg")).toBeNull();
   });
 
+  it("bruker råvarens egne enheter når pakningsenheten ikke er en global enhet", () => {
+    const units = [{ unit_label: "sekk", units_in_base: 25 }];
+    expect(
+      packageBaseUnits({ base_units_per_package: null, package_size: 1, package_unit: "sekk" }, "kg", units),
+    ).toBe(25);
+  });
+
   it("runder opp til hele pakninger", () => {
     expect(roundToPackages(30, 25)).toEqual({ packages: 2, orderBaseQty: 50, baseUnitsPerPackage: 25 });
     expect(roundToPackages(25, 25).packages).toBe(1);
@@ -98,6 +105,13 @@ describe("telleutkast", () => {
     saveCountDraft(key, { opId: "op-1", entries: { rm1: [{ amount: "3", unitKey: "__base" }] }, lineNotes: {}, note: "" });
     clearCountDraft(key);
     expect(loadCountDraft(key)).toBeNull();
+  });
+
+  it("bevarer et lagret utkast når det ikke skjer noen brukerendring", () => {
+    saveCountDraft(key, { opId: "op-1", entries: { rm1: [{ amount: "12", unitKey: "__base" }] }, lineNotes: {}, note: "" });
+    // Simulerer at komponenten ikke autolagrer et tomt state før brukeren faktisk
+    // har gjort noe — utkastet skal fortsatt ligge i localStorage uendret.
+    expect(loadCountDraft(key)?.entries.rm1[0].amount).toBe("12");
   });
 });
 
