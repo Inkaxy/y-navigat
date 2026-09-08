@@ -89,7 +89,9 @@ language plpgsql
 set search_path to 'public'
 as $function$
 begin
-  if current_setting('role', true) = 'service_role' then
+  -- Kall fra RPC-en (SECURITY DEFINER, eier postgres) kjører ikke som 'authenticated'
+  -- og skal slippe forbi. Vakten gjelder direkte klientskriving.
+  if current_user <> 'authenticated' then
     return new;
   end if;
   if old.status in ('applied') then
@@ -136,7 +138,7 @@ declare
   e record;
   v_uid uuid := auth.uid();
   v_entity uuid;
-  v_line_entity uuid;
+  v_entity_count int;
   v_name text;
   v_current numeric;
   v_diff numeric;
@@ -171,12 +173,12 @@ begin
 
   -- 2b) Alle varene må høre til samme selskap, og brukeren må ha skrivetilgang der.
   select count(distinct rm.legal_entity_id), min(rm.legal_entity_id)
-    into v_line_entity, v_entity
+    into v_entity_count, v_entity
     from public.raw_materials rm where rm.id = any(v_ids);
   if v_entity is null then
     raise exception 'Ingen av varene finnes';
   end if;
-  if v_line_entity > 1 then
+  if v_entity_count > 1 then
     raise exception 'Tellingen blander varer fra flere selskaper' using errcode = '42501';
   end if;
   if (select count(*) from public.raw_materials rm where rm.id = any(v_ids)) <> array_length(v_ids, 1) then
@@ -358,6 +360,9 @@ drop trigger if exists trg_rm_stock_lots_updated_at on public.rm_stock_lots;
 create trigger trg_rm_stock_lots_updated_at
   before update on public.rm_stock_lots
   for each row execute function public.update_updated_at_column();
+
+-- Gammel enarguments-signatur fjernes slik at det bare finnes én kontrakt.
+drop function if exists public.rm_receive_invoice_line(uuid);
 
 create or replace function public.rm_receive_invoice_line(
   p_line_id uuid,
