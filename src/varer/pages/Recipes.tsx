@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { copyRecipe } from "@/varer/lib/copyRecipe";
 import { fetchAllRows } from "@/lib/supabasePaging";
+import { deriveLabelingStatus, LABELING_STATUS_LABEL, type LabelingStatus } from "@/varer/lib/labelStaleness";
 import { format } from "date-fns";
 import { nb } from "date-fns/locale";
 
