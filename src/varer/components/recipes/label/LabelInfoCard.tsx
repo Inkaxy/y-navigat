@@ -78,7 +78,9 @@ export function LabelInfoCard({
     },
     onSuccess: () => {
       setTouched(false);
-      qc.invalidateQueries({ queryKey: ["recipe-detail", recipeId] });
+      // IKKE «recipe-detail»: den nullstiller oppskriftseditoren og kaster
+      // ulagrede linjer. Bare merkedataene trenger å hentes på nytt.
+      qc.invalidateQueries({ queryKey: ["recipe-label-calculated", recipeId] });
       toast.success("Etikettopplysninger lagret");
     },
     onError: (e: unknown) => showError("LabelInfoCard", e),
