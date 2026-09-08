@@ -1,6 +1,4 @@
-/**
- * @vitest-environment jsdom
- */
+// @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from "vitest";
 import { packageBaseUnits, roundToPackages } from "@/ravarer/lib/reorder";
 import { parsePackageFilter, matchesPackageFilter } from "@/ravarer/lib/packageFilter";
