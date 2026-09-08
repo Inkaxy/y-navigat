@@ -21,7 +21,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useSuppliers, useCreateSupplier } from "@/ravarer/hooks/useSuppliers";
+import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
+import { NewSupplierDialog } from "@/ravarer/components/NewSupplierDialog";
+import { AgreementDocumentLink } from "@/ravarer/components/AgreementDocumentLink";
 import {
   useRawMaterialSuppliers,
   useUpsertRmSupplier,
@@ -296,69 +298,6 @@ export function SuppliersTab({ rm }: Props) {
         }))}
       />
     </div>
-  );
-}
-
-function NewSupplierDialog({
-  open,
-  onOpenChange,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-}) {
-  const create = useCreateSupplier();
-  const [name, setName] = useState("");
-  const [orgNumber, setOrgNumber] = useState("");
-  const [email, setEmail] = useState("");
-  const submit = async () => {
-    if (!name.trim()) return;
-    await create.mutateAsync({
-      name: name.trim(),
-      org_number: orgNumber.trim() || undefined,
-      contact_email: email.trim() || undefined,
-    });
-    onOpenChange(false);
-    setName("");
-    setOrgNumber("");
-    setEmail("");
-  };
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Ny leverandør</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div>
-            <Label>Navn *</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div>
-            <Label>Org.nr</Label>
-            <Input
-              value={orgNumber}
-              onChange={(e) => setOrgNumber(e.target.value)}
-            />
-          </div>
-          <div>
-            <Label>E-post</Label>
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Avbryt
-          </Button>
-          <Button onClick={submit} disabled={create.isPending || !name.trim()}>
-            Opprett
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 
