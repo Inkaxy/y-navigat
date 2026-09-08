@@ -146,10 +146,10 @@ export function PdfDeclarationImportDialog({ open, onOpenChange, productId, prod
           .update({
             declaration_mode: "manual",
             manual_ingredient_declaration: ingredientEdit || null,
-            manual_nutrition: Object.keys(nut).length ? (nut as never) : null,
-            manual_allergen_summary: allergenSummary as never,
-            declaration_updated_at: new Date().toISOString(),
-          })
+            manual_nutrition: Object.keys(nut).length ? nut : null,
+            manual_allergen_summary: allergenSummary,
+            manual_declaration_updated_at: new Date().toISOString(),
+          } as never)
           .eq("id", productId);
         if (pErr) throw pErr;
         await logAudit({
