@@ -222,6 +222,8 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
       targetTempCelsius: p.target_temp_celsius,
       ripeTimeHours: p.ripe_time_hours,
       instructions: p.instructions,
+      prepNote: p.prep_time_minutes != null ? `Forberedelse: ${fmtDuration(p.prep_time_minutes)}` : null,
+      restMinutes: p.rest_time_minutes ?? null,
       lines,
       totalG: summary.totalG * input.factor,
       hydrationPct: summary.hydrationPct,
@@ -233,6 +235,27 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
   const preferments = allParts.filter((p) => p.partType === "preferment");
   const mainParts = allParts.filter((p) => p.partType !== "preferment");
   const prefermentedFlourPct = preferments.reduce((s, p) => s + p.prefermentedFlourPct, 0);
+
+  // Per-batch-oppstilling — deler den skalerte oppskriften i fysiske batcher når
+  // antall enheter per batch er kjent. Baker-% er uendret; det som deles er gram/mengde.
+  let batches: RecipePDFData["batches"] = null;
+  const unitsPerBatch = Number(input.unitsPerBatch) || 0;
+  if (unitsPerBatch > 0) {
+    const count = Math.max(1, Math.round(input.scaledUnits / unitsPerBatch));
+    const batchLines = input.lines.map((l) => {
+      const s = byId.get(l.id);
+      const exact = s ? s.exact : false;
+      const exactGrams = s?.exactGrams ?? 0;
+      return {
+        name: lineDisplayName(l),
+        grams: exact ? roundBakerGrams(exactGrams / count) : null,
+        unit: l.unit,
+        quantity: (s?.scaledQuantity ?? Number(l.quantity) * input.factor) / count,
+      };
+    });
+    const doughG = allParts.reduce((s, p) => s + p.lines.reduce((ls, l) => ls + l.grams, 0), 0);
+    batches = { count, perBatchDoughG: count > 0 ? roundBakerGrams(doughG / count) : null, lines: batchLines };
+  }
 
   const steps: RecipePDFStep[] = input.steps.map((s, i) => ({
     index: i + 1,
@@ -265,6 +288,9 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
     description: input.description ?? null,
     imageUrl: input.imageUrl ?? null,
     printedAt: new Date(),
+    batchId: input.batchId ?? null,
+    productionDate: input.productionDate ?? null,
+    allergens: input.allergens ?? null,
     scaledUnits: Math.round(input.scaledUnits),
     scaleFactorValue: input.factor,
     unitWeightGrams: uw > 0 ? uw : null,
@@ -288,6 +314,7 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
     steps,
     totalProcessMinutes: steps.reduce((s, x) => s + (Number(x.durationMinutes) || 0), 0),
     costs,
+    batches,
   };
 }
 

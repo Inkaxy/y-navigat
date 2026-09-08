@@ -41,6 +41,10 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 13, fontWeight: 700, marginTop: 2 },
 
   sectionTitle: { fontSize: 13, fontWeight: 700, marginTop: 4, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.6 },
+  partMeta: { fontSize: 9, color: "#555", marginTop: -3, marginBottom: 5 },
+  allergenBox: { borderWidth: 1, borderColor: "#111", padding: 8, marginBottom: 14 },
+  allergenTitle: { fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 3 },
+  allergenText: { fontSize: 11 },
 
   prefermentBox: { borderWidth: 1.5, borderColor: "#111", padding: 8, marginBottom: 10 },
   prefermentHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 5 },
@@ -58,8 +62,10 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", paddingVertical: 4, paddingHorizontal: 3, borderBottomWidth: 0.5, borderBottomColor: "#ddd" },
   colCheck: { width: 22 },
   colName: { flex: 1, paddingRight: 8 },
-  colGrams: { width: 78, textAlign: "right" },
-  colPct: { width: 62, textAlign: "right" },
+  colGrams: { width: 70, textAlign: "right" },
+  colPct: { width: 54, textAlign: "right" },
+  colActual: { width: 62, paddingLeft: 6 },
+  actualBox: { borderBottomWidth: 1, borderBottomColor: "#111", height: 14 },
   checkbox: { width: 12, height: 12, borderWidth: 1, borderColor: "#111" },
   ingName: { fontSize: 12 },
   ingNameFlour: { fontSize: 12, fontWeight: 700 },
@@ -113,6 +119,7 @@ function IngredientRow({ line, index, showPercent }: { line: RecipePDFLine; inde
       {showPercent && (
         <View style={styles.colPct}><Text style={styles.ingPct}>{pct(line.percent)}</Text></View>
       )}
+      <View style={styles.colActual}><View style={styles.actualBox} /></View>
     </View>
   );
 }
@@ -127,6 +134,7 @@ function IngredientTable({ part, showPercent }: { part: RecipePDFPart; showPerce
         <View style={styles.colName}><Text style={styles.th}>Ingrediens</Text></View>
         <View style={styles.colGrams}><Text style={[styles.th, { textAlign: "right" }]}>Vekt</Text></View>
         {showPercent && <View style={styles.colPct}><Text style={[styles.th, { textAlign: "right" }]}>Baker-%</Text></View>}
+        <View style={styles.colActual}><Text style={styles.th}>Faktisk vekt</Text></View>
       </View>
       {part.lines.map((l, i) => <IngredientRow key={l.id} line={l} index={i} showPercent={showPercent} />)}
       <View style={styles.totalRow}>
@@ -138,6 +146,33 @@ function IngredientTable({ part, showPercent }: { part: RecipePDFPart; showPerce
   );
 }
 
+
+function BatchTable({ batches }: { batches: NonNullable<RecipePDFData["batches"]> }) {
+  return (
+    <View wrap={false}>
+      <Text style={styles.sectionTitle}>Per batch ({batches.count} batcher)</Text>
+      {batches.perBatchDoughG != null && (
+        <Text style={styles.partMeta}>Deigvekt per batch: {fmtGrams(batches.perBatchDoughG)} g</Text>
+      )}
+      <View style={styles.tableHead}>
+        <View style={styles.colName}><Text style={styles.th}>Ingrediens</Text></View>
+        <View style={styles.colGrams}><Text style={[styles.th, { textAlign: "right" }]}>Per batch</Text></View>
+        <View style={styles.colActual}><Text style={styles.th}>Faktisk vekt</Text></View>
+      </View>
+      {batches.lines.map((l, i) => (
+        <View key={`${l.name}-${i}`} style={[styles.row, zebraBg(i)]}>
+          <View style={styles.colName}><Text style={styles.ingName}>{l.name}</Text></View>
+          <View style={styles.colGrams}>
+            <Text style={styles.ingGrams}>
+              {l.grams != null ? `${fmtGrams(l.grams)} g` : `${fmtNum(l.quantity, 2)} ${l.unit}`}
+            </Text>
+          </View>
+          <View style={styles.colActual}><View style={styles.actualBox} /></View>
+        </View>
+      ))}
+    </View>
+  );
+}
 
 export function RecipePDFDocument({ data }: { data: RecipePDFData }) {
   const s = data.stats;
