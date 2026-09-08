@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +15,11 @@ import {
   type DeclarationMode,
   type RecipeLabelSnapshot,
 } from "@/varer/lib/effectiveDeclaration";
+import { useApproveDeclaration, useLabelStaleness } from "@/varer/hooks/useLabelApproval";
+import { useUserDisplayName } from "@/varer/hooks/useRecipeLabel";
+import { deriveLabelingStatus } from "@/varer/lib/labelStaleness";
+import { parseAllergenSummary, pickNutrition, type NutritionPer100g } from "@/varer/lib/effectiveDeclaration";
+import { ApproveDeclarationDialog, type ApproveSourceData } from "./ApproveDeclarationDialog";
 import { LabelStatusBar } from "./LabelStatusBar";
 import { DataQualityCard, type MissingData } from "./DataQualityCard";
 import { DeclarationNutritionSection } from "./DeclarationNutritionSection";
@@ -127,12 +132,28 @@ export function LabelTab({
     onError: (e: unknown) => toast.error((e as Error).message ?? "Kunne ikke lagre"),
   });
 
+  const approve = useApproveDeclaration();
+  const [approveOpen, setApproveOpen] = useState(false);
+  const [checklistBlocked, setChecklistBlocked] = useState(false);
+  const onChecklistChange = useCallback((v: boolean) => setChecklistBlocked(v), []);
+
   const label = labelQuery.data ?? null;
   const coveragePct = label?.coverage_by_weight_pct ?? null;
   const coverageOk = (coveragePct ?? 0) >= 90;
   const keyhole = (label?.keyhole ?? null) as KeyholeResult | null;
   const links = linksQuery.data ?? [];
   const primaryCount = links.filter((l) => l.is_primary).length;
+
+  const { staleness } = useLabelStaleness(recipeId, label?.computed_at ?? null);
+  const approvedAt = recipe.declaration_updated_at ?? null;
+  const approverQuery = useUserDisplayName(recipe.declaration_updated_by ?? null);
+  const missing = (label?.missing_data ?? null) as MissingData | null;
+  const status = deriveLabelingStatus({
+    approvedAt,
+    computedAt: label?.computed_at ?? null,
+    sources: staleness.sources,
+    blocked: !!missing?.blocked || checklistBlocked,
+  });
 
   const declarationManual = ((recipe.declaration_mode as DeclarationMode | null) ?? "auto") === "manual";
   const breadscaleMode: "auto" | "manual" = recipe.breadscale_mode === "manual" ? "manual" : "auto";
@@ -169,6 +190,17 @@ export function LabelTab({
     [recipe, label, recipeId],
   );
 
+  const manualSource: ApproveSourceData = useMemo(() => {
+    const al = parseAllergenSummary(recipe.manual_allergen_summary);
+    const nut = pickNutrition(recipe.manual_nutrition) as NutritionPer100g | null;
+    return {
+      ingredientText: recipe.manual_ingredient_declaration ?? null,
+      contains: al.contains,
+      mayContain: al.may_contain,
+      nutrition: (nut ?? null) as Record<string, number | null> | null,
+    };
+  }, [recipe.manual_allergen_summary, recipe.manual_ingredient_declaration, recipe.manual_nutrition]);
+
   if (labelQuery.isLoading) {
     return (
       <div className="flex h-40 items-center justify-center">
@@ -188,6 +220,36 @@ export function LabelTab({
         canWrite={canWrite}
         computing={compute.isPending}
         onRecompute={recompute}
+        status={status}
+        approvedAt={approvedAt}
+        approvedByName={approverQuery.data ?? null}
+        staleSourceName={staleness.sourceName}
+        staleSourceAt={staleness.sourceAt}
+        allergenReviewed={(missing?.composite_unreviewed?.length ?? 0) === 0}
+        declarationNamed={(missing?.declaration_names?.length ?? 0) === 0}
+        approving={approve.isPending}
+        onApprove={() => setApproveOpen(true)}
+      />
+
+      <ApproveDeclarationDialog
+        open={approveOpen}
+        onOpenChange={setApproveOpen}
+        currentMode={declarationManual ? "manual" : "auto"}
+        blocked={checklistBlocked}
+        saving={approve.isPending}
+        calculated={{
+          ingredientText: label?.ingredient_declaration ?? null,
+          contains: label?.allergens?.contains ?? [],
+          mayContain: label?.allergens?.may_contain ?? [],
+          nutrition: (label?.nutrition_per_100g ?? null) as Record<string, number | null> | null,
+        }}
+        manual={manualSource}
+        onApprove={(mode, adopt) =>
+          approve.mutate(
+            { recipeId, mode, adopt },
+            { onSuccess: () => setApproveOpen(false) },
+          )
+        }
       />
 
       <DataQualityCard
@@ -267,6 +329,10 @@ export function LabelTab({
         storageInstructions={recipe.storage_instructions ?? null}
         countryOfOrigin={recipe.country_of_origin ?? null}
         entity={entityQuery.data ?? null}
+        blocked={!!missing?.blocked}
+        keyholeQualifies={keyhole?.qualifies ?? false}
+        coveragePct={coveragePct}
+        onChecklistChange={onChecklistChange}
         nutritionUsable={declarationManual ? !!effective.nutrition : coverageOk && !!effective.nutrition}
       />
 
