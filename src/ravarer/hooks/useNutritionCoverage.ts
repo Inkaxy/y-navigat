@@ -12,6 +12,23 @@ import {
 
 export type NutritionStatus = "complete" | "incomplete" | "missing";
 
+/** Rå rad fra viewet — alle kolonner er nullbare i genererte typer. */
+interface RawCoverageViewRow {
+  raw_material_id: string | null;
+  name: string | null;
+  category: string | null;
+  status: string | null;
+  source: string | null;
+  matvaretabellen_food_id: string | null;
+  manual_field_count: number | null;
+  used_in_recipes: boolean | null;
+  recipe_grams: number | null;
+  purchase_12m: number | null;
+  needs_nutrition: boolean | null;
+  is_complete: boolean | null;
+  recipe_lines: number | null;
+}
+
 interface CoverageViewRow extends CoverageRow {
   is_complete: boolean | null;
   recipe_lines: number | null;
@@ -20,6 +37,7 @@ interface CoverageViewRow extends CoverageRow {
 export interface CoverageItem {
   raw_material_id: string;
   name: string;
+  declaration_name: string | null;
   category: string | null;
   status: NutritionStatus;
   source: NutritionSource | null;
@@ -37,6 +55,8 @@ export interface NutritionCoverage {
   incomplete: number;
   missing: number;
   linked: number;
+  /** Dekning vektet på antall oppskriftslinjer råvarene brukes i. */
+  recipeWeighted: { pct: number; covered: number; total: number };
   bySource: Record<"matvaretabellen" | "datablad" | "manuell" | "analyse" | "ukjent", number>;
   candidates: CoverageItem[];
   review: CoverageItem[];
