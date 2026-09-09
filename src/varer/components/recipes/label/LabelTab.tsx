@@ -276,6 +276,7 @@ export function LabelTab({
         recalculating={compute.isPending}
         canWrite={canWrite}
         onGoToRecipeTab={onGoToRecipeTab}
+        recipeId={recipeId}
       />
 
       <DeclarationNutritionSection
