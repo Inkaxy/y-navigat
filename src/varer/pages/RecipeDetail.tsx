@@ -572,8 +572,7 @@ export default function RecipeDetail() {
     } finally {
       setSaving(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recipe, header, parts, lines, steps, persistRecipe, qc, editor, draft]);
+  }, [recipe, header, parts, lines, steps, persistRecipe, qc, editor, draft, computeLabel, syncCompositePriceQuietly]);
 
   /** Ctrl/Cmd + S lagrer, som i alle andre editorer. */
   useEffect(() => {
