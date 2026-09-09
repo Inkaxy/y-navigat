@@ -178,9 +178,12 @@ const GridRow = memo(function GridRow({
   /** Sann når linjens enhet faktisk kan regnes om til gram — begge veier. */
   const convertible = isLineConvertible(line);
   const conversion = lineToGrams(line);
-  const conversionWarning = conversion.exact
-    ? null
-    : conversion.reason ?? "Mengden kan ikke regnes om til gram";
+  const OLD_UNIT_RE = /^(dråpe|drape|dr\.?|pl|ts|ss|kork(er)?|boks(er)?|ca\.?)$/i;
+  const conversionWarning = OLD_UNIT_RE.test((line.unit ?? "").trim())
+    ? "Gammel enhet — rett enheten på linjen før lagring"
+    : conversion.exact
+      ? null
+      : conversion.reason ?? "Mengden kan ikke regnes om til gram";
 
   function setGrams(value: string) {
     const conv = lineToGrams({ ...line, quantity: value });
@@ -254,15 +257,33 @@ const GridRow = memo(function GridRow({
           disabled={!canWrite}
           currentRecipeId={currentRecipeId}
           autoFocus={cellFocused("name")}
-          onSelect={(id, opt) => {
-            onChange({
-              raw_material_id: id,
-              ...(id ? { sub_product_id: null } : {}),
-              ingredient_name: opt?.name ?? line.ingredient_name,
-              // Baseenheten heter «l» i den kanoniske lista — ikke «liter».
-              unit: opt?.base_unit === "kg" || opt?.base_unit === "l" ? line.unit : (opt?.base_unit ?? line.unit),
-              _rm: id ? (rmMap[id] ?? { id, name: opt?.name ?? "" }) : null,
-            } as never);
+          onSelect={(selection) => {
+            if (selection.kind === "raw") {
+              onChange({
+                raw_material_id: selection.id,
+                sub_product_id: null,
+                ingredient_name: selection.opt.name,
+                // Baseenheten heter «l» i den kanoniske lista — ikke «liter».
+                unit: selection.opt.base_unit === "kg" || selection.opt.base_unit === "l"
+                  ? line.unit
+                  : (selection.opt.base_unit ?? line.unit),
+                _rm: rmMap[selection.id] ?? { id: selection.id, name: selection.opt.name },
+              } as never);
+            } else if (selection.kind === "sub") {
+              onChange({
+                raw_material_id: null,
+                sub_product_id: selection.id,
+                ingredient_name: selection.name,
+                _rm: null,
+              } as never);
+            } else {
+              // Fjern kobling: behold ingrediensnavn og mengde, nullstill kun koblingen.
+              onChange({
+                raw_material_id: null,
+                sub_product_id: null,
+                _rm: null,
+              } as never);
+            }
           }}
           onKeyDown={onKeyDown({ lineId: line.id, column: "name" })}
         />

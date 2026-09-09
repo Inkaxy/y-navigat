@@ -8,6 +8,7 @@ import {
   normalizeCereal,
   textComponentInheritance,
   wholeGrainPctOfDry,
+  wholeGrainDryGrams,
   type TopLine,
 } from "./declaration-core.ts";
 
@@ -284,14 +285,14 @@ Deno.test("A: 300 siktet + 200 sammalt + 50 hvetekli = 425/550 = 77,3 % ekstra g
   assertEquals(r.grain_category, "ekstra_grovt");
 });
 
-Deno.test("A: prosenten kan overstige 100 — kolonnen får min(100, pct)", () => {
+Deno.test("A: prosenten kan overstige 100 — grain_pct er IKKE lenger klampet til 100 (CHECK er 0–999)", () => {
   const r = computeBreadscale([
     bs("Sammalt", 450, "whole_grain_flour", "hvete"),
     bs("Hele korn", 50, "whole_grains", "hvete"),
     bs("Hvetekli", 50, "wheat_bran"),
   ]);
   assertEquals(r.breadscale_pct, 131.8);
-  assertEquals(r.grain_pct, 100);
+  assertEquals(r.grain_pct, 131.8);
   assertEquals(r.breadscale_pct_display, "131,8 %");
 });
 
@@ -416,4 +417,86 @@ Deno.test("E: fritekstlinje med kornord over 5 g blokkerer merket", () => {
   ]);
   assertEquals(r.free_text_grain_lines.length, 1);
   assertEquals(r.free_text_grain_lines[0].grams, 79_000);
+});
+
+
+/* ------------------------------------------------------------------ *
+ * A: dekningsprosenten regnes med SAMME teller og nevner (post-vannregel)
+ * ------------------------------------------------------------------ */
+
+Deno.test("A: dekning er 100 % når vannregelen fjerner vannlinjen (finalWeight 1030)", async () => {
+  const res = await computeDeclarationCore(
+    stub(baseTables()),
+    [
+      line({ name: "Hvetemel", raw_material_id: MEL, raw_material: { id: MEL }, quantity: 1000 }),
+      line({ name: "Vann", raw_material_id: VANN, raw_material: { id: VANN }, quantity: 600 }),
+    ],
+    { finalWeightGrams: 1030 },
+  );
+  assertEquals(res.coverage_pct, 100);
+});
+
+Deno.test("A: dekning er 100 % når vannregelen beholder vannlinjen (finalWeight 1400)", async () => {
+  const res = await computeDeclarationCore(
+    stub(baseTables()),
+    [
+      line({ name: "Hvetemel", raw_material_id: MEL, raw_material: { id: MEL }, quantity: 1000 }),
+      line({ name: "Vann", raw_material_id: VANN, raw_material: { id: VANN }, quantity: 600 }),
+    ],
+    { finalWeightGrams: 1400 },
+  );
+  assertEquals(res.coverage_pct, 100);
+});
+
+/* ------------------------------------------------------------------ *
+ * B: isGlutenFree må sjekke KODER, ikke norske etikettord
+ * ------------------------------------------------------------------ */
+
+Deno.test("B: containsCodes eksponerer råkodene bak «Inneholder» (gluten_wheat osv.)", async () => {
+  const res = await computeDeclarationCore(stub(baseTables()), [
+    line({ name: "Hvetemel", raw_material_id: MEL, raw_material: { id: MEL }, quantity: 1000 }),
+  ]);
+  assertEquals(res.containsCodes.includes("gluten_wheat"), true);
+  // De norske etikett-tekstene inneholder aldri ordet «gluten» — derfor var det
+  // gamle tekstsøket alltid sant. Se compute-recipe-label/index.ts.
+  assertEquals(res.containsList.some((a) => a.toLowerCase().includes("gluten")), false);
+});
+
+/* ------------------------------------------------------------------ *
+ * C: fullkorn av tørrstoff — wholeGrainDryGrams uten manuell ×0,85
+ * ------------------------------------------------------------------ */
+
+Deno.test("C: veilederen eksempel 3 — 119/84 uten manuell ×0,85 = 58,6 %", () => {
+  const entries = [
+    { name: "Sammalt hvete", effective_grams: 119_000, water_content_pct: null, grain_classification: "whole_grain_flour" },
+    { name: "Hvetemel", effective_grams: 84_000, water_content_pct: null, grain_classification: "sifted_flour" },
+  ];
+  const dry = dryMatterGrams(entries);
+  assertEquals(wholeGrainPctOfDry(wholeGrainDryGrams(entries), dry), 58.6);
+});
+
+Deno.test("C: veilederen eksempel 4 — poteter TS 0,24 uten manuell ×0,85 = 45,0 %", () => {
+  const entries = [
+    { name: "Sammalt rug", effective_grams: 60, water_content_pct: null, grain_classification: "whole_grain_flour" },
+    { name: "Poteter", effective_grams: 260, water_content_pct: 76, grain_classification: null },
+  ];
+  const dry = dryMatterGrams(entries);
+  assertEquals(wholeGrainPctOfDry(wholeGrainDryGrams(entries), dry), 45);
+});
+
+Deno.test("C: veilederen eksempel 5 — surdeig TS 0,45 uten manuell ×0,85 = 30,8 %", () => {
+  const entries = [
+    { name: "Sammalt rug", effective_grams: 40, water_content_pct: null, grain_classification: "whole_grain_flour" },
+    { name: "Surdeig", effective_grams: 170, water_content_pct: 55, grain_classification: null },
+  ];
+  const dry = dryMatterGrams(entries);
+  assertEquals(wholeGrainPctOfDry(wholeGrainDryGrams(entries), dry), 30.8);
+});
+
+Deno.test("C: vannlinjer har 0 g tørrstoff — telles aldri som fullkorn selv med feilklassifisering", () => {
+  const entries = [
+    { name: "Vann", effective_grams: 500, water_content_pct: null, grain_classification: "whole_grain_flour" },
+    { name: "Sammalt hvete", effective_grams: 100, water_content_pct: null, grain_classification: "whole_grain_flour" },
+  ];
+  assertEquals(wholeGrainDryGrams(entries), 85);
 });

@@ -98,7 +98,7 @@ export default function RecipeDetail() {
     queryFn: async () => {
       const { data } = await supabase
         .from("raw_materials")
-        .select("id, name, category, grain_classification, cereal_type, water_content_pct, unit_weight_grams, base_unit, current_cost_price, produced_by_recipe_id")
+        .select("id, name, category, grain_classification, cereal_type, water_content_pct, unit_weight_grams, base_unit, current_cost_price, produced_by_recipe_id, density_g_per_ml, is_water")
         .limit(2000);
       const map: Record<string, BakersRawMaterial> = {};
       for (const r of (data ?? []) as BakersRawMaterial[]) map[r.id] = r;
@@ -178,6 +178,10 @@ export default function RecipeDetail() {
   const loadedRef = useRef<{ id: string | null; updatedAt: string | null }>({ id: null, updatedAt: null });
   const [remoteConflict, setRemoteConflict] = useState(false);
 
+  /** `dirty` endres av hvert tastetrykk og skal ikke utløse ny vurdering av serverdataene. */
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+
   const hydrate = useCallback(
     (row: RecipeDetailRow) => {
       editor.hydrate(row);
@@ -194,13 +198,10 @@ export default function RecipeDetail() {
       loadedUpdatedAt: loadedRef.current.updatedAt,
       incomingRecipeId: recipe.id ?? null,
       incomingUpdatedAt: recipe.updated_at ?? null,
-      dirty,
+      dirty: dirtyRef.current,
     });
     if (decision === "hydrate") hydrate(recipe);
     else if (decision === "conflict") setRemoteConflict(true);
-    // `dirty` er med vilje utelatt: den endres av hver tastetrykk, og skal ikke
-    // utløse en ny vurdering av serverdataene.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recipe, hydrate]);
 
   // Koble på råvaredata når kartet er lastet
@@ -515,6 +516,24 @@ export default function RecipeDetail() {
     [recipe, persistRecipe, qc],
   );
 
+  /** Stille prisoppdatering av den koblede grunnoppskrift-råvaren etter lagring. */
+  const syncCompositePriceQuietly = useCallback(async () => {
+    if (!composite) return;
+    const price = costPerKg(hydratedLines);
+    if (price == null) return;
+    const { error } = await supabase
+      .from("raw_materials")
+      .update({
+        current_cost_price: price,
+        price_source: "recipe",
+        price_updated_at: new Date().toISOString(),
+      } as never)
+      .eq("id", composite.id);
+    if (error) return;
+    qc.invalidateQueries({ queryKey: ["recipe-composite", recipe?.id] });
+    qc.invalidateQueries({ queryKey: ["raw_materials_autocomplete"] });
+  }, [composite, hydratedLines, qc, recipe?.id]);
+
   const save = useCallback(async () => {
     if (!recipe) return;
     setSaving(true);
@@ -571,8 +590,7 @@ export default function RecipeDetail() {
     } finally {
       setSaving(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recipe, header, parts, lines, steps, persistRecipe, qc, editor, draft]);
+  }, [recipe, header, parts, lines, steps, persistRecipe, qc, editor, draft, computeLabel, syncCompositePriceQuietly]);
 
   /** Ctrl/Cmd + S lagrer, som i alle andre editorer. */
   useEffect(() => {
@@ -609,24 +627,6 @@ export default function RecipeDetail() {
     qc.invalidateQueries({ queryKey: ["recipe-composite", recipe?.id] });
     qc.invalidateQueries({ queryKey: ["raw_materials_autocomplete"] });
     toast.success(`Pris oppdatert: ${price.toFixed(2).replace(".", ",")} kr/kg`);
-  }
-
-  /** Stille prisoppdatering av den koblede grunnoppskrift-råvaren etter lagring. */
-  async function syncCompositePriceQuietly() {
-    if (!composite) return;
-    const price = costPerKg(hydratedLines);
-    if (price == null) return;
-    const { error } = await supabase
-      .from("raw_materials")
-      .update({
-        current_cost_price: price,
-        price_source: "recipe",
-        price_updated_at: new Date().toISOString(),
-      } as never)
-      .eq("id", composite.id);
-    if (error) return;
-    qc.invalidateQueries({ queryKey: ["recipe-composite", recipe?.id] });
-    qc.invalidateQueries({ queryKey: ["raw_materials_autocomplete"] });
   }
 
   /** Lag kopi: ny oppskrift uten produktkoblinger, åpnet i navneredigering. */

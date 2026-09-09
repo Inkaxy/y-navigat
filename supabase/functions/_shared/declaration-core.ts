@@ -154,7 +154,7 @@ export function computeBreadscale(entries: BreadscaleEntry[]): BreadscaleResult 
     coarse_grams_weighted: coarseWeighted,
     breadscale_pct: pct,
     breadscale_pct_display: pct == null ? null : `${nbNum(pct)} %`,
-    grain_pct: pct == null ? null : Math.min(100, pct),
+    grain_pct: pct,
     grain_category: pct == null ? null : breadscaleCategory(pct),
     whole_grain_grams: wholeGrain,
     rye_flour_grams: rye,
@@ -195,6 +195,25 @@ export function dryMatterGrams(entries: DryMatterEntry[]): number {
 export function wholeGrainPctOfDry(wholeGrainG: number, dryG: number): number | null {
   if (!(dryG > 0)) return null;
   return Math.round((wholeGrainG / dryG) * 1000) / 10;
+}
+
+/**
+ * Fullkorn regnet av TØRRSTOFF (Nøkkelhull-veilederen 4.2.1): hver fullkornlinje
+ * (whole_grain_flour/whole_grains/gluten_free_grain/gluten_free_whole) telles med
+ * sin egen tørrstoffandel — faktisk `water_content_pct` når den finnes, ellers
+ * faktoren 0,85. Vannlinjer har 0 g tørrstoff uansett.
+ */
+export function wholeGrainDryGrams(entries: DryMatterEntry[]): number {
+  let dry = 0;
+  for (const e of entries) {
+    if (isWaterName(e.name)) continue;
+    const bucket = e.grain_classification ? GRAIN_BUCKET[e.grain_classification] : undefined;
+    if (bucket !== "whole") continue;
+    const g = Number(e.effective_grams) || 0;
+    const known = e.water_content_source ? e.water_content_source !== "unknown" : e.water_content_pct != null;
+    dry += known ? g * (1 - (e.water_content_pct ?? 0) / 100) : g * 0.85;
+  }
+  return dry;
 }
 
 /** Ingredienser som praktisk talt alltid finnes og som ALDRI skal antas å være 0. */
@@ -379,8 +398,12 @@ export type CoreResult = {
   ingredientText: string;
   containsList: string[];
   mayContainList: string[];
+  /** Rå allergenkoder («gluten_wheat» osv.) bak «Inneholder» — for regelsjekk (f.eks. glutenfritt), ikke visning. */
+  containsCodes: string[];
   nutritionTotals: Record<string, number>;
   coveredGrams: number;
+  /** Datadekning i % — ÉN kilde til sannheten, brukt av begge edge-funksjonene. */
+  coverage_pct: number;
   /** Andel av vekten (%) med data, per obligatorisk næringsfelt. */
   coverage_by_nutrient: Record<string, number>;
   /** Linjer over 0,25 % av vekten uten komplett næring. */
@@ -959,6 +982,7 @@ export async function computeDeclarationCore(
     for (const al of a.inherited_may_allergens) if (!allergenSet.has(al)) mayContainSet.add(al);
   }
   for (const al of allergenOnlyMay) if (!allergenSet.has(al)) mayContainSet.add(al);
+  const containsCodes = [...allergenSet].sort();
   const containsList = [...allergenSet].map((a) => ALLERGEN_LABEL[a] ?? a).sort();
   const mayContainList = [...mayContainSet].map((a) => ALLERGEN_LABEL[a] ?? a).sort();
 
@@ -1021,6 +1045,11 @@ export async function computeDeclarationCore(
   for (const f of NUT_FIELDS) {
     coverage_by_nutrient[f] = Math.round((coveredByField[f] / totalForCoverage) * 1000) / 10;
   }
+  // Dekningsprosent — ÉN definisjon: teller og nevner er begge etter vannregelen
+  // (samme sortedAgg-sum). Før dette ble dekket vekt talt ETTER vannregelen mens
+  // nevneren var innveid vekt FØR den — det ga feil prosent når vannregelen slo inn.
+  const coverage_pct = totalForCoverage > 0 ? Math.round((coveredGrams / totalForCoverage) * 1000) / 10 : 0;
+
   const lines_without_nutrition_over_pct = missing_nutrition.filter((m) => m.pct_of_weight > CRITICAL_LINE_PCT);
   const critical_missing_nutrition = missing_nutrition.filter((m) => m.critical).map((m) => m.name);
 
@@ -1034,8 +1063,10 @@ export async function computeDeclarationCore(
     ingredientText,
     containsList,
     mayContainList,
+    containsCodes,
     nutritionTotals,
     coveredGrams,
+    coverage_pct,
     coverage_by_nutrient,
     lines_without_nutrition_over_pct,
     missing_nutrition,

@@ -149,8 +149,10 @@ function IngredientTable({ part, showPercent }: { part: RecipePDFPart; showPerce
 
 function BatchTable({ batches }: { batches: NonNullable<RecipePDFData["batches"]> }) {
   return (
-    <View wrap={false}>
-      <Text style={styles.sectionTitle}>Per batch ({batches.count} batcher)</Text>
+    <View>
+      <Text style={styles.sectionTitle} wrap minPresenceAhead={60}>
+        Per batch ({batches.count} batcher)
+      </Text>
       {batches.perBatchDoughG != null && (
         <Text style={styles.partMeta}>Deigvekt per batch: {fmtGrams(batches.perBatchDoughG)} g</Text>
       )}

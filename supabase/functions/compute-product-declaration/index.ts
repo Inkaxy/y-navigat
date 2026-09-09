@@ -128,7 +128,8 @@ Deno.serve(async (req) => {
     // Datakvalitet
     const linesWithoutRm = sortedAgg.filter((a) => !a.raw_material_id).length;
     const linesWithoutNut = sortedAgg.filter((a) => a.raw_material_id && !a.has_nutrition).length;
-    const nutritionCoveragePct = Math.round((core.coveredGrams / (totalInputGrams || 1)) * 1000) / 10;
+    // ÉN kilde til dekningsprosenten — samme som compute-recipe-label (declaration-core.ts).
+    const nutritionCoveragePct = core.coverage_pct;
     const gate = declarationGate(core, nutritionCoveragePct);
 
     const warnings: string[] = [...expandWarnings];

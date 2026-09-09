@@ -247,6 +247,34 @@ export function NewProductWizard({ open, onOpenChange, productOptions }: Props) 
     return null;
   }, [calcType, manualCost]);
 
+  /**
+   * Henter selskapets margin-mål for et prisnivå direkte fra margin_targets,
+   * siden varen ikke finnes ennå og resolve_margin_target(null) alltid gir
+   * tomt svar. Prioritetsrekkefølgen speiler RPC-en: mest spesifikk treff
+   * (varegruppe + kalkyletype) foran mer generelle rader.
+   */
+  async function resolveMarginTargetForNewProduct(
+    priceLevel: string,
+  ): Promise<number | null> {
+    if (!legalEntityId) return null;
+    const { data, error } = await supabase
+      .from("margin_targets")
+      .select("target_dg2_pct, main_category_id, calc_type")
+      .eq("legal_entity_id", legalEntityId)
+      .eq("price_level", priceLevel as never);
+    if (error || !data) return null;
+    type Row = { target_dg2_pct: number | null; main_category_id: string | null; calc_type: string | null };
+    const rows = data as unknown as Row[];
+    const candidates = [
+      rows.find((r) => r.main_category_id === mainCategoryId && r.calc_type === calcType),
+      rows.find((r) => r.main_category_id === mainCategoryId && r.calc_type === null),
+      rows.find((r) => r.main_category_id === null && r.calc_type === calcType),
+      rows.find((r) => r.main_category_id === null && r.calc_type === null),
+    ];
+    const hit = candidates.find((r) => r != null);
+    return typeof hit?.target_dg2_pct === "number" ? hit.target_dg2_pct : null;
+  }
+
   /** Bygger prisforslag når steg 3 åpnes. */
   async function prepareStep3() {
     const lists = priceListsQuery.data ?? [];
@@ -254,17 +282,7 @@ export function NewProductWizard({ open, onOpenChange, productOptions }: Props) 
     for (const l of lists) {
       let targetPct: number | null = null;
       if (l.price_level) {
-        // Varen finnes ikke ennå — vi henter selskapets standardmål for nivået.
-        // Feiler kallet, viser vi bare «—» i stedet for å blokkere veiviseren.
-        const { data, error } = await supabase.rpc("resolve_margin_target", {
-          p_product_id: null as unknown as string,
-          p_price_level: l.price_level as never,
-        });
-        if (!error) {
-          const row = Array.isArray(data) ? data[0] : data;
-          const t = (row as { target_dg2_pct?: number | null } | null)?.target_dg2_pct;
-          targetPct = typeof t === "number" ? t : null;
-        }
+        targetPct = await resolveMarginTargetForNewProduct(l.price_level);
       }
       const required = requiredPriceForTarget(estimatedCost, targetPct);
       const suggested = required != null ? roundPrice(required, 0.5) : null;
@@ -311,7 +329,7 @@ export function NewProductWizard({ open, onOpenChange, productOptions }: Props) 
         .insert(insertRow as never)
         .select("id, display_name, display_number")
         .single();
-      if (error) throw error;
+      if (error) throw new Error(`Kunne ikke opprette produktet: ${error.message}`);
 
       // --- Kalkyle: handelsvare/bakeoff kobles til råvaren ---
       if ((calcType === "handelsvare" || calcType === "bakeoff") && rawMaterialId) {
@@ -328,19 +346,25 @@ export function NewProductWizard({ open, onOpenChange, productOptions }: Props) 
       if (calcType === "oppskrift") {
         let recipeId = existingRecipeId;
         if (recipeMode === "new") {
+          const yieldQty = Number(yieldQuantity);
+          const unitWeight = Number(unitWeightG);
           const { data: recipe, error: rErr } = await supabase
             .from("recipes")
             .insert({
               legal_entity_id: legalEntityId,
               name: displayName.trim(),
               status: "draft",
-              yield_quantity: Number(yieldQuantity),
+              yield_quantity: yieldQty,
               yield_unit: "stk",
-              unit_weight_grams: Number(unitWeightG),
+              unit_weight_grams: unitWeight,
+              // Kalkylen (product_cost, product_calc_readiness) leser disse feltene,
+              // ikke yield_quantity/unit_weight_grams.
+              units_per_batch: yieldQty,
+              dough_piece_grams: unitWeight,
             } as never)
             .select("id")
             .single();
-          if (rErr) throw rErr;
+          if (rErr) throw new Error(`Kunne ikke opprette oppskriften: ${rErr.message}`);
           recipeId = recipe.id;
         }
         if (recipeId) {
@@ -349,7 +373,7 @@ export function NewProductWizard({ open, onOpenChange, productOptions }: Props) 
             recipe_id: recipeId,
             is_primary: true,
           } as never);
-          if (lErr) throw lErr;
+          if (lErr) throw new Error(`Kunne ikke koble oppskriften til varen: ${lErr.message}`);
         }
       }
 

@@ -9,7 +9,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { logAudit } from "@/varer/lib/audit";
-import { syncEffectiveDeclaration } from "@/varer/lib/effectiveDeclaration";
 
 interface Props {
   open: boolean;
@@ -140,16 +139,18 @@ export function PdfDeclarationImportDialog({ open, onOpenChange, productId, prod
       };
 
       if (!productRecipeLinkId) {
-        // Uten kobling skriver vi rett på produktets snapshotfelt.
+        // Uten kobling skriver vi rett på produktets egne manual_*-felt.
+        const { data: auth } = await supabase.auth.getUser();
         const { error: pErr } = await supabase
           .from("products")
           .update({
-            declaration_mode: "manual",
             manual_ingredient_declaration: ingredientEdit || null,
-            manual_nutrition: Object.keys(nut).length ? nut : null,
-            manual_allergen_summary: allergenSummary,
+            manual_nutrition_per_100g: Object.keys(nut).length ? nut : null,
+            manual_allergens_contains: allergenSummary.contains,
+            manual_allergens_may_contain: allergenSummary.may_contain,
             manual_declaration_updated_at: new Date().toISOString(),
-          } as never)
+            manual_declaration_updated_by: auth.user?.id ?? null,
+          })
           .eq("id", productId);
         if (pErr) throw pErr;
         await logAudit({
@@ -174,18 +175,17 @@ export function PdfDeclarationImportDialog({ open, onOpenChange, productId, prod
         .update({
           declaration_mode: "manual",
           manual_ingredient_declaration: ingredientEdit || null,
-          manual_nutrition: Object.keys(nut).length ? (nut as never) : null,
+          manual_nutrition: Object.keys(nut).length ? nut : null,
           manual_allergen_summary: {
             contains: containsEdit.split(",").map((s) => s.trim()).filter(Boolean),
             may_contain: mayContainEdit.split(",").map((s) => s.trim()).filter(Boolean),
-          } as never,
+          },
           declaration_updated_at: new Date().toISOString(),
         })
         .eq("id", productRecipeLinkId);
       if (error) throw error;
 
-      // Oppdater produkt-snapshotet med én gang.
-      await syncEffectiveDeclaration(productRecipeLinkId);
+      // Godkjenningen (7a) synker produktsnapshotet — klienten skriver det ikke lenger selv.
 
       await logAudit({
         action: "ai_declaration_imported",

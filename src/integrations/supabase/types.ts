@@ -16500,7 +16500,7 @@ export type Database = {
           reason: string
         }[]
       }
-      recipe_label_recalc_stale: { Args: { p_limit: number }; Returns: number }
+      recipe_label_recalc_stale: { Args: { p_limit?: number }; Returns: number }
       recipe_line_base_qty: {
         Args: {
           p_base_unit: string

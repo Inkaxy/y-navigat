@@ -61,17 +61,25 @@ const NUTRIENT_KEYS = [
   "salt_g",
 ] as const;
 
-/** Er allergenet uthevet (markert med ** eller <strong>) i ingredienslisten? */
+/**
+ * Er allergenet uthevet i ingredienslisten?
+ *
+ * Godtar markørene *term*, **term** og <strong>term</strong>. Rendrerne (skjerm og
+ * PDF) uthever i tillegg hver allergenterm de finner i teksten, også når teksten
+ * er strippet for markører eller skrevet med VERSALER. Derfor holder det at termen
+ * finnes i teksten.
+ */
 export function allergenIsHighlighted(text: string, term: string): boolean {
   if (!term.trim()) return true;
   const t = term.trim().toLocaleLowerCase("nb-NO");
   const lower = text.toLocaleLowerCase("nb-NO");
-  const marked = /\*\*(.+?)\*\*|<strong>(.+?)<\/strong>/g;
+  const marked = /\*{1,2}(.+?)\*{1,2}|<strong>(.+?)<\/strong>/g;
   let m: RegExpExecArray | null;
   while ((m = marked.exec(lower)) !== null) {
     if ((m[1] ?? m[2] ?? "").includes(t)) return true;
   }
-  return false;
+  // Rendreren uthever per term — termen i klartekst er nok.
+  return lower.includes(t);
 }
 
 export function buildLabelChecklist(input: LabelChecklistInput): LabelChecklist {

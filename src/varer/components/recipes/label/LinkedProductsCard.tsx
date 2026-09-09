@@ -13,7 +13,6 @@ import {
   useSyncBreadscaleProducts,
   type RecipeLinkedProduct,
 } from "@/varer/hooks/useRecipeLabel";
-import { syncEffectiveDeclaration } from "@/varer/lib/effectiveDeclaration";
 
 interface Props {
   recipeId: string;
@@ -37,26 +36,15 @@ export function LinkedProductsCard({ recipeId, links, canWrite }: Props) {
 
   async function syncAll() {
     setBusy(true);
-    const errs: Record<string, string> = {};
-    let ok = 0;
-    for (const l of links) {
-      try {
-        await syncEffectiveDeclaration(l.id);
-        ok++;
-      } catch (e) {
-        errs[l.id] = (e as Error).message ?? "Ukjent feil";
-      }
-    }
+    setErrors({});
     try {
       await syncBreadscale.mutateAsync(recipeId);
+      toast.success("Grovhet synkronisert");
     } catch (e) {
       toast.error(`Grovhetssynk feilet: ${(e as Error).message}`);
     }
-    setErrors(errs);
     setBusy(false);
     qc.invalidateQueries({ queryKey: ["recipe-linked-products", recipeId] });
-    if (Object.keys(errs).length === 0) toast.success(`${ok} produkter synkronisert`);
-    else toast.error(`${Object.keys(errs).length} produkter feilet — se lista`);
   }
 
   return (

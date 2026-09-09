@@ -49,7 +49,7 @@ interface Props {
 }
 
 
-const BASE_UNITS = ["kg", "g", "liter", "ml", "stk"];
+const BASE_UNITS = ["kg", "g", "l", "ml", "stk"];
 
 /** Én rad i nedtrekket — delt av gruppene «Grunnoppskrifter» og «Råvarer». */
 function RawMaterialRow({

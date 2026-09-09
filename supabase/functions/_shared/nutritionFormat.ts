@@ -56,9 +56,13 @@ export function nbNumber(value: number, decimals: number): string {
  * Formaterer én næringsverdi til det som skal stå på etiketten.
  *
  * - energi: hele tall (kJ og kcal står på ÉN rad, se `formatEnergyRow`)
- * - fett/karbohydrat/protein/kostfiber: ≥ 10 → hele tall, < 10 → 1 desimal, < 0,5 → «< 0,5 g»
- * - mettede fettsyrer/sukkerarter: som over, men < 0,1 → «< 0,1 g»
+ * - fett/karbohydrat/sukkerarter/protein/kostfiber: ≥ 10 → hele tall, < 10 → 1 desimal,
+ *   < 0,5 → «< 0,5 g» (samme klasse som databasens label_format_nutrient)
+ * - mettede fettsyrer: som over, men < 0,1 → «< 0,1 g»
  * - salt: ≥ 1 → 1 desimal, < 1 → 2 desimaler, < 0,0125 → «0 g»
+ *
+ * Avrundingen skjer desimal-sikkert (Math.round(v * 10) / 10 før toFixed) slik at
+ * 0,85 blir «0,9 g» og 9,96 blir «10 g» — nøyaktig som i databasen.
  */
 export function formatNutrient(key: NutrientKey | string, value: number | null | undefined): string {
   if (value == null || !Number.isFinite(Number(value))) return "—";
@@ -69,20 +73,23 @@ export function formatNutrient(key: NutrientKey | string, value: number | null |
 
   if (key === "salt_g") {
     if (v < 0.0125) return "0 g";
-    if (v < 1) return `${nbNumber(v, 2)} g`;
-    return `${nbNumber(v, 1)} g`;
+    const r2 = Math.round(v * 100) / 100;
+    if (r2 < 1) return `${nbNumber(r2, 2)} g`;
+    return `${nbNumber(Math.round(v * 10) / 10, 1)} g`;
   }
 
-  if (key === "saturated_fat_g" || key === "sugars_g") {
-    if (v < 0.1) return "< 0,1 g";
-    if (v >= 10) return `${nbNumber(Math.round(v), 0)} g`;
-    return `${nbNumber(v, 1)} g`;
+  const r1 = Math.round(v * 10) / 10;
+
+  if (key === "saturated_fat_g") {
+    if (r1 < 0.1) return "< 0,1 g";
+    if (r1 >= 10) return `${nbNumber(Math.round(r1), 0)} g`;
+    return `${nbNumber(r1, 1)} g`;
   }
 
-  // fat_g, carbs_g, protein_g, fiber_g og alt annet oppgitt i gram
-  if (v < 0.5) return "< 0,5 g";
-  if (v >= 10) return `${nbNumber(Math.round(v), 0)} g`;
-  return `${nbNumber(v, 1)} g`;
+  // fat_g, carbs_g, sugars_g, protein_g, fiber_g og alt annet oppgitt i gram
+  if (r1 < 0.5) return "< 0,5 g";
+  if (r1 >= 10) return `${nbNumber(Math.round(r1), 0)} g`;
+  return `${nbNumber(r1, 1)} g`;
 }
 
 /** «1 050 kJ / 250 kcal» — energi skal stå på én rad. */
