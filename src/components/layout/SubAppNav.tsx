@@ -14,6 +14,7 @@ import { useInvoiceAccess } from "@/ravarer/hooks/useInvoiceAccess";
 import { useRavarerAccessLevel } from "@/ravarer/hooks/useRavarerAccessLevel";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useMarginAlerts } from "@/varer/hooks/useMarginAlerts";
 import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import {
@@ -384,12 +385,20 @@ function VarerNav() {
     staleTime: 60_000,
   });
 
+  const { data: marginAlerts = [] } = useMarginAlerts(NB_LEGAL_ENTITY_ID);
+
   const items: NavItem[] = [
     { kind: "link", to: "/varer/dashbord", label: "Dashbord", icon: LayoutDashboard },
     { kind: "link", to: "/varer/vareliste", label: "Vareliste", icon: Cookie },
     { kind: "link", to: "/varer/priser", label: "Priser", icon: Tags },
     { kind: "link", to: "/varer/spesialpriser", label: "Spesialpriser", icon: HandCoins },
-    { kind: "link", to: "/varer/lonnsomhet", label: "Lønnsomhet", icon: TrendingUp },
+    {
+      kind: "link",
+      to: "/varer/lonnsomhet",
+      label: "Lønnsomhet",
+      icon: TrendingUp,
+      badge: marginAlerts.length,
+    },
     { kind: "link", to: "/varer/prisrunder", label: "Prisrunder", icon: Receipt },
     { kind: "link", to: "/varer/kakebygger", label: "Kakebygger", icon: CakeSlice },
     {
