@@ -14,6 +14,7 @@ import { NUT_ROWS, nutritionValueText } from "./labelShared";
 import { MarkedText } from "@/varer/components/label/MarkedText";
 import type { EffectiveDeclaration } from "@/varer/lib/effectiveDeclaration";
 import { buildLabelChecklist } from "@/varer/lib/labelChecklist";
+import { mmToPt, type RecipeLabelProfile } from "@/varer/hooks/useRecipeLabelProfile";
 
 interface EntityInfo {
   name: string | null;
@@ -36,6 +37,8 @@ interface Props {
   storageInstructions: string | null;
   countryOfOrigin: string | null;
   entity: EntityInfo | null;
+  /** Etikettprofilen som gjelder for hovedproduktet — styrer papirmål og bunntekst. */
+  profile?: RecipeLabelProfile | null;
   nutritionUsable: boolean;
   /** Beregningen er sperret av kritiske mangler. */
   blocked?: boolean;
@@ -76,14 +79,25 @@ export function ConsumerLabelSection({
   storageInstructions,
   countryOfOrigin,
   entity,
+  profile,
   nutritionUsable,
   blocked,
   keyholeQualifies,
   coveragePct,
   onChecklistChange,
 }: Props) {
-  const [size, setSize] = useState<LabelSizeKey>("100x70");
+  const [size, setSize] = useState<LabelSizeKey | "profile">(profile ? "profile" : "100x70");
   const [printing, setPrinting] = useState(false);
+
+  // Profilen kan komme etter første render (egen spørring) — velg den da.
+  useEffect(() => {
+    if (profile) setSize("profile");
+  }, [profile]);
+
+  const profileSize = profile
+    ? { width: mmToPt(profile.paper_width_mm), height: mmToPt(profile.paper_height_mm) }
+    : null;
+  const pdfSize: LabelSizeKey = size === "profile" ? "100x70" : size;
 
   const grainCategory = effectiveGrainPct != null ? grainCategoryFromPct(effectiveGrainPct) : null;
   const netWeightText = unitWeightGrams ? `${Math.round(unitWeightGrams)} g` : null;
@@ -140,7 +154,8 @@ export function ConsumerLabelSection({
       ]);
       const blob = await pdf(
         <mod.ConsumerLabelPDFDocument
-          size={size}
+          size={pdfSize}
+          customSize={size === "profile" ? profileSize : null}
           data={{
             productName: recipeName,
             ingredientText: effective.ingredientText ?? "",
@@ -151,7 +166,7 @@ export function ConsumerLabelSection({
             originText: countryOfOrigin ?? null,
             nutritionRows,
             nutritionUsable,
-            producerName: entity?.name ?? null,
+            producerName: entity?.name ?? profile?.company_name ?? null,
             producerAddress,
             grainMarkImage,
             // Grovhetsprosenten skal trykkes under merket (BKLF pkt. 4.4).
@@ -181,11 +196,16 @@ export function ConsumerLabelSection({
         <div className="flex flex-wrap items-end gap-3">
           <div>
             <Label className="text-xs">Etikettstørrelse</Label>
-            <Select value={size} onValueChange={(v) => setSize(v as LabelSizeKey)}>
+            <Select value={size} onValueChange={(v) => setSize(v as LabelSizeKey | "profile")}>
               <SelectTrigger className="h-10 w-56">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                {profile && (
+                  <SelectItem value="profile">
+                    {`Profil: ${profile.name} (${profile.paper_width_mm} × ${profile.paper_height_mm} mm)`}
+                  </SelectItem>
+                )}
                 {Object.entries(LABEL_SIZES).map(([k, v]) => (
                   <SelectItem key={k} value={k}>
                     {v.label}
@@ -206,6 +226,13 @@ export function ConsumerLabelSection({
             </p>
           )}
         </div>
+
+        {profile && (
+          <p className="text-xs text-muted-foreground">
+            Etikettprofil fra hovedproduktet: <b>{profile.name}</b>
+            {profile.company_note ? ` · ${profile.company_note}` : ""}
+          </p>
+        )}
 
         <p className="text-xs">
           Bruker: Deklarasjon &amp; næring — <b>{declarationManual ? "Manuell" : "Beregnet"}</b> · Grovhet —{" "}
