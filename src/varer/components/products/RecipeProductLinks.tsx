@@ -31,7 +31,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { syncEffectiveDeclarationForRecipe } from "@/varer/lib/effectiveDeclaration";
 
 
 interface Props {
@@ -92,36 +91,30 @@ export function RecipeProductLinks({ recipeId, currentProductId, canWrite }: Pro
 
   async function afterLinkChange() {
     try {
-      const n = await syncEffectiveDeclarationForRecipe(recipeId);
-      if (n > 0) toast.success(`Deklarasjonen er synket til ${n} produkt(er)`);
+      const { error } = await supabase.functions.invoke("compute-recipe-label", { body: { recipe_id: recipeId } });
+      if (error) throw error;
     } catch (e) {
-      console.error("syncEffectiveDeclarationForRecipe", e);
-      toast.warning("Koblingen er lagret, men snapshotet ble ikke synket. Bruk «Synk nå».");
+      console.error("compute-recipe-label", e);
+      toast.warning("Koblingen er lagret, men merkedata ble ikke beregnet på nytt. Bruk «Beregn på nytt».");
     }
     await linksQuery.refetch();
+    qc.invalidateQueries({ queryKey: ["recipe-label-calculated", recipeId] });
     qc.invalidateQueries({ queryKey: ["recipe-linked-products", recipeId] });
     qc.invalidateQueries({ queryKey: ["products"] });
   }
 
   async function addLink(productId: string) {
-    // Har produktet ingen primæroppskrift fra før, blir denne primær.
-    const { data: existing, error: exErr } = await supabase
-      .from("product_recipe_links")
-      .select("id, is_primary")
-      .eq("product_id", productId);
-    if (exErr) {
-      toast.error(exErr.message);
-      return;
-    }
-    const hasPrimary = (existing ?? []).some((l) => l.is_primary === true);
+    // DB-en avgjør selv om koblingen blir primær (første kobling for produktet).
     const { error } = await supabase
       .from("product_recipe_links")
-      .insert({ product_id: productId, recipe_id: recipeId, is_primary: !hasPrimary } as never);
+      .insert({ product_id: productId, recipe_id: recipeId } as never);
     if (error) {
-      toast.error(error.message);
+      if (error.code === "42501") toast.error("Mangler skrivetilgang til oppskriften");
+      else if (error.code === "23514") toast.error("Sirkulær referanse — oppskriften kan ikke kobles til seg selv (via halvfabrikat)");
+      else toast.error(error.message);
       return;
     }
-    toast.success(hasPrimary ? "Produkt koblet til oppskrift" : "Produkt koblet — satt som primæroppskrift");
+    toast.success("Produkt koblet til oppskrift");
     setPickerOpen(false);
     await afterLinkChange();
   }

@@ -4,7 +4,7 @@ import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { fetchAllRows } from "@/lib/supabasePaging";
-import { rpcReceiveInvoiceLine } from "@/ravarer/lib/pendingRpc";
+import type { ReceiveLineResult } from "@/ravarer/lib/rpcContracts";
 
 
 export interface ReceiptInvoiceRow {
@@ -247,31 +247,29 @@ export interface ReceiveLineInput {
 }
 
 /**
- * Fører én fakturalinje inn på lager.
- *
- * Bruker RPC-en `rm_receive_invoice_line` når den er rullet ut: den låser linja og
- * fakturaen, kontrollerer tilgang og selskap i basen, og fører ALDRI en bevegelse
- * på toppen av den fakturalinje-triggeren allerede har laget. Kreditnota beholder
- * negativ mengde. Finnes ikke funksjonen ennå, faller vi tilbake til den gamle
- * klientveien, som er idempotent på (fakturalinje, kjøp).
+ * Fører én fakturalinje inn på lager via RPC-en `rm_receive_invoice_line`: den
+ * låser linja og fakturaen, kontrollerer tilgang og selskap i basen, og fører
+ * ALDRI en bevegelse på toppen av den fakturalinje-triggeren allerede har laget.
+ * Kreditnota beholder negativ mengde. Skulle funksjonen mangle (feil miljø),
+ * faller vi tilbake til den gamle klientveien, som er idempotent på
+ * (fakturalinje, kjøp).
  */
 export function useReceiveInvoiceLine() {
   const qc = useQueryClient();
   const { legalEntityId, user } = useRavarer();
   return useMutation({
     mutationFn: async (input: ReceiveLineInput): Promise<{ skipped: boolean }> => {
-      try {
-        const res = await rpcReceiveInvoiceLine({
-          lineId: input.invoice_line_id,
-          lotNumber: input.lot_number ?? null,
-          bestBefore: input.best_before ?? null,
-          note: `Mottak faktura ${input.invoice_number}`,
-        });
+      const { data, error } = await supabase.rpc("rm_receive_invoice_line", {
+        p_line_id: input.invoice_line_id,
+        p_lot_number: input.lot_number ?? null,
+        p_best_before: input.best_before ?? null,
+        p_note: `Mottak faktura ${input.invoice_number}`,
+      });
+      if (!error) {
+        const res = data as unknown as ReceiveLineResult;
         return { skipped: res.already_received === true || !!res.skipped };
-      } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        if (!/could not find the function|does not exist/i.test(message)) throw e;
       }
+      if (!/could not find the function|does not exist/i.test(error.message)) throw error;
 
       if (!(input.quantity_base > 0)) throw new Error("Linja mangler omregnet mengde");
       const { data: existing, error: exErr } = await supabase

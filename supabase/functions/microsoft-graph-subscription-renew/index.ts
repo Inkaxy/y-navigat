@@ -11,14 +11,22 @@ const corsHeaders = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+  // Overgangsordning: godta enten verify_cron_secret-RPC-en eller den gamle
+  // statiske CRON_SECRET-miljøvariabelen, til alle kallere er byttet over.
+  const provided = req.headers.get("x-cron-secret") ?? "";
   const expected = Deno.env.get("CRON_SECRET");
-  const provided = req.headers.get("x-cron-secret");
-  if (!expected || provided !== expected) {
+  let authorized = !!expected && provided === expected;
+  if (!authorized && provided) {
+    const { data, error } = await admin.rpc("verify_cron_secret", { p_secret: provided });
+    authorized = !error && data === true;
+  }
+  if (!authorized) {
     return json({ error: "Unauthorized" }, 401);
   }
 
   try {
-    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     const cutoff = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
     const { data: subs, error } = await admin

@@ -19,6 +19,9 @@ export interface InboxInvoice {
   line_extraction_status: string | null;
   source: string | null;
   notes: string | null;
+  paid_at: string | null;
+  tripletex_is_paid: boolean | null;
+  line_extraction_attempts: number;
   line_count: number;
   assessment: InboxAssessment;
 }
@@ -46,6 +49,9 @@ interface RawInvoice {
   line_extraction_status: string | null;
   source: string | null;
   notes: string | null;
+  paid_at: string | null;
+  tripletex_is_paid: boolean | null;
+  line_extraction_attempts: number;
   suppliers: { name: string } | null;
   invoice_lines:
     | Array<{
@@ -72,7 +78,7 @@ export function useInboxInvoices(
         .select(
           `id, invoice_number, invoice_date, status, legal_entity_id, supplier_id, is_credit_note,
            total_amount, total_vat, lines_sum_status, lines_sum_variance_pct, source_document_url,
-           line_extraction_status, source, notes, suppliers(name),
+           line_extraction_status, line_extraction_attempts, source, notes, paid_at, tripletex_is_paid, suppliers(name),
            invoice_lines(raw_material_id, requires_review, price_variance_pct, variance_status, raw_materials(category))`,
         )
         .in("status", filters.onlyReady ? ["ready"] : ["imported", "needs_review", "ready", "flagged"])
@@ -110,6 +116,9 @@ export function useInboxInvoices(
           line_extraction_status: r.line_extraction_status,
           source: r.source,
           notes: r.notes,
+          paid_at: r.paid_at,
+          tripletex_is_paid: r.tripletex_is_paid,
+          line_extraction_attempts: r.line_extraction_attempts ?? 0,
           line_count: lines.length,
           assessment: assessInboxInvoice(
             {

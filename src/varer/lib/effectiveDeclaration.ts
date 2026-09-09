@@ -267,26 +267,6 @@ export async function syncEffectiveDeclaration(linkId: string): Promise<Effectiv
   return eff;
 }
 
-/** Synkroniserer alle produkter som er koblet til en oppskrift. */
-export async function syncEffectiveDeclarationForRecipe(recipeId: string): Promise<number> {
-  const { data, error } = await supabase
-    .from("product_recipe_links")
-    .select("id")
-    .eq("recipe_id", recipeId);
-  if (error) throw error;
-  const links = data ?? [];
-  let n = 0;
-  for (const l of links) {
-    try {
-      await syncEffectiveDeclaration(l.id);
-      n++;
-    } catch (e) {
-      console.error("syncEffectiveDeclaration", l.id, e);
-    }
-  }
-  return n;
-}
-
 /** Sammenligner beregnet mot manuell for å oppdage at beregningen har flyttet seg. */
 export function declarationDrift(
   manual: { nutrition: NutritionPer100g | null; contains: string[] },

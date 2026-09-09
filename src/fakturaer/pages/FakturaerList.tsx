@@ -24,6 +24,7 @@ import {
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
 import { useInvoices, useInvoiceSuppliers, type InvoiceSortKey, type SortDir } from "@/fakturaer/hooks/useInvoices";
+import { getPaidBadgeInfo } from "@/fakturaer/lib/paidStatus";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
 import { formatNok, formatDate, INVOICE_STATUSES, INVOICE_SOURCES } from "@/fakturaer/lib/constants";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
@@ -46,6 +47,7 @@ export default function FakturaerListPage() {
   const dateFrom = params.get("fra") ?? "";
   const dateTo = params.get("til") ?? "";
   const onlyMismatch = params.get("avvik") === "1";
+  const paidStatus = (params.get("betalt") as "betalt" | "ubetalt" | null) ?? null;
   const sortKey = (params.get("sort") as InvoiceSortKey) ?? "invoice_date";
   const sortDir = (params.get("dir") as SortDir) ?? "desc";
   const page = Math.max(1, Number(params.get("side") ?? "1") || 1);
@@ -74,6 +76,7 @@ export default function FakturaerListPage() {
     dateFrom: dateFrom || null,
     dateTo: dateTo || null,
     onlyMismatch,
+    paidStatus,
     sortKey,
     sortDir,
     page,
@@ -93,6 +96,7 @@ export default function FakturaerListPage() {
     !!dateFrom ||
     !!dateTo ||
     onlyMismatch ||
+    !!paidStatus ||
     search.trim().length > 0;
 
   // Banneret skal telle HELE køen, ikke bare gjeldende side.
@@ -237,6 +241,15 @@ export default function FakturaerListPage() {
               ))}
             </SelectContent>
           </Select>
+
+          <Select value={paidStatus ?? "all"} onValueChange={(v) => update({ betalt: v === "all" ? null : v })}>
+            <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Betalt/ubetalt</SelectItem>
+              <SelectItem value="betalt">Betalt</SelectItem>
+              <SelectItem value="ubetalt">Ubetalt</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -309,6 +322,7 @@ export default function FakturaerListPage() {
                     <th className="px-4 py-3 text-right"><SortHeader label="Beløp" sortKeyName="total_amount" align="right" /></th>
                     <th className="px-4 py-3 text-center">Linjer</th>
                     <th className="px-4 py-3">Kilde</th>
+                    <th className="px-4 py-3">Betalt</th>
                     <th className="px-4 py-3">Status</th>
                   </tr>
                 </thead>
@@ -351,6 +365,21 @@ export default function FakturaerListPage() {
                               </span>
                             )}
                           </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {(() => {
+                            const paid = getPaidBadgeInfo(r.paid_at, r.tripletex_is_paid);
+                            const paidTone: Record<string, string> = {
+                              success: "bg-success/15 text-success border-success/30",
+                              warning: "bg-warning/15 text-warning border-warning/30",
+                              muted: "bg-muted text-ink-secondary border-line-subtle",
+                            };
+                            return (
+                              <Badge variant="outline" className={paidTone[paid.tone]}>
+                                {paid.label}
+                              </Badge>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap items-center gap-1.5">

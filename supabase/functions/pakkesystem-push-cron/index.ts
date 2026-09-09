@@ -2,11 +2,9 @@
 // akkurat nå (push_time innenfor siste 15 min og ikke pushet enda i dag), og sender
 // JSON-snapshotet fra pakkesystem-export til deres URL.
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { authorizeCron, CRON_CORS_HEADERS } from "../_shared/cron-auth.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const corsHeaders = CRON_CORS_HEADERS;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -14,6 +12,13 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+
+  if (!(await authorizeCron(req, admin))) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
   const now = new Date();
   const oslo = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Oslo" }));

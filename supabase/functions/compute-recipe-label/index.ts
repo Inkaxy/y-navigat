@@ -13,6 +13,7 @@ import {
 import { expandRecipeLines, sumLineGrams } from "../_shared/recipe-lines.ts";
 import { storeNutrient } from "../_shared/nutritionFormat.ts";
 import { syncAutoProductsForRecipe } from "../_shared/effective-declaration.ts";
+import { authorizeCron } from "../_shared/cron-auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -99,10 +100,14 @@ Deno.serve(async (req) => {
     const token = authHeader.replace(/^Bearer\s+/i, "");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    if (!token) return json({ error: "Unauthorized" }, 401);
+    const service = createClient(supabaseUrl, serviceKey);
 
-    const isService = token === serviceKey;
-    if (!isService) {
+    // Cron sender {recipe_id, source:'cron'} og kan mangle/ha tom Authorization —
+    // den skal godkjennes på X-Cron-Secret FØR bearer-kravet under vurderes.
+    const cronAuth = await authorizeCron(req, service);
+    const isService = cronAuth === "service" || token === serviceKey;
+    if (cronAuth === null && !isService) {
+      if (!token) return json({ error: "Unauthorized" }, 401);
       const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
         global: { headers: { Authorization: `Bearer ${token}` } },
       });
@@ -111,8 +116,6 @@ Deno.serve(async (req) => {
       const { data: access } = await userClient.from("recipes").select("id").eq("id", recipeId).maybeSingle();
       if (!access) return json({ error: "Forbidden" }, 403);
     }
-
-    const service = createClient(supabaseUrl, serviceKey);
 
     const { data: recipe } = await service
       .from("recipes")

@@ -5,6 +5,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getSessionToken, baseUrl, authHeader } from "../_shared/tripletex.ts";
 import { parsePackageFromDescription } from "../_shared/units.ts";
 import { computeLinesSum, needsReviewFromConfidence } from "../_shared/lines-sum.ts";
+import { planLineExtractionFailure } from "./failure-plan.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -92,20 +93,15 @@ Deno.serve(async (req) => {
       return json({ error: "Unauthorized" }, 401);
     }
 
-    const limit = body.invoice_id ? 1 : Math.max(1, Math.min(50, Number(body.limit ?? 5)));
+    // retry_failed er en no-op nå: kø-RPC-en avgjør selv hvilke fakturaer som kan
+    // claimes (bl.a. basert på line_extraction_attempts), så flagget trengs ikke lenger.
+    const limit = Math.max(1, Math.min(50, Number(body.limit ?? 20)));
 
-    let q = admin
-      .from("invoices")
-      .select("id, tripletex_supplier_invoice_id, invoice_number, total_amount, total_vat, status")
-      .eq("legal_entity_id", legalEntityId)
-      .not("tripletex_supplier_invoice_id", "is", null)
-      .order("invoice_date", { ascending: false })
-      .limit(limit);
-    if (body.invoice_id) q = q.eq("id", body.invoice_id);
-    else if (body.retry_failed) q = q.in("line_extraction_status", ["pending", "failed"]);
-    else q = q.eq("line_extraction_status", "pending");
-
-    const { data: invoices, error: invErr } = await q;
+    const { data: invoices, error: invErr } = await admin.rpc("rm_claim_invoice_line_extraction", {
+      p_legal_entity_id: legalEntityId,
+      p_limit: limit,
+      p_invoice_id: body.invoice_id ?? null,
+    });
     if (invErr) throw new Error(invErr.message);
 
     let behandlet = 0;
@@ -274,22 +270,25 @@ Deno.serve(async (req) => {
         } catch (e) {
           feilet++;
           const msg = e instanceof Error ? e.message : String(e);
-          const patch: Record<string, unknown> = {
-            line_extraction_status: "failed",
-            line_extraction_error: msg,
-            line_extraction_at: new Date().toISOString(),
-          };
-          if ((e as any)?.pdfFail) patch.pdf_status = "failed";
+          const { patch } = planLineExtractionFailure({
+            attempts: Number((inv as any).line_extraction_attempts ?? 0),
+            message: msg,
+            status: (inv as any).status ?? null,
+            pdfFail: !!(e as any)?.pdfFail,
+          });
           await admin.from("invoices").update(patch).eq("id", inv.id);
         }
       }
     }
 
+    // «gjenstaar» = pending med forsøk igjen (attempts < maks) — utmattede fakturaer
+    // er «failed»/«needs_review» og skal ikke telles som noe cronen kan ta senere.
     const { count } = await admin
       .from("invoices")
       .select("id", { count: "exact", head: true })
       .eq("legal_entity_id", legalEntityId)
-      .eq("line_extraction_status", "pending");
+      .eq("line_extraction_status", "pending")
+      .lt("line_extraction_attempts", 3);
 
     return json({ ok: true, behandlet, vellykket, feilet, gjenstaar: count ?? 0 });
   } catch (err) {

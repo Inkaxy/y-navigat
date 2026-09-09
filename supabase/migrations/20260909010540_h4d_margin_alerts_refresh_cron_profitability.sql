@@ -1,0 +1,4 @@
+-- Kjørt direkte mot prosjektet 9. september 2026 som versjon 20260909010540 (h4d_margin_alerts_refresh_cron_profitability).
+-- Fullt innhold: Inkaxy/nbos docs/db-migrasjoner/.
+-- Markørfil for migrasjonsmotoren – skal ikke kjøres på nytt.
+-- La til marginvarsler, oppfriskning via cron og lønnsomhetsgrunnlag.

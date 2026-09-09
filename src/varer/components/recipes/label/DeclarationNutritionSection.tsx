@@ -21,7 +21,6 @@ import {
   parseAllergenSummary,
   pickNutrition,
   stripHtml,
-  syncEffectiveDeclarationForRecipe,
   type DeclarationMode,
   type NutritionPer100g,
   type RecipeLabelSnapshot,
@@ -109,10 +108,11 @@ export function DeclarationNutritionSection({
   const setNut = (k: string, v: string) => setForm((f) => ({ ...f, nutrition: { ...f.nutrition, [k]: v } }));
 
   const afterWrite = async () => {
-    const n = await syncEffectiveDeclarationForRecipe(recipeId);
+    const { error } = await supabase.functions.invoke("compute-recipe-label", { body: { recipe_id: recipeId } });
+    if (error) console.error("compute-recipe-label", error);
     qc.invalidateQueries({ queryKey: ["recipe-detail", recipeId] });
+    qc.invalidateQueries({ queryKey: ["recipe-label-calculated", recipeId] });
     qc.invalidateQueries({ queryKey: ["recipe-linked-products"] });
-    return n;
   };
 
   const setMode = useMutation({
@@ -121,7 +121,7 @@ export function DeclarationNutritionSection({
       if (error) throw error;
       return afterWrite();
     },
-    onSuccess: (n) => toast.success(`Valget er lagret — ${n} produkt${n === 1 ? "" : "er"} oppdatert`),
+    onSuccess: () => toast.success("Valget er lagret"),
     onError: (e: unknown) => showError("DeclarationNutritionSection", e),
   });
 

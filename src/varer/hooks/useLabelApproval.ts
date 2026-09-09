@@ -1,130 +1,151 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { syncEffectiveDeclarationForRecipe } from "@/varer/lib/effectiveDeclaration";
-import { computeStaleness, type StalenessSource, type StalenessResult } from "@/varer/lib/labelStaleness";
 
-interface RecipeLineRow {
-  raw_material_id: string | null;
-  raw_materials: { name: string | null; updated_at: string | null } | null;
-}
-
-/**
- * Kildetidspunkter for oppskriften: oppskriften selv, råvarene og næringsradene.
- * Brukes til å avgjøre om beregningen er utdatert inntil en DB-trigger finnes.
- */
-export function useLabelStaleness(recipeId: string | undefined, computedAt: string | null | undefined) {
-  const query = useQuery({
-    queryKey: ["recipe-label-sources", recipeId],
-    enabled: !!recipeId,
-    queryFn: async (): Promise<StalenessSource[]> => {
-      const { data: recipe, error: rErr } = await supabase
-        .from("recipes")
-        .select("name, updated_at")
-        .eq("id", recipeId!)
-        .maybeSingle();
-      if (rErr) throw rErr;
-
-      const { data: lines, error: lErr } = await supabase
-        .from("recipe_lines")
-        .select("raw_material_id, raw_materials(name, updated_at)")
-        .eq("recipe_id", recipeId!)
-        .limit(500);
-      if (lErr) throw lErr;
-
-      const rows = (lines ?? []) as unknown as RecipeLineRow[];
-      const rmIds = rows.map((l) => l.raw_material_id).filter((v): v is string => !!v);
-
-      let nutritionRows: { raw_material_id: string; updated_at: string | null }[] = [];
-      if (rmIds.length > 0) {
-        const { data: nut, error: nErr } = await supabase
-          .from("raw_material_nutrition")
-          .select("raw_material_id, updated_at")
-          .in("raw_material_id", rmIds);
-        if (nErr) throw nErr;
-        nutritionRows = (nut ?? []) as { raw_material_id: string; updated_at: string | null }[];
-      }
-      const nameById = new Map(rows.map((l) => [l.raw_material_id, l.raw_materials?.name ?? "Råvare"]));
-
-      const sources: StalenessSource[] = [];
-      if (recipe?.updated_at) sources.push({ name: recipe.name ?? "Oppskriften", updatedAt: recipe.updated_at });
-      for (const l of rows) {
-        if (l.raw_materials?.updated_at) {
-          sources.push({ name: l.raw_materials.name ?? "Råvare", updatedAt: l.raw_materials.updated_at });
-        }
-      }
-      for (const n of nutritionRows) {
-        if (n.updated_at) {
-          sources.push({ name: `${nameById.get(n.raw_material_id) ?? "Råvare"} (næring)`, updatedAt: n.updated_at });
-        }
-      }
-      return sources;
-    },
-  });
-
-  const result: StalenessResult = computeStaleness(computedAt ?? null, query.data ?? []);
-  return { ...query, staleness: result };
+/** Overstyringer godkjenningen kan sende med — alle valgfrie, men objektet sendes alltid. */
+export interface ApproveDeclarationOverrides {
+  ingredient_text?: string | null;
+  ingredient_html?: string | null;
+  allergens_contains?: string[];
+  allergens_may_contain?: string[];
+  nutrition_per_100g?: Record<string, number | null> | null;
+  coverage_pct?: number | null;
+  net_weight_g?: number | null;
+  shelf_life_days?: number | null;
+  storage_text?: string | null;
+  origin_text?: string | null;
+  claim_keyhole?: boolean;
+  claim_grain?: boolean;
+  breadscale_pct?: number | null;
 }
 
 export interface ApproveDeclarationInput {
   recipeId: string;
-  /** Hvilken kilde som skal gjelde etter godkjenningen. */
-  mode: "auto" | "manual";
-  /** Beregnet innhold som skal overtas som manuell v1 (ved mode = manual og «overta»). */
-  adopt?: {
-    ingredientText: string | null;
-    contains: string[];
-    mayContain: string[];
-    nutrition: Record<string, number | null> | null;
-  } | null;
-  /** Merker som godkjennes samtidig. */
-  claims?: { grain?: boolean; keyhole?: boolean };
+  source: "calculated" | "manual";
+  overrides?: ApproveDeclarationOverrides;
+}
+
+export interface ApproveDeclarationResult {
+  versionId: string;
+  version: number;
+  productsUpdated: number;
+}
+
+/** Feilen ved «Beregningen er utdatert» — tilbyr «Beregn på nytt» og ny godkjenning. */
+export class DeclarationStaleError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DeclarationStaleError";
+  }
+}
+
+function mapApproveError(error: { code?: string; message: string }): Error {
+  if (error.code === "42501") return new Error("Du mangler tilgang til å godkjenne denne deklarasjonen.");
+  if (error.code === "P0002") return new Error("Ingen beregning finnes ennå — beregn merkedata først.");
+  if (error.code === "P0001" && /utdatert/i.test(error.message)) return new DeclarationStaleError(error.message);
+  if (error.code === "P0001") return new Error(error.message);
+  if (error.code === "22023") return new Error(error.message);
+  return new Error(error.message);
 }
 
 /**
- * Godkjenner deklarasjonen: setter kilde, godkjenner-stempel og merker,
- * og synker snapshot til koblede produkter — bare herfra, aldri automatisk.
+ * Godkjenner deklarasjonen via `approve_recipe_declaration`. RPC-en skriver selv
+ * `recipes.declaration_mode` / `*_approved_*` og `products.manual_*` /
+ * `declaration_version_id` / `declaration_needs_review` — frontend gjør ingen
+ * direkte update lenger.
  */
 export function useApproveDeclaration() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: ApproveDeclarationInput) => {
-      const { data: u } = await supabase.auth.getUser();
-      const now = new Date().toISOString();
-      const patch: Record<string, unknown> = {
-        declaration_mode: input.mode,
-        declaration_updated_at: now,
-        declaration_updated_by: u.user?.id ?? null,
-        declaration_needs_review: false,
-      };
-      if (input.mode === "manual" && input.adopt) {
-        patch.manual_ingredient_declaration = input.adopt.ingredientText;
-        patch.manual_allergen_summary = { contains: input.adopt.contains, may_contain: input.adopt.mayContain };
-        patch.manual_nutrition = input.adopt.nutrition;
-      }
-      if (input.claims && (input.claims.grain != null || input.claims.keyhole != null)) {
-        if (input.claims.grain != null) patch.label_claim_grain = input.claims.grain;
-        if (input.claims.keyhole != null) patch.label_claim_keyhole = input.claims.keyhole;
-        if (input.claims.grain || input.claims.keyhole) {
-          patch.label_claims_approved_by = u.user?.id ?? null;
-          patch.label_claims_approved_at = now;
-        }
-      }
-      const { error } = await supabase.from("recipes").update(patch as never).eq("id", input.recipeId);
-      if (error) throw error;
-      const synced = await syncEffectiveDeclarationForRecipe(input.recipeId);
-      return { synced };
+    mutationFn: async (input: ApproveDeclarationInput): Promise<ApproveDeclarationResult> => {
+      // p_overrides sendes ALLTID, minst som tomt objekt.
+      const { data, error } = await supabase.rpc("approve_recipe_declaration", {
+        p_recipe_id: input.recipeId,
+        p_source: input.source,
+        p_overrides: (input.overrides ?? {}) as never,
+      });
+      if (error) throw mapApproveError(error);
+      const d = (data ?? {}) as { version_id: string; version: number; products_updated: number };
+      return { versionId: d.version_id, version: d.version, productsUpdated: d.products_updated };
     },
-    onSuccess: ({ synced }, input) => {
+    onSuccess: (res, input) => {
       qc.invalidateQueries({ queryKey: ["recipe-detail", input.recipeId] });
       qc.invalidateQueries({ queryKey: ["recipe-label-calculated", input.recipeId] });
       qc.invalidateQueries({ queryKey: ["recipe-linked-products", input.recipeId] });
+      qc.invalidateQueries({ queryKey: ["recipe-declaration-versions", input.recipeId] });
       qc.invalidateQueries({ queryKey: ["recipes"] });
       qc.invalidateQueries({ queryKey: ["products"] });
       toast.success(
-        synced > 0 ? `Deklarasjonen er godkjent og synket til ${synced} produkt(er)` : "Deklarasjonen er godkjent",
+        res.productsUpdated > 0
+          ? `Deklarasjonen er godkjent (v${res.version}) og synket til ${res.productsUpdated} produkt(er)`
+          : `Deklarasjonen er godkjent (v${res.version})`,
       );
     },
-    onError: (e: unknown) => toast.error((e as Error).message ?? "Kunne ikke godkjenne deklarasjonen"),
+    onError: (e: unknown) => {
+      if (e instanceof DeclarationStaleError) return; // håndteres av kalleren (tilbyr «Beregn på nytt»)
+      toast.error((e as Error).message ?? "Kunne ikke godkjenne deklarasjonen");
+    },
+  });
+}
+
+export interface RecipeDeclarationVersion {
+  id: string;
+  version: number;
+  source: string;
+  approved_at: string;
+  approved_by: string | null;
+  diff_from_previous: unknown;
+  ingredient_text: string | null;
+  ingredient_html: string | null;
+  allergens_contains: string[];
+  allergens_may_contain: string[];
+  nutrition_per_100g: unknown;
+  coverage_pct: number | null;
+  net_weight_g: number | null;
+  shelf_life_days: number | null;
+  storage_text: string | null;
+  origin_text: string | null;
+  claim_grain: boolean;
+  claim_keyhole: boolean;
+  breadscale_pct: number | null;
+  restored_from_version_id: string | null;
+}
+
+/** Versjonshistorikk for en oppskrifts deklarasjon, nyeste først. */
+export function useRecipeDeclarationVersions(recipeId: string | undefined) {
+  return useQuery({
+    queryKey: ["recipe-declaration-versions", recipeId],
+    enabled: !!recipeId,
+    queryFn: async (): Promise<RecipeDeclarationVersion[]> => {
+      const { data, error } = await supabase
+        .from("recipe_declaration_versions")
+        .select(
+          "id, version, source, approved_at, approved_by, diff_from_previous, ingredient_text, ingredient_html, allergens_contains, allergens_may_contain, nutrition_per_100g, coverage_pct, net_weight_g, shelf_life_days, storage_text, origin_text, claim_grain, claim_keyhole, breadscale_pct, restored_from_version_id",
+        )
+        .eq("recipe_id", recipeId!)
+        .order("version", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as RecipeDeclarationVersion[];
+    },
+  });
+}
+
+/** Gjenoppretter en tidligere deklarasjonsversjon. */
+export function useRestoreRecipeDeclaration() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (versionId: string) => {
+      const { data, error } = await supabase.rpc("restore_recipe_declaration", { p_version_id: versionId });
+      if (error) throw mapApproveError(error);
+      return data as { version_id: string; version: number; products_updated?: number };
+    },
+    onSuccess: (_res, _versionId) => {
+      qc.invalidateQueries({ queryKey: ["recipe-detail"] });
+      qc.invalidateQueries({ queryKey: ["recipe-label-calculated"] });
+      qc.invalidateQueries({ queryKey: ["recipe-declaration-versions"] });
+      qc.invalidateQueries({ queryKey: ["products"] });
+      toast.success("Versjonen er gjenopprettet");
+    },
+    onError: (e: unknown) => toast.error((e as Error).message ?? "Kunne ikke gjenopprette versjonen"),
   });
 }
