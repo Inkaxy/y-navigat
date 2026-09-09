@@ -95,7 +95,6 @@ const VarerPriceRoundDetail = lazy(() => import("@/varer/pages/PriceRoundDetail"
 const VarerRecipes = lazy(() => import("@/varer/pages/Recipes"));
 const VarerRecipesCleanup = lazy(() => import("@/varer/pages/RecipesCleanup"));
 const VarerRecipeDetail = lazy(() => import("@/varer/pages/RecipeDetail"));
-const VarerPlaceholder = lazy(() => import("@/varer/pages/PlaceholderPage"));
 const VarerCakeBuilderList = lazy(() => import("@/varer/pages/cakebuilder/CakeBuilderList"));
 const VarerCakeBuilderDetail = lazy(() => import("@/varer/pages/cakebuilder/CakeBuilderDetail"));
 const VarerSettingsLayout = lazy(() => import("@/varer/pages/settings/SettingsLayout"));
@@ -370,8 +369,6 @@ const App = () => (
               <Route path="/varer/oppskrifter/:id" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerRecipeDetail /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/kakebygger" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerCakeBuilderList /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/kakebygger/:id" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerCakeBuilderDetail /></VarerAppProvider></AppAccessGuard></Shell>} />
-              <Route path="/varer/sortiment" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerPlaceholder title="Sortiment" subtitle="Kanaler og kunder" body="Sortimentsstyring er ikke tilgjengelig ennå. Kanal- og kundesortiment styres inntil videre via prislister og spesialpriser." /></VarerAppProvider></AppAccessGuard></Shell>} />
-              <Route path="/varer/avvik" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerPlaceholder title="Avvik" subtitle="Avviksregistrering" body="Avviksregistrering for varer er ikke tilgjengelig. Meld avvik via ordre- eller produksjonsmodulen inntil videre." /></VarerAppProvider></AppAccessGuard></Shell>} />
               <Route path="/varer/innstillinger" element={<Shell><AppAccessGuard appCode="varer" appName="Varer"><VarerAppProvider><VarerSettingsLayout /></VarerAppProvider></AppAccessGuard></Shell>}>
                 <Route index element={<Navigate to="/varer/innstillinger/hovedvaregrupper" replace />} />
                 <Route path="generelt" element={<VarerSettingsGeneral />} />

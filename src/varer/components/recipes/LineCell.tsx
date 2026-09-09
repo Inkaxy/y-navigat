@@ -57,6 +57,7 @@ export function LineNameCell({
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [focused, setFocused] = useState(false);
+  const [highlightIndex, setHighlightIndex] = useState(0);
 
   useEffect(() => {
     if (autoFocus) inputRef.current?.focus();
@@ -118,6 +119,10 @@ export function LineNameCell({
   const options = query.data ?? [];
   const subOptions = subQuery.data ?? [];
   const supplierSkus = supplierSkuQuery.data ?? {};
+
+  useEffect(() => {
+    setHighlightIndex(0);
+  }, [text, open]);
 
   const q = text.trim().toLowerCase();
   const filtered = q
@@ -189,16 +194,33 @@ export function LineNameCell({
                 inputRef.current?.blur();
                 return;
               }
-              if (e.key === "Enter" && open && (filtered.length > 0 || filteredSub.length > 0)) {
+              // Listen er kombinert (råvarer + halvfabrikat) — highlightIndex
+              // teller over begge gruppene, råvarer først.
+              const combinedLength = filtered.length + filteredSub.length;
+              if (open && combinedLength > 0 && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
                 e.preventDefault();
-                if (filtered.length > 0) void select(filtered[0]);
-                else selectSub(filteredSub[0]);
+                setHighlightIndex((i) => {
+                  const next = e.key === "ArrowDown" ? i + 1 : i - 1;
+                  return ((next % combinedLength) + combinedLength) % combinedLength;
+                });
                 return;
+              }
+              if (e.key === "Enter" && open && combinedLength > 0) {
+                e.preventDefault();
+                if (highlightIndex < filtered.length) void select(filtered[highlightIndex]);
+                else selectSub(filteredSub[highlightIndex - filtered.length]);
+                return;
+              }
+              if (e.key === "Tab") {
+                // Listen skal ikke henge igjen når fokus flytter seg videre i griddet.
+                setOpen(false);
               }
               if (!open && (e.key === "ArrowDown" || e.key.length === 1)) {
                 setOpen(true);
+                return;
               }
-              onKeyDown?.(e);
+              // Griddets egen navigasjon skal kun styre når forslagslisten er lukket.
+              if (!open) onKeyDown?.(e);
             }}
             onBlur={() => {
               setFocused(false);
@@ -220,8 +242,13 @@ export function LineNameCell({
                     <div className="py-3 text-center text-sm text-muted-foreground">Ingen treff</div>
                   </CommandEmpty>
                   <CommandGroup>
-                    {filtered.slice(0, 30).map((o) => (
-                      <CommandItem key={o.id} value={o.id} onSelect={() => void select(o)}>
+                    {filtered.slice(0, 30).map((o, i) => (
+                      <CommandItem
+                        key={o.id}
+                        value={o.id}
+                        onSelect={() => void select(o)}
+                        className={cn(i === highlightIndex && "bg-accent text-accent-foreground")}
+                      >
                         <div className="flex w-full items-center justify-between gap-2">
                           <div className="min-w-0">
                             <div className="truncate text-sm">{o.name}</div>
@@ -238,8 +265,13 @@ export function LineNameCell({
                   </CommandGroup>
                   {filteredSub.length > 0 && (
                     <CommandGroup heading="Halvfabrikat">
-                      {filteredSub.slice(0, 30).map((s) => (
-                        <CommandItem key={s.id} value={`sub:${s.id}`} onSelect={() => selectSub(s)}>
+                      {filteredSub.slice(0, 30).map((s, i) => (
+                        <CommandItem
+                          key={s.id}
+                          value={`sub:${s.id}`}
+                          onSelect={() => selectSub(s)}
+                          className={cn(filtered.length + i === highlightIndex && "bg-accent text-accent-foreground")}
+                        >
                           <div className="flex w-full items-center justify-between gap-2">
                             <span className="truncate text-sm">{s.display_name}</span>
                             <span className="shrink-0 rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700">

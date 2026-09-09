@@ -2,7 +2,7 @@
 // Kostpriser, leverandører, marginer og interne notater forlater ALDRI serveren
 // med mindre lenken eksplisitt er merket med include_costs.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { convertToGrams } from "../_shared/units-recipe.ts";
+import { computeUnitCount, convertToGrams } from "../_shared/units-recipe.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -218,7 +218,7 @@ Deno.serve(async (req) => {
         saltPct: pct(saltG),
         leavenPct: pct(leavenG),
         prefermentedFlourPct: pct(prefermentFlourG),
-        unitCount: uw > 0 ? Math.floor(totalDoughG / uw) : null,
+        unitCount: computeUnitCount(recipe, totalDoughG),
         doughPerUnitG: uw > 0 ? uw : null,
       },
     });

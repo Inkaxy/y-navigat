@@ -543,7 +543,9 @@ function PreviewDialog({ open, onClose, productName, computed }: { open: boolean
     lines.push(productName);
     lines.push("");
     lines.push(`Ingredienser: ${text}`);
-    if (computed.allergens_contains.length) lines.push(`Inneholder: ${computed.allergens_contains.join(", ")}.`);
+    // Allergener er allerede uthevet i ingredienslisten (jf. 1169/2011 vedlegg II) — «Inneholder»-setningen
+    // er kun nødvendig når det ikke finnes noen ingrediensliste å utheve dem i.
+    if (!text.trim() && computed.allergens_contains.length) lines.push(`Inneholder: ${computed.allergens_contains.join(", ")}.`);
     if (computed.allergens_may_contain.length) lines.push(`Kan inneholde spor av: ${computed.allergens_may_contain.join(", ")}.`);
     lines.push("");
     lines.push("Næring pr 100 g:");
@@ -579,7 +581,7 @@ function PreviewDialog({ open, onClose, productName, computed }: { open: boolean
             <span className="font-medium">Ingredienser: </span>
             <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(computed.ingredient_declaration_html || "—", { USE_PROFILES: { html: true } }) }} />
           </div>
-          {computed.allergens_contains.length > 0 && (
+          {!computed.ingredient_declaration_html && computed.allergens_contains.length > 0 && (
             <div><span className="font-medium">Inneholder:</span> {computed.allergens_contains.join(", ")}.</div>
           )}
           {computed.allergens_may_contain.length > 0 && (

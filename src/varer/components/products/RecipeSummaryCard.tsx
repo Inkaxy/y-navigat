@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ChefHat, ExternalLink, Loader2, Plus } from "lucide-react";
 import { useStockTrackedRawMaterials } from "@/varer/hooks/useStockTrackedRawMaterials";
 import { computeTotalsForRecipe, fmtG, fmtPercent, RECIPE_STATUS_LABEL, type BakersRawMaterial } from "@/varer/lib/bakers";
+import { computeUnitCount } from "@/varer/lib/units-recipe";
 
 interface Props {
   productId: string;
@@ -28,7 +29,7 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
     queryFn: async () => {
       const { data } = await supabase
         .from("product_recipe_links")
-        .select("id, recipe_id, recipes(id, name, category, status, version, unit_weight_grams, recipe_lines(id, quantity, unit, raw_material_id, is_flour_override, water_content_pct_override, ingredient_name))")
+        .select("id, recipe_id, recipes(id, name, category, status, version, unit_weight_grams, dough_piece_grams, dough_waste_pct, units_per_batch, recipe_lines(id, quantity, unit, raw_material_id, is_flour_override, water_content_pct_override, ingredient_name))")
         .eq("product_id", productId)
         .order("is_primary", { ascending: false })
         .limit(1)
@@ -36,7 +37,7 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
       if (data) return data as any;
       const { data: direct } = await supabase
         .from("recipes")
-        .select("id, name, category, status, version, unit_weight_grams, recipe_lines(id, quantity, unit, raw_material_id, is_flour_override, water_content_pct_override, ingredient_name)")
+        .select("id, name, category, status, version, unit_weight_grams, dough_piece_grams, dough_waste_pct, units_per_batch, recipe_lines(id, quantity, unit, raw_material_id, is_flour_override, water_content_pct_override, ingredient_name)")
         .eq("product_id", productId)
         .is("valid_to", null)
         .maybeSingle();
@@ -105,6 +106,7 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
     _rm: l.raw_material_id ? (rmQuery.data ?? {})[l.raw_material_id] ?? null : null,
   }));
   const totals = computeTotalsForRecipe(lines, recipe);
+  const unitCount = computeUnitCount(recipe, totals.totalDoughG);
   const trackedCount = lines.filter((l: any) => l.raw_material_id && trackedIds?.has(l.raw_material_id)).length;
 
   return (
@@ -125,6 +127,7 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
         <Stat label="Hydrering" value={fmtPercent(totals.hydrationPct)} />
         <Stat label="Deigvekt" value={`${fmtG(totals.totalDoughG)} g`} />
         <Stat label="Ingredienser" value={`${lines.length}`} />
+        <Stat label="Antall emner" value={unitCount != null ? `${unitCount} stk` : "—"} />
       </CardContent>
       {trackedCount > 0 && (
         <CardContent className="pt-0 text-xs text-muted-foreground">

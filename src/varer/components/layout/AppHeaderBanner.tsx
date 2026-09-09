@@ -2,6 +2,7 @@ import { Package, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ReactNode } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { useCompany } from "@/hooks/useCompany";
 
 interface AppHeaderBannerProps {
   title?: string;
@@ -11,10 +12,13 @@ interface AppHeaderBannerProps {
 
 export function AppHeaderBanner({
   title = "Varer",
-  subtitle = "Produktkatalogen for Nøtterø Bakeri AS",
+  subtitle,
   actions,
 }: AppHeaderBannerProps) {
-  return <PageHeader icon={Package} title={title} subtitle={subtitle} actions={actions} />;
+  const { data: company } = useCompany();
+  const resolvedSubtitle =
+    subtitle ?? (company ? `Produktkatalogen for ${company.display_name}` : "Produktkatalogen");
+  return <PageHeader icon={Package} title={title} subtitle={resolvedSubtitle} actions={actions} />;
 }
 
 export function NewProductActionButton({ onClick }: { onClick: () => void }) {
