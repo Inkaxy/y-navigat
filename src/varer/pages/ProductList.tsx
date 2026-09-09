@@ -130,8 +130,12 @@ export default function ProductList() {
   const productsQuery = useQuery({
     queryKey: ["products", legalEntityId],
     queryFn: async () => {
-      // Databasetypen har `status: string`; vi smalner den til ProductStatus etter henting.
-      const rows = await fetchAllRows<Omit<ProductRow, "status"> & { status: string }>((from, to) =>
+      // Databasetypen gir `status` og `cake_role` som frie tekster; vi smalner dem etter henting.
+      type DbProductRow = Omit<ProductRow, "status" | "cake_role"> & {
+        status: string;
+        cake_role: string | null;
+      };
+      const rows = await fetchAllRows<DbProductRow>((from, to) =>
         supabase
           .from("products")
           .select(

@@ -49,37 +49,10 @@ export function ProductInfoDialog({ productId, productName, displayNumber, sales
     },
   });
 
-  const linkQuery = useQuery({
-    queryKey: ["product-info-link", productId],
-    enabled: !!productId && open,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("product_recipe_links")
-        .select("id")
-        .eq("product_id", productId!)
-        .order("is_primary", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const declQuery = useQuery({
-    queryKey: ["product-info-decl", linkQuery.data?.id],
-    enabled: !!linkQuery.data?.id && open,
-    queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("compute-product-declaration", {
-        body: { product_recipe_link_id: linkQuery.data!.id },
-      });
-      if (error) throw error;
-      return data as ComputedDeclaration;
-    },
-  });
-
+  // Godkjent snapshot: samme kilde som etiketten (produktets manuelle/godkjente
+  // felter), ikke et nytt beregnet kall til compute-product-declaration.
   const product = productQuery.data;
-  const computed = declQuery.data;
-  const loading = productQuery.isLoading || linkQuery.isLoading || declQuery.isLoading;
+  const loading = productQuery.isLoading;
   const [generating, setGenerating] = useState(false);
 
   return (
