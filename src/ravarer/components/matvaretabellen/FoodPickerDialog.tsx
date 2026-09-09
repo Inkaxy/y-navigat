@@ -68,7 +68,7 @@ export function FoodPickerDialog({ open, onOpenChange, rawMaterialId, initialQue
   // Er råvaren fortsatt ulagret (ikke funnet ennå), foreslår vi ut fra teksten alene.
   const { data: suggestKnown = [] } = useMatvaretabellenSuggest(rm ? rawMaterialId : null);
   const { data: suggestForName = [] } = useMatvaretabellenSuggestForName(
-    rm ? null : { name: q, declarationName: rm?.declaration_name ?? null, category: rm?.category ?? null },
+    rm ? null : { name: q, declarationName: null, category: null },
   );
   const suggestions = (rm ? suggestKnown : suggestForName).slice(0, 5);
   const suggestionIds = useMemo(() => new Set(suggestions.map((s) => s.food_id)), [suggestions]);
