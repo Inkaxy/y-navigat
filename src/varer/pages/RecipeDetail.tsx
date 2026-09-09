@@ -740,7 +740,7 @@ export default function RecipeDetail() {
       qc.invalidateQueries({ queryKey: ["recipe-linked-products", recipe.id] });
       qc.invalidateQueries({ queryKey: ["halvfabrikat_autocomplete"] });
       toast.success("Halvfabrikatet er lagret");
-      navigate(`/varer/varer/${productId}`);
+      navigate(`/varer/vareliste/${productId}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Kunne ikke lagre halvfabrikatet");
     } finally {
