@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ function suspiciousRowAsWorklistRow(row: SuspiciousPackageRow): PackageWorklistR
     name: row.raw_material_name,
     base_unit: row.base_unit,
     category: null,
-    current_cost_price: null,
+    current_cost_price: row.current_cost_price,
     pakningsfaktor: null,
     faktor_kilde: null,
     bekreftet_dato: null,
@@ -37,6 +37,19 @@ function suspiciousRowAsWorklistRow(row: SuspiciousPackageRow): PackageWorklistR
     foreslatt_fra_referanse: null,
     status: "mangler_pakning",
   };
+}
+
+/**
+ * Leverandørkoblingen som dialogen skal forhåndsfylle med.
+ *
+ * Verdien er FORSLAGET, ikke dagens feilverdi — bekrefter man raden med den
+ * gamle verdien, blir pakningen stående som mistenkelig.
+ */
+export function suspiciousSupplierPrefill(
+  row: SuspiciousPackageRow,
+): { supplierId: string; supplierUnits: number } | null {
+  if (!row.supplier_id) return null;
+  return { supplierId: row.supplier_id, supplierUnits: row.suggested_base_units };
 }
 
 function Row({ row, onOpen }: { row: SuspiciousPackageRow; onOpen: (row: SuspiciousPackageRow) => void }) {
@@ -75,6 +88,20 @@ export function SuspiciousPackagesCard() {
   const { data: rows = [], isLoading } = useSuspiciousPackages();
   const [activeRow, setActiveRow] = useState<SuspiciousPackageRow | null>(null);
 
+  // Stabile objekter: ellers ville dialogens reset-effekt kjørt på hver render
+  // og skrevet over tallet brukeren nettopp skrev inn.
+  const worklistRow = useMemo(() => (activeRow ? suspiciousRowAsWorklistRow(activeRow) : null), [activeRow]);
+  const suggestion = useMemo(
+    () => (activeRow ? { size: activeRow.suggested_base_units, contentUnit: activeRow.base_unit } : null),
+    [activeRow],
+  );
+  // Forhåndsfyll med FORSLAGET, ikke dagens feilverdi — ellers skrives den gale
+  // pakningen tilbake og raden blir stående som mistenkelig.
+  const initialSupplier = useMemo(
+    () => (activeRow ? suspiciousSupplierPrefill(activeRow) : null),
+    [activeRow],
+  );
+
   if (!isLoading && rows.length === 0) return null;
 
   return (
@@ -112,17 +139,12 @@ export function SuspiciousPackagesCard() {
       )}
 
       <SetPackageDialog
-        row={activeRow ? suspiciousRowAsWorklistRow(activeRow) : null}
+        row={worklistRow}
         open={!!activeRow}
         onOpenChange={v => !v && setActiveRow(null)}
-        suggestion={
-          activeRow ? { size: activeRow.suggested_base_units, contentUnit: activeRow.base_unit } : null
-        }
-        initialSupplier={
-          activeRow?.supplier_id && activeRow.supplier_base_units != null
-            ? { supplierId: activeRow.supplier_id, supplierUnits: activeRow.supplier_base_units }
-            : null
-        }
+        suggestion={suggestion}
+        initialSupplier={initialSupplier}
+        forceSupplierSection
       />
     </Card>
   );

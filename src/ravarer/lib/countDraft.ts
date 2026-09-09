@@ -91,6 +91,19 @@ export function clearCountDraft(key: string): void {
   }
 }
 
+/**
+ * Skal utkastet lagres nå?
+ *
+ * Nei rett etter at et lagret utkast er lastet inn og brukeren ennå ikke har
+ * endret noe — ellers ville monteringen skrevet over utkastet med tom tilstand.
+ */
+export function shouldAutosave(draftLoaded: boolean, dirty: boolean): boolean {
+  if (draftLoaded && !dirty) return false;
+  return dirty;
+}
+
+
+
 
 /**
  * Lokasjon på hylle/lager per råvare, lagret separat fra telleutkastet.

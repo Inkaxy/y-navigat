@@ -25,6 +25,7 @@ import {
   loadLocations,
   newOpId,
   saveCountDraft,
+  shouldAutosave,
   saveLocation,
   type CountDraft,
 } from "@/ravarer/lib/countDraft";
@@ -109,7 +110,7 @@ export default function Varetelling() {
   }, [draftKey, legalEntityId]);
 
   useEffect(() => {
-    if (!draftLoaded || !dirty) return;
+    if (!shouldAutosave(draftLoaded, dirty)) return;
     saveCountDraft(draftKey, { entries, lineNotes, note, opId });
   }, [draftKey, draftLoaded, dirty, entries, lineNotes, note, opId]);
 

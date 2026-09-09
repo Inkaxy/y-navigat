@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { osloTodayISO } from "@/lib/osloDate";
 import { parseDecimal } from "@/ravarer/lib/packageMath";
+import { agreementBaseUnitsPerPackage } from "@/ravarer/lib/agreementPricing";
 import type { AgreementPayload, ApplyAgreementResult } from "@/ravarer/lib/rpcContracts";
 
 interface Props {
@@ -65,6 +66,13 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
   const selectedRm = useMemo(() => rms.find((r) => r.id === rawMaterialId), [rms, rawMaterialId]);
   const activeRms = useMemo(() => rms.filter((r) => r.is_active), [rms]);
 
+  // Grunnenheter per pakning avgjør prisen — ikke pakningstallet. En sekk
+  // oppgitt som «1 stk» med 25 kg innhold skal gi kilopris, ikke sekkepris.
+  const unitsPerPackage = useMemo(
+    () => agreementBaseUnitsPerPackage(baseUnitsPerPackage, packageSize, packageUnit, selectedRm?.base_unit ?? null),
+    [baseUnitsPerPackage, packageSize, packageUnit, selectedRm?.base_unit],
+  );
+
   // Auto-beregn pris pr grunnenhet ut fra hva prisen gjelder.
   useEffect(() => {
     if (pricePerBaseUnitTouched) return;
@@ -74,24 +82,24 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
       setPricePerBaseUnit(String(ap));
       return;
     }
-    const ps = parseDecimal(packageSize);
-    if (ps != null && ps > 0) setPricePerBaseUnit((ap / ps).toFixed(4));
-  }, [agreedPrice, packageSize, priceBasis, pricePerBaseUnitTouched]);
+    if (unitsPerPackage != null && unitsPerPackage > 0) {
+      setPricePerBaseUnit((ap / unitsPerPackage).toFixed(4));
+    }
+  }, [agreedPrice, unitsPerPackage, priceBasis, pricePerBaseUnitTouched]);
 
   const create = useMutation({
     mutationFn: async () => {
       if (!rawMaterialId) throw new Error("Velg råvare");
       if (!supplierId) throw new Error("Velg leverandør");
       const entered = parseDecimal(agreedPrice);
-      const ps = parseDecimal(packageSize);
       const ppbu = parseDecimal(pricePerBaseUnit);
       const bupp = parseDecimal(baseUnitsPerPackage);
       // Begge prisfeltene lagres konsistent: per pakning og per grunnenhet.
       const ap =
         priceBasis === "package"
           ? entered
-          : entered != null && ps != null && ps > 0
-            ? entered * ps
+          : entered != null && unitsPerPackage != null && unitsPerPackage > 0
+            ? entered * unitsPerPackage
             : null;
 
       // Last opp dokument hvis valgt
@@ -112,7 +120,7 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
         supplier_product_name: supplierProductName.trim() || null,
         agreed_price: ap,
         agreed_price_per_base_unit: ppbu,
-        package_size: ps,
+        package_size: parseDecimal(packageSize),
         package_unit: packageUnit || null,
         base_units_per_package: bupp,
         agreement_valid_from: validFrom || null,
