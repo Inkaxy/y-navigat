@@ -232,19 +232,25 @@ export default function ProductList() {
     queryKey: ["product-calc-readiness", legalEntityId],
     enabled: !!legalEntityId,
     queryFn: async () => {
-      return await fetchAllRows<ProductCalcReadinessRow & { product_id: string; recipe_id: string | null }>(
-        (from, to) =>
-          supabase
-            .from("product_calc_readiness")
-            .select("product_id, recipe_id, status, mangler")
-            .eq("legal_entity_id", legalEntityId!)
-            .range(from, to),
+      return await fetchAllRows<{
+        product_id: string | null;
+        recipe_id: string | null;
+        status: string | null;
+        mangler: string[] | null;
+      }>((from, to) =>
+        supabase
+          .from("product_calc_readiness")
+          .select("product_id, recipe_id, status, mangler")
+          .eq("legal_entity_id", legalEntityId!)
+          .range(from, to),
       );
     },
   });
   const readinessMap = useMemo(() => {
     const m = new Map<string, ProductCalcReadinessRow & { recipe_id: string | null }>();
-    (readinessQuery.data ?? []).forEach((r) => m.set(r.product_id, r));
+    (readinessQuery.data ?? []).forEach((r) => {
+      if (r.product_id) m.set(r.product_id, { status: r.status, mangler: r.mangler, recipe_id: r.recipe_id });
+    });
     return m;
   }, [readinessQuery.data]);
 
