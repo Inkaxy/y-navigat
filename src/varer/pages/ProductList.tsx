@@ -145,7 +145,13 @@ export default function ProductList() {
           .order("display_number", { ascending: true })
           .range(from, to),
       );
-      return rows;
+      const isStatus = (v: string): v is ProductStatus => v in PRODUCT_STATUS_LABEL;
+      const isCakeRole = (v: string): v is CakeRole => v in CAKE_ROLE_LABEL;
+      return rows.map<ProductRow>((r) => ({
+        ...r,
+        status: isStatus(r.status) ? r.status : "draft",
+        cake_role: r.cake_role && isCakeRole(r.cake_role) ? r.cake_role : null,
+      }));
     },
   });
 
