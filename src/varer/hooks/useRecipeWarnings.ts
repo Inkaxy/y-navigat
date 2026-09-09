@@ -167,7 +167,7 @@ export function useRecipeWarnings({
           lineId: line.id,
           rawMaterialId: rmId,
           message: `«${name}»: mengden kan ikke regnes om til gram`,
-          action: rmId ? { label: "Åpne råvaren", href: `/ravarer/vare/${rmId}?tab=pakninger` } : null,
+          action: rmId ? { label: "Åpne råvaren", href: `/ravarer/vareliste/${rmId}?tab=suppliers` } : null,
         });
       }
 
@@ -177,7 +177,7 @@ export function useRecipeWarnings({
           lineId: line.id,
           rawMaterialId: rmId,
           message: `«${name}» er ført i stk, men råvaren mangler stykkvekt`,
-          action: { label: "Sett stykkvekt", href: `/ravarer/vare/${rmId}?tab=pakninger` },
+          action: { label: "Sett stykkvekt", href: `/ravarer/vareliste/${rmId}?tab=suppliers` },
         });
       }
 
@@ -188,7 +188,7 @@ export function useRecipeWarnings({
             lineId: line.id,
             rawMaterialId: rmId,
             message: `«${name}» mangler næringsdata`,
-            action: { label: "Legg inn næring", href: `/ravarer/vare/${rmId}?tab=nutrition` },
+            action: { label: "Legg inn næring", href: `/ravarer/vareliste/${rmId}?tab=nutrition` },
           });
         }
         if (!cov.allergens.has(rmId)) {
@@ -197,7 +197,7 @@ export function useRecipeWarnings({
             lineId: line.id,
             rawMaterialId: rmId,
             message: `«${name}» mangler allergeninformasjon`,
-            action: { label: "Legg inn allergener", href: `/ravarer/vare/${rmId}?tab=nutrition` },
+            action: { label: "Legg inn allergener", href: `/ravarer/vareliste/${rmId}?tab=nutrition` },
           });
         }
         if (!cov.packages.has(rmId)) {
@@ -206,7 +206,7 @@ export function useRecipeWarnings({
             lineId: line.id,
             rawMaterialId: rmId,
             message: `«${name}» mangler pakning`,
-            action: { label: "Legg inn pakning", href: `/ravarer/vare/${rmId}?tab=pakninger` },
+            action: { label: "Legg inn pakning", href: `/ravarer/vareliste/${rmId}?tab=suppliers` },
           });
         }
       }

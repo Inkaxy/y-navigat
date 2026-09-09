@@ -65,10 +65,8 @@ export const GRAIN_CLASSIFICATION_OPTIONS: Array<{
   { value: "wheat_bran", label: "Hvetekli", hint: "faktor 4,5", requiresCereal: false },
   { value: "rye_bran", label: "Rugkli", hint: "faktor 4,0", requiresCereal: false },
   { value: "oat_bran", label: "Havrekli", hint: "faktor 2,0", requiresCereal: false },
-  { value: "gluten_or_germ", label: "Gluten eller kim", hint: "teller som siktet i nevneren", requiresCereal: false },
   { value: "gluten_free_grain", label: "Glutenfritt korn", hint: "faktor 1,0 — teller som grovt", requiresCereal: true },
   { value: "other_flour", label: "Annet mel", hint: "teller som siktet", requiresCereal: false },
-  { value: "malt_or_improver", label: "Malt eller bakemiddel", hint: "utenfor beregningen", requiresCereal: false },
   { value: "not_grain", label: "Ikke korn", hint: "utenfor beregningen", requiresCereal: false },
 ];
 
