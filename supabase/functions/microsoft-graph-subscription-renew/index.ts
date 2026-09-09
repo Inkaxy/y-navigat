@@ -2,27 +2,18 @@
 // Triggered via pg_cron every 6 hours (or invoked manually).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { decryptToken, encryptToken, refreshAccessToken } from "../_shared/m365-crypto.ts";
+import { authorizeCron, CRON_CORS_HEADERS } from "../_shared/cron-auth.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
-};
+const corsHeaders = CRON_CORS_HEADERS;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-  // Overgangsordning: godta enten verify_cron_secret-RPC-en eller den gamle
-  // statiske CRON_SECRET-miljøvariabelen, til alle kallere er byttet over.
-  const provided = req.headers.get("x-cron-secret") ?? "";
-  const expected = Deno.env.get("CRON_SECRET");
-  let authorized = !!expected && provided === expected;
-  if (!authorized && provided) {
-    const { data, error } = await admin.rpc("verify_cron_secret", { p_secret: provided });
-    authorized = !error && data === true;
-  }
-  if (!authorized) {
+  // Kun service-bearer eller X-Cron-Secret verifisert via verify_cron_secret.
+  // Den gamle statiske CRON_SECRET-miljøvariabelen godtas ikke lenger.
+  if (!(await authorizeCron(req, admin))) {
     return json({ error: "Unauthorized" }, 401);
   }
 
