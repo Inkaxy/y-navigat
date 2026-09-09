@@ -15,6 +15,12 @@ import {
 } from "@/varer/hooks/useMissingNutrition";
 import { ManualNutritionDialog } from "./ManualNutritionDialog";
 import { MissingDeclarationNames, type MissingDeclarationNameRow } from "./MissingDeclarationNames";
+import {
+  ConfirmAllergensInline,
+  FreeTextLinkInline,
+  GrainClassInline,
+  WaterContentInline,
+} from "./InlineRawMaterialFix";
 
 export interface MissingData {
   nutrition?: MissingNutritionRow[];
@@ -49,10 +55,21 @@ interface Props {
   canWrite: boolean;
   /** Bytter til Oppskrift-fanen for å koble fritekstlinjer. */
   onGoToRecipeTab?: () => void;
+  /** Oppskriften kortet gjelder — kreves for inline-kobling av fritekstlinjer. */
+  recipeId?: string;
 }
 
 function nameList(items: MissingData["water_content"]): string[] {
   return (items ?? []).map((x) => (typeof x === "string" ? x : x?.name ?? "Uten navn")).filter(Boolean);
+}
+
+/** Navn + eventuell råvare-id for inline-retting. */
+function idList(items: MissingData["water_content"]): Array<{ name: string; raw_material_id: string | null }> {
+  return (items ?? []).map((x) =>
+    typeof x === "string"
+      ? { name: x, raw_material_id: null }
+      : { name: x?.name ?? "Uten navn", raw_material_id: x?.raw_material_id ?? null },
+  );
 }
 
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
@@ -73,11 +90,13 @@ export function DataQualityCard({
   recalculating,
   canWrite,
   onGoToRecipeTab,
+  recipeId,
 }: Props) {
   const pct = coveragePct ?? 0;
   const ok = pct >= 90;
   const missing = missingData?.nutrition ?? [];
   const water = nameList(missingData?.water_content);
+  const waterRows = idList(missingData?.water_content);
   const unclassified = missingData?.unclassified_grain_names ?? [];
   const compositeUnreviewed = nameList(missingData?.composite_unreviewed);
   const compositeTextOnly = nameList(missingData?.composite_text_only);
@@ -201,16 +220,24 @@ export function DataQualityCard({
                           {r.name}
                           {r.pct_of_weight != null ? ` (${fmtPct(r.pct_of_weight)})` : ""}
                         </span>
-                        {r.raw_material_id && (
-                          <a
-                            className="text-xs underline underline-offset-2"
-                            href={`/ravarer/${r.raw_material_id}?tab=nutrition`}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            Bekreft allergener
-                          </a>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <ConfirmAllergensInline
+                            rawMaterialId={r.raw_material_id}
+                            name={r.name}
+                            disabled={!canWrite}
+                            onSaved={onRecalculate}
+                          />
+                          {r.raw_material_id && (
+                            <a
+                              className="text-xs underline underline-offset-2"
+                              href={`/ravarer/${r.raw_material_id}?tab=nutrition`}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Åpne råvaren
+                            </a>
+                          )}
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -243,10 +270,24 @@ export function DataQualityCard({
 
               {freeTextLines.length > 0 && (
                 <Group title="Fritekstlinjer sperrer automatisk deklarasjon">
-                  <p className="text-sm">{freeTextLines.map((f) => f.name).join(", ")}</p>
+                  <ul className="space-y-1.5 text-sm">
+                    {freeTextLines.map((f) => (
+                      <li key={f.name} className="flex flex-wrap items-center justify-between gap-2">
+                        <span>{f.name}</span>
+                        {recipeId ? (
+                          <FreeTextLinkInline
+                            recipeId={recipeId}
+                            name={f.name}
+                            disabled={!canWrite}
+                            onSaved={onRecalculate}
+                          />
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
                   {onGoToRecipeTab && (
-                    <Button size="sm" variant="outline" onClick={onGoToRecipeTab}>
-                      Koble til råvare
+                    <Button size="sm" variant="link" className="h-auto p-0 text-xs" onClick={onGoToRecipeTab}>
+                      Åpne Oppskrift-fanen
                     </Button>
                   )}
                 </Group>
@@ -346,7 +387,19 @@ export function DataQualityCard({
 
               {water.length > 0 && (
                 <Group title="Mangler vanninnhold">
-                  <p className="text-sm">{water.join(", ")}</p>
+                  <ul className="space-y-1.5 text-sm">
+                    {waterRows.map((w) => (
+                      <li key={`${w.raw_material_id ?? "n"}-${w.name}`} className="flex flex-wrap items-center justify-between gap-2">
+                        <span>{w.name}</span>
+                        <WaterContentInline
+                          rawMaterialId={w.raw_material_id}
+                          name={w.name}
+                          disabled={!canWrite}
+                          onSaved={onRecalculate}
+                        />
+                      </li>
+                    ))}
+                  </ul>
                   <p className="text-xs text-muted-foreground">
                     Uten vanninnhold antas 0 % — det påvirker tørrstoff, grovhet og næring per 100 g.
                   </p>
@@ -355,7 +408,14 @@ export function DataQualityCard({
 
               {unclassified.length > 0 && (
                 <Group title="Uten kornklassifisering">
-                  <p className="text-sm">{unclassified.join(", ")}</p>
+                  <ul className="space-y-1.5 text-sm">
+                    {unclassified.map((n) => (
+                      <li key={n} className="flex flex-wrap items-center justify-between gap-2">
+                        <span>{n}</span>
+                        <GrainClassInline name={n} disabled={!canWrite} onSaved={onRecalculate} />
+                      </li>
+                    ))}
+                  </ul>
                   <p className="text-xs text-muted-foreground">Grovheten kan bli feil før disse er klassifisert.</p>
                 </Group>
               )}

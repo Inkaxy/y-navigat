@@ -16,7 +16,7 @@ import { storeNutrient } from "../_shared/nutritionFormat.ts";
 import { syncAutoProductsForRecipe } from "../_shared/effective-declaration.ts";
 import { buildInputsHash, type HashMaterialFact } from "../_shared/recipe-label-hash.ts";
 import { authorizeCron } from "../_shared/cron-auth.ts";
-import { isGlutenFreeFromCodes, wholeGrainLimitFor } from "./keyhole.ts";
+import { evaluateKeyhole, keyholeGroupForRecipe, KEYHOLE_MIN_COVERAGE_PCT } from "./keyhole.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,63 +26,10 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-/**
- * NØKKELHULLKRITERIER
- * Kilde: Mattilsynets veileder til forskrift om frivillig merking av næringsmidler
- * med Nøkkelhullet (nøkkelhullforskriften), produktgruppe 8 «Brød».
- * Oppdater tallene her hvis forskriften endres.
- */
-const KEYHOLE_GROUPS = {
-  "8a": {
-    label: "Gruppe 8a — brød",
-    criteria: [
-      { key: "whole_grain_pct_of_dry", name: "Fullkorn av tørrstoff", op: "min" as const, limit: 30, unit: "%" },
-      { key: "fiber_g", name: "Kostfiber", op: "min" as const, limit: 5, unit: "g/100 g" },
-      { key: "fat_g", name: "Fett", op: "max" as const, limit: 7, unit: "g/100 g" },
-      { key: "sugars_g", name: "Sukkerarter", op: "max" as const, limit: 5, unit: "g/100 g" },
-      { key: "salt_g", name: "Salt", op: "max" as const, limit: 1.0, unit: "g/100 g" },
-    ],
-  },
-  "8b": {
-    label: "Gruppe 8b — rugbrød",
-    criteria: [
-      { key: "whole_grain_pct_of_dry", name: "Fullkorn av tørrstoff", op: "min" as const, limit: 35, unit: "%" },
-      { key: "fiber_g", name: "Kostfiber", op: "min" as const, limit: 6, unit: "g/100 g" },
-      { key: "fat_g", name: "Fett", op: "max" as const, limit: 7, unit: "g/100 g" },
-      { key: "sugars_g", name: "Sukkerarter", op: "max" as const, limit: 5, unit: "g/100 g" },
-      { key: "salt_g", name: "Salt", op: "max" as const, limit: 1.2, unit: "g/100 g" },
-      { key: "rye_share_of_grain_pct", name: "Rugandel av kornet", op: "min" as const, limit: 30, unit: "%" },
-    ],
-  },
-  // Gruppe 9 «Knekkebrød og annet flatbrød» har egne grenser.
-  "9": {
-    label: "Gruppe 9 — knekkebrød",
-    criteria: [
-      { key: "whole_grain_pct_of_dry", name: "Fullkorn av tørrstoff", op: "min" as const, limit: 50, unit: "%" },
-      { key: "fiber_g", name: "Kostfiber", op: "min" as const, limit: 6, unit: "g/100 g" },
-      { key: "fat_g", name: "Fett", op: "max" as const, limit: 7, unit: "g/100 g" },
-      { key: "sugars_g", name: "Sukkerarter", op: "max" as const, limit: 5, unit: "g/100 g" },
-      { key: "salt_g", name: "Salt", op: "max" as const, limit: 1.3, unit: "g/100 g" }, // Kilde: Veileder til nøkkelhullforskriften (mars 2021), kap. 4.5.3.4, gruppe 9
-    ],
-  },
-};
-
-/** Nøkkelhullet vurderes bare for brød, rundstykker og knekkebrød. */
-function keyholeGroupForRecipe(category: string | null, name: string | null): "8a" | "9" | null {
-  const hay = `${category ?? ""} ${name ?? ""}`.toLowerCase();
-  if (/knekkebr|flatbr/.test(hay)) return "9";
-  if (/br(ø|o)d|rundstykk|bagett|loff|ciabatta|focaccia|horn|bolle?br/.test(hay)) return "8a";
-  return null;
-}
-
-/** Minste datadekning (andel av innveid vekt med næringsdata) for å konkludere om Nøkkelhullet. */
-const KEYHOLE_MIN_COVERAGE_PCT = 90;
-
-const NUTRIENT_KEYS = new Set(["fiber_g", "fat_g", "sugars_g", "salt_g"]);
-
 function nb(n: number, decimals = 1): string {
   return Number(n).toFixed(decimals).replace(".", ",");
 }
+
 
 
 Deno.serve(async (req) => {
@@ -219,17 +166,7 @@ Deno.serve(async (req) => {
     for (const r of gate.reasons) if (!warnings.includes(r)) warnings.push(r);
 
     // 8) Nøkkelhullet
-    const measured: Record<string, number | null> = {
-      whole_grain_pct_of_dry: wholeGrainPctOfDry,
-      rye_share_of_grain_pct: ryeSharePct,
-      fiber_g: per100.fiber_g,
-      fat_g: per100.fat_g,
-      sugars_g: per100.sugars_g,
-      salt_g: per100.salt_g,
-    };
 
-    // Glutenfritt avgjøres av allergenKODENE, ikke av de norske etikettene.
-    const isGlutenFree = isGlutenFreeFromCodes(core.containsCodes);
 
     // Gramendring for et næringskriterium: hvor mye må ingrediensen ned/opp i deigen?
     function adviceFor(c: { key: string; name: string; op: "min" | "max"; limit: number; unit: string }, value: number): string {
@@ -263,86 +200,44 @@ Deno.serve(async (req) => {
       return `${c.name} er ${nb(value)} ${c.unit}. Kravet er ${c.op === "max" ? "høyst" : "minst"} ${nb(c.limit)}.`;
     }
 
-    function evaluateGroup(groupKey: "8a" | "8b" | "9") {
-      const g = KEYHOLE_GROUPS[groupKey];
-      const criteria = g.criteria.map((c0) => {
-        // Glutenfrie produkter har lavere fullkornkrav (10 %/15 %).
-        const c = c0.key === "whole_grain_pct_of_dry"
-          ? { ...c0, limit: wholeGrainLimitFor(groupKey, isGlutenFree, c0.limit) }
-          : c0;
-        const value = measured[c.key];
-        const needsNutrition = NUTRIENT_KEYS.has(c.key);
-        const unknown = value == null || (needsNutrition && coveragePct < KEYHOLE_MIN_COVERAGE_PCT);
-        const met = unknown ? null : (c.op === "max" ? value! <= c.limit : value! >= c.limit);
-        return {
-          key: c.key,
-          name: c.name,
-          requirement: `${c.op === "max" ? "høyst" : "minst"} ${nb(c.limit)} ${c.unit}`,
-          limit: c.limit,
-          op: c.op,
-          unit: c.unit,
-          value: value ?? null,
-          met,
-          difference: value == null ? null : Math.round((c.op === "max" ? value - c.limit : value - c.limit) * 100) / 100,
-        };
-      });
-      const anyUnknown = criteria.some((c) => c.met === null);
-      const allMet = criteria.every((c) => c.met === true);
-      const advice = criteria
-        .filter((c) => c.met === false)
-        .map((c) => adviceFor({ ...g.criteria.find((x) => x.key === c.key)!, limit: c.limit }, c.value as number));
-      return { group: groupKey, group_label: g.label, criteria, allMet, anyUnknown, advice };
-    }
+    // Gruppevalg, kriterier og status ligger i keyhole.ts (ren, testet funksjon).
+    const keyholeEval = evaluateKeyhole(
+      {
+        containsCodes: core.containsCodes,
+        whole_grain_pct_of_dry: wholeGrainPctOfDry,
+        rye_share_of_grain_pct: ryeSharePct,
+        free_text_grain_lines: grainTextLines,
+        missing_bake_loss: missingBakeLoss,
+      },
+      { category: recipe.category ?? null, name: recipe.name ?? null },
+      {
+        fiber_g: per100.fiber_g,
+        fat_g: per100.fat_g,
+        sugars_g: per100.sugars_g,
+        salt_g: per100.salt_g,
+      },
+      coveragePct,
+    );
 
-    // Gruppevalg: produkttype først (Nøkkelhullet gjelder bare brødvarer),
-    // deretter rugandel ≥ 30 % ⇒ vurder også 8b.
-    const baseGroup = keyholeGroupForRecipe(recipe.category ?? null, recipe.name ?? null);
-    const candidates: Array<"8a" | "8b" | "9"> = baseGroup === "9"
-      ? ["9"]
-      : (ryeSharePct ?? 0) >= 30
-        ? ["8b", "8a"]
-        : ["8a"];
-    const evaluations = baseGroup ? candidates.map(evaluateGroup) : [];
-    const best = evaluations.find((e) => e.allMet && !e.anyUnknown) ?? evaluations[0] ?? null;
-
-    let keyholeStatus: "oppfylt" | "ikke_oppfylt" | "ukjent";
-    let statusReason: string | null = null;
-    if (!baseGroup || !best) {
-      keyholeStatus = "ukjent";
-      statusReason = "Oppskriften er ikke brød, rundstykke eller knekkebrød — Nøkkelhullet vurderes ikke.";
-    } else if (grainTextLines.length) {
-      keyholeStatus = "ukjent";
-      statusReason = `Fritekstlinjer med korn er ikke koblet til råvare: ${grainTextLines.map((l) => l.name).join(", ")}.`;
-    } else if (missingBakeLoss) {
-      keyholeStatus = "ukjent";
-      statusReason = "Ferdigvekt er lik innveid vekt (0 % stektap) — fullkorn og næring per 100 g kan ikke vurderes.";
-    } else if (coveragePct < KEYHOLE_MIN_COVERAGE_PCT) {
-      keyholeStatus = "ukjent";
-      statusReason = `Datadekningen er ${nb(coveragePct)} % av deigvekten. Det kreves minst ${KEYHOLE_MIN_COVERAGE_PCT} % næringsdekning for å konkludere.`;
-    } else if (best.anyUnknown) {
-      keyholeStatus = "ukjent";
-      statusReason = "Ett eller flere kriterier mangler data.";
-    } else {
-      keyholeStatus = best.allMet ? "oppfylt" : "ikke_oppfylt";
-    }
+    const best = keyholeEval.best;
+    const bestAdvice = (best?.criteria ?? [])
+      .filter((c) => c.met === false)
+      .map((c) => adviceFor({ key: c.key, name: c.name, op: c.op, limit: c.limit, unit: c.unit }, c.value as number));
 
     const keyhole = {
       group: best?.group ?? null,
       group_label: best?.group_label ?? "Ikke vurdert",
-      group_choice_reason: !baseGroup
-        ? "Nøkkelhullet gjelder bare brød, rundstykker og knekkebrød."
-        : (ryeSharePct ?? 0) >= 30
-        ? `Rugandelen er ${nb(ryeSharePct ?? 0)} % — vurdert mot rugbrødgruppen.`
-        : `Rugandelen er ${ryeSharePct == null ? "ukjent" : nb(ryeSharePct) + " %"} — vurdert mot brødgruppen.`,
-      status: keyholeStatus,
-      qualifies: keyholeStatus === "oppfylt",
-      status_reason: statusReason,
+      group_choice_reason: keyholeEval.groupChoiceReason,
+      status: keyholeEval.status,
+      qualifies: keyholeEval.status === "oppfylt",
+      status_reason: keyholeEval.statusReason,
       min_coverage_pct: KEYHOLE_MIN_COVERAGE_PCT,
       coverage_by_weight_pct: coveragePct,
       criteria: best?.criteria ?? [],
-      advice: keyholeStatus === "ukjent" ? [] : (best?.advice ?? []),
-      evaluated_groups: evaluations.map((e) => ({ group: e.group, all_met: e.allMet, any_unknown: e.anyUnknown })),
+      advice: keyholeEval.status === "ukjent" ? [] : bestAdvice,
+      evaluated_groups: keyholeEval.evaluations.map((e) => ({ group: e.group, all_met: e.allMet, any_unknown: e.anyUnknown })),
     };
+
 
     const missing_data = {
       nutrition: missingNutrition,

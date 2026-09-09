@@ -87,13 +87,16 @@ function renderIngredients(text: string, _terms: string[], fontSize: number) {
 export function ConsumerLabelPDFDocument({
   data,
   size,
+  customSize,
   ingredientFontSize = MIN_INGREDIENT_FONT_PT,
 }: {
   data: ConsumerLabelData;
   size: LabelSizeKey;
+  /** Papirmål i punkt fra en etikettprofil — overstyrer `size` når den er satt. */
+  customSize?: { width: number; height: number } | null;
   ingredientFontSize?: number;
 }) {
-  const s = LABEL_SIZES[size];
+  const s = customSize ?? LABEL_SIZES[size];
   const fs = Math.max(MIN_INGREDIENT_FONT_PT, ingredientFontSize);
 
   return (

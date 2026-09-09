@@ -11,7 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, ArrowLeft, Copy, FileText, Loader2, Lock, Package, Pencil, Plus, Printer, RefreshCw, Save, Share2, Wheat } from "lucide-react";
+import { saveAsHalvfabrikat } from "@/varer/lib/saveAsHalvfabrikat";
+import { AlertTriangle, ArrowLeft, Copy, FileText, Loader2, Lock, Package, Pencil, Plus, Printer, RefreshCw, Layers, Save, Share2, Wheat } from "lucide-react";
 import { logAudit } from "@/varer/lib/audit";
 import { RecipeProductLinks } from "@/varer/components/products/RecipeProductLinks";
 import { RecipeStatsBar } from "@/varer/components/recipes/RecipeStatsBar";
@@ -177,6 +178,7 @@ export default function RecipeDetail() {
   const [rawMatOpen, setRawMatOpen] = useState(false);
   const [repricing, setRepricing] = useState(false);
   const [copying, setCopying] = useState(false);
+  const [savingHalvfabrikat, setSavingHalvfabrikat] = useState(false);
   /** Inline-redigering av tittelen øverst — samme felt som i Oppskriftsinfo. */
   const [titleEditing, setTitleEditing] = useState(false);
   /** Bekreftelse når grunnoppskrift slås AV mens en råvare er koblet. */
@@ -724,6 +726,68 @@ export default function RecipeDetail() {
     }
   }
 
+  /**
+   * «Bruk som ny oppskrift»: kopien lagres med de SKALERTE mengdene
+   * (perBatch × antall satser), i gram der linjen kunne regnes om.
+   */
+  async function handleSaveScaledAsNew() {
+    if (!recipe) return;
+    if (!isScaled) {
+      await handleCopy();
+      return;
+    }
+    setCopying(true);
+    try {
+      const lineOverrides: Record<string, { quantity: number; unit: string }> = {};
+      for (const l of scaleResult.perBatch) {
+        lineOverrides[l.lineId] = l.grams != null
+          ? { quantity: l.grams * scaleResult.batchCount, unit: "g" }
+          : { quantity: l.quantity * scaleResult.batchCount, unit: l.unit };
+      }
+      const recipePatch: Record<string, unknown> = {};
+      if (scaleResult.unitCount != null && scaleResult.unitCount > 0) {
+        recipePatch.units_per_batch = Math.round(scaleResult.unitCount);
+      }
+      const piece = Number(header.dough_piece_grams) || 0;
+      if (piece > 0) recipePatch.dough_piece_grams = piece;
+
+      const newId = await copyRecipe(recipe.id, {
+        lineOverrides,
+        recipePatch,
+        nameSuffix: "(skalert)",
+      });
+      qc.invalidateQueries({ queryKey: ["recipes-list"] });
+      toast.success("Skalert oppskrift lagret");
+      navigate(`/varer/oppskrifter/${newId}?rename=1`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kunne ikke lagre den skalerte oppskriften");
+    } finally {
+      setCopying(false);
+    }
+  }
+
+  /** Lagre som halvfabrikat: eget produkt som andre oppskrifter kan bruke. */
+  async function handleSaveAsHalvfabrikat() {
+    if (!recipe || !legalEntityId) return;
+    setSavingHalvfabrikat(true);
+    try {
+      const productId = await saveAsHalvfabrikat({
+        recipeId: recipe.id,
+        recipeName: header.name || recipe.name || "Halvfabrikat",
+        legalEntityId,
+      });
+      qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["recipe-linked-products", recipe.id] });
+      qc.invalidateQueries({ queryKey: ["halvfabrikat_autocomplete"] });
+      toast.success("Halvfabrikatet er lagret");
+      navigate(`/varer/vareliste/${productId}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kunne ikke lagre halvfabrikatet");
+    } finally {
+      setSavingHalvfabrikat(false);
+    }
+  }
+
   /** Bryteren «Grunnoppskrift»: setter kategori og tilbyr råvare-kobling. */
   function toggleBaseRecipe(on: boolean) {
     if (on) {
@@ -863,6 +927,12 @@ export default function RecipeDetail() {
             </Button>
           )}
           {canWrite && (
+            <Button variant="outline" onClick={handleSaveAsHalvfabrikat} disabled={savingHalvfabrikat}>
+              {savingHalvfabrikat ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Layers className="mr-2 h-4 w-4" />}
+              Lagre som halvfabrikat
+            </Button>
+          )}
+          {canWrite && (
             <Button onClick={save} disabled={saving || !dirty || isScaled}>
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Lagre
@@ -909,7 +979,7 @@ export default function RecipeDetail() {
             setScaleInput(String(baseUnits));
             setScaleWaste("");
           }}
-          onSaveAsNew={canWrite ? handleCopy : undefined}
+          onSaveAsNew={canWrite ? handleSaveScaledAsNew : undefined}
           savingAsNew={copying}
         />
 
