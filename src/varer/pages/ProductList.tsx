@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,6 +46,8 @@ type ProductRow = {
   in_pos: boolean | null;
   manual_ingredient_declaration: string | null;
   declaration_needs_review: boolean | null;
+  calc_type: string | null;
+  manual_cost_price: number | null;
 };
 
 /** Merkestatus for produktlista, avledet fra snapshotet på produktet. */
@@ -106,7 +108,7 @@ export default function ProductList() {
       const { data, error } = await supabase
         .from("products")
         .select(
-          "id, display_number, code, display_name, product_category, product_subcategory, unit_of_sale, status, variant_of_product_id, variant_label, label_mode, is_cake_component, cake_role, image_url, mva_rate, pieces_per_tray, in_web_shop, in_pos, manual_ingredient_declaration, declaration_needs_review, main_category:product_main_categories(code, display_name), sub_category:product_sub_categories(code, display_name)",
+          "id, display_number, code, display_name, product_category, product_subcategory, unit_of_sale, status, variant_of_product_id, variant_label, label_mode, is_cake_component, cake_role, image_url, mva_rate, pieces_per_tray, in_web_shop, in_pos, manual_ingredient_declaration, declaration_needs_review, calc_type, manual_cost_price, main_category:product_main_categories(code, display_name), sub_category:product_sub_categories(code, display_name)",
         )
         .eq("legal_entity_id", legalEntityId!)
         .order("display_number", { ascending: true })
@@ -395,27 +397,35 @@ export default function ProductList() {
       {
         key: "calc",
         label: "Kalkyle",
-        render: (p) => {
+        render: (p, ctx) => {
+          const cache = ctx.costCache;
           const q = calcQuality({
-            hasCost: p.calc_type === "manuell" ? p.manual_cost_price != null : false,
-            costPrice: p.calc_type === "manuell" ? p.manual_cost_price : null,
+            hasCost: cache ? cache.has_cost === true : p.manual_cost_price != null,
+            costPrice: cache ? cache.cost_per_unit : p.manual_cost_price,
             hasRecipe: p.calc_type === "oppskrift",
             calcType: p.calc_type,
           });
           return (
-            <Badge
-              variant="outline"
-              className={
-                q === "A"
-                  ? "border-success/40 bg-success/10 text-success"
-                  : q === "B"
-                    ? "border-warning/40 bg-warning/10 text-warning"
-                    : "text-muted-foreground"
-              }
-              title={CALC_QUALITY_LABEL[q]}
-            >
-              {q === "ukjent" ? "–" : q}
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge
+                  variant="outline"
+                  className={
+                    q === "A"
+                      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700"
+                      : q === "B"
+                        ? "border-amber-500/40 bg-amber-500/10 text-amber-700"
+                        : "text-muted-foreground"
+                  }
+                >
+                  {q === "ukjent" ? "–" : q}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                {CALC_QUALITY_LABEL[q]}
+                {cache?.is_stale ? " — kalkylen må regnes på nytt" : ""}
+              </TooltipContent>
+            </Tooltip>
           );
         },
       },
