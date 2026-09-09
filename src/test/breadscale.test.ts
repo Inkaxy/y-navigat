@@ -7,6 +7,8 @@ import {
   grainLevelLabel,
   GRAIN_CLASSIFICATION_OPTIONS,
 } from "@/varer/lib/breadscale";
+import { gramsToNextLevel } from "@/varer/lib/breadscale";
+import { brodskalanFor } from "@/varer/lib/brodskalan";
 import { lineToGrams, type BakersLine } from "@/varer/lib/bakers";
 import { brodskalaPctText } from "@/produksjon/features/etiketter/lib/labelPdf";
 
@@ -102,5 +104,31 @@ describe("Brødskala'n — klient", () => {
       brodskalaPctText({ felter: { brodskala_pct: 77.25 } } as never),
     ).toBe("77,3 %");
     expect(brodskalaPctText({ felter: {} } as never)).toBeNull();
+  });
+});
+
+describe("Brødskala'n — neste nivå og merke", () => {
+  it("over 100 % finnes ikke noe neste nivå", () => {
+    expect(gramsToNextLevel(600, 500)).toBeNull();
+    // Allerede ekstra grovt på nøyaktig 76 %.
+    expect(gramsToNextLevel(760, 1000)).toBeNull();
+  });
+
+  it("regner ut hvor mange gram siktet som må byttes", () => {
+    const next = gramsToNextLevel(200, 1000);
+    expect(next?.next.key).toBe("halvgrovt");
+    expect(next?.gramsNeeded).toBe(60);
+  });
+
+  it("uten melgrunnlag gis ingen anbefaling", () => {
+    expect(gramsToNextLevel(0, 0)).toBeNull();
+  });
+
+  it("merket vises aldri på gjetning", () => {
+    expect(brodskalanFor(null)).toBeNull();
+    expect(brodskalanFor(undefined)).toBeNull();
+    expect(brodskalanFor("")).toBeNull();
+    expect(brodskalanFor("ukjent")).toBeNull();
+    expect(brodskalanFor("grovt")?.label).toBe("Grovt");
   });
 });
