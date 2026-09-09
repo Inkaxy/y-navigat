@@ -15,9 +15,9 @@ import {
   type DeclarationMode,
   type RecipeLabelSnapshot,
 } from "@/varer/lib/effectiveDeclaration";
-import { useApproveDeclaration, useLabelStaleness } from "@/varer/hooks/useLabelApproval";
+import { useApproveDeclaration } from "@/varer/hooks/useLabelApproval";
 import { useUserDisplayName } from "@/varer/hooks/useRecipeLabel";
-import { deriveLabelingStatus } from "@/varer/lib/labelStaleness";
+import { deriveLabelingStatusFromDb } from "@/varer/lib/labelStaleness";
 import { parseAllergenSummary, pickNutrition, type NutritionPer100g } from "@/varer/lib/effectiveDeclaration";
 import { ApproveDeclarationDialog, type ApproveSourceData } from "./ApproveDeclarationDialog";
 import { LabelStatusBar } from "./LabelStatusBar";
@@ -144,14 +144,14 @@ export function LabelTab({
   const links = linksQuery.data ?? [];
   const primaryCount = links.filter((l) => l.is_primary).length;
 
-  const { staleness, data: stalenessSources } = useLabelStaleness(recipeId, label?.computed_at ?? null);
   const approvedAt = recipe.declaration_updated_at ?? null;
   const approverQuery = useUserDisplayName(recipe.declaration_updated_by ?? null);
   const missing = (label?.missing_data ?? null) as MissingData | null;
-  const status = deriveLabelingStatus({
+  // Utdatert-vurderingen kommer nå fra basen (trigger på recipe_label_calculated).
+  const status = deriveLabelingStatusFromDb({
     approvedAt,
     computedAt: label?.computed_at ?? null,
-    sources: stalenessSources ?? [],
+    isStale: label?.is_stale ?? null,
     blocked: !!missing?.blocked || checklistBlocked,
   });
 
@@ -223,8 +223,8 @@ export function LabelTab({
         status={status}
         approvedAt={approvedAt}
         approvedByName={approverQuery.data ?? null}
-        staleSourceName={staleness.sourceName}
-        staleSourceAt={staleness.changedAt}
+        staleSourceName={label?.stale_reason ?? null}
+        staleSourceAt={null}
         allergenReviewed={(missing?.composite_unreviewed?.length ?? 0) === 0}
         declarationNamed={(missing?.declaration_names?.length ?? 0) === 0}
         approving={approve.isPending}
@@ -246,7 +246,19 @@ export function LabelTab({
         manual={manualSource}
         onApprove={(mode, adopt) =>
           approve.mutate(
-            { recipeId, mode, adopt },
+            {
+              recipeId,
+              source: mode === "manual" ? "manual" : "calculated",
+              // p_overrides sendes alltid – tomt objekt når ingenting overstyres.
+              overrides: adopt
+                ? {
+                    ingredient_text: adopt.ingredientText,
+                    allergens_contains: adopt.contains,
+                    allergens_may_contain: adopt.mayContain,
+                    nutrition_per_100g: adopt.nutrition,
+                  }
+                : {},
+            },
             { onSuccess: () => setApproveOpen(false) },
           )
         }

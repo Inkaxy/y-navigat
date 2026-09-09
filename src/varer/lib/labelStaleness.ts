@@ -77,3 +77,23 @@ export const LABELING_STATUS_LABEL: Record<LabelingStatus, string> = {
   stale: "Utdatert",
   missing: "Mangler",
 };
+
+/**
+ * Status basert på databasens egne flagg (`recipe_label_calculated.is_stale`).
+ * Dette er fasit etter at triggerne i basen overtok utdatert-vurderingen —
+ * klientsammenligningen over brukes kun i lister som ennå leser råe tidspunkt.
+ */
+export function deriveLabelingStatusFromDb(input: {
+  approvedAt: string | null | undefined;
+  computedAt: string | null | undefined;
+  isStale: boolean | null | undefined;
+  blocked?: boolean;
+}): LabelingStatus {
+  if (!input.computedAt) return "missing";
+  if (!input.approvedAt || input.blocked) return "missing";
+  if (input.isStale) return "stale";
+  const approved = ms(input.approvedAt);
+  const computed = ms(input.computedAt);
+  if (approved != null && computed != null && approved < computed) return "stale";
+  return "approved";
+}

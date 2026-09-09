@@ -17,7 +17,7 @@ import {
 } from "@/varer/lib/bakers";
 import type { EditorLine } from "@/varer/components/recipes/RecipePartCard";
 
-const UNITS = ["g", "kg", "ml", "liter", "stk"];
+const UNITS = ["g", "kg", "ml", "cl", "dl", "l", "stk"];
 
 export interface LineGridProps {
   partId: string;

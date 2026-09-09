@@ -31,6 +31,7 @@ export function useDeclarationWorklist(legalEntityId: string | undefined) {
         .from("raw_material_declaration_worklist")
         .select("*")
         .eq("legal_entity_id", legalEntityId!)
+        .eq("missing_declaration_name", true)
         .order("total_quantity", { ascending: false, nullsFirst: false });
       if (error) throw error;
       return (data ?? []).map((r) => ({

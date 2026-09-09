@@ -209,7 +209,20 @@ Deno.serve(async (req) => {
     const FIELDS =
       "id,invoiceNumber,invoiceDate,invoiceDueDate,amount,amountExcludingVat," +
       "amountCurrency,amountExcludingVatCurrency,isCreditNote," +
-      "currency(code),voucher(id,number),supplier(id,name,organizationNumber,supplierNumber)";
+      "currency(code),voucher(id,number),supplier(id,name,organizationNumber,supplierNumber)," +
+      "outstandingAmount,payments(id,date,amount,amountCurrency)";
+
+    /** Betalt = restbeløpet er (tilnærmet) null. Betalingsdato = seneste innbetaling. */
+    function paymentFacts(inv: any): { is_paid: boolean | null; paid_at: string | null } {
+      const outstanding = inv?.outstandingAmount;
+      if (outstanding == null) return { is_paid: null, paid_at: null };
+      const isPaid = Math.abs(Number(outstanding)) < 0.005;
+      if (!isPaid) return { is_paid: false, paid_at: null };
+      const payments: any[] = Array.isArray(inv?.payments) ? inv.payments : [];
+      const dates = payments.map((p) => p?.date).filter((d): d is string => !!d);
+      const latest = dates.length ? dates.sort().at(-1)! : null;
+      return { is_paid: true, paid_at: latest ? `${latest}T00:00:00Z` : null };
+    }
 
     async function fetchPage(from: string, to: string, offset: number) {
       const query: Record<string, unknown> = {
@@ -315,7 +328,8 @@ Deno.serve(async (req) => {
             .from("invoices")
             .select(
               "id, line_extraction_status, invoice_date, total_amount, is_credit_note, " +
-                "tripletex_voucher_id, tripletex_voucher_number, tripletex_supplier_id",
+                "tripletex_voucher_id, tripletex_voucher_number, tripletex_supplier_id, " +
+                "tripletex_is_paid, paid_at",
             )
             .eq("legal_entity_id", legalEntityId)
             .eq("tripletex_supplier_invoice_id", ttInvoiceId)
@@ -327,6 +341,7 @@ Deno.serve(async (req) => {
             // dato og kreditnota-flagg røres aldri — manuell matching og avstemming
             // skal ikke nullstilles. Avvik rapporteres som konflikt i stedet.
             const ttAmountRaw = Number(inv.amount ?? 0) || Number(inv.amountCurrency ?? 0);
+            const facts = paymentFacts(inv);
             const plan = planExistingUpdate(ex, {
               invoice_date: inv.invoiceDate ?? null,
               total_amount: Number.isFinite(ttAmountRaw) ? ttAmountRaw : null,
@@ -334,6 +349,8 @@ Deno.serve(async (req) => {
               tripletex_voucher_id: inv?.voucher?.id ? String(inv.voucher.id) : null,
               tripletex_voucher_number: inv?.voucher?.number ? String(inv.voucher.number) : null,
               tripletex_supplier_id: ttSupId,
+              tripletex_is_paid: facts.is_paid,
+              paid_at: facts.paid_at,
             }, { trackLines: !!supplier.track_invoice_lines });
 
             if (Object.keys(plan.patch).length > 0) {
@@ -365,6 +382,7 @@ Deno.serve(async (req) => {
           const totalVat = vatUnknown ? null : round2(Math.abs(amount - exVat));
           const invoiceNumber = String(inv.invoiceNumber ?? "").trim() || `TT-${ttInvoiceId}`;
 
+          const newFacts = paymentFacts(inv);
           const { error: insErr } = await admin.from("invoices").insert({
             legal_entity_id: legalEntityId,
             supplier_id: supplier.id,
@@ -382,6 +400,8 @@ Deno.serve(async (req) => {
             tripletex_voucher_id: inv?.voucher?.id ? String(inv.voucher.id) : null,
             tripletex_voucher_number: inv?.voucher?.number ? String(inv.voucher.number) : null,
             tripletex_supplier_id: ttSupId,
+            tripletex_is_paid: newFacts.is_paid,
+            paid_at: newFacts.paid_at,
             imported_from_tripletex_at: nowIso,
             pdf_status: "none",
             line_extraction_status: "pending",
@@ -415,6 +435,47 @@ Deno.serve(async (req) => {
         truncated,
       });
       if (failed === failedBefore && !truncated) lastCompletedChunkTo = chunk.to;
+    }
+
+    // --- Oppfrisking av betalingsstatus for tidligere ubetalte fakturaer ---
+    // Egen, feiltolerant runde etter chunk-løkken. Rører aldri cursoren.
+    let betalingOppdatert = 0;
+    if (!isBackfill) try {
+      const refreshCutoff = addDays(today, -120);
+      const { data: unpaid } = await admin
+        .from("invoices")
+        .select("id, tripletex_supplier_invoice_id")
+        .eq("legal_entity_id", legalEntityId)
+        .not("tripletex_supplier_invoice_id", "is", null)
+        .not("tripletex_is_paid", "is", true)
+        .gte("invoice_date", refreshCutoff)
+        .order("invoice_date", { ascending: false })
+        .limit(500);
+
+      const rows = (unpaid ?? []).filter((r) => r.tripletex_supplier_invoice_id);
+      for (let i = 0; i < rows.length; i += 100) {
+        const batch = rows.slice(i, i + 100);
+        const ids = batch.map((r) => r.tripletex_supplier_invoice_id).join(",");
+        const res = await tripletexFetch("/v2/supplierInvoice", {
+          sessionToken,
+          query: { id: ids, fields: "id,outstandingAmount,payments(date)" },
+        });
+        const values: any[] = res?.values ?? [];
+        const byId = new Map(batch.map((r) => [String(r.tripletex_supplier_invoice_id), r.id]));
+        for (const v of values) {
+          const facts = paymentFacts(v);
+          if (facts.is_paid == null) continue;
+          const invoiceId = byId.get(String(v.id));
+          if (!invoiceId) continue;
+          const { error: refreshErr } = await admin
+            .from("invoices")
+            .update({ tripletex_is_paid: facts.is_paid, paid_at: facts.paid_at })
+            .eq("id", invoiceId);
+          if (!refreshErr) betalingOppdatert++;
+        }
+      }
+    } catch (e) {
+      console.error("tripletex-sync-invoices: betalingsoppfrisking feilet", e instanceof Error ? e.message : e);
     }
 
     // Cursor flyttes bare til og med SISTE fullførte bit. En bit med feil eller
@@ -469,6 +530,7 @@ Deno.serve(async (req) => {
       har_mer: harMer || ufullstendig,
       ufullstendig_henting: ufullstendig,
       oppdatert: updated,
+      betaling_oppdatert: betalingOppdatert,
       hoppet_over_ikke_fulgt: hoppetOverIkkeFulgt,
       etterhenting: isBackfill ? body.supplier_id : null,
       biter: chunkResults,
@@ -516,6 +578,7 @@ Deno.serve(async (req) => {
       imported,
       skipped,
       updated,
+      betaling_oppdatert: betalingOppdatert,
       failed,
       errors,
       ufullstendig_henting: ufullstendig,

@@ -39,6 +39,11 @@ export type HeaderState = {
   mixing_speed1_minutes: number | string;
   mixing_speed2_minutes: number | string;
   autolyse_minutes: number | string;
+  room_temp_celsius: number | string | null;
+  flour_temp_celsius: number | string | null;
+  preferment_temp_celsius: number | string | null;
+  keyhole_group: string | null;
+  is_template: boolean;
   notes: string;
   decor_notes: string;
 };
@@ -284,6 +289,11 @@ export function stateFromRecipe(recipe: RecipeDetailRow): RecipeEditorState {
     mixing_speed1_minutes: recipe.mixing_speed1_minutes ?? "",
     mixing_speed2_minutes: recipe.mixing_speed2_minutes ?? "",
     autolyse_minutes: recipe.autolyse_minutes ?? "",
+    room_temp_celsius: recipe.room_temp_celsius ?? null,
+    flour_temp_celsius: recipe.flour_temp_celsius ?? null,
+    preferment_temp_celsius: recipe.preferment_temp_celsius ?? null,
+    keyhole_group: recipe.keyhole_group ?? null,
+    is_template: recipe.is_template ?? false,
     notes: recipe.notes ?? "",
     decor_notes: recipe.decor_notes ?? "",
   };

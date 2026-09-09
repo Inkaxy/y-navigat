@@ -10,6 +10,7 @@ import { useCallback, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { resolveLineCost, type CostBasis, type ResolveLineCostResult } from "@/fakturaer/lib/units";
+import { isNonFatalPermissionError } from "@/ravarer/lib/recalcBatch";
 
 const LINE_PAGE_SIZE = 500;
 const APPLY_CHUNK = 10;
@@ -423,7 +424,7 @@ export function useCostRecalc() {
         let statsRefreshed = false;
         if (updatedMaterials > 0) {
           const { error: rpcErr } = await supabase.rpc("refresh_purchase_stats");
-          statsRefreshed = !rpcErr;
+          statsRefreshed = !rpcErr || isNonFatalPermissionError(rpcErr);
         }
 
         const applied = selected.slice(0, updatedMaterials);

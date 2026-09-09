@@ -173,8 +173,9 @@ describe("samlet validering før lagring", () => {
     id: "l1", recipe_part_id: "p1", quantity: 1000, unit: "g", raw_material_id: null,
     waste_percent: 0, sort_order: 0, ingredient_name: "Hvetemel", ...over,
   });
-  const input = (over: Partial<Parameters<typeof validateRecipeSave>[0]> = {}) => ({
-    recipeId: "r1", displayName: "Grovbrød", originalPartIds: ["p1"],
+  type SaveInput = Parameters<typeof validateRecipeSave>[0];
+  const input = (over: Partial<SaveInput> = {}): SaveInput => ({
+    recipeId: "r1", displayName: "Grovbrød", originalPartIds: ["p1"], updatedAt: "t1",
     header: { name: "Grovbrød" }, parts: [part], lines: [line({})], steps: [], ...over,
   });
 

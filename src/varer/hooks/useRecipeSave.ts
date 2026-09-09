@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { logAudit } from "@/varer/lib/audit";
 import { normalizeRecipeUnit } from "@/varer/lib/units-recipe";
 import type { EditorLine, EditorPart } from "@/varer/components/recipes/RecipePartCard";
 import type { EditorStep } from "@/varer/components/recipes/RecipeStepsEditor";
@@ -24,33 +23,46 @@ export interface RecipeHeaderInput {
   mixing_speed1_minutes?: number | string;
   mixing_speed2_minutes?: number | string;
   autolyse_minutes?: number | string;
+  room_temp_celsius?: number | string | null;
+  flour_temp_celsius?: number | string | null;
+  preferment_temp_celsius?: number | string | null;
+  keyhole_group?: string | null;
+  is_template?: boolean;
 }
 
 export interface RecipeSaveInput {
   recipeId: string;
+  /** `recipes.updated_at` slik den ble hentet — brukes til optimistisk låsing i `save_recipe`. */
+  updatedAt: string | null;
   displayName: string;
-  /** Delene som lå i databasen før redigering — brukes til å finne slettede. */
-  originalPartIds: string[];
   header: RecipeHeaderInput;
   parts: EditorPart[];
   lines: EditorLine[];
   steps: EditorStep[];
+  /** Kort forklaring til versjonshistorikken. */
+  changeSummary?: string | null;
+}
+
+export interface RecipeSaveResult {
+  version: number;
+  updatedAt: string;
 }
 
 /** Hvilket steg som feilet — gir presise feilmeldinger i stedet for «Kunne ikke lagre». */
 export type SavePhase = "oppskrift" | "deler" | "ingredienser" | "steg";
 
-const PHASE_LABEL: Record<SavePhase, string> = {
-  oppskrift: "oppskriftsinformasjonen",
-  deler: "delene (deig og fordeig)",
-  ingredienser: "ingredienslinjene",
-  steg: "produksjonsstegene",
-};
-
 export class RecipeSaveError extends Error {
   constructor(readonly phase: SavePhase, readonly detail: string) {
-    super(`Kunne ikke lagre ${PHASE_LABEL[phase]}: ${detail}`);
+    super(detail);
     this.name = "RecipeSaveError";
+  }
+}
+
+/** Kastes når `save_recipe` avviser lagringen fordi noen andre har lagret i mellomtiden (Postgres P0409). */
+export class RecipeSaveConflictError extends Error {
+  constructor() {
+    super("Oppskriften er endret av noen andre – last inn på nytt.");
+    this.name = "RecipeSaveConflictError";
   }
 }
 
@@ -61,7 +73,7 @@ function num(v: number | string | null | undefined): number | null {
 }
 
 /**
- * Kontrollerer HELE oppskriften før noe skrives.
+ * Kontrollerer HELE oppskriften før noe sendes til `save_recipe`.
  * Én halvferdig lagring er verre enn en avvist lagring, så alt valideres samlet
  * og brukeren får alle feilene på én gang.
  */
@@ -117,14 +129,89 @@ export function validateRecipeSave(input: RecipeSaveInput): string[] {
   return errors;
 }
 
-function buildLineRows(input: RecipeSaveInput, partIdMap: Record<string, string>) {
-  return input.lines
+/** JSON-formen `save_recipe(p_recipe jsonb)` forventer. Rene datastrukturer — ingen sideeffekter her. */
+export interface SaveRecipePayload {
+  id: string;
+  updated_at: string | null;
+  name: string | null;
+  category: string | null;
+  department: string | null;
+  status: string | undefined;
+  description: string | null;
+  notes: string | null;
+  decor_notes: string | null;
+  dough_piece_grams: number | null;
+  dough_waste_pct: number | null;
+  finished_weight_grams: number | null;
+  measured_per_kg: boolean;
+  units_per_batch: number | null;
+  target_dough_temp_celsius: number | null;
+  friction_factor_celsius: number | null;
+  mixing_speed1_minutes: number | null;
+  mixing_speed2_minutes: number | null;
+  autolyse_minutes: number | null;
+  room_temp_celsius: number | null;
+  flour_temp_celsius: number | null;
+  preferment_temp_celsius: number | null;
+  keyhole_group: string | null;
+  is_template: boolean;
+  change_summary: string | null;
+  parts: {
+    id: string;
+    name: string;
+    sort_order: number;
+    instructions: string | null;
+    prep_time_minutes: number | null;
+    rest_time_minutes: number | null;
+    part_type: string;
+    preferment_kind: string | null;
+    target_temp_celsius: number | null;
+    ripe_time_hours: number | null;
+    _new?: boolean;
+  }[];
+  lines: {
+    id: string;
+    recipe_part_id: string;
+    raw_material_id: string | null;
+    sub_product_id: string | null;
+    ingredient_name: string | null;
+    quantity: number;
+    unit: string;
+    waste_percent: number;
+    sort_order: number;
+    notes: string | null;
+    entry_mode: string;
+    bakers_percent: number | null;
+    is_flour_override: boolean | null;
+    water_content_pct_override: number | null;
+    include_in_declaration: boolean;
+    is_quid_relevant: boolean;
+    custom_declaration_text: string | null;
+    _new?: boolean;
+  }[];
+  steps: {
+    id: string;
+    sort_order: number;
+    step_type: string;
+    title: string | null;
+    instruction: string | null;
+    duration_minutes: number | null;
+    temp_celsius: number | null;
+    humidity_pct: number | null;
+    _new?: boolean;
+  }[];
+}
+
+/** Bygger payloaden til `save_recipe`. Tomme linjer forkastes stille — samme regel som valideringen. */
+export function buildSaveRecipePayload(input: RecipeSaveInput): SaveRecipePayload {
+  const h = input.header;
+  const lines = input.lines
     .map((l) => {
       const qty = Number(l.quantity) || 0;
       if (qty <= 0 && !l.raw_material_id && !l.sub_product_id && !l.ingredient_name) return null;
       return {
-        recipe_id: input.recipeId,
-        recipe_part_id: partIdMap[l.recipe_part_id] ?? l.recipe_part_id,
+        id: l.id,
+        recipe_part_id: l.recipe_part_id,
         raw_material_id: l.raw_material_id,
         sub_product_id: l.sub_product_id ?? null,
         ingredient_name: l.raw_material_id ? null : l.ingredient_name || null,
@@ -140,20 +227,99 @@ function buildLineRows(input: RecipeSaveInput, partIdMap: Record<string, string>
         include_in_declaration: l.include_in_declaration !== false,
         is_quid_relevant: !!l.is_quid_relevant,
         custom_declaration_text: l.custom_declaration_text || null,
+        ...(l._new ? { _new: true as const } : {}),
       };
     })
     .filter((r): r is NonNullable<typeof r> => r !== null);
+
+  const parts = input.parts.map((p) => ({
+    id: p.id,
+    name: p.name,
+    sort_order: p.sort_order,
+    instructions: p.instructions,
+    prep_time_minutes: p.prep_time_minutes,
+    rest_time_minutes: p.rest_time_minutes,
+    part_type: p.part_type,
+    preferment_kind: p.part_type === "preferment" ? p.preferment_kind : null,
+    target_temp_celsius: p.target_temp_celsius,
+    ripe_time_hours: p.ripe_time_hours,
+    ...(p._new ? { _new: true as const } : {}),
+  }));
+
+  const steps = input.steps.map((s) => ({
+    id: s.id,
+    sort_order: s.sort_order,
+    step_type: s.step_type,
+    title: s.title,
+    instruction: s.instruction,
+    duration_minutes: s.duration_minutes,
+    temp_celsius: s.temp_celsius,
+    humidity_pct: s.humidity_pct,
+    ...(s._new ? { _new: true as const } : {}),
+  }));
+
+  return {
+    id: input.recipeId,
+    updated_at: input.updatedAt,
+    name: h.name || null,
+    category: h.category || null,
+    department: h.department || null,
+    status: h.status,
+    description: h.description || null,
+    notes: h.notes || null,
+    decor_notes: h.decor_notes || null,
+    dough_piece_grams: num(h.dough_piece_grams),
+    dough_waste_pct: num(h.dough_waste_pct),
+    finished_weight_grams: num(h.finished_weight_grams),
+    measured_per_kg: !!h.measured_per_kg,
+    units_per_batch: num(h.units_per_batch),
+    target_dough_temp_celsius: h.target_dough_temp_celsius ?? null,
+    friction_factor_celsius: h.friction_factor_celsius ?? null,
+    mixing_speed1_minutes: num(h.mixing_speed1_minutes),
+    mixing_speed2_minutes: num(h.mixing_speed2_minutes),
+    autolyse_minutes: num(h.autolyse_minutes),
+    room_temp_celsius: num(h.room_temp_celsius),
+    flour_temp_celsius: num(h.flour_temp_celsius),
+    preferment_temp_celsius: num(h.preferment_temp_celsius),
+    keyhole_group: h.keyhole_group || null,
+    is_template: !!h.is_template,
+    change_summary: input.changeSummary || null,
+    parts,
+    lines,
+    steps,
+  };
+}
+
+interface PostgrestLikeError {
+  code?: string;
+  message?: string;
+}
+
+/** Oversetter Postgres-feilkoder fra `save_recipe` til meldinger brukeren forstår. */
+export function mapSaveRecipeError(error: PostgrestLikeError): Error {
+  switch (error.code) {
+    case "P0409":
+      return new RecipeSaveConflictError();
+    case "22023":
+      return new RecipeSaveError("oppskrift", error.message ?? "Ugyldige verdier i oppskriften.");
+    case "42501":
+      return new RecipeSaveError("oppskrift", "Du har ikke tilgang til å lagre denne oppskriften.");
+    case "23514":
+      return new RecipeSaveError("oppskrift", "Oppskriften bryter en regel i databasen (sjekk verdiene).");
+    default:
+      return new RecipeSaveError("oppskrift", error.message ?? "Ukjent feil ved lagring.");
+  }
 }
 
 /**
- * Lagrer hele oppskriften. Alt valideres først, deretter skrives hodet, delene,
- * linjene og stegene. Feiler et steg, stopper vi der og forteller nøyaktig hva
- * som ikke gikk gjennom — ingen stille delvis lagring.
+ * Lagrer hele oppskriften i ett `save_recipe`-kall. Databasen validerer, skriver
+ * hodet, delene, linjene og stegene i én transaksjon, og teller opp versjonen —
+ * det finnes ingen stille delvis lagring lenger.
  */
 export function useRecipeSave() {
   const [saving, setSaving] = useState(false);
 
-  const save = useCallback(async (input: RecipeSaveInput): Promise<void> => {
+  const save = useCallback(async (input: RecipeSaveInput): Promise<RecipeSaveResult> => {
     const problems = validateRecipeSave(input);
     if (problems.length > 0) {
       throw new Error(
@@ -165,106 +331,18 @@ export function useRecipeSave() {
 
     setSaving(true);
     try {
-      const h = input.header;
-      const { error: e1 } = await supabase
-        .from("recipes")
-        .update({
-          name: h.name || null,
-          category: h.category || null,
-          department: h.department || null,
-          status: h.status,
-          description: h.description || null,
-          notes: h.notes || null,
-          decor_notes: h.decor_notes || null,
-          dough_piece_grams: num(h.dough_piece_grams),
-          dough_waste_pct: num(h.dough_waste_pct),
-          finished_weight_grams: num(h.finished_weight_grams),
-          measured_per_kg: !!h.measured_per_kg,
-          units_per_batch: num(h.units_per_batch),
-          target_dough_temp_celsius: h.target_dough_temp_celsius ?? null,
-          friction_factor_celsius: h.friction_factor_celsius ?? null,
-          mixing_speed1_minutes: num(h.mixing_speed1_minutes),
-          mixing_speed2_minutes: num(h.mixing_speed2_minutes),
-          autolyse_minutes: num(h.autolyse_minutes),
-        } as never)
-        .eq("id", input.recipeId);
-      if (e1) throw new RecipeSaveError("oppskrift", e1.message);
-
-      const keptIds = input.parts.filter((p) => !p._new).map((p) => p.id);
-      const toDelete = input.originalPartIds.filter((pid) => !keptIds.includes(pid));
-      if (toDelete.length) {
-        const { error } = await supabase.from("recipe_parts").delete().in("id", toDelete);
-        if (error) throw new RecipeSaveError("deler", error.message);
+      const payload = buildSaveRecipePayload(input);
+      const { data, error } = await supabase.rpc("save_recipe", { p_recipe: payload as never });
+      if (error) throw mapSaveRecipeError(error);
+      const result = data as unknown as { version?: number; updated_at?: string } | null;
+      if (!result || typeof result.version !== "number" || !result.updated_at) {
+        throw new RecipeSaveError("oppskrift", "Fikk ikke svar fra lagringen.");
       }
-
-      const partIdMap: Record<string, string> = {};
-      for (const p of input.parts) {
-        const payload = {
-          name: p.name,
-          sort_order: p.sort_order,
-          instructions: p.instructions,
-          prep_time_minutes: p.prep_time_minutes,
-          rest_time_minutes: p.rest_time_minutes,
-          part_type: p.part_type,
-          preferment_kind: p.part_type === "preferment" ? p.preferment_kind : null,
-          target_temp_celsius: p.target_temp_celsius,
-          ripe_time_hours: p.ripe_time_hours,
-        };
-        if (p._new) {
-          const { data, error } = await supabase
-            .from("recipe_parts")
-            .insert({ recipe_id: input.recipeId, ...payload } as never)
-            .select("id")
-            .single();
-          if (error) throw new RecipeSaveError("deler", error.message);
-          partIdMap[p.id] = data.id;
-        } else {
-          const { error } = await supabase.from("recipe_parts").update(payload as never).eq("id", p.id);
-          if (error) throw new RecipeSaveError("deler", error.message);
-        }
-      }
-
-      const { error: e2 } = await supabase.rpc("replace_child_rows", {
-        p_table: "recipe_lines",
-        p_parent_column: "recipe_id",
-        p_parent_id: input.recipeId,
-        p_rows: buildLineRows(input, partIdMap),
-      } as never);
-      if (e2) throw new RecipeSaveError("ingredienser", e2.message);
-
-      const stepRows = input.steps.map((s, i) => ({
-        recipe_id: input.recipeId,
-        sort_order: i,
-        step_type: s.step_type,
-        title: s.title || null,
-        instruction: s.instruction || null,
-        duration_minutes: s.duration_minutes,
-        temp_celsius: s.temp_celsius,
-        humidity_pct: s.humidity_pct,
-      }));
-      const { error: e3 } = await supabase.rpc("replace_child_rows", {
-        p_table: "recipe_steps",
-        p_parent_column: "recipe_id",
-        p_parent_id: input.recipeId,
-        p_rows: stepRows,
-      } as never);
-      if (e3) throw new RecipeSaveError("steg", e3.message);
-
-      await logAudit({
-        action: "update",
-        entity_type: "recipe",
-        entity_id: input.recipeId,
-        entity_display_reference: input.displayName,
-        changes: {
-          parts: input.parts.length,
-          lines: input.lines.length,
-          steps: input.steps.length,
-        },
-      });
+      return { version: result.version, updatedAt: result.updated_at };
     } finally {
       setSaving(false);
     }
   }, []);
 
-  return { saving, save };
+  return { save, saving };
 }

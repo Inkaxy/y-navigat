@@ -73,6 +73,8 @@ export interface ExistingInvoice {
   tripletex_voucher_number: string | null;
   tripletex_supplier_id: string | null;
   line_extraction_status: string | null;
+  tripletex_is_paid: boolean | null;
+  paid_at: string | null;
 }
 
 export interface TripletexInvoiceFacts {
@@ -82,6 +84,8 @@ export interface TripletexInvoiceFacts {
   tripletex_voucher_id: string | null;
   tripletex_voucher_number: string | null;
   tripletex_supplier_id: string | null;
+  tripletex_is_paid: boolean | null;
+  paid_at: string | null;
 }
 
 export interface ExistingUpdatePlan {
@@ -116,6 +120,15 @@ export function planExistingUpdate(
 
   if (opts.trackLines && existing.line_extraction_status === "not_requested") {
     patch.line_extraction_status = "pending";
+  }
+
+  // Betalingsstatus overskrives alltid ved reell endring — dette er ikke noe
+  // manuell matching rører, så det trenger ingen konflikthåndtering.
+  if (tt.tripletex_is_paid != null && Boolean(existing.tripletex_is_paid) !== tt.tripletex_is_paid) {
+    patch.tripletex_is_paid = tt.tripletex_is_paid;
+  }
+  if ((existing.paid_at ?? null) !== (tt.paid_at ?? null)) {
+    patch.paid_at = tt.paid_at ?? null;
   }
 
   if (tt.invoice_date && existing.invoice_date && tt.invoice_date !== existing.invoice_date) {
