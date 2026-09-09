@@ -16,6 +16,7 @@ import {
   type RecipeLabelSnapshot,
 } from "@/varer/lib/effectiveDeclaration";
 import { useApproveDeclaration } from "@/varer/hooks/useLabelApproval";
+import { useRecipeLabelProfile } from "@/varer/hooks/useRecipeLabelProfile";
 import { useUserDisplayName } from "@/varer/hooks/useRecipeLabel";
 import { deriveLabelingStatusFromDb } from "@/varer/lib/labelStaleness";
 import { parseAllergenSummary, pickNutrition, type NutritionPer100g } from "@/varer/lib/effectiveDeclaration";
@@ -132,6 +133,7 @@ export function LabelTab({
     onError: (e: unknown) => toast.error((e as Error).message ?? "Kunne ikke lagre"),
   });
 
+  const labelProfileQuery = useRecipeLabelProfile(recipeId);
   const approve = useApproveDeclaration();
   const [approveOpen, setApproveOpen] = useState(false);
   const [checklistBlocked, setChecklistBlocked] = useState(false);
@@ -343,6 +345,7 @@ export function LabelTab({
         storageInstructions={recipe.storage_instructions ?? null}
         countryOfOrigin={recipe.country_of_origin ?? null}
         entity={entityQuery.data ?? null}
+        profile={labelProfileQuery.data ?? null}
         blocked={!!missing?.blocked}
         keyholeQualifies={keyhole?.status === "oppfylt"}
         coveragePct={coveragePct}
