@@ -540,7 +540,10 @@ export default function RecipeDetail() {
     try {
       const result = await persistRecipe({
         recipeId: recipe.id,
-        updatedAt: recipe.updated_at ?? null,
+        // Vår EGEN siste lagring er sannheten for den optimistiske låsen. Bruker vi
+        // `recipe.updated_at` før refetchen har landet, meldes vår egen lagring som
+        // «endret av noen andre».
+        updatedAt: loadedRef.current.updatedAt ?? recipe.updated_at ?? null,
         displayName: header.name || recipe.name || recipe.id,
         header: {
           name: header.name,
