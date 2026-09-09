@@ -249,6 +249,8 @@ export function LabelTab({
             {
               recipeId,
               source: mode === "manual" ? "manual" : "calculated",
+              // Skrives til recipes.label_claim_* før RPC-en leser dem.
+              claims: { grain: !!recipe.label_claim_grain, keyhole: !!recipe.label_claim_keyhole },
               // p_overrides sendes alltid – tomt objekt når ingenting overstyres.
               overrides: adopt
                 ? {

@@ -23,6 +23,11 @@ export interface ApproveDeclarationInput {
   recipeId: string;
   source: "calculated" | "manual";
   overrides?: ApproveDeclarationOverrides;
+  /**
+   * Påstandene som skal gjelde for denne versjonen. RPC-en leser dem fra
+   * `recipes.label_claim_*`, så de må skrives FØR godkjenningen kalles.
+   */
+  claims?: { grain: boolean; keyhole: boolean };
 }
 
 export interface ApproveDeclarationResult {
@@ -58,6 +63,25 @@ export function useApproveDeclaration() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: ApproveDeclarationInput): Promise<ApproveDeclarationResult> => {
+      // Påstandene skrives først — RPC-en henter dem fra oppskriftsraden.
+      if (input.claims) {
+        const { data: u } = await supabase.auth.getUser();
+        const anyClaim = input.claims.grain || input.claims.keyhole;
+        const patch: Record<string, unknown> = {
+          label_claim_grain: input.claims.grain,
+          label_claim_keyhole: input.claims.keyhole,
+        };
+        if (anyClaim) {
+          patch.label_claims_approved_by = u.user?.id ?? null;
+          patch.label_claims_approved_at = new Date().toISOString();
+        }
+        const { error: claimError } = await supabase
+          .from("recipes")
+          .update(patch as never)
+          .eq("id", input.recipeId);
+        if (claimError) throw new Error("Kunne ikke lagre merkevalgene før godkjenning.");
+      }
+
       // p_overrides sendes ALLTID, minst som tomt objekt.
       const { data, error } = await supabase.rpc("approve_recipe_declaration", {
         p_recipe_id: input.recipeId,
