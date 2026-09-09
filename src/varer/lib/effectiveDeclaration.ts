@@ -133,9 +133,6 @@ export interface RecipeLabelSnapshot {
   coverage_by_weight_pct: number | null;
 }
 
-const LINK_SELECT =
-  "id, product_id, recipe_id, declaration_mode, manual_ingredient_declaration, manual_nutrition, manual_allergen_summary, recipes(declaration_mode, manual_ingredient_declaration, manual_nutrition, manual_allergen_summary)";
-
 /** Effektiv modus: koblingen vinner over oppskriften, ellers «auto». */
 export function effectiveMode(
   linkMode: DeclarationMode | null | undefined,
@@ -186,85 +183,6 @@ export function buildEffectiveDeclaration(
     coveragePct: coverage,
     nutritionSuppressed: !coverageOk,
   };
-}
-
-async function fetchCalculated(recipeId: string): Promise<RecipeLabelSnapshot | null> {
-  const { data } = await supabase
-    .from("recipe_label_calculated")
-    .select("ingredient_declaration, allergens, nutrition_per_100g, coverage_by_weight_pct")
-    .eq("recipe_id", recipeId)
-    .maybeSingle();
-  return (data ?? null) as RecipeLabelSnapshot | null;
-}
-
-/**
- * Skriver snapshotet til produktet.
- * MERK: nettbutikkens næringstabell (`product_nutrition_calculated`) er en VIEW som
- * regnes ut fra oppskriftslinjene — den kan ikke skrives til. Manuell næring når
- * derfor ikke nettbutikken uten en databaseendring (view → tabell, eller at
- * `push_products_to_nettside` leser `products.manual_nutrition_per_100g`).
- */
-async function writeSnapshot(productId: string, eff: EffectiveDeclaration) {
-  const { data: auth } = await supabase.auth.getUser();
-
-  const { error } = await supabase
-    .from("products")
-    .update({
-      manual_ingredient_declaration: eff.ingredientText,
-      manual_allergens_contains: eff.contains,
-      manual_allergens_may_contain: eff.mayContain,
-      manual_nutrition_per_100g: (eff.nutrition ?? null) as never,
-      manual_declaration_updated_at: new Date().toISOString(),
-      manual_declaration_updated_by: auth.user?.id ?? null,
-    })
-    .eq("id", productId);
-  if (error) throw error;
-}
-
-/** Synkroniserer én produkt/oppskrift-kobling. Returnerer det som ble skrevet. */
-export async function syncEffectiveDeclaration(linkId: string): Promise<EffectiveDeclaration | null> {
-  const { data, error } = await supabase
-    .from("product_recipe_links")
-    .select(LINK_SELECT)
-    .eq("id", linkId)
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) return null;
-  const link = data as unknown as LinkRow;
-
-  if (effectiveMode(link.declaration_mode, link.recipes?.declaration_mode) === "auto_with_overrides") {
-    const { data: computed, error: fnErr } = await supabase.functions.invoke(
-      "compute-product-declaration",
-      { body: { product_recipe_link_id: link.id } },
-    );
-    if (fnErr) throw fnErr;
-    const c = computed as {
-      ingredient_declaration_html?: string | null;
-      allergens_contains?: string[];
-      allergens_may_contain?: string[];
-      nutrition_per_100g?: Record<string, number | null> | null;
-      data_quality?: { nutrition_coverage_pct?: number | null };
-    };
-    const coverage = c.data_quality?.nutrition_coverage_pct ?? null;
-    const coverageOk = (coverage ?? 0) >= MIN_NUTRITION_COVERAGE_PCT;
-    const eff: EffectiveDeclaration = {
-      mode: "auto_with_overrides",
-      source: "calculated",
-      ingredientText: stripHtml(c.ingredient_declaration_html) || null,
-      contains: c.allergens_contains ?? [],
-      mayContain: c.allergens_may_contain ?? [],
-      nutrition: coverageOk ? pickNutrition(c.nutrition_per_100g) : null,
-      coveragePct: coverage,
-      nutritionSuppressed: !coverageOk,
-    };
-    await writeSnapshot(link.product_id, eff);
-    return eff;
-  }
-
-  const calculated = link.recipe_id ? await fetchCalculated(link.recipe_id) : null;
-  const eff = buildEffectiveDeclaration(link, calculated);
-  await writeSnapshot(link.product_id, eff);
-  return eff;
 }
 
 /** Sammenligner beregnet mot manuell for å oppdage at beregningen har flyttet seg. */
