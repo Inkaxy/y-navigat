@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import DOMPurify from "dompurify";
 import ReactMarkdown from "react-markdown";
 import { Loader2, FileDown, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -8,26 +7,21 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { formatNOK } from "@/ordre/lib/format";
+import { MarkedText } from "@/varer/components/label/MarkedText";
+import { formatNutrient, type NutrientKey } from "@/varer/lib/nutritionFormat";
 
-
-const NUTRITION_FIELDS: { key: string; label: string }[] = [
+// Samme felt-sett og rekkefølge som etiketten/deklarasjonen (vedlegg XV).
+const NUTRITION_FIELDS: { key: NutrientKey; label: string }[] = [
   { key: "energy_kj", label: "Energi (kJ)" },
   { key: "energy_kcal", label: "Energi (kcal)" },
-  { key: "fat_g", label: "Fett (g)" },
-  { key: "saturated_fat_g", label: "— hvorav mettede fettsyrer (g)" },
-  { key: "carbs_g", label: "Karbohydrater (g)" },
-  { key: "sugars_g", label: "— hvorav sukkerarter (g)" },
-  { key: "fiber_g", label: "Fiber (g)" },
-  { key: "protein_g", label: "Protein (g)" },
-  { key: "salt_g", label: "Salt (g)" },
+  { key: "fat_g", label: "Fett" },
+  { key: "saturated_fat_g", label: "— hvorav mettede fettsyrer" },
+  { key: "carbs_g", label: "Karbohydrater" },
+  { key: "sugars_g", label: "— hvorav sukkerarter" },
+  { key: "fiber_g", label: "Fiber" },
+  { key: "protein_g", label: "Protein" },
+  { key: "salt_g", label: "Salt" },
 ];
-
-type ComputedDeclaration = {
-  ingredient_declaration_html?: string | null;
-  allergens_contains?: string[];
-  allergens_may_contain?: string[];
-  nutrition_per_100g?: Record<string, number | null> | null;
-};
 
 interface Props {
   productId: string | null;
