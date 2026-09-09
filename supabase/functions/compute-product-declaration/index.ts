@@ -164,18 +164,35 @@ Deno.serve(async (req) => {
     function pickManual<T>(linkVal: T | null | undefined, recipeVal: T | null | undefined): T | null | undefined {
       return linkVal ?? recipeVal;
     }
+    let manualBlocked = false;
+    const manualBlockReasons: string[] = [];
     if (mode === "manual") {
       const ing = pickManual(link.manual_ingredient_declaration, recipe?.manual_ingredient_declaration);
       if (ing) finalIngredient = ing as string;
-      else warnings.push("Manuell modus, men ingen manuell ingrediensliste er lagret — beregningen vises i stedet");
+      else {
+        manualBlocked = true;
+        manualBlockReasons.push("Manuell modus, men ingen manuell ingrediensliste er lagret");
+      }
       const nut = pickManual(link.manual_nutrition, recipe?.manual_nutrition);
-      if (nut && typeof nut === "object") finalNutrition = nut as any;
+      if (nut && typeof nut === "object") {
+        finalNutrition = nut as any;
+        // Feil skal feile lukket: mangler ett av pliktfeltene i vedlegg XV, sperres deklarasjonen.
+        const missingNutrients = NUT_FIELDS.filter((f) => f !== "fiber_g" && (finalNutrition as any)[f] == null);
+        if (missingNutrients.length > 0) {
+          manualBlocked = true;
+          manualBlockReasons.push(`Manuell næringsdeklarasjon mangler pliktfelt: ${missingNutrients.join(", ")}`);
+        }
+      } else {
+        manualBlocked = true;
+        manualBlockReasons.push("Manuell modus, men ingen manuell næringsdeklarasjon er lagret");
+      }
       const all = pickManual(link.manual_allergen_summary, recipe?.manual_allergen_summary);
       if (all && typeof all === "object") {
         const m = all as any;
         if (Array.isArray(m.contains)) finalContains = m.contains;
         if (Array.isArray(m.may_contain)) finalMayContain = m.may_contain;
       }
+      if (manualBlocked) for (const r of manualBlockReasons) warnings.push(r);
     } else if (mode === "auto_with_overrides") {
       const { data: overrides } = await service.from("product_declaration_overrides")
         .select("field_name, override_value").eq("product_recipe_link_id", linkId);
@@ -220,8 +237,8 @@ Deno.serve(async (req) => {
         lines_without_nutrition: linesWithoutNut,
         nutrition_coverage_pct: nutritionCoveragePct,
         yield_grams_set: yieldGrams != null || recipe?.yield_grams != null || recipe?.finished_weight_grams != null,
-        blocked: gate.blocked,
-        block_reasons: gate.reasons,
+        blocked: gate.blocked || manualBlocked,
+        block_reasons: manualBlocked ? [...gate.reasons, ...manualBlockReasons] : gate.reasons,
       },
       ingredient_declaration_text: core.ingredientText,
       coverage_by_nutrient: core.coverage_by_nutrient,

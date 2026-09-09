@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import DOMPurify from "dompurify";
 import ReactMarkdown from "react-markdown";
 import { Loader2, FileDown, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -8,26 +7,21 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { formatNOK } from "@/ordre/lib/format";
+import { MarkedText } from "@/varer/components/label/MarkedText";
+import { formatNutrient, type NutrientKey } from "@/varer/lib/nutritionFormat";
 
-
-const NUTRITION_FIELDS: { key: string; label: string }[] = [
+// Samme felt-sett og rekkefølge som etiketten/deklarasjonen (vedlegg XV).
+const NUTRITION_FIELDS: { key: NutrientKey; label: string }[] = [
   { key: "energy_kj", label: "Energi (kJ)" },
   { key: "energy_kcal", label: "Energi (kcal)" },
-  { key: "fat_g", label: "Fett (g)" },
-  { key: "saturated_fat_g", label: "— hvorav mettede fettsyrer (g)" },
-  { key: "carbs_g", label: "Karbohydrater (g)" },
-  { key: "sugars_g", label: "— hvorav sukkerarter (g)" },
-  { key: "fiber_g", label: "Fiber (g)" },
-  { key: "protein_g", label: "Protein (g)" },
-  { key: "salt_g", label: "Salt (g)" },
+  { key: "fat_g", label: "Fett" },
+  { key: "saturated_fat_g", label: "— hvorav mettede fettsyrer" },
+  { key: "carbs_g", label: "Karbohydrater" },
+  { key: "sugars_g", label: "— hvorav sukkerarter" },
+  { key: "fiber_g", label: "Fiber" },
+  { key: "protein_g", label: "Protein" },
+  { key: "salt_g", label: "Salt" },
 ];
-
-type ComputedDeclaration = {
-  ingredient_declaration_html?: string | null;
-  allergens_contains?: string[];
-  allergens_may_contain?: string[];
-  nutrition_per_100g?: Record<string, number | null> | null;
-};
 
 interface Props {
   productId: string | null;
@@ -55,37 +49,10 @@ export function ProductInfoDialog({ productId, productName, displayNumber, sales
     },
   });
 
-  const linkQuery = useQuery({
-    queryKey: ["product-info-link", productId],
-    enabled: !!productId && open,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("product_recipe_links")
-        .select("id")
-        .eq("product_id", productId!)
-        .order("is_primary", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const declQuery = useQuery({
-    queryKey: ["product-info-decl", linkQuery.data?.id],
-    enabled: !!linkQuery.data?.id && open,
-    queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("compute-product-declaration", {
-        body: { product_recipe_link_id: linkQuery.data!.id },
-      });
-      if (error) throw error;
-      return data as ComputedDeclaration;
-    },
-  });
-
+  // Godkjent snapshot: samme kilde som etiketten (produktets manuelle/godkjente
+  // felter), ikke et nytt beregnet kall til compute-product-declaration.
   const product = productQuery.data;
-  const computed = declQuery.data;
-  const loading = productQuery.isLoading || linkQuery.isLoading || declQuery.isLoading;
+  const loading = productQuery.isLoading;
   const [generating, setGenerating] = useState(false);
 
   return (
@@ -171,69 +138,57 @@ export function ProductInfoDialog({ productId, productName, displayNumber, sales
           {(() => {
             if (loading) return null;
 
-            // Bygg "effektiv" deklarasjon: prefer computed (oppskrift), fall back til manuelle felter på produktet.
+            // Godkjent snapshot fra produktet — samme kilde som etiketten.
             const manualIng = product?.manual_ingredient_declaration?.trim() || null;
             const manualContains = (product?.manual_allergens_contains ?? []) as string[];
             const manualMay = (product?.manual_allergens_may_contain ?? []) as string[];
-            const manualNut = (product?.manual_nutrition_per_100g ?? null) as Record<string, number> | null;
+            const manualNut = (product?.manual_nutrition_per_100g ?? null) as Record<string, number | null> | null;
 
-            const effIngredient = computed?.ingredient_declaration_html || manualIng;
-            const effContains = computed?.allergens_contains?.length ? computed.allergens_contains : manualContains;
-            const effMay = computed?.allergens_may_contain?.length ? computed.allergens_may_contain : manualMay;
-            const effNutrition = computed?.nutrition_per_100g ?? manualNut;
-            const isManual = !computed && (manualIng || manualContains.length || manualMay.length || manualNut);
-
-            if (!computed && !isManual) {
+            if (!manualIng && manualContains.length === 0 && manualMay.length === 0 && !manualNut) {
               return (
                 <p className="text-sm text-muted-foreground">
-                  Ingen oppskrift eller manuell deklarasjon registrert for dette produktet.
+                  Ingen godkjent deklarasjon registrert for dette produktet.
                 </p>
               );
             }
 
             return (
               <>
-                {effIngredient && (
+                {manualIng && (
                   <section>
                     <h3 className="mb-1 font-semibold">Ingredienser</h3>
-                    <div
-                      className="text-sm leading-relaxed text-foreground"
-                      dangerouslySetInnerHTML={{
-                        __html: DOMPurify.sanitize(effIngredient, { USE_PROFILES: { html: true } }),
-                      }}
-                    />
-                    {isManual && (
-                      <p className="mt-1 text-[11px] text-muted-foreground">Lagt inn manuelt</p>
-                    )}
+                    <p className="text-sm leading-relaxed text-foreground">
+                      <MarkedText text={manualIng} />
+                    </p>
                   </section>
                 )}
 
-                {effContains.length > 0 && (
+                {manualContains.length > 0 && (
                   <section>
                     <h3 className="mb-1 font-semibold">Allergener</h3>
-                    <p className="text-sm">{effContains.join(", ")}</p>
+                    <p className="text-sm">{manualContains.join(", ")}</p>
                   </section>
                 )}
 
-                {effMay.length > 0 && (
+                {manualMay.length > 0 && (
                   <section>
                     <h3 className="mb-1 font-semibold">Kan inneholde spor av</h3>
-                    <p className="text-sm">{effMay.join(", ")}</p>
+                    <p className="text-sm">{manualMay.join(", ")}</p>
                   </section>
                 )}
 
                 <section>
                   <h3 className="mb-1 font-semibold">Næringsinnhold pr 100 g</h3>
-                  {effNutrition ? (
+                  {manualNut ? (
                     <table className="w-full text-sm">
                       <tbody>
                         {NUTRITION_FIELDS.map((f) => {
-                          const v = effNutrition?.[f.key];
+                          const v = manualNut?.[f.key];
                           if (v == null) return null;
                           return (
                             <tr key={f.key} className="border-b border-border/50 last:border-0">
                               <td className="py-1">{f.label}</td>
-                              <td className="py-1 text-right tabular-nums">{v}</td>
+                              <td className="py-1 text-right tabular-nums">{formatNutrient(f.key, v)}</td>
                             </tr>
                           );
                         })}
@@ -259,17 +214,12 @@ export function ProductInfoDialog({ productId, productName, displayNumber, sales
                 const manualIng = product.manual_ingredient_declaration?.trim() || null;
                 const manualContains = (product.manual_allergens_contains ?? []) as string[];
                 const manualMay = (product.manual_allergens_may_contain ?? []) as string[];
-                const manualNut = (product.manual_nutrition_per_100g ?? null) as Record<string, number> | null;
-                const effIngredientHtml = computed?.ingredient_declaration_html || manualIng;
-                const ingredientsText = effIngredientHtml
-                  ? new DOMParser().parseFromString(
-                      DOMPurify.sanitize(effIngredientHtml, { USE_PROFILES: { html: true } }),
-                      "text/html",
-                    ).body.textContent?.trim() || null
-                  : null;
+                const manualNut = (product.manual_nutrition_per_100g ?? null) as Record<string, number | null> | null;
+                // Rå tekst uten markørstjerner til PDF-en (samme kilde som forhåndsvisningen).
+                const ingredientsText = manualIng ? manualIng.replace(/\*/g, "") : null;
                 const rich = product.description_rich as { format?: string; text?: string } | null | undefined;
                 const description = (rich?.text ?? product.description ?? "").trim() || null;
-                const isManual = !computed && !!(manualIng || manualContains.length || manualMay.length || manualNut);
+                const isManual = true;
 
                 const [{ pdf }, { DatasheetPDFDocument }] = await Promise.all([
                   import("@react-pdf/renderer"),
@@ -282,9 +232,9 @@ export function ProductInfoDialog({ productId, productName, displayNumber, sales
                       imageUrl: product.image_url,
                       description,
                       ingredientsText,
-                      allergensContains: computed?.allergens_contains?.length ? computed.allergens_contains : manualContains,
-                      allergensMay: computed?.allergens_may_contain?.length ? computed.allergens_may_contain : manualMay,
-                      nutrition: computed?.nutrition_per_100g ?? manualNut,
+                      allergensContains: manualContains,
+                      allergensMay: manualMay,
+                      nutrition: manualNut,
                       isManual,
                     }}
                   />,

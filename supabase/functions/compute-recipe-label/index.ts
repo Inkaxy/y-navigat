@@ -62,7 +62,7 @@ const KEYHOLE_GROUPS = {
       { key: "fiber_g", name: "Kostfiber", op: "min" as const, limit: 6, unit: "g/100 g" },
       { key: "fat_g", name: "Fett", op: "max" as const, limit: 7, unit: "g/100 g" },
       { key: "sugars_g", name: "Sukkerarter", op: "max" as const, limit: 5, unit: "g/100 g" },
-      { key: "salt_g", name: "Salt", op: "max" as const, limit: 1.1, unit: "g/100 g" },
+      { key: "salt_g", name: "Salt", op: "max" as const, limit: 1.3, unit: "g/100 g" }, // Kilde: Veileder til nøkkelhullforskriften (mars 2021), kap. 4.5.3.4, gruppe 9
     ],
   },
 };
@@ -144,7 +144,10 @@ Deno.serve(async (req) => {
     const yieldLossPct = Number(recipe.yield_loss_pct) || 0;
     const hasFinishedWeight = recipe.finished_weight_grams != null && Number(recipe.finished_weight_grams) > 0;
     // Uten stektap blir næring per 100 g regnet på deigvekt — 11–18 % for lavt for brød.
-    const missingBakeLoss = yieldLossPct <= 0 && !hasFinishedWeight;
+    // Kravet gjelder bare for oppskrifter Nøkkelhullet i det hele tatt vurderer
+    // (brød, rundstykker, knekkebrød) — andre oppskrifter kan ha 0 % stektap uten sperre.
+    const isKeyholeCandidate = keyholeGroupForRecipe(recipe.category ?? null, recipe.name ?? null) !== null;
+    const missingBakeLoss = isKeyholeCandidate && !hasFinishedWeight && finalWeight >= inputGramsEstimate - 0.5;
     if (missingBakeLoss) {
       warnings.push("0 % stektap er registrert — BKLF antar ca. 12 % for brød. Næring per 100 g blir for lav til den er satt.");
     }
@@ -209,6 +212,10 @@ Deno.serve(async (req) => {
     }));
     if (coveragePct < 90) warnings.push(`Kun ${nb(coveragePct)} % av deigvekten har næringsdata`);
     const gate = declarationGate(core, coveragePct);
+    if (missingBakeLoss) {
+      gate.reasons.push("0 % stektap – sett stektap eller ferdigvekt");
+      gate.blocked = true;
+    }
     for (const r of gate.reasons) if (!warnings.includes(r)) warnings.push(r);
 
     // 8) Nøkkelhullet

@@ -40,7 +40,8 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { toCsv, downloadCsv } from "@/varer/lib/pricing";
-import { MatrixView, type ProductRow, type PriceListLite } from "@/varer/components/prices/MatrixView";
+import { MatrixView, type ProductRow, type PriceListLite, type ProfitabilityRow } from "@/varer/components/prices/MatrixView";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BatchAdjustDialog } from "@/varer/components/prices/BatchAdjustDialog";
 import { OfferPriceListsDialog } from "@/varer/components/prices/OfferPriceListsDialog";
 import { ImportPricesDialog } from "@/varer/components/prices/ImportPricesDialog";
@@ -78,6 +79,9 @@ export default function PriceLists() {
   const [search, setSearch] = useState("");
   const [includeNotForSale, setIncludeNotForSale] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showProfitability, setShowProfitability] = useState(false);
+  const [profitabilityListId, setProfitabilityListId] = useState<string>("");
+  const [applyingNecessary, setApplyingNecessary] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [offerListsOpen, setOfferListsOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -305,6 +309,96 @@ export default function PriceLists() {
       return agg;
     },
   });
+
+  // Default lønnsomhets-prisliste = første aktive base-liste (typisk hovedprislisten).
+  useEffect(() => {
+    if (!profitabilityListId && activeLists.length > 0) {
+      setProfitabilityListId(activeLists.find((l) => l.price_list_type === "base")?.id ?? activeLists[0].id);
+    }
+  }, [activeLists, profitabilityListId]);
+
+  /* ----- Valgfrie lønnsomhetskolonner (profitability_sheet for én prisliste) ----- */
+  const profitabilitySheetQuery = useQuery({
+    queryKey: ["profitability-sheet-matrix", profitabilityListId, priceDate],
+    enabled: view === "matrix" && showProfitability && !!profitabilityListId,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("profitability_sheet", {
+        p_price_list_id: profitabilityListId,
+        p_date: priceDate,
+      });
+      if (error) throw error;
+      return (data ?? []) as unknown as Array<{
+        product_id: string;
+        kostpris: number | null;
+        dg2_pct: number | null;
+        maal_dg2_pct: number | null;
+        nodvendig_pris: number | null;
+        status: string | null;
+      }>;
+    },
+  });
+
+  const profitabilityMap = useMemo(() => {
+    const m = new Map<string, ProfitabilityRow>();
+    for (const r of profitabilitySheetQuery.data ?? []) {
+      m.set(r.product_id, {
+        kostpris: r.kostpris,
+        dg2_pct: r.dg2_pct,
+        maal_dg2_pct: r.maal_dg2_pct,
+        nodvendig_pris: r.nodvendig_pris,
+        status: (r.status as ProfitabilityRow["status"]) ?? null,
+      });
+    }
+    return m;
+  }, [profitabilitySheetQuery.data]);
+
+  const profitabilityListName = activeLists.find((l) => l.id === profitabilityListId)?.display_name ?? null;
+
+  /** «Sett valgte til nødvendig pris» — skriver nødvendig_pris for de valgte varene til den valgte lønnsomhets-prislisten. */
+  async function applyNecessaryPricesToSelected() {
+    if (!profitabilityListId || selectedIds.size === 0) return;
+    setApplyingNecessary(true);
+    try {
+      const rows = Array.from(selectedIds)
+        .map((productId) => {
+          const prof = profitabilityMap.get(productId);
+          if (prof?.nodvendig_pris == null) return null;
+          return {
+            priceListId: profitabilityListId,
+            productId,
+            price: prof.nodvendig_pris,
+            validFrom: priceDate,
+            label: productNames[productId] ?? productId,
+          };
+        })
+        .filter((r): r is { priceListId: string; productId: string; price: number; validFrom: string; label: string } => r !== null);
+      if (rows.length === 0) {
+        toast.info("Ingen av de valgte varene har en nødvendig pris å sette");
+        return;
+      }
+      const res = await setPrices(rows);
+      const nameFor = (pid: string | null) => (pid ? (productNames[pid] ?? pid) : "");
+      for (const r of res.rows.filter((x) => !x.ok)) {
+        toast.error(`${nameFor(r.productId)}: ${r.error ?? "Ukjent feil"}`);
+      }
+      if (res.succeeded > 0 || res.unchanged > 0) {
+        await logAudit({
+          action: "price_adjusted",
+          entity_type: "price_list_item",
+          entity_id: null,
+          entity_display_reference: `Sett til nødvendig pris (${res.succeeded} varer) · ${priceDate}`,
+          changes: { count: res.succeeded, unchanged: res.unchanged, failed: res.failed, valid_from: priceDate, price_list_id: profitabilityListId },
+        });
+        toast.success(summarizeSetPrices(res, nameFor));
+        invalidatePriceQueries();
+        qc.invalidateQueries({ queryKey: ["profitability-sheet-matrix"] });
+      } else if (res.failed > 0) {
+        toast.error(`Ingen priser lagret — ${res.failed} feilet`);
+      }
+    } finally {
+      setApplyingNecessary(false);
+    }
+  }
 
   /* ----- Spesialpris-flagg for matrix ----- */
   const specialFlagsQuery = useQuery({
@@ -593,6 +687,28 @@ export default function PriceLists() {
             vis også varer som ikke er til salgs
           </label>
 
+          {view === "matrix" && (
+            <label className="flex items-center gap-2 text-sm">
+              <Switch checked={showProfitability} onCheckedChange={setShowProfitability} />
+              <span className="text-muted-foreground">Vis lønnsomhet</span>
+            </label>
+          )}
+
+          {view === "matrix" && showProfitability && (
+            <Select value={profitabilityListId} onValueChange={setProfitabilityListId}>
+              <SelectTrigger className="h-9 w-56">
+                <SelectValue placeholder="Velg prisliste" />
+              </SelectTrigger>
+              <SelectContent>
+                {activeLists.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>
+                    {l.display_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
           <label className="ml-auto flex items-center gap-2 text-sm">
             <Switch checked={showInclMva} onCheckedChange={setShowInclMva} />
             <span className="text-muted-foreground">Vis inkl. mva</span>
@@ -633,6 +749,16 @@ export default function PriceLists() {
         {view === "matrix" && selectedIds.size > 0 && (
           <div className="flex flex-wrap items-center gap-2 rounded-md border border-app/30 bg-app/5 px-3 py-2 text-sm">
             <span className="font-medium text-app-dark">{selectedIds.size} valgt</span>
+            {showProfitability && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={applyNecessaryPricesToSelected}
+                disabled={applyingNecessary || !profitabilityListId}
+              >
+                Sett valgte til nødvendig pris
+              </Button>
+            )}
             <Button
               size="sm"
               variant="ghost"
@@ -677,6 +803,9 @@ export default function PriceLists() {
                 onToggleSelectAll={toggleAll}
                 highlightPriceListId={highlight}
                 showInclMva={showInclMva}
+                profitability={profitabilityMap}
+                showProfitability={showProfitability}
+                profitabilityPriceListName={profitabilityListName}
               />
             )}
             <div className="text-xs text-muted-foreground">

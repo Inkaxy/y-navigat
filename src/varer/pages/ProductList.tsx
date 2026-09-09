@@ -130,16 +130,28 @@ export default function ProductList() {
   const productsQuery = useQuery({
     queryKey: ["products", legalEntityId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select(
-          "id, display_number, code, display_name, product_category, product_subcategory, unit_of_sale, status, variant_of_product_id, variant_label, label_mode, is_cake_component, cake_role, image_url, mva_rate, pieces_per_tray, in_web_shop, in_pos, manual_ingredient_declaration, declaration_needs_review, calc_type, manual_cost_price, main_category:product_main_categories(code, display_name), sub_category:product_sub_categories(code, display_name)",
-        )
-        .eq("legal_entity_id", legalEntityId!)
-        .order("display_number", { ascending: true })
-        .limit(2000);
-      if (error) throw error;
-      return (data ?? []) as ProductRow[];
+      // Databasetypen gir `status` og `cake_role` som frie tekster; vi smalner dem etter henting.
+      type DbProductRow = Omit<ProductRow, "status" | "cake_role"> & {
+        status: string;
+        cake_role: string | null;
+      };
+      const rows = await fetchAllRows<DbProductRow>((from, to) =>
+        supabase
+          .from("products")
+          .select(
+            "id, display_number, code, display_name, product_category, product_subcategory, unit_of_sale, status, variant_of_product_id, variant_label, label_mode, is_cake_component, cake_role, image_url, mva_rate, pieces_per_tray, in_web_shop, in_pos, manual_ingredient_declaration, declaration_needs_review, calc_type, manual_cost_price, main_category:product_main_categories(code, display_name), sub_category:product_sub_categories(code, display_name)",
+          )
+          .eq("legal_entity_id", legalEntityId!)
+          .order("display_number", { ascending: true })
+          .range(from, to),
+      );
+      const isStatus = (v: string): v is ProductStatus => v in PRODUCT_STATUS_LABEL;
+      const isCakeRole = (v: string): v is CakeRole => v in CAKE_ROLE_LABEL;
+      return rows.map<ProductRow>((r) => ({
+        ...r,
+        status: isStatus(r.status) ? r.status : "draft",
+        cake_role: r.cake_role && isCakeRole(r.cake_role) ? r.cake_role : null,
+      }));
     },
   });
 

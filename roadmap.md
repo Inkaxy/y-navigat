@@ -16,3 +16,23 @@
 - [x] M Ingen falsk «endret av noen andre» etter egen lagring
 - [x] N Kanonisk enhetsliste og tetthet
 - [x] O Ingen nye eslint-disable + PDF-wrap
+
+## Varer 7c/7: komplettering av delvis leverte G1–G6
+- [ ] 1 Grid-tastatur (input+select, forslagsnavigasjon, test)
+- [ ] 2 Vektet vanntemperatur lagret på oppskriften + PDF-linje
+- [ ] 3 Skalering → ny oppskrift med skalerte mengder + PDF per sats
+- [ ] 4 Sticky statuslinje, Fordeig %, margin, missing_cost
+- [ ] 5 Splitt RecipeDetail + invalidering + selskapsfiltrert råvarespørring
+- [ ] 6 Likt enhetsantall (RecipeSummaryCard + validate-recipe-share)
+- [ ] 7 Stektap som krav i declarationGate
+- [ ] 8 Fritekst-kornlinjer låser grovhetspåstand
+- [ ] 9 Ordre-dialog viser godkjent snapshot + manuell sperre i edge
+- [ ] 10 Tekst-rester, deklarasjonsnavn, (øvrige), arvet næring
+- [ ] 11 Nøkkelhull-grafikk, grunnlagstekst, grenser, salt gr. 9, væskeliste
+- [ ] 12 Halvfabrikat modell B
+- [ ] 13 Meny med sju grupper + prismatrise-kolonner
+- [ ] 14 Opprydding (as any, fetchAllRows, priser, døde ruter, invalidering)
+- [ ] 15 Merking-siden restpunkter
+- [ ] 16 PrintLabelDialog mangler fra RPC
+- [ ] 17 Én definisjon av næringsfeltene
+- [ ] 18 Manglende tester

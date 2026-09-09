@@ -42,38 +42,23 @@ import type { ProductionDepartment } from "@/produksjon/features/produksjonsavde
 /**
  * Felter der manglende data er et matsikkerhetsproblem. Mangler noen av disse
  * på en etikett som skal bære deklarasjon, blokkeres utskriften.
+ *
+ * Kilden til «mangler» er alltid `resolve_label_data` (RPC-en) — det finnes
+ * ingen lokal duplikat-sjekk her lenger. RPC-en dekker både 1169/2011-feltene
+ * og Nøkkelhullforskriftens pliktfelt (naering, vekt, holdbarhet/best_for,
+ * oppbevaring, produsent) via `label_declaration_missing`.
  */
 const CRITICAL_LABEL_FIELDS = new Set([
   "allergener",
   "kan_inneholde",
   "ingredienser",
+  "naering",
+  "vekt",
+  "holdbarhet",
+  "best_for",
+  "oppbevaring",
+  "produsent",
 ]);
-
-/**
- * Pliktfelt etter 1169/2011 som etiketten selv må bære når profilen skriver
- * dem ut. `resolve_label_data.mangler` dekker ikke disse, så vi sjekker
- * verdiene direkte på klienten før utskrift.
- */
-const DECLARATION_FIELD_KEYS: Record<string, string> = {
-  ingredienser: "ingrediensliste",
-  allergener: "allergener",
-  kan_inneholde: "«kan inneholde spor av»",
-  naringsinnhold: "næringsdeklarasjon",
-  nettovekt: "nettovekt",
-  holdbarhet: "holdbarhet",
-  best_for: "holdbarhet",
-  oppbevaring: "oppbevaring",
-  produsent: "produsent",
-};
-
-/** Tom verdi = pliktfeltet mangler på etiketten. */
-function isEmptyFieldValue(v: unknown): boolean {
-  if (v == null) return true;
-  if (typeof v === "string") return v.trim() === "";
-  if (Array.isArray(v)) return v.length === 0;
-  if (typeof v === "object") return Object.keys(v as object).length === 0;
-  return false;
-}
 
 interface Props {
   open: boolean;
@@ -177,39 +162,10 @@ export function PrintLabelDialog({
     return { critical, other };
   }, [labelDataMap, selectedUnits, orderLineIds, printedFields, row?.display_name]);
 
-  /**
-   * Pliktfeltsjekk: profilen skriver ut deklarasjonsfelt, men verdien er tom.
-   * Da sperres utskriften — det finnes ingen «skriv ut likevel».
-   */
-  const missingMandatory = useMemo(() => {
-    const printedDeclFields = [...printedFields].filter((k) => k in DECLARATION_FIELD_KEYS);
-    if (printedDeclFields.length === 0) return [] as Array<{ key: string; label: string; who: string }>;
-    const byField = new Map<string, Set<string>>();
-    const rowsToCheck =
-      selectedUnits.length > 0
-        ? selectedUnits.map((u) => ({ id: u.order_line_id, label: `etikett ${u.number}` }))
-        : orderLineIds.map((id) => ({ id, label: row?.display_name ?? "varen" }));
-    for (const r of rowsToCheck) {
-      if (!r.id) continue;
-      const felter = labelDataMap?.[r.id]?.felter;
-      if (!felter) continue;
-      for (const key of printedDeclFields) {
-        // «Kan inneholde» er valgfri når det ikke finnes sporallergener.
-        if (key === "kan_inneholde") continue;
-        if (!isEmptyFieldValue(felter[key])) continue;
-        const set = byField.get(key) ?? new Set<string>();
-        set.add(r.label);
-        byField.set(key, set);
-      }
-    }
-    return [...byField.entries()].map(([key, who]) => ({
-      key,
-      label: DECLARATION_FIELD_KEYS[key] ?? key,
-      who: [...who].join(", "),
-    }));
-  }, [printedFields, selectedUnits, orderLineIds, labelDataMap, row?.display_name]);
-
-  const blockedByMissing = missingReport.critical.size > 0 || missingMandatory.length > 0;
+  // Pliktfeltsjekken er nå alene om å komme fra `resolve_label_data.mangler`
+  // (via missingReport.critical) — ingen lokal duplikat-liste med egne nøkler
+  // som kan gå ut av synk med databasens felt-katalog.
+  const blockedByMissing = missingReport.critical.size > 0;
 
   const describeMissing = (m: Map<string, Set<string>>) =>
     [...m.entries()].map(([key, who]) => ({
@@ -431,11 +387,6 @@ export function PrintLabelDialog({
               {describeMissing(missingReport.critical).map((m) => (
                 <li key={m.key}>
                   {m.label} mangler for {m.who}
-                </li>
-              ))}
-              {missingMandatory.map((m) => (
-                <li key={`plikt-${m.key}`}>
-                  Pliktfelt: {m.label} mangler for {m.who}
                 </li>
               ))}
             </ul>

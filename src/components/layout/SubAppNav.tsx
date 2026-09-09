@@ -15,7 +15,7 @@ import { useRavarerAccessLevel } from "@/ravarer/hooks/useRavarerAccessLevel";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMarginAlerts } from "@/varer/hooks/useMarginAlerts";
-import { NB_LEGAL_ENTITY_ID } from "@/varer/lib/constants";
+import { useCompany } from "@/hooks/useCompany";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import {
   DropdownMenu,
@@ -369,8 +369,11 @@ function OrdreNav() {
 }
 
 function VarerNav() {
+  const { data: company } = useCompany();
+  const legalEntityId = company?.id ?? null;
   const { data: cleanupCount = 0 } = useQuery({
-    queryKey: ["varer-cleanup-count"],
+    queryKey: ["varer-cleanup-count", legalEntityId],
+    enabled: !!legalEntityId,
     queryFn: async () => {
       // recipes.product_id er tom overalt — selskapet leses direkte på oppskriften.
       const { count, error } = await supabase
@@ -378,14 +381,14 @@ function VarerNav() {
         .select("id", { count: "exact", head: true })
         .eq("requires_cleanup", true)
         .is("valid_to", null)
-        .eq("legal_entity_id", NB_LEGAL_ENTITY_ID);
+        .eq("legal_entity_id", legalEntityId!);
       if (error) return 0;
       return count ?? 0;
     },
     staleTime: 60_000,
   });
 
-  const { data: marginAlerts = [] } = useMarginAlerts(NB_LEGAL_ENTITY_ID);
+  const { data: marginAlerts = [] } = useMarginAlerts(legalEntityId);
 
   const items: NavItem[] = [
     { kind: "link", to: "/varer/dashbord", label: "Dashbord", icon: LayoutDashboard },

@@ -103,6 +103,7 @@ interface Props {
   dryMatterPct: number | null;
   finalWeightGrams: number | null;
   warnings: string[] | null;
+  freeTextGrainLines?: Array<{ name: string; grams: number }> | null;
   flourLines: FlourLine[];
   canWrite: boolean;
   savingClaim: boolean;
@@ -125,6 +126,7 @@ export function GrainSection({
   dryMatterPct,
   finalWeightGrams,
   warnings,
+  freeTextGrainLines,
   flourLines,
   canWrite,
   savingClaim,
@@ -203,7 +205,7 @@ export function GrainSection({
   });
 
   const busy = setMode.isPending || saveManual.isPending || syncProducts.isPending;
-  const claimLocked = effectivePct == null;
+  const claimLocked = effectivePct == null || (freeTextGrainLines?.length ?? 0) > 0;
 
   return (
     <Card>
