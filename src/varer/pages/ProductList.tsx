@@ -79,8 +79,20 @@ type ColDef = ColumnOption & {
   cellClassName?: string;
   render: (
     p: ProductRow,
-    ctx: { parent: ProductRow | null; price: number | undefined },
+    ctx: {
+      parent: ProductRow | null;
+      price: number | undefined;
+      costCache: CostCacheRow | undefined;
+    },
   ) => React.ReactNode;
+};
+
+type CostCacheRow = {
+  product_id: string;
+  cost_per_unit: number | null;
+  has_cost: boolean | null;
+  quality: string | null;
+  is_stale: boolean | null;
 };
 
 const COLUMN_PREF_SCOPE = "varer.product_list.columns.v1";
@@ -216,6 +228,26 @@ export default function ProductList() {
       );
     },
   });
+
+  /** Kalkylekvalitet leses fra kostbufferen i databasen. */
+  const costCacheQuery = useQuery({
+    queryKey: ["product-cost-cache", legalEntityId],
+    enabled: !!legalEntityId,
+    queryFn: async () => {
+      return await fetchAllRows<CostCacheRow>((from, to) =>
+        supabase
+          .from("product_cost_cache")
+          .select("product_id, cost_per_unit, has_cost, quality, is_stale")
+          .range(from, to),
+      );
+    },
+  });
+
+  const costCacheMap = useMemo(() => {
+    const m = new Map<string, CostCacheRow>();
+    (costCacheQuery.data ?? []).forEach((r) => m.set(r.product_id, r));
+    return m;
+  }, [costCacheQuery.data]);
 
   const today = osloTodayISO();
   const priceMap = useMemo(() => {
@@ -723,7 +755,7 @@ export default function ProductList() {
                     >
                       {visibleCols.map((c) => (
                         <td key={c.key} className={`px-4 py-2.5 ${c.cellClassName ?? ""}`}>
-                          {c.render(p, { parent, price })}
+                          {c.render(p, { parent, price, costCache: costCacheMap.get(p.id) })}
                         </td>
                       ))}
                     </tr>
