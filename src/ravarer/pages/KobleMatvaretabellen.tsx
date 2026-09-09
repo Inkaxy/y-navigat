@@ -245,7 +245,7 @@ export default function KobleMatvaretabellen() {
                   {r.name}
                 </Link>{" "}
                 <span className="text-ink-secondary">
-                  mangler {r.missing_fields.length} felt · kilde {r.source ?? "ukjent"}
+                  ufullstendig næringsdata · kilde {r.source ?? "ukjent"}
                 </span>
               </li>
             ))}
