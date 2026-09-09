@@ -219,17 +219,7 @@ Deno.serve(async (req) => {
     for (const r of gate.reasons) if (!warnings.includes(r)) warnings.push(r);
 
     // 8) Nøkkelhullet
-    const measured: Record<string, number | null> = {
-      whole_grain_pct_of_dry: wholeGrainPctOfDry,
-      rye_share_of_grain_pct: ryeSharePct,
-      fiber_g: per100.fiber_g,
-      fat_g: per100.fat_g,
-      sugars_g: per100.sugars_g,
-      salt_g: per100.salt_g,
-    };
 
-    // Glutenfritt avgjøres av allergenKODENE, ikke av de norske etikettene.
-    const isGlutenFree = isGlutenFreeFromCodes(core.containsCodes);
 
     // Gramendring for et næringskriterium: hvor mye må ingrediensen ned/opp i deigen?
     function adviceFor(c: { key: string; name: string; op: "min" | "max"; limit: number; unit: string }, value: number): string {
