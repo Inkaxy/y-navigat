@@ -68,7 +68,7 @@ const KEYHOLE_GROUPS: Record<"8a" | "8b" | "9", { label: string; criteria: Keyho
 };
 
 const NUTRIENT_KEYS = new Set(["fiber_g", "fat_g", "sugars_g", "salt_g"]);
-const KEYHOLE_MIN_COVERAGE_PCT = 90;
+export const KEYHOLE_MIN_COVERAGE_PCT = 90;
 
 /** Nøkkelhullet vurderes bare for brød, rundstykker og knekkebrød. */
 export function keyholeGroupForRecipe(category: string | null, name: string | null): "8a" | "9" | null {
