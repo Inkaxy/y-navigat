@@ -6,6 +6,7 @@ import { getSessionToken, baseUrl, authHeader } from "../_shared/tripletex.ts";
 import { parsePackageFromDescription } from "../_shared/units.ts";
 import { computeLinesSum, needsReviewFromConfidence } from "../_shared/lines-sum.ts";
 import { planLineExtractionFailure } from "./failure-plan.ts";
+import { pickLedgerAccount } from "./ledger-account.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -217,6 +218,24 @@ Deno.serve(async (req) => {
             vellykket++;
             continue;
           }
+
+          // Hovedbokskonto fra bilagets posteringer — feil her skal ikke velte fakturaen.
+          let ledgerAccount: string | null = null;
+          try {
+            const vRes = await fetch(
+              `${baseUrl()}/supplierInvoice/${ttId}?fields=voucher(postings(account(number),amountGross,amount))`,
+              { headers: { Authorization: authHeader(sessionToken), Accept: "application/json" } },
+            );
+            if (vRes.ok) {
+              const vJson = await vRes.json().catch(() => null);
+              ledgerAccount = pickLedgerAccount(vJson?.value?.voucher?.postings);
+            } else {
+              await vRes.text().catch(() => "");
+            }
+          } catch (_e) {
+            ledgerAccount = null;
+          }
+          for (const r of rows) (r as { ledger_account: string | null }).ledger_account = ledgerAccount;
 
           const { error: linesErr } = await admin.from("invoice_lines").insert(rows);
           if (linesErr) throw new Error(linesErr.message);

@@ -101,8 +101,18 @@ export function CalculationTab({ productId, canWrite }: Props) {
   );
 }
 
+/** Ekstra `product_cost`-nøkler som ikke er i den delte typen ennå. */
+interface ExtendedProductCost extends ProductCost {
+  calc_type_set?: boolean | null;
+  recipe_id?: string | null;
+  dough_grams_net?: number | null;
+  package_items?: { name?: string; cost?: number }[] | null;
+  energy_cost_per_unit?: number | null;
+}
+
 function CostCard({ cost, isTrade }: { cost: ProductCost; isTrade: boolean }) {
   const total = Number(cost.cost_price ?? 0);
+  const ext = cost as ExtendedProductCost;
 
   const rows: { label: string; value: number | null | undefined }[] = isTrade
     ? [
@@ -167,6 +177,30 @@ function CostCard({ cost, isTrade }: { cost: ProductCost; isTrade: boolean }) {
             {nPct(cost.dough_waste_pct, 1)} →{" "}
             <b className="text-foreground">{nNum(cost.units_per_batch, 1)} enheter</b>
           </p>
+        )}
+
+        {(ext.dough_grams_net != null || ext.energy_cost_per_unit != null || ext.recipe_id) && (
+          <div className="space-y-1 border-t border-border pt-2 text-xs text-muted-foreground">
+            {ext.recipe_id && <div>Oppskrift: <span className="font-mono">{ext.recipe_id}</span></div>}
+            {ext.dough_grams_net != null && <div>Netto deigvekt: {nG(ext.dough_grams_net)}</div>}
+            {ext.energy_cost_per_unit != null && (
+              <div>Energikostnad per enhet: {nKr(ext.energy_cost_per_unit)}</div>
+            )}
+            {ext.calc_type_set != null && (
+              <div>Kalkyletype satt: {ext.calc_type_set ? "Ja" : "Nei"}</div>
+            )}
+            {ext.package_items && ext.package_items.length > 0 && (
+              <div>
+                Emballasje:{" "}
+                {ext.package_items.map((it, i) => (
+                  <span key={i}>
+                    {i > 0 ? ", " : ""}
+                    {it.name ?? "—"}{it.cost != null ? ` (${nKr(it.cost)})` : ""}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>

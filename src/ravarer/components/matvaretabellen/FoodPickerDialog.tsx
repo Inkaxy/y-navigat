@@ -17,13 +17,15 @@ import { Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
-import { useApplyMatvaretabellen, useMatvaretabellenFoods } from "@/ravarer/hooks/useMatvaretabellen";
+import {
+  useApplyMatvaretabellen,
+  useMatvaretabellenSearch,
+  useMatvaretabellenSuggest,
+  useMatvaretabellenSuggestForName,
+} from "@/ravarer/hooks/useMatvaretabellen";
 import { useRawMaterial } from "@/ravarer/hooks/useRawMaterials";
-import { formatNumber } from "@/ravarer/lib/constants";
-import { rankBySearch } from "@/lib/textSimilarity";
 import { suggestDeclarationNameLocal } from "@/ravarer/lib/declarationName";
 import { nutritionSourceLabel } from "@/ravarer/lib/nutritionSource";
-import { suggestFoods } from "@/ravarer/lib/foodSuggestions";
 
 interface Props {
   open: boolean;
@@ -35,7 +37,6 @@ interface Props {
 
 /** Velg en matvare for en kjent råvare (motsatt vei av LinkRawMaterialDialog). */
 export function FoodPickerDialog({ open, onOpenChange, rawMaterialId, initialQuery }: Props) {
-  const { data: foods = [], isLoading } = useMatvaretabellenFoods();
   const { data: rm } = useRawMaterial(rawMaterialId);
   const apply = useApplyMatvaretabellen();
 
@@ -53,29 +54,35 @@ export function FoodPickerDialog({ open, onOpenChange, rawMaterialId, initialQue
   const debounced = useDebouncedValue(q, 250);
   const [checkingId, setCheckingId] = useState<string | null>(null);
   const [pending, setPending] = useState<{ foodId: string; foodName: string; source: string } | null>(null);
+  const [skippedInfo, setSkippedInfo] = useState<{ foodId: string; count: number } | null>(null);
 
   useEffect(() => {
     if (open) {
       setQ(defaultQuery);
       setTouched(false);
+      setSkippedInfo(null);
     }
   }, [open, defaultQuery]);
 
-  const suggestions = useMemo(
-    () => (rm ? suggestFoods({ name: rm.name, declaration_name: rm.declaration_name, category: rm.category }, foods, 3) : []),
-    [rm, foods],
+  // Råvaren er lagret — bruk den presise suggest-en, som rangeres i databasen.
+  // Er råvaren fortsatt ulagret (ikke funnet ennå), foreslår vi ut fra teksten alene.
+  const { data: suggestKnown = [] } = useMatvaretabellenSuggest(rm ? rawMaterialId : null);
+  const { data: suggestForName = [] } = useMatvaretabellenSuggestForName(
+    rm ? null : { name: q, declarationName: rm?.declaration_name ?? null, category: rm?.category ?? null },
   );
+  const suggestions = (rm ? suggestKnown : suggestForName).slice(0, 5);
   const suggestionIds = useMemo(() => new Set(suggestions.map((s) => s.food_id)), [suggestions]);
 
-  const visible = useMemo(() => {
-    const needle = debounced.trim();
-    if (!needle) return foods.slice(0, 50);
-    return rankBySearch(foods, needle, (f) => [f.food_name, ...(f.search_keywords ?? [])]).slice(0, 100);
-  }, [foods, debounced]);
+  const { data: searchResults = [], isFetching: searching } = useMatvaretabellenSearch(debounced);
+  const visible = searchResults;
 
-  const link = async (foodId: string) => {
+  const link = async (foodId: string, force?: boolean) => {
     try {
-      await apply.mutateAsync({ rawMaterialId, foodId });
+      const res = await apply.mutateAsync({ rawMaterialId, foodId, force });
+      if (!force && (res.result?.skipped?.length ?? 0) > 0) {
+        setSkippedInfo({ foodId, count: res.result!.skipped.length });
+        return;
+      }
       onOpenChange(false);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Kunne ikke hente næringsverdier");
@@ -93,7 +100,9 @@ export function FoodPickerDialog({ open, onOpenChange, rawMaterialId, initialQue
       if (error) throw error;
       const existingFoodId = data?.matvaretabellen_food_id ?? null;
       if (data && existingFoodId !== foodId) {
-        const foodName = foods.find((f) => f.food_id === foodId)?.food_name ?? "valgt matvare";
+        const foodName = visible.find((f) => f.food_id === foodId)?.food_name
+          ?? suggestions.find((s) => s.food_id === foodId)?.food_name
+          ?? "valgt matvare";
         setPending({ foodId, foodName, source: nutritionSourceLabel(data.source) });
         return;
       }
@@ -129,7 +138,7 @@ export function FoodPickerDialog({ open, onOpenChange, rawMaterialId, initialQue
 
           {!touched && suggestions.length > 0 && (
             <div className="rounded-lg border border-line-subtle p-3">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-secondary">Forslag</div>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-secondary">Foreslått</div>
               <div className="flex flex-wrap gap-2">
                 {suggestions.map((s) => (
                   <Button
@@ -140,8 +149,11 @@ export function FoodPickerDialog({ open, onOpenChange, rawMaterialId, initialQue
                     onClick={() => choose(s.food_id)}
                   >
                     {s.food_name}
+                    {s.food_group_name && (
+                      <span className="ml-1.5 text-ink-secondary">· {s.food_group_name}</span>
+                    )}
                     <Badge variant="secondary" className="ml-2 text-[10px]">
-                      {Math.round(s.confidence * 100)} %
+                      {Math.round(s.score * 100)} %
                     </Badge>
                   </Button>
                 ))}
@@ -150,10 +162,12 @@ export function FoodPickerDialog({ open, onOpenChange, rawMaterialId, initialQue
           )}
 
           <div className="max-h-[45vh] overflow-y-auto rounded-lg border border-line-subtle">
-            {isLoading ? (
+            {searching ? (
               <div className="flex items-center justify-center p-8 text-ink-secondary">
                 <Loader2 className="h-5 w-5 animate-spin" />
               </div>
+            ) : debounced.trim().length < 2 ? (
+              <p className="p-6 text-center text-sm text-ink-secondary">Skriv minst to tegn for å søke.</p>
             ) : visible.length === 0 ? (
               <p className="p-6 text-center text-sm text-ink-secondary">Ingen matvarer matcher søket.</p>
             ) : (
@@ -178,7 +192,6 @@ export function FoodPickerDialog({ open, onOpenChange, rawMaterialId, initialQue
                     <div className="truncate text-xs text-ink-secondary">{f.food_group_name ?? "—"}</div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2 text-xs tabular-nums text-ink-secondary">
-                    {f.energy_kcal == null ? "—" : `${formatNumber(f.energy_kcal, 0)} kcal`}
                     {checkingId === f.food_id && <Loader2 className="h-4 w-4 animate-spin" />}
                   </div>
                 </button>
@@ -213,6 +226,30 @@ export function FoodPickerDialog({ open, onOpenChange, rawMaterialId, initialQue
               }}
             >
               Overskriv
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!skippedInfo} onOpenChange={(v) => !v && setSkippedInfo(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Noen felt ble beholdt</AlertDialogTitle>
+            <AlertDialogDescription>
+              {skippedInfo?.count} felt beholdt fra datablad/manuell, fordi de kommer fra en kilde vi ikke
+              overskriver automatisk. Du kan overskrive dem likevel med tallene fra Matvaretabellen.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => onOpenChange(false)}>Behold</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                const foodId = skippedInfo?.foodId;
+                setSkippedInfo(null);
+                if (foodId) await link(foodId, true);
+              }}
+            >
+              Overskriv likevel
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -127,8 +127,12 @@ export default function SettingsCalc() {
     qc.invalidateQueries({ queryKey: ["margin-targets", legalEntityId] });
   }
 
+  /** Enhver manuell endring på et marginmål fjerner «standard – ikke justert»-merket. */
   async function patchTarget(id: string, patch: Record<string, any>) {
-    const { error } = await (supabase as any).from("margin_targets").update(patch).eq("id", id);
+    const { error } = await (supabase as any)
+      .from("margin_targets")
+      .update({ ...patch, is_seed_default: false })
+      .eq("id", id);
     if (error) return toast.error(error.message);
     qc.invalidateQueries({ queryKey: ["margin-targets", legalEntityId] });
   }
@@ -260,6 +264,7 @@ export default function SettingsCalc() {
                   <th className="py-2 text-right font-medium">Mål brutto %</th>
                   <th className="py-2 text-right font-medium">Mål DG2 %</th>
                   <th className="py-2 text-right font-medium">Varsel under (pp)</th>
+                  <th className="py-2 text-left font-medium">Kilde</th>
                   <th />
                 </tr>
               </thead>
@@ -319,6 +324,15 @@ export default function SettingsCalc() {
                     <td className="py-1.5 pl-2">
                       <NumCell value={t.warn_below_pp} disabled={!canWrite} onCommit={(v) => patchTarget(t.id, { warn_below_pp: v })} />
                     </td>
+                    <td className="py-1.5 pl-2">
+                      {t.is_seed_default ? (
+                        <span className="inline-flex items-center rounded bg-muted px-1.5 py-0.5 text-xs italic text-muted-foreground">
+                          Standard – ikke justert
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Justert</span>
+                      )}
+                    </td>
                     <td className="py-1.5 pl-2 text-right">
                       {canWrite && (
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeTarget(t.id)}>
@@ -330,7 +344,7 @@ export default function SettingsCalc() {
                 ))}
                 {(targetsQuery.data ?? []).length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-6 text-center text-muted-foreground">
+                    <td colSpan={8} className="py-6 text-center text-muted-foreground">
                       Ingen marginmål satt opp.
                     </td>
                   </tr>

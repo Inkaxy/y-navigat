@@ -61,7 +61,7 @@ import { SaveAsRawMaterialDialog, type CompositeRawMaterial } from "@/varer/comp
 import { RecipeImageUpload } from "@/varer/components/recipes/RecipeImageUpload";
 import { BASE_RECIPE_CATEGORY, costPerKg, costPerKgBlockedReason } from "@/varer/lib/halvfabrikat";
 import { copyRecipe } from "@/varer/lib/copyRecipe";
-import { RECIPE_TEMPLATE_CATEGORY } from "@/varer/pages/Recipes";
+import { buildRestoreInput, type RecipeVersionRow } from "@/varer/lib/recipeVersions";
 import { asDepartment, RECIPE_DEPARTMENT_LABEL, RECIPE_DEPARTMENTS } from "@/varer/lib/departments";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -468,6 +468,53 @@ export default function RecipeDetail() {
 
   const { save: persistRecipe } = useRecipeSave();
 
+  /** Versjonshistorikk fra `recipe_versions` — nyeste først. */
+  const versionsQuery = useQuery({
+    queryKey: ["recipe-versions", recipe?.id],
+    enabled: !!recipe?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("recipe_versions")
+        .select("id, recipe_id, version, changed_at, changed_by, change_summary, diff, snapshot")
+        .eq("recipe_id", recipe!.id)
+        .order("version", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return (data ?? []) as RecipeVersionRow[];
+    },
+  });
+  const [restoringVersion, setRestoringVersion] = useState<number | null>(null);
+
+  /** Gjenoppretter et tidligere snapshot ved å sende det gjennom vanlig lagring. */
+  const restoreVersion = useCallback(
+    async (row: RecipeVersionRow) => {
+      if (!recipe) return;
+      setRestoringVersion(row.version);
+      try {
+        const input = buildRestoreInput(row.snapshot, {
+          recipeId: recipe.id,
+          updatedAt: loadedRef.current.updatedAt,
+          version: row.version,
+        });
+        const result = await persistRecipe(input);
+        loadedRef.current = { id: recipe.id, updatedAt: result.updatedAt };
+        setRemoteConflict(false);
+        toast.success(`Gjenopprettet versjon ${row.version}`);
+        await qc.invalidateQueries({ queryKey: ["recipe-detail", recipe.id] });
+        await qc.invalidateQueries({ queryKey: ["recipe-versions", recipe.id] });
+      } catch (err) {
+        if (err instanceof RecipeSaveConflictError) {
+          setRemoteConflict(true);
+        } else {
+          toast.error(err instanceof Error ? err.message : "Kunne ikke gjenopprette versjonen");
+        }
+      } finally {
+        setRestoringVersion(null);
+      }
+    },
+    [recipe, persistRecipe, qc],
+  );
+
   const save = useCallback(async () => {
     if (!recipe) return;
     setSaving(true);
@@ -606,7 +653,7 @@ export default function RecipeDetail() {
       const newId = await copyRecipe(recipe.id);
       const { error } = await supabase
         .from("recipes")
-        .update({ category: RECIPE_TEMPLATE_CATEGORY } as never)
+        .update({ is_template: true } as never)
         .eq("id", newId);
       if (error) throw error;
       qc.invalidateQueries({ queryKey: ["recipes-list"] });
@@ -1131,6 +1178,47 @@ export default function RecipeDetail() {
           <CardContent>
             <Textarea rows={3} value={header.notes ?? ""} disabled={!editable}
               onChange={(e) => patchHeader({ notes: e.target.value })} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3"><CardTitle className="text-base">Versjonshistorikk</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {versionsQuery.isLoading && (
+              <p className="text-sm text-muted-foreground">Laster versjoner…</p>
+            )}
+            {!versionsQuery.isLoading && (versionsQuery.data ?? []).length === 0 && (
+              <p className="text-sm text-muted-foreground">Ingen tidligere versjoner ennå.</p>
+            )}
+            {(versionsQuery.data ?? []).map((v) => (
+              <div
+                key={v.id}
+                className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-sm"
+              >
+                <div>
+                  <span className="font-medium">v{v.version}</span>{" "}
+                  <span className="text-muted-foreground">
+                    {new Date(v.changed_at).toLocaleString("nb-NO")}
+                  </span>
+                  {v.change_summary && (
+                    <div className="text-muted-foreground">{v.change_summary}</div>
+                  )}
+                </div>
+                {canWrite && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={restoringVersion !== null}
+                    onClick={() => restoreVersion(v)}
+                  >
+                    {restoringVersion === v.version ? (
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    ) : null}
+                    Gjenopprett
+                  </Button>
+                )}
+              </div>
+            ))}
           </CardContent>
         </Card>
           </TabsContent>

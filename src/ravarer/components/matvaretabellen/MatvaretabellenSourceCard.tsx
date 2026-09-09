@@ -42,6 +42,16 @@ export function MatvaretabellenSourceCard({ rawMaterialId, source, foodId }: Pro
   const [findOpen, setFindOpen] = useState(false);
   const [confirmUnlink, setConfirmUnlink] = useState(false);
   const [confirmRefresh, setConfirmRefresh] = useState(false);
+  const [skippedCount, setSkippedCount] = useState<number | null>(null);
+
+  const refresh = async (force?: boolean) => {
+    const res = await apply.mutateAsync({ rawMaterialId, foodId: foodId!, force });
+    if (!force && (res.result?.skipped?.length ?? 0) > 0) {
+      setSkippedCount(res.result!.skipped.length);
+    } else {
+      setSkippedCount(null);
+    }
+  };
 
   if (!linked) {
     return (
@@ -99,7 +109,7 @@ export function MatvaretabellenSourceCard({ rawMaterialId, source, foodId }: Pro
               variant="outline"
               size="sm"
               disabled={apply.isPending}
-              onClick={() => (manualOverride ? setConfirmRefresh(true) : apply.mutate({ rawMaterialId, foodId: foodId! }))}
+              onClick={() => (manualOverride ? setConfirmRefresh(true) : void refresh())}
             >
               {apply.isPending ? (
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -115,6 +125,15 @@ export function MatvaretabellenSourceCard({ rawMaterialId, source, foodId }: Pro
         )}
       </Card>
 
+      {skippedCount != null && (
+        <Card className="flex flex-wrap items-center justify-between gap-3 border-warning/30 bg-warning/5 p-3 text-sm">
+          <span>{skippedCount} felt beholdt fra datablad/manuell.</span>
+          <Button variant="outline" size="sm" disabled={apply.isPending} onClick={() => void refresh(true)}>
+            Overskriv likevel
+          </Button>
+        </Card>
+      )}
+
       <AlertDialog open={confirmRefresh} onOpenChange={setConfirmRefresh}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -126,7 +145,7 @@ export function MatvaretabellenSourceCard({ rawMaterialId, source, foodId }: Pro
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Behold mine verdier</AlertDialogCancel>
-            <AlertDialogAction onClick={() => apply.mutate({ rawMaterialId, foodId: foodId! })}>
+            <AlertDialogAction onClick={() => void refresh()}>
               Hent på nytt
             </AlertDialogAction>
           </AlertDialogFooter>

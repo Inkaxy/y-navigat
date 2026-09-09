@@ -6,7 +6,8 @@ import { fetchAllRows } from "@/lib/supabasePaging";
 import { AppHeaderBanner, NewProductActionButton } from "@/varer/components/layout/AppHeaderBanner";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LABELING_STATUS_LABEL, type LabelingStatus } from "@/varer/lib/labelStaleness";
+import { LABELING_STATUS_LABEL, deriveLabelingStatusFromDb, type LabelingStatus } from "@/varer/lib/labelStaleness";
+import { readinessChips, readinessStatusLabel, type ProductCalcReadinessRow } from "@/varer/lib/readinessChips";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,7 +15,7 @@ import { QuickCreateProductDialog } from "@/varer/components/products/QuickCreat
 import { BulkImageUploadDialog } from "@/varer/components/products/BulkImageUploadDialog";
 import { ColumnPicker, type ColumnOption } from "@/varer/components/products/ColumnPicker";
 import { Button } from "@/components/ui/button";
-import { Search, Loader2, Tag, Cake, Images, ImageIcon, Pencil, Check, X } from "lucide-react";
+import { Search, Loader2, Tag, Cake, Images, ImageIcon, Pencil, Check, X, RefreshCw } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { calcQuality, CALC_QUALITY_LABEL } from "@/varer/lib/calcQuality";
 import { PRODUCT_STATUS_LABEL, ProductStatus, CAKE_ROLE_LABEL, CakeRole, LABEL_MODE_OPTIONS } from "@/varer/lib/constants";
@@ -50,10 +51,21 @@ type ProductRow = {
   manual_cost_price: number | null;
 };
 
-/** Merkestatus for produktlista, avledet fra snapshotet på produktet. */
-function productLabelingStatus(p: ProductRow): LabelingStatus {
+/** Merkestatus for produktlista — basert på databasens `recipe_label_calculated.is_stale`. */
+function productLabelingStatus(
+  p: ProductRow,
+  labelRow: { computed_at: string | null; is_stale: boolean } | undefined,
+): LabelingStatus {
   if (!p.manual_ingredient_declaration) return "missing";
-  return p.declaration_needs_review ? "stale" : "approved";
+  if (!labelRow) return p.declaration_needs_review ? "stale" : "approved";
+  return deriveLabelingStatusFromDb({
+    // Ingen eget godkjenningstidspunkt på produktet ennå — deklarasjonen regnes
+    // som godkjent på beregningstidspunktet, med mindre basen selv sier utdatert.
+    approvedAt: labelRow.computed_at,
+    computedAt: labelRow.computed_at,
+    isStale: labelRow.is_stale,
+    blocked: !!p.declaration_needs_review,
+  });
 }
 
 const STATUS_BADGE: Record<ProductStatus, string> = {
@@ -83,6 +95,7 @@ type ColDef = ColumnOption & {
       parent: ProductRow | null;
       price: number | undefined;
       costCache: CostCacheRow | undefined;
+      readiness: (ProductCalcReadinessRow & { recipe_id: string | null }) | undefined;
     },
   ) => React.ReactNode;
 };
@@ -173,10 +186,14 @@ export default function ProductList() {
       if (status !== "all" && p.status !== status) return false;
       if (variantFilter === "parents" && p.variant_of_product_id) return false;
       if (variantFilter === "variants" && !p.variant_of_product_id) return false;
-      if (labelingFilter !== "all" && productLabelingStatus(p) !== labelingFilter) return false;
+      if (
+        labelingFilter !== "all" &&
+        productLabelingStatus(p, labelCalcMap.get(readinessMap.get(p.id)?.recipe_id ?? "")) !== labelingFilter
+      )
+        return false;
       return true;
     });
-  }, [all, search, category, status, variantFilter, labelingFilter]);
+  }, [all, search, category, status, variantFilter, labelingFilter, readinessMap, labelCalcMap]);
 
   /** Prislista priskolonnen viser — huskes lokalt per bruker. */
   const priceListsQuery = useQuery({
@@ -248,6 +265,88 @@ export default function ProductList() {
     (costCacheQuery.data ?? []).forEach((r) => m.set(r.product_id, r));
     return m;
   }, [costCacheQuery.data]);
+
+  /** Kalkylestatus A/B/C og manglende felt — leses fra viewet `product_calc_readiness`. */
+  const readinessQuery = useQuery({
+    queryKey: ["product-calc-readiness", legalEntityId],
+    enabled: !!legalEntityId,
+    queryFn: async () => {
+      return await fetchAllRows<ProductCalcReadinessRow & { product_id: string; recipe_id: string | null }>(
+        (from, to) =>
+          supabase
+            .from("product_calc_readiness")
+            .select("product_id, recipe_id, status, mangler")
+            .eq("legal_entity_id", legalEntityId!)
+            .range(from, to),
+      );
+    },
+  });
+  const readinessMap = useMemo(() => {
+    const m = new Map<string, ProductCalcReadinessRow & { recipe_id: string | null }>();
+    (readinessQuery.data ?? []).forEach((r) => m.set(r.product_id, r));
+    return m;
+  }, [readinessQuery.data]);
+
+  /** Merkingsstatus per oppskrift — hentes for alle koblede oppskrifter under ett. */
+  const recipeIdsForLabeling = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (readinessQuery.data ?? [])
+            .map((r) => r.recipe_id)
+            .filter((id): id is string => !!id),
+        ),
+      ),
+    [readinessQuery.data],
+  );
+  const labelCalcQuery = useQuery({
+    queryKey: ["recipe-label-calculated-list", recipeIdsForLabeling],
+    enabled: recipeIdsForLabeling.length > 0,
+    queryFn: async () => {
+      return await fetchAllRows<{ recipe_id: string; computed_at: string | null; is_stale: boolean }>(
+        (from, to) =>
+          supabase
+            .from("recipe_label_calculated")
+            .select("recipe_id, computed_at, is_stale")
+            .in("recipe_id", recipeIdsForLabeling)
+            .range(from, to),
+      );
+    },
+  });
+  const labelCalcMap = useMemo(() => {
+    const m = new Map<string, { computed_at: string | null; is_stale: boolean }>();
+    (labelCalcQuery.data ?? []).forEach((r) => m.set(r.recipe_id, r));
+    return m;
+  }, [labelCalcQuery.data]);
+
+  /** «Beregn nå» — kjører batch-jobben på kostbufferen og oppsummerer på norsk. */
+  const [recalculating, setRecalculating] = useState(false);
+  async function recalcCostCache() {
+    setRecalculating(true);
+    try {
+      const { data, error } = await supabase.rpc("refresh_product_cost_cache", { p_limit: 50 });
+      if (error) throw error;
+      const r = (data ?? {}) as {
+        computed?: number;
+        errors?: number;
+        alerts?: number;
+        remaining_stale?: number;
+        ms?: number;
+      };
+      toast.success(
+        `Beregnet ${r.computed ?? 0} varer på ${r.ms ?? 0} ms` +
+          (r.errors ? ` — ${r.errors} feilet` : "") +
+          (r.alerts ? `, ${r.alerts} varsler` : "") +
+          (r.remaining_stale ? `. ${r.remaining_stale} venter fortsatt` : ""),
+      );
+      qc.invalidateQueries({ queryKey: ["product-cost-cache", legalEntityId] });
+      qc.invalidateQueries({ queryKey: ["product-calc-readiness", legalEntityId] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Kunne ikke beregne kostbufferen");
+    } finally {
+      setRecalculating(false);
+    }
+  }
 
   const today = osloTodayISO();
   const priceMap = useMemo(() => {
@@ -430,32 +529,32 @@ export default function ProductList() {
         key: "calc",
         label: "Kalkyle",
         render: (p, ctx) => {
+          const readiness = ctx.readiness;
           const cache = ctx.costCache;
-          const q = calcQuality({
-            hasCost: cache ? cache.has_cost === true : p.manual_cost_price != null,
-            costPrice: cache ? cache.cost_per_unit : p.manual_cost_price,
-            hasRecipe: p.calc_type === "oppskrift",
-            calcType: p.calc_type,
-          });
+          const status = readinessStatusLabel(readiness);
+          const chips = readinessChips(readiness);
+          const cls =
+            status === "A"
+              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700"
+              : status === "B"
+                ? "border-amber-500/40 bg-amber-500/10 text-amber-700"
+                : status === "C"
+                  ? "border-destructive/40 bg-destructive/10 text-destructive"
+                  : "text-muted-foreground";
           return (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Badge
-                  variant="outline"
-                  className={
-                    q === "A"
-                      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700"
-                      : q === "B"
-                        ? "border-amber-500/40 bg-amber-500/10 text-amber-700"
-                        : "text-muted-foreground"
-                  }
-                >
-                  {q === "ukjent" ? "–" : q}
-                </Badge>
+                <Badge variant="outline" className={cls}>{status}</Badge>
               </TooltipTrigger>
               <TooltipContent>
-                {CALC_QUALITY_LABEL[q]}
-                {cache?.is_stale ? " — kalkylen må regnes på nytt" : ""}
+                {chips.length > 0 ? (
+                  <ul className="space-y-0.5">
+                    {chips.map((c) => <li key={c.key}>{c.label}</li>)}
+                  </ul>
+                ) : (
+                  "Kalkylen er komplett"
+                )}
+                {cache?.is_stale ? <div className="mt-1">Kostbufferen må regnes på nytt</div> : null}
               </TooltipContent>
             </Tooltip>
           );
@@ -504,8 +603,8 @@ export default function ProductList() {
       {
         key: "labeling",
         label: "Merking",
-        render: (p) => {
-          const st = productLabelingStatus(p);
+        render: (p, ctx) => {
+          const st = productLabelingStatus(p, labelCalcMap.get(ctx.readiness?.recipe_id ?? ""));
           return (
             <Badge
               variant="outline"
@@ -534,7 +633,7 @@ export default function ProductList() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [editingCol, pendingEdits],
+    [editingCol, pendingEdits, labelCalcMap],
   );
 
   function renderBoolCell(p: ProductRow, field: BulkEditableField) {
@@ -696,6 +795,22 @@ export default function ProductList() {
                   <Images className="h-4 w-4" /> Massimport bilder
                 </Button>
               )}
+              {canWrite && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={recalcCostCache}
+                  disabled={recalculating}
+                  className="gap-1.5"
+                >
+                  {recalculating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  Beregn nå
+                </Button>
+              )}
               <span className="text-sm text-muted-foreground">{filtered.length} treff</span>
             </div>
           </div>
@@ -772,7 +887,7 @@ export default function ProductList() {
                     >
                       {visibleCols.map((c) => (
                         <td key={c.key} className={`px-4 py-2.5 ${c.cellClassName ?? ""}`}>
-                          {c.render(p, { parent, price, costCache: costCacheMap.get(p.id) })}
+                          {c.render(p, { parent, price, costCache: costCacheMap.get(p.id), readiness: readinessMap.get(p.id) })}
                         </td>
                       ))}
                     </tr>

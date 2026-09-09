@@ -104,6 +104,20 @@ export function usePackageWorklistRow(rawMaterialId: string | undefined) {
   });
 }
 
+/** Oversetter kjente feilkoder fra `set_raw_material_package` til lesbar tekst. */
+export function friendlyPackageError(e: { code?: string | null; message?: string } | null | undefined): string {
+  if (e?.code === "P0002") return "Leverandøren finnes ikke";
+  if (e?.code === "42501") return "Leverandøren tilhører et annet selskap enn råvaren";
+  return e?.message ?? "Ukjent feil";
+}
+
+/** Normalisert pakningsenhet til visning — trimmet og med liten forbokstav. */
+export function normalizePackageUnit(unit: string | null | undefined): string | null {
+  const t = (unit ?? "").trim();
+  if (!t) return null;
+  return t.toLowerCase();
+}
+
 async function callSetPackage(input: SetPackageInput): Promise<PackageRpcResult> {
   const args: Record<string, unknown> = {
     p_raw_material_id: input.p_raw_material_id,
@@ -116,7 +130,7 @@ async function callSetPackage(input: SetPackageInput): Promise<PackageRpcResult>
   if (input.p_reason) args.p_reason = input.p_reason;
 
   const { data, error } = await supabase.rpc("set_raw_material_package", args as never);
-  if (error) throw error;
+  if (error) throw new Error(friendlyPackageError(error));
   return data as unknown as PackageRpcResult;
 }
 

@@ -175,7 +175,7 @@ describe("samlet validering før lagring", () => {
   });
   type SaveInput = Parameters<typeof validateRecipeSave>[0];
   const input = (over: Partial<SaveInput> = {}): SaveInput => ({
-    recipeId: "r1", displayName: "Grovbrød", originalPartIds: ["p1"], updatedAt: "t1",
+    recipeId: "r1", displayName: "Grovbrød", updatedAt: "t1",
     header: { name: "Grovbrød" }, parts: [part], lines: [line({})], steps: [], ...over,
   });
 
