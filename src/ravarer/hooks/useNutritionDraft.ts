@@ -6,7 +6,7 @@ export const EMPTY_NUTRITION: NutritionRow = {
   energy_kj: null, energy_kcal: null,
   fat_g: null, saturated_fat_g: null,
   carbs_g: null, sugars_g: null,
-  fiber_g: null, protein_g: null, salt_g: null,
+  fiber_g: null, protein_g: null, salt_g: null, sodium_mg: null,
   ingredient_declaration: null, country_of_origin: null,
   e_numbers: null, source: null, source_document_url: null,
   verified_at: null, verified_by: null,

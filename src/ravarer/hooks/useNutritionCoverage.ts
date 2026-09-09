@@ -12,6 +12,23 @@ import {
 
 export type NutritionStatus = "complete" | "incomplete" | "missing";
 
+/** Rå rad fra viewet — alle kolonner er nullbare i genererte typer. */
+interface RawCoverageViewRow {
+  raw_material_id: string | null;
+  name: string | null;
+  category: string | null;
+  status: string | null;
+  source: string | null;
+  matvaretabellen_food_id: string | null;
+  manual_field_count: number | null;
+  used_in_recipes: boolean | null;
+  recipe_grams: number | null;
+  purchase_12m: number | null;
+  needs_nutrition: boolean | null;
+  is_complete: boolean | null;
+  recipe_lines: number | null;
+}
+
 interface CoverageViewRow extends CoverageRow {
   is_complete: boolean | null;
   recipe_lines: number | null;
@@ -20,6 +37,7 @@ interface CoverageViewRow extends CoverageRow {
 export interface CoverageItem {
   raw_material_id: string;
   name: string;
+  declaration_name: string | null;
   category: string | null;
   status: NutritionStatus;
   source: NutritionSource | null;
@@ -37,6 +55,8 @@ export interface NutritionCoverage {
   incomplete: number;
   missing: number;
   linked: number;
+  /** Dekning vektet på antall oppskriftslinjer råvarene brukes i. */
+  recipeWeighted: { pct: number; covered: number; total: number };
   bySource: Record<"matvaretabellen" | "datablad" | "manuell" | "analyse" | "ukjent", number>;
   candidates: CoverageItem[];
   review: CoverageItem[];
@@ -62,7 +82,7 @@ export function useNutritionCoverage() {
     enabled: !!legalEntityId,
     staleTime: 60_000,
     queryFn: async (): Promise<NutritionCoverage> => {
-      const rows = await fetchAllRows<CoverageViewRow>((from, to) =>
+      const raw = await fetchAllRows<RawCoverageViewRow>((from, to) =>
         supabase
           .from("raw_material_nutrition_coverage")
           .select(
@@ -72,6 +92,21 @@ export function useNutritionCoverage() {
           .eq("needs_nutrition", true)
           .range(from, to),
       );
+      const rows: CoverageViewRow[] = raw
+        .filter((r): r is RawCoverageViewRow & { raw_material_id: string } => !!r.raw_material_id)
+        .map((r) => ({ ...r, raw_material_id: r.raw_material_id }));
+
+      // Deklarasjonsnavnet ligger på råvaren, ikke i dekningsviewet — det trengs
+      // for å foreslå riktig matvare.
+      const declarationNames = new Map<string, string | null>();
+      const declRows = await fetchAllRows<{ id: string; declaration_name: string | null }>((from, to) =>
+        supabase
+          .from("raw_materials")
+          .select("id, declaration_name")
+          .eq("legal_entity_id", legalEntityId!)
+          .range(from, to),
+      );
+      declRows.forEach((r) => declarationNames.set(r.id, r.declaration_name));
 
       const sorted = sortCoverageRows(rows);
       const items: CoverageItem[] = sorted.map((r) => {
@@ -81,6 +116,7 @@ export function useNutritionCoverage() {
         return {
           raw_material_id: r.raw_material_id,
           name: r.name ?? "",
+          declaration_name: declarationNames.get(r.raw_material_id) ?? null,
           category: r.category,
           status,
           source,
@@ -99,12 +135,24 @@ export function useNutritionCoverage() {
         bySource[i.source ?? "ukjent"] += 1;
       }
 
+      // Vekting på oppskriftsbruk: linjer med fullstendig næringsdata av alle linjer.
+      const weightedTotal = items.reduce((sum, i) => sum + i.recipes_using, 0);
+      const weightedCovered = items.reduce(
+        (sum, i) => sum + (i.status === "complete" ? i.recipes_using : 0),
+        0,
+      );
+
       return {
         total: items.length,
         complete: items.filter((i) => i.status === "complete").length,
         incomplete: items.filter((i) => i.status === "incomplete").length,
         missing: items.filter((i) => i.status === "missing").length,
         linked: items.filter((i) => !!i.food_id).length,
+        recipeWeighted: {
+          pct: weightedTotal > 0 ? Math.round((weightedCovered / weightedTotal) * 100) : 0,
+          covered: weightedCovered,
+          total: weightedTotal,
+        },
         bySource,
         candidates: items.filter((i) => i.status === "missing"),
         review: items.filter((i) => i.status === "incomplete"),

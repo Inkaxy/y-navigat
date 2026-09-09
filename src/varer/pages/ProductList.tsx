@@ -155,45 +155,6 @@ export default function ProductList() {
     return Array.from(set).sort();
   }, [all]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const rangeMatch = q.match(/^(\d+)\s*-\s*(\d+)$/);
-    let rangeFrom: number | null = null;
-    let rangeTo: number | null = null;
-    if (rangeMatch) {
-      const a = parseInt(rangeMatch[1], 10);
-      const b = parseInt(rangeMatch[2], 10);
-      rangeFrom = Math.min(a, b);
-      rangeTo = Math.max(a, b);
-    }
-    const numberList = !rangeMatch && /^[\d\s,]+$/.test(q) && /[,\s]/.test(q)
-      ? q.split(/[,\s]+/).map((s) => parseInt(s, 10)).filter((n) => !isNaN(n))
-      : null;
-
-    return all.filter((p) => {
-      if (q) {
-        if (rangeFrom !== null && rangeTo !== null) {
-          if (p.display_number < rangeFrom || p.display_number > rangeTo) return false;
-        } else if (numberList && numberList.length > 0) {
-          if (!numberList.includes(p.display_number)) return false;
-        } else if (
-          !`${p.display_name} ${p.code} ${p.display_number}`.toLowerCase().includes(q)
-        ) {
-          return false;
-        }
-      }
-      if (category !== "all" && p.product_category !== category) return false;
-      if (status !== "all" && p.status !== status) return false;
-      if (variantFilter === "parents" && p.variant_of_product_id) return false;
-      if (variantFilter === "variants" && !p.variant_of_product_id) return false;
-      if (
-        labelingFilter !== "all" &&
-        productLabelingStatus(p, labelCalcMap.get(readinessMap.get(p.id)?.recipe_id ?? "")) !== labelingFilter
-      )
-        return false;
-      return true;
-    });
-  }, [all, search, category, status, variantFilter, labelingFilter, readinessMap, labelCalcMap]);
 
   /** Prislista priskolonnen viser — huskes lokalt per bruker. */
   const priceListsQuery = useQuery({
@@ -271,19 +232,25 @@ export default function ProductList() {
     queryKey: ["product-calc-readiness", legalEntityId],
     enabled: !!legalEntityId,
     queryFn: async () => {
-      return await fetchAllRows<ProductCalcReadinessRow & { product_id: string; recipe_id: string | null }>(
-        (from, to) =>
-          supabase
-            .from("product_calc_readiness")
-            .select("product_id, recipe_id, status, mangler")
-            .eq("legal_entity_id", legalEntityId!)
-            .range(from, to),
+      return await fetchAllRows<{
+        product_id: string | null;
+        recipe_id: string | null;
+        status: string | null;
+        mangler: string[] | null;
+      }>((from, to) =>
+        supabase
+          .from("product_calc_readiness")
+          .select("product_id, recipe_id, status, mangler")
+          .eq("legal_entity_id", legalEntityId!)
+          .range(from, to),
       );
     },
   });
   const readinessMap = useMemo(() => {
     const m = new Map<string, ProductCalcReadinessRow & { recipe_id: string | null }>();
-    (readinessQuery.data ?? []).forEach((r) => m.set(r.product_id, r));
+    (readinessQuery.data ?? []).forEach((r) => {
+      if (r.product_id) m.set(r.product_id, { status: r.status, mangler: r.mangler, recipe_id: r.recipe_id });
+    });
     return m;
   }, [readinessQuery.data]);
 
@@ -318,6 +285,46 @@ export default function ProductList() {
     (labelCalcQuery.data ?? []).forEach((r) => m.set(r.recipe_id, r));
     return m;
   }, [labelCalcQuery.data]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const rangeMatch = q.match(/^(\d+)\s*-\s*(\d+)$/);
+    let rangeFrom: number | null = null;
+    let rangeTo: number | null = null;
+    if (rangeMatch) {
+      const a = parseInt(rangeMatch[1], 10);
+      const b = parseInt(rangeMatch[2], 10);
+      rangeFrom = Math.min(a, b);
+      rangeTo = Math.max(a, b);
+    }
+    const numberList = !rangeMatch && /^[\d\s,]+$/.test(q) && /[,\s]/.test(q)
+      ? q.split(/[,\s]+/).map((s) => parseInt(s, 10)).filter((n) => !isNaN(n))
+      : null;
+
+    return all.filter((p) => {
+      if (q) {
+        if (rangeFrom !== null && rangeTo !== null) {
+          if (p.display_number < rangeFrom || p.display_number > rangeTo) return false;
+        } else if (numberList && numberList.length > 0) {
+          if (!numberList.includes(p.display_number)) return false;
+        } else if (
+          !`${p.display_name} ${p.code} ${p.display_number}`.toLowerCase().includes(q)
+        ) {
+          return false;
+        }
+      }
+      if (category !== "all" && p.product_category !== category) return false;
+      if (status !== "all" && p.status !== status) return false;
+      if (variantFilter === "parents" && p.variant_of_product_id) return false;
+      if (variantFilter === "variants" && !p.variant_of_product_id) return false;
+      if (
+        labelingFilter !== "all" &&
+        productLabelingStatus(p, labelCalcMap.get(readinessMap.get(p.id)?.recipe_id ?? "")) !== labelingFilter
+      )
+        return false;
+      return true;
+    });
+  }, [all, search, category, status, variantFilter, labelingFilter, readinessMap, labelCalcMap]);
 
   /** «Beregn nå» — kjører batch-jobben på kostbufferen og oppsummerer på norsk. */
   const [recalculating, setRecalculating] = useState(false);
