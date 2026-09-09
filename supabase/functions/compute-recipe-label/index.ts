@@ -16,7 +16,7 @@ import { storeNutrient } from "../_shared/nutritionFormat.ts";
 import { syncAutoProductsForRecipe } from "../_shared/effective-declaration.ts";
 import { buildInputsHash, type HashMaterialFact } from "../_shared/recipe-label-hash.ts";
 import { authorizeCron } from "../_shared/cron-auth.ts";
-import { isGlutenFreeFromCodes, wholeGrainLimitFor } from "./keyhole.ts";
+import { evaluateKeyhole, keyholeGroupForRecipe, KEYHOLE_MIN_COVERAGE_PCT } from "./keyhole.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,63 +26,10 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-/**
- * NØKKELHULLKRITERIER
- * Kilde: Mattilsynets veileder til forskrift om frivillig merking av næringsmidler
- * med Nøkkelhullet (nøkkelhullforskriften), produktgruppe 8 «Brød».
- * Oppdater tallene her hvis forskriften endres.
- */
-const KEYHOLE_GROUPS = {
-  "8a": {
-    label: "Gruppe 8a — brød",
-    criteria: [
-      { key: "whole_grain_pct_of_dry", name: "Fullkorn av tørrstoff", op: "min" as const, limit: 30, unit: "%" },
-      { key: "fiber_g", name: "Kostfiber", op: "min" as const, limit: 5, unit: "g/100 g" },
-      { key: "fat_g", name: "Fett", op: "max" as const, limit: 7, unit: "g/100 g" },
-      { key: "sugars_g", name: "Sukkerarter", op: "max" as const, limit: 5, unit: "g/100 g" },
-      { key: "salt_g", name: "Salt", op: "max" as const, limit: 1.0, unit: "g/100 g" },
-    ],
-  },
-  "8b": {
-    label: "Gruppe 8b — rugbrød",
-    criteria: [
-      { key: "whole_grain_pct_of_dry", name: "Fullkorn av tørrstoff", op: "min" as const, limit: 35, unit: "%" },
-      { key: "fiber_g", name: "Kostfiber", op: "min" as const, limit: 6, unit: "g/100 g" },
-      { key: "fat_g", name: "Fett", op: "max" as const, limit: 7, unit: "g/100 g" },
-      { key: "sugars_g", name: "Sukkerarter", op: "max" as const, limit: 5, unit: "g/100 g" },
-      { key: "salt_g", name: "Salt", op: "max" as const, limit: 1.2, unit: "g/100 g" },
-      { key: "rye_share_of_grain_pct", name: "Rugandel av kornet", op: "min" as const, limit: 30, unit: "%" },
-    ],
-  },
-  // Gruppe 9 «Knekkebrød og annet flatbrød» har egne grenser.
-  "9": {
-    label: "Gruppe 9 — knekkebrød",
-    criteria: [
-      { key: "whole_grain_pct_of_dry", name: "Fullkorn av tørrstoff", op: "min" as const, limit: 50, unit: "%" },
-      { key: "fiber_g", name: "Kostfiber", op: "min" as const, limit: 6, unit: "g/100 g" },
-      { key: "fat_g", name: "Fett", op: "max" as const, limit: 7, unit: "g/100 g" },
-      { key: "sugars_g", name: "Sukkerarter", op: "max" as const, limit: 5, unit: "g/100 g" },
-      { key: "salt_g", name: "Salt", op: "max" as const, limit: 1.3, unit: "g/100 g" }, // Kilde: Veileder til nøkkelhullforskriften (mars 2021), kap. 4.5.3.4, gruppe 9
-    ],
-  },
-};
-
-/** Nøkkelhullet vurderes bare for brød, rundstykker og knekkebrød. */
-function keyholeGroupForRecipe(category: string | null, name: string | null): "8a" | "9" | null {
-  const hay = `${category ?? ""} ${name ?? ""}`.toLowerCase();
-  if (/knekkebr|flatbr/.test(hay)) return "9";
-  if (/br(ø|o)d|rundstykk|bagett|loff|ciabatta|focaccia|horn|bolle?br/.test(hay)) return "8a";
-  return null;
-}
-
-/** Minste datadekning (andel av innveid vekt med næringsdata) for å konkludere om Nøkkelhullet. */
-const KEYHOLE_MIN_COVERAGE_PCT = 90;
-
-const NUTRIENT_KEYS = new Set(["fiber_g", "fat_g", "sugars_g", "salt_g"]);
-
 function nb(n: number, decimals = 1): string {
   return Number(n).toFixed(decimals).replace(".", ",");
 }
+
 
 
 Deno.serve(async (req) => {
