@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { GRAIN_CLASSIFICATION_OPTIONS } from "@/varer/lib/breadscale";
+import { RawMaterialAutocomplete } from "@/varer/components/products/RawMaterialAutocomplete";
 
 /**
  * Inline-retting av råvaredata rett fra datakvalitetskortet, slik at man slipper
@@ -152,5 +153,54 @@ export function GrainClassInline({
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+/** «Koble fritekstlinje» — setter råvare på linjer med dette fritekstnavnet. */
+export function FreeTextLinkInline({
+  recipeId,
+  name,
+  disabled,
+  onSaved,
+}: {
+  recipeId: string;
+  name: string;
+  disabled?: boolean;
+  onSaved: () => void;
+}) {
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState(false);
+
+  async function link(rawMaterialId: string | null) {
+    if (!rawMaterialId) return;
+    setBusy(true);
+    try {
+      const { error } = await supabase
+        .from("recipe_lines")
+        .update({ raw_material_id: rawMaterialId } as never)
+        .eq("recipe_id", recipeId)
+        .eq("ingredient_name", name)
+        .is("raw_material_id", null);
+      if (error) throw new Error(error.message);
+      qc.invalidateQueries({ queryKey: ["recipe-lines", recipeId] });
+      toast.success(`«${name}» er koblet til råvaren`);
+      onSaved();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kunne ikke koble linjen");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="w-64">
+      <RawMaterialAutocomplete
+        value={null}
+        onChange={(id) => void link(id)}
+        disabled={disabled || busy}
+        placeholder={`Koble «${name}»`}
+        currentRecipeId={recipeId}
+      />
+    </div>
   );
 }
