@@ -74,12 +74,14 @@ export default function KobleMatvaretabellen() {
     queryFn: async (): Promise<Map<string, number>> => {
       const { data, error } = await supabase
         .from("raw_material_nutrition")
-        .select(`raw_material_id, ${NUTRITION_FIELDS.join(", ")}`)
+        .select(
+          "raw_material_id, energy_kj, energy_kcal, fat_g, saturated_fat_g, carbs_g, sugars_g, fiber_g, protein_g, salt_g",
+        )
         .in("raw_material_id", reviewIds);
       if (error) throw error;
       const map = new Map<string, number>();
       for (const row of data ?? []) {
-        const r = row as Record<string, unknown>;
+        const r = row as unknown as Record<string, unknown>;
         const missing = NUTRITION_FIELDS.filter((f) => r[f] === null || r[f] === undefined).length;
         map.set(r.raw_material_id as string, missing);
       }
