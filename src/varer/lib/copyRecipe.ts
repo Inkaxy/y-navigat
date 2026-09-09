@@ -45,7 +45,17 @@ async function fetchChildren(table: string, recipeId: string): Promise<Row[]> {
 }
 
 
-export async function copyRecipe(recipeId: string): Promise<string> {
+/** Overstyringer per originallinje — brukes når en skalert utgave lagres som ny oppskrift. */
+export interface CopyRecipeOptions {
+  /** Nøkkel: originallinjens id. Verdi: mengde og enhet som skal lagres i kopien. */
+  lineOverrides?: Record<string, { quantity: number; unit: string }>;
+  /** Hodefelter som skal overstyres i kopien (f.eks. units_per_batch, dough_piece_grams). */
+  recipePatch?: Record<string, unknown>;
+  /** Navnetillegg. Standard er «(kopi)». */
+  nameSuffix?: string;
+}
+
+export async function copyRecipe(recipeId: string, options: CopyRecipeOptions = {}): Promise<string> {
   const { data: original, error: readErr } = await supabase
     .from("recipes")
     .select("*")
@@ -57,11 +67,12 @@ export async function copyRecipe(recipeId: string): Promise<string> {
   const src = original as unknown as Row;
   const payload: Row = {
     ...stripped(src, RECIPE_SKIP),
-    name: `${(src.name as string | null) ?? "Oppskrift"} (kopi)`,
+    name: `${(src.name as string | null) ?? "Oppskrift"} ${options.nameSuffix ?? "(kopi)"}`.trim(),
     status: "draft",
     version: 1,
     product_id: null,
     valid_to: null,
+    ...(options.recipePatch ?? {}),
   };
 
 
@@ -92,10 +103,12 @@ export async function copyRecipe(recipeId: string): Promise<string> {
     if (lines.length > 0) {
       const rows = lines.map((l) => {
         const oldPart = l.recipe_part_id == null ? null : String(l.recipe_part_id);
+        const override = options.lineOverrides?.[String(l.id)];
         return {
           ...stripped(l, CHILD_SKIP),
           recipe_id: newId,
           recipe_part_id: oldPart ? partIdMap.get(oldPart) ?? null : null,
+          ...(override ? { quantity: override.quantity, unit: override.unit } : {}),
         };
       });
       const { error } = await supabase.from("recipe_lines").insert(rows as never);
