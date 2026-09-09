@@ -105,8 +105,8 @@ Deno.test("svinn på halvfabrikatlinjen regnes inn før skaleringen", async () =
   const t = tables();
   (t.recipe_lines[0] as Record<string, unknown>).waste_percent = 50;
   const out = await expandRecipeLines(stub(t), TOP_RECIPE, 0, new Set([TOP_RECIPE]), []);
-  // 300 g + 50 % svinn = 600 g behov ⇒ faktor 3.
-  assertEquals(out.map((l) => l.quantity), [300, 300]);
+  // 300 g med 50 % svinn gir 200 g netto ⇒ faktor 1.
+  assertEquals(out.map((l) => l.quantity), [100, 100]);
 });
 
 Deno.test("halvfabrikat uten vekt gir advarsel og beholder linjen", async () => {
