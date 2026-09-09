@@ -516,6 +516,24 @@ export default function RecipeDetail() {
     [recipe, persistRecipe, qc],
   );
 
+  /** Stille prisoppdatering av den koblede grunnoppskrift-råvaren etter lagring. */
+  const syncCompositePriceQuietly = useCallback(async () => {
+    if (!composite) return;
+    const price = costPerKg(hydratedLines);
+    if (price == null) return;
+    const { error } = await supabase
+      .from("raw_materials")
+      .update({
+        current_cost_price: price,
+        price_source: "recipe",
+        price_updated_at: new Date().toISOString(),
+      } as never)
+      .eq("id", composite.id);
+    if (error) return;
+    qc.invalidateQueries({ queryKey: ["recipe-composite", recipe?.id] });
+    qc.invalidateQueries({ queryKey: ["raw_materials_autocomplete"] });
+  }, [composite, hydratedLines, qc, recipe?.id]);
+
   const save = useCallback(async () => {
     if (!recipe) return;
     setSaving(true);
