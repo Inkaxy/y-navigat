@@ -379,7 +379,7 @@ export function SetPackageDialog({ row, open, onOpenChange, suggestion, initialS
                             {c.description ?? "—"}
                           </td>
                           <td className="px-3 py-2 text-right tabular-nums">{formatNumber(c.quantity, 3)}</td>
-                          <td className="px-3 py-2">{c.unit ?? "—"}</td>
+                          <td className="px-3 py-2">{normalizePackageUnit(c.unit) ?? "—"}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{formatNumber(c.total_amount, 2)}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{formatNumber(c.old_ppb, 3)}</td>
                           <td className="px-3 py-2 text-right tabular-nums font-semibold">
