@@ -57,10 +57,22 @@ describe("pliktfelt-sjekklisten (1169/2011)", () => {
     expect(r.items.find((i) => i.key === "storage")?.level).toBe("warn");
   });
 
-  it("allergen som ikke er uthevet sperrer", () => {
-    const r = buildLabelChecklist(complete({ ingredientText: "Hvetemel, vann", contains: ["hvete"] }));
+  it("allergen som mangler helt i ingredienslisten sperrer", () => {
+    const r = buildLabelChecklist(complete({ ingredientText: "Rugmel, vann", contains: ["hvete"] }));
     expect(r.errors.map((e) => e.key)).toContain("allergens");
+  });
+
+  it("manuell deklarasjon godtas uansett markering", () => {
+    // Rendreren uthever per term, så *hvete*, **hvete**, <strong> og klartekst
+    // (også VERSALER) skal alle passere.
     expect(allergenIsHighlighted("Sammalt <strong>hvete</strong>mel", "hvete")).toBe(true);
+    expect(allergenIsHighlighted("Sammalt *hvete*mel", "hvete")).toBe(true);
+    expect(allergenIsHighlighted("Sammalt **hvete**mel", "hvete")).toBe(true);
+    expect(allergenIsHighlighted("HVETEMEL, vann", "hvete")).toBe(true);
+    expect(
+      buildLabelChecklist(complete({ ingredientText: "HVETEMEL, vann, salt", contains: ["hvete"] })).errors
+        .map((e) => e.key),
+    ).not.toContain("allergens");
   });
 
   it("under 90 % dekning sier eksplisitt at næringen utelates", () => {

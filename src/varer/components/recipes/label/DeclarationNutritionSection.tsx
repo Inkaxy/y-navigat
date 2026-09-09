@@ -25,19 +25,17 @@ import {
   type NutritionPer100g,
   type RecipeLabelSnapshot,
 } from "@/varer/lib/effectiveDeclaration";
+import { NUTRIENT_LABEL } from "@/varer/lib/nutritionFormat";
 import { DiffNote, NUT_ROWS, SourceColumn, SourceSegmented, formatDateTimeNb, nutritionValueText } from "./labelShared";
 
-const NUT_LABELS: Record<string, string> = {
-  energy_kj: "Energi (kJ)",
-  energy_kcal: "Energi (kcal)",
-  fat_g: "Fett (g)",
-  saturated_fat_g: "— mettede fettsyrer (g)",
-  carbs_g: "Karbohydrater (g)",
-  sugars_g: "— sukkerarter (g)",
-  fiber_g: "Kostfiber (g)",
-  protein_g: "Protein (g)",
-  salt_g: "Salt (g)",
+// Ordlyden kommer fra ÉN kilde (vedlegg XV), enheten legges på her.
+const NUT_UNIT: Record<string, string> = {
+  energy_kj: "kJ", energy_kcal: "kcal", fat_g: "g", saturated_fat_g: "g",
+  carbs_g: "g", sugars_g: "g", fiber_g: "g", protein_g: "g", salt_g: "g",
 };
+const NUT_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(NUTRIENT_LABEL).map(([k, label]) => [k, `${label} (${NUT_UNIT[k] ?? "g"})`]),
+);
 
 interface Props {
   recipeId: string;

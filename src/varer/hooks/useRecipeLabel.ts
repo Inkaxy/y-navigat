@@ -12,6 +12,15 @@ export type RecipeLabelCalculated = {
   flour_grams: number | null;
   whole_grain_grams: number | null;
   whole_grain_pct_of_dry: number | null;
+  /** Ekstra beregningsfelter i jsonb-kolonnen `lines`. */
+  lines: {
+    ingredient_declaration_text?: string | null;
+    breadscale_pct?: number | null;
+    breadscale_pct_display?: string | null;
+    /** Brødskala'ns teller: grovt korn med kli vektet. */
+    coarse_weighted_grams?: number | null;
+    whole_grain_grams_no_bran?: number | null;
+  } | null;
   grain_score_pct: number | null;
   grain_category: string | null;
   rye_share_of_grain_pct: number | null;

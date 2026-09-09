@@ -294,7 +294,7 @@ export function LabelTab({
         grainPct={label?.grain_score_pct ?? null}
         grainCategory={label?.grain_category ?? null}
         flourGrams={label?.flour_grams ?? null}
-        coarseWeightedGrams={label?.whole_grain_grams ?? null}
+        coarseWeightedGrams={label?.lines?.coarse_weighted_grams ?? null}
         wholeGrainPctOfDry={label?.whole_grain_pct_of_dry ?? null}
         dryMatterPct={label?.dry_matter_pct ?? null}
         finalWeightGrams={label?.final_weight_grams ?? null}

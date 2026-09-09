@@ -16,6 +16,7 @@ import { storeNutrient } from "../_shared/nutritionFormat.ts";
 import { syncAutoProductsForRecipe } from "../_shared/effective-declaration.ts";
 import { buildInputsHash, type HashMaterialFact } from "../_shared/recipe-label-hash.ts";
 import { authorizeCron } from "../_shared/cron-auth.ts";
+import { isGlutenFreeFromCodes, wholeGrainLimitFor } from "./keyhole.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -65,12 +66,6 @@ const KEYHOLE_GROUPS = {
     ],
   },
 };
-
-/**
- * Glutenfrie produkter har lavere fullkornkrav (veilederen 4.2.1):
- * 10 % for brød (8a), 15 % for rug-/knekkebrødgruppene.
- */
-const GLUTEN_FREE_WHOLE_GRAIN_LIMIT: Record<string, number> = { "8a": 10, "8b": 15, "9": 15 };
 
 /** Nøkkelhullet vurderes bare for brød, rundstykker og knekkebrød. */
 function keyholeGroupForRecipe(category: string | null, name: string | null): "8a" | "9" | null {
@@ -226,13 +221,8 @@ Deno.serve(async (req) => {
       salt_g: per100.salt_g,
     };
 
-    /** Glutenfritt: ingen av glutenkornenes allergenkoder er i «Inneholder».
-     *  Kodesjekk — IKKE tekstsøk i norske etiketter (der sto «gluten» aldri, så
-     *  sjekken var alltid sann). */
-    const GLUTEN_ALLERGEN_CODES = [
-      "gluten_wheat", "gluten_rye", "gluten_barley", "gluten_oats", "gluten_spelt", "gluten_khorasan",
-    ];
-    const isGlutenFree = !core.containsCodes.some((c: string) => GLUTEN_ALLERGEN_CODES.includes(c));
+    // Glutenfritt avgjøres av allergenKODENE, ikke av de norske etikettene.
+    const isGlutenFree = isGlutenFreeFromCodes(core.containsCodes);
 
     // Gramendring for et næringskriterium: hvor mye må ingrediensen ned/opp i deigen?
     function adviceFor(c: { key: string; name: string; op: "min" | "max"; limit: number; unit: string }, value: number): string {
@@ -270,8 +260,8 @@ Deno.serve(async (req) => {
       const g = KEYHOLE_GROUPS[groupKey];
       const criteria = g.criteria.map((c0) => {
         // Glutenfrie produkter har lavere fullkornkrav (10 %/15 %).
-        const c = isGlutenFree && c0.key === "whole_grain_pct_of_dry"
-          ? { ...c0, limit: GLUTEN_FREE_WHOLE_GRAIN_LIMIT[groupKey] ?? c0.limit }
+        const c = c0.key === "whole_grain_pct_of_dry"
+          ? { ...c0, limit: wholeGrainLimitFor(groupKey, isGlutenFree, c0.limit) }
           : c0;
         const value = measured[c.key];
         const needsNutrition = NUTRIENT_KEYS.has(c.key);
@@ -471,6 +461,9 @@ Deno.serve(async (req) => {
         breadscale_pct_display: core.breadscale.breadscale_pct_display,
         breadscale_contributors: core.breadscale.contributors,
         whole_grain_grams_no_bran: Math.round(wholeGrainGrams * 100) / 100,
+        // Brødskala'ns TELLER: grovt korn med kli vektet. `whole_grain_grams`
+        // er Nøkkelhullets fullkorn (uten kli, uvektet) og er noe annet.
+        coarse_weighted_grams: Math.round(core.breadscale.coarse_grams_weighted * 100) / 100,
       },
       allergens,
       keyhole,
