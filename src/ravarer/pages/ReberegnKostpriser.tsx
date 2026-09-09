@@ -80,7 +80,7 @@ function ChangeBadge({ row }: { row: RecalcRow }) {
 }
 
 export default function ReberegnKostpriser() {
-  const { rows, progress, receipt, error, scan, apply, cancel, reset } = useCostRecalc();
+  const { rows, progress, receipt, items, batchIds, error, scan, apply, undoAll, cancel, reset } = useCostRecalc();
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -207,12 +207,68 @@ export default function ReberegnKostpriser() {
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               )}
-              <div className="pt-1">
+              {(receipt.errorCount > 0 || receipt.protectedCount > 0) && (
+                <p className="text-ink-secondary">
+                  {receipt.errorCount > 0 && `${receipt.errorCount} feilet. `}
+                  {receipt.protectedCount > 0 && `${receipt.protectedCount} har manuelt låst kostpris og ble ikke rørt.`}
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2 pt-1">
                 <Button variant="outline" size="sm" onClick={() => { reset(); setChecked(new Set()); }}>
                   <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Nullstill
                 </Button>
+                {batchIds.length > 0 && (
+                  <Button variant="outline" size="sm" onClick={() => void undoAll()}>
+                    <X className="mr-1.5 h-3.5 w-3.5" /> Angre alle
+                  </Button>
+                )}
               </div>
             </div>
+          </div>
+        </Card>
+      )}
+
+      {items.length > 0 && (
+        <Card className="overflow-hidden">
+          <div className="border-b border-line-subtle px-4 py-3">
+            <h3 className="text-sm font-semibold text-ink-primary">Resultat per vare ({items.length})</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-surface-sunken text-xs uppercase tracking-wide text-ink-secondary">
+                <tr>
+                  <th className="px-3 py-2 text-left">Vare</th>
+                  <th className="px-3 py-2 text-left">Status</th>
+                  <th className="px-3 py-2 text-right">Før</th>
+                  <th className="px-3 py-2 text-right">Etter</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line-subtle">
+                {items.map((it) => {
+                  const row = (rows ?? []).find((r) => r.rawMaterialId === it.raw_material_id);
+                  return (
+                    <tr key={it.raw_material_id}>
+                      <td className="px-3 py-2">{row?.name ?? it.raw_material_id}</td>
+                      <td className="px-3 py-2">
+                        {it.ok ? (
+                          it.manual_cost_protected ? (
+                            <Badge variant="outline" className="border-warning/40 text-warning">manuelt låst</Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-success/40 text-success">ok</Badge>
+                          )
+                        ) : (
+                          <Badge variant="outline" className="border-destructive/40 text-destructive">
+                            {it.error ?? "feil"}
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums">{kr(it.cost_before)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{kr(it.cost_after)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </Card>
       )}

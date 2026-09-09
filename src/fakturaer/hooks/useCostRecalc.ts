@@ -10,7 +10,12 @@ import { useCallback, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { resolveLineCost, type CostBasis, type ResolveLineCostResult } from "@/fakturaer/lib/units";
-import { isNonFatalPermissionError } from "@/ravarer/lib/recalcBatch";
+import {
+  chunkRawMaterialIds,
+  isNonFatalPermissionError,
+  summarizeRecalcItems,
+  type RecalcItemResult,
+} from "@/ravarer/lib/recalcBatch";
 
 const LINE_PAGE_SIZE = 500;
 const APPLY_CHUNK = 10;
@@ -70,6 +75,8 @@ export interface RecalcReceipt {
   biggestDown: RecalcRow | null;
   stillBlocked: number;
   statsRefreshed: boolean;
+  errorCount: number;
+  protectedCount: number;
 }
 
 interface LineRow {
@@ -127,6 +134,8 @@ export function useCostRecalc() {
   const [rows, setRows] = useState<RecalcRow[] | null>(null);
   const [progress, setProgress] = useState<RecalcProgress>(IDLE);
   const [receipt, setReceipt] = useState<RecalcReceipt | null>(null);
+  const [items, setItems] = useState<RecalcItemResult[]>([]);
+  const [batchIds, setBatchIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const cancelRef = useRef(false);
 
@@ -358,101 +367,121 @@ export function useCostRecalc() {
       cancelRef.current = false;
       setError(null);
       setReceipt(null);
-      const { data: auth } = await supabase.auth.getUser();
-      const userId = auth.user?.id ?? null;
+      setItems([]);
+      setBatchIds([]);
 
-      let updatedMaterials = 0;
-      let updatedLines = 0;
-      const changes: number[] = [];
+      const eligible = selected.filter((r) => r.proposedPrice != null);
+      const ids = eligible.map((r) => r.rawMaterialId);
+      const byId = new Map(eligible.map((r) => [r.rawMaterialId, r]));
+      const chunks = chunkRawMaterialIds(ids);
+      const allItems: RecalcItemResult[] = [];
+      const newBatchIds: string[] = [];
 
       try {
-        for (let i = 0; i < selected.length; i += APPLY_CHUNK) {
+        for (let i = 0; i < chunks.length; i++) {
           if (cancelRef.current) {
-            setProgress({ phase: "avbrutt", done: updatedMaterials, total: selected.length, label: "Avbrutt" });
+            setProgress({ phase: "avbrutt", done: allItems.length, total: ids.length, label: "Avbrutt" });
             break;
           }
-          const chunk = selected.slice(i, i + APPLY_CHUNK);
-          for (const row of chunk) {
-            if (row.proposedPrice == null) continue;
-            const now = new Date().toISOString();
-            const { error: upErr } = await supabase
-              .from("raw_materials")
-              .update({
-                current_cost_price: row.proposedPrice,
-                price_source: "invoice",
-                price_updated_at: now,
-              })
-              .eq("id", row.rawMaterialId);
-            if (upErr) throw new Error(`${row.name}: ${upErr.message}`);
+          const chunkIds = chunks[i];
 
-            const { error: histErr } = await supabase.from("raw_material_price_history").insert({
-              raw_material_id: row.rawMaterialId,
-              supplier_id: row.supplierId,
-              price: row.proposedPrice,
-              effective_date: row.invoiceDate ?? now.slice(0, 10),
-              source: "invoice",
-              source_reference: row.invoiceNumber,
-              invoice_id: row.invoiceId,
-              notes: `Reberegning av kostpris fra faktura ${row.invoiceNumber ?? "—"} (${row.invoiceDate ?? "ukjent dato"}). ${row.explanation}`,
-              created_by: userId,
-            });
-            if (histErr) throw new Error(`${row.name}: ${histErr.message}`);
+          // Forhåndsvisning før vi faktisk skriver noe.
+          const { error: previewErr } = await supabase.rpc("recalc_raw_material_costs", {
+            p_raw_material_ids: chunkIds,
+            p_reason: `Reberegning av kostpris (${eligible.length} varer)`,
+            p_dry_run: true,
+          });
+          if (previewErr) throw new Error(previewErr.message);
 
-            for (const u of row.lineUpdates) {
-              const { error: lineErr } = await supabase
-                .from("invoice_lines")
-                .update({
-                  price_per_base_unit: u.pricePerBaseUnit,
-                  base_quantity: u.baseQuantity,
-                })
-                .eq("id", u.lineId);
-              if (lineErr) throw new Error(`${row.name} (fakturalinje): ${lineErr.message}`);
-              updatedLines += 1;
-            }
+          const { data, error: runErr } = await supabase.rpc("recalc_raw_material_costs", {
+            p_raw_material_ids: chunkIds,
+            p_reason: `Reberegning av kostpris (${eligible.length} varer)`,
+            p_dry_run: false,
+          });
+          if (runErr) throw new Error(runErr.message);
+          const result = data as unknown as { batch_id: string | null; items: RecalcItemResult[] };
+          if (result.batch_id) newBatchIds.push(result.batch_id);
+          allItems.push(...(result.items ?? []));
 
-            updatedMaterials += 1;
-            if (row.changePct != null) changes.push(row.changePct);
-          }
           setProgress({
             phase: "skriver",
-            done: updatedMaterials,
-            total: selected.length,
-            label: `Oppdaterer kostpriser … ${updatedMaterials} av ${selected.length}`,
+            done: allItems.length,
+            total: ids.length,
+            label: `Oppdaterer kostpriser … ${allItems.length} av ${ids.length}`,
           });
         }
 
+        setItems(allItems);
+        setBatchIds(newBatchIds);
+
+        const { okCount, errorCount, protectedCount } = summarizeRecalcItems(allItems);
         let statsRefreshed = false;
-        if (updatedMaterials > 0) {
+        if (okCount > 0) {
           const { error: rpcErr } = await supabase.rpc("refresh_purchase_stats");
           statsRefreshed = !rpcErr || isNonFatalPermissionError(rpcErr);
         }
 
-        const applied = selected.slice(0, updatedMaterials);
-        const withChange = applied.filter((r) => r.changePct != null);
+        const changed: number[] = [];
+        const withChangeRows: RecalcRow[] = [];
+        let updatedLines = 0;
+        for (const item of allItems) {
+          if (!item.ok) continue;
+          const row = byId.get(item.raw_material_id);
+          if (!row) continue;
+          updatedLines += row.lineUpdates.length;
+          if (item.cost_before != null && item.cost_after != null && item.cost_before > 0) {
+            const pct = ((item.cost_after - item.cost_before) / item.cost_before) * 100;
+            changed.push(pct);
+            withChangeRows.push({ ...row, changePct: pct });
+          }
+        }
+
         setReceipt({
-          updatedMaterials,
+          updatedMaterials: okCount,
           updatedLines,
-          avgChangePct: changes.length ? changes.reduce((s, c) => s + c, 0) / changes.length : null,
-          biggestUp: withChange.reduce<RecalcRow | null>((best, r) => (!best || (r.changePct ?? 0) > (best.changePct ?? 0) ? r : best), null),
-          biggestDown: withChange.reduce<RecalcRow | null>((best, r) => (!best || (r.changePct ?? 0) < (best.changePct ?? 0) ? r : best), null),
+          avgChangePct: changed.length ? changed.reduce((s, c) => s + c, 0) / changed.length : null,
+          biggestUp: withChangeRows.reduce<RecalcRow | null>((best, r) => (!best || (r.changePct ?? 0) > (best.changePct ?? 0) ? r : best), null),
+          biggestDown: withChangeRows.reduce<RecalcRow | null>((best, r) => (!best || (r.changePct ?? 0) < (best.changePct ?? 0) ? r : best), null),
           stillBlocked: (rows ?? []).filter((r) => r.bucket === "umulig").length,
           statsRefreshed,
+          errorCount,
+          protectedCount,
         });
-        setProgress({ phase: "ferdig", done: updatedMaterials, total: selected.length, label: "Ferdig" });
+        setProgress({ phase: "ferdig", done: allItems.length, total: ids.length, label: "Ferdig" });
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
-        setProgress({ phase: "ferdig", done: updatedMaterials, total: selected.length, label: "Stoppet med feil" });
+        setProgress({ phase: "ferdig", done: allItems.length, total: ids.length, label: "Stoppet med feil" });
       }
     },
     [rows],
   );
 
+  const undoAll = useCallback(async () => {
+    if (batchIds.length === 0) return;
+    setError(null);
+    try {
+      for (const batchId of batchIds) {
+        const { error: undoErr } = await supabase.rpc("undo_raw_material_recalcs", { p_batch_id: batchId });
+        if (undoErr) throw new Error(undoErr.message);
+      }
+      setBatchIds([]);
+      setItems([]);
+      setReceipt(null);
+      setRows(null);
+      setProgress(IDLE);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }, [batchIds]);
+
   const reset = useCallback(() => {
     setRows(null);
     setReceipt(null);
+    setItems([]);
+    setBatchIds([]);
     setError(null);
     setProgress(IDLE);
   }, []);
 
-  return { rows, progress, receipt, error, scan, apply, cancel, reset };
+  return { rows, progress, receipt, items, batchIds, error, scan, apply, undoAll, cancel, reset };
 }

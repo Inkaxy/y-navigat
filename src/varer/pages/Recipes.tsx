@@ -35,9 +35,6 @@ import {
 } from "@/varer/lib/departments";
 import { RecipeListCard } from "@/varer/components/recipes/RecipeListCard";
 
-/** Kategoriverdi som markerer en oppskrift som mal for «Ny fra mal». */
-export const RECIPE_TEMPLATE_CATEGORY = "Mal";
-
 /** Valgene i segmentkontrollen for avdeling. */
 const DEPARTMENT_FILTERS: { value: "all" | RecipeDepartment | "none"; label: string }[] = [
   { value: "all", label: "Alle" },
@@ -62,6 +59,7 @@ type RecipeListRow = {
   dough_piece_grams: number | null;
   dough_waste_pct: number | null;
   product_id: string | null;
+  is_template: boolean | null;
   recipe_lines: RecipeLineRow[] | null;
   product_recipe_links: { product_id: string; products: { display_name: string | null } | null }[] | null;
 };
@@ -155,7 +153,7 @@ export default function Recipes() {
       const data = await fetchAllRows<RecipeListRow>((from, to) =>
         supabase
           .from("recipes")
-          .select("id, name, image_url, category, status, department, version, updated_at, unit_weight_grams, units_per_batch, dough_piece_grams, dough_waste_pct, product_id, recipe_lines(id, quantity, unit, raw_material_id, is_flour_override, water_content_pct_override, ingredient_name), product_recipe_links(product_id, products(display_name))")
+          .select("id, name, image_url, category, status, department, version, updated_at, unit_weight_grams, units_per_batch, dough_piece_grams, dough_waste_pct, product_id, is_template, recipe_lines(id, quantity, unit, raw_material_id, is_flour_override, water_content_pct_override, ingredient_name), product_recipe_links(product_id, products(display_name))")
           .is("valid_to", null)
           .order("created_at", { ascending: false })
           .range(from, to) as unknown as PromiseLike<{ data: RecipeListRow[] | null; error: { message: string } | null }>,
@@ -229,6 +227,7 @@ export default function Recipes() {
           .filter((n): n is string => !!n);
         return { ...r, totals, products, labeling: labelingMap[r.id] ?? "missing" };
       })
+      .filter((r) => !r.is_template)
       .filter((r) => (statusFilter === "all" ? true : (r.status ?? "draft") === statusFilter))
       .filter((r) => (labelingFilter === "all" ? true : r.labeling === labelingFilter))
       .filter((r) => {
@@ -285,9 +284,9 @@ export default function Recipes() {
     return Array.from(set).sort((a, b) => a.localeCompare(b, "nb"));
   }, [recipesQuery.data]);
 
-  /** Oppskrifter markert som mal (kategori === RECIPE_TEMPLATE_CATEGORY). */
+  /** Oppskrifter markert som mal (is_template = true). */
   const templates = useMemo(
-    () => (recipesQuery.data ?? []).filter((r) => r.category === RECIPE_TEMPLATE_CATEGORY),
+    () => (recipesQuery.data ?? []).filter((r) => r.is_template),
     [recipesQuery.data],
   );
 
@@ -316,9 +315,10 @@ export default function Recipes() {
     setCreatingFromTemplate(true);
     try {
       const newId = await copyRecipe(templateId);
+      // Kopien skal være en vanlig, redigerbar oppskrift, ikke selv en mal.
       const { error } = await supabase
         .from("recipes")
-        .update({ name: `Ny fra ${templateName}` } as never)
+        .update({ name: `Ny fra ${templateName}`, is_template: false } as never)
         .eq("id", newId);
       if (error) throw error;
       qc.invalidateQueries({ queryKey: ["recipes-list"] });

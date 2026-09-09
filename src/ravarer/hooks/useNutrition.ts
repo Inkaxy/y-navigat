@@ -17,6 +17,8 @@ export interface NutritionRow {
   fiber_g: number | null;
   protein_g: number | null;
   salt_g: number | null;
+  sodium_mg: number | null;
+  field_sources?: Record<string, string> | null;
   ingredient_declaration: string | null;
   country_of_origin: string | null;
   e_numbers: string[] | null;

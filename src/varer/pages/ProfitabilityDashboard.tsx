@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { osloTodayISO } from "@/lib/osloDate";
 import { nKr, nNum, nPct } from "@/varer/lib/calcFormat";
 import { useAppContext } from "@/varer/context/AppContext";
+import { useOpenMarginAlerts, useAcknowledgeMarginAlert } from "@/varer/hooks/useAcknowledgeMarginAlert";
 import {
   ROUND_STATUS_META,
   usePriceRounds,
@@ -102,6 +103,9 @@ export default function ProfitabilityDashboard() {
       return (data ?? []) as unknown as SheetRow[];
     },
   });
+
+  const openAlertsQuery = useOpenMarginAlerts(legalEntityId);
+  const acknowledge = useAcknowledgeMarginAlert(legalEntityId);
 
   const roundsQuery = usePriceRounds(legalEntityId, 5);
   const rounds = roundsQuery.data ?? [];
@@ -229,6 +233,41 @@ export default function ProfitabilityDashboard() {
               <span className="shrink-0 text-sm font-medium text-destructive">Åpne lønnsomhetsarket →</span>
             </button>
           )}
+
+          <section className="rounded-xl border bg-card">
+            <h2 className="border-b px-4 py-3 text-sm font-semibold">
+              Ukvitterte marginvarsler ({(openAlertsQuery.data ?? []).length})
+            </h2>
+            <div className="divide-y divide-border">
+              {(openAlertsQuery.data ?? []).map((a) => (
+                <div key={a.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium">
+                      {a.display_number != null ? `#${a.display_number} ` : ""}
+                      {a.display_name ?? "Ukjent vare"}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {a.price_list_name ?? "—"} · {a.status_before ?? "—"} → {a.status_after ?? "—"}
+                      {a.dg2_after != null ? ` · DG2 ${nNum(a.dg2_after, 1)} %` : ""}
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={acknowledge.isPending}
+                    onClick={() => acknowledge.mutate(a.id)}
+                  >
+                    Kvitter
+                  </Button>
+                </div>
+              ))}
+              {!(openAlertsQuery.data ?? []).length && (
+                <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+                  Ingen ukvitterte marginvarsler.
+                </p>
+              )}
+            </div>
+          </section>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="rounded-xl border bg-card p-4">

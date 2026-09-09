@@ -35,6 +35,12 @@ import { useNutritionDraft } from "@/ravarer/hooks/useNutritionDraft";
 import { QueryState } from "@/components/common/QueryState";
 import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
 
+/** Kilde-chip per felt: bare «manuell» skal markeres — resten er ikke interessant her. */
+function fieldSource(fieldSources: Record<string, string> | null | undefined, key: string): string | null {
+  const v = fieldSources?.[key];
+  return typeof v === "string" ? v : null;
+}
+
 const ALLERGEN_LABEL_BY_VALUE: Record<string, string> = Object.fromEntries(ALLERGENS.map((a) => [a.value, a.label]));
 const PRESENCE_LABEL: Record<string, string> = {
   contains: "inneholder",
@@ -260,17 +266,18 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-          <NumField label="Energi (kJ)" value={draft.energy_kj} onChange={setNum("energy_kj")} disabled={!canWrite} />
-          <NumField label="Energi (kcal)" value={draft.energy_kcal} onChange={setNum("energy_kcal")} disabled={!canWrite} />
+          <NumField label="Energi (kJ)" value={draft.energy_kj} onChange={setNum("energy_kj")} disabled={!canWrite} source={fieldSource(existing?.field_sources, "energy_kj")} />
+          <NumField label="Energi (kcal)" value={draft.energy_kcal} onChange={setNum("energy_kcal")} disabled={!canWrite} source={fieldSource(existing?.field_sources, "energy_kcal")} />
           <div />
-          <NumField label="Fett (g)" value={draft.fat_g} onChange={setNum("fat_g")} disabled={!canWrite} />
-          <NumField label="— hvorav mettet (g)" value={draft.saturated_fat_g} onChange={setNum("saturated_fat_g")} disabled={!canWrite} />
+          <NumField label="Fett (g)" value={draft.fat_g} onChange={setNum("fat_g")} disabled={!canWrite} source={fieldSource(existing?.field_sources, "fat_g")} />
+          <NumField label="— hvorav mettet (g)" value={draft.saturated_fat_g} onChange={setNum("saturated_fat_g")} disabled={!canWrite} source={fieldSource(existing?.field_sources, "saturated_fat_g")} />
           <div />
-          <NumField label="Karbohydrater (g)" value={draft.carbs_g} onChange={setNum("carbs_g")} disabled={!canWrite} />
-          <NumField label="— hvorav sukker (g)" value={draft.sugars_g} onChange={setNum("sugars_g")} disabled={!canWrite} />
-          <NumField label="Fiber (g)" value={draft.fiber_g} onChange={setNum("fiber_g")} disabled={!canWrite} />
-          <NumField label="Protein (g)" value={draft.protein_g} onChange={setNum("protein_g")} disabled={!canWrite} />
-          <NumField label="Salt (g)" value={draft.salt_g} onChange={setNum("salt_g")} disabled={!canWrite} />
+          <NumField label="Karbohydrater (g)" value={draft.carbs_g} onChange={setNum("carbs_g")} disabled={!canWrite} source={fieldSource(existing?.field_sources, "carbs_g")} />
+          <NumField label="— hvorav sukker (g)" value={draft.sugars_g} onChange={setNum("sugars_g")} disabled={!canWrite} source={fieldSource(existing?.field_sources, "sugars_g")} />
+          <NumField label="Fiber (g)" value={draft.fiber_g} onChange={setNum("fiber_g")} disabled={!canWrite} source={fieldSource(existing?.field_sources, "fiber_g")} />
+          <NumField label="Protein (g)" value={draft.protein_g} onChange={setNum("protein_g")} disabled={!canWrite} source={fieldSource(existing?.field_sources, "protein_g")} />
+          <NumField label="Salt (g)" value={draft.salt_g} onChange={setNum("salt_g")} disabled={!canWrite} source={fieldSource(existing?.field_sources, "salt_g")} />
+          <NumField label="Natrium (mg) — valgfritt" value={draft.sodium_mg ?? null} onChange={setNum("sodium_mg")} disabled={!canWrite} source={fieldSource(existing?.field_sources, "sodium_mg")} />
         </div>
         {energyWarning && (
           <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
@@ -465,10 +472,29 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
   );
 }
 
-function NumField({ label, value, onChange, disabled }: { label: string; value: number | null; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; disabled?: boolean }) {
+function NumField({
+  label,
+  value,
+  onChange,
+  disabled,
+  source,
+}: {
+  label: string;
+  value: number | null;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  disabled?: boolean;
+  source?: string | null;
+}) {
   return (
     <div>
-      <Label className="text-xs">{label}</Label>
+      <div className="flex items-center gap-1.5">
+        <Label className="text-xs">{label}</Label>
+        {source === "manuell" && (
+          <Badge variant="outline" className="text-[10px]">
+            Manuelt overstyrt
+          </Badge>
+        )}
+      </div>
       <Input type="number" step="0.01" value={value ?? ""} onChange={onChange} disabled={disabled} />
     </div>
   );
