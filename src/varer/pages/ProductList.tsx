@@ -130,7 +130,8 @@ export default function ProductList() {
   const productsQuery = useQuery({
     queryKey: ["products", legalEntityId],
     queryFn: async () => {
-      const rows = await fetchAllRows<ProductRow>((from, to) =>
+      // Databasetypen har `status: string`; vi smalner den til ProductStatus etter henting.
+      const rows = await fetchAllRows<Omit<ProductRow, "status"> & { status: string }>((from, to) =>
         supabase
           .from("products")
           .select(

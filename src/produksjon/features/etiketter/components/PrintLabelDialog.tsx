@@ -162,39 +162,10 @@ export function PrintLabelDialog({
     return { critical, other };
   }, [labelDataMap, selectedUnits, orderLineIds, printedFields, row?.display_name]);
 
-  /**
-   * Pliktfeltsjekk: profilen skriver ut deklarasjonsfelt, men verdien er tom.
-   * Da sperres utskriften — det finnes ingen «skriv ut likevel».
-   */
-  const missingMandatory = useMemo(() => {
-    const printedDeclFields = [...printedFields].filter((k) => k in DECLARATION_FIELD_KEYS);
-    if (printedDeclFields.length === 0) return [] as Array<{ key: string; label: string; who: string }>;
-    const byField = new Map<string, Set<string>>();
-    const rowsToCheck =
-      selectedUnits.length > 0
-        ? selectedUnits.map((u) => ({ id: u.order_line_id, label: `etikett ${u.number}` }))
-        : orderLineIds.map((id) => ({ id, label: row?.display_name ?? "varen" }));
-    for (const r of rowsToCheck) {
-      if (!r.id) continue;
-      const felter = labelDataMap?.[r.id]?.felter;
-      if (!felter) continue;
-      for (const key of printedDeclFields) {
-        // «Kan inneholde» er valgfri når det ikke finnes sporallergener.
-        if (key === "kan_inneholde") continue;
-        if (!isEmptyFieldValue(felter[key])) continue;
-        const set = byField.get(key) ?? new Set<string>();
-        set.add(r.label);
-        byField.set(key, set);
-      }
-    }
-    return [...byField.entries()].map(([key, who]) => ({
-      key,
-      label: DECLARATION_FIELD_KEYS[key] ?? key,
-      who: [...who].join(", "),
-    }));
-  }, [printedFields, selectedUnits, orderLineIds, labelDataMap, row?.display_name]);
-
-  const blockedByMissing = missingReport.critical.size > 0 || missingMandatory.length > 0;
+  // Pliktfeltsjekken er nå alene om å komme fra `resolve_label_data.mangler`
+  // (via missingReport.critical) — ingen lokal duplikat-liste med egne nøkler
+  // som kan gå ut av synk med databasens felt-katalog.
+  const blockedByMissing = missingReport.critical.size > 0;
 
   const describeMissing = (m: Map<string, Set<string>>) =>
     [...m.entries()].map(([key, who]) => ({
@@ -416,11 +387,6 @@ export function PrintLabelDialog({
               {describeMissing(missingReport.critical).map((m) => (
                 <li key={m.key}>
                   {m.label} mangler for {m.who}
-                </li>
-              ))}
-              {missingMandatory.map((m) => (
-                <li key={`plikt-${m.key}`}>
-                  Pliktfelt: {m.label} mangler for {m.who}
                 </li>
               ))}
             </ul>
