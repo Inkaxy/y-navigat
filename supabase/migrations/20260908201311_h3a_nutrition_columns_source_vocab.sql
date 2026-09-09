@@ -1,0 +1,4 @@
+-- Kjørt direkte mot prosjektet 8. september 2026 som versjon 20260908201311 (h3a_nutrition_columns_source_vocab).
+-- Fullt innhold: Inkaxy/nbos docs/db-migrasjoner/.
+-- Markørfil for migrasjonsmotoren – skal ikke kjøres på nytt.
+-- La til næringskolonner og et fast kildevokabular.

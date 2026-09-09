@@ -1,0 +1,4 @@
+-- Kjørt direkte mot prosjektet 8. september 2026 som versjon 20260908201457 (h3c_nutrition_seed_ready_worklist).
+-- Fullt innhold: Inkaxy/nbos docs/db-migrasjoner/.
+-- Markørfil for migrasjonsmotoren – skal ikke kjøres på nytt.
+-- Klargjorde arbeidslisten for næringsdata.

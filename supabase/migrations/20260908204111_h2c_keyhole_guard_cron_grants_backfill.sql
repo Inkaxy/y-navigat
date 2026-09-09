@@ -1,0 +1,4 @@
+-- Kjørt direkte mot prosjektet 8. september 2026 som versjon 20260908204111 (h2c_keyhole_guard_cron_grants_backfill).
+-- Fullt innhold: Inkaxy/nbos docs/db-migrasjoner/.
+-- Markørfil for migrasjonsmotoren – skal ikke kjøres på nytt.
+-- La til Nøkkelhull-vakt, cron, rettigheter og etterfylling.

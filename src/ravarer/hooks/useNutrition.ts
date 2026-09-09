@@ -59,14 +59,27 @@ export function useNutrition(rawMaterialId: string | undefined) {
   return useQuery(nutritionQueryOptions(rawMaterialId));
 }
 
+/**
+ * Genererte kolonner i `raw_material_nutrition` — databasen regner dem ut selv,
+ * og et insert/update som prøver å sette dem blir avvist.
+ */
+export const GENERATED_NUTRITION_COLUMNS = ["is_complete", "is_water", "food_name_norm", "search_keywords_norm"] as const;
+
+export function stripGeneratedColumns<T extends Record<string, unknown>>(input: T): T {
+  const clone: Record<string, unknown> = { ...input };
+  for (const col of GENERATED_NUTRITION_COLUMNS) delete clone[col];
+  return clone as T;
+}
+
 export function useUpsertNutrition() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: Partial<NutritionRow> & { raw_material_id: string }) => {
+      const payload = stripGeneratedColumns(input);
       const { data, error } = await supabase
         .from("raw_material_nutrition")
         // `source` er nullbar i vår type, men Insert-typen krever `string | undefined`.
-        .upsert(input as never, { onConflict: "raw_material_id" })
+        .upsert(payload as never, { onConflict: "raw_material_id" })
         .select()
         .single();
       if (error) throw error;

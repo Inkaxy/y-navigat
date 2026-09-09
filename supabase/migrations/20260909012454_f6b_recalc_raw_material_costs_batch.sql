@@ -1,0 +1,4 @@
+-- Kjørt direkte mot prosjektet 9. september 2026 som versjon 20260909012454 (f6b_recalc_raw_material_costs_batch).
+-- Fullt innhold: Inkaxy/nbos docs/db-migrasjoner/.
+-- Markørfil for migrasjonsmotoren – skal ikke kjøres på nytt.
+-- La til batchvis reberegning av råvarekost med angremulighet.

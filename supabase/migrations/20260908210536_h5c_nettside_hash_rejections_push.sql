@@ -1,0 +1,4 @@
+-- Kjørt direkte mot prosjektet 8. september 2026 som versjon 20260908210536 (h5c_nettside_hash_rejections_push).
+-- Fullt innhold: Inkaxy/nbos docs/db-migrasjoner/.
+-- Markørfil for migrasjonsmotoren – skal ikke kjøres på nytt.
+-- La til hash, avvisningslogg og push-styring for nettsiden.

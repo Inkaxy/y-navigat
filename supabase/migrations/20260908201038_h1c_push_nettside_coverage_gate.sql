@@ -1,0 +1,4 @@
+-- Kjørt direkte mot prosjektet 8. september 2026 som versjon 20260908201038 (h1c_push_nettside_coverage_gate).
+-- Fullt innhold: Inkaxy/nbos docs/db-migrasjoner/.
+-- Markørfil for migrasjonsmotoren – skal ikke kjøres på nytt.
+-- Innførte dekningskrav før push til nettsiden.

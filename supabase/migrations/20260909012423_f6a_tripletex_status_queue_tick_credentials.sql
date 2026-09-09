@@ -1,0 +1,4 @@
+-- Kjørt direkte mot prosjektet 9. september 2026 som versjon 20260909012423 (f6a_tripletex_status_queue_tick_credentials).
+-- Fullt innhold: Inkaxy/nbos docs/db-migrasjoner/.
+-- Markørfil for migrasjonsmotoren – skal ikke kjøres på nytt.
+-- La til Tripletex-status, kø og legitimasjonshåndtering.

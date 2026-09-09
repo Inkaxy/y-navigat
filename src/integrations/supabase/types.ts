@@ -664,6 +664,13 @@ export type Database = {
             foreignKeyName: "cake_categories_base_product_id_fkey"
             columns: ["base_product_id"]
             isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "cake_categories_base_product_id_fkey"
+            columns: ["base_product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -1142,6 +1149,13 @@ export type Database = {
             foreignKeyName: "cake_step_products_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "cake_step_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -1251,6 +1265,13 @@ export type Database = {
             foreignKeyName: "customer_bake_logs_baked_product_id_fkey"
             columns: ["baked_product_id"]
             isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "customer_bake_logs_baked_product_id_fkey"
+            columns: ["baked_product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -1260,6 +1281,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_bake_logs_raw_product_id_fkey"
+            columns: ["raw_product_id"]
+            isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "customer_bake_logs_raw_product_id_fkey"
@@ -2958,6 +2986,13 @@ export type Database = {
             foreignKeyName: "invoice_line_match_suggestions_raw_material_id_fkey"
             columns: ["raw_material_id"]
             isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "invoice_line_match_suggestions_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
             referencedRelation: "raw_material_package_worklist"
             referencedColumns: ["id"]
           },
@@ -2993,6 +3028,7 @@ export type Database = {
           expected_price_per_base_unit: number | null
           id: string
           invoice_id: string
+          ledger_account: string | null
           line_number: number | null
           match_confidence: string | null
           package_size: number | null
@@ -3022,6 +3058,7 @@ export type Database = {
           expected_price_per_base_unit?: number | null
           id?: string
           invoice_id: string
+          ledger_account?: string | null
           line_number?: number | null
           match_confidence?: string | null
           package_size?: number | null
@@ -3051,6 +3088,7 @@ export type Database = {
           expected_price_per_base_unit?: number | null
           id?: string
           invoice_id?: string
+          ledger_account?: string | null
           line_number?: number | null
           match_confidence?: string | null
           package_size?: number | null
@@ -3085,6 +3123,13 @@ export type Database = {
             columns: ["raw_material_id"]
             isOneToOne: false
             referencedRelation: "raw_material_declaration_worklist"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "invoice_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
             referencedColumns: ["raw_material_id"]
           },
           {
@@ -3302,6 +3347,7 @@ export type Database = {
           is_credit_note: boolean
           legal_entity_id: string
           line_extraction_at: string | null
+          line_extraction_attempts: number
           line_extraction_error: string | null
           line_extraction_status: string
           lines_source: string | null
@@ -3309,6 +3355,7 @@ export type Database = {
           lines_sum_status: string
           lines_sum_variance_pct: number | null
           notes: string | null
+          paid_at: string | null
           pdf_status: string
           reconciled_at: string | null
           reconciled_by: string | null
@@ -3318,6 +3365,7 @@ export type Database = {
           supplier_id: string
           total_amount: number | null
           total_vat: number | null
+          tripletex_is_paid: boolean | null
           tripletex_supplier_id: string | null
           tripletex_supplier_invoice_id: string | null
           tripletex_voucher_id: string | null
@@ -3342,6 +3390,7 @@ export type Database = {
           is_credit_note?: boolean
           legal_entity_id: string
           line_extraction_at?: string | null
+          line_extraction_attempts?: number
           line_extraction_error?: string | null
           line_extraction_status?: string
           lines_source?: string | null
@@ -3349,6 +3398,7 @@ export type Database = {
           lines_sum_status?: string
           lines_sum_variance_pct?: number | null
           notes?: string | null
+          paid_at?: string | null
           pdf_status?: string
           reconciled_at?: string | null
           reconciled_by?: string | null
@@ -3358,6 +3408,7 @@ export type Database = {
           supplier_id: string
           total_amount?: number | null
           total_vat?: number | null
+          tripletex_is_paid?: boolean | null
           tripletex_supplier_id?: string | null
           tripletex_supplier_invoice_id?: string | null
           tripletex_voucher_id?: string | null
@@ -3382,6 +3433,7 @@ export type Database = {
           is_credit_note?: boolean
           legal_entity_id?: string
           line_extraction_at?: string | null
+          line_extraction_attempts?: number
           line_extraction_error?: string | null
           line_extraction_status?: string
           lines_source?: string | null
@@ -3389,6 +3441,7 @@ export type Database = {
           lines_sum_status?: string
           lines_sum_variance_pct?: number | null
           notes?: string | null
+          paid_at?: string | null
           pdf_status?: string
           reconciled_at?: string | null
           reconciled_by?: string | null
@@ -3398,6 +3451,7 @@ export type Database = {
           supplier_id?: string
           total_amount?: number | null
           total_vat?: number | null
+          tripletex_is_paid?: boolean | null
           tripletex_supplier_id?: string | null
           tripletex_supplier_invoice_id?: string | null
           tripletex_voucher_id?: string | null
@@ -3622,6 +3676,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "order_lines"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "label_print_jobs_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "label_print_jobs_product_id_fkey"
@@ -3986,10 +4047,85 @@ export type Database = {
           },
         ]
       }
+      margin_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          created_at: string
+          dg2_after: number | null
+          dg2_before: number | null
+          id: string
+          legal_entity_id: string
+          price_list_id: string
+          product_id: string
+          status_after: string
+          status_before: string | null
+          target_pct: number | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          created_at?: string
+          dg2_after?: number | null
+          dg2_before?: number | null
+          id?: string
+          legal_entity_id: string
+          price_list_id: string
+          product_id: string
+          status_after: string
+          status_before?: string | null
+          target_pct?: number | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          created_at?: string
+          dg2_after?: number | null
+          dg2_before?: number | null
+          id?: string
+          legal_entity_id?: string
+          price_list_id?: string
+          product_id?: string
+          status_after?: string
+          status_before?: string | null
+          target_pct?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "margin_alerts_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "margin_alerts_price_list_id_fkey"
+            columns: ["price_list_id"]
+            isOneToOne: false
+            referencedRelation: "price_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "margin_alerts_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "margin_alerts_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       margin_targets: {
         Row: {
           calc_type: Database["public"]["Enums"]["calc_type"] | null
           id: string
+          is_seed_default: boolean
           legal_entity_id: string
           main_category_id: string | null
           price_level: Database["public"]["Enums"]["price_level"]
@@ -4002,6 +4138,7 @@ export type Database = {
         Insert: {
           calc_type?: Database["public"]["Enums"]["calc_type"] | null
           id?: string
+          is_seed_default?: boolean
           legal_entity_id: string
           main_category_id?: string | null
           price_level: Database["public"]["Enums"]["price_level"]
@@ -4014,6 +4151,7 @@ export type Database = {
         Update: {
           calc_type?: Database["public"]["Enums"]["calc_type"] | null
           id?: string
+          is_seed_default?: boolean
           legal_entity_id?: string
           main_category_id?: string | null
           price_level?: Database["public"]["Enums"]["price_level"]
@@ -4042,7 +4180,10 @@ export type Database = {
       }
       matvaretabellen_foods: {
         Row: {
+          added_sugar_g: number | null
           carbs_g: number | null
+          cholesterol_mg: number | null
+          constituents: Json | null
           edible_part_pct: number | null
           energy_kcal: number | null
           energy_kj: number | null
@@ -4052,20 +4193,31 @@ export type Database = {
           food_group_name: string | null
           food_id: string
           food_name: string
+          food_name_norm: string | null
+          is_stale: boolean
+          langual_codes: string[] | null
           latin_name: string | null
+          mono_unsat_g: number | null
+          poly_unsat_g: number | null
           portions: Json | null
           protein_g: number | null
           salt_g: number | null
           saturated_fat_g: number | null
           search_keywords: string[] | null
+          search_keywords_norm: string | null
+          sodium_mg: number | null
           starch_g: number | null
           sugars_g: number | null
           synced_at: string
+          trans_fat_g: number | null
           uri: string | null
           water_g: number | null
         }
         Insert: {
+          added_sugar_g?: number | null
           carbs_g?: number | null
+          cholesterol_mg?: number | null
+          constituents?: Json | null
           edible_part_pct?: number | null
           energy_kcal?: number | null
           energy_kj?: number | null
@@ -4075,20 +4227,31 @@ export type Database = {
           food_group_name?: string | null
           food_id: string
           food_name: string
+          food_name_norm?: string | null
+          is_stale?: boolean
+          langual_codes?: string[] | null
           latin_name?: string | null
+          mono_unsat_g?: number | null
+          poly_unsat_g?: number | null
           portions?: Json | null
           protein_g?: number | null
           salt_g?: number | null
           saturated_fat_g?: number | null
           search_keywords?: string[] | null
+          search_keywords_norm?: string | null
+          sodium_mg?: number | null
           starch_g?: number | null
           sugars_g?: number | null
           synced_at?: string
+          trans_fat_g?: number | null
           uri?: string | null
           water_g?: number | null
         }
         Update: {
+          added_sugar_g?: number | null
           carbs_g?: number | null
+          cholesterol_mg?: number | null
+          constituents?: Json | null
           edible_part_pct?: number | null
           energy_kcal?: number | null
           energy_kj?: number | null
@@ -4098,15 +4261,23 @@ export type Database = {
           food_group_name?: string | null
           food_id?: string
           food_name?: string
+          food_name_norm?: string | null
+          is_stale?: boolean
+          langual_codes?: string[] | null
           latin_name?: string | null
+          mono_unsat_g?: number | null
+          poly_unsat_g?: number | null
           portions?: Json | null
           protein_g?: number | null
           salt_g?: number | null
           saturated_fat_g?: number | null
           search_keywords?: string[] | null
+          search_keywords_norm?: string | null
+          sodium_mg?: number | null
           starch_g?: number | null
           sugars_g?: number | null
           synced_at?: string
+          trans_fat_g?: number | null
           uri?: string | null
           water_g?: number | null
         }
@@ -4267,6 +4438,13 @@ export type Database = {
             columns: ["raw_material_id"]
             isOneToOne: false
             referencedRelation: "raw_material_declaration_worklist"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "negotiation_items_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
             referencedColumns: ["raw_material_id"]
           },
           {
@@ -4759,6 +4937,13 @@ export type Database = {
             foreignKeyName: "nettside_sync_rejections_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "nettside_sync_rejections_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -4829,6 +5014,13 @@ export type Database = {
           status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "nettside_sync_state_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
           {
             foreignKeyName: "nettside_sync_state_product_id_fkey"
             columns: ["product_id"]
@@ -5041,6 +5233,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "order_lines_product_id_fkey"
@@ -6170,6 +6369,13 @@ export type Database = {
             foreignKeyName: "pos_keypad_buttons_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "pos_keypad_buttons_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -6640,6 +6846,13 @@ export type Database = {
             foreignKeyName: "pos_product_images_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "pos_product_images_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -7005,6 +7218,13 @@ export type Database = {
           unit_price_excl_mva?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "pos_transaction_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
           {
             foreignKeyName: "pos_transaction_lines_product_id_fkey"
             columns: ["product_id"]
@@ -7447,6 +7667,13 @@ export type Database = {
             foreignKeyName: "price_list_items_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "price_list_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -7663,6 +7890,13 @@ export type Database = {
             foreignKeyName: "price_round_lines_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "price_round_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -7826,6 +8060,13 @@ export type Database = {
             foreignKeyName: "product_cost_additions_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "product_cost_additions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -7834,6 +8075,13 @@ export type Database = {
             columns: ["raw_material_id"]
             isOneToOne: false
             referencedRelation: "raw_material_declaration_worklist"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "product_cost_additions_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
             referencedColumns: ["raw_material_id"]
           },
           {
@@ -7863,6 +8111,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "resale_stock_status"
             referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "product_cost_additions_sub_product_id_fkey"
+            columns: ["sub_product_id"]
+            isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "product_cost_additions_sub_product_id_fkey"
@@ -7905,6 +8160,13 @@ export type Database = {
           stale_marked_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "product_cost_cache_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
           {
             foreignKeyName: "product_cost_cache_product_id_fkey"
             columns: ["product_id"]
@@ -7982,6 +8244,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "production_departments"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_label_departments_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "product_label_departments_product_id_fkey"
@@ -8069,8 +8338,22 @@ export type Database = {
             foreignKeyName: "product_package_items_contained_product_id_fkey"
             columns: ["contained_product_id"]
             isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "product_package_items_contained_product_id_fkey"
+            columns: ["contained_product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_package_items_package_product_id_fkey"
+            columns: ["package_product_id"]
+            isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "product_package_items_package_product_id_fkey"
@@ -8113,6 +8396,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "packing_areas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_packing_areas_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "product_packing_areas_product_id_fkey"
@@ -8239,6 +8529,13 @@ export type Database = {
             foreignKeyName: "product_recipe_links_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "product_recipe_links_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -8301,6 +8598,13 @@ export type Database = {
             foreignKeyName: "product_return_price_overrides_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "product_return_price_overrides_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -8323,6 +8627,13 @@ export type Database = {
           sales_group_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "product_sales_groups_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
           {
             foreignKeyName: "product_sales_groups_product_id_fkey"
             columns: ["product_id"]
@@ -8365,6 +8676,13 @@ export type Database = {
           units_per_sold_unit?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "product_stock_links_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
           {
             foreignKeyName: "product_stock_links_product_id_fkey"
             columns: ["product_id"]
@@ -8583,6 +8901,13 @@ export type Database = {
             foreignKeyName: "production_groups_main_product_id_fkey"
             columns: ["main_product_id"]
             isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "production_groups_main_product_id_fkey"
+            columns: ["main_product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -8623,6 +8948,13 @@ export type Database = {
           trays_partial?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "production_plan_snapshot_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
           {
             foreignKeyName: "production_plan_snapshot_items_product_id_fkey"
             columns: ["product_id"]
@@ -9041,8 +9373,22 @@ export type Database = {
             foreignKeyName: "products_baked_product_id_fkey"
             columns: ["baked_product_id"]
             isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "products_baked_product_id_fkey"
+            columns: ["baked_product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_calc_source_product_id_fkey"
+            columns: ["calc_source_product_id"]
+            isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "products_calc_source_product_id_fkey"
@@ -9111,6 +9457,13 @@ export type Database = {
             foreignKeyName: "products_variant_of_product_id_fkey"
             columns: ["variant_of_product_id"]
             isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "products_variant_of_product_id_fkey"
+            columns: ["variant_of_product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -9147,6 +9500,13 @@ export type Database = {
             foreignKeyName: "raw_material_allergens_raw_material_id_fkey"
             columns: ["raw_material_id"]
             isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_material_allergens_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
             referencedRelation: "raw_material_package_worklist"
             referencedColumns: ["id"]
           },
@@ -9172,6 +9532,27 @@ export type Database = {
             referencedColumns: ["raw_material_id"]
           },
         ]
+      }
+      raw_material_category_food_groups: {
+        Row: {
+          category: string
+          created_at: string
+          food_group_id: string
+          note: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          food_group_id: string
+          note?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          food_group_id?: string
+          note?: string | null
+        }
+        Relationships: []
       }
       raw_material_changelog: {
         Row: {
@@ -9238,6 +9619,13 @@ export type Database = {
             columns: ["raw_material_id"]
             isOneToOne: false
             referencedRelation: "raw_material_declaration_worklist"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_material_changelog_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
             referencedColumns: ["raw_material_id"]
           },
           {
@@ -9325,6 +9713,13 @@ export type Database = {
             foreignKeyName: "raw_material_components_component_raw_material_id_fkey"
             columns: ["component_raw_material_id"]
             isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_material_components_component_raw_material_id_fkey"
+            columns: ["component_raw_material_id"]
+            isOneToOne: false
             referencedRelation: "raw_material_package_worklist"
             referencedColumns: ["id"]
           },
@@ -9354,6 +9749,13 @@ export type Database = {
             columns: ["parent_raw_material_id"]
             isOneToOne: false
             referencedRelation: "raw_material_declaration_worklist"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_material_components_parent_raw_material_id_fkey"
+            columns: ["parent_raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
             referencedColumns: ["raw_material_id"]
           },
           {
@@ -9388,6 +9790,7 @@ export type Database = {
       }
       raw_material_cost_recalcs: {
         Row: {
+          batch_id: string | null
           cost_after: number | null
           cost_before: number | null
           factor_source: string | null
@@ -9403,6 +9806,7 @@ export type Database = {
           undone_by: string | null
         }
         Insert: {
+          batch_id?: string | null
           cost_after?: number | null
           cost_before?: number | null
           factor_source?: string | null
@@ -9418,6 +9822,7 @@ export type Database = {
           undone_by?: string | null
         }
         Update: {
+          batch_id?: string | null
           cost_after?: number | null
           cost_before?: number | null
           factor_source?: string | null
@@ -9438,6 +9843,13 @@ export type Database = {
             columns: ["raw_material_id"]
             isOneToOne: false
             referencedRelation: "raw_material_declaration_worklist"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_material_cost_recalcs_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
             referencedColumns: ["raw_material_id"]
           },
           {
@@ -9510,6 +9922,13 @@ export type Database = {
             columns: ["raw_material_id"]
             isOneToOne: false
             referencedRelation: "raw_material_declaration_worklist"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_material_cost_reference_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
             referencedColumns: ["raw_material_id"]
           },
           {
@@ -9625,6 +10044,13 @@ export type Database = {
             columns: ["raw_material_id"]
             isOneToOne: false
             referencedRelation: "raw_material_declaration_worklist"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_material_datasheets_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
             referencedColumns: ["raw_material_id"]
           },
           {
@@ -9749,6 +10175,13 @@ export type Database = {
             foreignKeyName: "raw_material_nutrition_raw_material_id_fkey"
             columns: ["raw_material_id"]
             isOneToOne: true
+            referencedRelation: "raw_material_nutrition_coverage"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_material_nutrition_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: true
             referencedRelation: "raw_material_package_worklist"
             referencedColumns: ["id"]
           },
@@ -9855,6 +10288,13 @@ export type Database = {
             foreignKeyName: "raw_material_price_history_raw_material_id_fkey"
             columns: ["raw_material_id"]
             isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_material_price_history_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
             referencedRelation: "raw_material_package_worklist"
             referencedColumns: ["id"]
           },
@@ -9924,6 +10364,13 @@ export type Database = {
             foreignKeyName: "raw_material_products_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "raw_material_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -9932,6 +10379,13 @@ export type Database = {
             columns: ["raw_material_id"]
             isOneToOne: false
             referencedRelation: "raw_material_declaration_worklist"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_material_products_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
             referencedColumns: ["raw_material_id"]
           },
           {
@@ -10033,6 +10487,13 @@ export type Database = {
             columns: ["raw_material_id"]
             isOneToOne: false
             referencedRelation: "raw_material_declaration_worklist"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_material_purchases_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
             referencedColumns: ["raw_material_id"]
           },
           {
@@ -10221,6 +10682,13 @@ export type Database = {
             foreignKeyName: "raw_material_suppliers_raw_material_id_fkey"
             columns: ["raw_material_id"]
             isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_material_suppliers_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
             referencedRelation: "raw_material_package_worklist"
             referencedColumns: ["id"]
           },
@@ -10300,6 +10768,13 @@ export type Database = {
             columns: ["raw_material_id"]
             isOneToOne: false
             referencedRelation: "raw_material_declaration_worklist"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_material_units_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
             referencedColumns: ["raw_material_id"]
           },
           {
@@ -10879,6 +11354,13 @@ export type Database = {
             foreignKeyName: "recipe_lines_raw_material_id_fkey"
             columns: ["raw_material_id"]
             isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "recipe_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
             referencedRelation: "raw_material_package_worklist"
             referencedColumns: ["id"]
           },
@@ -10923,6 +11405,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "recipe_parts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_lines_sub_product_id_fkey"
+            columns: ["sub_product_id"]
+            isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "recipe_lines_sub_product_id_fkey"
@@ -10973,6 +11462,13 @@ export type Database = {
             columns: ["raw_material_id"]
             isOneToOne: false
             referencedRelation: "raw_material_declaration_worklist"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "recipe_packaging_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
             referencedColumns: ["raw_material_id"]
           },
           {
@@ -11196,6 +11692,54 @@ export type Database = {
           },
         ]
       }
+      recipe_versions: {
+        Row: {
+          change_summary: string | null
+          changed_at: string
+          changed_by: string | null
+          diff: Json | null
+          id: string
+          recipe_id: string
+          snapshot: Json
+          version: number
+        }
+        Insert: {
+          change_summary?: string | null
+          changed_at?: string
+          changed_by?: string | null
+          diff?: Json | null
+          id?: string
+          recipe_id: string
+          snapshot: Json
+          version: number
+        }
+        Update: {
+          change_summary?: string | null
+          changed_at?: string
+          changed_by?: string | null
+          diff?: Json | null
+          id?: string
+          recipe_id?: string
+          snapshot?: Json
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_versions_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_nutrition_calculated"
+            referencedColumns: ["recipe_id"]
+          },
+          {
+            foreignKeyName: "recipe_versions_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recipes: {
         Row: {
           autolyse_minutes: number | null
@@ -11217,10 +11761,13 @@ export type Database = {
           dough_piece_grams: number | null
           dough_waste_pct: number
           finished_weight_grams: number | null
+          flour_temp_celsius: number | null
           friction_factor_celsius: number | null
           hourly_rate: number
           id: string
           image_url: string | null
+          is_template: boolean
+          keyhole_group: string | null
           label_claim_grain: boolean
           label_claim_keyhole: boolean
           label_claims_approved_at: string | null
@@ -11235,6 +11782,7 @@ export type Database = {
           mixing_speed2_minutes: number | null
           name: string | null
           notes: string | null
+          preferment_temp_celsius: number | null
           price_egne_utsalg: number | null
           price_engros: number | null
           price_engros_with_packaging: number | null
@@ -11242,6 +11790,7 @@ export type Database = {
           product_id: string | null
           production_notes: string | null
           requires_cleanup: boolean
+          room_temp_celsius: number | null
           shape_proof_minutes: number | null
           shelf_life_days: number | null
           status: string
@@ -11280,10 +11829,13 @@ export type Database = {
           dough_piece_grams?: number | null
           dough_waste_pct?: number
           finished_weight_grams?: number | null
+          flour_temp_celsius?: number | null
           friction_factor_celsius?: number | null
           hourly_rate?: number
           id?: string
           image_url?: string | null
+          is_template?: boolean
+          keyhole_group?: string | null
           label_claim_grain?: boolean
           label_claim_keyhole?: boolean
           label_claims_approved_at?: string | null
@@ -11298,6 +11850,7 @@ export type Database = {
           mixing_speed2_minutes?: number | null
           name?: string | null
           notes?: string | null
+          preferment_temp_celsius?: number | null
           price_egne_utsalg?: number | null
           price_engros?: number | null
           price_engros_with_packaging?: number | null
@@ -11305,6 +11858,7 @@ export type Database = {
           product_id?: string | null
           production_notes?: string | null
           requires_cleanup?: boolean
+          room_temp_celsius?: number | null
           shape_proof_minutes?: number | null
           shelf_life_days?: number | null
           status?: string
@@ -11343,10 +11897,13 @@ export type Database = {
           dough_piece_grams?: number | null
           dough_waste_pct?: number
           finished_weight_grams?: number | null
+          flour_temp_celsius?: number | null
           friction_factor_celsius?: number | null
           hourly_rate?: number
           id?: string
           image_url?: string | null
+          is_template?: boolean
+          keyhole_group?: string | null
           label_claim_grain?: boolean
           label_claim_keyhole?: boolean
           label_claims_approved_at?: string | null
@@ -11361,6 +11918,7 @@ export type Database = {
           mixing_speed2_minutes?: number | null
           name?: string | null
           notes?: string | null
+          preferment_temp_celsius?: number | null
           price_egne_utsalg?: number | null
           price_engros?: number | null
           price_engros_with_packaging?: number | null
@@ -11368,6 +11926,7 @@ export type Database = {
           product_id?: string | null
           production_notes?: string | null
           requires_cleanup?: boolean
+          room_temp_celsius?: number | null
           shape_proof_minutes?: number | null
           shelf_life_days?: number | null
           status?: string
@@ -11387,6 +11946,13 @@ export type Database = {
           yield_unit?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "recipes_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
           {
             foreignKeyName: "recipes_product_id_fkey"
             columns: ["product_id"]
@@ -11431,6 +11997,13 @@ export type Database = {
           weekday?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "recurring_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
           {
             foreignKeyName: "recurring_order_items_product_id_fkey"
             columns: ["product_id"]
@@ -11796,6 +12369,13 @@ export type Database = {
             foreignKeyName: "rm_goods_receipts_raw_material_id_fkey"
             columns: ["raw_material_id"]
             isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "rm_goods_receipts_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
             referencedRelation: "raw_material_package_worklist"
             referencedColumns: ["id"]
           },
@@ -11947,6 +12527,13 @@ export type Database = {
             columns: ["raw_material_id"]
             isOneToOne: false
             referencedRelation: "raw_material_declaration_worklist"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "rm_stock_lots_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
             referencedColumns: ["raw_material_id"]
           },
           {
@@ -12122,6 +12709,13 @@ export type Database = {
             foreignKeyName: "special_prices_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "special_prices_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -12153,6 +12747,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "statistic_groups"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "statistic_group_members_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "statistic_group_members_product_id_fkey"
@@ -12331,6 +12932,13 @@ export type Database = {
             foreignKeyName: "stock_items_defined_by_product_id_fkey"
             columns: ["defined_by_product_id"]
             isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "stock_items_defined_by_product_id_fkey"
+            columns: ["defined_by_product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -12422,6 +13030,13 @@ export type Database = {
             columns: ["raw_material_id"]
             isOneToOne: false
             referencedRelation: "raw_material_declaration_worklist"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "stock_movements_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
             referencedColumns: ["raw_material_id"]
           },
           {
@@ -13063,7 +13678,6 @@ export type Database = {
           created_at: string
           employee_token_encrypted: string | null
           initial_import_done: boolean
-          jwt_token_encrypted: string | null
           last_invoice_synced_date: string | null
           last_supplier_sync_at: string | null
           last_sync_error: string | null
@@ -13083,7 +13697,6 @@ export type Database = {
           created_at?: string
           employee_token_encrypted?: string | null
           initial_import_done?: boolean
-          jwt_token_encrypted?: string | null
           last_invoice_synced_date?: string | null
           last_supplier_sync_at?: string | null
           last_sync_error?: string | null
@@ -13103,7 +13716,6 @@ export type Database = {
           created_at?: string
           employee_token_encrypted?: string | null
           initial_import_done?: boolean
-          jwt_token_encrypted?: string | null
           last_invoice_synced_date?: string | null
           last_supplier_sync_at?: string | null
           last_sync_error?: string | null
@@ -13660,6 +14272,55 @@ export type Database = {
       }
     }
     Views: {
+      margin_alerts_open: {
+        Row: {
+          created_at: string | null
+          dg2_after: number | null
+          dg2_before: number | null
+          display_name: string | null
+          display_number: number | null
+          id: string | null
+          legal_entity_id: string | null
+          price_level: Database["public"]["Enums"]["price_level"] | null
+          price_list_code: string | null
+          price_list_id: string | null
+          price_list_name: string | null
+          product_id: string | null
+          status_after: string | null
+          status_before: string | null
+          target_pct: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "margin_alerts_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "margin_alerts_price_list_id_fkey"
+            columns: ["price_list_id"]
+            isOneToOne: false
+            referencedRelation: "price_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "margin_alerts_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "margin_alerts_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       price_round_letter_basis: {
         Row: {
           antall_varer: number | null
@@ -13674,6 +14335,29 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "price_rounds_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_calc_readiness: {
+        Row: {
+          calc_type: string | null
+          calc_type_ikke_satt: boolean | null
+          display_name: string | null
+          display_number: number | null
+          legal_entity_id: string | null
+          mangler: string[] | null
+          product_id: string | null
+          product_status: string | null
+          recipe_id: string | null
+          status: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_legal_entity_id_fkey"
             columns: ["legal_entity_id"]
             isOneToOne: false
             referencedRelation: "legal_entities"
@@ -13701,6 +14385,13 @@ export type Database = {
           total_input_grams: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "product_recipe_links_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
           {
             foreignKeyName: "product_recipe_links_product_id_fkey"
             columns: ["product_id"]
@@ -13764,6 +14455,13 @@ export type Database = {
             foreignKeyName: "invoice_lines_raw_material_id_fkey"
             columns: ["raw_material_id"]
             isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "invoice_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
             referencedRelation: "raw_material_package_worklist"
             referencedColumns: ["id"]
           },
@@ -13790,6 +14488,37 @@ export type Database = {
           },
           {
             foreignKeyName: "invoices_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      raw_material_nutrition_coverage: {
+        Row: {
+          category: string | null
+          is_complete: boolean | null
+          is_packaging: boolean | null
+          item_type: string | null
+          legal_entity_id: string | null
+          manual_field_count: number | null
+          matvaretabellen_food_id: string | null
+          name: string | null
+          needs_nutrition: boolean | null
+          purchase_12m: number | null
+          raw_material_id: string | null
+          recipe_grams: number | null
+          recipe_lines: number | null
+          recipes_using: number | null
+          source: string | null
+          status: string | null
+          used_in_recipes: boolean | null
+          verified_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "raw_materials_legal_entity_id_fkey"
             columns: ["legal_entity_id"]
             isOneToOne: false
             referencedRelation: "legal_entities"
@@ -13861,6 +14590,13 @@ export type Database = {
             columns: ["raw_material_id"]
             isOneToOne: false
             referencedRelation: "raw_material_declaration_worklist"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "invoice_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
             referencedColumns: ["raw_material_id"]
           },
           {
@@ -13977,6 +14713,13 @@ export type Database = {
             columns: ["raw_material_id"]
             isOneToOne: false
             referencedRelation: "raw_material_declaration_worklist"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "invoice_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
             referencedColumns: ["raw_material_id"]
           },
           {
@@ -14152,6 +14895,13 @@ export type Database = {
           status: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "stock_items_defined_by_product_id_fkey"
+            columns: ["defined_by_product_id"]
+            isOneToOne: false
+            referencedRelation: "product_calc_readiness"
+            referencedColumns: ["product_id"]
+          },
           {
             foreignKeyName: "stock_items_defined_by_product_id_fkey"
             columns: ["defined_by_product_id"]
@@ -14832,6 +15582,28 @@ export type Database = {
         Args: { p_raw_material_ids: string[] }
         Returns: string[]
       }
+      h4_margin_eval: {
+        Args: {
+          p_calc_type: string
+          p_cost: Json
+          p_is_provisional: boolean
+          p_price: number
+          p_price_level: Database["public"]["Enums"]["price_level"]
+          p_product_id: string
+        }
+        Returns: {
+          avvik_pp: number
+          brutto_pct: number
+          db2: number
+          dg2_pct: number
+          needed_price: number
+          status: string
+          target_brutto_pct: number
+          target_dg2_pct: number
+          target_source: string
+          warn_below_pp: number
+        }[]
+      }
       h4_mark_cost_stale: { Args: { p_product_ids: string[] }; Returns: number }
       h4_products_for_raw_materials: {
         Args: { p_rm_ids: string[] }
@@ -14841,6 +15613,41 @@ export type Database = {
         Args: { p_recipe_ids: string[] }
         Returns: string[]
       }
+      h4_sub_product_reaches: {
+        Args: {
+          p_extra_link_product?: string
+          p_extra_link_recipe?: string
+          p_start_product: string
+          p_target_products: string[]
+        }
+        Returns: boolean
+      }
+      h6_bump_recipe_versions: {
+        Args: { p_recipe_ids: string[] }
+        Returns: number
+      }
+      h6_diff_summary: { Args: { p_diff: Json }; Returns: Json }
+      h6_is_uuid: { Args: { p: string }; Returns: boolean }
+      h6_json_pick: { Args: { p_keys: string[]; p_obj: Json }; Returns: Json }
+      h6_line_grams: {
+        Args: {
+          p_client_grams: number
+          p_quantity: number
+          p_raw_material_id: string
+          p_unit: string
+        }
+        Returns: number
+      }
+      h6_object_diff: {
+        Args: { p_ignore: string[]; p_new: Json; p_old: Json }
+        Returns: Json
+      }
+      h6_recipe_snapshot: { Args: { p_recipe_id: string }; Returns: Json }
+      h6_rows_diff: {
+        Args: { p_ignore: string[]; p_new: Json; p_old: Json }
+        Returns: Json
+      }
+      h6_snapshot_diff: { Args: { p_new: Json; p_old: Json }; Returns: Json }
       has_access_to_outlet: { Args: { p_outlet_id: string }; Returns: boolean }
       has_active_position: {
         Args: { p_position_code: string }
@@ -14889,6 +15696,11 @@ export type Database = {
         Args: { p_legal_entity_id: string; p_position_code: string }
         Returns: boolean
       }
+      immutable_keywords_text: {
+        Args: { p_keywords: string[] }
+        Returns: string
+      }
+      immutable_unaccent: { Args: { p_text: string }; Returns: string }
       import_tedebe_products_prices: {
         Args: {
           p_legal_entity_id: string
@@ -15108,6 +15920,29 @@ export type Database = {
         }
         Returns: number
       }
+      matvaretabellen_suggest: {
+        Args: { p_limit?: number; p_raw_material_id: string }
+        Returns: {
+          food_group_name: string
+          food_id: string
+          food_name: string
+          score: number
+        }[]
+      }
+      matvaretabellen_suggest_for_name: {
+        Args: {
+          p_category?: string
+          p_declaration_name?: string
+          p_limit?: number
+          p_name: string
+        }
+        Returns: {
+          food_group_name: string
+          food_id: string
+          food_name: string
+          score: number
+        }[]
+      }
       merge_raw_materials: {
         Args: { p_dup: string; p_keep: string }
         Returns: undefined
@@ -15145,6 +15980,10 @@ export type Database = {
           order_sequence: number
           order_year: number
         }[]
+      }
+      nutrition_coverage_summary: {
+        Args: { p_legal_entity_id?: string }
+        Returns: Json
       }
       order_is_production_scope: {
         Args: { p_status: string }
@@ -15642,6 +16481,14 @@ export type Database = {
         }
         Returns: Json
       }
+      recalc_raw_material_costs: {
+        Args: {
+          p_dry_run?: boolean
+          p_raw_material_ids: string[]
+          p_reason?: string
+        }
+        Returns: Json
+      }
       recipe_breadscale_effective: {
         Args: { p_recipe_id: string }
         Returns: number
@@ -15667,6 +16514,7 @@ export type Database = {
         Args: { p_quantity: number; p_quantity_grams: number; p_unit: string }
         Returns: number
       }
+      refresh_product_cost_cache: { Args: { p_limit?: number }; Returns: Json }
       refresh_purchase_stats: { Args: never; Returns: undefined }
       register_cake_image_print: {
         Args: {
@@ -15858,6 +16706,25 @@ export type Database = {
           }
       rm_can_read: { Args: { _rm_id: string }; Returns: boolean }
       rm_can_write: { Args: { _rm_id: string }; Returns: boolean }
+      rm_claim_invoice_line_extraction: {
+        Args: {
+          p_invoice_id?: string
+          p_lease?: string
+          p_legal_entity_id: string
+          p_limit?: number
+          p_max_attempts?: number
+        }
+        Returns: {
+          id: string
+          invoice_number: string
+          line_extraction_attempts: number
+          line_extraction_status: string
+          status: string
+          total_amount: number
+          total_vat: number
+          tripletex_supplier_invoice_id: string
+        }[]
+      }
       rm_effective_agreement: {
         Args: { p_on_date?: string; p_raw_material_id: string }
         Returns: {
@@ -15959,6 +16826,7 @@ export type Database = {
           orders_deleted: number
         }[]
       }
+      save_recipe: { Args: { p_recipe: Json }; Returns: Json }
       search_products_trgm: {
         Args: { p_legal_entity_id: string; p_limit?: number; p_query: string }
         Returns: {
@@ -16054,6 +16922,15 @@ export type Database = {
           totalt: number
         }[]
       }
+      tripletex_invoice_lines_tick: {
+        Args: {
+          p_dry_run?: boolean
+          p_limit?: number
+          p_max_attempts?: number
+          p_only_with_pending?: boolean
+        }
+        Returns: Json
+      }
       tripletex_token_status: {
         Args: { _legal_entity_id: string }
         Returns: {
@@ -16071,6 +16948,7 @@ export type Database = {
         Returns: Json
       }
       undo_raw_material_recalc: { Args: { p_recalc_id: string }; Returns: Json }
+      undo_raw_material_recalcs: { Args: { p_batch_id: string }; Returns: Json }
       unfinalize_delivery_notes: {
         Args: { p_ids: string[]; p_reason?: string }
         Returns: Json

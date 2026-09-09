@@ -15,9 +15,12 @@ export interface InvoiceListRow {
   imported_at: string;
   line_extraction_status: string | null;
   line_extraction_error: string | null;
+  line_extraction_attempts: number;
   /** AI-ens lesesikkerhet ved PDF-import (0–1). */
   extraction_confidence: number | null;
   lines_sum_status: string | null;
+  paid_at: string | null;
+  tripletex_is_paid: boolean | null;
 
   supplier?: { name: string } | null;
   legal_entity?: { legal_name: string; short_code: string | null } | null;
@@ -41,6 +44,8 @@ export interface InvoiceFilters {
   dateFrom?: string | null;
   dateTo?: string | null;
   onlyMismatch?: boolean;
+  /** Filtrer på betalt-status: «betalt» krever paid_at, «ubetalt» krever tripletex_is_paid = false. */
+  paidStatus?: "betalt" | "ubetalt" | null;
   sortKey?: InvoiceSortKey;
   sortDir?: SortDir;
   page?: number;
@@ -48,7 +53,7 @@ export interface InvoiceFilters {
 }
 
 const SELECT =
-  "id, legal_entity_id, supplier_id, invoice_number, invoice_date, due_date, total_amount, currency, status, source, imported_at, line_extraction_status, line_extraction_error, extraction_confidence, lines_sum_status, suppliers!inner(name), legal_entities(legal_name, short_code), invoice_lines(id, requires_review)";
+  "id, legal_entity_id, supplier_id, invoice_number, invoice_date, due_date, total_amount, currency, status, source, imported_at, line_extraction_status, line_extraction_error, line_extraction_attempts, extraction_confidence, lines_sum_status, paid_at, tripletex_is_paid, suppliers!inner(name), legal_entities(legal_name, short_code), invoice_lines(id, requires_review)";
 
 export function useInvoices(filters: InvoiceFilters) {
   const page = filters.page ?? 1;
@@ -67,6 +72,8 @@ export function useInvoices(filters: InvoiceFilters) {
       if (filters.dateFrom) q = q.gte("invoice_date", filters.dateFrom);
       if (filters.dateTo) q = q.lte("invoice_date", filters.dateTo);
       if (filters.onlyMismatch) q = q.eq("lines_sum_status", "mismatch");
+      if (filters.paidStatus === "betalt") q = q.not("paid_at", "is", null);
+      if (filters.paidStatus === "ubetalt") q = q.is("paid_at", null).eq("tripletex_is_paid", false);
 
       const search = filters.search?.trim();
       if (search) {
@@ -121,6 +128,9 @@ export function useInvoices(filters: InvoiceFilters) {
         lines_sum_status: r.lines_sum_status,
         line_extraction_status: r.line_extraction_status ?? null,
         line_extraction_error: r.line_extraction_error ?? null,
+        line_extraction_attempts: r.line_extraction_attempts ?? 0,
+        paid_at: r.paid_at ?? null,
+        tripletex_is_paid: r.tripletex_is_paid ?? null,
         supplier: r.suppliers ? { name: r.suppliers.name } : null,
         legal_entity: r.legal_entities
           ? { legal_name: r.legal_entities.legal_name, short_code: r.legal_entities.short_code }

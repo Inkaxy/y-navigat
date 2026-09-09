@@ -1,0 +1,4 @@
+-- Kjørt direkte mot prosjektet 9. september 2026 som versjon 20260909010654 (h4e_readiness_targets_cycles_link_fill).
+-- Fullt innhold: Inkaxy/nbos docs/db-migrasjoner/.
+-- Markørfil for migrasjonsmotoren – skal ikke kjøres på nytt.
+-- La til kalkyleberedskap, marginmål, sirkelsjekk og kobling.

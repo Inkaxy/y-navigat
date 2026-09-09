@@ -44,6 +44,7 @@ export default function InvoiceDetailPage() {
   const [docOpen, setDocOpen] = useState(false);
   const isMobile = useIsMobile();
   const [unflagging, setUnflagging] = useState(false);
+  const [showLedgerAccount, setShowLedgerAccount] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["invoice", id],
@@ -226,6 +227,11 @@ export default function InvoiceDetailPage() {
               >
                 {fetchingLines ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                 Hent linjer fra PDF nå
+                {data.line_extraction_status === "failed" && (
+                  <span className="text-xs opacity-80">
+                    (forsøk {Math.min(data.line_extraction_attempts ?? 0, 3)}/3)
+                  </span>
+                )}
               </Button>
             )}
             {!isFinal && canMatch && lines.length > 0 && (
@@ -322,6 +328,15 @@ export default function InvoiceDetailPage() {
         </div>
       )}
 
+      {data.line_extraction_status === "failed" && data.line_extraction_error && (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+          <span className="font-medium">
+            Kunne ikke hente fakturalinjer (forsøk {Math.min(data.line_extraction_attempts ?? 0, 3)}/3).
+          </span>{" "}
+          {data.line_extraction_error}
+        </div>
+      )}
+
       {lowConfidence && (
         <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning">
           <span className="font-medium">Lest med lav sikkerhet ({Math.round(Number(data.extraction_confidence) * 100)} %).</span>{" "}
@@ -380,8 +395,12 @@ export default function InvoiceDetailPage() {
         </Card>
 
         <Card className="overflow-hidden lg:col-span-2">
-          <div className="border-b border-line-subtle p-4">
+          <div className="flex items-center justify-between border-b border-line-subtle p-4">
             <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-secondary">Linjer ({lines.length})</h3>
+            <label className="flex cursor-pointer items-center gap-2 text-xs text-ink-secondary">
+              <Checkbox checked={showLedgerAccount} onCheckedChange={(v) => setShowLedgerAccount(!!v)} />
+              Vis konto
+            </label>
           </div>
           {lines.length === 0 ? (
             <div className="p-8 text-center text-sm text-ink-secondary">
@@ -402,6 +421,7 @@ export default function InvoiceDetailPage() {
                     <th className="px-4 py-3">Enhet</th>
                     <th className="px-4 py-3 text-right">Pris</th>
                     <th className="px-4 py-3 text-right">Sum</th>
+                    {showLedgerAccount && <th className="px-4 py-3">Konto</th>}
                     <th className="px-4 py-3"><span className="sr-only">Handlinger</span></th>
                   </tr>
                 </thead>
@@ -455,6 +475,9 @@ export default function InvoiceDetailPage() {
                         <td className="px-4 py-3 text-ink-secondary">{l.unit}</td>
                         <td className="px-4 py-3 text-right tabular-nums">{formatNok(l.unit_price)}</td>
                         <td className="px-4 py-3 text-right tabular-nums">{formatNok(l.total_amount)}</td>
+                        {showLedgerAccount && (
+                          <td className="px-4 py-3 font-mono text-xs text-ink-secondary">{l.ledger_account ?? "—"}</td>
+                        )}
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1">
                             {canMatch && (

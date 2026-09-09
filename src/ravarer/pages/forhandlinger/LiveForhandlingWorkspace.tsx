@@ -84,8 +84,16 @@ export default function LiveForhandlingWorkspace() {
   const [realtimeConnected, setRealtimeConnected] = useState(false);
   useEffect(() => {
     if (!id) return;
+    let connected = false;
     const channel = supabase
       .channel(`live-negotiation-${id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "negotiations", filter: `id=eq.${id}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ["negotiation", id] });
+        },
+      )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "negotiation_items", filter: `negotiation_id=eq.${id}` },
@@ -102,17 +110,19 @@ export default function LiveForhandlingWorkspace() {
         },
       )
       .subscribe((status) => {
-        setRealtimeConnected(status === "SUBSCRIBED");
+        connected = status === "SUBSCRIBED";
+        setRealtimeConnected(connected);
       });
 
-    // negotiation_items/negotiation_live_events ligger ikke i
-    // supabase_realtime-publikasjonen, så kanalen over blir aldri SUBSCRIBED i
-    // praksis. Pollingen er derfor hovedmekanismen, ikke bare en reserve —
-    // den kjører uansett kanalstatus.
+    // negotiations/negotiation_items/negotiation_live_events er nå med i
+    // supabase_realtime-publikasjonen, så kanalen over blir normalt SUBSCRIBED.
+    // Pollingen hvert 30. sekund er kun en reserve for tilfeller der
+    // kanalstatusen ikke er SUBSCRIBED (f.eks. nettbrudd).
     const fallback = window.setInterval(() => {
+      if (connected) return;
       qc.invalidateQueries({ queryKey: ["negotiation-items", id] });
       qc.invalidateQueries({ queryKey: ["negotiation", id] });
-    }, 5000);
+    }, 30000);
 
     return () => {
       window.clearInterval(fallback);

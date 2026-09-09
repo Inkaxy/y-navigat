@@ -1,0 +1,4 @@
+-- Kjørt direkte mot prosjektet 9. september 2026 som versjon 20260909011957 (h6a_recipe_versions_schema_bump_triggers).
+-- Fullt innhold: Inkaxy/nbos docs/db-migrasjoner/.
+-- Markørfil for migrasjonsmotoren – skal ikke kjøres på nytt.
+-- La til oppskriftsversjoner og tilhørende triggere.

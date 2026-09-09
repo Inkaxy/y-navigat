@@ -1,0 +1,4 @@
+-- Kjørt direkte mot prosjektet 9. september 2026 som versjon 20260909012149 (h6b_save_recipe_rpc_baseline).
+-- Fullt innhold: Inkaxy/nbos docs/db-migrasjoner/.
+-- Markørfil for migrasjonsmotoren – skal ikke kjøres på nytt.
+-- La til save_recipe som samlet lagringsfunksjon.

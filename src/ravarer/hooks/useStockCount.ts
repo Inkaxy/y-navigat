@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
-import { rpcApplyStockCount, type CountLinePayload } from "@/ravarer/lib/pendingRpc";
+import type { CountApplyResult, CountLinePayload } from "@/ravarer/lib/rpcContracts";
 
 export interface CountLineInput {
   raw_material_id: string;
@@ -54,41 +54,35 @@ function normalize(data: unknown): CountResult {
 }
 
 /**
- * Bokfører en varetelling.
- *
- * Bruker `rm_stock_count_apply_v2` når den er rullet ut: den låser varene i fast
- * rekkefølge, avviser tellingen hvis beholdningen er endret av andre underveis, og
- * er idempotent på operasjons-ID-en — et nytt forsøk etter nettbrudd dobbeltfører
- * altså ikke. Finnes ikke funksjonen ennå, faller vi tilbake til den gamle
- * `rm_stock_count_apply`, som ikke har konfliktkontroll.
+ * Bokfører en varetelling via `rm_stock_count_apply_v2`: den låser varene i fast
+ * rekkefølge, avviser tellingen hvis beholdningen er endret av andre underveis
+ * (feilkode 40001), avviser duplikat linjeinnhold (23505), og er idempotent på
+ * operasjons-ID-en — et nytt forsøk etter nettbrudd dobbeltfører altså ikke.
  */
 export function useApplyRmStockCount() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { opId: string; lines: CountLineInput[]; note: string }): Promise<CountResult> => {
       if (input.lines.length === 0) throw new Error("Ingen varer er talt opp");
+      const missingExpected = input.lines.find(l => l.expected_base == null);
+      if (missingExpected) throw new Error("Mangler forventet beholdning for en eller flere linjer");
       const payload: CountLinePayload[] = input.lines.map(l => ({
         raw_material_id: l.raw_material_id,
         counted_base: l.counted_base,
-        expected_base: l.expected_base ?? null,
+        expected_base: l.expected_base as number,
         line_note: l.line_note ?? null,
       }));
-      try {
-        return normalize(await rpcApplyStockCount({ opId: input.opId, lines: payload, note: input.note }));
-      } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        // Bare «funksjonen finnes ikke» skal falle tilbake — alt annet er en reell feil.
-        if (!/could not find the function|does not exist/i.test(message)) throw e;
-        const { data, error } = await supabase.rpc("rm_stock_count_apply", {
-          p_lines: input.lines.map(l => ({
-            raw_material_id: l.raw_material_id,
-            counted_base: l.counted_base,
-          })) as unknown as never,
-          p_note: input.note,
-        });
-        if (error) throw error;
-        return normalize(data);
+      const { data, error } = await supabase.rpc("rm_stock_count_apply_v2", {
+        p_op_id: input.opId,
+        p_lines: payload as unknown as never,
+        p_note: input.note,
+      });
+      if (error) {
+        if (error.code === "23505") throw new Error("Tellingen inneholder annet innhold enn forventet");
+        if (error.code === "40001") throw new Error("Beholdningen er endret av andre — last på nytt og prøv igjen");
+        throw error;
       }
+      return normalize(data as unknown as CountApplyResult);
     },
     onSuccess: res => {
       invalidateRawMaterial(qc);
