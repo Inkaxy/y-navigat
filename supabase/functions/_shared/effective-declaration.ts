@@ -99,7 +99,7 @@ export async function syncAutoProductsForRecipe(
 
   const { data: links, error: linksErr } = await service
     .from("product_recipe_links")
-    .select("id, product_id, declaration_mode")
+    .select("id, product_id, declaration_mode, products(declaration_version_id)")
     .eq("recipe_id", recipeId);
   if (linksErr) {
     console.error("syncAutoProductsForRecipe: kunne ikke lese koblinger", recipeId, linksErr.message);
@@ -123,6 +123,22 @@ export async function syncAutoProductsForRecipe(
   for (const link of links) {
     const mode = ((link.declaration_mode as DeclarationMode | null) ?? recipeMode) as DeclarationMode;
     if (mode === "manual") continue;
+
+    // Produktet har en godkjent deklarasjonsversjon fra før: den skal ikke overskrives
+    // stille av en ny beregning. Flagg for ny godkjenning i stedet.
+    const declarationVersionId = (link as { products?: { declaration_version_id?: string | null } | null })
+      .products?.declaration_version_id ?? null;
+    if (declarationVersionId) {
+      const { error } = await service
+        .from("products")
+        .update({
+          declaration_needs_review: true,
+          declaration_review_reason: "Ny beregning – godkjenn på nytt",
+        })
+        .eq("id", link.product_id);
+      if (error) console.error("syncAutoProductsForRecipe (versjonert)", link.product_id, error.message);
+      continue;
+    }
 
     if (mode === "auto_with_overrides") {
       const ok = await syncOverrideLink(service, link.id as string, link.product_id as string);

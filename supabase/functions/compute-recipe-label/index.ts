@@ -13,6 +13,7 @@ import {
 import { expandRecipeLines, sumLineGrams } from "../_shared/recipe-lines.ts";
 import { storeNutrient } from "../_shared/nutritionFormat.ts";
 import { syncAutoProductsForRecipe } from "../_shared/effective-declaration.ts";
+import { buildInputsHash, type HashMaterialFact } from "../_shared/recipe-label-hash.ts";
 import { authorizeCron } from "../_shared/cron-auth.ts";
 
 const corsHeaders = {
@@ -365,6 +366,75 @@ Deno.serve(async (req) => {
 
     const allergens = { contains: core.containsList, may_contain: core.mayContainList };
 
+    // --- inputs_hash: fanger linjer, yield-felt og fakta om hver råvare ---
+    // Feiler dette oppslaget av en eller annen grunn, lagres beregningen likevel —
+    // is_stale-triggeren nullstiller uansett feltet ved neste reelle endring.
+    let inputsHash: string | null = null;
+    try {
+      const { data: rawLines } = await service
+        .from("recipe_lines")
+        .select(
+          "raw_material_id, sub_product_id, ingredient_name, quantity, waste_percent, include_in_declaration, custom_declaration_text",
+        )
+        .eq("recipe_id", recipeId);
+
+      const rmIds = [...core.rmMap.keys()];
+      const { data: allergenRows } = rmIds.length
+        ? await service
+          .from("raw_material_allergens")
+          .select("raw_material_id, allergen")
+          .in("raw_material_id", rmIds)
+        : { data: [] as { raw_material_id: string; allergen: string }[] };
+      const allergensByRm = new Map<string, string[]>();
+      for (const a of allergenRows ?? []) {
+        const arr = allergensByRm.get(a.raw_material_id) ?? [];
+        arr.push(a.allergen);
+        allergensByRm.set(a.raw_material_id, arr);
+      }
+
+      const materials: HashMaterialFact[] = rmIds.map((id) => {
+        const rm = core.rmMap.get(id) ?? {};
+        const nutrition = core.nutritionByRm.get(id) ?? null;
+        return {
+          raw_material_id: id,
+          declaration_name: rm.declaration_name ?? null,
+          water_content_pct: rm.water_content_pct ?? null,
+          grain_classification: rm.grain_classification ?? null,
+          cereal_type: rm.cereal_type ?? null,
+          unit_weight_grams: rm.unit_weight_grams ?? null,
+          allergens: allergensByRm.get(id) ?? [],
+          nutrition_updated_at: nutrition?.updated_at ?? null,
+        };
+      });
+
+      inputsHash = await buildInputsHash(
+        (rawLines ?? []).map((l) => ({
+          raw_material_id: l.raw_material_id ?? null,
+          sub_product_id: l.sub_product_id ?? null,
+          ingredient_name: l.ingredient_name ?? null,
+          grams: l.quantity ?? null,
+          waste_percent: l.waste_percent ?? null,
+          include_in_declaration: l.include_in_declaration !== false,
+          custom_declaration_text: l.custom_declaration_text ?? null,
+        })),
+        {
+          yield_grams: recipe.yield_grams ?? null,
+          yield_loss_pct: recipe.yield_loss_pct ?? null,
+          finished_weight_grams: recipe.finished_weight_grams ?? null,
+          yield_quantity: recipe.yield_quantity ?? null,
+          yield_unit: recipe.yield_unit ?? null,
+        },
+        materials,
+      );
+    } catch (e) {
+      console.error("compute-recipe-label inputs_hash", e);
+    }
+
+    // Kli i Brødskala'ns bidragsytere — brukes til bran_grams uavhengig av vekting.
+    const branGrams = core.breadscale.contributors
+      .filter((c) => c.classification.endsWith("_bran"))
+      .reduce((sum, c) => sum + c.grams, 0);
+
     const row = {
       recipe_id: recipeId,
       computed_at: new Date().toISOString(),
@@ -397,6 +467,12 @@ Deno.serve(async (req) => {
       coverage_by_weight_pct: coveragePct,
       missing_data,
       warnings,
+      inputs_hash: inputsHash,
+      breadscale_denominator_grams: Math.round(flourGrams * 100) / 100,
+      bran_grams: Math.round(branGrams * 100) / 100,
+      whole_grain_grams_keyhole: Math.round(wholeGrainGrams * 100) / 100,
+      keyhole_group: keyhole.group,
+      // is_stale settes IKKE her — DB-triggeren nullstiller den ved reelle endringer.
     };
 
     const { error: upsertErr } = await service

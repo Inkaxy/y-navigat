@@ -82,6 +82,8 @@ const existing = {
   tripletex_voucher_number: null,
   tripletex_supplier_id: null,
   line_extraction_status: "not_requested",
+  tripletex_is_paid: false,
+  paid_at: null,
 };
 
 Deno.test("eksisterende faktura får TT-felt uten at matching nullstilles", () => {
@@ -92,6 +94,8 @@ Deno.test("eksisterende faktura får TT-felt uten at matching nullstilles", () =
     tripletex_voucher_id: "v1",
     tripletex_voucher_number: "42",
     tripletex_supplier_id: "s9",
+    tripletex_is_paid: false,
+    paid_at: null,
   }, { trackLines: true });
   assertEquals(plan.patch, {
     tripletex_voucher_id: "v1",
@@ -102,6 +106,55 @@ Deno.test("eksisterende faktura får TT-felt uten at matching nullstilles", () =
   assertEquals(plan.conflicts.length, 0);
 });
 
+Deno.test("ubetalt→betalt gir patch med begge betalingsfeltene", () => {
+  const plan = planExistingUpdate(existing, {
+    invoice_date: "2026-01-05",
+    total_amount: 1000,
+    is_credit_note: false,
+    tripletex_voucher_id: null,
+    tripletex_voucher_number: null,
+    tripletex_supplier_id: null,
+    tripletex_is_paid: true,
+    paid_at: "2026-01-10T00:00:00Z",
+  }, { trackLines: false });
+  assertEquals(plan.patch, {
+    tripletex_is_paid: true,
+    paid_at: "2026-01-10T00:00:00Z",
+  });
+});
+
+Deno.test("uendret betalingsstatus gir tom patch", () => {
+  const plan = planExistingUpdate(existing, {
+    invoice_date: "2026-01-05",
+    total_amount: 1000,
+    is_credit_note: false,
+    tripletex_voucher_id: null,
+    tripletex_voucher_number: null,
+    tripletex_supplier_id: null,
+    tripletex_is_paid: false,
+    paid_at: null,
+  }, { trackLines: false });
+  assertEquals(plan.patch, {});
+});
+
+Deno.test("betalt→ubetalt nullstiller paid_at", () => {
+  const betalt = { ...existing, tripletex_is_paid: true, paid_at: "2026-01-10T00:00:00Z" };
+  const plan = planExistingUpdate(betalt, {
+    invoice_date: "2026-01-05",
+    total_amount: 1000,
+    is_credit_note: false,
+    tripletex_voucher_id: null,
+    tripletex_voucher_number: null,
+    tripletex_supplier_id: null,
+    tripletex_is_paid: false,
+    paid_at: null,
+  }, { trackLines: false });
+  assertEquals(plan.patch, {
+    tripletex_is_paid: false,
+    paid_at: null,
+  });
+});
+
 Deno.test("avvik i beløp, dato og kreditnota rapporteres som konflikt, ikke overskriving", () => {
   const plan = planExistingUpdate(existing, {
     invoice_date: "2026-01-09",
@@ -110,6 +163,8 @@ Deno.test("avvik i beløp, dato og kreditnota rapporteres som konflikt, ikke ove
     tripletex_voucher_id: null,
     tripletex_voucher_number: null,
     tripletex_supplier_id: null,
+    tripletex_is_paid: false,
+    paid_at: null,
   }, { trackLines: false });
   assertEquals(Object.keys(plan.patch).length, 0);
   assertEquals(plan.conflicts.map((c) => c.field).sort(), ["invoice_date", "is_credit_note", "total_amount"]);

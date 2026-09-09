@@ -52,7 +52,7 @@ export default function RawMaterialDetail() {
   const page = useRawMaterialPage(id);
   const rm = page.rm;
   const rename = useRenameRawMaterial();
-  const { legalEntityId } = useRavarer();
+  const { legalEntityId, canWrite } = useRavarer();
   const { data: stats } = useRawMaterialPurchaseStats(id);
 
   const [editingName, setEditingName] = useState(false);
@@ -243,7 +243,7 @@ export default function RawMaterialDetail() {
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
-            {!editingName && (
+            {!editingName && canWrite && (
               <Button variant="outline" size="sm" onClick={startEdit}>
                 <Pencil className="mr-1.5 h-3.5 w-3.5" /> Endre navn
               </Button>

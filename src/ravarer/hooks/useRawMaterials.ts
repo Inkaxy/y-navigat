@@ -178,7 +178,14 @@ export function useRenameRawMaterial() {
       invalidateRawMaterial(qc, data.id);
       toast.success("Navn oppdatert");
     },
-    onError: (e: unknown) => toast.error(`Kunne ikke endre navn: ${errText(e)}`),
+    onError: (e: unknown) => {
+      const code = (e as { code?: string } | null)?.code;
+      if (code === "42501") {
+        toast.error("Ikke tilgang");
+        return;
+      }
+      toast.error(`Kunne ikke endre navn: ${errText(e)}`);
+    },
   });
 }
 

@@ -37,7 +37,7 @@ import {
 } from "@/varer/lib/bakers";
 import { computeRecipeCost } from "@/varer/lib/recipeCost";
 import { decideHydration } from "@/varer/lib/recipeEditorSync";
-import { useRecipeSave } from "@/varer/hooks/useRecipeSave";
+import { useRecipeSave, RecipeSaveConflictError } from "@/varer/hooks/useRecipeSave";
 import {
   buildRecipePDFData, useRecipePDF, type BuildRecipePDFInput, type RecipeCardOptions,
 } from "@/varer/hooks/useRecipePDF";
@@ -472,10 +472,10 @@ export default function RecipeDetail() {
     if (!recipe) return;
     setSaving(true);
     try {
-      await persistRecipe({
+      const result = await persistRecipe({
         recipeId: recipe.id,
+        updatedAt: recipe.updated_at ?? null,
         displayName: header.name || recipe.name || recipe.id,
-        originalPartIds: ((recipe.recipe_parts ?? []) as { id: string }[]).map((p) => p.id),
         header: {
           name: header.name,
           category: header.category,
@@ -494,15 +494,21 @@ export default function RecipeDetail() {
           mixing_speed1_minutes: header.mixing_speed1_minutes,
           mixing_speed2_minutes: header.mixing_speed2_minutes,
           autolyse_minutes: header.autolyse_minutes,
+          room_temp_celsius: header.room_temp_celsius ?? null,
+          flour_temp_celsius: header.flour_temp_celsius ?? null,
+          preferment_temp_celsius: header.preferment_temp_celsius ?? null,
+          keyhole_group: header.keyhole_group ?? null,
+          is_template: header.is_template ?? false,
         },
         parts,
         lines,
         steps,
       });
       editor.markSaved();
+      loadedRef.current = { id: recipe.id, updatedAt: result.updatedAt };
       draft.clear();
       setRemoteConflict(false);
-      toast.success("Oppskrift lagret");
+      toast.success(`Lagret – v${result.version}`);
       qc.invalidateQueries({ queryKey: ["recipe-detail", recipe.id] });
       qc.invalidateQueries({ queryKey: ["recipes-list"] });
       // Merkedata (deklarasjon, næring, grovhet, Nøkkelhull) beregnes automatisk ved lagring
@@ -510,7 +516,11 @@ export default function RecipeDetail() {
       // Grunnoppskrift: den koblede råvaren skal alltid ha fersk kilopris.
       void syncCompositePriceQuietly();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Kunne ikke lagre oppskriften");
+      if (err instanceof RecipeSaveConflictError) {
+        setRemoteConflict(true);
+      } else {
+        toast.error(err instanceof Error ? err.message : "Kunne ikke lagre oppskriften");
+      }
     } finally {
       setSaving(false);
     }
