@@ -726,6 +726,46 @@ export default function RecipeDetail() {
     }
   }
 
+  /**
+   * «Bruk som ny oppskrift»: kopien lagres med de SKALERTE mengdene
+   * (perBatch × antall satser), i gram der linjen kunne regnes om.
+   */
+  async function handleSaveScaledAsNew() {
+    if (!recipe) return;
+    if (!isScaled) {
+      await handleCopy();
+      return;
+    }
+    setCopying(true);
+    try {
+      const lineOverrides: Record<string, { quantity: number; unit: string }> = {};
+      for (const l of scaleResult.perBatch) {
+        lineOverrides[l.lineId] = l.grams != null
+          ? { quantity: l.grams * scaleResult.batchCount, unit: "g" }
+          : { quantity: l.quantity * scaleResult.batchCount, unit: l.unit };
+      }
+      const recipePatch: Record<string, unknown> = {};
+      if (scaleResult.unitCount != null && scaleResult.unitCount > 0) {
+        recipePatch.units_per_batch = Math.round(scaleResult.unitCount);
+      }
+      const piece = Number(header.dough_piece_grams) || 0;
+      if (piece > 0) recipePatch.dough_piece_grams = piece;
+
+      const newId = await copyRecipe(recipe.id, {
+        lineOverrides,
+        recipePatch,
+        nameSuffix: "(skalert)",
+      });
+      qc.invalidateQueries({ queryKey: ["recipes-list"] });
+      toast.success("Skalert oppskrift lagret");
+      navigate(`/varer/oppskrifter/${newId}?rename=1`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kunne ikke lagre den skalerte oppskriften");
+    } finally {
+      setCopying(false);
+    }
+  }
+
   /** Lagre som halvfabrikat: eget produkt som andre oppskrifter kan bruke. */
   async function handleSaveAsHalvfabrikat() {
     if (!recipe || !legalEntityId) return;
@@ -939,7 +979,7 @@ export default function RecipeDetail() {
             setScaleInput(String(baseUnits));
             setScaleWaste("");
           }}
-          onSaveAsNew={canWrite ? handleCopy : undefined}
+          onSaveAsNew={canWrite ? handleSaveScaledAsNew : undefined}
           savingAsNew={copying}
         />
 
