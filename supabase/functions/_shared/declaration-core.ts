@@ -122,9 +122,10 @@ export function computeBreadscale(entries: BreadscaleEntry[]): BreadscaleResult 
       free_text_grain_lines.push({ name: e.custom_text, grams: g });
       continue;
     }
-    // Fritekstlinjer uten råvarekobling har ikke nødvendigvis fylt ut custom_text —
-    // da må selve linjenavnet sjekkes, ellers slipper reelle fritekst-kornlinjer gjennom.
-    if (!e.raw_material_id && !e.custom_text && GRAIN_TEXT_RE.test(e.name) && g > GRAIN_TEXT_MIN_GRAMS) {
+    // Fritekstlinjer uten råvarekobling og uten klassifisering har ikke nødvendigvis
+    // fylt ut custom_text — da må selve linjenavnet sjekkes mot kornordene, ellers
+    // slipper reelle fritekst-kornlinjer gjennom ukontrollert.
+    if (!bucket && !e.raw_material_id && !e.custom_text && GRAIN_TEXT_RE.test(e.name) && g > GRAIN_TEXT_MIN_GRAMS) {
       free_text_grain_lines.push({ name: e.name, grams: g });
       continue;
     }
