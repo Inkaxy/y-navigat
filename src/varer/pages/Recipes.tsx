@@ -136,7 +136,7 @@ export default function Recipes() {
       const data = await fetchAllRows<BakersRawMaterial>((from, to) =>
         supabase
           .from("raw_materials")
-          .select("id, name, category, grain_classification, water_content_pct, unit_weight_grams, current_cost_price")
+          .select("id, name, category, grain_classification, water_content_pct, unit_weight_grams, current_cost_price, density_g_per_ml, is_water")
           .eq("legal_entity_id", legalEntityId!)
           .eq("is_active", true)
           .range(from, to) as unknown as PromiseLike<{ data: BakersRawMaterial[] | null; error: { message: string } | null }>,

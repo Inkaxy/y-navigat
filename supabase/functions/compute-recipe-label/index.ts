@@ -7,6 +7,7 @@ import {
   resolveFinalWeight,
   NUT_FIELDS,
   dryMatterGrams as dryMatterOfEntries,
+  wholeGrainDryGrams,
   wholeGrainPctOfDry as wholeGrainPct,
   type TopLine,
 } from "../_shared/declaration-core.ts";
@@ -174,7 +175,10 @@ Deno.serve(async (req) => {
     const breadscalePctRaw = core.breadscale.breadscale_pct;
     const grainScorePct = core.breadscale.grain_pct;
     const grainCategory = core.breadscale.grain_category;
-    const wholeGrainPctOfDry = wholeGrainPct(wholeGrainGrams, dryMatterGrams);
+    // Nøkkelhullets fullkornandel regnes av TØRRSTOFF: hver fullkornlinje med sin
+    // egen tørrstoffandel (faktisk vanninnhold når kjent, ellers × 0,85) — ikke råvekt.
+    const wholeGrainDry = wholeGrainDryGrams(core.sortedAgg);
+    const wholeGrainPctOfDry = wholeGrainPct(wholeGrainDry, dryMatterGrams);
     if (core.breadscale.unclassified.length) {
       warnings.push(`Brødskala: ${core.breadscale.unclassified.length} ingrediens(er) er ikke klassifisert — grovheten kan være feil`);
     }
@@ -198,8 +202,9 @@ Deno.serve(async (req) => {
     // Fiber vises ikke når ikke alle bidragsytere har fiberverdi.
     if (!core.fiber_complete) per100.fiber_g = null;
 
-    // 7) Datadekning målt i VEKT
-    const coveragePct = Math.round((core.coveredGrams / totalInputGrams) * 1000) / 10;
+    // 7) Datadekning målt i VEKT — ÉN kilde: kjernen regner teller og nevner
+    // med samme (post-vannregel) sum, se declaration-core.ts.
+    const coveragePct = core.coverage_pct;
     const missingNutrition = core.missing_nutrition.map((m) => ({
       raw_material_id: m.raw_material_id,
       name: m.name,
@@ -221,8 +226,13 @@ Deno.serve(async (req) => {
       salt_g: per100.salt_g,
     };
 
-    /** Glutenfritt: ingen glutenallergen i deklarasjonen. */
-    const isGlutenFree = !core.containsList.some((a: string) => String(a).toLowerCase().includes("gluten"));
+    /** Glutenfritt: ingen av glutenkornenes allergenkoder er i «Inneholder».
+     *  Kodesjekk — IKKE tekstsøk i norske etiketter (der sto «gluten» aldri, så
+     *  sjekken var alltid sann). */
+    const GLUTEN_ALLERGEN_CODES = [
+      "gluten_wheat", "gluten_rye", "gluten_barley", "gluten_oats", "gluten_spelt", "gluten_khorasan",
+    ];
+    const isGlutenFree = !core.containsCodes.some((c: string) => GLUTEN_ALLERGEN_CODES.includes(c));
 
     // Gramendring for et næringskriterium: hvor mye må ingrediensen ned/opp i deigen?
     function adviceFor(c: { key: string; name: string; op: "min" | "max"; limit: number; unit: string }, value: number): string {

@@ -112,6 +112,7 @@ import {
   computeUnitCount,
   convertToGrams,
   fromGrams,
+  normalizeRecipeUnit,
   type ConvertOptions,
   type GramsResult,
   type UnitCountRecipe,
@@ -152,9 +153,11 @@ export function isPureWaterLine(line: BakersLine): boolean {
  * Stykkvekt hentes fra den faktiske kolonnen `raw_materials.unit_weight_grams`.
  */
 export function lineConvertOptions(line: BakersLine): ConvertOptions {
+  const rm = line._rm;
+  const isWaterLine = isPureWaterLine(line) || !!rm?.is_water;
   return {
-    densityGPerMl: isPureWaterLine(line) ? 1 : null,
-    pieceWeightG: line._rm?.unit_weight_grams ?? null,
+    densityGPerMl: rm?.density_g_per_ml ?? (isWaterLine ? 1 : null),
+    pieceWeightG: rm?.unit_weight_grams ?? null,
   };
 }
 
@@ -192,6 +195,10 @@ export interface BakersRawMaterial {
   unit_weight_grams?: number | null;
   /** Grunnenheten kostprisen er oppgitt i — `raw_materials.base_unit` (kg, l, stk). */
   base_unit?: string | null;
+  /** Tetthet i g/ml — `raw_materials.density_g_per_ml`. Brukes til volum→gram-omregning. */
+  density_g_per_ml?: number | null;
+  /** Rent vann — `raw_materials.is_water`. Vann uten tetthet regnes som 1 g/ml. */
+  is_water?: boolean | null;
 
 }
 
@@ -591,7 +598,7 @@ export function scaledSummary(
 export function weighingOrder<T extends BakersLine>(lines: T[]): T[] {
   const rank = (l: T) => {
     if (isFlourLine(l)) return 0;
-    if (waterPctForLine(l) >= 50 || l.unit === "ml" || l.unit === "liter") return 1;
+    if (waterPctForLine(l) >= 50 || normalizeRecipeUnit(l.unit) === "ml") return 1;
     return 2;
   };
   return [...lines].sort((a, b) => {

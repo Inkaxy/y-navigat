@@ -98,7 +98,7 @@ export default function RecipeDetail() {
     queryFn: async () => {
       const { data } = await supabase
         .from("raw_materials")
-        .select("id, name, category, grain_classification, cereal_type, water_content_pct, unit_weight_grams, base_unit, current_cost_price, produced_by_recipe_id")
+        .select("id, name, category, grain_classification, cereal_type, water_content_pct, unit_weight_grams, base_unit, current_cost_price, produced_by_recipe_id, density_g_per_ml, is_water")
         .limit(2000);
       const map: Record<string, BakersRawMaterial> = {};
       for (const r of (data ?? []) as BakersRawMaterial[]) map[r.id] = r;
@@ -178,6 +178,10 @@ export default function RecipeDetail() {
   const loadedRef = useRef<{ id: string | null; updatedAt: string | null }>({ id: null, updatedAt: null });
   const [remoteConflict, setRemoteConflict] = useState(false);
 
+  /** `dirty` endres av hvert tastetrykk og skal ikke utløse ny vurdering av serverdataene. */
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+
   const hydrate = useCallback(
     (row: RecipeDetailRow) => {
       editor.hydrate(row);
@@ -194,13 +198,10 @@ export default function RecipeDetail() {
       loadedUpdatedAt: loadedRef.current.updatedAt,
       incomingRecipeId: recipe.id ?? null,
       incomingUpdatedAt: recipe.updated_at ?? null,
-      dirty,
+      dirty: dirtyRef.current,
     });
     if (decision === "hydrate") hydrate(recipe);
     else if (decision === "conflict") setRemoteConflict(true);
-    // `dirty` er med vilje utelatt: den endres av hver tastetrykk, og skal ikke
-    // utløse en ny vurdering av serverdataene.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recipe, hydrate]);
 
   // Koble på råvaredata når kartet er lastet

@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { costPerKg, costPerKgBlockedReason, makeSku } from "@/varer/lib/halvfabrikat";
 import { computeTotals, isFlourLine, lineToGrams, type BakersLine } from "@/varer/lib/bakers";
 
-const BASE_UNITS = ["kg", "g", "liter", "ml", "stk"];
+const BASE_UNITS = ["kg", "g", "l", "ml", "stk"];
 
 export interface CompositeRawMaterial {
   id: string;

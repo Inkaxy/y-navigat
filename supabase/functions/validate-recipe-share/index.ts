@@ -35,9 +35,14 @@ function rateCheck(map: Map<string, { count: number; resetAt: number }>, key: st
 // Bruker den delte enhetsmotoren (_shared/units-recipe.ts), samme fil som
 // oppskriftseditoren i appen. Volum uten kjent tetthet regnes som 1 g/ml, slik
 // at den offentlige visningen fortsatt får en vekt å vise.
-function toGrams(quantity: unknown, unit: string | null, pieceWeightG: number | null = null): number {
+function toGrams(
+  quantity: unknown,
+  unit: string | null,
+  pieceWeightG: number | null = null,
+  densityGPerMl: number | null = null,
+): number {
   return convertToGrams(Number(quantity) || 0, unit ?? "g", {
-    densityGPerMl: 1,
+    densityGPerMl,
     pieceWeightG,
   }).grams;
 }
@@ -60,6 +65,8 @@ interface Line {
     grain_classification: string | null;
     water_content_pct: number | null;
     unit_weight_grams: number | null;
+    density_g_per_ml: number | null;
+    is_water: boolean | null;
   } | null;
 }
 
@@ -148,7 +155,7 @@ Deno.serve(async (req) => {
     if (rmIds.length) {
       const { data: rms } = await admin
         .from("raw_materials")
-        .select("id, name, grain_classification, water_content_pct, unit_weight_grams, current_cost_price")
+        .select("id, name, grain_classification, water_content_pct, unit_weight_grams, current_cost_price, density_g_per_ml, is_water")
         .in("id", rmIds);
       for (const r of (rms ?? []) as any[]) {
         rmMap[r.id] = {
@@ -156,6 +163,9 @@ Deno.serve(async (req) => {
           name: r.name,
           grain_classification: r.grain_classification,
           water_content_pct: r.water_content_pct,
+          unit_weight_grams: r.unit_weight_grams,
+          density_g_per_ml: r.density_g_per_ml,
+          is_water: r.is_water,
           ...(includeCosts ? { current_cost_price: r.current_cost_price } : {}),
         };
       }
@@ -168,8 +178,12 @@ Deno.serve(async (req) => {
 
     // Nøkkeltall regnes på serveren, så klienten ikke trenger noe internt.
     let totalFlourG = 0, totalWaterG = 0, totalDoughG = 0, saltG = 0, leavenG = 0;
+    const densityFor = (l: Line): number | null => {
+      const isWaterLine = !!l._rm?.is_water || /^(is|kaldt|kald|varmt|varm|lunkent|lunket|romtemperert|temperert|cold|warm|ice)?[\s-]*(vann|water)$/i.test((l._rm?.name ?? l.ingredient_name ?? "").trim());
+      return l._rm?.density_g_per_ml ?? (isWaterLine ? 1 : null);
+    };
     for (const l of lines) {
-      const g = toGrams(l.quantity, l.unit, l._rm?.unit_weight_grams ?? null);
+      const g = toGrams(l.quantity, l.unit, l._rm?.unit_weight_grams ?? null, densityFor(l));
       totalDoughG += g;
       if (isFlour(l)) totalFlourG += g;
       totalWaterG += (g * waterPct(l)) / 100;
@@ -179,7 +193,7 @@ Deno.serve(async (req) => {
     }
     const prefermentFlourG = lines
       .filter((l) => isFlour(l) && (parts ?? []).some((p: any) => p.id === l.recipe_part_id && p.part_type === "preferment"))
-      .reduce((s, l) => s + toGrams(l.quantity, l.unit, l._rm?.unit_weight_grams ?? null), 0);
+      .reduce((s, l) => s + toGrams(l.quantity, l.unit, l._rm?.unit_weight_grams ?? null, densityFor(l)), 0);
     const pct = (v: number) => (totalFlourG > 0 ? (v / totalFlourG) * 100 : 0);
     const uw = Number(recipe.unit_weight_grams) || 0;
 

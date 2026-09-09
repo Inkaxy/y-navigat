@@ -121,6 +121,11 @@ export function useRecipeDraft<T>(options: UseRecipeDraftOptions<T>): UseRecipeD
   const [pending, setPending] = useState<RecipeDraftPayload<T> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // `baseUpdatedAt` skal IKKE utløse et nytt leseforsøk (kun `recipeId` skal),
+  // så den ferskeste verdien holdes i en ref i stedet for i avhengighetslista.
+  const baseUpdatedAtRef = useRef(baseUpdatedAt);
+  baseUpdatedAtRef.current = baseUpdatedAt;
+
   // Les utkastet én gang når recipeId endres.
   useEffect(() => {
     if (!recipeId) {
@@ -128,34 +133,28 @@ export function useRecipeDraft<T>(options: UseRecipeDraftOptions<T>): UseRecipeD
       return;
     }
     const draft = readDraft<T>(recipeId);
-    setPending(draftIsRelevant(draft, baseUpdatedAt) ? draft : null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setPending(draftIsRelevant(draft, baseUpdatedAtRef.current) ? draft : null);
   }, [recipeId]);
 
-  // Debounced autolagring.
-  useEffect(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    if (!recipeId || !dirty) return;
+  // Debounced autolagring. `value`/`dirty`/`baseUpdatedAt` endres på hvert
+  // tastetrykk — vi vil IKKE resette debounce-timeren for det, så de ferskeste
+  // verdiene leses fra en ref i stedet for å stå i avhengighetslista.
+  const latestRef = useRef({ value, dirty, baseUpdatedAt });
+  latestRef.current = { value, dirty, baseUpdatedAt };
 
-    timeoutRef.current = setTimeout(() => {
+  useEffect(() => {
+    if (!recipeId) return;
+    const id = setInterval(() => {
+      const { value: v, dirty: d, baseUpdatedAt: base } = latestRef.current;
+      if (!d) return;
       writeDraft<T>(recipeId, {
-        data: value,
+        data: v,
         savedAt: new Date().toISOString(),
-        baseUpdatedAt,
+        baseUpdatedAt: base,
       });
     }, debounceMs);
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recipeId, value, dirty, baseUpdatedAt, debounceMs]);
+    return () => clearInterval(id);
+  }, [recipeId, debounceMs]);
 
   const discard = (): void => {
     if (recipeId) clearDraft(recipeId);
