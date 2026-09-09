@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import DOMPurify from "dompurify";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -118,6 +119,19 @@ export function DeclarationTab({ productId, productName, canWrite }: Props) {
         }}
       />
     </>
+  );
+}
+
+function RecipeEditLink({ recipeId }: { recipeId: string }) {
+  const navigate = useNavigate();
+  return (
+    <button
+      type="button"
+      onClick={() => navigate(`/varer/oppskrifter/${recipeId}`)}
+      className="ml-auto font-medium underline"
+    >
+      Rediger i oppskriften
+    </button>
   );
 }
 
@@ -248,12 +262,7 @@ function DeclarationView({ link, productName, canWrite, qc }: { link: any; produ
               : "Varen har egne overstyringer, så deklarasjonen beregnes for denne varen."}
           </span>
           {hasOverrides && <Badge variant="outline">Overstyrt per vare</Badge>}
-          <a
-            href={`/varer/oppskrifter/${link.recipe_id}`}
-            className="ml-auto font-medium underline"
-          >
-            Rediger i oppskriften
-          </a>
+          <RecipeEditLink recipeId={link.recipe_id} />
         </div>
       )}
 

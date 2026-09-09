@@ -173,7 +173,8 @@ export function computeBreadscale(entries: BreadscaleEntry[]): BreadscaleResult 
 }
 
 /** Flytende fett og sirup holdes utenfor tørrstoffet (veilederen 4.2.1). */
-export const LIQUID_EXCLUDED_RE = /(olje|sirup|flytende fett)/i;
+/** Flytende gjær/malt/honning ekskluderes helst via kategori (malt_or_improver) — regex er reservefall for navn uten kobling. */
+export const LIQUID_EXCLUDED_RE = /(olje|sirup|flytende fett|flytende gj(æ|ae)r|flytende malt|honning)/i;
 
 export type DryMatterEntry = {
   name: string;
@@ -192,6 +193,9 @@ export function dryMatterGrams(entries: DryMatterEntry[]): number {
   let dry = 0;
   for (const e of entries) {
     const g = Number(e.effective_grams) || 0;
+    // Malt/bakemidler (ofte flytende) holdes utenfor via kategorien når den er kjent —
+    // navnematching (LIQUID_EXCLUDED_RE) er bare reservefall for ukoblede fritekstlinjer.
+    if (e.grain_classification === "malt_or_improver") continue;
     if (LIQUID_EXCLUDED_RE.test(e.name ?? "")) continue;
     const known = e.water_content_source ? e.water_content_source !== "unknown" : e.water_content_pct != null;
     dry += known ? g * (1 - (e.water_content_pct ?? 0) / 100) : g * 0.85;
@@ -662,6 +666,7 @@ export async function computeDeclarationCore(
     depth: number,
     parentChain: string | null,
     waterOverride: number | null | undefined,
+    parentNutritionRef: string | null = null,
   ): FlatLine[] {
     const rm = rmId ? rmMap.get(rmId) ?? null : null;
     // Sammensatt bare når komponentene faktisk peker på egne råvarer. Er de bare
@@ -700,7 +705,9 @@ export async function computeDeclarationCore(
         inherited_allergens: [],
         inherited_may_allergens: [],
         has_nutrition: hasCompleteNutrition(rmId, declName),
-        nutrition_ref: null,
+        // En koblet komponent uten egen næringsrad arver forelderens næringsrad
+        // (parentNutritionRef) i stedet for å telle som et hull i dekningen.
+        nutrition_ref: hasCompleteNutrition(rmId, declName) ? null : parentNutritionRef,
       }];
     }
     if (rmId && !rm?.components_reviewed_at) {
@@ -727,7 +734,7 @@ export async function computeDeclarationCore(
       const childGrams = grams * ratio;
       const childEff = effective_grams * ratio;
       if (c.component_raw_material_id) {
-        out.push(...decompose(source, childGrams, childEff, c.component_raw_material_id, "(komponent)", c.is_quid_relevant || isQuid, null, depth + 1, rmId, null));
+        out.push(...decompose(source, childGrams, childEff, c.component_raw_material_id, "(komponent)", c.is_quid_relevant || isQuid, null, depth + 1, rmId, null, rmId));
       } else {
         const nm = c.primary_ingredient_name ?? "(komponent)";
         // Tekstkomponenten har ingen egen næring eller allergener. Forelderens rad
@@ -769,7 +776,7 @@ export async function computeDeclarationCore(
         source,
         key: `text:øvrige@${rmId}`,
         raw_material_id: null,
-        name: "øvrige",
+        name: "(øvrige)",
         grams: grams * ratio,
         effective_grams: effective_grams * ratio,
         is_quid: false,
@@ -961,13 +968,22 @@ export async function computeDeclarationCore(
           missingDeclMap.set(pid, { raw_material_id: pid, name: parentRm.name ?? "Sammensatt", fallback_used: parentName });
         }
         const kids = (parentToChildren.get(pid) ?? []).slice().sort((x, y) => y.effective_grams - x.effective_grams);
-        // Forelderens egne allergener uthevet på FORELDER-nivå.
+        // Forelderens egne allergener uthevet på FORELDER-nivå. Parentesen med
+        // allergenet som ikke står i navnet skal stå BAK komponentlisten, ikke
+        // rett etter forelderens navn — highlightAllergens legger den til på
+        // slutten av strengen den får inn, så vi kjører den på navnet ALENE og
+        // flytter en eventuell tilføyd parentes til slutten.
         const parentAllergens = allergensOf(pid).contains;
         entries.push({
           weight: parentWeight.get(pid) ?? 0,
           keys: kids.map((k) => k.key),
-          render: () =>
-            `${highlightAllergens(escapeHtml(parentName), parentAllergens)} (${kids.map((k) => renderItem(k, false)).join(", ")})`,
+          render: () => {
+            const nameHighlighted = highlightAllergens(escapeHtml(parentName), parentAllergens);
+            const kidsPart = `(${kids.map((k) => renderItem(k, false)).join(", ")})`;
+            const appended = nameHighlighted.match(/^([\s\S]*?)( \([\s\S]*\))$/);
+            if (appended) return `${appended[1]} ${kidsPart}${appended[2]}`;
+            return `${nameHighlighted} ${kidsPart}`;
+          },
         });
         continue;
       }
@@ -1114,5 +1130,10 @@ export function declarationGate(core: CoreResult, coveragePct: number): Declarat
   }
   for (const u of core.unit_problems) reasons.push(`${u.name}: ${u.reason}`);
   for (const t of core.free_text_lines) reasons.push(`Fritekstlinjen «${t.name}» må kobles til en råvare`);
+  // Manglende deklarasjonsnavn sperrer ikke i seg selv (innkjøpsnavnet brukes midlertidig),
+  // men skal synes som en tydelig oppfordring med forslaget kjernen allerede har regnet ut.
+  for (const d of core.missing_declaration_names) {
+    reasons.push(`${d.name} mangler deklarasjonsnavn – forslag: ${d.fallback_used}`);
+  }
   return { blocked: reasons.length > 0, reasons };
 }

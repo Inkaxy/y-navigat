@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,16 +61,11 @@ export function LabelInfoCard({
     form.storage !== saved.storage ||
     form.origin !== saved.origin;
 
-  // Vakt mot å forlate siden med ulagrede pliktfelt.
-  useEffect(() => {
-    if (!dirty) return;
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [dirty]);
+  // Rutevakt mot å miste ulagrede etikettopplysninger (lenkeklikk, tilbake, faneskift).
+  const guard = useUnsavedChangesGuard(dirty, () => {
+    setForm(saved);
+    setTouched(false);
+  });
 
   const save = useMutation({
     mutationFn: async () => {
@@ -169,6 +166,7 @@ export function LabelInfoCard({
           </div>
         )}
       </CardContent>
+      <UnsavedChangesDialog {...guard.dialogProps} />
     </Card>
   );
 }

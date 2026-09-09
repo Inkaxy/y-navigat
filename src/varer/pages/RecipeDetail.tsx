@@ -32,7 +32,7 @@ import { ScalePanel } from "@/varer/components/recipes/ScalePanel";
 import { PrintRecipeCardDialog } from "@/varer/components/recipes/PrintRecipeCardDialog";
 import { ShareRecipeDialog } from "@/varer/components/recipes/ShareRecipeDialog";
 import {
-  RECIPE_STATUS_OPTIONS, computeTotalsForRecipe, lineToGrams, roundBakerGrams, scaleLines, scaledSummary,
+  RECIPE_STATUS_OPTIONS, computePartSummary, computeTotalsForRecipe, lineToGrams, roundBakerGrams, scaleLines, scaledSummary,
   type BakersRawMaterial,
 } from "@/varer/lib/bakers";
 import { computeRecipeCost } from "@/varer/lib/recipeCost";
@@ -350,11 +350,18 @@ export default function RecipeDetail() {
    * De lagres lokalt per oppskrift slik at både panelet og PDF-en viser de
    * faktiske tallene i stedet for 21 °C hver gang.
    */
-  const tempStorageKey = id ? `nbhub:recipe-temps:${id}` : null;
+  const tempStorageKey = legalEntityId ? `nbhub:recipe-temps:${legalEntityId}` : null;
   const [roomTemp, setRoomTemp] = useState(21);
   const [flourTemp, setFlourTemp] = useState(21);
 
   useEffect(() => {
+    // Oppskriften har allerede lagrede temperaturer — de er sannheten, ikke localStorage.
+    if (header.room_temp_celsius != null || header.flour_temp_celsius != null) {
+      setRoomTemp(header.room_temp_celsius != null ? Number(header.room_temp_celsius) : 21);
+      setFlourTemp(header.flour_temp_celsius != null ? Number(header.flour_temp_celsius) : 21);
+      return;
+    }
+    // Ny/ubrukt oppskrift: localStorage er bare et forslag, lagret per selskap.
     if (!tempStorageKey) return;
     try {
       const raw = window.localStorage.getItem(tempStorageKey);
@@ -370,7 +377,7 @@ export default function RecipeDetail() {
       setRoomTemp(21);
       setFlourTemp(21);
     }
-  }, [tempStorageKey]);
+  }, [tempStorageKey, header.room_temp_celsius, header.flour_temp_celsius]);
 
   const persistTemps = useCallback(
     (next: { roomTemp: number; flourTemp: number }) => {
@@ -384,10 +391,14 @@ export default function RecipeDetail() {
     [tempStorageKey],
   );
 
-  const prefermentTemp = useMemo(() => {
-    const p = parts.find((x) => x.part_type === "preferment" && x.target_temp_celsius != null);
-    return p?.target_temp_celsius ?? null;
-  }, [parts]);
+  const prefermentTemp = header.preferment_temp_celsius != null ? Number(header.preferment_temp_celsius) : null;
+
+  /** Fordeigens vekt — summen av linjene i delene med `part_type = 'preferment'`. */
+  const prefermentGrams = useMemo(() => {
+    const prefPartIds = new Set(parts.filter((p) => p.part_type === "preferment").map((p) => p.id));
+    const prefLines = hydratedLines.filter((l) => prefPartIds.has(l.recipe_part_id));
+    return computePartSummary(prefLines, totals.totalFlourG).totalG;
+  }, [parts, hydratedLines, totals.totalFlourG]);
 
   // ===== PDF =====
   const { generating, printProductionSheet, printRecipeCard } = useRecipePDF();
@@ -1096,14 +1107,19 @@ export default function RecipeDetail() {
           onRoomTempChange={(v) => {
             setRoomTemp(v);
             persistTemps({ roomTemp: v, flourTemp });
+            patchHeader({ room_temp_celsius: v });
           }}
           onFlourTempChange={(v) => {
             setFlourTemp(v);
             persistTemps({ roomTemp, flourTemp: v });
+            patchHeader({ flour_temp_celsius: v });
           }}
+          onPrefermentTempChange={(v) => patchHeader({ preferment_temp_celsius: v })}
           targetDoughTemp={header.target_dough_temp_celsius ?? null}
           frictionFactor={header.friction_factor_celsius ?? null}
           prefermentTemp={prefermentTemp}
+          prefermentGrams={prefermentGrams}
+          totalDoughG={totals.totalDoughG}
           canWrite={canWrite}
           onChange={patchHeader}
         />
