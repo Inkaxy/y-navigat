@@ -212,6 +212,24 @@ export default function ProfitabilityDashboard() {
             />
           </div>
 
+          {kpi.underMaal > 0 && (
+            <button
+              type="button"
+              onClick={() => navigate("/varer/lonnsomhet")}
+              className="flex w-full items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-left transition hover:bg-destructive/15"
+            >
+              <span className="text-sm">
+                <span className="font-semibold text-destructive">
+                  {nNum(kpi.underMaal, 0)} varer ligger under marginmålet
+                </span>
+                <span className="ml-2 text-muted-foreground">
+                  Samlet prisgap {nKr(kpi.tapt)} per enhet. Klikk for å se og rette prisene.
+                </span>
+              </span>
+              <span className="shrink-0 text-sm font-medium text-destructive">Åpne lønnsomhetsarket →</span>
+            </button>
+          )}
+
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="rounded-xl border bg-card p-4">
               <h2 className="mb-3 text-sm font-semibold">Statusfordeling</h2>
