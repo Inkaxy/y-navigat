@@ -9,8 +9,9 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { CalculationTab } from "./CalculationTab";
 import { LaborPackagingEditor } from "./LaborPackagingEditor";
-import { marginPct, requiredPriceForTarget, writePriceForDate } from "@/varer/lib/priceWrite";
-import { supabasePriceStore, PRICE_QUERY_KEYS } from "@/varer/lib/supabasePriceStore";
+import { marginPct, requiredPriceForTarget } from "@/varer/lib/priceWrite";
+import { setPrice } from "@/varer/lib/serverPriceWrite";
+import { PRICE_QUERY_KEYS } from "@/varer/lib/supabasePriceStore";
 import { roundPrice } from "@/varer/lib/pricing";
 import { osloTodayISO } from "@/lib/osloDate";
 import { logAudit } from "@/varer/lib/audit";
@@ -145,18 +146,12 @@ export function CostPriceTab({
     }
     setSavingId(row.priceListId);
     try {
-      const res = await writePriceForDate(supabasePriceStore, {
+      await setPrice({
         priceListId: row.priceListId,
         productId,
         price: num,
-        date: osloTodayISO(),
-      });
-      await logAudit({
-        action: "update",
-        entity_type: "price_list_item",
-        entity_id: res.rowId,
-        entity_display_reference: `${productName} → ${row.name}`,
-        changes: { price: num, previous_price: res.previousPrice },
+        validFrom: osloTodayISO(),
+        note: `${productName} → ${row.name}`,
       });
       for (const key of PRICE_QUERY_KEYS) qc.invalidateQueries({ queryKey: [...key] });
       qc.invalidateQueries({ queryKey: ["product-margin-rows", productId] });

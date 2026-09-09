@@ -13,8 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 
 import { logAudit } from "@/varer/lib/audit";
-import { writePriceForDate } from "@/varer/lib/priceWrite";
-import { supabasePriceStore, PRICE_QUERY_KEYS } from "@/varer/lib/supabasePriceStore";
+import { setPrice } from "@/varer/lib/serverPriceWrite";
+import { PRICE_QUERY_KEYS } from "@/varer/lib/supabasePriceStore";
 import { osloTodayISO } from "@/lib/osloDate";
 import { toast } from "sonner";
 import { useAppContext } from "@/varer/context/AppContext";
@@ -75,23 +75,17 @@ export default function PriceListDetail() {
     // prishistorikken bevares og EXCLUDE-constrainten holder.
     const today = osloTodayISO();
     try {
-      const res = await writePriceForDate(supabasePriceStore, {
+      await setPrice({
         priceListId: id!,
         productId,
         price: num,
-        date: today,
-      });
-      await logAudit({
-        action: "update",
-        entity_type: "price_list_item",
-        entity_id: res.rowId,
-        entity_display_reference: displayName,
-        changes: { price: num, previous_price: res.previousPrice, valid_from: today },
+        validFrom: today,
+        note: `Endret fra prislisten (${displayName})`,
       });
       for (const key of PRICE_QUERY_KEYS) qc.invalidateQueries({ queryKey: [...key] });
       qc.invalidateQueries({ queryKey: ["price-list-items", id] });
       setEditing(null);
-      toast.success(res.action === "insert" ? "Ny prisperiode opprettet" : "Pris oppdatert");
+      toast.success("Prisen gjelder fra i dag");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Kunne ikke lagre prisen");
     }

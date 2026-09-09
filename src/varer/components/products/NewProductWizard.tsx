@@ -32,8 +32,8 @@ import {
 } from "@/varer/lib/constants";
 import { CALC_TYPE_HELP, CALC_TYPE_LABEL, type CalcType } from "@/varer/hooks/useProductCalc";
 import { requiredPriceForTarget } from "@/varer/lib/priceWrite";
-import { supabasePriceStore, PRICE_QUERY_KEYS } from "@/varer/lib/supabasePriceStore";
-import { writePriceForDate } from "@/varer/lib/priceWrite";
+import { PRICE_QUERY_KEYS } from "@/varer/lib/supabasePriceStore";
+import { setPrices } from "@/varer/lib/serverPriceWrite";
 import { roundPrice } from "@/varer/lib/pricing";
 import { osloTodayISO } from "@/lib/osloDate";
 import { logAudit } from "@/varer/lib/audit";
@@ -356,18 +356,25 @@ export function NewProductWizard({ open, onOpenChange, productOptions }: Props) 
       // --- Priser ---
       const today = osloTodayISO();
       const failed: string[] = [];
-      for (const line of priceLines) {
-        const num = Number(line.price);
-        if (line.price.trim() === "" || !Number.isFinite(num) || num < 0) continue;
+      const rows = priceLines
+        .map((line) => ({ line, num: Number(line.price) }))
+        .filter(({ line, num }) => line.price.trim() !== "" && Number.isFinite(num) && num >= 0)
+        .map(({ line, num }) => ({
+          priceListId: line.priceListId,
+          productId: product.id,
+          price: num,
+          validFrom: today,
+          label: line.name,
+        }));
+      if (rows.length > 0) {
         try {
-          await writePriceForDate(supabasePriceStore, {
-            priceListId: line.priceListId,
-            productId: product.id,
-            price: num,
-            date: today,
-          });
+          const res = await setPrices(rows);
+          const nameByList = new Map(rows.map((r) => [r.priceListId, r.label]));
+          for (const r of res.rows.filter((x) => !x.ok)) {
+            failed.push(`${nameByList.get(r.priceListId ?? "") ?? "Prisliste"}: ${r.error ?? "feil"}`);
+          }
         } catch (e) {
-          failed.push(`${line.name}: ${e instanceof Error ? e.message : "feil"}`);
+          failed.push(e instanceof Error ? e.message : "Prisene kunne ikke lagres");
         }
       }
       for (const f of failed) toast.error(f);

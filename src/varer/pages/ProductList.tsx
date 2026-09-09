@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,6 +46,8 @@ type ProductRow = {
   in_pos: boolean | null;
   manual_ingredient_declaration: string | null;
   declaration_needs_review: boolean | null;
+  calc_type: string | null;
+  manual_cost_price: number | null;
 };
 
 /** Merkestatus for produktlista, avledet fra snapshotet på produktet. */
@@ -77,8 +79,20 @@ type ColDef = ColumnOption & {
   cellClassName?: string;
   render: (
     p: ProductRow,
-    ctx: { parent: ProductRow | null; price: number | undefined },
+    ctx: {
+      parent: ProductRow | null;
+      price: number | undefined;
+      costCache: CostCacheRow | undefined;
+    },
   ) => React.ReactNode;
+};
+
+type CostCacheRow = {
+  product_id: string;
+  cost_per_unit: number | null;
+  has_cost: boolean | null;
+  quality: string | null;
+  is_stale: boolean | null;
 };
 
 const COLUMN_PREF_SCOPE = "varer.product_list.columns.v1";
@@ -106,7 +120,7 @@ export default function ProductList() {
       const { data, error } = await supabase
         .from("products")
         .select(
-          "id, display_number, code, display_name, product_category, product_subcategory, unit_of_sale, status, variant_of_product_id, variant_label, label_mode, is_cake_component, cake_role, image_url, mva_rate, pieces_per_tray, in_web_shop, in_pos, manual_ingredient_declaration, declaration_needs_review, main_category:product_main_categories(code, display_name), sub_category:product_sub_categories(code, display_name)",
+          "id, display_number, code, display_name, product_category, product_subcategory, unit_of_sale, status, variant_of_product_id, variant_label, label_mode, is_cake_component, cake_role, image_url, mva_rate, pieces_per_tray, in_web_shop, in_pos, manual_ingredient_declaration, declaration_needs_review, calc_type, manual_cost_price, main_category:product_main_categories(code, display_name), sub_category:product_sub_categories(code, display_name)",
         )
         .eq("legal_entity_id", legalEntityId!)
         .order("display_number", { ascending: true })
@@ -214,6 +228,26 @@ export default function ProductList() {
       );
     },
   });
+
+  /** Kalkylekvalitet leses fra kostbufferen i databasen. */
+  const costCacheQuery = useQuery({
+    queryKey: ["product-cost-cache", legalEntityId],
+    enabled: !!legalEntityId,
+    queryFn: async () => {
+      return await fetchAllRows<CostCacheRow>((from, to) =>
+        supabase
+          .from("product_cost_cache")
+          .select("product_id, cost_per_unit, has_cost, quality, is_stale")
+          .range(from, to),
+      );
+    },
+  });
+
+  const costCacheMap = useMemo(() => {
+    const m = new Map<string, CostCacheRow>();
+    (costCacheQuery.data ?? []).forEach((r) => m.set(r.product_id, r));
+    return m;
+  }, [costCacheQuery.data]);
 
   const today = osloTodayISO();
   const priceMap = useMemo(() => {
@@ -395,27 +429,35 @@ export default function ProductList() {
       {
         key: "calc",
         label: "Kalkyle",
-        render: (p) => {
+        render: (p, ctx) => {
+          const cache = ctx.costCache;
           const q = calcQuality({
-            hasCost: p.calc_type === "manuell" ? p.manual_cost_price != null : false,
-            costPrice: p.calc_type === "manuell" ? p.manual_cost_price : null,
+            hasCost: cache ? cache.has_cost === true : p.manual_cost_price != null,
+            costPrice: cache ? cache.cost_per_unit : p.manual_cost_price,
             hasRecipe: p.calc_type === "oppskrift",
             calcType: p.calc_type,
           });
           return (
-            <Badge
-              variant="outline"
-              className={
-                q === "A"
-                  ? "border-success/40 bg-success/10 text-success"
-                  : q === "B"
-                    ? "border-warning/40 bg-warning/10 text-warning"
-                    : "text-muted-foreground"
-              }
-              title={CALC_QUALITY_LABEL[q]}
-            >
-              {q === "ukjent" ? "–" : q}
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge
+                  variant="outline"
+                  className={
+                    q === "A"
+                      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700"
+                      : q === "B"
+                        ? "border-amber-500/40 bg-amber-500/10 text-amber-700"
+                        : "text-muted-foreground"
+                  }
+                >
+                  {q === "ukjent" ? "–" : q}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                {CALC_QUALITY_LABEL[q]}
+                {cache?.is_stale ? " — kalkylen må regnes på nytt" : ""}
+              </TooltipContent>
+            </Tooltip>
           );
         },
       },
@@ -605,6 +647,23 @@ export default function ProductList() {
               </SelectContent>
             </Select>
 
+            <Select
+              value={priceListId ?? ""}
+              onValueChange={(v) => setPriceListId(v)}
+              disabled={(priceListsQuery.data ?? []).length === 0}
+            >
+              <SelectTrigger className="w-48" aria-label="Prisliste for priskolonnen">
+                <SelectValue placeholder="Prisliste" />
+              </SelectTrigger>
+              <SelectContent>
+                {(priceListsQuery.data ?? []).map((l) => (
+                  <SelectItem key={l.id} value={l.id}>
+                    Pris: {l.display_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Select value={status} onValueChange={setStatus}>
               <SelectTrigger className="w-36"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
@@ -713,7 +772,7 @@ export default function ProductList() {
                     >
                       {visibleCols.map((c) => (
                         <td key={c.key} className={`px-4 py-2.5 ${c.cellClassName ?? ""}`}>
-                          {c.render(p, { parent, price })}
+                          {c.render(p, { parent, price, costCache: costCacheMap.get(p.id) })}
                         </td>
                       ))}
                     </tr>
