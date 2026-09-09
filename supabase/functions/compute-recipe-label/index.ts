@@ -62,7 +62,7 @@ const KEYHOLE_GROUPS = {
       { key: "fiber_g", name: "Kostfiber", op: "min" as const, limit: 6, unit: "g/100 g" },
       { key: "fat_g", name: "Fett", op: "max" as const, limit: 7, unit: "g/100 g" },
       { key: "sugars_g", name: "Sukkerarter", op: "max" as const, limit: 5, unit: "g/100 g" },
-      { key: "salt_g", name: "Salt", op: "max" as const, limit: 1.1, unit: "g/100 g" },
+      { key: "salt_g", name: "Salt", op: "max" as const, limit: 1.3, unit: "g/100 g" }, // Kilde: Veileder til nøkkelhullforskriften (mars 2021), kap. 4.5.3.4, gruppe 9
     ],
   },
 };

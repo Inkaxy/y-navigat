@@ -203,7 +203,7 @@ export function GrainSection({
   });
 
   const busy = setMode.isPending || saveManual.isPending || syncProducts.isPending;
-  const claimLocked = effectivePct == null;
+  const claimLocked = effectivePct == null || freeTextGrainLines.length > 0;
 
   return (
     <Card>

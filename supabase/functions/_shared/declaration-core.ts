@@ -77,6 +77,7 @@ export type BreadscaleEntry = {
   grain_classification: string | null;
   cereal_type: string | null;
   custom_text?: string | null;
+  raw_material_id?: string | null;
 };
 
 export type BreadscaleResult = {
@@ -119,6 +120,12 @@ export function computeBreadscale(entries: BreadscaleEntry[]): BreadscaleResult 
 
     if (e.custom_text && GRAIN_TEXT_RE.test(e.custom_text) && g > GRAIN_TEXT_MIN_GRAMS) {
       free_text_grain_lines.push({ name: e.custom_text, grams: g });
+      continue;
+    }
+    // Fritekstlinjer uten råvarekobling har ikke nødvendigvis fylt ut custom_text —
+    // da må selve linjenavnet sjekkes, ellers slipper reelle fritekst-kornlinjer gjennom.
+    if (!e.raw_material_id && !e.custom_text && GRAIN_TEXT_RE.test(e.name) && g > GRAIN_TEXT_MIN_GRAMS) {
+      free_text_grain_lines.push({ name: e.name, grams: g });
       continue;
     }
     if (!bucket) {
