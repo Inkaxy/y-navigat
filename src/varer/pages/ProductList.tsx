@@ -647,6 +647,23 @@ export default function ProductList() {
               </SelectContent>
             </Select>
 
+            <Select
+              value={priceListId ?? ""}
+              onValueChange={(v) => setPriceListId(v)}
+              disabled={(priceListsQuery.data ?? []).length === 0}
+            >
+              <SelectTrigger className="w-48" aria-label="Prisliste for priskolonnen">
+                <SelectValue placeholder="Prisliste" />
+              </SelectTrigger>
+              <SelectContent>
+                {(priceListsQuery.data ?? []).map((l) => (
+                  <SelectItem key={l.id} value={l.id}>
+                    Pris: {l.display_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Select value={status} onValueChange={setStatus}>
               <SelectTrigger className="w-36"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
