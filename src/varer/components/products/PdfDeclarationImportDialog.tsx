@@ -1,3 +1,4 @@
+import { NUTRITION_FIELDS as NUTRITION_FIELD_CATALOG } from "@/varer/lib/nutritionFields";
 import { useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -20,17 +21,12 @@ interface Props {
   onApproved: () => void;
 }
 
-const NUTRITION_FIELDS = [
-  { key: "energy_kj", label: "Energi (kJ)" },
-  { key: "energy_kcal", label: "Energi (kcal)" },
-  { key: "fat_g", label: "Fett (g)" },
-  { key: "saturated_fat_g", label: "— hvorav mettede fettsyrer (g)" },
-  { key: "carbs_g", label: "Karbohydrater (g)" },
-  { key: "sugars_g", label: "— hvorav sukkerarter (g)" },
-  { key: "fiber_g", label: "Fiber (g)" },
-  { key: "protein_g", label: "Protein (g)" },
-  { key: "salt_g", label: "Salt (g)" },
-] as const;
+// Feltlista kommer fra den delte katalogen (src/varer/lib/nutritionFields.ts),
+// slik at frontend og edge alltid har samme felt i samme rekkefølge.
+const NUTRITION_FIELDS = NUTRITION_FIELD_CATALOG.map((f) => ({
+  key: f.key,
+  label: `${f.label} (${f.unit})`,
+}));
 
 interface ParsedResult {
   ingredient_declaration: string;

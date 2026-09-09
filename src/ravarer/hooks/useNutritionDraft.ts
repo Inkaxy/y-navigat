@@ -1,3 +1,4 @@
+import { NUTRITION_FIELD_KEYS } from "@/varer/lib/nutritionFields";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { NutritionRow } from "@/ravarer/hooks/useNutrition";
 
@@ -23,15 +24,7 @@ export function emptyNutritionFor(rawMaterialId: string): NutritionRow {
  * skal aldri hindre at en vellykket lagring blir ren igjen.
  */
 export const EDITABLE_NUTRITION_FIELDS = [
-  "energy_kj",
-  "energy_kcal",
-  "fat_g",
-  "saturated_fat_g",
-  "carbs_g",
-  "sugars_g",
-  "fiber_g",
-  "protein_g",
-  "salt_g",
+  ...NUTRITION_FIELD_KEYS,
   "ingredient_declaration",
   "country_of_origin",
   "e_numbers",
