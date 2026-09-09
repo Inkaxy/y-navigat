@@ -104,3 +104,6 @@ verify_jwt = false
 
 [functions.compute-recipe-label]
 verify_jwt = false
+
+[functions.matvaretabellen-sync]
+verify_jwt = false

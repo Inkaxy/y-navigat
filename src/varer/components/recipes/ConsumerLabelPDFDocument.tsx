@@ -1,4 +1,5 @@
 import { Circle, Document, Image, Page, Path, StyleSheet, Svg, Text, View } from "@react-pdf/renderer";
+import { splitMarkedText } from "@/varer/lib/markedText";
 
 export type LabelSizeKey = "60x40" | "100x70" | "a6";
 
@@ -72,19 +73,21 @@ const styles = StyleSheet.create({
   markPct: { fontSize: 6, marginTop: 1, textAlign: "center" },
 });
 
-/** Deler ingredienslisten opp slik at allergener kan settes i fet skrift. */
-function renderIngredients(text: string, terms: string[], fontSize: number) {
-  const clean = terms.filter(Boolean).map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  if (!clean.length) return <Text style={{ fontSize }}>{text}</Text>;
-  const re = new RegExp(`(${clean.join("|")})`, "gi");
-  const parts = text.split(re);
+/**
+ * Deler ingredienslisten opp slik at allergener kan settes i fet skrift.
+ * Teksten kommer med *stjerne*-markører rundt allergenordene — aldri hele
+ * feltet — og deles opp med samme funksjon som brukes på selve etiketten.
+ */
+function renderIngredients(text: string, _terms: string[], fontSize: number) {
+  const segments = splitMarkedText(text);
+  if (!segments.length) return <Text style={{ fontSize }}>{text}</Text>;
   return (
     <Text style={{ fontSize }}>
-      {parts.map((p, i) =>
-        re.test(p) && clean.some((c) => new RegExp(`^${c}$`, "i").test(p)) ? (
-          <Text key={i} style={{ fontFamily: "Helvetica-Bold" }}>{p}</Text>
+      {segments.map((seg, i) =>
+        seg.bold ? (
+          <Text key={i} style={{ fontFamily: "Helvetica-Bold" }}>{seg.text}</Text>
         ) : (
-          <Text key={i}>{p}</Text>
+          <Text key={i}>{seg.text}</Text>
         ),
       )}
     </Text>
