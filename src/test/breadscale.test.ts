@@ -73,12 +73,15 @@ describe("Brødskala'n — klient", () => {
     expect(grainLevelLabel("ekstra_grovt")).toBe("Ekstra grovt");
   });
 
-  it("velgeren tilbyr alle klasser inkludert rug- og havrekli", () => {
+  it("velgeren tilbyr bare klassene databasens CHECK godtar", () => {
     const values = GRAIN_CLASSIFICATION_OPTIONS.map((o) => o.value);
-    for (const v of ["sifted_flour", "whole_grain_flour", "whole_grains", "wheat_bran", "rye_bran", "oat_bran", "gluten_or_germ", "malt_or_improver", "not_grain"]) {
-      expect(values).toContain(v);
-    }
-    expect(GRAIN_CLASSIFICATION_OPTIONS.length).toBeGreaterThanOrEqual(9);
+    // raw_materials_grain_classification_check tillater nøyaktig disse.
+    expect(values.slice().sort()).toEqual(
+      [
+        "sifted_flour", "whole_grain_flour", "whole_grains", "wheat_bran", "rye_bran",
+        "oat_bran", "gluten_free_grain", "other_flour", "not_grain",
+      ].sort(),
+    );
   });
 
   it("mel oppgitt i kg regnes om til gram før grovheten", () => {
