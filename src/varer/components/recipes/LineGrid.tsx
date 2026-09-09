@@ -51,7 +51,7 @@ export function LineGrid({
     // en unik data-nøkkel per (rad, kolonne) som cellene lytter på ved re-render.
     requestAnimationFrame(() => {
       const el = document.querySelector<HTMLElement>(
-        `[data-grid-cell="${focus.lineId}:${focus.column}"] input`,
+        `[data-grid-cell="${focus.lineId}:${focus.column}"] :is(input,select)`,
       );
       el?.focus();
     });
