@@ -39,6 +39,7 @@ const styles = StyleSheet.create({
   },
   statLabel: { fontSize: 7, textTransform: "uppercase", color: "#555", letterSpacing: 0.4 },
   statValue: { fontSize: 13, fontWeight: 700, marginTop: 2 },
+  statsNote: { fontSize: 8.5, color: "#555", marginTop: -8, marginBottom: 12 },
 
   sectionTitle: { fontSize: 13, fontWeight: 700, marginTop: 4, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.6 },
   partMeta: { fontSize: 9, color: "#555", marginTop: -3, marginBottom: 5 },
@@ -247,6 +248,9 @@ export function RecipePDFDocument({ data }: { data: RecipePDFData }) {
             </View>
           ))}
         </View>
+        <Text style={styles.statsNote}>
+          Beregnet med romtemp {fmtNum(s.roomTemp, 1)} °C, meltemp {fmtNum(s.flourTemp, 1)} °C, mål {s.targetDoughTemp != null ? `${fmtNum(s.targetDoughTemp, 1)} °C` : "—"}
+        </Text>
 
         {data.allergens && data.allergens.length > 0 && (
           <View style={styles.allergenBox}>
