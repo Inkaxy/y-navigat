@@ -250,52 +250,23 @@ export interface ReceiveLineInput {
  * Fører én fakturalinje inn på lager via RPC-en `rm_receive_invoice_line`: den
  * låser linja og fakturaen, kontrollerer tilgang og selskap i basen, og fører
  * ALDRI en bevegelse på toppen av den fakturalinje-triggeren allerede har laget.
- * Kreditnota beholder negativ mengde. Skulle funksjonen mangle (feil miljø),
- * faller vi tilbake til den gamle klientveien, som er idempotent på
- * (fakturalinje, kjøp).
+ * Kreditnota beholder negativ mengde.
  */
 export function useReceiveInvoiceLine() {
   const qc = useQueryClient();
-  const { legalEntityId, user } = useRavarer();
   return useMutation({
     mutationFn: async (input: ReceiveLineInput): Promise<{ skipped: boolean }> => {
       const { data, error } = await supabase.rpc("rm_receive_invoice_line", {
         p_line_id: input.invoice_line_id,
-        p_lot_number: input.lot_number ?? null,
-        p_best_before: input.best_before ?? null,
+        p_lot_number: input.lot_number ?? undefined,
+        p_best_before: input.best_before ?? undefined,
         p_note: `Mottak faktura ${input.invoice_number}`,
       });
-      if (!error) {
-        const res = data as unknown as ReceiveLineResult;
-        return { skipped: res.already_received === true || !!res.skipped };
-      }
-      if (!/could not find the function|does not exist/i.test(error.message)) throw error;
-
-      if (!(input.quantity_base > 0)) throw new Error("Linja mangler omregnet mengde");
-      const { data: existing, error: exErr } = await supabase
-        .from("stock_movements")
-        .select("id")
-        .eq("source_table", "invoice_lines")
-        .eq("source_id", input.invoice_line_id)
-        .eq("movement_type", "purchase")
-        .limit(1);
-      if (exErr) throw exErr;
-      if ((existing ?? []).length > 0) return { skipped: true };
-
-      const { error } = await supabase.from("stock_movements").insert({
-        legal_entity_id: legalEntityId,
-        raw_material_id: input.raw_material_id,
-        movement_type: "purchase",
-        quantity_base: input.quantity_base,
-        note: `Mottak faktura ${input.invoice_number}`,
-        occurred_at: input.occurred_at ?? new Date().toISOString(),
-        source_table: "invoice_lines",
-        source_id: input.invoice_line_id,
-        created_by: user?.id ?? null,
-      });
       if (error) throw error;
-      return { skipped: false };
+      const res = data as unknown as ReceiveLineResult;
+      return { skipped: res.already_received === true || !!res.skipped };
     },
+
 
     onSuccess: (res, vars) => {
       invalidateRawMaterial(qc, vars.raw_material_id);

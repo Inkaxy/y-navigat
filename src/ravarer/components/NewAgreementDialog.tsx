@@ -121,78 +121,12 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
         agreement_document_url: docUrl,
         is_primary: setPrimary,
       };
-      const { data, error } = await supabase.rpc("rm_apply_agreement", { p_payload: payload as unknown as never });
-      if (error) {
-        if (!/could not find the function|does not exist/i.test(error.message)) throw error;
-      } else {
-        const res = data as unknown as ApplyAgreementResult;
-        if (res.ok === false) throw new Error("Avtalen kunne ikke lagres");
-        return;
-      }
-
-      // Upsert raw_material_suppliers
-      const { data: existing } = await supabase
-        .from("raw_material_suppliers")
-        .select("id")
-        .eq("raw_material_id", rawMaterialId)
-        .eq("supplier_id", supplierId)
-        .maybeSingle();
-
-      const payload: {
-        raw_material_id: string;
-        supplier_id: string;
-        supplier_sku: string | null;
-        supplier_product_name: string | null;
-        agreed_price: number | null;
-        agreed_price_per_base_unit: number | null;
-        package_size: number | null;
-        package_unit: string | null;
-        agreement_valid_from: string | null;
-        agreement_valid_to: string | null;
-        agreed_price_set_at: string | null;
-        agreed_price_set_by: string | null;
-        is_primary: boolean;
-        base_units_per_package: number | null;
-        agreement_document_url?: string;
-      } = {
-        raw_material_id: rawMaterialId,
-        supplier_id: supplierId,
-        supplier_sku: supplierSku.trim() || null,
-        supplier_product_name: supplierProductName.trim() || null,
-        agreed_price: ap,
-        agreed_price_per_base_unit: ppbu,
-        package_size: ps,
-        package_unit: packageUnit || null,
-        base_units_per_package: bupp,
-        agreement_valid_from: validFrom || null,
-        agreement_valid_to: validTo || null,
-        agreed_price_set_at: ppbu == null && ap == null ? null : new Date().toISOString(),
-        agreed_price_set_by: ppbu == null && ap == null ? null : (user?.id ?? null),
-        is_primary: setPrimary,
-      };
-      if (docUrl) payload.agreement_document_url = docUrl;
-
-      if (existing) {
-        const { error } = await supabase.from("raw_material_suppliers").update(payload).eq("id", existing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("raw_material_suppliers").insert(payload);
-        if (error) throw error;
-      }
-
-      // Hvis primær: nullstill is_primary på øvrige
-      if (setPrimary) {
-        await supabase
-          .from("raw_material_suppliers")
-          .update({ is_primary: false })
-          .eq("raw_material_id", rawMaterialId)
-          .neq("supplier_id", supplierId);
-        // Sett primary_supplier_id på råvaren
-        await supabase
-          .from("raw_materials")
-          .update({ primary_supplier_id: supplierId })
-          .eq("id", rawMaterialId);
-      }
+      const { data, error } = await supabase.rpc("rm_apply_agreement", {
+        p_payload: payload as unknown as never,
+      });
+      if (error) throw error;
+      const res = data as unknown as ApplyAgreementResult;
+      if (res.ok === false) throw new Error("Avtalen kunne ikke lagres");
     },
     onSuccess: () => {
       invalidateRawMaterial(qc, rawMaterialId);

@@ -22,6 +22,10 @@ export type RecipeLabelCalculated = {
   coverage_by_weight_pct: number | null;
   missing_data: any | null;
   warnings: string[] | null;
+  /** Settes av databasetriggeren når grunnlaget er endret etter siste beregning. */
+  is_stale: boolean | null;
+  /** Kort forklaring fra databasen på hvorfor beregningen er utdatert. */
+  stale_reason: string | null;
 };
 
 /** Lagret beregning for en oppskrift. */
