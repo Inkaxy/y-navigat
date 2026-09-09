@@ -463,7 +463,7 @@ Deno.serve(async (req) => {
         whole_grain_grams_no_bran: Math.round(wholeGrainGrams * 100) / 100,
         // Brødskala'ns TELLER: grovt korn med kli vektet. `whole_grain_grams`
         // er Nøkkelhullets fullkorn (uten kli, uvektet) og er noe annet.
-        coarse_weighted_grams: Math.round(core.breadscale.coarse_weighted_grams * 100) / 100,
+        coarse_weighted_grams: Math.round(core.breadscale.coarse_grams_weighted * 100) / 100,
       },
       allergens,
       keyhole,
