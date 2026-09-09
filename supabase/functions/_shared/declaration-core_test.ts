@@ -500,3 +500,46 @@ Deno.test("C: vannlinjer har 0 g tørrstoff — telles aldri som fullkorn selv m
   ];
   assertEquals(wholeGrainDryGrams(entries), 85);
 });
+
+/* ------------------------------------------------------------------ *
+ * Punkt 18: samme råvare både som egen linje og inne i en parentes
+ * ------------------------------------------------------------------ */
+
+Deno.test("kompositt + egen linje gir både rm:x og rm:x@p, og forelderen plasseres etter samlet vekt", async () => {
+  const topLines: TopLine[] = [
+    {
+      source: "master", raw_material: { id: PARENT, is_composite: true }, raw_material_id: PARENT,
+      name: "Fyll", quantity: 1000, unit: "g", waste_percent: 0, include: true,
+      is_quid: false, custom_text: null, unit_weight_grams: null,
+    },
+    {
+      source: "master", raw_material: { id: CHILD }, raw_material_id: CHILD,
+      name: "Hvetemel", quantity: 1200, unit: "g", waste_percent: 0, include: true,
+      is_quid: false, custom_text: null, unit_weight_grams: null,
+    },
+  ];
+
+  const res = await computeDeclarationCore(stubService(), topLines);
+  const keys = res.sortedAgg.map((a) => a.key);
+  // Den frittstående linjen og komponentlinjen holdes fra hverandre.
+  assertEquals(keys.includes(`rm:${CHILD}`), true);
+  assertEquals(keys.includes(`rm:${CHILD}@${PARENT}`), true);
+  assertEquals(res.sortedAgg.find((a) => a.key === `rm:${CHILD}`)?.effective_grams, 1200);
+  assertEquals(res.sortedAgg.find((a) => a.key === `rm:${CHILD}@${PARENT}`)?.effective_grams, 400);
+
+  // Forelderen veier 1000 g samlet (400 + 600) og skal derfor stå ETTER de 1200 g.
+  const html = res.ingredientHtml;
+  assertEquals(html.indexOf("fyll") > 0, true);
+  assertEquals(html.indexOf("hvetemel") < html.indexOf("fyll"), true);
+});
+
+/* Avrundingsgrensene for Brødskala'n — samme tabell som vitest-testen. */
+Deno.test("Brødskala'n: trinngrensene er identiske i kjernen og på klienten", () => {
+  assertEquals(breadscaleCategory(25.9), "fint");
+  assertEquals(breadscaleCategory(26), "halvgrovt");
+  assertEquals(breadscaleCategory(50.9), "halvgrovt");
+  assertEquals(breadscaleCategory(51), "grovt");
+  assertEquals(breadscaleCategory(75.9), "grovt");
+  assertEquals(breadscaleCategory(76), "ekstra_grovt");
+  assertEquals(breadscaleCategory(120), "ekstra_grovt");
+});
