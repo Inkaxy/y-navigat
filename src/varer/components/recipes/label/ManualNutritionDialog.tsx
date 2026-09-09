@@ -4,18 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Save } from "lucide-react";
 import { useRawMaterialNutrition, useSaveRawMaterialNutrition } from "@/varer/hooks/useMissingNutrition";
-
-export const NUTRITION_FIELDS = [
-  { key: "energy_kj", label: "Energi (kJ)" },
-  { key: "energy_kcal", label: "Energi (kcal)" },
-  { key: "fat_g", label: "Fett (g)" },
-  { key: "saturated_fat_g", label: "— hvorav mettede fettsyrer (g)" },
-  { key: "carbs_g", label: "Karbohydrater (g)" },
-  { key: "sugars_g", label: "— hvorav sukkerarter (g)" },
-  { key: "fiber_g", label: "Kostfiber (g)" },
-  { key: "protein_g", label: "Protein (g)" },
-  { key: "salt_g", label: "Salt (g)" },
-] as const;
+import { NUTRITION_FIELDS } from "@/varer/lib/nutritionFields";
 
 interface Props {
   open: boolean;

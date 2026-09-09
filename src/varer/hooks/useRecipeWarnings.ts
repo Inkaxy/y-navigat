@@ -13,6 +13,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { isLineConvertible, lineToGrams, type BakersLine } from "@/varer/lib/bakers";
+import { lineCost } from "@/varer/lib/recipeCost";
 
 export type RecipeWarningKind =
   | "missing_nutrition"
@@ -22,7 +23,8 @@ export type RecipeWarningKind =
   | "zero_quantity"
   | "free_text_line"
   | "unknown_conversion"
-  | "low_margin";
+  | "low_margin"
+  | "missing_cost";
 
 export interface RecipeWarning {
   kind: RecipeWarningKind;
@@ -44,6 +46,7 @@ export const WARNING_TITLE: Record<RecipeWarningKind, string> = {
   free_text_line: "Fritekstlinje",
   unknown_conversion: "Ukjent omregning",
   low_margin: "Lav dekningsgrad",
+  missing_cost: "Mangler kostpris",
 };
 
 /** Linjen slik editoren kjenner den. */
@@ -169,6 +172,20 @@ export function useRecipeWarnings({
           message: `«${name}»: mengden kan ikke regnes om til gram`,
           action: rmId ? { label: "Åpne råvaren", href: `/ravarer/vareliste/${rmId}?tab=suppliers` } : null,
         });
+      }
+
+      const conv = lineToGrams(line);
+      if (conv.exact) {
+        const costRes = lineCost(line, conv.grams);
+        if (costRes.cost == null) {
+          out.push({
+            kind: "missing_cost",
+            lineId: line.id,
+            rawMaterialId: rmId,
+            message: `«${name}»: ${costRes.reason ?? "mangler kostpris"}`,
+            action: rmId ? { label: "Åpne råvaren", href: `/ravarer/vareliste/${rmId}?tab=suppliers` } : null,
+          });
+        }
       }
 
       if (line.unit === "stk" && rmId && cov && !cov.unitWeights.get(rmId)) {

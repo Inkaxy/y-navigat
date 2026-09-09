@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import type { RecipeDepartment } from "@/varer/lib/departments";
 import { lineCost } from "@/varer/lib/recipeCost";
+import type { ScaleMode, ScaledBatchLine } from "@/varer/lib/scaling";
 import {
   calcWaterTemp,
   computePartSummary,
@@ -161,6 +162,8 @@ export interface BuildRecipePDFInput {
     humidity_pct: number | null;
   }[];
   includeCosts?: boolean;
+  /** Skaleringsresultatet fra siden — når satt, viser batch-PDF-en faktiske mengder per sats. */
+  scaleResult?: { mode: ScaleMode; batchCount: number; perBatch: ScaledBatchLine[] } | null;
 }
 
 function lineCostOrNull(line: BakersLine, grams: number): number | null {
@@ -180,13 +183,23 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
   const prefermentTemp =
     input.parts.find((p) => p.part_type === "preferment" && p.target_temp_celsius != null)?.target_temp_celsius ?? null;
 
-  const temp = calcWaterTemp({
-    targetDoughTemp: input.targetDoughTemp ?? 24,
-    roomTemp: input.roomTemp ?? 21,
-    flourTemp: input.flourTemp ?? 21,
-    frictionFactor: input.frictionFactor ?? 0,
-    prefermentTemp,
+  /** Fordeigens vekt — brukes til å vekte fordeigens bidrag til vanntemperaturen proporsjonalt med dens andel av deigen. */
+  const prefermentPartIds = new Set(input.parts.filter((p) => p.part_type === "preferment").map((p) => p.id));
+  const prefermentGrams =
+    prefermentPartIds.size > 0
+      ? computePartSummary(input.lines.filter((l) => prefermentPartIds.has(l.recipe_part_id)), baseTotals.totalFlourG).totalG
+      : 0;
+
+  const weightedTemp = calcWaterTemp({
+    targetDoughTempC: input.targetDoughTemp ?? 24,
+    roomTempC: input.roomTemp ?? 21,
+    flourTempC: input.flourTemp ?? 21,
+    frictionC: input.frictionFactor ?? 0,
+    preferment: prefermentTemp != null && prefermentGrams > 0 ? { tempC: prefermentTemp, grams: prefermentGrams } : null,
+    totalDoughG: baseTotals.totalDoughG,
   });
+  const waterTemp = weightedTemp?.waterTempC ?? null;
+  const waterTempFeasible = waterTemp != null && waterTemp >= 0 && waterTemp <= 60;
 
   function buildPart(p: BuildRecipePDFInput["parts"][number]): RecipePDFPart {
     const partLines = input.lines.filter((l) => l.recipe_part_id === p.id);
@@ -240,7 +253,14 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
   // antall enheter per batch er kjent. Baker-% er uendret; det som deles er gram/mengde.
   let batches: RecipePDFData["batches"] = null;
   const unitsPerBatch = Number(input.unitsPerBatch) || 0;
-  if (unitsPerBatch > 0) {
+  if (input.scaleResult && input.scaleResult.batchCount > 1) {
+    const { batchCount, perBatch } = input.scaleResult;
+    batches = {
+      count: batchCount,
+      perBatchDoughG: perBatch.reduce((s, l) => s + (l.grams ?? 0), 0) || null,
+      lines: perBatch.map((l) => ({ name: l.name, grams: l.grams, unit: l.unit, quantity: l.quantity })),
+    };
+  } else if (unitsPerBatch > 0) {
     const count = Math.max(1, Math.round(input.scaledUnits / unitsPerBatch));
     const batchLines = input.lines.map((l) => {
       const s = byId.get(l.id);
@@ -303,8 +323,8 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
       leavenPct: baseTotals.leavenPct,
       prefermentedFlourPct,
       targetDoughTemp: input.targetDoughTemp ?? null,
-      waterTemp: temp.waterTemp,
-      waterTempFeasible: temp.feasible,
+      waterTemp,
+      waterTempFeasible,
       roomTemp: input.roomTemp ?? 21,
       flourTemp: input.flourTemp ?? 21,
       prefermentTemp,

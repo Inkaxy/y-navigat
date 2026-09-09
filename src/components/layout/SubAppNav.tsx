@@ -390,20 +390,23 @@ function VarerNav() {
 
   const { data: marginAlerts = [] } = useMarginAlerts(legalEntityId);
 
+  // Sju grupper med nedtrekk. Alle tidligere ruter finnes fortsatt — de er
+  // bare samlet under et av de sju toppnivåpunktene.
   const items: NavItem[] = [
-    { kind: "link", to: "/varer/dashbord", label: "Dashbord", icon: LayoutDashboard },
-    { kind: "link", to: "/varer/vareliste", label: "Vareliste", icon: Cookie },
-    { kind: "link", to: "/varer/priser", label: "Priser", icon: Tags },
-    { kind: "link", to: "/varer/spesialpriser", label: "Spesialpriser", icon: HandCoins },
     {
-      kind: "link",
-      to: "/varer/lonnsomhet",
-      label: "Lønnsomhet",
-      icon: TrendingUp,
-      badge: marginAlerts.length,
+      kind: "dropdown",
+      label: "Dashbord",
+      icon: LayoutDashboard,
+      basePath: "/varer/dashbord",
+      links: [{ to: "/varer/dashbord", label: "Dashbord" }],
     },
-    { kind: "link", to: "/varer/prisrunder", label: "Prisrunder", icon: Receipt },
-    { kind: "link", to: "/varer/kakebygger", label: "Kakebygger", icon: CakeSlice },
+    {
+      kind: "dropdown",
+      label: "Varer",
+      icon: Cookie,
+      basePath: "/varer/vareliste",
+      links: [{ to: "/varer/vareliste", label: "Vareliste" }],
+    },
     {
       kind: "dropdown",
       label: "Oppskrifter",
@@ -414,7 +417,40 @@ function VarerNav() {
         { to: "/varer/oppskrifter/krever-opprydding", label: "Krever opprydding", badge: cleanupCount },
       ],
     },
-    { kind: "link", to: "/varer/innstillinger", label: "Innstillinger", icon: Settings },
+    {
+      kind: "dropdown",
+      label: "Priser",
+      icon: Tags,
+      basePath: "/varer/priser",
+      matches: ["/varer/priser", "/varer/spesialpriser", "/varer/prisrunder"],
+      links: [
+        { to: "/varer/priser", label: "Priser" },
+        { to: "/varer/spesialpriser", label: "Spesialpriser" },
+        { to: "/varer/prisrunder", label: "Prisrunder" },
+      ],
+    },
+    {
+      kind: "dropdown",
+      label: "Lønnsomhet",
+      icon: TrendingUp,
+      basePath: "/varer/lonnsomhet",
+      badge: marginAlerts.length,
+      links: [{ to: "/varer/lonnsomhet", label: "Lønnsomhet", badge: marginAlerts.length }],
+    },
+    {
+      kind: "dropdown",
+      label: "Kakebygger",
+      icon: CakeSlice,
+      basePath: "/varer/kakebygger",
+      links: [{ to: "/varer/kakebygger", label: "Kakebygger" }],
+    },
+    {
+      kind: "dropdown",
+      label: "Innstillinger",
+      icon: Settings,
+      basePath: "/varer/innstillinger",
+      links: [{ to: "/varer/innstillinger", label: "Innstillinger" }],
+    },
   ];
 
   return <NavBar appSlug="varer" items={items} />;

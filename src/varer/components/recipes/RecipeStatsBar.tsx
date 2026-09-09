@@ -20,12 +20,15 @@ export function RecipeStatsBar({
   totals,
   cost,
   margin,
+  prefermentedFlourPct,
   className,
 }: {
   totals: BakersTotals;
   /** Kost for oppskriften. Utelates når kost ikke skal vises. */
   cost?: RecipeCostTotals;
   margin?: RecipeMargin;
+  /** Sum av `prefermentedFlourPct` fra `computePartSummary` over fordeig-delene. */
+  prefermentedFlourPct?: number | null;
   className?: string;
 }) {
   const items: { label: string; value: string; hint?: string; tone?: "app" | "warning" }[] = [
@@ -33,6 +36,9 @@ export function RecipeStatsBar({
     { label: "Hydrering", value: fmtPercent(totals.hydrationPct), tone: "app" },
     { label: "Salt", value: fmtPercent(totals.saltPct) },
     { label: "Gjær / surdeig", value: fmtPercent(totals.leavenPct) },
+    ...(prefermentedFlourPct != null
+      ? [{ label: "Fordeig %", value: fmtPercent(prefermentedFlourPct) }]
+      : []),
     {
       label: "Total deigvekt",
       value: totals.incomplete ? `Minst ${fmtG(totals.totalDoughG)} g` : `${fmtG(totals.totalDoughG)} g`,
@@ -83,7 +89,7 @@ export function RecipeStatsBar({
   }
 
   return (
-    <Card className={cn("border-app/30 bg-app/[0.04]", className)}>
+    <Card className={cn("sticky top-0 z-10 border-app/30 bg-app/[0.04]", className)}>
       <CardContent className="grid grid-cols-2 gap-x-6 gap-y-3 py-3 sm:grid-cols-3 lg:grid-cols-6">
         {items.map((it) => (
           <div key={it.label}>

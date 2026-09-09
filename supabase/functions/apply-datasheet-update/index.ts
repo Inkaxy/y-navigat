@@ -24,10 +24,7 @@ import {
   shouldWriteAppliedStatus,
 } from "../_shared/datasheet-apply-rules.ts";
 
-const NUTRITION_FIELDS = [
-  "energy_kj", "energy_kcal", "fat_g", "saturated_fat_g",
-  "carbs_g", "sugars_g", "fiber_g", "protein_g", "salt_g",
-] as const;
+import { NUTRITION_FIELD_KEYS as NUTRITION_FIELDS } from "../_shared/nutritionFields.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

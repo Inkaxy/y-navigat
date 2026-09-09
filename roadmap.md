@@ -36,3 +36,9 @@
 - [ ] 16 PrintLabelDialog mangler fra RPC
 - [ ] 17 Én definisjon av næringsfeltene
 - [ ] 18 Manglende tester
+
+## Tillegg fra 7a-restpunkter
+- [ ] A «Mangler N felt» i KobleMatvaretabellen.tsx regnet i klienten fra raw_material_nutrition
+- [ ] B normalizePackageUnit koblet inn i SetPackageDialog.tsx
+- [ ] C Deno-tester på autorisasjonsgrenen i microsoft-graph-subscription-renew og pakkesystem-push-cron
+- [ ] D Fjern env CRON_SECRET-grenen i microsoft-graph-subscription-renew

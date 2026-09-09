@@ -15,6 +15,7 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Tag,
   Folders,
@@ -61,6 +62,16 @@ import { CostPriceTab } from "@/varer/components/products/CostPriceTab";
 import { CalculationTab } from "@/varer/components/products/CalculationTab";
 import { StockTab } from "@/varer/components/products/StockTab";
 import { useNavigate as useNav } from "react-router-dom";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 const TABS: TabConfig[] = [
   { type: "tab", id: "navn", label: "Navn og nummer", icon: Tag },
@@ -522,7 +533,13 @@ export default function ProductDetail() {
             productionDepartments={lookups?.productionDepartments ?? []}
           />
         )}
-        {tab === "varianter" && <VariantsTab product={product} variants={variantsQuery.data ?? []} />}
+        {tab === "varianter" && (
+          <VariantsTab
+            product={product}
+            variants={variantsQuery.data ?? []}
+            onVariantCreated={() => qc.invalidateQueries({ queryKey: ["product-variants", id] })}
+          />
+        )}
         {tab === "oppskrift" && !product.variant_of_product_id && (
           <RecipeSummaryCard
             productId={product.id}
@@ -574,8 +591,19 @@ export default function ProductDetail() {
   );
 }
 
-function VariantsTab({ product, variants }: { product: any; variants: any[] }) {
+function VariantsTab({
+  product,
+  variants,
+  onVariantCreated,
+}: {
+  product: any;
+  variants: any[];
+  onVariantCreated: () => void;
+}) {
   const navigate = useNav();
+  const { canWrite } = useAppContext();
+  const [dialogOpen, setDialogOpen] = useState(false);
+
   if (product.variant_of_product_id) {
     return (
       <Card>
@@ -590,10 +618,18 @@ function VariantsTab({ product, variants }: { product: any; variants: any[] }) {
   }
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">Varianter ({variants.length})</CardTitle></CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between gap-3">
+        <CardTitle className="text-base">Varianter ({variants.length})</CardTitle>
+        {canWrite && (
+          <Button size="sm" onClick={() => setDialogOpen(true)}>Ny variant</Button>
+        )}
+      </CardHeader>
       <CardContent>
         {variants.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Ingen varianter ennå. Opprett ny vare og velg «Variant av».</p>
+          <p className="text-sm text-muted-foreground">
+            Ingen varianter ennå. Bruk «Ny variant» for å opprette en med arvet kalkyle, eller opprett ny vare og velg
+            «Variant av».
+          </p>
         ) : (
           <ul className="divide-y divide-border">
             {variants.map((v) => (
@@ -610,6 +646,125 @@ function VariantsTab({ product, variants }: { product: any; variants: any[] }) {
           </ul>
         )}
       </CardContent>
+      <NewVariantDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        parent={product}
+        onCreated={(newId) => {
+          onVariantCreated();
+          navigate(`/varer/vareliste/${newId}`);
+        }}
+      />
     </Card>
+  );
+}
+
+/**
+ * «Ny variant» oppretter et produkt med arvet kalkyle: calc_type = «arvet»,
+ * variant_of_product_id og calc_source_product_id satt til mor-varen, og en
+ * faktor på kost/pris — i tråd med arvelogikken i NewProductWizard.
+ */
+function NewVariantDialog({
+  open,
+  onOpenChange,
+  parent,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  parent: any;
+  onCreated: (id: string) => void;
+}) {
+  const [variantLabel, setVariantLabel] = useState("");
+  const [factor, setFactor] = useState("1");
+  const [submitting, setSubmitting] = useState(false);
+
+  const factorNum = Number(factor);
+  const valid = variantLabel.trim().length > 0 && Number.isFinite(factorNum) && factorNum > 0;
+
+  async function submit() {
+    if (!valid) return;
+    setSubmitting(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const insertRow = {
+        legal_entity_id: parent.legal_entity_id,
+        code: `${parent.code}_${variantLabel.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")}`,
+        display_name: `${parent.display_name} (${variantLabel.trim()})`,
+        variant_label: variantLabel.trim(),
+        unit_of_sale: parent.unit_of_sale,
+        main_category_id: parent.main_category_id,
+        product_category: parent.product_category,
+        status: "draft",
+        calc_type: "arvet",
+        variant_of_product_id: parent.id,
+        calc_source_product_id: parent.id,
+        calc_factor: factorNum,
+        mva_rate: parent.mva_rate,
+        created_by: userData.user?.id ?? null,
+      };
+      const { data, error } = await supabase
+        .from("products")
+        .insert(insertRow as never)
+        .select("id, display_name")
+        .single();
+      if (error) throw error;
+      await logAudit({
+        action: "create",
+        entity_type: "product",
+        entity_id: data.id,
+        entity_display_reference: data.display_name,
+        changes: { variant_of_product_id: parent.id, calc_type: "arvet", calc_factor: factorNum },
+      });
+      toast.success("Variant opprettet");
+      onOpenChange(false);
+      setVariantLabel("");
+      setFactor("1");
+      onCreated(data.id);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Kunne ikke opprette varianten");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Ny variant</DialogTitle>
+          <DialogDescription>
+            Oppretter en vare med arvet kalkyle fra «{parent.display_name}», med en faktor på kost og pris.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label>Variant-etikett *</Label>
+            <Input
+              value={variantLabel}
+              onChange={(e) => setVariantLabel(e.target.value)}
+              placeholder="f.eks. Halv, Stor, Sukkerfri"
+              autoFocus
+            />
+          </div>
+          <div>
+            <Label>Faktor *</Label>
+            <Input value={factor} onChange={(e) => setFactor(e.target.value)} placeholder="1" />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Multipliseres med mor-varens kost og pris, f.eks. 0,5 for halv porsjon.
+            </p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
+            Avbryt
+          </Button>
+          <Button onClick={submit} disabled={!valid || submitting}>
+            {submitting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+            Opprett variant
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
