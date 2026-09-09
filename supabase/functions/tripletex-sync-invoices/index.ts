@@ -437,6 +437,47 @@ Deno.serve(async (req) => {
       if (failed === failedBefore && !truncated) lastCompletedChunkTo = chunk.to;
     }
 
+    // --- Oppfrisking av betalingsstatus for tidligere ubetalte fakturaer ---
+    // Egen, feiltolerant runde etter chunk-løkken. Rører aldri cursoren.
+    let betalingOppdatert = 0;
+    if (!isBackfill) try {
+      const refreshCutoff = addDays(today, -120);
+      const { data: unpaid } = await admin
+        .from("invoices")
+        .select("id, tripletex_supplier_invoice_id")
+        .eq("legal_entity_id", legalEntityId)
+        .not("tripletex_supplier_invoice_id", "is", null)
+        .not("tripletex_is_paid", "is", true)
+        .gte("invoice_date", refreshCutoff)
+        .order("invoice_date", { ascending: false })
+        .limit(500);
+
+      const rows = (unpaid ?? []).filter((r) => r.tripletex_supplier_invoice_id);
+      for (let i = 0; i < rows.length; i += 100) {
+        const batch = rows.slice(i, i + 100);
+        const ids = batch.map((r) => r.tripletex_supplier_invoice_id).join(",");
+        const res = await tripletexFetch("/v2/supplierInvoice", {
+          sessionToken,
+          query: { id: ids, fields: "id,outstandingAmount,payments(date)" },
+        });
+        const values: any[] = res?.values ?? [];
+        const byId = new Map(batch.map((r) => [String(r.tripletex_supplier_invoice_id), r.id]));
+        for (const v of values) {
+          const facts = paymentFacts(v);
+          if (facts.is_paid == null) continue;
+          const invoiceId = byId.get(String(v.id));
+          if (!invoiceId) continue;
+          const { error: refreshErr } = await admin
+            .from("invoices")
+            .update({ tripletex_is_paid: facts.is_paid, paid_at: facts.paid_at })
+            .eq("id", invoiceId);
+          if (!refreshErr) betalingOppdatert++;
+        }
+      }
+    } catch (e) {
+      console.error("tripletex-sync-invoices: betalingsoppfrisking feilet", e instanceof Error ? e.message : e);
+    }
+
     // Cursor flyttes bare til og med SISTE fullførte bit. En bit med feil eller
     // ufullstendig henting hentes på nytt neste kjøring.
     const cursorTo = nextCursor(chunkResults, cred.last_invoice_synced_date ?? null, today, {
@@ -489,6 +530,7 @@ Deno.serve(async (req) => {
       har_mer: harMer || ufullstendig,
       ufullstendig_henting: ufullstendig,
       oppdatert: updated,
+      betaling_oppdatert: betalingOppdatert,
       hoppet_over_ikke_fulgt: hoppetOverIkkeFulgt,
       etterhenting: isBackfill ? body.supplier_id : null,
       biter: chunkResults,
@@ -536,6 +578,7 @@ Deno.serve(async (req) => {
       imported,
       skipped,
       updated,
+      betaling_oppdatert: betalingOppdatert,
       failed,
       errors,
       ufullstendig_henting: ufullstendig,
