@@ -42,38 +42,23 @@ import type { ProductionDepartment } from "@/produksjon/features/produksjonsavde
 /**
  * Felter der manglende data er et matsikkerhetsproblem. Mangler noen av disse
  * på en etikett som skal bære deklarasjon, blokkeres utskriften.
+ *
+ * Kilden til «mangler» er alltid `resolve_label_data` (RPC-en) — det finnes
+ * ingen lokal duplikat-sjekk her lenger. RPC-en dekker både 1169/2011-feltene
+ * og Nøkkelhullforskriftens pliktfelt (naering, vekt, holdbarhet/best_for,
+ * oppbevaring, produsent) via `label_declaration_missing`.
  */
 const CRITICAL_LABEL_FIELDS = new Set([
   "allergener",
   "kan_inneholde",
   "ingredienser",
+  "naering",
+  "vekt",
+  "holdbarhet",
+  "best_for",
+  "oppbevaring",
+  "produsent",
 ]);
-
-/**
- * Pliktfelt etter 1169/2011 som etiketten selv må bære når profilen skriver
- * dem ut. `resolve_label_data.mangler` dekker ikke disse, så vi sjekker
- * verdiene direkte på klienten før utskrift.
- */
-const DECLARATION_FIELD_KEYS: Record<string, string> = {
-  ingredienser: "ingrediensliste",
-  allergener: "allergener",
-  kan_inneholde: "«kan inneholde spor av»",
-  naringsinnhold: "næringsdeklarasjon",
-  nettovekt: "nettovekt",
-  holdbarhet: "holdbarhet",
-  best_for: "holdbarhet",
-  oppbevaring: "oppbevaring",
-  produsent: "produsent",
-};
-
-/** Tom verdi = pliktfeltet mangler på etiketten. */
-function isEmptyFieldValue(v: unknown): boolean {
-  if (v == null) return true;
-  if (typeof v === "string") return v.trim() === "";
-  if (Array.isArray(v)) return v.length === 0;
-  if (typeof v === "object") return Object.keys(v as object).length === 0;
-  return false;
-}
 
 interface Props {
   open: boolean;
