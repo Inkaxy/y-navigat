@@ -1130,10 +1130,12 @@ export function declarationGate(core: CoreResult, coveragePct: number): Declarat
   }
   for (const u of core.unit_problems) reasons.push(`${u.name}: ${u.reason}`);
   for (const t of core.free_text_lines) reasons.push(`Fritekstlinjen «${t.name}» må kobles til en råvare`);
-  // Manglende deklarasjonsnavn sperrer ikke i seg selv (innkjøpsnavnet brukes midlertidig),
-  // men skal synes som en tydelig oppfordring med forslaget kjernen allerede har regnet ut.
+  const blocked = reasons.length > 0;
+  // Manglende deklarasjonsnavn sperrer IKKE i seg selv (innkjøpsnavnet brukes midlertidig
+  // for aktive oppskrifter), men skal synes som en tydelig oppfordring med forslaget
+  // kjernen allerede har regnet ut — lagt til ETTER at `blocked` er avgjort.
   for (const d of core.missing_declaration_names) {
     reasons.push(`${d.name} mangler deklarasjonsnavn – forslag: ${d.fallback_used}`);
   }
-  return { blocked: reasons.length > 0, reasons };
+  return { blocked, reasons };
 }
