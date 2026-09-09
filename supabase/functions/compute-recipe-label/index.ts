@@ -16,7 +16,7 @@ import { storeNutrient } from "../_shared/nutritionFormat.ts";
 import { syncAutoProductsForRecipe } from "../_shared/effective-declaration.ts";
 import { buildInputsHash, type HashMaterialFact } from "../_shared/recipe-label-hash.ts";
 import { authorizeCron } from "../_shared/cron-auth.ts";
-import { GLUTEN_FREE_WHOLE_GRAIN_LIMIT, isGlutenFreeFromCodes, wholeGrainLimitFor } from "./keyhole.ts";
+import { isGlutenFreeFromCodes, wholeGrainLimitFor } from "./keyhole.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
