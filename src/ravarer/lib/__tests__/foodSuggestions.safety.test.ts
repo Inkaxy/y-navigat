@@ -124,8 +124,22 @@ describe("fasit mot ekte matvarenavn (8. sep 2026)", () => {
     expect(r.reason).toContain("flere plausible");
   });
 
-  it("GRØNN TE SITRON 100POS TWINING er sperret — ingen mat i basen matcher", () => {
-    const r = check({ name: "GRØNN TE SITRON 100POS TWINING", category: "Diverse" });
+  it("GRØNN TE SITRON 100POS TWINING sperres selv om basen har grønn te", () => {
+    const r = check({ name: "GRØNN TE SITRON 100POS TWINING", category: "Kaffe og te" });
+    expect(r.autoLinkAllowed).toBe(false);
+    // «sitron» og «twining» finnes ikke i matvarenavnet — taket holder treffet nede.
+    expect(r.confidence).toBeLessThanOrEqual(0.78);
+  });
+
+  it("CROISSANT XL M /SMØR kobles ikke til «Smør»", () => {
+    const r = check({ name: "CROISSANT XL M /SMØR S3101", category: "Bakevarer" });
+    expect(r.autoLinkAllowed).toBe(false);
+  });
+
+  it("REGAL STEINMALT RUGMEL foreslås, men det ukjente forordet sperrer koblingen", () => {
+    const r = check({ name: "REGAL STEINMALT RUGMEL 25KG", category: "Mel og korn" });
+    expect(r.top).toBe("Rugmel, siktet");
+    expect(r.confidence).toBeLessThanOrEqual(0.79);
     expect(r.autoLinkAllowed).toBe(false);
   });
 

@@ -43,11 +43,24 @@ interface Props {
   suggestion?: PackageFillSuggestion | null;
   /** Forhåndsvelg leverandørkoblingen, f.eks. fra en mistenkelig pakning som skal bekreftes. */
   initialSupplier?: { supplierId: string; supplierUnits: number } | null;
+  /**
+   * Vis leverandørseksjonen selv om råvaren bare har én leverandør. Brukes når
+   * hele poenget er å rette nettopp den ene koblingen.
+   */
+  forceSupplierSection?: boolean;
   /** Kalles etter en vellykket lagring, i tillegg til den vanlige suksessmeldingen. */
   onApplied?: (res: PackageRpcResult) => void;
 }
 
-export function SetPackageDialog({ row, open, onOpenChange, suggestion, initialSupplier, onApplied }: Props) {
+export function SetPackageDialog({
+  row,
+  open,
+  onOpenChange,
+  suggestion,
+  initialSupplier,
+  forceSupplierSection = false,
+  onApplied,
+}: Props) {
   const [step, setStep] = useState<1 | 2>(1);
   const [units, setUnits] = useState("");
   const [packageUnit, setPackageUnit] = useState("");
@@ -261,7 +274,7 @@ export function SetPackageDialog({ row, open, onOpenChange, suggestion, initialS
               </div>
             </div>
 
-            {(row.antall_leverandorer ?? 0) > 1 && (
+            {(forceSupplierSection || (row.antall_leverandorer ?? 0) > 1) && (
               <Collapsible open={supplierOpen} onOpenChange={setSupplierOpen}>
                 <CollapsibleTrigger asChild>
                   <Button variant="outline" size="sm" className="w-full justify-between">

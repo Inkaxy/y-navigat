@@ -21,7 +21,7 @@ export const REASON_LABELS: Record<string, string> = {
   sku_collision: "Konflikt",
   no_baseline: "Uten avtalepris",
   // Prissynken setter denne når fakturaen er i annen valuta enn NOK.
-  unsupported_currency: "Ikke støttet valuta",
+  unsupported_currency: "Valuta ikke støttet",
 };
 
 export function reasonsOf(line: { review_reason: string | null }): string[] {

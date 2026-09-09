@@ -226,6 +226,7 @@ export function isManualOnlyFood(foodName: string | null | undefined): boolean {
  * ------------------------------------------------------------------ */
 
 const BRAND_WORDS_NORMALIZED = new Set(BRAND_WORDS.map((b) => normalizeForSearch(b)));
+const PACKAGING_WORDS_NORMALIZED = new Set(PACKAGING_WORDS.map((p) => normalizeForSearch(p)));
 
 /** Sant for kvalifikatorer som bare nevner en merkevare («Tine»). */
 function isBrandQualifier(q: string): boolean {
@@ -280,19 +281,88 @@ function isWeakSuffix(query: string, foodHead: string): boolean {
   );
 }
 
-function keywordScore(query: string, food: FoodCandidate, foodHasQualifier: boolean): number {
+function keywordScore(
+  query: string,
+  food: FoodCandidate,
+  foodHasQualifier: boolean,
+  keywordCertaintyAllowed: boolean,
+): number {
   const qWords = searchWords(query);
   let s = 0;
   for (const kw of food.search_keywords ?? []) {
     const k = normalizeForSearch(kw);
     if (!k) continue;
     if (k === query) {
-      // 1b: søkeordet ER hele søket, og navnet har ingen kvalifikator å ta feil av.
-      if (!foodHasQualifier) return KEYWORD_MAX;
-      s = Math.max(s, KEYWORD_QUALIFIER_SCORE);
+      // 1b: søkeordet ER hele søket, og navnet har ingen kvalifikator å ta feil
+      // av — da er treffet like entydig som et navnetreff. Unntaket gjelder bare
+      // når ingen matvare bærer søket som selve navnet: «sukker» er søkeord på
+      // «Melis», men basen har «Sukker, hvitt», og da skal navnet vinne.
+      if (!foodHasQualifier && keywordCertaintyAllowed) return 1;
+      s = Math.max(s, foodHasQualifier ? KEYWORD_QUALIFIER_SCORE : KEYWORD_MAX);
     } else if (k.length >= 4 && qWords.includes(k)) s = Math.max(s, 0.7);
   }
   return Math.min(s, KEYWORD_MAX);
+}
+
+/**
+ * Hvor i søket hovednavnet starter. −1 når hodet ikke står som ordsekvens
+ * (suffikstreff). Brukes til å se om søket har et ukjent FORORD foran hodet.
+ */
+function headStartIndex(query: string, foodHead: string): number {
+  const words = query.split(" ");
+  const headWords = foodHead.split(" ");
+  for (let i = 0; i + headWords.length <= words.length; i++) {
+    if (headWords.every((h, k) => words[i + k] === h)) return i;
+  }
+  for (let i = 0; i + 1 < words.length; i++) {
+    if (`${words[i]}${words[i + 1]}` === foodHead) return i;
+  }
+  return -1;
+}
+
+/** Tak for treff der søket har et ukjent forord foran hovednavnet («steinmalt rugmel»). */
+export const UNKNOWN_PREFIX_MAX = 0.79;
+/** Tak for lange søk der flere ord ikke finnes igjen i matvarenavnet («grønn te sitron twining»). */
+export const UNCOVERED_WORDS_MAX = 0.78;
+
+function isNumericToken(w: string): boolean {
+  return /^\d+$/.test(w);
+}
+
+/**
+ * Sant når søket har et ord foran hovednavnet som verken er emballasje,
+ * merkevare, tall eller en kvalifikator basen faktisk bruker. «Jordbærsirup»
+ * er ikke «Sirup», og «steinmalt rugmel» er ikke «Rugmel, siktet».
+ */
+function hasUnknownPrefixWord(query: string, foodHead: string, knownQualWords: ReadonlySet<string>): boolean {
+  const start = headStartIndex(query, foodHead);
+  if (start <= 0) return false;
+  return query
+    .split(" ")
+    .slice(0, start)
+    .some(
+      (w) =>
+        w.length >= 3 &&
+        !isNumericToken(w) &&
+        !BRAND_WORDS_NORMALIZED.has(w) &&
+        !PACKAGING_WORDS_NORMALIZED.has(w) &&
+        !knownQualWords.has(w),
+    );
+}
+
+/**
+ * Sant når et langt søk (tre ord eller mer) har ord som ikke finnes igjen i
+ * matvarenavnet i det hele tatt. «GRØNN TE SITRON TWINING» treffer «te» og
+ * «grønn», men «sitron» og «twining» sier at det er en annen vare.
+ */
+function hasUncoveredQueryWords(query: string, food: FoodCandidate): boolean {
+  const qWords = searchWords(query).filter((w) => w.length >= 3 && !isNumericToken(w));
+  if (qWords.length < 3) return false;
+  const foodWords = new Set(searchWords(food.food_name));
+  for (const kw of food.search_keywords ?? []) for (const w of searchWords(kw)) foodWords.add(w);
+  return qWords.some(
+    (w) => !foodWords.has(w) && !BRAND_WORDS_NORMALIZED.has(w) && !PACKAGING_WORDS_NORMALIZED.has(w),
+  );
 }
 
 interface ScoreResult {
@@ -310,7 +380,13 @@ function minPercentDiff(a: readonly number[], b: readonly number[]): number {
   return Number.isFinite(min) ? min : 0;
 }
 
-function scoreFood(query: Query, food: FoodCandidate, variantSpecified: boolean): ScoreResult {
+function scoreFood(
+  query: Query,
+  food: FoodCandidate,
+  variantSpecified: boolean,
+  knownQualWords: ReadonlySet<string>,
+  keywordCertaintyAllowed = true,
+): ScoreResult {
   const full = normalizeForSearch(food.food_name);
   const h = head(food.food_name);
   const quals = qualifiers(food.food_name);
@@ -318,11 +394,23 @@ function scoreFood(query: Query, food: FoodCandidate, variantSpecified: boolean)
 
   if (query.text === full) return { score: 1, percentMismatch: false };
 
+  // 1b gjelder også når hodet så vidt treffer som suffiks: «MEIERISMØR» er
+  // basens eget søkeord for «Smør», og da er treffet entydig.
+  const kwCertain = keywordScore(query.text, food, quals.length > 0, keywordCertaintyAllowed);
+  if (kwCertain === 1) return { score: 1, percentMismatch: false };
+
   if (kind) {
+    // Taket for navnetreff der søket sier mer enn matvarenavnet gjør.
+    // «Jordbærsirup» er ikke «Sirup», og «grønn te sitron twining» er ikke te.
+    let cap = 1;
+    if (kind !== "suffix" && hasUnknownPrefixWord(query.text, h, knownQualWords)) cap = UNKNOWN_PREFIX_MAX;
+    if (hasUncoveredQueryWords(query.text, food)) cap = Math.min(cap, UNCOVERED_WORDS_MAX);
+    const capped = (score: number): ScoreResult => ({ score: Math.min(score, cap), percentMismatch: false });
+
     if (quals.length === 0) {
-      if (kind === "exact") return { score: 1, percentMismatch: false };
-      if (kind === "phrase") return { score: 0.92, percentMismatch: false };
-      return { score: isWeakSuffix(query.text, h) ? 0.79 : 0.9, percentMismatch: false };
+      if (kind === "exact") return capped(1);
+      if (kind === "phrase") return capped(0.92);
+      return capped(isWeakSuffix(query.text, h) ? 0.79 : 0.9);
     }
     const base = kind === "suffix" ? 1 - QUALIFIER_PENALTY - 0.1 : 1 - QUALIFIER_PENALTY;
     const foodPercents = percentValues(food.food_name);
@@ -336,18 +424,23 @@ function scoreFood(query: Query, food: FoodCandidate, variantSpecified: boolean)
         // faktisk ligger — begrunnelsen skal kunne peke på det nærmeste.
         const diff = minPercentDiff(query.percents, foodPercents);
         const score = Math.max(0.5, PERCENT_MISMATCH_SCORE - diff * PERCENT_DIFF_PENALTY);
-        return { score, percentMismatch: true };
+        return { score: Math.min(score, cap), percentMismatch: true };
       }
-      let score = 1;
+      // Merkebonusen legges på FØR fradragene og kappes med det samme, slik at
+      // den ikke blir spist opp av Math.min til slutt.
+      const last = quals[quals.length - 1];
+      // Fasit-merket i innkjøpsnavnet stemmer med merket i matvarenavnet.
+      let score = Math.min(1, query.brand && last === query.brand ? 1 + 0.02 : 1);
       for (const q of quals) {
         if (PERCENT_EXTRA_QUALIFIERS.has(q) && !q.split(" ").every((w) => qWords.has(w))) score -= 0.05;
       }
-      // Fasit-merket i innkjøpsnavnet stemmer med merket i matvarenavnet.
-      if (query.brand && quals[quals.length - 1] === query.brand) score += 0.02;
-      // «Uspesifisert» er en gjettevariant når innkjøpsnavnet faktisk nevner et
-      // merke — den skal ikke stå likt med varianten som stemmer på merket.
-      else if (query.brand && quals[quals.length - 1] === UNIVERSAL_DEFAULT_QUALIFIER) score -= 0.03;
-      return { score: Math.min(1, score), percentMismatch: false };
+      if (query.brand && last !== query.brand) {
+        // «Uspesifisert» er en gjettevariant når innkjøpsnavnet nevner et merke,
+        // og EN ANNEN merkevare er direkte feil vare.
+        if (last === UNIVERSAL_DEFAULT_QUALIFIER) score -= 0.05;
+        else if (isBrandQualifier(last)) score -= 0.08;
+      }
+      return { score: Math.min(cap, Math.min(1, score)), percentMismatch: false };
     }
 
     // Nevner søket kvalifikatoren eksplisitt («brunt sukker»), er treffet entydig —
@@ -355,23 +448,21 @@ function scoreFood(query: Query, food: FoodCandidate, variantSpecified: boolean)
     const scorableQuals = quals.filter((q) => q !== UNIVERSAL_DEFAULT_QUALIFIER && !isBrandQualifier(q));
     if (scorableQuals.length > 0) {
       const uncovered = scorableQuals.filter((q) => !q.split(" ").every((w) => qWords.has(w)));
-      if (uncovered.length === 0) return { score: 1, percentMismatch: false };
+      if (uncovered.length === 0) return capped(1);
       // Søket nevner en ANNEN variant enn denne — jo mindre av kvalifikatoren
       // som stemmer, jo lenger ned skal kandidaten falle.
       if (variantSpecified) {
-        const score = Math.max(0, base - 0.1 * (uncovered.length / scorableQuals.length));
-        return { score, percentMismatch: false };
+        return capped(Math.max(0, base - 0.1 * (uncovered.length / scorableQuals.length)));
       }
     }
 
     if (!variantSpecified && isDefaultQualifier(h, quals)) {
-      return { score: base + DEFAULT_QUALIFIER_BONUS, percentMismatch: false };
+      return capped(base + DEFAULT_QUALIFIER_BONUS);
     }
-    return { score: base, percentMismatch: false };
+    return capped(base);
   }
 
-  const kw = keywordScore(query.text, food, full !== h);
-  if (kw > 0) return { score: kw, percentMismatch: false };
+  if (kwCertain > 0) return { score: kwCertain, percentMismatch: false };
 
   // Søket er lik nøyaktig én kvalifikator i navnet («potetstivelse» i
   // «Potetmel, potetstivelse»), selv om hodet ikke treffer.
@@ -401,16 +492,33 @@ function variantSpecifiedFor(query: Query, foods: readonly FoodCandidate[]): boo
   return false;
 }
 
+/** Alle ord basen faktisk bruker som kvalifikator — «brunt», «siktet», «sammalt» … */
+function collectQualifierWords(foods: readonly FoodCandidate[]): Set<string> {
+  const out = new Set<string>();
+  for (const food of foods) {
+    for (const q of qualifiers(food.food_name)) for (const w of q.split(" ")) if (w) out.add(w);
+  }
+  return out;
+}
+
 function rankForQuery(
   rm: RawMaterialForSuggestion,
   query: Query,
   foods: readonly FoodCandidate[],
   minConfidence: number,
+  knownQualWords: ReadonlySet<string>,
 ): { food: FoodCandidate; confidence: number; len: number }[] {
   const variantSpecified = variantSpecifiedFor(query, foods);
+  // Bærer en matvare søket som selve NAVNET, er søkeord bare en snarvei og skal
+  // aldri gi full sikkerhet: «sukker» er søkeord på «Melis», men basen har
+  // «Sukker, hvitt».
+  const keywordCertaintyAllowed = !foods.some((f) => {
+    const k = headMatch(query.text, head(f.food_name));
+    return k === "exact" || k === "phrase";
+  });
   const scored: { food: FoodCandidate; confidence: number; len: number }[] = [];
   for (const food of foods) {
-    const { score } = scoreFood(query, food, variantSpecified);
+    const { score } = scoreFood(query, food, variantSpecified, knownQualWords, keywordCertaintyAllowed);
     if (score <= 0) continue;
     // Gruppen brukes bare som straff. Som bonus løftet den alle søsken likt og
     // gjorde poengsummene ubrukelige til å skille dem.
@@ -443,8 +551,9 @@ export function suggestFoods(
   // overstyre at innkjøpsnavnet sier «Helmelk 3,5 %».
   let best: { food: FoodCandidate; confidence: number; len: number }[] = [];
   let bestTop = -1;
+  const knownQualWords = collectQualifierWords(foods);
   for (const q of queries) {
-    const ranked = rankForQuery(rm, q, foods, minConfidence);
+    const ranked = rankForQuery(rm, q, foods, minConfidence, knownQualWords);
     const top = ranked[0]?.confidence ?? 0;
     if (top > bestTop + 1e-9) {
       best = ranked;
@@ -470,7 +579,7 @@ export function suggestFoods(
  * ------------------------------------------------------------------ */
 
 /** Minste avstand mellom forslag 1 og 2 før vi tør å koble automatisk. */
-export const AMBIGUITY_MARGIN = 0.03;
+export const AMBIGUITY_MARGIN = 0.08;
 /** Laveste tekstlikhet som kan kobles automatisk. */
 export const AUTO_LINK_MIN_CONFIDENCE = 0.8;
 
@@ -575,6 +684,28 @@ export interface SuggestionSafety {
   reason: string | null;
 }
 
+/**
+ * Råvarenavnet nevner selv en kvalifikator som toppforslaget har og nummer to
+ * mangler («TINE Helmelk», «HVETEMEL SAMMALT»). Da er de to ikke «nesten like»
+ * — de skiller seg på nettopp det brukeren har skrevet, og margin-sperren skal
+ * ikke stoppe koblingen.
+ */
+function qualifierDecides(
+  rm: RawMaterialForSuggestion,
+  top: FoodSuggestion,
+  second: FoodSuggestion,
+): boolean {
+  const words = new Set(searchWords([rm.declaration_name ?? "", rm.name].join(" ")));
+  const secondQuals = new Set(qualifiers(second.food_name));
+  return qualifiers(top.food_name).some(
+    (q) =>
+      q !== UNIVERSAL_DEFAULT_QUALIFIER &&
+      q.split(" ").every((w) => words.has(w)) &&
+      !secondQuals.has(q),
+  );
+}
+
+
 /** Kan toppforslaget kobles automatisk, eller må noen velge selv? */
 export function assessSuggestions(
   rm: RawMaterialForSuggestion,
@@ -606,7 +737,7 @@ export function assessSuggestions(
   }
 
   const second = suggestions[1];
-  if (second && top.confidence - second.confidence < AMBIGUITY_MARGIN) {
+  if (second && top.confidence - second.confidence < AMBIGUITY_MARGIN && !qualifierDecides(rm, top, second)) {
     return {
       autoLinkAllowed: false,
       reason: `Flere nesten like treff (${top.food_name} / ${second.food_name}) — velg selv`,

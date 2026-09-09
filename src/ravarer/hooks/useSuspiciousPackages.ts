@@ -18,6 +18,8 @@ export interface SuspiciousPackageRow {
   raw_material_id: string;
   raw_material_name: string;
   base_unit: string | null;
+  /** Dagens kostpris per grunnenhet, så kortet slipper å vise «—». */
+  current_cost_price: number | null;
   supplier_id: string | null;
   supplier_name: string | null;
   supplier_product_name: string | null;
@@ -49,7 +51,7 @@ export function useSuspiciousPackages() {
       const { data, error } = await supabase
         .from("raw_material_suppliers")
         .select(
-          "id, raw_material_id, supplier_id, supplier_product_name, package_size, package_unit, base_units_per_package, package_confirmed_at, raw_materials!inner(id, name, base_unit, legal_entity_id), suppliers(name)",
+          "id, raw_material_id, supplier_id, supplier_product_name, package_size, package_unit, base_units_per_package, package_confirmed_at, raw_materials!inner(id, name, base_unit, current_cost_price, legal_entity_id), suppliers(name)",
         )
         .is("package_confirmed_at", null)
         .eq("raw_materials.legal_entity_id", legalEntityId!);
@@ -64,7 +66,7 @@ export function useSuspiciousPackages() {
         package_unit: string | null;
         base_units_per_package: number | null;
         package_confirmed_at: string | null;
-        raw_materials: { id: string; name: string; base_unit: string } | null;
+        raw_materials: { id: string; name: string; base_unit: string; current_cost_price: number | null } | null;
         suppliers: { name: string } | null;
       }
 
@@ -113,6 +115,7 @@ export function useSuspiciousPackages() {
           raw_material_id: r.raw_material_id,
           raw_material_name: rm?.name ?? "—",
           base_unit: base,
+          current_cost_price: rm?.current_cost_price == null ? null : Number(rm.current_cost_price),
           supplier_id: r.supplier_id,
           supplier_name: r.suppliers?.name ?? null,
           supplier_product_name: r.supplier_product_name ?? null,
