@@ -629,24 +629,6 @@ export default function RecipeDetail() {
     toast.success(`Pris oppdatert: ${price.toFixed(2).replace(".", ",")} kr/kg`);
   }
 
-  /** Stille prisoppdatering av den koblede grunnoppskrift-råvaren etter lagring. */
-  async function syncCompositePriceQuietly() {
-    if (!composite) return;
-    const price = costPerKg(hydratedLines);
-    if (price == null) return;
-    const { error } = await supabase
-      .from("raw_materials")
-      .update({
-        current_cost_price: price,
-        price_source: "recipe",
-        price_updated_at: new Date().toISOString(),
-      } as never)
-      .eq("id", composite.id);
-    if (error) return;
-    qc.invalidateQueries({ queryKey: ["recipe-composite", recipe?.id] });
-    qc.invalidateQueries({ queryKey: ["raw_materials_autocomplete"] });
-  }
-
   /** Lag kopi: ny oppskrift uten produktkoblinger, åpnet i navneredigering. */
   async function handleCopy() {
     if (!recipe) return;
