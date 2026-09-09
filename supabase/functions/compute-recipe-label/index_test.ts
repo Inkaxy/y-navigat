@@ -123,3 +123,54 @@ Deno.test("C: veilederen eksempel 5 → 30,8 %", () => {
   ];
   assertEquals(wholeGrainPctOfDry(wholeGrainDryGrams(entries), dryMatterGrams(entries)), 30.8);
 });
+
+/* Punkt 18 — gruppevalg og status i evaluateKeyhole. */
+
+import { evaluateKeyhole, type KeyholeCore } from "./keyhole.ts";
+
+function core(over: Partial<KeyholeCore> = {}): KeyholeCore {
+  return {
+    containsCodes: ["gluten_wheat"],
+    whole_grain_pct_of_dry: 60,
+    rye_share_of_grain_pct: 0,
+    free_text_grain_lines: [],
+    missing_bake_loss: false,
+    ...over,
+  };
+}
+
+const OK_PER100 = { fiber_g: 7, fat_g: 3, sugars_g: 2, salt_g: 0.9 };
+
+Deno.test("evaluateKeyhole: rugandel ≥ 30 % gir rugbrødgruppen 8b først", () => {
+  const res = evaluateKeyhole(
+    core({ rye_share_of_grain_pct: 45 }),
+    { category: "Brød", name: "Rugbrød" },
+    OK_PER100,
+    100,
+  );
+  assertEquals(res.candidates, ["8b", "8a"]);
+  assertEquals(res.baseGroup, "8a");
+});
+
+Deno.test("evaluateKeyhole: glutenfritt brød måles mot 10 % fullkorn", () => {
+  const res = evaluateKeyhole(
+    core({ containsCodes: [], whole_grain_pct_of_dry: 12 }),
+    { category: "Brød", name: "Glutenfritt brød" },
+    OK_PER100,
+    100,
+  );
+  const wg = res.best?.criteria.find((c) => c.key === "whole_grain_pct_of_dry");
+  assertEquals(wg?.limit, 10);
+  assertEquals(res.status, "oppfylt");
+});
+
+Deno.test("evaluateKeyhole: ikke-brød vurderes ikke", () => {
+  const res = evaluateKeyhole(core(), { category: "Kaker", name: "Sjokoladekake" }, OK_PER100, 100);
+  assertEquals(res.baseGroup, null);
+  assertEquals(res.status, "ukjent");
+});
+
+Deno.test("evaluateKeyhole: for lav næringsdekning gir ukjent", () => {
+  const res = evaluateKeyhole(core(), { category: "Brød", name: "Grovbrød" }, OK_PER100, 70);
+  assertEquals(res.status, "ukjent");
+});
