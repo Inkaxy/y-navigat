@@ -14,6 +14,7 @@ import {
 import { Loader2, Save, Award, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { BrodskalanMark } from "@/varer/components/label/BrodskalanMark";
+import { logAudit } from "@/varer/lib/audit";
 import { grainCategoryFromBreadscaleValue } from "@/varer/lib/brodskalan";
 import { grainLevelLabel, fmtPct } from "@/varer/lib/breadscale";
 
@@ -236,6 +237,14 @@ export function CertificationsEditor({ productId, canWrite }: Props) {
               onClick={() => {
                 setNokkelhull(true);
                 setConfirmOpen(false);
+                // Grunnlaget lagres som audit-notat inntil en egen kolonne finnes.
+                void logAudit({
+                  action: "update",
+                  entity_type: "product",
+                  entity_id: productId,
+                  reason: "Manuelt satt Nøkkelhullet — grunnlag",
+                  changes: { keyhole_manual_basis: basis.trim() },
+                });
                 toast.info("Husk å lagre. Grunnlaget må også dokumenteres i kvalitetspermen.");
               }}
             >

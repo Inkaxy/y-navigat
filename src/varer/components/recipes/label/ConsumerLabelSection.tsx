@@ -8,6 +8,7 @@ import { AlertTriangle, CheckCircle2, Loader2, Printer, XCircle } from "lucide-r
 import { toast } from "sonner";
 import { fmtPct, grainCategoryFromPct, grainLevelLabel } from "@/varer/lib/breadscale";
 import { BRODSKALAN_MARKS } from "@/varer/lib/brodskalan";
+import nokkelhulletSrc from "@/assets/nokkelhullet.svg";
 import { LABEL_SIZES, type LabelSizeKey } from "../ConsumerLabelPDFDocument";
 import { NUT_ROWS, nutritionValueText } from "./labelShared";
 import { MarkedText } from "@/varer/components/label/MarkedText";
@@ -129,7 +130,10 @@ export function ConsumerLabelSection({
     const win = window.open("", "_blank");
     try {
       const grainMarkSrc = claimGrain && grainCategory ? BRODSKALAN_MARKS[grainCategory].src : null;
-      const grainMarkImage = grainMarkSrc ? await toDataUrl(grainMarkSrc) : null;
+      const [grainMarkImage, keyholeMarkImage] = await Promise.all([
+        grainMarkSrc ? toDataUrl(grainMarkSrc) : Promise.resolve(null),
+        claimKeyhole ? toDataUrl(nokkelhulletSrc) : Promise.resolve(null),
+      ]);
       const [{ pdf }, mod] = await Promise.all([
         import("@react-pdf/renderer"),
         import("../ConsumerLabelPDFDocument"),
@@ -153,7 +157,7 @@ export function ConsumerLabelSection({
             // Grovhetsprosenten skal trykkes under merket (BKLF pkt. 4.4).
             mayContain: effective.mayContain,
             grainPctText: effectiveGrainPct != null ? fmtPct(effectiveGrainPct) : null,
-            keyholeMark: claimKeyhole,
+            keyholeMarkImage,
           }}
         />,
       ).toBlob();
@@ -272,7 +276,12 @@ export function ConsumerLabelSection({
                   Brødskala'n: {grainLevelLabel(grainCategory)} ({fmtPct(effectiveGrainPct)})
                 </Badge>
               )}
-              {claimKeyhole && <Badge variant="outline">Nøkkelhullet</Badge>}
+              {claimKeyhole && (
+                <Badge variant="outline" className="gap-1.5">
+                  <img src={nokkelhulletSrc} alt="Nøkkelhullet" className="h-4 w-4" />
+                  Nøkkelhullet
+                </Badge>
+              )}
             </div>
           </div>
         </div>

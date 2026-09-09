@@ -225,7 +225,7 @@ export function LabelTab({
         approvedByName={approverQuery.data ?? null}
         staleSourceName={label?.stale_reason ?? null}
         staleSourceAt={null}
-        allergenReviewed={(missing?.composite_unreviewed?.length ?? 0) === 0}
+        allergenReviewed={(missing?.allergens_unreviewed?.length ?? 0) === 0}
         declarationNamed={(missing?.declaration_names?.length ?? 0) === 0}
         approving={approve.isPending}
         onApprove={() => setApproveOpen(true)}

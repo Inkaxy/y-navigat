@@ -29,6 +29,38 @@ export type PriceListLite = {
   prices_include_mva: boolean;
 };
 
+/** Lønnsomhetsstatus fra `profitability_sheet`, brukt til cellefarge på de valgfrie kolonnene. */
+export type ProfitabilityStatus =
+  | "gronn"
+  | "gul"
+  | "rod"
+  | "ingen_pris"
+  | "forelopig"
+  | "ikke_vurdert"
+  | "halvfabrikat"
+  | "mangler_kalkyle"
+  | null;
+
+export type ProfitabilityRow = {
+  kostpris: number | null;
+  dg2_pct: number | null;
+  maal_dg2_pct: number | null;
+  nodvendig_pris: number | null;
+  status: ProfitabilityStatus;
+};
+
+/** Semantiske tokens — ingen hardkodede farger. */
+const PROFITABILITY_STATUS_CLS: Record<string, string> = {
+  gronn: "bg-success/15 text-success-foreground",
+  gul: "bg-warning/15 text-warning-foreground",
+  rod: "bg-destructive/15 text-destructive",
+  mangler_kalkyle: "bg-destructive/10 text-destructive",
+  ingen_pris: "bg-muted text-muted-foreground",
+  forelopig: "bg-muted text-muted-foreground",
+  ikke_vurdert: "bg-muted text-muted-foreground",
+  halvfabrikat: "bg-muted text-muted-foreground",
+};
+
 interface Props {
   products: ProductRow[];
   priceLists: PriceListLite[];
@@ -45,6 +77,10 @@ interface Props {
   onToggleSelectAll: (checked: boolean) => void;
   highlightPriceListId?: string | null;
   showInclMva?: boolean;
+  /** Valgfrie lønnsomhetskolonner (Kost / DG2 % / Mål / Nødvendig pris) for én valgt prisliste. */
+  profitability?: Map<string, ProfitabilityRow>;
+  showProfitability?: boolean;
+  profitabilityPriceListName?: string | null;
 }
 
 export function MatrixView({
@@ -60,6 +96,9 @@ export function MatrixView({
   onToggleSelectAll,
   highlightPriceListId,
   showInclMva = false,
+  profitability,
+  showProfitability = false,
+  profitabilityPriceListName,
 }: Props) {
   const { canWrite, legalEntityId } = useAppContext();
   const [editing, setEditing] = useState<{ key: string; value: string } | null>(null);
@@ -216,13 +255,29 @@ export function MatrixView({
                     </div>
                   </th>
                 ))}
+                {showProfitability && (
+                  <>
+                    <th className="bg-muted/50 px-2 py-2 text-right text-xs uppercase tracking-wide text-muted-foreground min-w-[90px]">
+                      Kost
+                    </th>
+                    <th className="bg-muted/50 px-2 py-2 text-right text-xs uppercase tracking-wide text-muted-foreground min-w-[70px]">
+                      DG2 %
+                    </th>
+                    <th className="bg-muted/50 px-2 py-2 text-right text-xs uppercase tracking-wide text-muted-foreground min-w-[70px]">
+                      Mål
+                    </th>
+                    <th className="bg-muted/50 px-2 py-2 text-right text-xs uppercase tracking-wide text-muted-foreground min-w-[100px]">
+                      Nødv. pris{profitabilityPriceListName ? ` (${profitabilityPriceListName})` : ""}
+                    </th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
               {products.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6 + priceLists.length}
+                    colSpan={6 + priceLists.length + (showProfitability ? 4 : 0)}
                     className="py-12 text-center text-sm text-muted-foreground"
                   >
                     Ingen varer matcher filtrene.
@@ -393,6 +448,26 @@ export function MatrixView({
                           </td>
                         );
                       })}
+                      {showProfitability && (() => {
+                        const prof = profitability?.get(p.id);
+                        const statusCls = prof?.status ? PROFITABILITY_STATUS_CLS[prof.status] ?? "" : "";
+                        return (
+                          <>
+                            <td className={cn("px-2 py-1 text-right tabular-nums", statusCls)}>
+                              {prof?.kostpris != null ? formatKr(prof.kostpris) : "—"}
+                            </td>
+                            <td className={cn("px-2 py-1 text-right tabular-nums", statusCls)}>
+                              {prof?.dg2_pct != null ? `${prof.dg2_pct.toFixed(1)} %` : "—"}
+                            </td>
+                            <td className={cn("px-2 py-1 text-right tabular-nums", statusCls)}>
+                              {prof?.maal_dg2_pct != null ? `${prof.maal_dg2_pct.toFixed(0)} %` : "—"}
+                            </td>
+                            <td className={cn("px-2 py-1 text-right font-medium tabular-nums", statusCls)}>
+                              {prof?.nodvendig_pris != null ? formatKr(prof.nodvendig_pris) : "—"}
+                            </td>
+                          </>
+                        );
+                      })()}
                     </tr>
                   );
                 })
