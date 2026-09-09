@@ -20,7 +20,7 @@ import { PdfDeclarationImportDialog } from "@/varer/components/products/PdfDecla
 import { ManualDeclarationEditor } from "@/varer/components/products/ManualDeclarationEditor";
 import { CertificationsEditor } from "@/varer/components/products/CertificationsEditor";
 import { showError } from "@/lib/userError";
-import { syncEffectiveDeclaration } from "@/varer/lib/effectiveDeclaration";
+import { formatNutrient } from "@/varer/lib/nutritionFormat";
 import { BreadscaleSection } from "@/varer/components/products/BreadscaleSection";
 
 type Mode = "auto" | "manual" | "auto_with_overrides";
@@ -189,12 +189,6 @@ function DeclarationView({ link, productName, canWrite, qc }: { link: any; produ
     if (newMode !== "inherit") setMode(newMode);
     await logAudit({ action: "update", entity_type: "product_recipe_link", entity_id: link.id, entity_display_reference: productName, changes: { declaration_mode: newMode } });
     qc.invalidateQueries({ queryKey: ["product-recipe-link-decl", link.product_id] });
-    // products.manual_* er EFFEKTIV deklarasjon (snapshot) — synk etter modusbytte.
-    try {
-      await syncEffectiveDeclaration(link.id);
-    } catch (e) {
-      showError("DeclarationTab", e);
-    }
     qc.invalidateQueries({ queryKey: ["compute-product-declaration", link.id] });
     qc.invalidateQueries({ queryKey: ["product-effective-decl", link.product_id] });
     toast.success("Modus oppdatert");
@@ -216,12 +210,6 @@ function DeclarationView({ link, productName, canWrite, qc }: { link: any; produ
       declaration_updated_at: new Date().toISOString(),
     }).eq("id", link.id);
     if (error) { showError("DeclarationTab", error); return; }
-    // products.manual_* er EFFEKTIV deklarasjon (snapshot) — synk etter lagring.
-    try {
-      await syncEffectiveDeclaration(link.id);
-    } catch (e) {
-      showError("DeclarationTab", e);
-    }
     qc.invalidateQueries({ queryKey: ["product-effective-decl", link.product_id] });
     toast.success("Manuell deklarasjon lagret");
     qc.invalidateQueries({ queryKey: ["product-recipe-link-decl", link.product_id] });
@@ -369,7 +357,7 @@ function DeclarationView({ link, productName, canWrite, qc }: { link: any; produ
                                 onChange={(e) => setManualNutrition((s) => ({ ...s, [f.key]: e.target.value }))}
                                 className="ml-auto h-8 w-28 text-right"
                               />
-                            ) : v != null ? v : <span className="text-muted-foreground">—</span>}
+                            ) : <span className={v == null ? "text-muted-foreground" : undefined}>{formatNutrient(f.key, v)}</span>}
                           </td>
                         </tr>
                       );
@@ -561,7 +549,7 @@ function PreviewDialog({ open, onClose, productName, computed }: { open: boolean
     lines.push("Næring pr 100 g:");
     for (const f of NUTRITION_FIELDS) {
       const v = (computed.nutrition_per_100g as any)?.[f.key];
-      if (v != null) lines.push(`  ${f.label}: ${v}`);
+      if (v != null) lines.push(`  ${f.label}: ${formatNutrient(f.key, v)}`);
     }
     return lines.join("\n");
   }
