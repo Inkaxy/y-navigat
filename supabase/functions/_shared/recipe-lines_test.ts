@@ -109,16 +109,16 @@ Deno.test("svinn på halvfabrikatlinjen regnes inn før skaleringen", async () =
   assertEquals(out.map((l) => l.quantity), [300, 300]);
 });
 
-Deno.test("halvfabrikat uten ferdigvekt gir advarsel og beholder linjen", async () => {
+Deno.test("halvfabrikat uten vekt gir advarsel og beholder linjen", async () => {
   const t = tables();
+  (t.recipe_lines[1] as Record<string, unknown>).quantity = 0;
+  (t.recipe_lines[2] as Record<string, unknown>).quantity = 0;
   t.recipes = [{ id: SUB_RECIPE, name: "Surdeig" }];
   const warnings: string[] = [];
   const out = await expandRecipeLines(stub(t), TOP_RECIPE, 0, new Set([TOP_RECIPE]), warnings);
   assertEquals(out.length, 1);
   assertEquals(out[0].name, "Surdeig");
-  assertEquals(warnings.length, 0);
-  // Uten yield_grams faller ferdigvekten tilbake til innveid vekt (200 g) ⇒ faktor 1,5.
-  assertEquals(out[0].quantity, 300);
+  assertEquals(warnings.some((w) => w.includes("mangler vekt")), true);
 });
 
 Deno.test("ring i halvfabrikatene hoppes over med advarsel", async () => {
