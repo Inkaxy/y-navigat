@@ -21,9 +21,20 @@ describe("nutritionFormat — Mattilsynets avrundingsregler", () => {
     expect(formatNutrient("protein_g", 0.3)).toBe("< 0,5 g");
   });
 
-  it("mettet fett og sukkerarter under 0,1 g", () => {
+  it("mettet fett under 0,1 g", () => {
     expect(formatNutrient("saturated_fat_g", 0.04)).toBe("< 0,1 g");
-    expect(formatNutrient("sugars_g", 0.05)).toBe("< 0,1 g");
+  });
+
+  // Databasens label_format_nutrient legger sukkerarter i 0,5-klassen, ikke 0,1.
+  it("sukkerarter følger 0,5-klassen som i databasen", () => {
+    expect(formatNutrient("sugars_g", 0.05)).toBe("< 0,5 g");
+    expect(formatNutrient("sugars_g", 0.4)).toBe("< 0,5 g");
+    expect(formatNutrient("sugars_g", 2.34)).toBe("2,3 g");
+  });
+
+  it("avrunding er desimal-sikker", () => {
+    expect(formatNutrient("fat_g", 0.85)).toBe("0,9 g");
+    expect(formatNutrient("carbs_g", 9.96)).toBe("10 g");
   });
 
   it("salt: én desimal fra 1 g, to under, 0 g under 0,0125", () => {
