@@ -52,7 +52,7 @@ type ProductRow = {
 };
 
 /** Merkestatus for produktlista — basert på databasens `recipe_label_calculated.is_stale`. */
-function productLabelingStatus(
+export function productLabelingStatus(
   p: ProductRow,
   labelRow: { computed_at: string | null; is_stale: boolean } | undefined,
 ): LabelingStatus {

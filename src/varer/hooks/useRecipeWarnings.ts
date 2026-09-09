@@ -22,7 +22,8 @@ export type RecipeWarningKind =
   | "zero_quantity"
   | "free_text_line"
   | "unknown_conversion"
-  | "low_margin";
+  | "low_margin"
+  | "missing_cost";
 
 export interface RecipeWarning {
   kind: RecipeWarningKind;
@@ -44,6 +45,7 @@ export const WARNING_TITLE: Record<RecipeWarningKind, string> = {
   free_text_line: "Fritekstlinje",
   unknown_conversion: "Ukjent omregning",
   low_margin: "Lav dekningsgrad",
+  missing_cost: "Mangler kostpris",
 };
 
 /** Linjen slik editoren kjenner den. */

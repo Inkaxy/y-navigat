@@ -10,7 +10,27 @@ import { Link } from "react-router-dom";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { QueryState } from "@/components/common/QueryState";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { useNutritionCoverage, type CoverageItem } from "@/ravarer/hooks/useNutritionCoverage";
+
+/**
+ * Feltene som utgjør «fullstendig» næringsdata på en råvare. Dekningsviewet
+ * har ikke feltlisten, så antallet manglende felt regnes ut i klienten.
+ * `nutritionFields.ts` finnes ikke i varer/lib ennå — dette er den lokale
+ * lista til bruk her, i tråd med feltene i `raw_material_nutrition`.
+ */
+const NUTRITION_FIELDS = [
+  "energy_kj",
+  "energy_kcal",
+  "fat_g",
+  "saturated_fat_g",
+  "carbs_g",
+  "sugars_g",
+  "fiber_g",
+  "protein_g",
+  "salt_g",
+] as const;
 import { useApplyMatvaretabellen, useMatvaretabellenFoods } from "@/ravarer/hooks/useMatvaretabellen";
 import {
   assessSuggestions,
@@ -46,6 +66,26 @@ export default function KobleMatvaretabellen() {
   const foodList = useMemo(() => foods.data ?? [], [foods.data]);
   const candidates = coverage.data?.candidates;
   const review = coverage.data?.review ?? [];
+
+  const reviewIds = useMemo(() => review.map((r) => r.raw_material_id), [review]);
+  const missingFieldsQuery = useQuery({
+    queryKey: ["nutrition-missing-fields", reviewIds],
+    enabled: reviewIds.length > 0,
+    queryFn: async (): Promise<Map<string, number>> => {
+      const { data, error } = await supabase
+        .from("raw_material_nutrition")
+        .select(`raw_material_id, ${NUTRITION_FIELDS.join(", ")}`)
+        .in("raw_material_id", reviewIds);
+      if (error) throw error;
+      const map = new Map<string, number>();
+      for (const row of data ?? []) {
+        const r = row as Record<string, unknown>;
+        const missing = NUTRITION_FIELDS.filter((f) => r[f] === null || r[f] === undefined).length;
+        map.set(r.raw_material_id as string, missing);
+      }
+      return map;
+    },
+  });
 
   const rows: RowData[] = useMemo(() => {
     if (foodList.length === 0) return [];
@@ -245,7 +285,11 @@ export default function KobleMatvaretabellen() {
                   {r.name}
                 </Link>{" "}
                 <span className="text-ink-secondary">
-                  ufullstendig næringsdata · kilde {r.source ?? "ukjent"}
+                  {(() => {
+                    const missing = missingFieldsQuery.data?.get(r.raw_material_id);
+                    return missing != null ? `mangler ${missing} felt` : "ufullstendig næringsdata";
+                  })()}{" "}
+                  · kilde {r.source ?? "ukjent"}
                 </span>
               </li>
             ))}
