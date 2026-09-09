@@ -155,3 +155,27 @@ export function formatDateTimeNb(iso: string | null | undefined): string {
   const d = new Date(iso);
   return Number.isFinite(d.getTime()) ? d.toLocaleString("nb-NO") : "—";
 }
+
+export type LabelingStatus = "approved" | "stale" | "missing";
+
+/**
+ * Statusen som vises i statuslinjen og i produktlistas «Merking»-kolonne.
+ * Utdatert leses nå direkte fra `recipe_label_calculated.is_stale` /
+ * `.stale_reason` (satt av databasen) — ingen egen klient-side sammenligning.
+ */
+export function deriveLabelingStatus(input: {
+  approvedAt: string | null | undefined;
+  isStale: boolean;
+  /** Ingen beregning finnes ennå. */
+  neverComputed: boolean;
+  blocked?: boolean;
+}): LabelingStatus {
+  if (!input.approvedAt || input.blocked || input.neverComputed) return "missing";
+  return input.isStale ? "stale" : "approved";
+}
+
+export const LABELING_STATUS_LABEL: Record<LabelingStatus, string> = {
+  approved: "Godkjent",
+  stale: "Utdatert",
+  missing: "Mangler",
+};
