@@ -61,6 +61,9 @@ import { SaveAsRawMaterialDialog, type CompositeRawMaterial } from "@/varer/comp
 import { RecipeImageUpload } from "@/varer/components/recipes/RecipeImageUpload";
 import { BASE_RECIPE_CATEGORY, costPerKg, costPerKgBlockedReason } from "@/varer/lib/halvfabrikat";
 import { copyRecipe } from "@/varer/lib/copyRecipe";
+import { fetchAllRows } from "@/lib/supabasePaging";
+import { useProductMargins } from "@/varer/hooks/useProductCalc";
+import { makeSku } from "@/varer/lib/halvfabrikat";
 import { buildRestoreInput, type RecipeVersionRow } from "@/varer/lib/recipeVersions";
 import { asDepartment, RECIPE_DEPARTMENT_LABEL, RECIPE_DEPARTMENTS } from "@/varer/lib/departments";
 import { Switch } from "@/components/ui/switch";
@@ -95,13 +98,17 @@ export default function RecipeDetail() {
 
   const rmQuery = useQuery({
     queryKey: ["rm-bakers-map", legalEntityId],
+    enabled: !!legalEntityId,
     queryFn: async () => {
-      const { data } = await supabase
-        .from("raw_materials")
-        .select("id, name, category, grain_classification, cereal_type, water_content_pct, unit_weight_grams, base_unit, current_cost_price, produced_by_recipe_id, density_g_per_ml, is_water")
-        .limit(2000);
+      const rows = await fetchAllRows<BakersRawMaterial>((from, to) =>
+        supabase
+          .from("raw_materials")
+          .select("id, name, category, grain_classification, cereal_type, water_content_pct, unit_weight_grams, base_unit, current_cost_price, produced_by_recipe_id, density_g_per_ml, is_water")
+          .eq("legal_entity_id", legalEntityId!)
+          .range(from, to) as unknown as PromiseLike<{ data: BakersRawMaterial[] | null; error: { message: string } | null }>,
+      );
       const map: Record<string, BakersRawMaterial> = {};
-      for (const r of (data ?? []) as BakersRawMaterial[]) map[r.id] = r;
+      for (const r of rows) map[r.id] = r;
       return map;
     },
   });
@@ -139,6 +146,25 @@ export default function RecipeDetail() {
     },
   });
   const usedIn = usedInQuery.data ?? [];
+
+  /** Primærproduktet oppskriften er koblet til — brukes til dekningsgraden i statuslinjen. */
+  const primaryProductQuery = useQuery({
+    queryKey: ["recipe-primary-product", id],
+    enabled: !!id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("product_recipe_links")
+        .select("product_id, is_primary")
+        .eq("recipe_id", id!)
+        .order("is_primary", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return (data?.product_id as string | undefined) ?? null;
+    },
+  });
+  const marginsQuery = useProductMargins(primaryProductQuery.data);
+  const marginPct = marginsQuery.data?.levels?.find((l) => l.price_level === "utsalg")?.dg2_pct ?? null;
+  const marginTargetPct = marginsQuery.data?.levels?.find((l) => l.price_level === "utsalg")?.target_dg2_pct ?? null;
 
 
   const recipe = recipeQuery.data;
@@ -343,6 +369,8 @@ export default function RecipeDetail() {
   const warnings = useRecipeWarnings({
     lines: hydratedLines,
     status: String(header.status ?? "draft"),
+    marginPct,
+    marginTargetPct,
   });
 
   /**
@@ -398,6 +426,14 @@ export default function RecipeDetail() {
     const prefPartIds = new Set(parts.filter((p) => p.part_type === "preferment").map((p) => p.id));
     const prefLines = hydratedLines.filter((l) => prefPartIds.has(l.recipe_part_id));
     return computePartSummary(prefLines, totals.totalFlourG).totalG;
+  }, [parts, hydratedLines, totals.totalFlourG]);
+
+  /** Andel av total melvekt som ligger i fordeig(er) — vises i statuslinjen. */
+  const prefermentedFlourPct = useMemo(() => {
+    const prefPartIds = new Set(parts.filter((p) => p.part_type === "preferment").map((p) => p.id));
+    if (prefPartIds.size === 0) return null;
+    const prefLines = hydratedLines.filter((l) => prefPartIds.has(l.recipe_part_id));
+    return computePartSummary(prefLines, totals.totalFlourG).prefermentedFlourPct;
   }, [parts, hydratedLines, totals.totalFlourG]);
 
   // ===== PDF =====
@@ -458,10 +494,11 @@ export default function RecipeDetail() {
         humidity_pct: s.humidity_pct,
       })),
       includeCosts,
+      scaleResult: isScaled ? { mode: scaleResult.mode, batchCount: scaleResult.batchCount, perBatch: scaleResult.perBatch } : null,
     }),
     [
       header, recipe, parts, hydratedLines, steps, factor, scaleSummary.unitCount, desiredUnits, baseUnits,
-      roomTemp, flourTemp, batchId, productionDate, allergens,
+      roomTemp, flourTemp, batchId, productionDate, allergens, isScaled, scaleResult,
     ],
   );
 
@@ -543,6 +580,8 @@ export default function RecipeDetail() {
     if (error) return;
     qc.invalidateQueries({ queryKey: ["recipe-composite", recipe?.id] });
     qc.invalidateQueries({ queryKey: ["raw_materials_autocomplete"] });
+    qc.invalidateQueries({ queryKey: ["rm-bakers-map"] });
+    qc.invalidateQueries({ queryKey: ["raw_materials"] });
   }, [composite, hydratedLines, qc, recipe?.id]);
 
   const save = useCallback(async () => {
@@ -591,6 +630,9 @@ export default function RecipeDetail() {
       toast.success(`Lagret – v${result.version}`);
       qc.invalidateQueries({ queryKey: ["recipe-detail", recipe.id] });
       qc.invalidateQueries({ queryKey: ["recipes-list"] });
+      qc.invalidateQueries({ queryKey: ["product-cost"] });
+      qc.invalidateQueries({ queryKey: ["product-margins"] });
+      qc.invalidateQueries({ queryKey: ["profitability-sheet"] });
       // Merkedata (deklarasjon, næring, grovhet, Nøkkelhull) beregnes automatisk ved lagring
       computeLabel.mutate(recipe.id);
       // Grunnoppskrift: den koblede råvaren skal alltid ha fersk kilopris.
@@ -640,6 +682,8 @@ export default function RecipeDetail() {
     }
     qc.invalidateQueries({ queryKey: ["recipe-composite", recipe?.id] });
     qc.invalidateQueries({ queryKey: ["raw_materials_autocomplete"] });
+    qc.invalidateQueries({ queryKey: ["rm-bakers-map"] });
+    qc.invalidateQueries({ queryKey: ["raw_materials"] });
     toast.success(`Pris oppdatert: ${price.toFixed(2).replace(".", ",")} kr/kg`);
   }
 
@@ -912,7 +956,12 @@ export default function RecipeDetail() {
 
         <RecipeWarningsBanner warnings={warnings.warnings} />
 
-        <RecipeStatsBar totals={displayTotals} cost={isScaled ? undefined : cost} />
+        <RecipeStatsBar
+          totals={displayTotals}
+          cost={isScaled ? undefined : cost}
+          margin={marginPct != null ? { marginPct, targetPct: marginTargetPct } : undefined}
+          prefermentedFlourPct={prefermentedFlourPct}
+        />
 
 
         <Card>

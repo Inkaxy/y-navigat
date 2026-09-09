@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import type { RecipeDepartment } from "@/varer/lib/departments";
 import { lineCost } from "@/varer/lib/recipeCost";
+import type { ScaleMode, ScaledBatchLine } from "@/varer/lib/scaling";
 import {
   calcWaterTemp,
   computePartSummary,
@@ -161,6 +162,8 @@ export interface BuildRecipePDFInput {
     humidity_pct: number | null;
   }[];
   includeCosts?: boolean;
+  /** Skaleringsresultatet fra siden — når satt, viser batch-PDF-en faktiske mengder per sats. */
+  scaleResult?: { mode: ScaleMode; batchCount: number; perBatch: ScaledBatchLine[] } | null;
 }
 
 function lineCostOrNull(line: BakersLine, grams: number): number | null {
@@ -250,7 +253,14 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
   // antall enheter per batch er kjent. Baker-% er uendret; det som deles er gram/mengde.
   let batches: RecipePDFData["batches"] = null;
   const unitsPerBatch = Number(input.unitsPerBatch) || 0;
-  if (unitsPerBatch > 0) {
+  if (input.scaleResult && input.scaleResult.batchCount > 1) {
+    const { batchCount, perBatch } = input.scaleResult;
+    batches = {
+      count: batchCount,
+      perBatchDoughG: perBatch.reduce((s, l) => s + (l.grams ?? 0), 0) || null,
+      lines: perBatch.map((l) => ({ name: l.name, grams: l.grams, unit: l.unit, quantity: l.quantity })),
+    };
+  } else if (unitsPerBatch > 0) {
     const count = Math.max(1, Math.round(input.scaledUnits / unitsPerBatch));
     const batchLines = input.lines.map((l) => {
       const s = byId.get(l.id);
