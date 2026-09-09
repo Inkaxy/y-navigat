@@ -121,6 +121,12 @@ export function ApproveDeclarationDialog({
           {mode === "manual" && !manual?.ingredientText && calculated?.ingredientText && (
             <Badge variant="outline">Beregnet tekst overtas som v1</Badge>
           )}
+
+          {mode === "auto" && manual?.ingredientText && (
+            <Button variant="outline" size="sm" onClick={() => setMode("manual")}>
+              Overta importert tekst som v1
+            </Button>
+          )}
         </div>
 
         {blocked && (
