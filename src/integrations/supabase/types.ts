@@ -16840,6 +16840,16 @@ export type Database = {
           orders_deleted: number
         }[]
       }
+      save_production_plan_snapshot: {
+        Args: {
+          p_attempt_id: string
+          p_criteria: Json
+          p_items: Json
+          p_legal_entity_id: string
+          p_production_date: string
+        }
+        Returns: Json
+      }
       save_recipe: { Args: { p_recipe: Json }; Returns: Json }
       search_products_trgm: {
         Args: { p_legal_entity_id: string; p_limit?: number; p_query: string }
