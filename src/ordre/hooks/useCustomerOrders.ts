@@ -539,7 +539,7 @@ export function useUpdateCustomerOrder() {
         }
 
         // Atomic replace: delete existing order_lines and insert the new set in one transaction.
-        const { error: replaceErr } = await (supabase as any).rpc("replace_child_rows", {
+        const { error: replaceErr } = await supabase.rpc("replace_child_rows", {
           p_table: "order_lines",
           p_parent_column: "order_id",
           p_parent_id: orderId,

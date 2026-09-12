@@ -56,7 +56,6 @@ import { useLabelChangeTracking } from "@/produksjon/features/etiketter/hooks/us
 import { useLabelRealtime } from "@/produksjon/features/etiketter/hooks/useLabelRealtime";
 import { usePrintedLabelCount } from "@/produksjon/features/etiketter/hooks/usePrintedLabelCount";
 import { useProductLabelProfiles } from "@/produksjon/features/etiketter/hooks/useProductLabelProfiles";
-import { useInsertLabelPrintJob } from "@/produksjon/features/etiketter/hooks/useLabelPrintJobs";
 import {
   cancelledGaps,
   formatNumberRanges,
@@ -221,7 +220,6 @@ export default function EtiketterPage() {
 
 
   // Bulk-print
-  const insertJob = useInsertLabelPrintJob();
   const [bulkRunning, setBulkRunning] = useState(false);
   const [missingProfileOpen, setMissingProfileOpen] = useState(false);
   const [missingProfileNames, setMissingProfileNames] = useState<string[]>([]);
