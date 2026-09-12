@@ -358,6 +358,11 @@ export function CustomerOrderModal({
   const linesRef = useRef<LineDraft[]>([]);
   const initializedRef = useRef(false);
   const skipNextDirtyRef = useRef(false);
+  /**
+   * Datoen ordren ble lastet med. En lagret ordre skal beholde prisene den ble
+   * lagret med — vi henter nye priser først når brukeren selv endrer datoen.
+   */
+  const loadedDeliveryDateRef = useRef<string | null>(null);
   const [merknadFor, setMerknadFor] = useState<string | null>(null);
   /** 0-pris må bekreftes aktivt før lagring. */
   const [zeroPriceOpen, setZeroPriceOpen] = useState(false);
@@ -392,6 +397,7 @@ export function CustomerOrderModal({
       setEmail(existing.final_customer_email ?? "");
       setPhone(existing.final_customer_phone ?? "");
       setDeliveryDate(existing.delivery_date);
+      loadedDeliveryDateRef.current = existing.delivery_date;
       if (existing.delivery_time) {
         const t = trimSec(existing.delivery_time); // "HH:mm"
         setHour(t.slice(0, 2));
