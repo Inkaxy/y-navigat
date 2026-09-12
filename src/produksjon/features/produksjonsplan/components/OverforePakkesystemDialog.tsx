@@ -26,9 +26,18 @@ interface Props {
   date: string; // yyyy-MM-dd
   criteria: ProduksjonsplanCriteria;
   summary: string;
+  /** Sant når produksjonsplanen er uavklart (laster, oppdateres eller feilet). */
+  planUnavailable?: boolean;
 }
 
-export function OverforePakkesystemDialog({ open, onOpenChange, date, criteria, summary }: Props) {
+export function OverforePakkesystemDialog({
+  open,
+  onOpenChange,
+  date,
+  criteria,
+  summary,
+  planUnavailable = false,
+}: Props) {
   const navigate = useNavigate();
   const { legalEntityId } = useSelection();
 
