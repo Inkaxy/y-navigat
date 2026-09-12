@@ -679,7 +679,9 @@ function NewVariantDialog({
   const [factor, setFactor] = useState("1");
   const [submitting, setSubmitting] = useState(false);
 
-  const factorNum = Number(factor);
+  // Norsk tallformat: komma som desimalskille skal godtas («0,5»).
+  const factorNum = Number(factor.trim().replace(",", "."));
+  const factorInvalid = factor.trim().length > 0 && !(Number.isFinite(factorNum) && factorNum > 0);
   const valid = variantLabel.trim().length > 0 && Number.isFinite(factorNum) && factorNum > 0;
 
   async function submit() {
@@ -749,10 +751,21 @@ function NewVariantDialog({
           </div>
           <div>
             <Label>Faktor *</Label>
-            <Input value={factor} onChange={(e) => setFactor(e.target.value)} placeholder="1" />
+            <Input
+              value={factor}
+              onChange={(e) => setFactor(e.target.value)}
+              placeholder="1"
+              inputMode="decimal"
+              aria-invalid={factorInvalid}
+            />
             <p className="mt-1 text-xs text-muted-foreground">
               Multipliseres med mor-varens kost og pris, f.eks. 0,5 for halv porsjon.
             </p>
+            {factorInvalid && (
+              <p className="mt-1 text-xs text-destructive">
+                Skriv et tall større enn 0, for eksempel 0,5.
+              </p>
+            )}
           </div>
         </div>
         <DialogFooter>

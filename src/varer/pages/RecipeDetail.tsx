@@ -210,13 +210,16 @@ export default function RecipeDetail() {
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
 
+  // Merk: `editor` er et nytt objekt ved hver render. Vi avhenger derfor bare av
+  // den stabile `editor.hydrate`, ellers kjører hydreringen i evig løkke.
+  const editorHydrate = editor.hydrate;
   const hydrate = useCallback(
     (row: RecipeDetailRow) => {
-      editor.hydrate(row);
+      editorHydrate(row);
       setRemoteConflict(false);
       loadedRef.current = { id: row.id ?? null, updatedAt: row.updated_at ?? null };
     },
-    [editor],
+    [editorHydrate],
   );
 
   useEffect(() => {
