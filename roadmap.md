@@ -51,3 +51,14 @@
 - [x] Tester: `src/test/orderLineRows.test.ts` (6), `src/test/usePricingTracker.test.tsx` (3)
 - Status: IKKE erklært 100 % lanseringsklar. `src/test/ticketInbox.test.tsx` er tidsavhengig (timeout ved
   samtidig bygg, grønn alene) og bør stabiliseres før lansering.
+
+## Anvendte sikkerhetsmigrasjoner (speilet i repo, IKKE kjørt på nytt av meg)
+- [x] 20260912191531 `restrict_global_cake_cleanup_to_server` — fil i `supabase/migrations/`
+- [x] 20260912204709 `scope_close_delivered_orders_to_user_entities` — ordrett kopi hentet fra
+  `supabase_migrations.schema_migrations.statements`, lagt i `supabase/applied-sql/` fordi
+  `supabase/migrations/` er låst av migrasjonsverktøyet og bare kan skrives ved å kjøre SQL-en.
+  GJENSTÅR: flytte filen til `supabase/migrations/` uten å kjøre DDL-en om igjen.
+- [x] Regresjon: `src/test/appliedSecuritySql.test.ts` (8 tester) pinner signatur, SECURITY DEFINER,
+  entitetsfilter, `IS NOT TRUE`-guard, anon-avvisning, dato-/returregler og fravær av destruktiv SQL.
+- Testdekning: kun statisk kontroll av speilet SQL i repoet + Henriks isolerte PGlite-kjøring (6/6).
+  INGEN test med ekte rollebrukere mot live-prosjektet er kjørt herfra.
