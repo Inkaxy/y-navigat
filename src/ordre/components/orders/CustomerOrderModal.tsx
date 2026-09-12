@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Search, Trash2, AlertTriangle, StickyNote } from "lucide-react";
+import { Loader2, Trash2, StickyNote } from "lucide-react";
 
 import { z } from "zod";
 import { toast } from "sonner";
 import { restoreLoadedPrices, type LoadedLinePrice } from "@/ordre/lib/orderRepricing";
+import {
+  PricingRequestTracker,
+  pricesResolved,
+  type PricingStatus,
+} from "@/ordre/lib/pricingRequestState";
 import {
   Dialog,
   DialogContent,
@@ -24,7 +29,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -377,8 +381,17 @@ export function CustomerOrderModal({
   const loadedLinePricesRef = useRef<Map<string, LoadedLinePrice>>(new Map());
   /** true når linjene er reprist bort fra datoen ordren ble lastet med. */
   const repricedAwayRef = useRef(false);
-  /** Prisoppslaget pågår — lagring skal være sperret så lenge det er uavklart. */
-  const [pricing, setPricing] = useState(false);
+  /**
+   * Prisoppslag ved datoendring. Generasjonssporingen sikrer at et gammelt,
+   * kansellert oppslag verken skriver priser eller melder «avklart» når det
+   * svarer etter et nyere oppslag.
+   */
+  const pricingTrackerRef = useRef(new PricingRequestTracker());
+  const [pricingStatus, setPricingStatus] = useState<PricingStatus>({ pending: false, failed: false });
+  const [pricingRetry, setPricingRetry] = useState(0);
+  const pricing = pricingStatus.pending;
+  /** Prisene for gjeldende dato er avklart (ingen oppslag pågår, ingen feil). */
+  const priceLookupResolved = pricesResolved(pricingStatus);
   const [merknadFor, setMerknadFor] = useState<string | null>(null);
   /** 0-pris må bekreftes aktivt før lagring. */
   const [zeroPriceOpen, setZeroPriceOpen] = useState(false);
@@ -642,25 +655,27 @@ export function CustomerOrderModal({
   // overstyrte priser røres ikke.
   useEffect(() => {
     if (!open || !deliveryDate) return;
+    const tracker = pricingTrackerRef.current;
     if (loadedDeliveryDateRef.current === deliveryDate) {
-      // Urørt, lagret ordre: behold prisene den ble lagret med.
+      // Tilbake til datoen ordren ble lagret med: pågående oppslag for en
+      // mellomdato skal forkastes, ellers kan de skrive prisene sine etterpå.
+      tracker.invalidate();
+      setPricingStatus(tracker.status());
       if (!repricedAwayRef.current) return;
-      // Brukeren har vært innom en annen dato og gått tilbake. Da må de avtalte
-      // prisene gjenopprettes — ellers blir mellomdatoens priser stående.
       repricedAwayRef.current = false;
       setLines((prev) => restoreLoadedPrices(prev, loadedLinePricesRef.current));
       return;
     }
     const customerId = customer.id;
     const date = deliveryDate;
-    let cancelled = false;
     void (async () => {
       const repriceable = linesRef.current.filter(
         (l) => l.product && !isManualOverride(l.unit_price_source),
       );
       if (repriceable.length === 0) return;
+      const generation = tracker.start();
+      setPricingStatus(tracker.status());
       let prices: Map<string, EffectivePrice>;
-      setPricing(true);
       try {
         prices = await fetchEffectivePricesBatch({
           productIds: Array.from(new Set(repriceable.map((l) => l.product!.id))),
@@ -670,12 +685,15 @@ export function CustomerOrderModal({
         });
       } catch (err) {
         logAppError(err, { scope: "ordre:kundeordre:reprising" });
-        toast.error("Fant ikke nye priser for datoen. Kontroller prisene før du lagrer.");
+        if (tracker.fail(generation)) {
+          setPricingStatus(tracker.status());
+          toast.error("Fant ikke nye priser for datoen. Prøv igjen før du lagrer.");
+        }
         return;
-      } finally {
-        setPricing(false);
       }
-      if (cancelled) return;
+      // Utdatert svar: verken priser eller status skal røres.
+      if (!tracker.succeed(generation)) return;
+      setPricingStatus(tracker.status());
       repricedAwayRef.current = true;
       setLines((prev) =>
         prev.map((l) => {
@@ -697,11 +715,8 @@ export function CustomerOrderModal({
         }),
       );
     })();
-    return () => {
-      cancelled = true;
-    };
-    // Kun ved datoendring — linjeendringer prises der de oppstår.
-  }, [deliveryDate, open, customer.id]);
+    // Kun ved datoendring (eller «Prøv igjen») — linjeendringer prises der de oppstår.
+  }, [deliveryDate, open, customer.id, pricingRetry]);
 
   // Ny prisrisiko må bekreftes på nytt.
   useEffect(() => {
@@ -948,6 +963,16 @@ export function CustomerOrderModal({
   }
 
   async function handleSave(overrideReason: string | null = null, forceZeroPrice = false) {
+    // Sperren må ligge i selve lagringen, ikke bare på knappen: bekreftelses-
+    // dialogene kaller handleSave direkte.
+    if (!priceLookupResolved) {
+      toast.error(
+        pricingStatus.pending
+          ? "Prisene for den nye datoen hentes fortsatt. Vent til de er klare."
+          : "Prisene for den nye datoen er ikke avklart. Prøv prisoppslaget på nytt før du lagrer.",
+      );
+      return;
+    }
     const input = buildInput(overrideReason);
     if (!input) return;
     if (!forceZeroPrice && !zeroPriceConfirmed && riskyPriceLines > 0) {
@@ -1574,6 +1599,23 @@ export function CustomerOrderModal({
             }
           />
 
+          {pricingStatus.failed && (
+            <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2">
+              <p className="text-xs text-destructive">
+                Prisene for den nye leveringsdatoen ble ikke hentet. Lagring er sperret til
+                prisoppslaget er gjort på nytt.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setPricingRetry((n) => n + 1)}
+              >
+                Prøv igjen
+              </Button>
+            </div>
+          )}
+
           <DialogFooter className="gap-2 sm:gap-2">
             {isEdit && (
               <Button
@@ -1596,7 +1638,7 @@ export function CustomerOrderModal({
                 type="button"
                 variant="brand"
                 onClick={() => setOverrideOpen(true)}
-                disabled={submitting}
+                disabled={submitting || !priceLookupResolved}
               >
                 Overstyr …
               </Button>
@@ -1604,13 +1646,15 @@ export function CustomerOrderModal({
               <Button
                 type="button"
                 onClick={() => handleSave()}
-                disabled={submitting || pricing || rulesPreview.blocks.length > 0}
+                disabled={submitting || !priceLookupResolved || rulesPreview.blocks.length > 0}
                 title={
                   rulesPreview.blocks.length > 0
                     ? "Ordren bryter en leveringsregel"
-                    : pricing
+                    : pricingStatus.pending
                       ? "Henter priser for datoen"
-                      : undefined
+                      : pricingStatus.failed
+                        ? "Prisene for datoen er ikke avklart"
+                        : undefined
                 }
               >
                 {submitting || pricing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}

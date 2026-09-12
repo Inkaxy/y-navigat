@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { resolveLineVatRate } from "@/ordre/lib/orderRepricing";
+import { parseOrderSaveResult, resolveExistingLineId } from "@/ordre/lib/orderSaveResult";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { fetchEffectivePricesBatch, type PriceCaller } from "@/ordre/hooks/useNBProducts";
@@ -394,17 +395,15 @@ export function useUpdateCustomerOrder() {
     mutationFn: async (params: { orderId: string; input: CustomerOrderInput }) => {
       const { orderId, input } = params;
 
-      // 0. Snapshot av hode + eksisterende linjer (for rollback og prisbevaring)
-      const { data: prevOrder, error: prevErr } = await supabase
+      // 0. Snapshot av eksisterende linjer (for prisbevaring). Hodet leses ikke
+      //    lenger: det skrives kun i RPC-en, så vi trenger ingen rollback-kopi.
+      const { error: orderExistsErr } = await supabase
         .from("orders")
-        .select(
-          `source, delivery_date, delivery_time, delivery_tour_id, distribution,
-           final_customer_name, final_customer_email, final_customer_phone,
-           send_sms_confirm, send_email_confirm, is_paid, rule_override_reason`,
-        )
+        .select("id")
         .eq("id", orderId)
         .maybeSingle();
-      if (prevErr) throw prevErr;
+      if (orderExistsErr) throw orderExistsErr;
+
 
       const { data: prevLines, error: prevLinesErr } = await supabase
         .from("order_lines")
@@ -441,7 +440,9 @@ export function useUpdateCustomerOrder() {
       }
 
 
-      // 1. Update order header
+      // 1. Hodeverdier — skrives KUN inne i order_save_with_lines, aldri som
+      //    en egen forhåndsoppdatering. Et separat hode-skriv ville brutt
+      //    atomisiteten og kunne overskrevet samtidige endringer.
       const updatePayload = {
         source: input.source,
         delivery_date: input.deliveryDate,
@@ -457,17 +458,12 @@ export function useUpdateCustomerOrder() {
         rule_override_reason: input.ruleOverrideReason ?? null,
       };
 
-      const { error: updErr } = await supabase
-        .from("orders")
-        .update(updatePayload as never)
-        .eq("id", orderId);
-      if (updErr) throw updErr;
 
       // 2. Bygg linjer: reprise KUN nye linjer. Eksisterende linjer beholder
       //    avtalt/manuell pris (og alle priser med låst kilde røres aldri).
       const fallbackLineIndices: number[] = [];
       let lineRows: unknown[] = [];
-      try {
+      {
         if (input.lines.length > 0) {
           const newProductIds = Array.from(
             new Set(
@@ -491,7 +487,7 @@ export function useUpdateCustomerOrder() {
               : new Map<string, { price: number; vat_rate: number; source: string; special_price_id: string | null; price_list_id: string | null; is_fallback: boolean }>();
 
           lineRows = input.lines.map((l, idx) => {
-            const lineId = l.id && existingIds.has(l.id) ? l.id : null;
+            const lineId = resolveExistingLineId(l.id ?? null, existingIds);
             const existing =
               // Linje-id-en er den sikreste koblingen til den lagrede raden.
               (lineId ? existingById.get(lineId) : undefined) ??
@@ -558,23 +554,17 @@ export function useUpdateCustomerOrder() {
           });
         }
 
-        // Atomisk lagring som BEVARER linje-id-ene: urørte linjer oppdateres,
-        // nye settes inn, og bare linjer brukeren faktisk fjernet slettes.
-        // (Den gamle «slett alt og sett inn på nytt»-varianten gjorde at
-        // etiketter og kakebilder mistet koblingen til linjen sin.)
-        const { error: saveErr } = await supabase.rpc("order_save_with_lines", {
+        // Atomisk lagring som BEVARER linje-id-ene: hode og linjer skrives i
+        // ÉN transaksjon inne i RPC-en. Ingen forhåndsskriv av hodet, og derfor
+        // heller ingen kompenserende tilbakerulling som kunne overskrevet en
+        // samtidig endring fra en annen bruker.
+        const { data: saveData, error: saveErr } = await supabase.rpc("order_save_with_lines", {
           p_order_id: orderId,
           p_header: updatePayload,
           p_lines: lineRows,
         } as never);
         if (saveErr) throw saveErr;
-      } catch (e) {
-        // Rull tilbake hode-endringen slik at ordren ikke blir stående med ny
-        // dato/tur men gamle linjer.
-        if (prevOrder) {
-          await supabase.from("orders").update(prevOrder as never).eq("id", orderId);
-        }
-        throw e;
+        parseOrderSaveResult(saveData);
       }
 
       // 3. Kakebilder: linjene ble byttet ut, så order_line_id peker på slettede
