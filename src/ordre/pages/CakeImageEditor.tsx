@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as fabric from "fabric";
-import { initAligningGuidelines } from "fabric/extensions";
+import { AligningGuidelines } from "fabric/extensions";
 // Låser Fabric-standardene til «left/top» (Fabric 6-semantikk) før noe tegnes.
 import "@/ordre/lib/fabricDefaults";
 import {
