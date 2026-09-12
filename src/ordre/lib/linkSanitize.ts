@@ -9,6 +9,7 @@ const ALLOWED_PROTOCOLS = new Set(["http:", "https:", "mailto:", "tel:"]);
 export function sanitizeEditorHref(raw: string): string | null {
   const value = raw.trim();
   if (value.length === 0) return null;
+// eslint-disable-next-line no-control-regex -- kontrolltegn er nettopp det vi vil avvise
   if (/[\u0000-\u001f\u007f]/.test(value)) return null;
 
   // Protokoll-relativt (`//vert`) er tvetydig — krev eksplisitt skjema.

@@ -7,6 +7,7 @@
  * men sender nettleseren ut av appen. Vi slipper derfor bare gjennom stier vi
  * selv kan tolke som en intern rute.
  */
+// eslint-disable-next-line no-control-regex -- kontrolltegn er nettopp det vi vil avvise
 const CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
 
 export function resolveInternalPath(raw: string | null | undefined): string | null {
