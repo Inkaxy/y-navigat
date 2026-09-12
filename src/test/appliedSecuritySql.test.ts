@@ -78,12 +78,17 @@ describe("anvendte sikkerhetsmigrasjoner er speilet i repoet", () => {
 
   describe("20260912210449 låser snapshot-forsøk uten å kreve UPDATE-rett", () => {
     const sql = readMirror("20260912210449", "fix_snapshot_retry_lock_under_rls");
+    // Kommentarlinjer forklarer bakgrunnen (som nevner FOR UPDATE) — kontroller SQL-en selv.
+    const code = sql
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("--"))
+      .join("\n");
 
     it("bruker advisory lock per forsøks-id i stedet for SELECT ... FOR UPDATE", () => {
-      expect(sql).toMatch(
+      expect(code).toMatch(
         /PERFORM pg_advisory_xact_lock\(hashtextextended\(p_attempt_id::text, 0\)\)/,
       );
-      expect(sql).not.toMatch(/FOR UPDATE/);
+      expect(code).not.toMatch(/FOR UPDATE/);
     });
 
     it("kjører som kaller (ingen SECURITY DEFINER) så RLS fortsatt gjelder", () => {
