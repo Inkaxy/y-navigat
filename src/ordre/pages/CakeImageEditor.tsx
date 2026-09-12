@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as fabric from "fabric";
-import { initAligningGuidelines } from "fabric/extensions";
+import { AligningGuidelines } from "fabric/extensions";
+// Låser Fabric-standardene til «left/top» (Fabric 6-semantikk) før noe tegnes.
+import "@/ordre/lib/fabricDefaults";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -376,7 +378,7 @@ export default function CakeImageEditor() {
       height: viewRef.current.clientHeight || 600,
     });
     fabRef.current = c;
-    const disposeGuides = initAligningGuidelines(c);
+    const guidelines = new AligningGuidelines(c);
 
     const onChanged = () => snapshot();
     const onSelection = () => {
@@ -495,7 +497,7 @@ export default function CakeImageEditor() {
 
     return () => {
       ro.disconnect();
-      disposeGuides();
+      guidelines.dispose();
       c.dispose();
       fabRef.current = null;
       setCanvasReady(false);
