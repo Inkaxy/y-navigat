@@ -378,7 +378,7 @@ export default function CakeImageEditor() {
       height: viewRef.current.clientHeight || 600,
     });
     fabRef.current = c;
-    const disposeGuides = initAligningGuidelines(c);
+    const guidelines = new AligningGuidelines(c);
 
     const onChanged = () => snapshot();
     const onSelection = () => {
