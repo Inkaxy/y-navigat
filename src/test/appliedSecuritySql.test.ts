@@ -101,15 +101,15 @@ describe("anvendte sikkerhetsmigrasjoner er speilet i repoet", () => {
     });
 
     it("utvider ingen rettigheter og endrer ingen policy eller tabell", () => {
-      expect(sql).not.toMatch(/CREATE POLICY/i);
-      expect(sql).not.toMatch(/ALTER POLICY/i);
-      expect(sql).not.toMatch(/\bGRANT\b/i);
-      expect(sql).not.toMatch(/ALTER TABLE/i);
-      expect(sql).not.toMatch(/CREATE TABLE/i);
-      expect(sql).not.toMatch(/\bDROP\b/i);
-      expect(sql).not.toMatch(/\bTRUNCATE\b/i);
-      expect(sql).not.toMatch(/\bDELETE\b/i);
-      expect(sql).not.toMatch(/\bUPDATE\b\s+public\./i);
+      expect(code).not.toMatch(/CREATE POLICY/i);
+      expect(code).not.toMatch(/ALTER POLICY/i);
+      expect(code).not.toMatch(/\bGRANT\b/i);
+      expect(code).not.toMatch(/ALTER TABLE/i);
+      expect(code).not.toMatch(/CREATE TABLE/i);
+      expect(code).not.toMatch(/\bDROP\b/i);
+      expect(code).not.toMatch(/\bTRUNCATE\b/i);
+      expect(code).not.toMatch(/\bDELETE\b/i);
+      expect(code).not.toMatch(/\bUPDATE\b\s+public\./i);
     });
 
     it("beholder tilgangs- og gyldighetskontrollene", () => {
