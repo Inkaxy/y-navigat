@@ -572,6 +572,7 @@ export function CustomerOrderModal({
     if (!open) {
       initializedRef.current = false;
       skipNextDirtyRef.current = false;
+      loadedDeliveryDateRef.current = null;
       return;
     }
     if (!initializedRef.current) {
@@ -593,6 +594,8 @@ export function CustomerOrderModal({
   // overstyrte priser røres ikke.
   useEffect(() => {
     if (!open || !deliveryDate) return;
+    // Urørt, lagret ordre: behold prisene den ble lagret med.
+    if (loadedDeliveryDateRef.current === deliveryDate) return;
     const customerId = customer.id;
     const date = deliveryDate;
     let cancelled = false;
