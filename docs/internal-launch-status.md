@@ -30,8 +30,35 @@ og målrettet lint — alle grønne (kun kjente, eldre lint-advarsler).
 
 ## Restvarsler (avhengigheter)
 
-`npm audit --omit=dev`: 2 moderate varsler, ingen høy/kritisk.
+To målinger, rapportert hver for seg:
 
+- **Produksjon (`npm audit --omit=dev`): 2 moderate, 0 høy, 0 kritisk.**
+- **Hele treet inkl. utviklings-/testverktøy (`npm audit`): 6 varsler —
+  5 moderate, 1 høy, 0 kritisk** (ned fra 17: 7 moderate, 9 høy, 1 kritisk).
+
+Gjennomførte, målrettede oppdateringer (ingen `--force`, ingen bytte av
+verktøykjede, samme Tiptap-familie):
+
+- `jsdom` 20 → 26: fjernet den gamle, uvedlikeholdte `canvas`-kjeden
+  (`@mapbox/node-pre-gyp` → `tar`) som sto bak det kritiske varselet.
+- `npm audit fix` innenfor eksisterende versjonsspenn: `ajv`,
+  `brace-expansion`, `browserslist`, `flatted`, `js-yaml`, `minimatch`,
+  `@humanfs/node`.
+- `vite` 5.4.19 → 5.4.21 og `rollup` 4.24 → 4.63 (siste kompatible patch).
+
+Test- og byggeoppsettet er uendret ellers; hele testsuiten kjører grønt etter
+oppdateringene.
+
+### Åpne varsler og hvorfor
+
+- **`vite` (høy) og `esbuild` (moderat)** — gjelder Vites *utviklingsserver*
+  (lesing av filer/svar fra dev-serveren, samt to Windows-spesifikke
+  stier). NBhub distribueres som statisk produksjonsbygg; dev-serveren kjører
+  kun lokalt hos utvikler og er ikke eksponert i drift. Rettelsen krever
+  vite 8, altså bytte av hele byggekjeden — bevisst utsatt til egen runde.
+- **`@vitest/mocker` / `vitest` (moderat)** — gjelder testkjøreren og treffer
+  bare kode som kjøres i test. Rettelsen krever vitest 5 (hovedversjon).
+  Ingen del av produksjonsbygget.
 - **GHSA-337j-9hxr-rhxg (SSR `deserializeErrors`)** — ikke eksponert. NBhub er
   en ren klientapp (Vite SPA, `BrowserRouter`); ingen SSR-kjøring av
   react-router på server.
@@ -43,6 +70,8 @@ og målrettet lint — alle grønne (kun kjente, eldre lint-advarsler).
   Oppgradering til react-router 7.18 er ikke gjort — det er et hovedversjons-
   bytte som krever egen runde. Varselet står derfor åpent, men uten kjent
   utnyttbar vei i appen.
+
+Ingen angrep er påvist; dette er revisjonsvarsler.
 
 ## Ikke gjort / gjenstår før full intern lansering
 
