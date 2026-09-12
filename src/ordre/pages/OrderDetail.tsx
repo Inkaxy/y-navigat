@@ -1,3 +1,4 @@
+import { resolveInternalPath } from "@/lib/safeInternalPath";
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { MessageSquare } from "lucide-react";
