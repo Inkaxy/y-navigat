@@ -48,7 +48,11 @@ vi.mock("@/providers/SelectionProvider", () => ({
   useSelection: () => ({ legalEntityId: "le-1", departmentId: "d-1" }),
 }));
 vi.mock("@/hooks/useUiPreference", () => ({
-  useUiPreference: <T,>(_k: string, fallback: T) => [fallback, vi.fn(), false] as const,
+  useUiPreference: <T,>(_k: string, fallback: T) => ({
+    value: fallback,
+    setValue: vi.fn(),
+    isLoading: false,
+  }),
 }));
 vi.mock("@/produksjon/features/produksjonsplan/components/ProductionPlanTable", () => ({
   ProductionPlanTable: ({ rows }: { rows: Array<{ product_name: string }> }) => (
@@ -58,7 +62,6 @@ vi.mock("@/produksjon/features/produksjonsplan/components/ProductionPlanTable", 
 vi.mock("@/produksjon/features/produksjonsplan/components/CorrectionPlanTable", () => ({
   CorrectionPlanTable: () => <div data-testid="correction-table" />,
 }));
-const stub = () => ({ default: () => null });
 vi.mock("@/produksjon/features/produksjonsplan/components/SettKriteriaDialog", () => ({
   SettKriteriaDialog: () => null,
 }));
