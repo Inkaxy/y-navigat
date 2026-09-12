@@ -26,20 +26,20 @@ export interface HydrationInput {
 /**
  * Avgjør hva som skal skje når et nytt serversvar kommer inn.
  * - Ny oppskrift, eller ingenting lastet ennå → hydrer.
- * - Ren editor → hydrer (billig, og holder visningen fersk).
- * - Ulagrede endringer og samme versjon → gjør ingenting.
+ * - Nøyaktig samme versjon som allerede er hydrert → gjør ingenting, uansett om
+ *   editoren er ren. Å hydrere identiske data på nytt gir bare nye objekter,
+ *   som igjen utløser ny render og i verste fall en evig oppdateringsløkke.
+ * - Ren editor og ny versjon fra serveren (inkludert egen lagring) → hydrer.
  * - Ulagrede endringer og nyere versjon → varsle, men aldri overskriv.
  */
 export function decideHydration(input: HydrationInput): HydrationDecision {
   if (!input.incomingRecipeId) return "skip";
   if (input.loadedRecipeId !== input.incomingRecipeId) return "hydrate";
-  if (!input.dirty) return "hydrate";
-  if (
-    input.incomingUpdatedAt &&
-    input.loadedUpdatedAt &&
-    input.incomingUpdatedAt !== input.loadedUpdatedAt
-  ) {
-    return "conflict";
-  }
-  return "skip";
+
+  const sameVersion =
+    input.incomingUpdatedAt === input.loadedUpdatedAt ||
+    !input.incomingUpdatedAt ||
+    !input.loadedUpdatedAt;
+  if (sameVersion) return "skip";
+  return input.dirty ? "conflict" : "hydrate";
 }
