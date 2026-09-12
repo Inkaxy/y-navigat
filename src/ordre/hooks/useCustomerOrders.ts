@@ -555,23 +555,17 @@ export function useUpdateCustomerOrder() {
           });
         }
 
-        // Atomisk lagring som BEVARER linje-id-ene: urørte linjer oppdateres,
-        // nye settes inn, og bare linjer brukeren faktisk fjernet slettes.
-        // (Den gamle «slett alt og sett inn på nytt»-varianten gjorde at
-        // etiketter og kakebilder mistet koblingen til linjen sin.)
-        const { error: saveErr } = await supabase.rpc("order_save_with_lines", {
+        // Atomisk lagring som BEVARER linje-id-ene: hode og linjer skrives i
+        // ÉN transaksjon inne i RPC-en. Ingen forhåndsskriv av hodet, og derfor
+        // heller ingen kompenserende tilbakerulling som kunne overskrevet en
+        // samtidig endring fra en annen bruker.
+        const { data: saveData, error: saveErr } = await supabase.rpc("order_save_with_lines", {
           p_order_id: orderId,
           p_header: updatePayload,
           p_lines: lineRows,
         } as never);
         if (saveErr) throw saveErr;
-      } catch (e) {
-        // Rull tilbake hode-endringen slik at ordren ikke blir stående med ny
-        // dato/tur men gamle linjer.
-        if (prevOrder) {
-          await supabase.from("orders").update(prevOrder as never).eq("id", orderId);
-        }
-        throw e;
+        parseOrderSaveResult(saveData);
       }
 
       // 3. Kakebilder: linjene ble byttet ut, så order_line_id peker på slettede
