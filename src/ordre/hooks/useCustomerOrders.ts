@@ -92,6 +92,9 @@ export type CustomerOrderLineDraftLoaded = {
   product_unit_of_sale: string;
   quantity: number;
   unit_price: number;
+  /** Priskilden linjen ble lagret med — bevares slik at visning og lagring samsvarer. */
+  unit_price_source: string | null;
+  unit_price_source_id: string | null;
   merknad: Merknad | null;
   notes: string;
 };
@@ -122,7 +125,7 @@ export function useCustomerOrderDetail(orderId: string | null) {
 
       const { data: lines, error: linesErr } = await supabase
         .from("order_lines")
-        .select("id, product_id, product_snapshot, quantity, unit_price, sales_unit, line_number, merknad, notes")
+        .select("id, product_id, product_snapshot, quantity, unit_price, unit_price_source, unit_price_source_id, sales_unit, line_number, merknad, notes")
         .eq("order_id", orderId!)
         .order("line_number", { ascending: true });
       if (linesErr) throw linesErr;
@@ -159,6 +162,10 @@ export function useCustomerOrderDetail(orderId: string | null) {
             product_unit_of_sale: snap.unit_of_sale ?? l.sales_unit ?? "",
             quantity: Number(l.quantity),
             unit_price: Number(l.unit_price),
+            unit_price_source:
+              (l as { unit_price_source?: string | null }).unit_price_source ?? null,
+            unit_price_source_id:
+              (l as { unit_price_source_id?: string | null }).unit_price_source_id ?? null,
             merknad: parseMerknad(l.merknad),
             notes: (l as { notes?: string | null }).notes ?? "",
           };
@@ -478,11 +485,14 @@ export function useUpdateCustomerOrder() {
             let vatRate: number;
             let source: string;
             let sourceId: string | null;
-            if (isManualOverride(l.unit_price_source ?? null)) {
-              // Manuell overstyring vinner over både lagret og ny pris.
+            if (l.unit_price_source) {
+              // Klienten har en eksplisitt priskilde på linjen: enten manuell
+              // overstyring eller prisen som faktisk vises etter en bevisst
+              // datoendring. Da lagres nøyaktig det som står på skjermen, slik
+              // at visning og persistert verdi aldri divergerer.
               unitPrice = l.unit_price;
               vatRate = l.product_mva_rate ?? existing?.vat_rate ?? 15;
-              source = l.unit_price_source as string;
+              source = l.unit_price_source;
               sourceId = l.unit_price_source_id ?? null;
             } else if (existing) {
               // Uendret linje — behold pris og kilde nøyaktig som bestilt.

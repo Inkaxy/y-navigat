@@ -430,6 +430,12 @@ export function CustomerOrderModal({
               product_unit_of_sale: l.product_unit_of_sale,
               quantity: String(l.quantity),
               unit_price: String(l.unit_price),
+              // Priskilden følger med fra ordren. Uten den ville linjen sett
+              // ut som en ny, uprisit linje og blitt reprist ved datoendring
+              // uten at lagringen fulgte etter.
+              unit_price_source: l.unit_price_source,
+              unit_price_source_id: l.unit_price_source_id,
+              effective_price: l.unit_price,
               merknad: l.merknad,
               notes: l.notes ?? "",
 
@@ -626,6 +632,10 @@ export function CustomerOrderModal({
           return {
             ...l,
             unit_price: String(ep.price ?? 0),
+            // Ny dato gir ny kilde. Den sendes med til lagring, slik at
+            // persistert pris og kilde blir nøyaktig det som vises.
+            unit_price_source: ep.source,
+            unit_price_source_id: ep.special_price_id ?? ep.price_list_id ?? null,
             is_fallback: ep.is_fallback,
             effective_price: ep.price,
           };
