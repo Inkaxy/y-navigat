@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { ProductionPlanRow, ProduksjonsplanCriteria } from "../types";
+import { fetchAllRows } from "@/lib/supabasePaging";
+import { DEFAULT_CRITERIA, type ProductionPlanRow, type ProduksjonsplanCriteria } from "../types";
 
 export interface SnapshotItem {
   row_key: string;
@@ -34,60 +35,115 @@ export function buildRowKey(
 
 
 /**
- * Sammenligner kun de kriterie-feltene som påvirker hvilke rader som dukker opp og hvordan de aggregeres.
- * Print-innstillinger (kopier, korreksjon) skal ikke gjøre snapshot ugyldig som sammenligningsgrunnlag.
+ * Sammenligner kun de kriterie-feltene som påvirker hvilke rader som dukker opp
+ * og hvordan de aggregeres. Print-innstillinger (kopier, korreksjon) skal ikke
+ * gjøre snapshot ugyldig som sammenligningsgrunnlag.
+ *
+ * Eldre snapshots kan ha lagret et ufullstendig `criteria_copy`. Derfor leses
+ * alle felt defensivt med de samme standardverdiene som planen selv bruker, slik
+ * at et gammelt snapshot uten f.eks. `merge_by_main_product` sammenlignes mot
+ * standardverdien i stedet for å kaste.
  */
-function criteriaSignature(c: ProduksjonsplanCriteria): string {
+export function criteriaSignature(input: Partial<ProduksjonsplanCriteria> | null | undefined): string {
+  const c = input ?? {};
+  const list = (v: unknown, fallback: string[] | number[]): unknown[] =>
+    Array.isArray(v) ? [...v] : [...fallback];
+  const bool = (v: unknown, fallback: boolean): boolean => (typeof v === "boolean" ? v : fallback);
   return JSON.stringify({
-    tour_numbers: [...c.tour_numbers].sort((a, b) => a - b),
-    sum_tours: !!c.sum_tours,
-    main_category_ids: [...c.main_category_ids].sort(),
-    sub_category_ids: [...c.sub_category_ids].sort(),
-    include_products_without_subcategory: !!c.include_products_without_subcategory,
-    aggregation: c.aggregation,
-    customer_group_ids: [...c.customer_group_ids].sort(),
+    tour_numbers: (list(c.tour_numbers, DEFAULT_CRITERIA.tour_numbers) as number[]).sort(
+      (a, b) => a - b,
+    ),
+    sum_tours: bool(c.sum_tours, DEFAULT_CRITERIA.sum_tours),
+    main_category_ids: (list(c.main_category_ids, DEFAULT_CRITERIA.main_category_ids) as string[]).sort(),
+    sub_category_ids: (list(c.sub_category_ids, DEFAULT_CRITERIA.sub_category_ids) as string[]).sort(),
+    include_products_without_subcategory: bool(
+      c.include_products_without_subcategory,
+      DEFAULT_CRITERIA.include_products_without_subcategory,
+    ),
+    aggregation: c.aggregation ?? DEFAULT_CRITERIA.aggregation,
+    customer_group_ids: (list(c.customer_group_ids, DEFAULT_CRITERIA.customer_group_ids) as string[]).sort(),
+    // Sammenslåing til hovedvare endrer hvilke rader som finnes i det hele tatt.
+    merge_by_main_product: bool(
+      c.merge_by_main_product,
+      !!DEFAULT_CRITERIA.merge_by_main_product,
+    ),
   });
 }
 
+/** Resultat av snapshot-oppslaget. «Ingen snapshot» og «feil» må skilles. */
+export type SnapshotLookup =
+  | { status: "ok"; takenAt: string; items: Map<string, SnapshotItem> }
+  | { status: "none" }
+  | { status: "error"; message: string };
+
+const SNAPSHOT_PAGE = 20;
+/** Maks antall snapshots vi leter gjennom bakover for samme dag. */
+const SNAPSHOT_MAX_SCAN = 200;
+
 /**
  * Hent siste snapshot for gitt selskap + dato som matcher samme kriterier
- * (ellers gir korreksjonslisten feil sammenligning). Returnerer items mappet på row_key.
+ * (ellers gir korreksjonslisten feil sammenligning).
  */
 export async function fetchLatestSnapshotItems(
   legalEntityId: string,
   productionDate: string,
   criteria: ProduksjonsplanCriteria,
-): Promise<{ takenAt: string; items: Map<string, SnapshotItem> } | null> {
-  const { data: snaps, error } = await supabase
-    .from("production_plan_snapshots")
-    .select("id, created_at, criteria_copy")
-    .eq("legal_entity_id", legalEntityId)
-    .eq("production_date", productionDate)
-    .eq("list_type", "produksjonsliste")
-    .order("created_at", { ascending: false })
-    .limit(20);
-
-  if (error || !snaps || snaps.length === 0) return null;
-
+): Promise<SnapshotLookup> {
   const wantedSig = criteriaSignature(criteria);
-  const match = snaps.find(
-    (s) => criteriaSignature((s.criteria_copy ?? {}) as unknown as ProduksjonsplanCriteria) === wantedSig,
-  );
-  if (!match) return null;
+  let match: { id: string; created_at: string } | null = null;
 
-  const { data: items, error: itemsErr } = await supabase
-    .from("production_plan_snapshot_items")
-    .select("row_key, product_id, quantity_ordered, quantity_from_stock, quantity_to_produce, trays_full, trays_partial")
-    .eq("snapshot_id", match.id);
+  for (let offset = 0; offset < SNAPSHOT_MAX_SCAN; offset += SNAPSHOT_PAGE) {
+    const { data: snaps, error } = await supabase
+      .from("production_plan_snapshots")
+      .select("id, created_at, criteria_copy")
+      .eq("legal_entity_id", legalEntityId)
+      .eq("production_date", productionDate)
+      .eq("list_type", "produksjonsliste")
+      .order("created_at", { ascending: false })
+      .range(offset, offset + SNAPSHOT_PAGE - 1);
 
-  if (itemsErr || !items) return null;
+    if (error) return { status: "error", message: error.message };
+    const page = snaps ?? [];
+    if (page.length === 0) break;
+
+    const found = page.find(
+      (s) =>
+        criteriaSignature(
+          (s.criteria_copy ?? {}) as unknown as Partial<ProduksjonsplanCriteria>,
+        ) === wantedSig,
+    );
+    if (found) {
+      match = { id: found.id, created_at: found.created_at };
+      break;
+    }
+    if (page.length < SNAPSHOT_PAGE) break;
+  }
+
+  if (!match) return { status: "none" };
+
+  let items: Array<Record<string, unknown>>;
+  try {
+    items = await fetchAllRows<Record<string, unknown>>((from, to) =>
+      supabase
+        .from("production_plan_snapshot_items")
+        .select(
+          "row_key, product_id, quantity_ordered, quantity_from_stock, quantity_to_produce, trays_full, trays_partial",
+        )
+        .eq("snapshot_id", match!.id)
+        .order("row_key", { ascending: true })
+        .range(from, to),
+    );
+  } catch (e) {
+    return { status: "error", message: e instanceof Error ? e.message : "Ukjent feil" };
+  }
 
   const map = new Map<string, SnapshotItem>();
-  for (const it of items) {
+  for (const raw of items) {
+    const it = raw as unknown as SnapshotItem;
     const key = it.row_key && it.row_key.length > 0 ? it.row_key : `legacy:${it.product_id}`;
-    map.set(key, it as SnapshotItem);
+    map.set(key, it);
   }
-  return { takenAt: match.created_at, items: map };
+  return { status: "ok", takenAt: match.created_at, items: map };
 }
 
 /** Lagre nytt snapshot av planen. */

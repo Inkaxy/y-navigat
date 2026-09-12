@@ -24,6 +24,17 @@ import {
   saveProductionPlanSnapshot,
   type SnapshotItem,
 } from "../features/produksjonsplan/hooks/useProductionPlanSnapshots";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import type { ProductionPlanRow } from "../features/produksjonsplan/types";
 import { CorrectionPlanTable } from "../features/produksjonsplan/components/CorrectionPlanTable";
 import {
   Popover,
@@ -188,9 +199,12 @@ export default function ProduksjonsplanPage() {
     return lines.join("\n");
   }, [criteria, mains.data, subs.data]);
 
-  const counts = plan.data?.orderCounts;
-  const rows = plan.data?.rows ?? [];
-  const basis = plan.data?.basis ?? null;
+  const counts = plan.isError ? undefined : plan.data?.orderCounts;
+  const rows = useMemo(() => (plan.isError ? [] : plan.data?.rows ?? []), [plan.isError, plan.data]);
+  const basis = plan.isError ? null : plan.data?.basis ?? null;
+  // Grunnlaget er uavklart så lenge planen laster eller har feilet. Da skal
+  // verken utskrift eller overføring til pakkesystemet kunne startes.
+  const planUnavailable = !legalEntityId || plan.isLoading || plan.isError || !plan.data;
 
   const applyTemplate = (t: CriteriaTemplate) => {
     setCriteria({ ...DEFAULT_CRITERIA, ...t.criteria });
@@ -198,63 +212,65 @@ export default function ProduksjonsplanPage() {
   };
 
   // === Print: snapshot + korreksjon =====================================
+  // Utskriften fryser radene den faktisk ble laget av. Ny korreksjons-baseline
+  // lagres først når brukeren bekrefter at listen er skrevet ut.
   const [printJob, setPrintJob] = useState<{
     correction: boolean;
     prevItems: Map<string, SnapshotItem> | null;
     prevTakenAt: string | null;
     alternateRowGray: boolean;
+    rows: ProductionPlanRow[];
+    criteria: ProduksjonsplanCriteria;
   } | null>(null);
+  const [confirmPrint, setConfirmPrint] = useState<{
+    rows: ProductionPlanRow[];
+    criteria: ProduksjonsplanCriteria;
+  } | null>(null);
+  const [savingBaseline, setSavingBaseline] = useState(false);
 
   const handlePrint = useCallback(async (options: PrintProduksjonslisteOptions = printProdDefaults) => {
-    if (!legalEntityId) {
-      window.print();
+    if (!legalEntityId) return;
+    if (planUnavailable) {
+      toast({
+        title: "Grunnlaget er ikke klart",
+        description: "Produksjonsplanen er ikke ferdig lastet. Prøv igjen når tallene vises.",
+        variant: "destructive",
+      });
       return;
     }
     if (rows.length === 0) {
       toast({
         title: "Ingen rader å skrive ut",
-        description: "Snapshot lagres ikke før produksjonslisten har innhold.",
+        description: "Produksjonslisten er tom.",
       });
       return;
     }
     const wantCorrection = !!criteria.print_correction_last;
 
     let prev: { takenAt: string; items: Map<string, SnapshotItem> } | null = null;
-    let savedItemCount = 0;
     if (wantCorrection) {
-      try {
-        prev = await fetchLatestSnapshotItems(legalEntityId, dateStr, criteria);
-      } catch (e) {
-        console.error(e);
-      }
-      if (!prev) {
+      const lookup = await fetchLatestSnapshotItems(legalEntityId, dateStr, criteria);
+      if (lookup.status === "error") {
         toast({
-          title: "Ingen tidligere snapshot",
-          description: "Korreksjonsliste hoppes over – siste kopi blir vanlig liste.",
-        });
-      }
-    }
-
-    try {
-      const saved = await saveProductionPlanSnapshot(legalEntityId, dateStr, criteria, rows);
-      if (!saved) {
-        toast({
-          title: "Snapshot ble ikke lagret",
-          description: "Utskrift er avbrutt slik at neste korreksjonsliste ikke får feil grunnlag.",
+          title: "Fant ikke forrige utskrift",
+          description: "Korreksjonslisten kan bli feil. Utskrift er avbrutt — prøv igjen.",
           variant: "destructive",
         });
         return;
       }
-      savedItemCount = saved.itemCount;
-    } catch (e) {
-      console.error("Snapshot-lagring feilet", e);
-      toast({
-        title: "Snapshot ble ikke lagret",
-        description: "Utskrift er avbrutt slik at neste korreksjonsliste ikke får feil grunnlag.",
-        variant: "destructive",
-      });
-      return;
+      if (lookup.status === "none") {
+        toast({
+          title: "Ingen tidligere utskrift",
+          description: "Korreksjonsliste hoppes over – listen skrives ut som vanlig.",
+        });
+      } else {
+        prev = { takenAt: lookup.takenAt, items: lookup.items };
+      }
     }
+
+    // Frys grunnlaget for nøyaktig denne utskriften.
+    const frozenRows = rows.map((r) => ({ ...r }));
+    const frozenCriteria = { ...criteria };
 
     flushSync(() => {
       setPrintJob({
@@ -262,21 +278,55 @@ export default function ProduksjonsplanPage() {
         prevItems: prev?.items ?? null,
         prevTakenAt: prev?.takenAt ?? null,
         alternateRowGray: options.alternateRowGray,
+        rows: frozenRows,
+        criteria: frozenCriteria,
       });
     });
 
-    // Snapshot er lagret før print-dialogen åpnes, slik at avbrutt/ferdig utskrift gir samme grunnlag.
     setTimeout(() => {
       window.print();
       setTimeout(() => {
         setPrintJob(null);
-        toast({
-          title: "Snapshot lagret",
-          description: `Lagret ${savedItemCount} varelinjer for ${format(date, "dd.MM.yyyy")}.`,
-        });
+        setConfirmPrint({ rows: frozenRows, criteria: frozenCriteria });
       }, 500);
     }, 100);
-  }, [legalEntityId, dateStr, date, criteria, rows, printProdDefaults]);
+  }, [legalEntityId, dateStr, criteria, rows, printProdDefaults, planUnavailable]);
+
+  /** Bruker bekrefter at listen faktisk er skrevet ut → lagre ny baseline. */
+  const handleConfirmPrinted = useCallback(async () => {
+    if (!legalEntityId || !confirmPrint) return;
+    setSavingBaseline(true);
+    try {
+      const saved = await saveProductionPlanSnapshot(
+        legalEntityId,
+        dateStr,
+        confirmPrint.criteria,
+        confirmPrint.rows,
+      );
+      if (!saved) {
+        toast({
+          title: "Grunnlaget ble ikke lagret",
+          description: "Neste korreksjonsliste ville fått feil sammenligning. Prøv igjen.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setConfirmPrint(null);
+      toast({
+        title: "Utskrift registrert",
+        description: `${saved.itemCount} varelinjer lagret som grunnlag for ${format(date, "dd.MM.yyyy")}.`,
+      });
+    } catch (e) {
+      console.error("Snapshot-lagring feilet", e);
+      toast({
+        title: "Grunnlaget ble ikke lagret",
+        description: "Neste korreksjonsliste ville fått feil sammenligning. Prøv igjen.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingBaseline(false);
+    }
+  }, [legalEntityId, dateStr, date, confirmPrint]);
 
 
   return (
@@ -347,7 +397,7 @@ export default function ProduksjonsplanPage() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button variant="outline" onClick={() => setPrintProdDialog(true)}>
+          <Button variant="outline" disabled={planUnavailable} onClick={() => setPrintProdDialog(true)}>
             <Printer className="h-4 w-4 mr-2" />
             Skriv ut
           </Button>
@@ -360,13 +410,13 @@ export default function ProduksjonsplanPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64">
-              <DropdownMenuItem onClick={() => setPrintProdDialog(true)}>Produksjonsliste</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setPrintPackDialog(true)}>Pakkeliste</DropdownMenuItem>
+              <DropdownMenuItem disabled={planUnavailable} onClick={() => setPrintProdDialog(true)}>Produksjonsliste</DropdownMenuItem>
+              <DropdownMenuItem disabled={planUnavailable} onClick={() => setPrintPackDialog(true)}>Pakkeliste</DropdownMenuItem>
               <DropdownMenuItem disabled>Spesifisert pakkeliste</DropdownMenuItem>
               <DropdownMenuItem disabled>Veieliste</DropdownMenuItem>
               <DropdownMenuItem disabled>Kvitteringsliste</DropdownMenuItem>
               <DropdownMenuItem disabled>Lagerliste</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setPakkesystemDialog(true)}>Overføre til Pakkesystem</DropdownMenuItem>
+              <DropdownMenuItem disabled={planUnavailable} onClick={() => setPakkesystemDialog(true)}>Overføre til Pakkesystem</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setSetDialog(true)}>Sett kriteria</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setHentDialog(true)}>Hent kriteria</DropdownMenuItem>
@@ -392,7 +442,7 @@ export default function ProduksjonsplanPage() {
             style={{ backgroundColor: activeColor ?? undefined }}
           >
             <span className="font-display tracking-tight">{activeTemplate.name}</span>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPrintProdDialog(true)} title="Skriv ut">
+            <Button variant="ghost" size="icon" className="h-7 w-7" disabled={planUnavailable} onClick={() => setPrintProdDialog(true)} title="Skriv ut">
               <Printer className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSaveDialog(true)} title="Lagre">
@@ -423,7 +473,19 @@ export default function ProduksjonsplanPage() {
         </Card>
       )}
 
-      {legalEntityId && (() => {
+      {legalEntityId && plan.isError && (
+        <Card className="p-6 space-y-3 text-center">
+          <p className="text-sm text-muted-foreground">
+            Produksjonsplanen kunne ikke hentes. Tallene vises ikke fordi de ville vært
+            ufullstendige.
+          </p>
+          <Button variant="outline" onClick={() => plan.refetch()}>
+            Prøv igjen
+          </Button>
+        </Card>
+      )}
+
+      {legalEntityId && !plan.isError && (() => {
         const cols: ColumnVisibility = {
           mainGroup: prefs.colMainGroup ?? true,
           doughType: (prefs.colDoughType ?? true) && !prefs.hideDoughTypes,
@@ -434,6 +496,10 @@ export default function ProduksjonsplanPage() {
           onStock: prefs.colOnStock ?? true,
         };
         const correctionLast = !!printJob?.correction && !!printJob?.prevItems;
+        // Utskriften skal alltid vise det frosne grunnlaget, ikke rader som kan
+        // ha endret seg mens print-dialogen sto åpen.
+        const printRows = printJob?.rows ?? rows;
+        const printCriteria = printJob?.criteria ?? criteria;
         const baseDateLabel = `${format(date, "EEEE dd.MM.yy", { locale: nb })}${criteria.sum_tours ? " sum alle turer" : ""}`;
         const printedAt = format(new Date(), "dd.MM.yy HH:mm");
 
@@ -511,16 +577,16 @@ export default function ProduksjonsplanPage() {
                   </div>
                   {p.kind === "correction" && printJob?.prevItems ? (
                     <CorrectionPlanTable
-                      rows={rows}
+                      rows={printRows}
                       showByMainGroup={prefs.showByMainGroup}
                       showTraysWithPlus={prefs.showTraysWithPlus}
                       columns={cols}
                       previousItems={printJob.prevItems}
-                      criteria={criteria}
+                      criteria={printCriteria}
                     />
                   ) : (
                     <ProductionPlanTable
-                      rows={rows}
+                      rows={printRows}
                       showByMainGroup={prefs.showByMainGroup}
                       showTraysWithPlus={prefs.showTraysWithPlus}
                       loading={false}
@@ -544,8 +610,29 @@ export default function ProduksjonsplanPage() {
       {/* Footer hint */}
       <p className="text-xs text-muted-foreground print-hide">
         <Plus className="inline h-3 w-3 mr-1" />
-        Snapshots lagres automatisk ved utskrift og slettes etter 2 dager.
+        Grunnlaget for korreksjonslisten lagres når du bekrefter utskriften, og slettes etter 2 dager.
       </p>
+
+      <AlertDialog open={!!confirmPrint} onOpenChange={(o) => { if (!o && !savingBaseline) setConfirmPrint(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ble produksjonslisten skrevet ut?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bekrefter du, blir denne utskriften grunnlaget neste korreksjonsliste sammenlignes
+              mot. Avbrøt du utskriften, beholdes forrige grunnlag.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={savingBaseline}>Nei – avbrutt eller feilet</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={savingBaseline}
+              onClick={(e) => { e.preventDefault(); void handleConfirmPrinted(); }}
+            >
+              {savingBaseline ? "Lagrer…" : "Ja, listen er skrevet ut"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <SettKriteriaDialog
         open={setDialog}

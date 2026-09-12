@@ -47,8 +47,8 @@ describe("fryst utskriftsforsøk", () => {
 
   it("sender samme jobb-id på nytt ved gjentatt bekreftelse — teller ikke dobbelt", async () => {
     const a = buildLabelPrintAttempt({ ...base, units: [unit(1)] });
-    rpc.mockResolvedValueOnce({ data: { counted: 1, already_logged: 0 }, error: null });
-    rpc.mockResolvedValueOnce({ data: { counted: 0, already_logged: 1 }, error: null });
+    rpc.mockResolvedValueOnce({ data: { status: "printed", counted: 1, already_logged: 0, units: [{ id: "u-1" }] }, error: null });
+    rpc.mockResolvedValueOnce({ data: { status: "printed", counted: 0, already_logged: 1, units: [{ id: "u-1" }] }, error: null });
 
     const first = await submitLabelPrintAttempt(a, "printed");
     const second = await submitLabelPrintAttempt(a, "printed");
@@ -63,7 +63,7 @@ describe("fryst utskriftsforsøk", () => {
 
   it("bekreftelsen bruker det fryste settet, ikke et senere endret utvalg", async () => {
     const a = buildLabelPrintAttempt({ ...base, units: [unit(3), unit(4)] });
-    rpc.mockResolvedValue({ data: { counted: 2, already_logged: 0 }, error: null });
+    rpc.mockResolvedValue({ data: { status: "printed", counted: 2, already_logged: 0, units: [{ id: "u-3" },{ id: "u-4" }] }, error: null });
     await submitLabelPrintAttempt(a, "printed");
     const jobs = (rpc.mock.calls[0][1] as { p_jobs: { label_unit_id: string }[] }).p_jobs;
     expect(jobs.map((j) => j.label_unit_id)).toEqual(["u-3", "u-4"]);
@@ -81,9 +81,33 @@ describe("fryst utskriftsforsøk", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
+  it("avviser tomt serversvar som falsk suksess", async () => {
+    const a = buildLabelPrintAttempt({ ...base, units: [unit(1)] });
+    rpc.mockResolvedValue({ data: null, error: null });
+    await expect(submitLabelPrintAttempt(a, "printed")).rejects.toThrow(/bekreftet ikke utskriften/i);
+  });
+
+  it("avviser svar der en etikett mangler bekreftelse", async () => {
+    const a = buildLabelPrintAttempt({ ...base, units: [unit(1), unit(2)] });
+    rpc.mockResolvedValue({
+      data: { status: "printed", counted: 1, already_logged: 0, units: [{ id: "u-1" }] },
+      error: null,
+    });
+    await expect(submitLabelPrintAttempt(a, "printed")).rejects.toThrow(/bekreftet ikke alle/i);
+  });
+
+  it("avviser svar med annen status enn den som ble sendt", async () => {
+    const a = buildLabelPrintAttempt({ ...base, units: [unit(1)] });
+    rpc.mockResolvedValue({
+      data: { status: "failed", counted: 0, already_logged: 0, units: [{ id: "u-1" }] },
+      error: null,
+    });
+    await expect(submitLabelPrintAttempt(a, "printed")).rejects.toThrow(/annen utskriftsstatus/i);
+  });
+
   it("logger mislykket utskrift uten å telle", async () => {
     const a = buildLabelPrintAttempt({ ...base, units: [unit(1)] });
-    rpc.mockResolvedValue({ data: { counted: 0, already_logged: 0 }, error: null });
+    rpc.mockResolvedValue({ data: { status: "failed", counted: 0, already_logged: 0, units: [{ id: "u-1" }] }, error: null });
     const res = await submitLabelPrintAttempt(a, "failed");
     expect(res.counted).toBe(0);
     expect((rpc.mock.calls[0][1] as { p_status: string }).p_status).toBe("failed");
