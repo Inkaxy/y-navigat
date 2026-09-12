@@ -77,8 +77,8 @@ describe("Fabric-origin etter oppgradering til 7", () => {
       top: 100,
       width: 80,
       height: 40,
-      originX: "center",
-      originY: "center",
+      originX: "center" as const,
+      originY: "center" as const,
       strokeWidth: 0,
     };
     const restored = await fabric.Rect.fromObject(saved);
