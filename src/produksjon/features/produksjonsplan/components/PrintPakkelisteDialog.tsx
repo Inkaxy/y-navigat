@@ -47,6 +47,8 @@ interface Props {
   onSaveDefaults: (o: PrintPakkelisteOptions) => void;
   onPrint: (o: PrintPakkelisteOptions) => void;
   onSend?: (o: PrintPakkelisteOptions) => void;
+  /** Sant når produksjonsplanen er uavklart (laster, oppdateres eller feilet). */
+  planUnavailable?: boolean;
 }
 
 export function PrintPakkelisteDialog({
@@ -58,6 +60,7 @@ export function PrintPakkelisteDialog({
   onSaveDefaults,
   onPrint,
   onSend,
+  planUnavailable = false,
 }: Props) {
   const [opts, setOpts] = useState<PrintPakkelisteOptions>(initial);
   useEffect(() => {
