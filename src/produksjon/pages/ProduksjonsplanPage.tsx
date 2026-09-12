@@ -411,7 +411,7 @@ export default function ProduksjonsplanPage() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button variant="outline" disabled={planUnavailable} onClick={() => setPrintProdDialog(true)}>
+          <Button variant="outline" disabled={printDisabled} onClick={() => setPrintProdDialog(true)}>
             <Printer className="h-4 w-4 mr-2" />
             Skriv ut
           </Button>
@@ -424,8 +424,8 @@ export default function ProduksjonsplanPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64">
-              <DropdownMenuItem disabled={planUnavailable} onClick={() => setPrintProdDialog(true)}>Produksjonsliste</DropdownMenuItem>
-              <DropdownMenuItem disabled={planUnavailable} onClick={() => setPrintPackDialog(true)}>Pakkeliste</DropdownMenuItem>
+              <DropdownMenuItem disabled={printDisabled} onClick={() => setPrintProdDialog(true)}>Produksjonsliste</DropdownMenuItem>
+              <DropdownMenuItem disabled={printDisabled} onClick={() => setPrintPackDialog(true)}>Pakkeliste</DropdownMenuItem>
               <DropdownMenuItem disabled>Spesifisert pakkeliste</DropdownMenuItem>
               <DropdownMenuItem disabled>Veieliste</DropdownMenuItem>
               <DropdownMenuItem disabled>Kvitteringsliste</DropdownMenuItem>
@@ -456,7 +456,7 @@ export default function ProduksjonsplanPage() {
             style={{ backgroundColor: activeColor ?? undefined }}
           >
             <span className="font-display tracking-tight">{activeTemplate.name}</span>
-            <Button variant="ghost" size="icon" className="h-7 w-7" disabled={planUnavailable} onClick={() => setPrintProdDialog(true)} title="Skriv ut">
+            <Button variant="ghost" size="icon" className="h-7 w-7" disabled={printDisabled} onClick={() => setPrintProdDialog(true)} title="Skriv ut">
               <Printer className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSaveDialog(true)} title="Lagre">
