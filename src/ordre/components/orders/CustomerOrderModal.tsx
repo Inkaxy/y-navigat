@@ -657,7 +657,7 @@ export function CustomerOrderModal({
   // overstyrte priser røres ikke.
   useEffect(() => {
     if (!open || !deliveryDate) return;
-    const tracker = pricingTrackerRef.current;
+    const tracker = pricingTracker;
     if (loadedDeliveryDateRef.current === deliveryDate) {
       // Tilbake til datoen ordren ble lagret med: pågående oppslag for en
       // mellomdato skal forkastes, ellers kan de skrive prisene sine etterpå.
