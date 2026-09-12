@@ -72,9 +72,42 @@ export async function submitLabelPrintAttempt(
     p_jobs: attempt.units.map((u) => ({ job_id: u.jobId, label_unit_id: u.unitId })),
   } as never);
   if (error) throw error;
-  const res = (data ?? {}) as { counted?: number; already_logged?: number };
-  return {
-    counted: Number(res.counted ?? 0),
-    alreadyLogged: Number(res.already_logged ?? 0),
+
+  // Serveren MÅ svare med et komplett resultat. Et tomt svar ble tidligere
+  // tolket som «0 registrert, alt i orden» — det ga falsk suksess.
+  if (data === null || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error("Serveren bekreftet ikke utskriften. Etikettene står fortsatt som uutskrevet.");
+  }
+  const res = data as {
+    status?: unknown;
+    counted?: unknown;
+    already_logged?: unknown;
+    units?: unknown;
   };
+  if (res.status !== status) {
+    throw new Error("Serveren bekreftet en annen utskriftsstatus enn den som ble sendt.");
+  }
+  const counted = Number(res.counted);
+  const alreadyLogged = Number(res.already_logged);
+  if (!Number.isFinite(counted) || !Number.isFinite(alreadyLogged)) {
+    throw new Error("Serveren svarte uten gyldig antall registrerte etiketter.");
+  }
+  if (!Array.isArray(res.units)) {
+    throw new Error("Serveren svarte uten oversikt over etikettene.");
+  }
+  const confirmed = new Set(
+    res.units
+      .map((u) => (u && typeof u === "object" ? (u as { id?: unknown }).id : null))
+      .filter((id): id is string => typeof id === "string"),
+  );
+  const missing = attempt.units.filter((u) => !confirmed.has(u.unitId));
+  if (missing.length > 0) {
+    throw new Error(
+      `Serveren bekreftet ikke alle etikettene (mangler ${missing.map((m) => m.number).join(", ")}).`,
+    );
+  }
+  if (status === "printed" && counted + alreadyLogged < attempt.units.length) {
+    throw new Error("Serveren registrerte færre etiketter enn det ble skrevet ut.");
+  }
+  return { counted, alreadyLogged };
 }

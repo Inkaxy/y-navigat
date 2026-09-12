@@ -3,6 +3,7 @@ import { Loader2, Search, Trash2, AlertTriangle, StickyNote } from "lucide-react
 
 import { z } from "zod";
 import { toast } from "sonner";
+import { restoreLoadedPrices, type LoadedLinePrice } from "@/ordre/lib/orderRepricing";
 import {
   Dialog,
   DialogContent,
@@ -368,6 +369,16 @@ export function CustomerOrderModal({
    * lagret med — vi henter nye priser først når brukeren selv endrer datoen.
    */
   const loadedDeliveryDateRef = useRef<string | null>(null);
+  /**
+   * Prisene ordren ble lastet med, per linje-id. Går brukeren til en annen dato
+   * og tilbake igjen, skal de avtalte prisene gjenopprettes — ikke prisene fra
+   * mellomdatoen.
+   */
+  const loadedLinePricesRef = useRef<Map<string, LoadedLinePrice>>(new Map());
+  /** true når linjene er reprist bort fra datoen ordren ble lastet med. */
+  const repricedAwayRef = useRef(false);
+  /** Prisoppslaget pågår — lagring skal være sperret så lenge det er uavklart. */
+  const [pricing, setPricing] = useState(false);
   const [merknadFor, setMerknadFor] = useState<string | null>(null);
   /** 0-pris må bekreftes aktivt før lagring. */
   const [zeroPriceOpen, setZeroPriceOpen] = useState(false);
@@ -403,6 +414,18 @@ export function CustomerOrderModal({
       setPhone(existing.final_customer_phone ?? "");
       setDeliveryDate(existing.delivery_date);
       loadedDeliveryDateRef.current = existing.delivery_date;
+      repricedAwayRef.current = false;
+      loadedLinePricesRef.current = new Map(
+        existing.lines.map((l) => [
+          l.id,
+          {
+            unit_price: String(l.unit_price),
+            source: l.unit_price_source,
+            source_id: l.unit_price_source_id,
+            effective: l.unit_price,
+          },
+        ]),
+      );
       if (existing.delivery_time) {
         const t = trimSec(existing.delivery_time); // "HH:mm"
         setHour(t.slice(0, 2));
@@ -458,7 +481,9 @@ export function CustomerOrderModal({
                   code: "",
                   display_name: l.product_display_name,
                   unit_of_sale: l.product_unit_of_sale,
-                  mva_rate: 15,
+                  // Faktisk lagret sats — ikke en hardkodet standard som ville
+                  // skrevet 15 % over en linje lagret med 25 % eller 0 %.
+                  mva_rate: l.vat_rate ?? 15,
                   status: "active",
                   is_for_sale: true,
                   is_divisible: false,
@@ -594,6 +619,8 @@ export function CustomerOrderModal({
       initializedRef.current = false;
       skipNextDirtyRef.current = false;
       loadedDeliveryDateRef.current = null;
+      loadedLinePricesRef.current = new Map();
+      repricedAwayRef.current = false;
       return;
     }
     if (!initializedRef.current) {
@@ -615,8 +642,15 @@ export function CustomerOrderModal({
   // overstyrte priser røres ikke.
   useEffect(() => {
     if (!open || !deliveryDate) return;
-    // Urørt, lagret ordre: behold prisene den ble lagret med.
-    if (loadedDeliveryDateRef.current === deliveryDate) return;
+    if (loadedDeliveryDateRef.current === deliveryDate) {
+      // Urørt, lagret ordre: behold prisene den ble lagret med.
+      if (!repricedAwayRef.current) return;
+      // Brukeren har vært innom en annen dato og gått tilbake. Da må de avtalte
+      // prisene gjenopprettes — ellers blir mellomdatoens priser stående.
+      repricedAwayRef.current = false;
+      setLines((prev) => restoreLoadedPrices(prev, loadedLinePricesRef.current));
+      return;
+    }
     const customerId = customer.id;
     const date = deliveryDate;
     let cancelled = false;
@@ -626,6 +660,7 @@ export function CustomerOrderModal({
       );
       if (repriceable.length === 0) return;
       let prices: Map<string, EffectivePrice>;
+      setPricing(true);
       try {
         prices = await fetchEffectivePricesBatch({
           productIds: Array.from(new Set(repriceable.map((l) => l.product!.id))),
@@ -637,8 +672,11 @@ export function CustomerOrderModal({
         logAppError(err, { scope: "ordre:kundeordre:reprising" });
         toast.error("Fant ikke nye priser for datoen. Kontroller prisene før du lagrer.");
         return;
+      } finally {
+        setPricing(false);
       }
       if (cancelled) return;
+      repricedAwayRef.current = true;
       setLines((prev) =>
         prev.map((l) => {
           if (!l.product || isManualOverride(l.unit_price_source)) return l;
@@ -862,6 +900,8 @@ export function CustomerOrderModal({
 
 
     const inputLines: CustomerOrderLineInput[] = validLines.map((l) => ({
+      // Bevarer linjeidentiteten ved lagring (etiketter/kakebilder peker hit).
+      id: l.id ?? null,
       product_id: l.product!.id,
       product_display_number: l.product!.display_number ?? null,
       product_display_name: l.product!.display_name,
@@ -1564,14 +1604,16 @@ export function CustomerOrderModal({
               <Button
                 type="button"
                 onClick={() => handleSave()}
-                disabled={submitting || rulesPreview.blocks.length > 0}
+                disabled={submitting || pricing || rulesPreview.blocks.length > 0}
                 title={
                   rulesPreview.blocks.length > 0
                     ? "Ordren bryter en leveringsregel"
-                    : undefined
+                    : pricing
+                      ? "Henter priser for datoen"
+                      : undefined
                 }
               >
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {submitting || pricing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 {isEdit ? "Lagre endringer" : "Opprett kundeordre"}
               </Button>
             )}

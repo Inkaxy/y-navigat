@@ -11,6 +11,10 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    // RLS-røyktestene treffer den ekte Supabase-instansen og krever
+    // konfigurasjon. De kjøres som egen jobb (`npm run test:rls`) slik at de
+    // ikke kan bli stille hoppet over i den vanlige testkjøringen.
+    exclude: ["node_modules/**", "dist/**", "src/test/rls.test.ts"],
   },
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },

@@ -16000,6 +16000,10 @@ export type Database = {
         Returns: boolean
       }
       order_lifecycle: { Args: { p_order_id: string }; Returns: string }
+      order_save_with_lines: {
+        Args: { p_header: Json; p_lines: Json; p_order_id: string }
+        Returns: Json
+      }
       orders_lifecycle: {
         Args: { p_order_ids: string[] }
         Returns: {

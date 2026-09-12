@@ -41,6 +41,30 @@ jobs:
           VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID || 'placeholder' }}
         run: npm run build
 
+  security:
+    name: Sikkerhet (RLS-røyktester)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Kjører kun på egne branches — forks har ikke secrets og skal ikke
+    # rapportere falsk grønt.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installer avhengigheter
+        run: npm ci
+
+      - name: RLS-røyktester (kun lesing)
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: npm run test:rls
+
   lint:
     # MIDLERTIDIG RAPPORTERENDE JOBB.
     # Kodebasen har i dag ~1 100 eksisterende ESLint-feil (hovedsakelig

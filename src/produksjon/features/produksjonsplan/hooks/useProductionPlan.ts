@@ -85,6 +85,26 @@ const EMPTY_BASIS: ProductionPlanBasis = {
   newAfterRunCount: 0,
 };
 
+/**
+ * Kundegruppemedlemskap for et sett kunder. Pagineres fordi et stort utvalg
+ * kunder lett gir flere rader enn API-grensen, og feil kastes videre — et
+ * tapt medlemskap ville stille fjernet kunden fra planen.
+ */
+async function fetchGroupMembers(
+  customerIds: string[],
+): Promise<Array<{ customer_id: string; group_id: string }>> {
+  if (customerIds.length === 0) return [];
+  return fetchAllRows<{ customer_id: string; group_id: string }>((from, to) =>
+    supabase
+      .from("customer_group_members")
+      .select("customer_id, group_id")
+      .in("customer_id", customerIds)
+      .order("customer_id", { ascending: true })
+      .order("group_id", { ascending: true })
+      .range(from, to),
+  );
+}
+
 export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
   return useQuery({
     queryKey: ["produksjonsplan", "rows", legalEntityId, date, criteria],
@@ -129,12 +149,16 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
 
 
       // Hent alle aktive turer for selskapet (trenger info for ekspandering av fastordre uten tur).
-      const { data: allTours } = await supabase
+      const { data: allTours, error: toursErr } = await supabase
         .from("delivery_tours")
         .select(
           "id, tour_number, display_name, status, active_monday, active_tuesday, active_wednesday, active_thursday, active_friday, active_saturday, active_sunday",
         )
-        .eq("legal_entity_id", legalEntityId);
+        .eq("legal_entity_id", legalEntityId)
+        .order("tour_number", { ascending: true });
+      // Turene avgjør både filtrering og fastordre-ekspansjon. Uten dem blir
+      // planen ufullstendig, og da skal spørringen feile synlig.
+      if (toursErr) throw toursErr;
       type TourRow = {
         id: string;
         tour_number: number | null;
@@ -170,11 +194,8 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
       const customerGroupMap = new Map<string, Set<string>>(); // customer_id -> Set<group_id>
       if (criteria.customer_group_ids.length > 0 && filteredOrders.length > 0) {
         const customerIds = Array.from(new Set(filteredOrders.map((o) => o.customer_id)));
-        const { data: members } = await supabase
-          .from("customer_group_members")
-          .select("customer_id, group_id")
-          .in("customer_id", customerIds);
-        for (const m of members ?? []) {
+        const members = await fetchGroupMembers(customerIds);
+        for (const m of members) {
           const set = customerGroupMap.get(m.customer_id) ?? new Set<string>();
           set.add(m.group_id);
           customerGroupMap.set(m.customer_id, set);
@@ -278,12 +299,9 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
       let finalRecurring = activeRecurring;
       if (criteria.customer_group_ids.length > 0 && activeRecurring.length > 0) {
         const recCustomerIds = Array.from(new Set(activeRecurring.map((r) => r.customer_id)));
-        const { data: members } = await supabase
-          .from("customer_group_members")
-          .select("customer_id, group_id")
-          .in("customer_id", recCustomerIds);
+        const members = await fetchGroupMembers(recCustomerIds);
         const map = new Map<string, Set<string>>();
-        for (const m of members ?? []) {
+        for (const m of members) {
           const set = map.get(m.customer_id) ?? new Set<string>();
           set.add(m.group_id);
           map.set(m.customer_id, set);
@@ -303,7 +321,7 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
           );
 
       // === Grunnlag: pakksedler når hovedkjøringen er fullført ================
-      const { data: runRows } = await supabase
+      const { data: runRows, error: runErr } = await supabase
         .from("delivery_note_runs")
         .select("id, completed_at, finished_at, tour_filter, notes_generated")
         .eq("legal_entity_id", legalEntityId)
@@ -312,6 +330,9 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
         .eq("status", "completed")
         .order("created_at", { ascending: false })
         .limit(10);
+      // Uten kjøringene vet vi ikke om pakksedlene er fasit — da kan planen
+      // vise bestillinger som om kjøringen aldri skjedde.
+      if (runErr) throw runErr;
       const mainRun = pickCompletedMainRun(
         (runRows ?? []) as RunLike[],
         criteria.tour_numbers,
@@ -337,12 +358,9 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
       /** null = ingen kundegruppe-filter, ellers settet med tillatte kunder. */
       const allowedByGroup = async (customerIds: string[]): Promise<Set<string> | null> => {
         if (criteria.customer_group_ids.length === 0 || customerIds.length === 0) return null;
-        const { data: members } = await supabase
-          .from("customer_group_members")
-          .select("customer_id, group_id")
-          .in("customer_id", customerIds);
+        const members = await fetchGroupMembers(customerIds);
         const map = new Map<string, Set<string>>();
-        for (const m of members ?? []) {
+        for (const m of members) {
           const set = map.get(m.customer_id) ?? new Set<string>();
           set.add(m.group_id);
           map.set(m.customer_id, set);
@@ -503,10 +521,12 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
       );
       let mainCatMap = new Map<string, MainCategoryRow>();
       if (mainCatIds.length > 0) {
-        const { data: cats } = await supabase
+        const { data: cats, error: catsErr } = await supabase
           .from("product_main_categories")
           .select("id, code, display_name, sort_order")
-          .in("id", mainCatIds);
+          .in("id", mainCatIds)
+          .order("sort_order", { ascending: true });
+        if (catsErr) throw catsErr;
         mainCatMap = new Map((cats ?? []).map((c) => [c.id, c as MainCategoryRow]));
       }
 
@@ -516,10 +536,12 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
       );
       let prodGroupMap = new Map<string, { id: string; display_name: string; main_product_id: string | null }>();
       if (prodGroupIds.length > 0) {
-        const { data: pgs } = await supabase
+        const { data: pgs, error: pgErr } = await supabase
           .from("production_groups")
           .select("id, display_name, main_product_id")
-          .in("id", prodGroupIds);
+          .in("id", prodGroupIds)
+          .order("id", { ascending: true });
+        if (pgErr) throw pgErr;
         prodGroupMap = new Map(
           (pgs ?? []).map((g: { id: string; display_name: string; main_product_id: string | null }) => [g.id, g]),
         );
@@ -537,10 +559,12 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
           ).filter((id) => !productMap.has(id))
         : [];
       if (mainProductIds.length > 0) {
-        const { data: extra } = await supabase
+        const { data: extra, error: extraErr } = await supabase
           .from("products")
           .select("id, display_number, display_name, unit_of_sale, main_category_id, sub_category_id, production_group_id, dough_type, pieces_per_tray, pieces_per_liter")
           .in("id", mainProductIds);
+        // Hovedvarene bestemmer hvilken rad mengdene slås sammen på.
+        if (extraErr) throw extraErr;
         for (const p of extra ?? []) productMap.set(p.id, p as ProductRow);
       }
 
@@ -694,12 +718,27 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
       // === Fra lager ==========================================================
       // Fordeler tilgjengelig beholdning per lagervare grådig i planens rekkefølge.
       {
-        const [linkRes, balRes] = await Promise.all([
-          supabase.from("product_stock_links").select("product_id, stock_item_id, units_per_sold_unit"),
-          supabase.from("stock_item_balance").select("id, on_hand").eq("legal_entity_id", legalEntityId),
+        // «Fra lager» trekker fra produksjonsbehovet. Feiler oppslaget, skal
+        // planen feile — ikke stille vise full produksjon eller halve lageret.
+        const [linkRows, balRows] = await Promise.all([
+          fetchAllRows<Record<string, unknown>>((from, to) =>
+            supabase
+              .from("product_stock_links")
+              .select("product_id, stock_item_id, units_per_sold_unit")
+              .order("product_id", { ascending: true })
+              .range(from, to),
+          ),
+          fetchAllRows<Record<string, unknown>>((from, to) =>
+            supabase
+              .from("stock_item_balance")
+              .select("id, on_hand")
+              .eq("legal_entity_id", legalEntityId)
+              .order("id", { ascending: true })
+              .range(from, to),
+          ),
         ]);
         const linkByProduct = new Map<string, { stock_item_id: string; units_per_sold_unit: number }>(
-          ((linkRes.data ?? []) as Record<string, unknown>[]).map((l) => [
+          linkRows.map((l) => [
             l.product_id as string,
             {
               stock_item_id: l.stock_item_id as string,
@@ -708,7 +747,7 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
           ]),
         );
         const avail = new Map<string, number>(
-          ((balRes.data ?? []) as Record<string, unknown>[]).map((b) => [b.id as string, Number(b.on_hand ?? 0)]),
+          balRows.map((b) => [b.id as string, Number(b.on_hand ?? 0)]),
         );
         for (const row of rows) {
           const link = linkByProduct.get(row.product_id);

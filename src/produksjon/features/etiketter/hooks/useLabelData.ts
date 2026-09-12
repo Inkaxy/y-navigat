@@ -21,12 +21,26 @@ export interface LabelData {
 
 export type LabelDataMap = Record<string, LabelData | null>;
 
-function toNum(v: unknown): number | null {
-  const n = typeof v === "number" ? v : Number(v);
-  return Number.isFinite(n) ? n : null;
+/**
+ * Tall fra RPC-en. Ekte 0 beholdes, men null/undefined/tom streng og ugyldige
+ * verdier gir null slik at neste kilde (faktisk grovhetsprosent) brukes —
+ * `Number(null)` og `Number("")` er 0 og ville stoppet fallbacken.
+ */
+export function toNum(v: unknown): number | null {
+  if (v === null || v === undefined) return null;
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v === "boolean") return null;
+  if (typeof v === "string") {
+    const t = v.trim();
+    if (t === "") return null;
+    const n = Number(t.replace(",", "."));
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
 }
 
-function toMap(ids: string[], rows: unknown): LabelDataMap {
+
+export function toMap(ids: string[], rows: unknown): LabelDataMap {
   const out: LabelDataMap = {};
   for (const id of ids) out[id] = null;
   for (const raw of (rows as Array<Record<string, unknown>>) ?? []) {

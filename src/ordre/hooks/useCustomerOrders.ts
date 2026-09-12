@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { resolveLineVatRate } from "@/ordre/lib/orderRepricing";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { fetchEffectivePricesBatch, type PriceCaller } from "@/ordre/hooks/useNBProducts";
@@ -95,6 +96,8 @@ export type CustomerOrderLineDraftLoaded = {
   /** Priskilden linjen ble lagret med — bevares slik at visning og lagring samsvarer. */
   unit_price_source: string | null;
   unit_price_source_id: string | null;
+  /** Mva-satsen linjen faktisk er lagret med (15/25/0 …). */
+  vat_rate: number | null;
   merknad: Merknad | null;
   notes: string;
 };
@@ -125,7 +128,7 @@ export function useCustomerOrderDetail(orderId: string | null) {
 
       const { data: lines, error: linesErr } = await supabase
         .from("order_lines")
-        .select("id, product_id, product_snapshot, quantity, unit_price, unit_price_source, unit_price_source_id, sales_unit, line_number, merknad, notes")
+        .select("id, product_id, product_snapshot, quantity, unit_price, unit_price_source, unit_price_source_id, vat_rate, sales_unit, line_number, merknad, notes")
         .eq("order_id", orderId!)
         .order("line_number", { ascending: true });
       if (linesErr) throw linesErr;
@@ -166,6 +169,7 @@ export function useCustomerOrderDetail(orderId: string | null) {
               (l as { unit_price_source?: string | null }).unit_price_source ?? null,
             unit_price_source_id:
               (l as { unit_price_source_id?: string | null }).unit_price_source_id ?? null,
+            vat_rate: l.vat_rate == null ? null : Number(l.vat_rate),
             merknad: parseMerknad(l.merknad),
             notes: (l as { notes?: string | null }).notes ?? "",
           };
@@ -214,6 +218,12 @@ export function useFinalCustomerSuggestions(customerId: string | null, search: s
 }
 
 export type CustomerOrderLineInput = {
+  /**
+   * Id-en til en eksisterende ordrelinje. Settes for linjer som allerede finnes
+   * på ordren, slik at lagringen oppdaterer raden i stedet for å slette og
+   * opprette den på nytt — etiketter og kakebilder peker på denne id-en.
+   */
+  id?: string | null;
   product_id: string;
   product_display_number: number | null;
   product_display_name: string;
@@ -410,6 +420,8 @@ export function useUpdateCustomerOrder() {
         vat_rate: number | null;
       };
       const existingByKey = new Map<string, PrevPrice>();
+      const existingById = new Map<string, PrevPrice>();
+      const existingIds = new Set<string>();
       // Kakelinjer prises av kakebyggeren. Merknaden (cake_config m.m.) kan endres
       // uten at prisen skal reprises, så vi matcher dem også kun på produkt.
       const cakePriceByProduct = new Map<string, PrevPrice>();
@@ -421,6 +433,8 @@ export function useUpdateCustomerOrder() {
           vat_rate: pl.vat_rate == null ? null : Number(pl.vat_rate),
         };
         existingByKey.set(`${pl.product_id}|${merknadKey(pl.merknad)}`, entry);
+        existingById.set(pl.id as string, entry);
+        existingIds.add(pl.id as string);
         if (entry.unit_price_source === "cake_builder") {
           cakePriceByProduct.set(pl.product_id, entry);
         }
@@ -477,7 +491,10 @@ export function useUpdateCustomerOrder() {
               : new Map<string, { price: number; vat_rate: number; source: string; special_price_id: string | null; price_list_id: string | null; is_fallback: boolean }>();
 
           lineRows = input.lines.map((l, idx) => {
+            const lineId = l.id && existingIds.has(l.id) ? l.id : null;
             const existing =
+              // Linje-id-en er den sikreste koblingen til den lagrede raden.
+              (lineId ? existingById.get(lineId) : undefined) ??
               existingByKey.get(`${l.product_id}|${merknadKey(l.merknad ?? null)}`) ??
               // Kakelinje: behold kakebygger-prisen selv om merknaden er endret.
               cakePriceByProduct.get(l.product_id);
@@ -491,13 +508,15 @@ export function useUpdateCustomerOrder() {
               // datoendring. Da lagres nøyaktig det som står på skjermen, slik
               // at visning og persistert verdi aldri divergerer.
               unitPrice = l.unit_price;
-              vatRate = l.product_mva_rate ?? existing?.vat_rate ?? 15;
+              // Faktisk lagret mva vinner: et syntetisk produkt-snapshot kan ha
+              // standardsatsen 15 selv om linjen er lagret med 25 eller 0.
+              vatRate = resolveLineVatRate(existing?.vat_rate, l.product_mva_rate);
               source = l.unit_price_source;
               sourceId = l.unit_price_source_id ?? null;
             } else if (existing) {
               // Uendret linje — behold pris og kilde nøyaktig som bestilt.
               unitPrice = existing.unit_price;
-              vatRate = existing.vat_rate ?? l.product_mva_rate ?? 15;
+              vatRate = resolveLineVatRate(existing.vat_rate, l.product_mva_rate);
               source = existing.unit_price_source ?? "unchanged";
               sourceId = existing.unit_price_source_id;
             } else {
@@ -512,6 +531,7 @@ export function useUpdateCustomerOrder() {
             const subtotal = l.quantity * unitPrice;
             const vat = subtotal * (vatRate / 100);
             return {
+              id: lineId,
               order_id: orderId,
               line_number: idx + 1,
               product_id: l.product_id,
@@ -538,14 +558,16 @@ export function useUpdateCustomerOrder() {
           });
         }
 
-        // Atomic replace: delete existing order_lines and insert the new set in one transaction.
-        const { error: replaceErr } = await supabase.rpc("replace_child_rows", {
-          p_table: "order_lines",
-          p_parent_column: "order_id",
-          p_parent_id: orderId,
-          p_rows: lineRows,
+        // Atomisk lagring som BEVARER linje-id-ene: urørte linjer oppdateres,
+        // nye settes inn, og bare linjer brukeren faktisk fjernet slettes.
+        // (Den gamle «slett alt og sett inn på nytt»-varianten gjorde at
+        // etiketter og kakebilder mistet koblingen til linjen sin.)
+        const { error: saveErr } = await supabase.rpc("order_save_with_lines", {
+          p_order_id: orderId,
+          p_header: updatePayload,
+          p_lines: lineRows,
         } as never);
-        if (replaceErr) throw replaceErr;
+        if (saveErr) throw saveErr;
       } catch (e) {
         // Rull tilbake hode-endringen slik at ordren ikke blir stående med ny
         // dato/tur men gamle linjer.
@@ -578,14 +600,18 @@ export function useUpdateCustomerOrder() {
             list.push(nl.id as string);
             availableByProduct.set(nl.product_id as string, list);
           }
+          const stillExisting = new Set((newLines ?? []).map((nl) => nl.id as string));
           for (const img of cakeImgs ?? []) {
-            const productId = img.order_line_id
-              ? prevProductByLineId.get(img.order_line_id as string)
-              : undefined;
-            const candidates = productId ? availableByProduct.get(productId) : undefined;
-            const newLineId = candidates?.shift() ?? null;
             const patch: Record<string, unknown> = { delivery_date: input.deliveryDate };
-            if (newLineId) patch.order_line_id = newLineId;
+            const oldLineId = (img.order_line_id as string | null) ?? null;
+            // Linje-id-ene bevares nå ved lagring. Bildet flyttes kun hvis
+            // linjen det pekte på faktisk ble fjernet.
+            if (!oldLineId || !stillExisting.has(oldLineId)) {
+              const productId = oldLineId ? prevProductByLineId.get(oldLineId) : undefined;
+              const candidates = productId ? availableByProduct.get(productId) : undefined;
+              const newLineId = candidates?.shift() ?? null;
+              if (newLineId) patch.order_line_id = newLineId;
+            }
             await supabase.from("cake_images").update(patch as never).eq("id", img.id);
           }
         }
