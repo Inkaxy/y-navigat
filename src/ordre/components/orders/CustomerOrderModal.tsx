@@ -172,6 +172,11 @@ type LineDraft = {
   /** Settes til 'manual_override' når operatøren skriver inn prisen selv. */
   unit_price_source?: string | null;
   unit_price_source_id?: string | null;
+  /** Priskilden som hører til `effective_price` — brukes når en manuell
+   *  overstyring angres, slik at linjen får tilbake riktig kilde og ikke en
+   *  tom kilde som ville fått lagringen til å beholde en gammel pris. */
+  base_price_source?: string | null;
+  base_price_source_id?: string | null;
   merknad: Merknad | null;
   /** Fritekstnotat på linjen — bl.a. begrunnelse for manuell prisoverstyring. */
   notes: string;
@@ -430,6 +435,18 @@ export function CustomerOrderModal({
               product_unit_of_sale: l.product_unit_of_sale,
               quantity: String(l.quantity),
               unit_price: String(l.unit_price),
+              // Priskilden følger med fra ordren. Uten den ville linjen sett
+              // ut som en ny, uprisit linje og blitt reprist ved datoendring
+              // uten at lagringen fulgte etter.
+              unit_price_source: l.unit_price_source,
+              unit_price_source_id: l.unit_price_source_id,
+              base_price_source: isManualOverride(l.unit_price_source)
+                ? null
+                : l.unit_price_source,
+              base_price_source_id: isManualOverride(l.unit_price_source)
+                ? null
+                : l.unit_price_source_id,
+              effective_price: l.unit_price,
               merknad: l.merknad,
               notes: l.notes ?? "",
 
@@ -554,6 +571,10 @@ export function CustomerOrderModal({
           unit_price: ep ? String(ep.price) : "0",
           is_fallback: !ep || ep.is_fallback,
           effective_price: ep?.price ?? null,
+          unit_price_source: ep?.source ?? null,
+          unit_price_source_id: ep?.special_price_id ?? ep?.price_list_id ?? null,
+          base_price_source: ep?.source ?? null,
+          base_price_source_id: ep?.special_price_id ?? ep?.price_list_id ?? null,
           merknad: null,
           notes: "",
         });
@@ -626,6 +647,12 @@ export function CustomerOrderModal({
           return {
             ...l,
             unit_price: String(ep.price ?? 0),
+            // Ny dato gir ny kilde. Den sendes med til lagring, slik at
+            // persistert pris og kilde blir nøyaktig det som vises.
+            unit_price_source: ep.source,
+            unit_price_source_id: ep.special_price_id ?? ep.price_list_id ?? null,
+            base_price_source: ep.source,
+            base_price_source_id: ep.special_price_id ?? ep.price_list_id ?? null,
             is_fallback: ep.is_fallback,
             effective_price: ep.price,
           };
@@ -1607,7 +1634,8 @@ export function CustomerOrderModal({
                 ? {
                     ...l,
                     unit_price: String(l.effective_price),
-                    unit_price_source: null,
+                    unit_price_source: l.base_price_source ?? null,
+                    unit_price_source_id: l.base_price_source_id ?? null,
                   }
                 : l,
             ),

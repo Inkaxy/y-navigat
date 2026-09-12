@@ -15795,6 +15795,16 @@ export type Database = {
         Args: { p_delivery_date?: string; p_product_id: string }
         Returns: Json
       }
+      label_units_mark_printed: {
+        Args: {
+          p_department_id: string
+          p_jobs: Json
+          p_legal_entity_id: string
+          p_profile_id: string
+          p_status: string
+        }
+        Returns: Json
+      }
       list_active_cake_categories: {
         Args: { p_legal_entity_id: string }
         Returns: {

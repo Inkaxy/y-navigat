@@ -51,6 +51,16 @@ describe("portvakt for etikettutskrift", () => {
     expect(r.status).toBe("missing_data");
   });
 
+  it("sperrer når det ikke finnes noe å kontrollere i det hele tatt", () => {
+    const r = evaluateLabelPrintGate({
+      ...ok,
+      requiredOrderLineIds: [],
+      resolvedOrderLineIds: [],
+    });
+    expect(r.canPrint).toBe(false);
+    expect(r.status).toBe("missing_data");
+  });
+
   it("sperrer uten etikettprofil", () => {
     const r = evaluateLabelPrintGate({ ...ok, hasProfile: false });
     expect(r.status).toBe("no_profile");
