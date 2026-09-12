@@ -8,6 +8,7 @@ import {
   type CombinedLabelItem,
 } from "../lib/labelPdf";
 import { useLabelData } from "../hooks/useLabelData";
+import { evaluateLabelPrintGate } from "../lib/labelPrintGate";
 import { useLabelFieldCatalog } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelFieldCatalog";
 import { useOrderLineCustomerInfo } from "../hooks/useOrderLineCustomerInfo";
 import {
@@ -114,7 +115,13 @@ export function PrintLabelDialog({
   );
 
   const orderLineIds = useMemo(() => row?.order_line_ids ?? [], [row]);
-  const { data: labelDataMap } = useLabelData(orderLineIds);
+  const {
+    data: labelDataMap,
+    isLoading: labelDataLoading,
+    isError: labelDataError,
+    refetch: refetchLabelData,
+    isFetching: labelDataFetching,
+  } = useLabelData(orderLineIds);
   const catalog = useLabelFieldCatalog();
   const fieldLabels = Object.fromEntries(
     catalog.entries.map((e) => [e.field_key, e.display_name]),
@@ -137,16 +144,21 @@ export function PrintLabelDialog({
    * øvrige. Kritiske mangler blokkerer utskrift — det finnes ingen «skriv ut
    * likevel».
    */
-  const missingReport = useMemo(() => {
-    const critical = new Map<string, Set<string>>();
-    const other = new Map<string, Set<string>>();
-    const rowsToCheck =
+  /** Radene deklarasjonskontrollen må dekke for denne utskriften. */
+  const rowsToCheck = useMemo(
+    () =>
       selectedUnits.length > 0
         ? selectedUnits.map((u) => ({
             id: u.order_line_id,
             label: `etikett ${u.number}`,
           }))
-        : orderLineIds.map((id) => ({ id, label: row?.display_name ?? "varen" }));
+        : orderLineIds.map((id) => ({ id, label: row?.display_name ?? "varen" })),
+    [selectedUnits, orderLineIds, row?.display_name],
+  );
+
+  const missingReport = useMemo(() => {
+    const critical = new Map<string, Set<string>>();
+    const other = new Map<string, Set<string>>();
 
     for (const r of rowsToCheck) {
       if (!r.id) continue;
@@ -160,12 +172,33 @@ export function PrintLabelDialog({
       }
     }
     return { critical, other };
-  }, [labelDataMap, selectedUnits, orderLineIds, printedFields, row?.display_name]);
+  }, [labelDataMap, rowsToCheck, printedFields]);
 
   // Pliktfeltsjekken er nå alene om å komme fra `resolve_label_data.mangler`
   // (via missingReport.critical) — ingen lokal duplikat-liste med egne nøkler
   // som kan gå ut av synk med databasens felt-katalog.
   const blockedByMissing = missingReport.critical.size > 0;
+
+  /**
+   * Ett sted som avgjør om utskrift i det hele tatt er forsvarlig: laster
+   * kontrollen, feilet den, mangler profil, mangler svar for en ordrelinje,
+   * eller finnes det kritiske mangler.
+   */
+  const gate = useMemo(
+    () =>
+      evaluateLabelPrintGate({
+        hasProfile: !!profile,
+        isLoading: orderLineIds.length > 0 && labelDataLoading,
+        isError: labelDataError,
+        requiredOrderLineIds: rowsToCheck.map((r) => r.id).filter((id): id is string => !!id),
+        resolvedOrderLineIds: Object.entries(labelDataMap ?? {})
+          .filter(([, v]) => v !== null && v !== undefined)
+          .map(([k]) => k),
+        criticalMissingCount: missingReport.critical.size,
+        unverifiableCount: rowsToCheck.filter((r) => !r.id).length,
+      }),
+    [profile, orderLineIds.length, labelDataLoading, labelDataError, rowsToCheck, labelDataMap, missingReport.critical.size],
+  );
 
   const describeMissing = (m: Map<string, Set<string>>) =>
     [...m.entries()].map(([key, who]) => ({
@@ -228,12 +261,8 @@ export function PrintLabelDialog({
 
   const handleDownloadPdf = async () => {
     if (!row) return;
-    if (blockedByMissing) {
-      toast.error("Kan ikke skrives ut — kritiske deklarasjonsdata mangler.");
-      return;
-    }
-    if (!profile) {
-      toast.error("Mangler etikett-profil for varen — sett profil først.");
+    if (!gate.canPrint) {
+      toast.error(gate.reason ?? "Etiketten kan ikke skrives ut ennå.");
       return;
     }
     setDownloading(true);
