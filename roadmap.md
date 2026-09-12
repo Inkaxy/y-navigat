@@ -42,3 +42,12 @@
 - [ ] B normalizePackageUnit koblet inn i SetPackageDialog.tsx
 - [ ] C Deno-tester på autorisasjonsgrenen i microsoft-graph-subscription-renew og pakkesystem-push-cron
 - [ ] D Fjern env CRON_SECRET-grenen i microsoft-graph-subscription-renew
+
+## Intern lanseringsstatus – ordrelagring (8cc8227-oppfølging)
+- [x] Ny linje skilles fra eksisterende via database-id; produkt/merknad brukes ikke lenger som identitet
+  (`src/ordre/lib/orderLineRows.ts`, `src/ordre/hooks/useCustomerOrders.ts`)
+- [x] Ny linje bærer egen bekreftet pris/kilde fra prisoppslaget (`appendProductLine` i `CustomerOrderModal.tsx`)
+- [x] Utestående prisoppslag forkastes ved lukking og ved bytte av ordre/kunde (`src/ordre/hooks/usePricingTracker.ts`)
+- [x] Tester: `src/test/orderLineRows.test.ts` (6), `src/test/usePricingTracker.test.tsx` (3)
+- Status: IKKE erklært 100 % lanseringsklar. `src/test/ticketInbox.test.tsx` er tidsavhengig (timeout ved
+  samtidig bygg, grønn alene) og bør stabiliseres før lansering.
