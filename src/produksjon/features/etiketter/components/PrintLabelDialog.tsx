@@ -316,16 +316,20 @@ export function PrintLabelDialog({
     }
   }
 
+  /**
+   * Steg 1: lag PDF-en og åpne den. Ingenting registreres som skrevet ut her —
+   * brukeren kan avbryte i nettleserens utskriftsvindu, og da er etiketten
+   * aldri kommet ut av skriveren.
+   */
   const handlePrint = async () => {
     if (!row || !deptId) return;
-    if (blockedByMissing) {
-      toast.error("Kan ikke skrives ut — kritiske deklarasjonsdata mangler.");
+    if (!gate.canPrint) {
+      toast.error(gate.reason ?? "Etiketten kan ikke skrives ut ennå.");
       return;
     }
     setErrorMessage(null);
     setPrinting(true);
     try {
-      if (!profile) throw new Error("Mangler etikett-profil for varen — sett profil først.");
       const blob = await generateBlob();
       const url = URL.createObjectURL(blob);
       const win = window.open(url, "_blank");
@@ -342,6 +346,7 @@ export function PrintLabelDialog({
         document.body.removeChild(a);
       }
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      setAwaitingConfirm(true);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Kunne ikke generere etikett-PDF";
       setErrorMessage(msg);
@@ -349,20 +354,43 @@ export function PrintLabelDialog({
       try {
         await logJobs("failed");
       } catch { /* ignorer dobbel-feil */ }
+    } finally {
       setPrinting(false);
-      return;
     }
+  };
 
+  /** Steg 2: brukeren bekrefter at etikettene faktisk kom ut av skriveren. */
+  const handleConfirmPrinted = async () => {
+    setErrorMessage(null);
+    setPrinting(true);
     try {
       await logJobs("printed");
       await markLabelUnitsPrinted(selectedUnits);
+      setAwaitingConfirm(false);
       toast.success(
         selectedUnits.length > 0
-          ? `Etikett ${formatNumberRanges(selectedUnits.map((u) => u.number))} skrevet ut`
-          : "Etikett skrevet ut",
+          ? `Etikett ${formatNumberRanges(selectedUnits.map((u) => u.number))} registrert som skrevet ut`
+          : "Etikett registrert som skrevet ut",
       );
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Kunne ikke logge print-jobb";
+      const msg = e instanceof Error ? e.message : "Kunne ikke registrere utskriften";
+      setErrorMessage(msg);
+      toast.error(msg);
+    } finally {
+      setPrinting(false);
+    }
+  };
+
+  /** Steg 2b: utskriften mislyktes eller ble avbrutt — numrene forblir uutskrevne. */
+  const handleReportFailed = async () => {
+    setErrorMessage(null);
+    setPrinting(true);
+    try {
+      await logJobs("failed");
+      setAwaitingConfirm(false);
+      toast.message("Registrert som mislykket — numrene står fortsatt som uutskrevne.");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Kunne ikke logge mislykket utskrift";
       setErrorMessage(msg);
       toast.error(msg);
     } finally {
