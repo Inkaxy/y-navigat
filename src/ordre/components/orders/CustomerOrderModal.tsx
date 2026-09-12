@@ -4,11 +4,8 @@ import { Loader2, Trash2, StickyNote } from "lucide-react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { restoreLoadedPrices, type LoadedLinePrice } from "@/ordre/lib/orderRepricing";
-import {
-  PricingRequestTracker,
-  pricesResolved,
-  type PricingStatus,
-} from "@/ordre/lib/pricingRequestState";
+import { pricesResolved } from "@/ordre/lib/pricingRequestState";
+import { usePricingTracker } from "@/ordre/hooks/usePricingTracker";
 import {
   Dialog,
   DialogContent,
@@ -386,8 +383,13 @@ export function CustomerOrderModal({
    * kansellert oppslag verken skriver priser eller melder «avklart» når det
    * svarer etter et nyere oppslag.
    */
-  const pricingTrackerRef = useRef(new PricingRequestTracker());
-  const [pricingStatus, setPricingStatus] = useState<PricingStatus>({ pending: false, failed: false });
+  // Lukking eller bytte av ordre/kunde forkaster utestående oppslag, slik at et
+  // sent svar ikke kan skrive priser inn i neste ordre.
+  const {
+    tracker: pricingTracker,
+    status: pricingStatus,
+    setStatus: setPricingStatus,
+  } = usePricingTracker({ open, orderId: orderId ?? null, customerId: customer.id });
   const [pricingRetry, setPricingRetry] = useState(0);
   const pricing = pricingStatus.pending;
   /** Prisene for gjeldende dato er avklart (ingen oppslag pågår, ingen feil). */
@@ -655,7 +657,7 @@ export function CustomerOrderModal({
   // overstyrte priser røres ikke.
   useEffect(() => {
     if (!open || !deliveryDate) return;
-    const tracker = pricingTrackerRef.current;
+    const tracker = pricingTracker;
     if (loadedDeliveryDateRef.current === deliveryDate) {
       // Tilbake til datoen ordren ble lagret med: pågående oppslag for en
       // mellomdato skal forkastes, ellers kan de skrive prisene sine etterpå.
@@ -715,7 +717,10 @@ export function CustomerOrderModal({
         }),
       );
     })();
-    // Kun ved datoendring (eller «Prøv igjen») — linjeendringer prises der de oppstår.
+    // Kun ved datoendring (eller «Prøv igjen») — linjeendringer prises der de
+    // oppstår. `pricingTracker`/`setPricingStatus` er stabile referanser og skal
+    // ikke trigge et nytt prisoppslag.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deliveryDate, open, customer.id, pricingRetry]);
 
   // Ny prisrisiko må bekreftes på nytt.
@@ -799,6 +804,13 @@ export function CustomerOrderModal({
       notes: "",
       unit_price: ep ? String(ep.price) : "0",
       is_fallback: !ep || ep.is_fallback,
+      // Den nye linjen bærer sin EGEN bekreftede pris og kilde. Uten kilde ville
+      // lagringen kunne gjenbruke prisen fra en eldre linje med samme produkt.
+      effective_price: ep?.price ?? null,
+      unit_price_source: ep?.source ?? null,
+      unit_price_source_id: ep?.special_price_id ?? ep?.price_list_id ?? null,
+      base_price_source: ep?.source ?? null,
+      base_price_source_id: ep?.special_price_id ?? ep?.price_list_id ?? null,
       merknad: null,
 
     };

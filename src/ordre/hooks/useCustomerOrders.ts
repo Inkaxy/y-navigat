@@ -1,6 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { resolveLineVatRate } from "@/ordre/lib/orderRepricing";
-import { parseOrderSaveResult, resolveExistingLineId } from "@/ordre/lib/orderSaveResult";
+import { parseOrderSaveResult } from "@/ordre/lib/orderSaveResult";
+import {
+  buildOrderLineRows,
+  productIdsNeedingPrice,
+  resolveLineIds,
+  type EffectivePriceEntry,
+} from "@/ordre/lib/orderLineRows";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { fetchEffectivePricesBatch, type PriceCaller } from "@/ordre/hooks/useNBProducts";
@@ -411,19 +416,18 @@ export function useUpdateCustomerOrder() {
         .eq("order_id", orderId);
       if (prevLinesErr) throw prevLinesErr;
 
-      const merknadKey = (m: unknown) => (m ? JSON.stringify(m) : "");
       type PrevPrice = {
         unit_price: number;
         unit_price_source: string | null;
         unit_price_source_id: string | null;
         vat_rate: number | null;
       };
-      const existingByKey = new Map<string, PrevPrice>();
+      // Historisk pris bevares KUN via linjens database-id. Produkt + merknad er
+      // ikke en identitet: en ny linje med samme produkt som en gammel, manuelt
+      // priset linje ville ellers blitt lagret med den gamle prisen, mens
+      // skjermen viste den ferske. Ny linje = ingen id = egen bekreftet pris.
       const existingById = new Map<string, PrevPrice>();
       const existingIds = new Set<string>();
-      // Kakelinjer prises av kakebyggeren. Merknaden (cake_config m.m.) kan endres
-      // uten at prisen skal reprises, så vi matcher dem også kun på produkt.
-      const cakePriceByProduct = new Map<string, PrevPrice>();
       for (const pl of prevLines ?? []) {
         const entry: PrevPrice = {
           unit_price: Number(pl.unit_price),
@@ -431,12 +435,8 @@ export function useUpdateCustomerOrder() {
           unit_price_source_id: (pl.unit_price_source_id as string | null) ?? null,
           vat_rate: pl.vat_rate == null ? null : Number(pl.vat_rate),
         };
-        existingByKey.set(`${pl.product_id}|${merknadKey(pl.merknad)}`, entry);
         existingById.set(pl.id as string, entry);
         existingIds.add(pl.id as string);
-        if (entry.unit_price_source === "cake_builder") {
-          cakePriceByProduct.set(pl.product_id, entry);
-        }
       }
 
 
@@ -461,21 +461,13 @@ export function useUpdateCustomerOrder() {
 
       // 2. Bygg linjer: reprise KUN nye linjer. Eksisterende linjer beholder
       //    avtalt/manuell pris (og alle priser med låst kilde røres aldri).
-      const fallbackLineIndices: number[] = [];
+      let fallbackLineIndices: number[] = [];
       let lineRows: unknown[] = [];
       {
         if (input.lines.length > 0) {
-          const newProductIds = Array.from(
-            new Set(
-              input.lines
-                .filter(
-                  (l) =>
-                    !existingByKey.has(`${l.product_id}|${merknadKey(l.merknad ?? null)}`) &&
-                    !cakePriceByProduct.has(l.product_id),
-                )
-                .map((l) => l.product_id),
-            ),
-          );
+          // Id-en avgjør om linjen er ny eller eksisterende — ikke produktet.
+          const resolvedLineIds = resolveLineIds(input.lines, existingIds);
+          const newProductIds = productIdsNeedingPrice(input.lines, resolvedLineIds);
           const priceMap =
             newProductIds.length > 0
               ? await fetchEffectivePricesBatch({
@@ -484,74 +476,17 @@ export function useUpdateCustomerOrder() {
                   date: input.deliveryDate,
                   caller: "customer_order_update" as PriceCaller,
                 })
-              : new Map<string, { price: number; vat_rate: number; source: string; special_price_id: string | null; price_list_id: string | null; is_fallback: boolean }>();
+              : new Map<string, EffectivePriceEntry>();
 
-          lineRows = input.lines.map((l, idx) => {
-            const lineId = resolveExistingLineId(l.id ?? null, existingIds);
-            const existing =
-              // Linje-id-en er den sikreste koblingen til den lagrede raden.
-              (lineId ? existingById.get(lineId) : undefined) ??
-              existingByKey.get(`${l.product_id}|${merknadKey(l.merknad ?? null)}`) ??
-              // Kakelinje: behold kakebygger-prisen selv om merknaden er endret.
-              cakePriceByProduct.get(l.product_id);
-            let unitPrice: number;
-            let vatRate: number;
-            let source: string;
-            let sourceId: string | null;
-            if (l.unit_price_source) {
-              // Klienten har en eksplisitt priskilde på linjen: enten manuell
-              // overstyring eller prisen som faktisk vises etter en bevisst
-              // datoendring. Da lagres nøyaktig det som står på skjermen, slik
-              // at visning og persistert verdi aldri divergerer.
-              unitPrice = l.unit_price;
-              // Faktisk lagret mva vinner: et syntetisk produkt-snapshot kan ha
-              // standardsatsen 15 selv om linjen er lagret med 25 eller 0.
-              vatRate = resolveLineVatRate(existing?.vat_rate, l.product_mva_rate);
-              source = l.unit_price_source;
-              sourceId = l.unit_price_source_id ?? null;
-            } else if (existing) {
-              // Uendret linje — behold pris og kilde nøyaktig som bestilt.
-              unitPrice = existing.unit_price;
-              vatRate = resolveLineVatRate(existing.vat_rate, l.product_mva_rate);
-              source = existing.unit_price_source ?? "unchanged";
-              sourceId = existing.unit_price_source_id;
-            } else {
-              const ep = priceMap.get(l.product_id);
-              unitPrice = ep ? ep.price : 0;
-              vatRate = ep?.vat_rate ?? l.product_mva_rate ?? 15;
-              source = ep?.source ?? "fallback_zero";
-              sourceId = ep?.special_price_id ?? ep?.price_list_id ?? null;
-              if (!ep || ep.is_fallback) fallbackLineIndices.push(idx);
-            }
-
-            const subtotal = l.quantity * unitPrice;
-            const vat = subtotal * (vatRate / 100);
-            return {
-              id: lineId,
-              order_id: orderId,
-              line_number: idx + 1,
-              product_id: l.product_id,
-              product_snapshot: {
-                display_number: l.product_display_number,
-                display_name: l.product_display_name,
-                code: l.product_code ?? null,
-                unit_of_sale: l.product_unit_of_sale,
-                mva_rate: vatRate,
-              },
-              quantity: l.quantity,
-              sales_unit: l.product_unit_of_sale,
-              unit_price: unitPrice,
-              unit_price_source: source,
-              unit_price_source_id: sourceId,
-              discount_percent: 0,
-              line_subtotal_excl_vat: Number(subtotal.toFixed(2)),
-              vat_rate: vatRate,
-              line_vat: Number(vat.toFixed(2)),
-              line_total_incl_vat: Number((subtotal + vat).toFixed(2)),
-              merknad: l.merknad ? (l.merknad as unknown as Record<string, unknown>) : null,
-              notes: l.notes ?? null,
-            };
+          const built = buildOrderLineRows({
+            orderId,
+            lines: input.lines,
+            resolvedLineIds,
+            existingById,
+            priceMap,
           });
+          lineRows = built.rows;
+          fallbackLineIndices = built.fallbackLineIndices;
         }
 
         // Atomisk lagring som BEVARER linje-id-ene: hode og linjer skrives i
