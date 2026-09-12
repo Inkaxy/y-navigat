@@ -85,3 +85,12 @@
   åpen redirect er avbøtet i koden via `resolveInternalPath`.
 - vite.config.ts har `server.host: "::"` — dev-serveren lytter på ALLE grensesnitt, ikke bare lokalt.
   Påstanden «bare lokal» i forrige vurdering var altså feil, og dev-server-varslene var reelle.
+
+## Snapshot-låsing under RLS (anvendt live 20260912210449)
+- 20260912205629 sin `SELECT ... FOR UPDATE` gjorde identisk nytt lagringsforsøk til 23505, fordi
+  `production_plan_snapshots` bevisst mangler UPDATE-policy for authenticated og raden derfor ble usynlig.
+- Rettingen (anvendt av bruker, ikke kjørt herfra) bruker `pg_advisory_xact_lock(hashtextextended(...))`
+  per forsøks-id + vanlig SELECT. Ingen policy utvidet, ingen ny tabell, øvrig validering uendret.
+- Ordrett speil: `supabase/applied-sql/20260912210449_fix_snapshot_retry_lock_under_rls.sql`.
+  Regresjon: 5 nye tester i `src/test/appliedSecuritySql.test.ts`. Dekningen er statisk kontroll av
+  speilet SQL pluss brukerens egne PGlite-tester (7/7); ingen test med ekte rollebrukere herfra.

@@ -76,6 +76,60 @@ describe("anvendte sikkerhetsmigrasjoner er speilet i repoet", () => {
     });
   });
 
+  describe("20260912210449 låser snapshot-forsøk uten å kreve UPDATE-rett", () => {
+    const sql = readMirror("20260912210449", "fix_snapshot_retry_lock_under_rls");
+    // Kommentarlinjer forklarer bakgrunnen (som nevner FOR UPDATE) — kontroller SQL-en selv.
+    const code = sql
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("--"))
+      .join("\n");
+
+    it("bruker advisory lock per forsøks-id i stedet for SELECT ... FOR UPDATE", () => {
+      expect(code).toMatch(
+        /PERFORM pg_advisory_xact_lock\(hashtextextended\(p_attempt_id::text, 0\)\)/,
+      );
+      expect(code).not.toMatch(/FOR UPDATE/);
+    });
+
+    it("kjører som kaller (ingen SECURITY DEFINER) så RLS fortsatt gjelder", () => {
+      expect(sql).toMatch(
+        /CREATE OR REPLACE FUNCTION public\.save_production_plan_snapshot\(p_attempt_id uuid, p_legal_entity_id uuid, p_production_date date, p_criteria jsonb, p_items jsonb\)/,
+      );
+      expect(sql).toMatch(/RETURNS jsonb/);
+      expect(sql).toMatch(/SET search_path TO 'public'/);
+      expect(sql).not.toMatch(/SECURITY DEFINER/);
+    });
+
+    it("utvider ingen rettigheter og endrer ingen policy eller tabell", () => {
+      expect(code).not.toMatch(/CREATE POLICY/i);
+      expect(code).not.toMatch(/ALTER POLICY/i);
+      expect(code).not.toMatch(/\bGRANT\b/i);
+      expect(code).not.toMatch(/ALTER TABLE/i);
+      expect(code).not.toMatch(/CREATE TABLE/i);
+      expect(code).not.toMatch(/\bDROP\b/i);
+      expect(code).not.toMatch(/\bTRUNCATE\b/i);
+      expect(code).not.toMatch(/\bDELETE\b/i);
+      expect(code).not.toMatch(/\bUPDATE\b\s+public\./i);
+    });
+
+    it("beholder tilgangs- og gyldighetskontrollene", () => {
+      expect(sql).toMatch(/auth\.uid\(\) IS NULL[\s\S]*?ERRCODE = '42501'/);
+      expect(sql).toMatch(/NOT public\.has_position_in_entity\(p_legal_entity_id\)/);
+      expect(sql).toMatch(
+        /NOT \(public\.has_app_write_access\('produksjon'\) OR public\.has_app_write_access\('varer'\)\)/,
+      );
+      expect(sql).toMatch(/jsonb_typeof\(p_items\) <> 'array'/);
+    });
+
+    it("beholder uforanderlig innholdsvalidering ved gjentatt forsøks-id", () => {
+      expect(sql).toMatch(/Forsøks-id er allerede brukt på et annet grunnlag/);
+      expect(sql).toMatch(/Forsøks-id er allerede brukt med andre kriterier/);
+      expect(sql).toMatch(/Forsøks-id er allerede brukt med andre varelinjer/);
+      expect(sql).toMatch(/'already_saved', true/);
+      expect(sql).toMatch(/Lagret % av % varelinjer/);
+    });
+  });
+
   it("speiler hver anvendt versjon nøyaktig én gang", () => {
     const names = [
       ...readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(".sql")),
