@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { resolveLineVatRate } from "@/ordre/lib/orderRepricing";
-import { parseOrderSaveResult, resolveExistingLineId } from "@/ordre/lib/orderSaveResult";
+import { parseOrderSaveResult } from "@/ordre/lib/orderSaveResult";
 import {
   buildOrderLineRows,
   productIdsNeedingPrice,
