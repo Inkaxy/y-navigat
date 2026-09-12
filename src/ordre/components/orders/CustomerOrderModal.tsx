@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Search, Trash2, AlertTriangle, StickyNote } from "lucide-react";
+import { Loader2, Trash2, StickyNote } from "lucide-react";
 
 import { z } from "zod";
 import { toast } from "sonner";
@@ -29,7 +29,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   AlertDialog,
   AlertDialogAction,
