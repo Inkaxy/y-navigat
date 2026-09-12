@@ -651,25 +651,27 @@ export function CustomerOrderModal({
   // overstyrte priser røres ikke.
   useEffect(() => {
     if (!open || !deliveryDate) return;
+    const tracker = pricingTrackerRef.current;
     if (loadedDeliveryDateRef.current === deliveryDate) {
-      // Urørt, lagret ordre: behold prisene den ble lagret med.
+      // Tilbake til datoen ordren ble lagret med: pågående oppslag for en
+      // mellomdato skal forkastes, ellers kan de skrive prisene sine etterpå.
+      tracker.invalidate();
+      setPricingStatus(tracker.status());
       if (!repricedAwayRef.current) return;
-      // Brukeren har vært innom en annen dato og gått tilbake. Da må de avtalte
-      // prisene gjenopprettes — ellers blir mellomdatoens priser stående.
       repricedAwayRef.current = false;
       setLines((prev) => restoreLoadedPrices(prev, loadedLinePricesRef.current));
       return;
     }
     const customerId = customer.id;
     const date = deliveryDate;
-    let cancelled = false;
     void (async () => {
       const repriceable = linesRef.current.filter(
         (l) => l.product && !isManualOverride(l.unit_price_source),
       );
       if (repriceable.length === 0) return;
+      const generation = tracker.start();
+      setPricingStatus(tracker.status());
       let prices: Map<string, EffectivePrice>;
-      setPricing(true);
       try {
         prices = await fetchEffectivePricesBatch({
           productIds: Array.from(new Set(repriceable.map((l) => l.product!.id))),
@@ -679,12 +681,15 @@ export function CustomerOrderModal({
         });
       } catch (err) {
         logAppError(err, { scope: "ordre:kundeordre:reprising" });
-        toast.error("Fant ikke nye priser for datoen. Kontroller prisene før du lagrer.");
+        if (tracker.fail(generation)) {
+          setPricingStatus(tracker.status());
+          toast.error("Fant ikke nye priser for datoen. Prøv igjen før du lagrer.");
+        }
         return;
-      } finally {
-        setPricing(false);
       }
-      if (cancelled) return;
+      // Utdatert svar: verken priser eller status skal røres.
+      if (!tracker.succeed(generation)) return;
+      setPricingStatus(tracker.status());
       repricedAwayRef.current = true;
       setLines((prev) =>
         prev.map((l) => {
@@ -706,11 +711,8 @@ export function CustomerOrderModal({
         }),
       );
     })();
-    return () => {
-      cancelled = true;
-    };
-    // Kun ved datoendring — linjeendringer prises der de oppstår.
-  }, [deliveryDate, open, customer.id]);
+    // Kun ved datoendring (eller «Prøv igjen») — linjeendringer prises der de oppstår.
+  }, [deliveryDate, open, customer.id, pricingRetry]);
 
   // Ny prisrisiko må bekreftes på nytt.
   useEffect(() => {
