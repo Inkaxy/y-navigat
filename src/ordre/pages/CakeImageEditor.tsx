@@ -497,7 +497,7 @@ export default function CakeImageEditor() {
 
     return () => {
       ro.disconnect();
-      disposeGuides();
+      guidelines.dispose();
       c.dispose();
       fabRef.current = null;
       setCanvasReady(false);
