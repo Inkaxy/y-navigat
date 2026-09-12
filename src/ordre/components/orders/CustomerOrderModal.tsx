@@ -799,6 +799,13 @@ export function CustomerOrderModal({
       notes: "",
       unit_price: ep ? String(ep.price) : "0",
       is_fallback: !ep || ep.is_fallback,
+      // Den nye linjen bærer sin EGEN bekreftede pris og kilde. Uten kilde ville
+      // lagringen kunne gjenbruke prisen fra en eldre linje med samme produkt.
+      effective_price: ep?.price ?? null,
+      unit_price_source: ep?.source ?? null,
+      unit_price_source_id: ep?.special_price_id ?? ep?.price_list_id ?? null,
+      base_price_source: ep?.source ?? null,
+      base_price_source_id: ep?.special_price_id ?? ep?.price_list_id ?? null,
       merknad: null,
 
     };
