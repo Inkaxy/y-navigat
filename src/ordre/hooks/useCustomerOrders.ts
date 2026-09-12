@@ -1,5 +1,4 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { resolveLineVatRate } from "@/ordre/lib/orderRepricing";
 import { parseOrderSaveResult } from "@/ordre/lib/orderSaveResult";
 import {
   buildOrderLineRows,
