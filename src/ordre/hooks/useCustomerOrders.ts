@@ -441,7 +441,9 @@ export function useUpdateCustomerOrder() {
       }
 
 
-      // 1. Update order header
+      // 1. Hodeverdier — skrives KUN inne i order_save_with_lines, aldri som
+      //    en egen forhåndsoppdatering. Et separat hode-skriv ville brutt
+      //    atomisiteten og kunne overskrevet samtidige endringer.
       const updatePayload = {
         source: input.source,
         delivery_date: input.deliveryDate,
@@ -457,11 +459,6 @@ export function useUpdateCustomerOrder() {
         rule_override_reason: input.ruleOverrideReason ?? null,
       };
 
-      const { error: updErr } = await supabase
-        .from("orders")
-        .update(updatePayload as never)
-        .eq("id", orderId);
-      if (updErr) throw updErr;
 
       // 2. Bygg linjer: reprise KUN nye linjer. Eksisterende linjer beholder
       //    avtalt/manuell pris (og alle priser med låst kilde røres aldri).
