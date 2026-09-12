@@ -29,8 +29,23 @@ export function resolveInternalPath(raw: string | null | undefined): string | nu
   try {
     const url = new URL(value, "https://internal.invalid");
     if (url.origin !== "https://internal.invalid") return null;
-    return `${url.pathname}${url.search}${url.hash}`;
+    const resolved = `${url.pathname}${url.search}${url.hash}`;
+    // Normaliseringen kan LAGE et farlig mål som ikke fantes i inndata:
+    // `/ordre/..//evil.example` og `/ordre/%2e%2e//evil.example` blir begge
+    // `//evil.example`, altså protokoll-relativt. Resultatet må derfor
+    // kontrolleres på nytt — ikke bare det brukeren skrev.
+    if (!isPlainInternalPath(resolved)) return null;
+    return resolved;
   } catch {
     return null;
   }
+}
+
+/** Nøyaktig én innledende skråstrek, ingen backslash og ingen kontrolltegn. */
+function isPlainInternalPath(path: string): boolean {
+  if (!path.startsWith("/")) return false;
+  if (path.startsWith("//")) return false;
+  if (path.includes("\\")) return false;
+  if (CONTROL_CHARS.test(path)) return false;
+  return true;
 }

@@ -1,9 +1,6 @@
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import Link from "@tiptap/extension-link";
-import Underline from "@tiptap/extension-underline";
-import Placeholder from "@tiptap/extension-placeholder";
 import { useEffect, useImperativeHandle, forwardRef } from "react";
+import { createRichTextExtensions } from "@/ordre/lib/richTextExtensions";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -30,12 +27,7 @@ interface Props {
 export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(
   ({ value, onChange, placeholder, onFocus }, ref) => {
     const editor = useEditor({
-      extensions: [
-        StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
-        Underline,
-        Link.configure({ openOnClick: false, autolink: true, HTMLAttributes: { class: "text-primary underline" } }),
-        Placeholder.configure({ placeholder: placeholder ?? "Skriv innholdet i e-posten her…" }),
-      ],
+      extensions: createRichTextExtensions(placeholder),
       content: value || "<p></p>",
       editorProps: {
         attributes: {
