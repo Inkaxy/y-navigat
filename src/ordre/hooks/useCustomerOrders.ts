@@ -1,6 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { resolveLineVatRate } from "@/ordre/lib/orderRepricing";
 import { parseOrderSaveResult, resolveExistingLineId } from "@/ordre/lib/orderSaveResult";
+import {
+  buildOrderLineRows,
+  productIdsNeedingPrice,
+  resolveLineIds,
+  type EffectivePriceEntry,
+} from "@/ordre/lib/orderLineRows";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { fetchEffectivePricesBatch, type PriceCaller } from "@/ordre/hooks/useNBProducts";
