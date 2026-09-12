@@ -31,10 +31,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { useInsertLabelPrintJob } from "../hooks/useLabelPrintJobs";
+import { useQueryClient } from "@tanstack/react-query";
+import { recentLabelJobsKey } from "../hooks/useLabelPrintJobs";
+import {
+  attemptNumbers,
+  buildLabelPrintAttempt,
+  submitLabelPrintAttempt,
+  type LabelPrintAttempt,
+} from "../lib/labelPrintAttempt";
 import {
   formatNumberRanges,
-  markLabelUnitsPrinted,
+  labelUnitsKey,
   type LabelUnit,
 } from "../hooks/useLabelUnits";
 import type { LabelProductRow } from "../types";
@@ -95,13 +102,18 @@ export function PrintLabelDialog({
    *  - "interleave": [A, A, B, B, C, C]   (orig + kopi annenhver) */
   const [copySortMode, setCopySortMode] = useState<"stack" | "interleave">("stack");
 
-  const insertJob = useInsertLabelPrintJob();
+  const qc = useQueryClient();
   const { data: profiles } = useLabelPrintProfiles(legalEntityId || undefined);
   const profile = profiles?.find((p) => p.id === profileId) ?? null;
   const [downloading, setDownloading] = useState(false);
   const [printing, setPrinting] = useState(false);
-  /** PDF er laget og åpnet, men ingen har bekreftet at etikettene kom ut ennå. */
-  const [awaitingConfirm, setAwaitingConfirm] = useState(false);
+  /**
+   * Fryst utskriftsforsøk: numrene og jobb-id-ene som PDF-en faktisk ble laget
+   * av. Så lenge dette er satt, venter vi på bekreftelse, og valgene i dialogen
+   * er låst slik at bekreftelsen alltid gjelder de samme etikettene.
+   */
+  const [attempt, setAttempt] = useState<LabelPrintAttempt | null>(null);
+  const awaitingConfirm = attempt !== null;
 
   const activeUnits = useMemo(
     () => units.filter((u) => u.status !== "cancelled"),
@@ -294,35 +306,22 @@ export function PrintLabelDialog({
       setQuantity(row.total_labels || 1);
       setOnlyUnprinted(true);
       setErrorMessage(null);
-      setAwaitingConfirm(false);
+      setAttempt(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, row?.product_id]);
 
-  /** Logger én print-jobb per etikett-enhet, med enhetens nummer. */
-  async function logJobs(status: "printed" | "failed") {
-    if (!row || !deptId) return;
-    if (selectedUnits.length === 0) return;
-    for (const u of selectedUnits) {
-      await insertJob.mutateAsync({
-        label_number: String(u.number),
-        label_unit_id: u.id,
-        product_id: row.product_id,
-        order_line_id: u.order_line_id,
-        legal_entity_id: legalEntityId,
-        production_department_id: deptId,
-        profile_id: profileId ?? null,
-        quantity: 1,
-        printer_name: null,
-        status,
-      });
-    }
+  /** Oppdaterer listene etter at serveren har registrert forsøket. */
+  function invalidateAfterAttempt(a: LabelPrintAttempt) {
+    qc.invalidateQueries({ queryKey: recentLabelJobsKey(a.departmentId) });
+    qc.invalidateQueries({ queryKey: labelUnitsKey(a.legalEntityId) .slice(0, 2) });
+    qc.invalidateQueries({ queryKey: ["label_units"] });
   }
 
   /**
    * Steg 1: lag PDF-en og åpne den. Ingenting registreres som skrevet ut her —
    * brukeren kan avbryte i nettleserens utskriftsvindu, og da er etiketten
-   * aldri kommet ut av skriveren.
+   * aldri kommet ut av skriveren. Settet med etiketter fryses her.
    */
   const handlePrint = async () => {
     if (!row || !deptId) return;
@@ -330,6 +329,17 @@ export function PrintLabelDialog({
       toast.error(gate.reason ?? "Etiketten kan ikke skrives ut ennå.");
       return;
     }
+    if (selectedUnits.length === 0) {
+      toast.error("Ingen etikettnumre å skrive ut.");
+      return;
+    }
+    const frozen = buildLabelPrintAttempt({
+      legalEntityId,
+      departmentId: deptId,
+      profileId: profileId ?? null,
+      productId: row.product_id,
+      units: selectedUnits,
+    });
     setErrorMessage(null);
     setPrinting(true);
     try {
@@ -349,13 +359,14 @@ export function PrintLabelDialog({
         document.body.removeChild(a);
       }
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      setAwaitingConfirm(true);
+      setAttempt(frozen);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Kunne ikke generere etikett-PDF";
       setErrorMessage(msg);
       toast.error(msg);
       try {
-        await logJobs("failed");
+        await submitLabelPrintAttempt(frozen, "failed");
+        invalidateAfterAttempt(frozen);
       } catch { /* ignorer dobbel-feil */ }
     } finally {
       setPrinting(false);
@@ -364,17 +375,16 @@ export function PrintLabelDialog({
 
   /** Steg 2: brukeren bekrefter at etikettene faktisk kom ut av skriveren. */
   const handleConfirmPrinted = async () => {
+    if (!attempt) return;
     setErrorMessage(null);
     setPrinting(true);
     try {
-      await logJobs("printed");
-      await markLabelUnitsPrinted(selectedUnits);
-      setAwaitingConfirm(false);
+      await submitLabelPrintAttempt(attempt, "printed");
+      invalidateAfterAttempt(attempt);
       toast.success(
-        selectedUnits.length > 0
-          ? `Etikett ${formatNumberRanges(selectedUnits.map((u) => u.number))} registrert som skrevet ut`
-          : "Etikett registrert som skrevet ut",
+        `Etikett ${formatNumberRanges(attemptNumbers(attempt))} registrert som skrevet ut`,
       );
+      setAttempt(null);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Kunne ikke registrere utskriften";
       setErrorMessage(msg);
@@ -386,12 +396,14 @@ export function PrintLabelDialog({
 
   /** Steg 2b: utskriften mislyktes eller ble avbrutt — numrene forblir uutskrevne. */
   const handleReportFailed = async () => {
+    if (!attempt) return;
     setErrorMessage(null);
     setPrinting(true);
     try {
-      await logJobs("failed");
-      setAwaitingConfirm(false);
+      await submitLabelPrintAttempt(attempt, "failed");
+      invalidateAfterAttempt(attempt);
       toast.message("Registrert som mislykket — numrene står fortsatt som uutskrevne.");
+      setAttempt(null);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Kunne ikke logge mislykket utskrift";
       setErrorMessage(msg);
@@ -403,8 +415,10 @@ export function PrintLabelDialog({
 
   if (!row) return null;
 
-  const isWorking = printing || insertJob.isPending;
-  const nothingToPrint = activeUnits.length > 0 && selectedUnits.length === 0;
+  const isWorking = printing;
+  // Uten etikettnumre finnes det ingen enhet å registrere utskrift på, og da
+  // skal utskriften sperres i stedet for å gå gjennom usporet.
+  const nothingToPrint = selectedUnits.length === 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -460,9 +474,11 @@ export function PrintLabelDialog({
           </div>
         )}
 
-        {awaitingConfirm && (
+        {attempt && (
           <div className="space-y-2 rounded-md border border-border bg-muted p-3 text-sm">
-            <p className="font-semibold">Kom etikettene ut av skriveren?</p>
+            <p className="font-semibold">
+              Kom etikett {formatNumberRanges(attemptNumbers(attempt))} ut av skriveren?
+            </p>
             <p className="text-xs text-muted-foreground">
               Numrene registreres som skrevet ut først når du bekrefter. Avbrøt du
               utskriften, velger du «Mislyktes».
@@ -530,7 +546,7 @@ export function PrintLabelDialog({
                 Ingen avdeling tildelt dette produktet.
               </p>
             ) : (
-              <Select value={deptId} onValueChange={setDeptId}>
+              <Select value={deptId} onValueChange={setDeptId} disabled={awaitingConfirm}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -557,6 +573,7 @@ export function PrintLabelDialog({
                 id="only-unprinted"
                 checked={onlyUnprinted}
                 onCheckedChange={setOnlyUnprinted}
+                disabled={awaitingConfirm}
               />
             </div>
           ) : (
@@ -614,7 +631,7 @@ export function PrintLabelDialog({
           <Button
             variant="outline"
             onClick={handleDownloadPdf}
-            disabled={downloading || nothingToPrint || !gate.canPrint}
+            disabled={downloading || nothingToPrint || !gate.canPrint || awaitingConfirm}
             className="gap-2"
             title={!profile ? "Sett etikett-profil for varen først" : undefined}
           >
@@ -633,7 +650,7 @@ export function PrintLabelDialog({
               !gate.canPrint
                 ? (gate.reason ?? undefined)
                 : nothingToPrint
-                  ? "Alle numre er allerede skrevet ut"
+                  ? "Ingen etikettnumre å skrive ut"
                   : undefined
             }
           >
