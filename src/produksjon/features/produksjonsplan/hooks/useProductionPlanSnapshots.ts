@@ -77,12 +77,20 @@ export type SnapshotLookup =
   | { status: "error"; message: string };
 
 const SNAPSHOT_PAGE = 20;
-/** Maks antall snapshots vi leter gjennom bakover for samme dag. */
-const SNAPSHOT_MAX_SCAN = 200;
+/**
+ * Sikkerhetsgrense for hvor mange snapshots vi leter gjennom for samme dag.
+ * Nås grensen UTEN treff, er søket ufullstendig — da er svaret «feil», aldri
+ * «ingen tidligere utskrift».
+ */
+export const SNAPSHOT_MAX_SCAN = 2000;
 
 /**
  * Hent siste snapshot for gitt selskap + dato som matcher samme kriterier
  * (ellers gir korreksjonslisten feil sammenligning).
+ *
+ * Søket pagineres helt til faktisk slutt på dagens snapshots. Sorteringen er
+ * stabil (created_at desc, id desc) slik at sider ikke overlapper eller hopper
+ * over rader med identisk tidsstempel.
  */
 export async function fetchLatestSnapshotItems(
   legalEntityId: string,
@@ -91,8 +99,10 @@ export async function fetchLatestSnapshotItems(
 ): Promise<SnapshotLookup> {
   const wantedSig = criteriaSignature(criteria);
   let match: { id: string; created_at: string } | null = null;
+  let scanned = 0;
+  let reachedEnd = false;
 
-  for (let offset = 0; offset < SNAPSHOT_MAX_SCAN; offset += SNAPSHOT_PAGE) {
+  while (scanned < SNAPSHOT_MAX_SCAN) {
     const { data: snaps, error } = await supabase
       .from("production_plan_snapshots")
       .select("id, created_at, criteria_copy")
@@ -100,12 +110,11 @@ export async function fetchLatestSnapshotItems(
       .eq("production_date", productionDate)
       .eq("list_type", "produksjonsliste")
       .order("created_at", { ascending: false })
-      .range(offset, offset + SNAPSHOT_PAGE - 1);
+      .order("id", { ascending: false })
+      .range(scanned, scanned + SNAPSHOT_PAGE - 1);
 
     if (error) return { status: "error", message: error.message };
     const page = snaps ?? [];
-    if (page.length === 0) break;
-
     const found = page.find(
       (s) =>
         criteriaSignature(
@@ -116,10 +125,22 @@ export async function fetchLatestSnapshotItems(
       match = { id: found.id, created_at: found.created_at };
       break;
     }
-    if (page.length < SNAPSHOT_PAGE) break;
+    scanned += page.length;
+    if (page.length < SNAPSHOT_PAGE) {
+      reachedEnd = true;
+      break;
+    }
   }
 
-  if (!match) return { status: "none" };
+  if (!match) {
+    if (!reachedEnd) {
+      return {
+        status: "error",
+        message: `Søket etter forrige utskrift stoppet etter ${SNAPSHOT_MAX_SCAN} snapshots uten å nå slutten.`,
+      };
+    }
+    return { status: "none" };
+  }
 
   let items: Array<Record<string, unknown>>;
   try {
@@ -146,31 +167,11 @@ export async function fetchLatestSnapshotItems(
   return { status: "ok", takenAt: match.created_at, items: map };
 }
 
-/** Lagre nytt snapshot av planen. */
-export async function saveProductionPlanSnapshot(
-  legalEntityId: string,
-  productionDate: string,
-  criteria: ProduksjonsplanCriteria,
+/** Aggregerer radene til snapshot-varelinjer (samme nøkkel som tabellen bruker). */
+export function buildSnapshotItems(
   rows: ProductionPlanRow[],
-): Promise<{ id: string; itemCount: number } | null> {
-  const { data: snap, error } = await supabase
-    .from("production_plan_snapshots")
-    .insert([{
-      legal_entity_id: legalEntityId,
-      production_date: productionDate,
-      tours: criteria.tour_numbers,
-      criteria_copy: criteria as never,
-      list_type: "produksjonsliste",
-    }])
-    .select("id")
-    .single();
-
-  if (error || !snap) {
-    console.error("Kunne ikke lagre snapshot", error);
-    return null;
-  }
-
-  // Lag én snapshot-item per rad i utskriften, nøklet på row_key (samme aggregering som tabellen).
+  criteria: ProduksjonsplanCriteria,
+): SnapshotItem[] {
   const agg = new Map<string, SnapshotItem>();
   for (const r of rows) {
     const key = buildRowKey(r, criteria);
@@ -193,18 +194,45 @@ export async function saveProductionPlanSnapshot(
       });
     }
   }
-
-  const items = Array.from(agg.values()).map((it) => ({ ...it, snapshot_id: snap.id }));
-  if (items.length > 0) {
-    const { error: insErr } = await supabase
-      .from("production_plan_snapshot_items")
-      .insert(items);
-    if (insErr) {
-      console.error("Kunne ikke lagre snapshot items", insErr);
-      await supabase.from("production_plan_snapshots").delete().eq("id", snap.id);
-      return null;
-    }
-  }
-
-  return { id: snap.id, itemCount: items.length };
+  return Array.from(agg.values());
 }
+
+export interface SnapshotSaveResult {
+  id: string;
+  itemCount: number;
+  alreadySaved: boolean;
+}
+
+/**
+ * Lagre nytt grunnlag for korreksjonslisten.
+ *
+ * Hele lagringen (hode + varelinjer) skjer i ÉN serveroperasjon, slik at et
+ * avbrutt kall aldri kan etterlate et tomt hode som neste korreksjonsliste
+ * leser som gyldig baseline. `attemptId` fryses av utskriftsforsøket: bekrefter
+ * brukeren to ganger, gjenbrukes samme grunnlag i stedet for å lage et nytt.
+ */
+export async function saveProductionPlanSnapshot(
+  attemptId: string,
+  legalEntityId: string,
+  productionDate: string,
+  criteria: ProduksjonsplanCriteria,
+  rows: ProductionPlanRow[],
+): Promise<SnapshotSaveResult> {
+  const items = buildSnapshotItems(rows, criteria);
+  const { data, error } = await supabase.rpc("save_production_plan_snapshot", {
+    p_attempt_id: attemptId,
+    p_legal_entity_id: legalEntityId,
+    p_production_date: productionDate,
+    p_criteria: criteria as unknown as never,
+    p_items: items as unknown as never,
+  });
+  if (error) throw new Error(error.message);
+  const res = (data ?? null) as
+    | { id?: string; item_count?: number; already_saved?: boolean }
+    | null;
+  if (!res || typeof res.id !== "string" || typeof res.item_count !== "number") {
+    throw new Error("Serveren svarte uten bekreftelse på lagret grunnlag.");
+  }
+  return { id: res.id, itemCount: res.item_count, alreadySaved: res.already_saved === true };
+}
+

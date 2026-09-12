@@ -47,6 +47,8 @@ interface Props {
   onSaveDefaults: (o: PrintPakkelisteOptions) => void;
   onPrint: (o: PrintPakkelisteOptions) => void;
   onSend?: (o: PrintPakkelisteOptions) => void;
+  /** Sant når produksjonsplanen er uavklart (laster, oppdateres eller feilet). */
+  planUnavailable?: boolean;
 }
 
 export function PrintPakkelisteDialog({
@@ -58,6 +60,7 @@ export function PrintPakkelisteDialog({
   onSaveDefaults,
   onPrint,
   onSend,
+  planUnavailable = false,
 }: Props) {
   const [opts, setOpts] = useState<PrintPakkelisteOptions>(initial);
   useEffect(() => {
@@ -153,20 +156,27 @@ export function PrintPakkelisteDialog({
             <Save className="h-4 w-4 mr-2" />
             Lagre
           </Button>
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={() => onOpenChange(false)}>
-              Lukk
-            </Button>
-            {onSend && (
-              <Button variant="default" onClick={() => onSend(opts)}>
-                <Send className="h-4 w-4 mr-2" />
-                Send
-              </Button>
+          <div className="flex flex-col items-end gap-2">
+            {planUnavailable && (
+              <p className="text-xs text-destructive">
+                Produksjonsplanen er ikke ferdig oppdatert. Utskrift er sperret til tallene er klare.
+              </p>
             )}
-            <Button variant="default" onClick={() => onPrint(opts)}>
-              <Printer className="h-4 w-4 mr-2" />
-              Skriv ut
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                Lukk
+              </Button>
+              {onSend && (
+                <Button variant="default" disabled={planUnavailable} onClick={() => onSend(opts)}>
+                  <Send className="h-4 w-4 mr-2" />
+                  Send
+                </Button>
+              )}
+              <Button variant="default" disabled={planUnavailable} onClick={() => onPrint(opts)}>
+                <Printer className="h-4 w-4 mr-2" />
+                Skriv ut
+              </Button>
+            </div>
           </div>
         </DialogFooter>
       </DialogContent>

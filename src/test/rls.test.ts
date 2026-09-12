@@ -2,17 +2,20 @@
  * RLS-røyktester mot den ekte Supabase-instansen med anon-nøkkel.
  *
  * Formålet er å fange regresjoner der en tabell eller RPC blir eksponert for
- * uinnloggede brukere. Testene hoppes over automatisk hvis env-variablene
- * mangler (f.eks. i en offline CI-jobb).
+ * uinnloggede brukere. Testene hoppes ALDRI over: mangler konfigurasjonen,
+ * kaster filen med en tydelig melding slik at kjøringen blir rød.
+ *
+ * Kjøres med `npm run test:rls` (krever VITE_SUPABASE_URL og
+ * VITE_SUPABASE_PUBLISHABLE_KEY). Alle kall her er leseoperasjoner — ingen
+ * innsetting, oppdatering, sletting eller opprydding.
  */
 import { describe, it, expect } from "vitest";
 import { createClient } from "@supabase/supabase-js";
+import { classifyAnonResult, classifyAnonDeniedOnly, anonOutcomeMessage } from "./support/anonAccess";
 
 const url = process.env.VITE_SUPABASE_URL;
 const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-// Sikkerhetstestene skal ALDRI hoppes over stille. Mangler konfigurasjonen,
-// feiler kjøringen med en tydelig melding slik at CI-jobben blir rød.
 if (!url || !key) {
   throw new Error(
     "RLS-testene krever VITE_SUPABASE_URL og VITE_SUPABASE_PUBLISHABLE_KEY. " +
@@ -37,27 +40,25 @@ describe("RLS: anon har ikke lesetilgang til sensitive tabeller", () => {
 
   for (const table of sensitive) {
     it(`blokkerer anon-select på ${table}`, async () => {
-      const { data, error } = await anon.from(table).select("*").limit(1);
-      // Enten en eksplisitt feil (permission denied) eller 0 rader (RLS filtrerer alt).
-      if (!error) expect(data ?? []).toHaveLength(0);
-      else expect(error.message).toBeTruthy();
+      const res = await anon.from(table).select("*").limit(1);
+      const outcome = classifyAnonResult({ data: res.data, error: res.error, status: res.status });
+      expect(anonOutcomeMessage(table, outcome)).toBe(`${table}: ok`);
     }, 20_000);
   }
 
   it("blokkerer anon-kall på privilegerte RPC-er", async () => {
-    const { data, error } = await anon.rpc("get_my_accessible_apps");
-    // Anon skal enten få permission denied eller en tom liste — aldri app-tilgang.
-    if (error) {
-      expect(error.message).toBeTruthy();
-    } else {
-      expect(Array.isArray(data) ? data : []).toHaveLength(0);
-    }
+    const res = await anon.rpc("get_my_accessible_apps");
+    const outcome = classifyAnonResult({ data: res.data, error: res.error, status: res.status });
+    expect(anonOutcomeMessage("get_my_accessible_apps", outcome)).toBe("get_my_accessible_apps: ok");
   }, 20_000);
 
   it("krever autentisering for faktura-RPC-er", async () => {
-    const { error } = await anon.rpc("get_invoice_run_preview_customers", {
+    const res = await anon.rpc("get_invoice_run_preview_customers", {
       p_run_id: "00000000-0000-0000-0000-000000000000",
     } as never);
-    expect(error).toBeTruthy();
+    const outcome = classifyAnonDeniedOnly({ data: res.data, error: res.error, status: res.status });
+    expect(anonOutcomeMessage("get_invoice_run_preview_customers", outcome)).toBe(
+      "get_invoice_run_preview_customers: ok",
+    );
   }, 20_000);
 });

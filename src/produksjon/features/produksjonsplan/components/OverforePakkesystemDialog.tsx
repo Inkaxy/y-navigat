@@ -26,9 +26,18 @@ interface Props {
   date: string; // yyyy-MM-dd
   criteria: ProduksjonsplanCriteria;
   summary: string;
+  /** Sant når produksjonsplanen er uavklart (laster, oppdateres eller feilet). */
+  planUnavailable?: boolean;
 }
 
-export function OverforePakkesystemDialog({ open, onOpenChange, date, criteria, summary }: Props) {
+export function OverforePakkesystemDialog({
+  open,
+  onOpenChange,
+  date,
+  criteria,
+  summary,
+  planUnavailable = false,
+}: Props) {
   const navigate = useNavigate();
   const { legalEntityId } = useSelection();
 
@@ -93,16 +102,22 @@ export function OverforePakkesystemDialog({ open, onOpenChange, date, criteria, 
         <p className="text-xs text-muted-foreground">
           Filen genereres først når pakksedler for {date} er kjørt.
         </p>
+        {planUnavailable && (
+          <p className="text-xs text-destructive">
+            Produksjonsplanen er ikke ferdig oppdatert. Overføring og nedlasting er sperret til
+            tallene er klare.
+          </p>
+        )}
         <DialogFooter className="gap-2 sm:justify-between">
           <Button variant="default" onClick={save} className="gap-2">
             <Save className="h-4 w-4" /> Lagre
           </Button>
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => onOpenChange(false)}>Lukk</Button>
-            <Button variant="default" onClick={overfor} className="gap-2 bg-green-700 hover:bg-green-800 text-white">
+            <Button variant="default" disabled={planUnavailable} onClick={overfor} className="gap-2 bg-green-700 hover:bg-green-800 text-white">
               <Send className="h-4 w-4" /> Overføre
             </Button>
-            <Button onClick={download} className="gap-2 bg-green-700 hover:bg-green-800 text-white">
+            <Button disabled={planUnavailable} onClick={download} className="gap-2 bg-green-700 hover:bg-green-800 text-white">
               <Download className="h-4 w-4" /> Last ned
             </Button>
           </div>
