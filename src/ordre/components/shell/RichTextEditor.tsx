@@ -80,11 +80,18 @@ function Toolbar({ editor }: { editor: Editor }) {
     const prev = editor.getAttributes("link").href as string | undefined;
     const url = window.prompt("Lenke (URL):", prev ?? "https://");
     if (url === null) return;
-    if (url === "") {
+    if (url.trim() === "") {
       editor.chain().focus().extendMarkRange("link").unsetLink().run();
       return;
     }
-    editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+    const href = sanitizeEditorHref(url);
+    if (!href) {
+      toast.error("Ugyldig lenke", {
+        description: "Bruk en http-, https-, mailto- eller tel-adresse.",
+      });
+      return;
+    }
+    editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
   };
 
   return (
