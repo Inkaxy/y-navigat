@@ -464,7 +464,7 @@ export function useUpdateCustomerOrder() {
       //    avtalt/manuell pris (og alle priser med låst kilde røres aldri).
       const fallbackLineIndices: number[] = [];
       let lineRows: unknown[] = [];
-      try {
+      {
         if (input.lines.length > 0) {
           const newProductIds = Array.from(
             new Set(
