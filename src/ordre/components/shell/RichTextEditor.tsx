@@ -12,6 +12,8 @@ import {
   Undo2, Redo2, Pilcrow,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { sanitizeEditorHref } from "@/ordre/lib/linkSanitize";
 
 export interface RichTextEditorHandle {
   insertText: (text: string) => void;
