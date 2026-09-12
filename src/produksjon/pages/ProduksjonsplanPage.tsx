@@ -202,9 +202,11 @@ export default function ProduksjonsplanPage() {
   const counts = plan.isError ? undefined : plan.data?.orderCounts;
   const rows = useMemo(() => (plan.isError ? [] : plan.data?.rows ?? []), [plan.isError, plan.data]);
   const basis = plan.isError ? null : plan.data?.basis ?? null;
-  // Grunnlaget er uavklart så lenge planen laster eller har feilet. Da skal
-  // verken utskrift eller overføring til pakkesystemet kunne startes.
-  const planUnavailable = !legalEntityId || plan.isLoading || plan.isError || !plan.data;
+  // Grunnlaget er uavklart så lenge planen laster, oppdateres i bakgrunnen eller
+  // har feilet. Da skal verken utskrift eller overføring til pakkesystemet kunne
+  // startes — en bakgrunnsoppdatering kan endre tallene under hendene på oss.
+  const planUnavailable =
+    !legalEntityId || plan.isLoading || plan.isFetching || plan.isError || !plan.data;
 
   const applyTemplate = (t: CriteriaTemplate) => {
     setCriteria({ ...DEFAULT_CRITERIA, ...t.criteria });
@@ -212,109 +214,115 @@ export default function ProduksjonsplanPage() {
   };
 
   // === Print: snapshot + korreksjon =====================================
-  // Utskriften fryser radene den faktisk ble laget av. Ny korreksjons-baseline
-  // lagres først når brukeren bekrefter at listen er skrevet ut.
-  const [printJob, setPrintJob] = useState<{
-    correction: boolean;
-    prevItems: Map<string, SnapshotItem> | null;
-    prevTakenAt: string | null;
-    alternateRowGray: boolean;
-    rows: ProductionPlanRow[];
-    criteria: ProduksjonsplanCriteria;
-  } | null>(null);
-  const [confirmPrint, setConfirmPrint] = useState<{
-    rows: ProductionPlanRow[];
-    criteria: ProduksjonsplanCriteria;
-  } | null>(null);
+  // Utskriften fryser HELE grunnlaget den ble laget av (dato, selskap, rader,
+  // kriterier og utskriftsvalg). Ny korreksjons-baseline lagres først når
+  // brukeren bekrefter at listen er skrevet ut, og da mot det frosne forsøket.
+  const [printJob, setPrintJob] = useState<PrintAttempt | null>(null);
+  const [confirmPrint, setConfirmPrint] = useState<PrintAttempt | null>(null);
+  const [preparingPrint, setPreparingPrint] = useState(false);
   const [savingBaseline, setSavingBaseline] = useState(false);
 
+  const printBusy = preparingPrint || !!printJob || !!confirmPrint;
+
   const handlePrint = useCallback(async (options: PrintProduksjonslisteOptions = printProdDefaults) => {
-    if (!legalEntityId) return;
-    if (planUnavailable) {
+    const gate = evaluatePrintGate({
+      legalEntityId,
+      planUnavailable,
+      rowCount: rows.length,
+      busy: printBusy,
+    });
+    if (!gate.ok) {
       toast({
-        title: "Grunnlaget er ikke klart",
-        description: "Produksjonsplanen er ikke ferdig lastet. Prøv igjen når tallene vises.",
+        title: gate.title,
+        description: gate.description,
+        variant: gate.reason === "empty" ? undefined : "destructive",
+      });
+      return;
+    }
+
+    // Frys alt FØR det asynkrone oppslaget.
+    const frozen = {
+      attemptId: crypto.randomUUID(),
+      legalEntityId: legalEntityId as string,
+      dateStr,
+      date,
+      rows,
+      criteria,
+      options,
+      now: new Date(),
+    };
+    const wantCorrection = !!frozen.criteria.print_correction_last;
+
+    setPreparingPrint(true);
+    let prev: { takenAt: string; items: Map<string, SnapshotItem> } | null = null;
+    try {
+      if (wantCorrection) {
+        const lookup = await fetchLatestSnapshotItems(
+          frozen.legalEntityId,
+          frozen.dateStr,
+          frozen.criteria,
+        );
+        if (lookup.status === "error") {
+          toast({
+            title: "Fant ikke forrige utskrift",
+            description: "Korreksjonslisten kan bli feil. Utskrift er avbrutt — prøv igjen.",
+            variant: "destructive",
+          });
+          return;
+        }
+        if (lookup.status === "none") {
+          toast({
+            title: "Ingen tidligere utskrift",
+            description: "Korreksjonsliste hoppes over – listen skrives ut som vanlig.",
+          });
+        } else {
+          prev = { takenAt: lookup.takenAt, items: lookup.items };
+        }
+      }
+    } catch (e) {
+      console.error("Snapshot-oppslag feilet", e);
+      toast({
+        title: "Fant ikke forrige utskrift",
+        description: "Korreksjonslisten kan bli feil. Utskrift er avbrutt — prøv igjen.",
         variant: "destructive",
       });
       return;
-    }
-    if (rows.length === 0) {
-      toast({
-        title: "Ingen rader å skrive ut",
-        description: "Produksjonslisten er tom.",
-      });
-      return;
-    }
-    const wantCorrection = !!criteria.print_correction_last;
-
-    let prev: { takenAt: string; items: Map<string, SnapshotItem> } | null = null;
-    if (wantCorrection) {
-      const lookup = await fetchLatestSnapshotItems(legalEntityId, dateStr, criteria);
-      if (lookup.status === "error") {
-        toast({
-          title: "Fant ikke forrige utskrift",
-          description: "Korreksjonslisten kan bli feil. Utskrift er avbrutt — prøv igjen.",
-          variant: "destructive",
-        });
-        return;
-      }
-      if (lookup.status === "none") {
-        toast({
-          title: "Ingen tidligere utskrift",
-          description: "Korreksjonsliste hoppes over – listen skrives ut som vanlig.",
-        });
-      } else {
-        prev = { takenAt: lookup.takenAt, items: lookup.items };
-      }
+    } finally {
+      setPreparingPrint(false);
     }
 
-    // Frys grunnlaget for nøyaktig denne utskriften.
-    const frozenRows = rows.map((r) => ({ ...r }));
-    const frozenCriteria = { ...criteria };
+    const attempt = buildPrintAttempt({ ...frozen, prev, wantCorrection });
 
     flushSync(() => {
-      setPrintJob({
-        correction: wantCorrection && !!prev,
-        prevItems: prev?.items ?? null,
-        prevTakenAt: prev?.takenAt ?? null,
-        alternateRowGray: options.alternateRowGray,
-        rows: frozenRows,
-        criteria: frozenCriteria,
-      });
+      setPrintJob(attempt);
     });
 
     setTimeout(() => {
       window.print();
       setTimeout(() => {
         setPrintJob(null);
-        setConfirmPrint({ rows: frozenRows, criteria: frozenCriteria });
+        setConfirmPrint(attempt);
       }, 500);
     }, 100);
-  }, [legalEntityId, dateStr, criteria, rows, printProdDefaults, planUnavailable]);
+  }, [legalEntityId, dateStr, date, criteria, rows, printProdDefaults, planUnavailable, printBusy]);
 
   /** Bruker bekrefter at listen faktisk er skrevet ut → lagre ny baseline. */
   const handleConfirmPrinted = useCallback(async () => {
-    if (!legalEntityId || !confirmPrint) return;
+    if (!confirmPrint) return;
     setSavingBaseline(true);
     try {
+      // Alt hentes fra det frosne forsøket — aldri fra levende dato/kriterier.
       const saved = await saveProductionPlanSnapshot(
-        legalEntityId,
-        dateStr,
+        confirmPrint.attemptId,
+        confirmPrint.legalEntityId,
+        confirmPrint.dateStr,
         confirmPrint.criteria,
         confirmPrint.rows,
       );
-      if (!saved) {
-        toast({
-          title: "Grunnlaget ble ikke lagret",
-          description: "Neste korreksjonsliste ville fått feil sammenligning. Prøv igjen.",
-          variant: "destructive",
-        });
-        return;
-      }
       setConfirmPrint(null);
       toast({
-        title: "Utskrift registrert",
-        description: `${saved.itemCount} varelinjer lagret som grunnlag for ${format(date, "dd.MM.yyyy")}.`,
+        title: saved.alreadySaved ? "Allerede registrert" : "Utskrift registrert",
+        description: `${saved.itemCount} varelinjer lagret som grunnlag for ${confirmPrint.dateStr}.`,
       });
     } catch (e) {
       console.error("Snapshot-lagring feilet", e);
@@ -326,7 +334,8 @@ export default function ProduksjonsplanPage() {
     } finally {
       setSavingBaseline(false);
     }
-  }, [legalEntityId, dateStr, date, confirmPrint]);
+  }, [confirmPrint]);
+
 
 
   return (
