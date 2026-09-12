@@ -55,6 +55,8 @@ interface Props {
   onSaveDefaults: (o: PrintProduksjonslisteOptions) => void;
   onPrint: (o: PrintProduksjonslisteOptions) => void;
   onSend?: (o: PrintProduksjonslisteOptions) => void;
+  /** Sant når produksjonsplanen er uavklart (laster, oppdateres eller feilet). */
+  planUnavailable?: boolean;
 }
 
 interface Row {
