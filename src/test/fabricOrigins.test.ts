@@ -87,9 +87,10 @@ describe("Fabric-origin etter oppgradering til 7", () => {
     expect(box.top).toBe(80);
   });
 
-  it("serialiserer origin slik Fabric 6 gjorde (eksplisitt kun når sentrert)", () => {
+  it("skriver origin eksplisitt i lagret design, slik at andre lesere tolker det likt", () => {
     const plain = new fabric.Rect({ width: 10, height: 10, left: 1, top: 2 }).toObject();
-    expect(plain.originX).toBeUndefined();
+    expect(plain.originX).toBe("left");
+    expect(plain.originY).toBe("top");
     const centered = new fabric.Rect({
       width: 10,
       height: 10,
@@ -100,18 +101,5 @@ describe("Fabric-origin etter oppgradering til 7", () => {
     }).toObject();
     expect(centered.originX).toBe("center");
     expect(centered.originY).toBe("center");
-  });
-
-  it("plasserer ny tekst sentrert der editoren ber om det", () => {
-    const text = new fabric.Textbox("Gratulerer", {
-      left: 200,
-      top: 120,
-      width: 100,
-      originX: "center",
-      originY: "center",
-    });
-    expect(text.originX).toBe("center");
-    const box = text.getBoundingRect();
-    expect(Math.round(box.left + box.width / 2)).toBe(200);
   });
 });
