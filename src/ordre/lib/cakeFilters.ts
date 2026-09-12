@@ -1,3 +1,4 @@
+import "@/ordre/lib/fabricDefaults";
 import * as fabric from "fabric";
 import { removeColorDistance } from "@/ordre/lib/cakeEditorMath";
 
