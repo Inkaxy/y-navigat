@@ -30,12 +30,7 @@ interface Props {
 export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(
   ({ value, onChange, placeholder, onFocus }, ref) => {
     const editor = useEditor({
-      extensions: [
-        StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
-        Underline,
-        Link.configure({ openOnClick: false, autolink: true, HTMLAttributes: { class: "text-primary underline" } }),
-        Placeholder.configure({ placeholder: placeholder ?? "Skriv innholdet i e-posten her…" }),
-      ],
+      extensions: createRichTextExtensions(placeholder),
       content: value || "<p></p>",
       editorProps: {
         attributes: {
