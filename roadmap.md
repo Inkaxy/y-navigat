@@ -71,3 +71,17 @@
 - [x] Ekte editor-rundtur: `src/ordre/lib/richTextExtensions.ts` deler oppsettet med skjermbildet, og
   lenkeutvidelsen avviser farlig `href` ved innlasting, innliming og autolenking (`isAllowedUri`/
   `shouldAutoLink`). `src/test/richTextEditorRoundtrip.test.ts` (5 tester) instansierer ekte editor.
+
+## Sårbarhetsrest etter d90d6cf (utført)
+- Vite 5.4.21 -> 6.4.3 og Vitest 3.2.4 -> 4.1.11 (minste patchede versjoner i 6-/4-familien iht.
+  GHSA-fx2h-pf6j-xcff og GHSA-82fw-gwwq-j7x9). Ingen Vite 8 / Vitest 5 / Rolldown.
+  Plugins uendret og kompatible: @vitejs/plugin-react-swc 3.11 (peer ^4||^5||^6||^7),
+  vite-plugin-svgr 5.2 (peer >=3), lovable-tagger 1.1.13 (peer >=5 <9). Tiptap/Fabric/SheetJS urørt.
+- `npm install` må kjøres med `--legacy-peer-deps` i dette miljøet: npm 10.9.4 (arborist) krasjer med
+  «Cannot read properties of null (reading 'edgesOut')» når det løser Vitest 4s valgfrie peer
+  @vitest/browser-playwright@5. `npm ci --dry-run --legacy-peer-deps` er grønn mot låsefila.
+- Audit etter oppgradering: 6 -> 2 funn (begge moderate, react-router GHSA-wrjc-x8rr-h8h6 og
+  GHSA-337j-9hxr-rhxg). Ingen high igjen. Rettelsen krever react-router-dom 7 (brudd) og er ikke gjort;
+  åpen redirect er avbøtet i koden via `resolveInternalPath`.
+- vite.config.ts har `server.host: "::"` — dev-serveren lytter på ALLE grensesnitt, ikke bare lokalt.
+  Påstanden «bare lokal» i forrige vurdering var altså feil, og dev-server-varslene var reelle.
