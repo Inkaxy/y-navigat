@@ -482,13 +482,9 @@ export function useUpdateCustomerOrder() {
               : new Map<string, { price: number; vat_rate: number; source: string; special_price_id: string | null; price_list_id: string | null; is_fallback: boolean }>();
 
           lineRows = input.lines.map((l, idx) => {
-            const lineId = resolveExistingLineId(l.id ?? null, existingIds);
-            const existing =
-              // Linje-id-en er den sikreste koblingen til den lagrede raden.
-              (lineId ? existingById.get(lineId) : undefined) ??
-              existingByKey.get(`${l.product_id}|${merknadKey(l.merknad ?? null)}`) ??
-              // Kakelinje: behold kakebygger-prisen selv om merknaden er endret.
-              cakePriceByProduct.get(l.product_id);
+            const lineId = resolvedLineIds[idx];
+            // Kun den faktiske raden med denne id-en kan gi historisk pris.
+            const existing = lineId ? existingById.get(lineId) : undefined;
             let unitPrice: number;
             let vatRate: number;
             let source: string;
