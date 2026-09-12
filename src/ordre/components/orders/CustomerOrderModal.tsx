@@ -717,7 +717,10 @@ export function CustomerOrderModal({
         }),
       );
     })();
-    // Kun ved datoendring (eller «Prøv igjen») — linjeendringer prises der de oppstår.
+    // Kun ved datoendring (eller «Prøv igjen») — linjeendringer prises der de
+    // oppstår. `pricingTracker`/`setPricingStatus` er stabile referanser og skal
+    // ikke trigge et nytt prisoppslag.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deliveryDate, open, customer.id, pricingRetry]);
 
   // Ny prisrisiko må bekreftes på nytt.
