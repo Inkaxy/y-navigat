@@ -1622,7 +1622,7 @@ export function CustomerOrderModal({
                 type="button"
                 variant="brand"
                 onClick={() => setOverrideOpen(true)}
-                disabled={submitting}
+                disabled={submitting || !priceLookupResolved}
               >
                 Overstyr …
               </Button>
@@ -1630,13 +1630,15 @@ export function CustomerOrderModal({
               <Button
                 type="button"
                 onClick={() => handleSave()}
-                disabled={submitting || pricing || rulesPreview.blocks.length > 0}
+                disabled={submitting || !priceLookupResolved || rulesPreview.blocks.length > 0}
                 title={
                   rulesPreview.blocks.length > 0
                     ? "Ordren bryter en leveringsregel"
-                    : pricing
+                    : pricingStatus.pending
                       ? "Henter priser for datoen"
-                      : undefined
+                      : pricingStatus.failed
+                        ? "Prisene for datoen er ikke avklart"
+                        : undefined
                 }
               >
                 {submitting || pricing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
