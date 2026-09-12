@@ -377,8 +377,17 @@ export function CustomerOrderModal({
   const loadedLinePricesRef = useRef<Map<string, LoadedLinePrice>>(new Map());
   /** true når linjene er reprist bort fra datoen ordren ble lastet med. */
   const repricedAwayRef = useRef(false);
-  /** Prisoppslaget pågår — lagring skal være sperret så lenge det er uavklart. */
-  const [pricing, setPricing] = useState(false);
+  /**
+   * Prisoppslag ved datoendring. Generasjonssporingen sikrer at et gammelt,
+   * kansellert oppslag verken skriver priser eller melder «avklart» når det
+   * svarer etter et nyere oppslag.
+   */
+  const pricingTrackerRef = useRef(new PricingRequestTracker());
+  const [pricingStatus, setPricingStatus] = useState<PricingStatus>({ pending: false, failed: false });
+  const [pricingRetry, setPricingRetry] = useState(0);
+  const pricing = pricingStatus.pending;
+  /** Prisene for gjeldende dato er avklart (ingen oppslag pågår, ingen feil). */
+  const priceLookupResolved = pricesResolved(pricingStatus);
   const [merknadFor, setMerknadFor] = useState<string | null>(null);
   /** 0-pris må bekreftes aktivt før lagring. */
   const [zeroPriceOpen, setZeroPriceOpen] = useState(false);
