@@ -544,7 +544,7 @@ export function useUpdateCustomerOrder() {
           p_parent_column: "order_id",
           p_parent_id: orderId,
           p_rows: lineRows,
-        });
+        } as never);
         if (replaceErr) throw replaceErr;
       } catch (e) {
         // Rull tilbake hode-endringen slik at ordren ikke blir stående med ny
