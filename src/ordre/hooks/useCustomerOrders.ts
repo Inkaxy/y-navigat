@@ -411,19 +411,18 @@ export function useUpdateCustomerOrder() {
         .eq("order_id", orderId);
       if (prevLinesErr) throw prevLinesErr;
 
-      const merknadKey = (m: unknown) => (m ? JSON.stringify(m) : "");
       type PrevPrice = {
         unit_price: number;
         unit_price_source: string | null;
         unit_price_source_id: string | null;
         vat_rate: number | null;
       };
-      const existingByKey = new Map<string, PrevPrice>();
+      // Historisk pris bevares KUN via linjens database-id. Produkt + merknad er
+      // ikke en identitet: en ny linje med samme produkt som en gammel, manuelt
+      // priset linje ville ellers blitt lagret med den gamle prisen, mens
+      // skjermen viste den ferske. Ny linje = ingen id = egen bekreftet pris.
       const existingById = new Map<string, PrevPrice>();
       const existingIds = new Set<string>();
-      // Kakelinjer prises av kakebyggeren. Merknaden (cake_config m.m.) kan endres
-      // uten at prisen skal reprises, så vi matcher dem også kun på produkt.
-      const cakePriceByProduct = new Map<string, PrevPrice>();
       for (const pl of prevLines ?? []) {
         const entry: PrevPrice = {
           unit_price: Number(pl.unit_price),
@@ -431,12 +430,8 @@ export function useUpdateCustomerOrder() {
           unit_price_source_id: (pl.unit_price_source_id as string | null) ?? null,
           vat_rate: pl.vat_rate == null ? null : Number(pl.vat_rate),
         };
-        existingByKey.set(`${pl.product_id}|${merknadKey(pl.merknad)}`, entry);
         existingById.set(pl.id as string, entry);
         existingIds.add(pl.id as string);
-        if (entry.unit_price_source === "cake_builder") {
-          cakePriceByProduct.set(pl.product_id, entry);
-        }
       }
 
 
