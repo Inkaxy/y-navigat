@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { resolveLineVatRate } from "@/ordre/lib/orderRepricing";
 import { supabase } from "@/integrations/supabase/client";
 import { NB_LEGAL_ENTITY_ID } from "@/ordre/lib/constants";
 import { fetchEffectivePricesBatch, type PriceCaller } from "@/ordre/hooks/useNBProducts";
@@ -509,13 +510,13 @@ export function useUpdateCustomerOrder() {
               unitPrice = l.unit_price;
               // Faktisk lagret mva vinner: et syntetisk produkt-snapshot kan ha
               // standardsatsen 15 selv om linjen er lagret med 25 eller 0.
-              vatRate = existing?.vat_rate ?? l.product_mva_rate ?? 15;
+              vatRate = resolveLineVatRate(existing?.vat_rate, l.product_mva_rate);
               source = l.unit_price_source;
               sourceId = l.unit_price_source_id ?? null;
             } else if (existing) {
               // Uendret linje — behold pris og kilde nøyaktig som bestilt.
               unitPrice = existing.unit_price;
-              vatRate = existing.vat_rate ?? l.product_mva_rate ?? 15;
+              vatRate = resolveLineVatRate(existing.vat_rate, l.product_mva_rate);
               source = existing.unit_price_source ?? "unchanged";
               sourceId = existing.unit_price_source_id;
             } else {

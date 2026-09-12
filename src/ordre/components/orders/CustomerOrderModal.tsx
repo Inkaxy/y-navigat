@@ -3,6 +3,7 @@ import { Loader2, Search, Trash2, AlertTriangle, StickyNote } from "lucide-react
 
 import { z } from "zod";
 import { toast } from "sonner";
+import { restoreLoadedPrices, type LoadedLinePrice } from "@/ordre/lib/orderRepricing";
 import {
   Dialog,
   DialogContent,
@@ -373,9 +374,7 @@ export function CustomerOrderModal({
    * og tilbake igjen, skal de avtalte prisene gjenopprettes — ikke prisene fra
    * mellomdatoen.
    */
-  const loadedLinePricesRef = useRef<
-    Map<string, { unit_price: string; source: string | null; source_id: string | null; effective: number }>
-  >(new Map());
+  const loadedLinePricesRef = useRef<Map<string, LoadedLinePrice>>(new Map());
   /** true når linjene er reprist bort fra datoen ordren ble lastet med. */
   const repricedAwayRef = useRef(false);
   /** Prisoppslaget pågår — lagring skal være sperret så lenge det er uavklart. */
@@ -649,23 +648,7 @@ export function CustomerOrderModal({
       // Brukeren har vært innom en annen dato og gått tilbake. Da må de avtalte
       // prisene gjenopprettes — ellers blir mellomdatoens priser stående.
       repricedAwayRef.current = false;
-      setLines((prev) =>
-        prev.map((l) => {
-          if (!l.id || isManualOverride(l.unit_price_source)) return l;
-          const base = loadedLinePricesRef.current.get(l.id);
-          if (!base) return l;
-          return {
-            ...l,
-            unit_price: base.unit_price,
-            unit_price_source: base.source,
-            unit_price_source_id: base.source_id,
-            base_price_source: isManualOverride(base.source) ? null : base.source,
-            base_price_source_id: isManualOverride(base.source) ? null : base.source_id,
-            is_fallback: false,
-            effective_price: base.effective,
-          };
-        }),
-      );
+      setLines((prev) => restoreLoadedPrices(prev, loadedLinePricesRef.current));
       return;
     }
     const customerId = customer.id;
