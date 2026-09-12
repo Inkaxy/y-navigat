@@ -228,6 +228,7 @@ export default function ProduksjonsplanPage() {
   const [savingBaseline, setSavingBaseline] = useState(false);
 
   const printBusy = preparingPrint || !!printJob || !!confirmPrint;
+  const printDisabled = planUnavailable || printBusy;
 
   const handlePrint = useCallback(async (options: PrintProduksjonslisteOptions = printProdDefaults) => {
     const gate = evaluatePrintGate({
