@@ -79,9 +79,8 @@ function xlsxFile(aoa: unknown[][], name = "tedebe.xlsx"): File {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), "Ark1");
   const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
-  return new File([buf], name, {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
+  // jsdom sin File mangler arrayBuffer(); parseren trenger bare navn + buffer.
+  return { name, arrayBuffer: async () => buf } as unknown as File;
 }
 
 const HEADER = [
