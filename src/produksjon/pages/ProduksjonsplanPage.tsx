@@ -608,7 +608,7 @@ export default function ProduksjonsplanPage() {
                       showTraysWithPlus={prefs.showTraysWithPlus}
                       loading={false}
                       columns={cols}
-                      deliveryDate={dateStr}
+                      deliveryDate={printDateStr}
                     />
                   )}
                   {counts && (
