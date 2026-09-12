@@ -3,6 +3,20 @@ import { nb } from "date-fns/locale";
 import type { ProductionPlanRow, ProduksjonsplanCriteria } from "../types";
 import type { SnapshotItem } from "../hooks/useProductionPlanSnapshots";
 import type { PrintProduksjonslisteOptions } from "../components/PrintProduksjonslisteDialog";
+import type { ColumnVisibility } from "../components/ProductionPlanTable";
+
+/** Visningsvalg som påvirker selve utskriften, fryst sammen med radene. */
+export interface PrintViewPrefs {
+  columns: ColumnVisibility;
+  showByMainGroup: boolean;
+  showTraysWithPlus: boolean;
+}
+
+export interface PrintOrderCounts {
+  fast: number;
+  datert: number;
+  pakkseddel: number;
+}
 
 /**
  * Et utskriftsforsøk fryser HELE grunnlaget før det asynkrone snapshot-oppslaget
@@ -25,6 +39,10 @@ export interface PrintAttempt {
   correction: boolean;
   prevItems: Map<string, SnapshotItem> | null;
   prevTakenAt: string | null;
+  /** Kolonner og visningsvalg slik de var da utskriften ble laget. */
+  prefs: PrintViewPrefs;
+  /** Ordretellingen i utskriftsfoten — fryses, leses aldri levende. */
+  counts: PrintOrderCounts | null;
 }
 
 export type PrintGate =
@@ -85,6 +103,8 @@ export interface BuildPrintAttemptInput {
   criteria: ProduksjonsplanCriteria;
   options: PrintProduksjonslisteOptions;
   now: Date;
+  prefs: PrintViewPrefs;
+  counts: PrintOrderCounts | null;
   prev: { takenAt: string; items: Map<string, SnapshotItem> } | null;
   wantCorrection: boolean;
 }
@@ -104,5 +124,11 @@ export function buildPrintAttempt(input: BuildPrintAttemptInput): PrintAttempt {
     correction: input.wantCorrection && !!input.prev,
     prevItems: input.prev?.items ?? null,
     prevTakenAt: input.prev?.takenAt ?? null,
+    prefs: {
+      columns: { ...input.prefs.columns },
+      showByMainGroup: input.prefs.showByMainGroup,
+      showTraysWithPlus: input.prefs.showTraysWithPlus,
+    },
+    counts: input.counts ? { ...input.counts } : null,
   };
 }

@@ -89,6 +89,46 @@ export function pickCompletedMainRun(
   return null;
 }
 
+export const MAIN_RUN_PAGE = 50;
+/**
+ * Sikkerhetsgrense for hvor mange kjøringer vi leter gjennom for samme dag.
+ * Nås grensen uten at vi har nådd slutten, er svaret ukjent — da feiler vi
+ * heller enn å påstå at hovedkjøringen ikke er kjørt.
+ */
+export const MAIN_RUN_MAX_SCAN = 2000;
+
+export interface RunPageResult {
+  data: RunLike[] | null;
+  error: { message: string } | null;
+}
+
+/**
+ * Leter gjennom dagens fullførte hovedkjøringer side for side til vi finner en
+ * kjøring som dekker turfilteret, eller til listen faktisk er slutt.
+ *
+ * Uten paginering kunne ti nyere kjøringer med et annet turfilter skjule en
+ * eldre, riktig kjøring — og planen ville feilaktig si «hovedkjøring ikke kjørt».
+ */
+export async function findCompletedMainRun(
+  fetchPage: (from: number, to: number) => Promise<RunPageResult>,
+  selectedTourNumbers: readonly number[],
+  tourNumberById: ReadonlyMap<string, number | null>,
+): Promise<RunLike | null> {
+  let scanned = 0;
+  while (scanned < MAIN_RUN_MAX_SCAN) {
+    const { data, error } = await fetchPage(scanned, scanned + MAIN_RUN_PAGE - 1);
+    if (error) throw new Error(error.message);
+    const page = data ?? [];
+    const hit = pickCompletedMainRun(page, selectedTourNumbers, tourNumberById);
+    if (hit) return hit;
+    scanned += page.length;
+    if (page.length < MAIN_RUN_PAGE) return null;
+  }
+  throw new Error(
+    `Fant ikke hovedkjøringen etter ${MAIN_RUN_MAX_SCAN} kjøringer. Grunnlaget er uavklart.`,
+  );
+}
+
 /** Tidspunktet kjøringen ble fullført (RPC-en skriver `completed_at`). */
 export function runCompletedAt(run: RunLike): string | null {
   return run.completed_at ?? run.finished_at;

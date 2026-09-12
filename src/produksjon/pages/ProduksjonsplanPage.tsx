@@ -1,4 +1,3 @@
-import { flushSync } from "react-dom";
 import { useMemo, useState, useCallback } from "react";
 import { format, addDays, subDays, parseISO, isToday, isTomorrow, isYesterday } from "date-fns";
 import { nb } from "date-fns/locale";
@@ -19,16 +18,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import {
-  fetchLatestSnapshotItems,
-  saveProductionPlanSnapshot,
-  type SnapshotItem,
-} from "../features/produksjonsplan/hooks/useProductionPlanSnapshots";
-import {
-  buildPrintAttempt,
-  evaluatePrintGate,
-  type PrintAttempt,
-} from "../features/produksjonsplan/lib/printAttempt";
+import { usePrintJob } from "../features/produksjonsplan/hooks/usePrintJob";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,7 +30,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { ProductionPlanRow } from "../features/produksjonsplan/types";
-import { CorrectionPlanTable } from "../features/produksjonsplan/components/CorrectionPlanTable";
+import {
+  FrozenPrintableProductionPlan,
+  PrintableProductionPlan,
+} from "../features/produksjonsplan/components/PrintableProductionPlan";
 import {
   Popover,
   PopoverContent,
@@ -222,125 +215,51 @@ export default function ProduksjonsplanPage() {
   // Utskriften fryser HELE grunnlaget den ble laget av (dato, selskap, rader,
   // kriterier og utskriftsvalg). Ny korreksjons-baseline lagres først når
   // brukeren bekrefter at listen er skrevet ut, og da mot det frosne forsøket.
-  const [printJob, setPrintJob] = useState<PrintAttempt | null>(null);
-  const [confirmPrint, setConfirmPrint] = useState<PrintAttempt | null>(null);
-  const [preparingPrint, setPreparingPrint] = useState(false);
-  const [savingBaseline, setSavingBaseline] = useState(false);
+  const cols: ColumnVisibility = useMemo(
+    () => ({
+      mainGroup: prefs.colMainGroup ?? true,
+      doughType: (prefs.colDoughType ?? true) && !prefs.hideDoughTypes,
+      unit: prefs.colUnit ?? true,
+      ordered: prefs.colOrdered ?? true,
+      fromStock: prefs.colFromStock ?? true,
+      liters: prefs.colLiters ?? true,
+      onStock: prefs.colOnStock ?? true,
+    }),
+    [prefs],
+  );
 
-  const printBusy = preparingPrint || !!printJob || !!confirmPrint;
+  const {
+    printJob,
+    confirmPrint,
+    savingBaseline,
+    printBusy,
+    startPrint,
+    confirmPrinted,
+    dismissConfirm,
+  } = usePrintJob({
+    legalEntityId,
+    dateStr,
+    date,
+    rows,
+    criteria,
+    counts: counts ?? null,
+    prefs: {
+      columns: cols,
+      showByMainGroup: prefs.showByMainGroup,
+      showTraysWithPlus: prefs.showTraysWithPlus,
+    },
+    planUnavailable,
+  });
+
   const printDisabled = planUnavailable || printBusy;
 
-  const handlePrint = useCallback(async (options: PrintProduksjonslisteOptions = printProdDefaults) => {
-    const gate = evaluatePrintGate({
-      legalEntityId,
-      planUnavailable,
-      rowCount: rows.length,
-      busy: printBusy,
-    });
-    if (!gate.ok) {
-      toast({
-        title: gate.title,
-        description: gate.description,
-        variant: gate.reason === "empty" ? undefined : "destructive",
-      });
-      return;
-    }
 
-    // Frys alt FØR det asynkrone oppslaget.
-    const frozen = {
-      attemptId: crypto.randomUUID(),
-      legalEntityId: legalEntityId as string,
-      dateStr,
-      date,
-      rows,
-      criteria,
-      options,
-      now: new Date(),
-    };
-    const wantCorrection = !!frozen.criteria.print_correction_last;
-
-    setPreparingPrint(true);
-    let prev: { takenAt: string; items: Map<string, SnapshotItem> } | null = null;
-    try {
-      if (wantCorrection) {
-        const lookup = await fetchLatestSnapshotItems(
-          frozen.legalEntityId,
-          frozen.dateStr,
-          frozen.criteria,
-        );
-        if (lookup.status === "error") {
-          toast({
-            title: "Fant ikke forrige utskrift",
-            description: "Korreksjonslisten kan bli feil. Utskrift er avbrutt — prøv igjen.",
-            variant: "destructive",
-          });
-          return;
-        }
-        if (lookup.status === "none") {
-          toast({
-            title: "Ingen tidligere utskrift",
-            description: "Korreksjonsliste hoppes over – listen skrives ut som vanlig.",
-          });
-        } else {
-          prev = { takenAt: lookup.takenAt, items: lookup.items };
-        }
-      }
-    } catch (e) {
-      console.error("Snapshot-oppslag feilet", e);
-      toast({
-        title: "Fant ikke forrige utskrift",
-        description: "Korreksjonslisten kan bli feil. Utskrift er avbrutt — prøv igjen.",
-        variant: "destructive",
-      });
-      return;
-    } finally {
-      setPreparingPrint(false);
-    }
-
-    const attempt = buildPrintAttempt({ ...frozen, prev, wantCorrection });
-
-    flushSync(() => {
-      setPrintJob(attempt);
-    });
-
-    setTimeout(() => {
-      window.print();
-      setTimeout(() => {
-        setPrintJob(null);
-        setConfirmPrint(attempt);
-      }, 500);
-    }, 100);
-  }, [legalEntityId, dateStr, date, criteria, rows, printProdDefaults, planUnavailable, printBusy]);
-
-  /** Bruker bekrefter at listen faktisk er skrevet ut → lagre ny baseline. */
-  const handleConfirmPrinted = useCallback(async () => {
-    if (!confirmPrint) return;
-    setSavingBaseline(true);
-    try {
-      // Alt hentes fra det frosne forsøket — aldri fra levende dato/kriterier.
-      const saved = await saveProductionPlanSnapshot(
-        confirmPrint.attemptId,
-        confirmPrint.legalEntityId,
-        confirmPrint.dateStr,
-        confirmPrint.criteria,
-        confirmPrint.rows,
-      );
-      setConfirmPrint(null);
-      toast({
-        title: saved.alreadySaved ? "Allerede registrert" : "Utskrift registrert",
-        description: `${saved.itemCount} varelinjer lagret som grunnlag for ${confirmPrint.dateStr}.`,
-      });
-    } catch (e) {
-      console.error("Snapshot-lagring feilet", e);
-      toast({
-        title: "Grunnlaget ble ikke lagret",
-        description: "Neste korreksjonsliste ville fått feil sammenligning. Prøv igjen.",
-        variant: "destructive",
-      });
-    } finally {
-      setSavingBaseline(false);
-    }
-  }, [confirmPrint]);
+  const handlePrint = useCallback(
+    (options: PrintProduksjonslisteOptions = printProdDefaults) => {
+      void startPrint(options);
+    },
+    [startPrint, printProdDefaults],
+  );
 
 
 
@@ -500,130 +419,84 @@ export default function ProduksjonsplanPage() {
         </Card>
       )}
 
-      {legalEntityId && !plan.isError && (() => {
-        const cols: ColumnVisibility = {
-          mainGroup: prefs.colMainGroup ?? true,
-          doughType: (prefs.colDoughType ?? true) && !prefs.hideDoughTypes,
-          unit: prefs.colUnit ?? true,
-          ordered: prefs.colOrdered ?? true,
-          fromStock: prefs.colFromStock ?? true,
-          liters: prefs.colLiters ?? true,
-          onStock: prefs.colOnStock ?? true,
-        };
-        const correctionLast = !!printJob?.correction && !!printJob?.prevItems;
-        // Utskriften skal alltid vise det frosne grunnlaget: rader, kriterier,
-        // dato og tidspunkt fra akkurat det utskriftsforsøket.
-        const printRows = printJob?.rows ?? rows;
-        const printCriteria = printJob?.criteria ?? criteria;
-        const baseDateLabel =
-          printJob?.dateLabel ??
-          `${format(date, "EEEE dd.MM.yy", { locale: nb })}${criteria.sum_tours ? " sum alle turer" : ""}`;
-        const printedAt = printJob?.printedAt ?? format(new Date(), "dd.MM.yy HH:mm");
-        const printDateStr = printJob?.dateStr ?? dateStr;
-
-        // Bygg liste over "sider": hovedliste + evt. én korreksjonsside
-        const pages: Array<{ kind: "normal" | "correction"; copyIdx: number }> = [
-          { kind: "normal", copyIdx: 0 },
-        ];
-        if (correctionLast) {
-          pages.push({ kind: "correction", copyIdx: 1 });
-        }
-
-        return (
-          <div className={cn("print-area space-y-3", (printJob?.options.alternateRowGray ?? true) && "print-zebra-rows")}>
-            {/* Skjerm-visning: kun den vanlige tabellen én gang */}
-            <div className="print:hidden">
-              {basis && (
-                <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-line-subtle bg-muted/40 px-3 py-2 text-xs">
-                  <FileText className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-                  {basis.mode === "pakksedler" ? (
-                    <>
-                      <span>
-                        Grunnlag: pakksedler kjørt
-                        {basis.runAt ? ` kl. ${format(new Date(basis.runAt), "HH:mm")}` : ""} (
-                        {basis.noteCount} pakksedler)
-                        {basis.newAfterRunCount > 0
-                          ? ` + ${basis.newAfterRunCount} ordre lagt inn etter kjøringen`
-                          : ""}
-                      </span>
-                      <Link
-                        to={`/ordre/pakksedler?date=${dateStr}`}
-                        className="font-medium underline underline-offset-2"
-                      >
-                        Se pakksedler
-                      </Link>
-                    </>
-                  ) : (
-                    <span>Grunnlag: bestillinger og fastordre — hovedkjøring ikke kjørt ennå</span>
-                  )}
-                </div>
-              )}
-              <ProductionPlanTable
-
-                rows={rows}
-                showByMainGroup={prefs.showByMainGroup}
-                showTraysWithPlus={prefs.showTraysWithPlus}
-                loading={plan.isLoading}
-                columns={cols}
-                deliveryDate={dateStr}
-              />
-              {counts && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  Fra {counts.datert} daterte ordre, {counts.fast} fastordre
-                  {counts.pakkseddel > 0 ? `, ${counts.pakkseddel} pakksedler` : ""}
-                </p>
-              )}
-            </div>
-
-            {/* Print-visning: N sider, evt. korreksjon på siste */}
-            <div className="hidden print:block">
-              {pages.map((p) => (
-                <div key={p.copyIdx} className="print-page">
-                  <div className="flex justify-between items-baseline mb-2">
-                    <h1 className="text-base font-bold uppercase">
-                      {p.kind === "correction" ? "Korreksjonsliste for: " : "Produksjonsliste for: "}
-                      {baseDateLabel}
-                      {p.kind === "correction" && printJob?.prevTakenAt && (
-                        <span className="ml-2 text-[9pt] font-normal normal-case">
-                          – endring siden {format(new Date(printJob.prevTakenAt), "HH:mm")}
-                        </span>
-                      )}
-                    </h1>
-                    <span className="text-[9pt]">
-                      Skrevet ut: {printedAt}
+      {legalEntityId && !plan.isError && (
+        <div className="print-area space-y-3">
+          {/* Skjerm-visning: kun den vanlige tabellen én gang */}
+          <div className="print:hidden">
+            {basis && (
+              <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-line-subtle bg-muted/40 px-3 py-2 text-xs">
+                <FileText className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                {basis.mode === "pakksedler" ? (
+                  <>
+                    <span>
+                      Grunnlag: pakksedler kjørt
+                      {basis.runAt ? ` kl. ${format(new Date(basis.runAt), "HH:mm")}` : ""} (
+                      {basis.noteCount} pakksedler)
+                      {basis.newAfterRunCount > 0
+                        ? ` + ${basis.newAfterRunCount} ordre lagt inn etter kjøringen`
+                        : ""}
                     </span>
-                  </div>
-                  {p.kind === "correction" && printJob?.prevItems ? (
-                    <CorrectionPlanTable
-                      rows={printRows}
-                      showByMainGroup={prefs.showByMainGroup}
-                      showTraysWithPlus={prefs.showTraysWithPlus}
-                      columns={cols}
-                      previousItems={printJob.prevItems}
-                      criteria={printCriteria}
-                    />
-                  ) : (
-                    <ProductionPlanTable
-                      rows={printRows}
-                      showByMainGroup={prefs.showByMainGroup}
-                      showTraysWithPlus={prefs.showTraysWithPlus}
-                      loading={false}
-                      columns={cols}
-                      deliveryDate={printDateStr}
-                    />
-                  )}
-                  {counts && (
-                    <p className="text-[9pt] mt-2">
-                      Fra {counts.datert} daterte ordre, {counts.fast} fastordre
-                      {counts.pakkseddel > 0 ? `, ${counts.pakkseddel} pakksedler` : ""}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
+                    <Link
+                      to={`/ordre/pakksedler?date=${dateStr}`}
+                      className="font-medium underline underline-offset-2"
+                    >
+                      Se pakksedler
+                    </Link>
+                  </>
+                ) : (
+                  <span>Grunnlag: bestillinger og fastordre — hovedkjøring ikke kjørt ennå</span>
+                )}
+              </div>
+            )}
+            <ProductionPlanTable
+              rows={rows}
+              showByMainGroup={prefs.showByMainGroup}
+              showTraysWithPlus={prefs.showTraysWithPlus}
+              loading={plan.isLoading}
+              columns={cols}
+              deliveryDate={dateStr}
+            />
+            {counts && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Fra {counts.datert} daterte ordre, {counts.fast} fastordre
+                {counts.pakkseddel > 0 ? `, ${counts.pakkseddel} pakksedler` : ""}
+              </p>
+            )}
           </div>
-        );
-      })()}
+        </div>
+      )}
+
+      {/* Utskriftsarket. Et fryst forsøk rendres UAVHENGIG av hva den levende
+          planen gjør etterpå — ny dato eller en feilet bakgrunnsoppdatering
+          skal aldri kunne gjøre den pågående utskriften blank. */}
+      {printJob ? (
+        <div className="print-area">
+          <FrozenPrintableProductionPlan attempt={printJob} />
+        </div>
+      ) : (
+        legalEntityId &&
+        !plan.isError && (
+          <div className="print-area">
+            <PrintableProductionPlan
+              rows={rows}
+              criteria={criteria}
+              dateLabel={`${format(date, "EEEE dd.MM.yy", { locale: nb })}${criteria.sum_tours ? " sum alle turer" : ""}`}
+              printedAt={format(new Date(), "dd.MM.yy HH:mm")}
+              dateStr={dateStr}
+              prefs={{
+                columns: cols,
+                showByMainGroup: prefs.showByMainGroup,
+                showTraysWithPlus: prefs.showTraysWithPlus,
+              }}
+              counts={counts ?? null}
+              prevItems={null}
+              prevTakenAt={null}
+              correction={false}
+              zebra={printProdDefaults.alternateRowGray ?? true}
+            />
+          </div>
+        )
+      )}
 
       {/* Footer hint */}
       <p className="text-xs text-muted-foreground print-hide">
@@ -631,7 +504,7 @@ export default function ProduksjonsplanPage() {
         Grunnlaget for korreksjonslisten lagres når du bekrefter utskriften, og slettes etter 2 dager.
       </p>
 
-      <AlertDialog open={!!confirmPrint} onOpenChange={(o) => { if (!o && !savingBaseline) setConfirmPrint(null); }}>
+      <AlertDialog open={!!confirmPrint} onOpenChange={(o) => { if (!o && !savingBaseline) dismissConfirm(); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Ble produksjonslisten skrevet ut?</AlertDialogTitle>
@@ -641,10 +514,10 @@ export default function ProduksjonsplanPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={savingBaseline}>Nei – avbrutt eller feilet</AlertDialogCancel>
+            <AlertDialogCancel disabled={savingBaseline} onClick={() => dismissConfirm()}>Nei – avbrutt eller feilet</AlertDialogCancel>
             <AlertDialogAction
               disabled={savingBaseline}
-              onClick={(e) => { e.preventDefault(); void handleConfirmPrinted(); }}
+              onClick={(e) => { e.preventDefault(); void confirmPrinted(); }}
             >
               {savingBaseline ? "Lagrer…" : "Ja, listen er skrevet ut"}
             </AlertDialogAction>

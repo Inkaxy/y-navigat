@@ -6,8 +6,8 @@ import { osloDateISO } from "@/lib/osloDate";
 import { fetchDeliveryPauses } from "@/ordre/lib/pendingOrders";
 import {
   excludePausedLines,
+  findCompletedMainRun,
   ordersNewAfterRun,
-  pickCompletedMainRun,
   productionStatusesForDate,
   runCompletedAt,
   type PlanSource,
@@ -105,6 +105,40 @@ async function fetchGroupMembers(
   );
 }
 
+const PRODUCT_COLUMNS =
+  "id, display_number, display_name, unit_of_sale, main_category_id, sub_category_id, production_group_id, dough_type, pieces_per_tray, pieces_per_liter";
+
+/** Antall id-er per spørring. Holder URL-lengden nede uten å miste rader. */
+const ID_CHUNK = 200;
+
+/**
+ * Henter ALLE rader for et sett id-er: id-ene deles i bolker og hver bolk
+ * pagineres. `.in()` alene kan avkortes stille av API-grensen, og en manglende
+ * vare/kategori ville gitt en ufullstendig produksjonsplan uten feilmelding.
+ */
+async function fetchAllByIds<T>(
+  ids: string[],
+  build: (
+    ids: string[],
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let i = 0; i < ids.length; i += ID_CHUNK) {
+    const chunk = ids.slice(i, i + ID_CHUNK);
+    const rows = await fetchAllRows<T>(
+      (from, to) =>
+        build(chunk, from, to) as PromiseLike<{
+          data: T[] | null;
+          error: { message: string } | null;
+        }>,
+    );
+    out.push(...rows);
+  }
+  return out;
+}
+
 export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
   return useQuery({
     queryKey: ["produksjonsplan", "rows", legalEntityId, date, criteria],
@@ -149,16 +183,20 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
 
 
       // Hent alle aktive turer for selskapet (trenger info for ekspandering av fastordre uten tur).
-      const { data: allTours, error: toursErr } = await supabase
-        .from("delivery_tours")
-        .select(
-          "id, tour_number, display_name, status, active_monday, active_tuesday, active_wednesday, active_thursday, active_friday, active_saturday, active_sunday",
-        )
-        .eq("legal_entity_id", legalEntityId)
-        .order("tour_number", { ascending: true });
-      // Turene avgjør både filtrering og fastordre-ekspansjon. Uten dem blir
-      // planen ufullstendig, og da skal spørringen feile synlig.
-      if (toursErr) throw toursErr;
+      // Turene avgjør både filtrering og fastordre-ekspansjon. Listen pagineres
+      // fullstendig, og feil kastes videre — en avkortet turliste ville stille
+      // gitt feil plan.
+      const allTours = await fetchAllRows((from, to) =>
+        supabase
+          .from("delivery_tours")
+          .select(
+            "id, tour_number, display_name, status, active_monday, active_tuesday, active_wednesday, active_thursday, active_friday, active_saturday, active_sunday",
+          )
+          .eq("legal_entity_id", legalEntityId)
+          .order("tour_number", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to),
+      );
       type TourRow = {
         id: string;
         tour_number: number | null;
@@ -321,20 +359,24 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
           );
 
       // === Grunnlag: pakksedler når hovedkjøringen er fullført ================
-      const { data: runRows, error: runErr } = await supabase
-        .from("delivery_note_runs")
-        .select("id, completed_at, finished_at, tour_filter, notes_generated")
-        .eq("legal_entity_id", legalEntityId)
-        .eq("delivery_date", date)
-        .eq("run_type", "main")
-        .eq("status", "completed")
-        .order("created_at", { ascending: false })
-        .limit(10);
-      // Uten kjøringene vet vi ikke om pakksedlene er fasit — da kan planen
-      // vise bestillinger som om kjøringen aldri skjedde.
-      if (runErr) throw runErr;
-      const mainRun = pickCompletedMainRun(
-        (runRows ?? []) as RunLike[],
+      // Kjøringene pagineres helt til treff eller faktisk slutt: et riktig,
+      // eldre turfilter skal ikke skjules av nyere kjøringer for andre turer.
+      // Feil eller ufullstendig søk kastes videre — uten kjøringene vet vi ikke
+      // om pakksedlene er fasit.
+      const mainRun = await findCompletedMainRun(
+        async (from, to) => {
+          const { data, error } = await supabase
+            .from("delivery_note_runs")
+            .select("id, completed_at, finished_at, tour_filter, notes_generated")
+            .eq("legal_entity_id", legalEntityId)
+            .eq("delivery_date", date)
+            .eq("run_type", "main")
+            .eq("status", "completed")
+            .order("created_at", { ascending: false })
+            .order("id", { ascending: false })
+            .range(from, to);
+          return { data: (data ?? null) as RunLike[] | null, error };
+        },
         criteria.tour_numbers,
         tourMap,
       );
@@ -504,47 +546,53 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
       if (productIds.length === 0) return { rows: [], orderCounts, basis };
 
 
-      // 3) Hent produkter
-      const { data: products, error: prodErr } = await supabase
-        .from("products")
-        .select("id, display_number, display_name, unit_of_sale, main_category_id, sub_category_id, production_group_id, dough_type, pieces_per_tray, pieces_per_liter")
-        .in("id", productIds);
-      if (prodErr) throw prodErr;
-
-      const productMap = new Map<string, ProductRow>(
-        (products ?? []).map((p) => [p.id, p as ProductRow]),
+      // 3) Hent produkter (pagineres og deles i bolker — en avkortet liste ville
+      //    stille fjernet varer fra produksjonsplanen).
+      const products = await fetchAllByIds<ProductRow>(productIds, (ids, from, to) =>
+        supabase
+          .from("products")
+          .select(PRODUCT_COLUMNS)
+          .in("id", ids)
+          .order("id", { ascending: true })
+          .range(from, to),
       );
+
+      const productMap = new Map<string, ProductRow>(products.map((p) => [p.id, p]));
 
       // 4) Hent hovedkategori-info
       const mainCatIds = Array.from(
-        new Set((products ?? []).map((p) => p.main_category_id).filter(Boolean) as string[]),
+        new Set(products.map((p) => p.main_category_id).filter(Boolean) as string[]),
       );
       let mainCatMap = new Map<string, MainCategoryRow>();
       if (mainCatIds.length > 0) {
-        const { data: cats, error: catsErr } = await supabase
-          .from("product_main_categories")
-          .select("id, code, display_name, sort_order")
-          .in("id", mainCatIds)
-          .order("sort_order", { ascending: true });
-        if (catsErr) throw catsErr;
-        mainCatMap = new Map((cats ?? []).map((c) => [c.id, c as MainCategoryRow]));
+        const cats = await fetchAllByIds<MainCategoryRow>(mainCatIds, (ids, from, to) =>
+          supabase
+            .from("product_main_categories")
+            .select("id, code, display_name, sort_order")
+            .in("id", ids)
+            .order("sort_order", { ascending: true })
+            .order("id", { ascending: true })
+            .range(from, to),
+        );
+        mainCatMap = new Map(cats.map((c) => [c.id, c]));
       }
 
       // 5) Hent produksjonsgrupper (inkl. hovedvare)
       const prodGroupIds = Array.from(
-        new Set((products ?? []).map((p) => p.production_group_id).filter(Boolean) as string[]),
+        new Set(products.map((p) => p.production_group_id).filter(Boolean) as string[]),
       );
-      let prodGroupMap = new Map<string, { id: string; display_name: string; main_product_id: string | null }>();
+      type ProdGroupRow = { id: string; display_name: string; main_product_id: string | null };
+      let prodGroupMap = new Map<string, ProdGroupRow>();
       if (prodGroupIds.length > 0) {
-        const { data: pgs, error: pgErr } = await supabase
-          .from("production_groups")
-          .select("id, display_name, main_product_id")
-          .in("id", prodGroupIds)
-          .order("id", { ascending: true });
-        if (pgErr) throw pgErr;
-        prodGroupMap = new Map(
-          (pgs ?? []).map((g: { id: string; display_name: string; main_product_id: string | null }) => [g.id, g]),
+        const pgs = await fetchAllByIds<ProdGroupRow>(prodGroupIds, (ids, from, to) =>
+          supabase
+            .from("production_groups")
+            .select("id, display_name, main_product_id")
+            .in("id", ids)
+            .order("id", { ascending: true })
+            .range(from, to),
         );
+        prodGroupMap = new Map(pgs.map((g) => [g.id, g]));
       }
 
       // 5b) Hent hovedvare-produkter (for sammenslåing)
@@ -559,13 +607,17 @@ export function useProductionPlan({ legalEntityId, date, criteria }: Args) {
           ).filter((id) => !productMap.has(id))
         : [];
       if (mainProductIds.length > 0) {
-        const { data: extra, error: extraErr } = await supabase
-          .from("products")
-          .select("id, display_number, display_name, unit_of_sale, main_category_id, sub_category_id, production_group_id, dough_type, pieces_per_tray, pieces_per_liter")
-          .in("id", mainProductIds);
-        // Hovedvarene bestemmer hvilken rad mengdene slås sammen på.
-        if (extraErr) throw extraErr;
-        for (const p of extra ?? []) productMap.set(p.id, p as ProductRow);
+        // Hovedvarene bestemmer hvilken rad mengdene slås sammen på — listen må
+        // være fullstendig.
+        const extra = await fetchAllByIds<ProductRow>(mainProductIds, (ids, from, to) =>
+          supabase
+            .from("products")
+            .select(PRODUCT_COLUMNS)
+            .in("id", ids)
+            .order("id", { ascending: true })
+            .range(from, to),
+        );
+        for (const p of extra) productMap.set(p.id, p);
       }
 
       // 5c) Fallback: hvis sammenslåing er på og en gruppe IKKE har hovedvare satt,
