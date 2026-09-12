@@ -964,6 +964,16 @@ export function CustomerOrderModal({
   }
 
   async function handleSave(overrideReason: string | null = null, forceZeroPrice = false) {
+    // Sperren må ligge i selve lagringen, ikke bare på knappen: bekreftelses-
+    // dialogene kaller handleSave direkte.
+    if (!priceLookupResolved) {
+      toast.error(
+        pricingStatus.pending
+          ? "Prisene for den nye datoen hentes fortsatt. Vent til de er klare."
+          : "Prisene for den nye datoen er ikke avklart. Prøv prisoppslaget på nytt før du lagrer.",
+      );
+      return;
+    }
     const input = buildInput(overrideReason);
     if (!input) return;
     if (!forceZeroPrice && !zeroPriceConfirmed && riskyPriceLines > 0) {
