@@ -102,6 +102,7 @@ export function PrintProduksjonslisteDialog({
   onSaveDefaults,
   onPrint,
   onSend,
+  planUnavailable = false,
 }: Props) {
   const [opts, setOpts] = useState<PrintProduksjonslisteOptions>(initial);
   useEffect(() => {
