@@ -61,10 +61,13 @@ import {
   cancelledGaps,
   formatNumberRanges,
   groupUnitsByProduct,
-  markLabelUnitsPrinted,
   useLabelUnits,
   useSyncLabelNumbers,
 } from "@/produksjon/features/etiketter/hooks/useLabelUnits";
+import {
+  buildLabelPrintAttempt,
+  submitLabelPrintAttempt,
+} from "@/produksjon/features/etiketter/lib/labelPrintAttempt";
 import { useLabelPrintProfiles } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelPrintProfiles";
 import type { LabelProductRow, LabelScreenFilter } from "@/produksjon/features/etiketter/types";
 import { useLabelUnitCakeImages } from "@/produksjon/features/etiketter/hooks/useLabelUnitCakeImages";
@@ -280,21 +283,19 @@ export default function EtiketterPage() {
           if (units.length === 0) {
             continue;
           }
-          for (const u of units) {
-            await insertJob.mutateAsync({
-              label_number: String(u.number),
-              label_unit_id: u.id,
-              product_id: r.product_id,
-              order_line_id: u.order_line_id,
-              legal_entity_id: legalEntityId,
-              production_department_id: deptId,
-              profile_id: profileId,
-              quantity: 1,
-              printer_name: null,
-              status: "printed",
-            });
-          }
-          await markLabelUnitsPrinted(units);
+          // Én transaksjon per vare: jobbene logges og numrene telles opp
+          // sammen, slik at en halvveis feilet kjøring aldri etterlater
+          // etiketter som er logget uten å være registrert utskrevet.
+          await submitLabelPrintAttempt(
+            buildLabelPrintAttempt({
+              legalEntityId,
+              departmentId: deptId,
+              profileId,
+              productId: r.product_id,
+              units,
+            }),
+            "printed",
+          );
           ok++;
         } catch {
           failed++;
