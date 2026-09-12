@@ -53,8 +53,12 @@ describe("RLS: anon har ikke lesetilgang til sensitive tabeller", () => {
   }, 20_000);
 
   it("krever autentisering for faktura-RPC-er", async () => {
+    // Signaturen er (p_legal_entity_id uuid, p_run_date date, p_groups text[]).
+    // Feil parameternavn ga 404 fra PostgREST — en schemafeil, ikke adgangsnekt.
     const res = await anon.rpc("get_invoice_run_preview_customers", {
-      p_run_id: "00000000-0000-0000-0000-000000000000",
+      p_legal_entity_id: "00000000-0000-0000-0000-000000000000",
+      p_run_date: "2026-09-12",
+      p_groups: null,
     } as never);
     const outcome = classifyAnonDeniedOnly({ data: res.data, error: res.error, status: res.status });
     expect(anonOutcomeMessage("get_invoice_run_preview_customers", outcome)).toBe(
