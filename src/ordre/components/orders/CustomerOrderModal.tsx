@@ -392,6 +392,17 @@ export function CustomerOrderModal({
   const pricing = pricingStatus.pending;
   /** Prisene for gjeldende dato er avklart (ingen oppslag pågår, ingen feil). */
   const priceLookupResolved = pricesResolved(pricingStatus);
+  // Lukking eller bytte av ordre/kunde: et utestående prisoppslag må forkastes
+  // her og nå. Ellers kan svaret komme etter at skjemaet er åpnet på nytt for en
+  // annen ordre og skrive prisene sine der.
+  useEffect(() => {
+    const tracker = pricingTrackerRef.current;
+    tracker.invalidate();
+    setPricingStatus(tracker.status());
+    return () => {
+      tracker.invalidate();
+    };
+  }, [open, orderId, customer.id]);
   const [merknadFor, setMerknadFor] = useState<string | null>(null);
   /** 0-pris må bekreftes aktivt før lagring. */
   const [zeroPriceOpen, setZeroPriceOpen] = useState(false);
