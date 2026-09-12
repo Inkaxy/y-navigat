@@ -1,3 +1,4 @@
+import { resolveInternalPath } from "@/lib/safeInternalPath";
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { MessageSquare } from "lucide-react";
@@ -89,7 +90,9 @@ export default function OrderDetail() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") === "samtaler" ? "samtaler" : "detaljer";
   const backParam = searchParams.get("tilbake");
-  const backUrl = backParam && backParam.startsWith("/") ? backParam : null;
+  // Kun interne stier: `//evil` og `/\evil` starter også med «/», men ville
+  // sendt brukeren ut av NBhub.
+  const backUrl = resolveInternalPath(backParam);
 
   const { data: order, isLoading, error } = useOrderDetail(id);
   const { data: lines = [] } = useOrderLines(id);

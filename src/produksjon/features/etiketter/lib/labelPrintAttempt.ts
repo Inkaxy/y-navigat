@@ -74,9 +74,14 @@ export async function submitLabelPrintAttempt(
   if (error) throw error;
 
   // Serveren MÅ svare med et komplett resultat. Et tomt svar ble tidligere
-  // tolket som «0 registrert, alt i orden» — det ga falsk suksess.
+  // tolket som «0 registrert, alt i orden» — det ga falsk suksess. Vi kan
+  // IKKE påstå at ingenting ble registrert: serveren kan ha fullført mens
+  // svaret gikk tapt. Samme attempt-/jobb-ID brukes ved nytt forsøk, så en
+  // retry avklarer tilstanden uten å telle dobbelt.
   if (data === null || typeof data !== "object" || Array.isArray(data)) {
-    throw new Error("Serveren bekreftet ikke utskriften. Etikettene står fortsatt som uutskrevet.");
+    throw new Error(
+      "Registreringen kunne ikke bekreftes. Prøv samme bekreftelse én gang til — den telles ikke dobbelt.",
+    );
   }
   const res = data as {
     status?: unknown;

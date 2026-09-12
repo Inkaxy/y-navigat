@@ -15,12 +15,12 @@ export type XlsxColumn = {
 
 export type XlsxCell = string | number | null | undefined;
 
-export function downloadXlsx(
-  filename: string,
+/** Bygger arbeidsboken. Skilt ut fra nedlastingen så den kan testes. */
+export function buildXlsxWorkbook(
   sheetName: string,
   columns: XlsxColumn[],
   rows: XlsxCell[][],
-) {
+): XLSX.WorkBook {
   const aoa: XlsxCell[][] = [columns.map((c) => c.header), ...rows];
   const ws = XLSX.utils.aoa_to_sheet(aoa as unknown[][]);
 
@@ -40,7 +40,16 @@ export function downloadXlsx(
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31));
-  XLSX.writeFile(wb, filename);
+  return wb;
+}
+
+export function downloadXlsx(
+  filename: string,
+  sheetName: string,
+  columns: XlsxColumn[],
+  rows: XlsxCell[][],
+) {
+  XLSX.writeFile(buildXlsxWorkbook(sheetName, columns, rows), filename);
 }
 
 /** Standard tallformater. */
