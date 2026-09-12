@@ -161,20 +161,27 @@ export function PrintProduksjonslisteDialog({
             <Save className="h-4 w-4 mr-2" />
             Lagre
           </Button>
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={() => onOpenChange(false)}>
-              Lukk
-            </Button>
-            {onSend && (
-              <Button variant="default" onClick={() => onSend(opts)}>
-                <Send className="h-4 w-4 mr-2" />
-                Send
-              </Button>
+          <div className="flex flex-col items-end gap-2">
+            {planUnavailable && (
+              <p className="text-xs text-destructive">
+                Produksjonsplanen er ikke ferdig oppdatert. Utskrift er sperret til tallene er klare.
+              </p>
             )}
-            <Button variant="default" onClick={() => onPrint(opts)}>
-              <Printer className="h-4 w-4 mr-2" />
-              Skriv ut
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                Lukk
+              </Button>
+              {onSend && (
+                <Button variant="default" disabled={planUnavailable} onClick={() => onSend(opts)}>
+                  <Send className="h-4 w-4 mr-2" />
+                  Send
+                </Button>
+              )}
+              <Button variant="default" disabled={planUnavailable} onClick={() => onPrint(opts)}>
+                <Printer className="h-4 w-4 mr-2" />
+                Skriv ut
+              </Button>
+            </div>
           </div>
         </DialogFooter>
       </DialogContent>
