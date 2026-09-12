@@ -686,6 +686,7 @@ export default function ProduksjonsplanPage() {
         summary={summary}
         templateName={activeTemplate?.name ?? null}
         initial={printProdDefaults}
+        planUnavailable={planUnavailable || printBusy}
         onSaveDefaults={(o) => {
           setPrintProdDefaults(o);
           toast({ title: "Standardvalg lagret" });
@@ -708,6 +709,7 @@ export default function ProduksjonsplanPage() {
         date={dateStr}
         criteria={criteria}
         summary={summary}
+        planUnavailable={planUnavailable}
       />
 
       <PrintPakkelisteDialog
@@ -716,6 +718,7 @@ export default function ProduksjonsplanPage() {
         summary={summary}
         templateName={activeTemplate?.name ?? null}
         initial={printPackDefaults}
+        planUnavailable={planUnavailable}
         onSaveDefaults={(o) => {
           setPrintPackDefaults(o);
           toast({ title: "Standardvalg lagret" });
