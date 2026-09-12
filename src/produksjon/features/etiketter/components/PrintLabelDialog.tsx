@@ -100,6 +100,8 @@ export function PrintLabelDialog({
   const profile = profiles?.find((p) => p.id === profileId) ?? null;
   const [downloading, setDownloading] = useState(false);
   const [printing, setPrinting] = useState(false);
+  /** PDF er laget og åpnet, men ingen har bekreftet at etikettene kom ut ennå. */
+  const [awaitingConfirm, setAwaitingConfirm] = useState(false);
 
   const activeUnits = useMemo(
     () => units.filter((u) => u.status !== "cancelled"),
@@ -292,6 +294,7 @@ export function PrintLabelDialog({
       setQuantity(row.total_labels || 1);
       setOnlyUnprinted(true);
       setErrorMessage(null);
+      setAwaitingConfirm(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, row?.product_id]);
@@ -434,6 +437,52 @@ export function PrintLabelDialog({
           </div>
         )}
 
+        {(gate.status === "loading" || gate.status === "error" || gate.status === "missing_data") && (
+          <div className="flex items-start gap-2 rounded-md border border-border bg-muted p-3 text-sm">
+            {gate.status === "loading" ? (
+              <Loader2 className="h-4 w-4 mt-0.5 shrink-0 animate-spin" />
+            ) : (
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
+            )}
+            <div className="space-y-2">
+              <p>{gate.reason}</p>
+              {gate.retryable && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void refetchLabelData()}
+                  disabled={labelDataFetching}
+                >
+                  Prøv igjen
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {awaitingConfirm && (
+          <div className="space-y-2 rounded-md border border-border bg-muted p-3 text-sm">
+            <p className="font-semibold">Kom etikettene ut av skriveren?</p>
+            <p className="text-xs text-muted-foreground">
+              Numrene registreres som skrevet ut først når du bekrefter. Avbrøt du
+              utskriften, velger du «Mislyktes».
+            </p>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleConfirmPrinted} disabled={printing}>
+                Ja, skrevet ut
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleReportFailed}
+                disabled={printing}
+              >
+                Mislyktes / avbrutt
+              </Button>
+            </div>
+          </div>
+        )}
+
         {blockedByMissing && (
           <div className="space-y-1 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
             <div className="flex items-center gap-2 font-semibold">
@@ -565,7 +614,7 @@ export function PrintLabelDialog({
           <Button
             variant="outline"
             onClick={handleDownloadPdf}
-            disabled={downloading || !profile || nothingToPrint || blockedByMissing}
+            disabled={downloading || nothingToPrint || !gate.canPrint}
             className="gap-2"
             title={!profile ? "Sett etikett-profil for varen først" : undefined}
           >
@@ -578,11 +627,11 @@ export function PrintLabelDialog({
           </Button>
           <Button
             onClick={handlePrint}
-            disabled={!deptId || isWorking || nothingToPrint || blockedByMissing}
+            disabled={!deptId || isWorking || nothingToPrint || !gate.canPrint || awaitingConfirm}
             className="gap-2"
             title={
-              blockedByMissing
-                ? "Utskrift er sperret — kritiske deklarasjonsdata mangler"
+              !gate.canPrint
+                ? (gate.reason ?? undefined)
                 : nothingToPrint
                   ? "Alle numre er allerede skrevet ut"
                   : undefined
