@@ -233,6 +233,17 @@ export async function saveProductionPlanSnapshot(
   if (!res || typeof res.id !== "string" || typeof res.item_count !== "number") {
     throw new Error("Serveren svarte uten bekreftelse på lagret grunnlag.");
   }
+  // Svaret må gjelde nøyaktig dette utskriftsforsøket og alle varelinjene vi
+  // sendte. Ellers kan en korreksjonsliste senere sammenlignes mot et annet
+  // eller ufullstendig grunnlag uten at noen oppdager det.
+  if (res.id !== attemptId) {
+    throw new Error("Serveren bekreftet et annet grunnlag enn utskriftsforsøket.");
+  }
+  if (res.item_count !== items.length) {
+    throw new Error(
+      `Serveren lagret ${res.item_count} av ${items.length} varelinjer. Grunnlaget er ikke gyldig.`,
+    );
+  }
   return { id: res.id, itemCount: res.item_count, alreadySaved: res.already_saved === true };
 }
 
