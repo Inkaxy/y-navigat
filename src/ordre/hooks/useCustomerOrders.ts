@@ -395,17 +395,15 @@ export function useUpdateCustomerOrder() {
     mutationFn: async (params: { orderId: string; input: CustomerOrderInput }) => {
       const { orderId, input } = params;
 
-      // 0. Snapshot av hode + eksisterende linjer (for rollback og prisbevaring)
-      const { data: prevOrder, error: prevErr } = await supabase
+      // 0. Snapshot av eksisterende linjer (for prisbevaring). Hodet leses ikke
+      //    lenger: det skrives kun i RPC-en, så vi trenger ingen rollback-kopi.
+      const { error: orderExistsErr } = await supabase
         .from("orders")
-        .select(
-          `source, delivery_date, delivery_time, delivery_tour_id, distribution,
-           final_customer_name, final_customer_email, final_customer_phone,
-           send_sms_confirm, send_email_confirm, is_paid, rule_override_reason`,
-        )
+        .select("id")
         .eq("id", orderId)
         .maybeSingle();
-      if (prevErr) throw prevErr;
+      if (orderExistsErr) throw orderExistsErr;
+
 
       const { data: prevLines, error: prevLinesErr } = await supabase
         .from("order_lines")
