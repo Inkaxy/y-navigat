@@ -318,7 +318,10 @@ const GridRow = memo(function GridRow({
           disabled={!canWrite}
           className="h-10 w-full rounded-md border border-input bg-background px-1 text-sm md:h-9"
         >
-          {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+          {/* Eldre linjer kan ha lagrede enheter som «liter» — de skal vises, ikke bli tomme. */}
+          {(UNITS.includes(line.unit) ? UNITS : [line.unit, ...UNITS]).map((u) => (
+            <option key={u} value={u}>{u}</option>
+          ))}
         </select>
       </div>
 
