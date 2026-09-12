@@ -1600,6 +1600,23 @@ export function CustomerOrderModal({
             }
           />
 
+          {pricingStatus.failed && (
+            <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2">
+              <p className="text-xs text-destructive">
+                Prisene for den nye leveringsdatoen ble ikke hentet. Lagring er sperret til
+                prisoppslaget er gjort på nytt.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setPricingRetry((n) => n + 1)}
+              >
+                Prøv igjen
+              </Button>
+            </div>
+          )}
+
           <DialogFooter className="gap-2 sm:gap-2">
             {isEdit && (
               <Button
