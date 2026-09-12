@@ -23,6 +23,12 @@ export interface LabelGateInput {
   resolvedOrderLineIds: string[];
   /** Antall kritiske mangler (matsikkerhet). */
   criticalMissingCount: number;
+  /**
+   * Etiketter som skal skrives ut uten at de kan knyttes til en ordrelinje.
+   * Da finnes det ingen deklarasjonskontroll å støtte seg på, og utskriften
+   * sperres i stedet for å godkjennes stilltiende.
+   */
+  unverifiableCount?: number;
 }
 
 export interface LabelGateResult {
@@ -73,6 +79,16 @@ export function evaluateLabelPrintGate(input: LabelGateInput): LabelGateResult {
           ? "Deklarasjonskontrollen mangler svar for én ordrelinje. Utskrift er sperret."
           : `Deklarasjonskontrollen mangler svar for ${mangler.length} ordrelinjer. Utskrift er sperret.`,
       retryable: true,
+    };
+  }
+
+  if ((input.unverifiableCount ?? 0) > 0) {
+    return {
+      status: "missing_data",
+      canPrint: false,
+      reason:
+        "Etiketten kan ikke knyttes til en ordrelinje, så deklarasjonen kan ikke kontrolleres. Utskrift er sperret.",
+      retryable: false,
     };
   }
 
