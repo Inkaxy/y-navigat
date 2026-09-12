@@ -1,3 +1,4 @@
+/** @vitest-environment jsdom */
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 
@@ -82,7 +83,6 @@ describe("usePrintJob", () => {
     fetchLatestSnapshotItems.mockReset();
     saveProductionPlanSnapshot.mockReset();
     toast.mockReset();
-    vi.stubGlobal("print", vi.fn());
     window.print = vi.fn();
   });
   afterEach(() => {
