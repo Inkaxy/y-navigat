@@ -510,12 +510,15 @@ export default function ProduksjonsplanPage() {
           onStock: prefs.colOnStock ?? true,
         };
         const correctionLast = !!printJob?.correction && !!printJob?.prevItems;
-        // Utskriften skal alltid vise det frosne grunnlaget, ikke rader som kan
-        // ha endret seg mens print-dialogen sto åpen.
+        // Utskriften skal alltid vise det frosne grunnlaget: rader, kriterier,
+        // dato og tidspunkt fra akkurat det utskriftsforsøket.
         const printRows = printJob?.rows ?? rows;
         const printCriteria = printJob?.criteria ?? criteria;
-        const baseDateLabel = `${format(date, "EEEE dd.MM.yy", { locale: nb })}${criteria.sum_tours ? " sum alle turer" : ""}`;
-        const printedAt = format(new Date(), "dd.MM.yy HH:mm");
+        const baseDateLabel =
+          printJob?.dateLabel ??
+          `${format(date, "EEEE dd.MM.yy", { locale: nb })}${criteria.sum_tours ? " sum alle turer" : ""}`;
+        const printedAt = printJob?.printedAt ?? format(new Date(), "dd.MM.yy HH:mm");
+        const printDateStr = printJob?.dateStr ?? dateStr;
 
         // Bygg liste over "sider": hovedliste + evt. én korreksjonsside
         const pages: Array<{ kind: "normal" | "correction"; copyIdx: number }> = [
@@ -526,7 +529,7 @@ export default function ProduksjonsplanPage() {
         }
 
         return (
-          <div className={cn("print-area space-y-3", (printJob?.alternateRowGray ?? true) && "print-zebra-rows")}>
+          <div className={cn("print-area space-y-3", (printJob?.options.alternateRowGray ?? true) && "print-zebra-rows")}>
             {/* Skjerm-visning: kun den vanlige tabellen én gang */}
             <div className="print:hidden">
               {basis && (
