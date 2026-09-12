@@ -84,7 +84,7 @@ describe("fryst utskriftsforsøk", () => {
   it("avviser tomt serversvar som falsk suksess", async () => {
     const a = buildLabelPrintAttempt({ ...base, units: [unit(1)] });
     rpc.mockResolvedValue({ data: null, error: null });
-    await expect(submitLabelPrintAttempt(a, "printed")).rejects.toThrow(/bekreftet ikke utskriften/i);
+    await expect(submitLabelPrintAttempt(a, "printed")).rejects.toThrow(/kunne ikke bekreftes/i);
   });
 
   it("avviser svar der en etikett mangler bekreftelse", async () => {
