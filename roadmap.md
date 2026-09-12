@@ -62,3 +62,12 @@
   entitetsfilter, `IS NOT TRUE`-guard, anon-avvisning, dato-/returregler og fravær av destruktiv SQL.
 - Testdekning: kun statisk kontroll av speilet SQL i repoet + Henriks isolerte PGlite-kjøring (6/6).
   INGEN test med ekte rollebrukere mot live-prosjektet er kjørt herfra.
+
+## Sikkerhetsfunn 8554ed1e
+- [x] `resolveInternalPath` validerer NÅ også den normaliserte returstien (nøyaktig én skråstrek, ingen
+  backslash/kontrolltegn). `/ordre/..//evil.example` og `/ordre/%2e%2e//evil.example` ble tidligere
+  `//evil.example` (protokoll-relativt → ekstern origin) og avvises nå. `src/lib/safeInternalPath.ts`,
+  4 nye tester i `src/test/safeInternalPath.test.ts` inkl. `/ordre/../varer` som fortsatt går gjennom.
+- [x] Ekte editor-rundtur: `src/ordre/lib/richTextExtensions.ts` deler oppsettet med skjermbildet, og
+  lenkeutvidelsen avviser farlig `href` ved innlasting, innliming og autolenking (`isAllowedUri`/
+  `shouldAutoLink`). `src/test/richTextEditorRoundtrip.test.ts` (5 tester) instansierer ekte editor.
