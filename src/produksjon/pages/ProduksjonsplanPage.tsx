@@ -25,6 +25,11 @@ import {
   type SnapshotItem,
 } from "../features/produksjonsplan/hooks/useProductionPlanSnapshots";
 import {
+  buildPrintAttempt,
+  evaluatePrintGate,
+  type PrintAttempt,
+} from "../features/produksjonsplan/lib/printAttempt";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
