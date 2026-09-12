@@ -11,8 +11,11 @@ export function sanitizeEditorHref(raw: string): string | null {
   if (value.length === 0) return null;
   if (/[\u0000-\u001f\u007f]/.test(value)) return null;
 
+  // Protokoll-relativt (`//vert`) er tvetydig — krev eksplisitt skjema.
+  if (value.startsWith("//") || value.startsWith("/\\")) return null;
+
   // Relative interne lenker er greit.
-  if (value.startsWith("/") && !value.startsWith("//") && !value.startsWith("/\\")) {
+  if (value.startsWith("/")) {
     return value;
   }
 
