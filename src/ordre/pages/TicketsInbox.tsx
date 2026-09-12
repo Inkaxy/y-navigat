@@ -122,7 +122,13 @@ function useInboxTickets() {
  * Grensen må være den samme som `xl` i Tailwind (1280 px), ellers ville et klikk
  * mellom 1024 og 1279 px bare endre URL-en uten å vise noe.
  */
-const DESKTOP_QUERY = "(min-width: 1280px)";
+export const TICKET_DESKTOP_MIN_WIDTH = 1280;
+const DESKTOP_QUERY = `(min-width: ${TICKET_DESKTOP_MIN_WIDTH}px)`;
+
+/** Sann når skjermen er bred nok til at peek-panelet faktisk vises (`xl`). */
+export function isTicketDesktopWidth(width: number): boolean {
+  return width >= TICKET_DESKTOP_MIN_WIDTH;
+}
 
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(

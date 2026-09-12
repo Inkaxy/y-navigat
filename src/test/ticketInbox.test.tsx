@@ -199,3 +199,16 @@ describe("SLA-brudd-varsel", () => {
     ).toEqual([]);
   });
 });
+
+describe("skjermbredde for peek-panelet", () => {
+  it("bruker samme grense som xl (1280 px) for rutevalg og panel", async () => {
+    const { isTicketDesktopWidth, TICKET_DESKTOP_MIN_WIDTH } = await import(
+      "@/ordre/pages/TicketsInbox"
+    );
+    expect(TICKET_DESKTOP_MIN_WIDTH).toBe(1280);
+    expect(isTicketDesktopWidth(1023)).toBe(false);
+    expect(isTicketDesktopWidth(1024)).toBe(false);
+    expect(isTicketDesktopWidth(1279)).toBe(false);
+    expect(isTicketDesktopWidth(1280)).toBe(true);
+  });
+});

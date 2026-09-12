@@ -8,6 +8,7 @@ import {
   type CombinedLabelItem,
 } from "../lib/labelPdf";
 import { useLabelData } from "../hooks/useLabelData";
+import { evaluateLabelPrintGate } from "../lib/labelPrintGate";
 import { useLabelFieldCatalog } from "@/produksjon/features/utskriftsprofiler/hooks/useLabelFieldCatalog";
 import { useOrderLineCustomerInfo } from "../hooks/useOrderLineCustomerInfo";
 import {
@@ -99,6 +100,8 @@ export function PrintLabelDialog({
   const profile = profiles?.find((p) => p.id === profileId) ?? null;
   const [downloading, setDownloading] = useState(false);
   const [printing, setPrinting] = useState(false);
+  /** PDF er laget og åpnet, men ingen har bekreftet at etikettene kom ut ennå. */
+  const [awaitingConfirm, setAwaitingConfirm] = useState(false);
 
   const activeUnits = useMemo(
     () => units.filter((u) => u.status !== "cancelled"),
@@ -114,7 +117,13 @@ export function PrintLabelDialog({
   );
 
   const orderLineIds = useMemo(() => row?.order_line_ids ?? [], [row]);
-  const { data: labelDataMap } = useLabelData(orderLineIds);
+  const {
+    data: labelDataMap,
+    isLoading: labelDataLoading,
+    isError: labelDataError,
+    refetch: refetchLabelData,
+    isFetching: labelDataFetching,
+  } = useLabelData(orderLineIds);
   const catalog = useLabelFieldCatalog();
   const fieldLabels = Object.fromEntries(
     catalog.entries.map((e) => [e.field_key, e.display_name]),
@@ -137,16 +146,21 @@ export function PrintLabelDialog({
    * øvrige. Kritiske mangler blokkerer utskrift — det finnes ingen «skriv ut
    * likevel».
    */
-  const missingReport = useMemo(() => {
-    const critical = new Map<string, Set<string>>();
-    const other = new Map<string, Set<string>>();
-    const rowsToCheck =
+  /** Radene deklarasjonskontrollen må dekke for denne utskriften. */
+  const rowsToCheck = useMemo(
+    () =>
       selectedUnits.length > 0
         ? selectedUnits.map((u) => ({
             id: u.order_line_id,
             label: `etikett ${u.number}`,
           }))
-        : orderLineIds.map((id) => ({ id, label: row?.display_name ?? "varen" }));
+        : orderLineIds.map((id) => ({ id, label: row?.display_name ?? "varen" })),
+    [selectedUnits, orderLineIds, row?.display_name],
+  );
+
+  const missingReport = useMemo(() => {
+    const critical = new Map<string, Set<string>>();
+    const other = new Map<string, Set<string>>();
 
     for (const r of rowsToCheck) {
       if (!r.id) continue;
@@ -160,12 +174,33 @@ export function PrintLabelDialog({
       }
     }
     return { critical, other };
-  }, [labelDataMap, selectedUnits, orderLineIds, printedFields, row?.display_name]);
+  }, [labelDataMap, rowsToCheck, printedFields]);
 
   // Pliktfeltsjekken er nå alene om å komme fra `resolve_label_data.mangler`
   // (via missingReport.critical) — ingen lokal duplikat-liste med egne nøkler
   // som kan gå ut av synk med databasens felt-katalog.
   const blockedByMissing = missingReport.critical.size > 0;
+
+  /**
+   * Ett sted som avgjør om utskrift i det hele tatt er forsvarlig: laster
+   * kontrollen, feilet den, mangler profil, mangler svar for en ordrelinje,
+   * eller finnes det kritiske mangler.
+   */
+  const gate = useMemo(
+    () =>
+      evaluateLabelPrintGate({
+        hasProfile: !!profile,
+        isLoading: orderLineIds.length > 0 && labelDataLoading,
+        isError: labelDataError,
+        requiredOrderLineIds: rowsToCheck.map((r) => r.id).filter((id): id is string => !!id),
+        resolvedOrderLineIds: Object.entries(labelDataMap ?? {})
+          .filter(([, v]) => v !== null && v !== undefined)
+          .map(([k]) => k),
+        criticalMissingCount: missingReport.critical.size,
+        unverifiableCount: rowsToCheck.filter((r) => !r.id).length,
+      }),
+    [profile, orderLineIds.length, labelDataLoading, labelDataError, rowsToCheck, labelDataMap, missingReport.critical.size],
+  );
 
   const describeMissing = (m: Map<string, Set<string>>) =>
     [...m.entries()].map(([key, who]) => ({
@@ -228,12 +263,8 @@ export function PrintLabelDialog({
 
   const handleDownloadPdf = async () => {
     if (!row) return;
-    if (blockedByMissing) {
-      toast.error("Kan ikke skrives ut — kritiske deklarasjonsdata mangler.");
-      return;
-    }
-    if (!profile) {
-      toast.error("Mangler etikett-profil for varen — sett profil først.");
+    if (!gate.canPrint) {
+      toast.error(gate.reason ?? "Etiketten kan ikke skrives ut ennå.");
       return;
     }
     setDownloading(true);
@@ -263,6 +294,7 @@ export function PrintLabelDialog({
       setQuantity(row.total_labels || 1);
       setOnlyUnprinted(true);
       setErrorMessage(null);
+      setAwaitingConfirm(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, row?.product_id]);
@@ -287,16 +319,20 @@ export function PrintLabelDialog({
     }
   }
 
+  /**
+   * Steg 1: lag PDF-en og åpne den. Ingenting registreres som skrevet ut her —
+   * brukeren kan avbryte i nettleserens utskriftsvindu, og da er etiketten
+   * aldri kommet ut av skriveren.
+   */
   const handlePrint = async () => {
     if (!row || !deptId) return;
-    if (blockedByMissing) {
-      toast.error("Kan ikke skrives ut — kritiske deklarasjonsdata mangler.");
+    if (!gate.canPrint) {
+      toast.error(gate.reason ?? "Etiketten kan ikke skrives ut ennå.");
       return;
     }
     setErrorMessage(null);
     setPrinting(true);
     try {
-      if (!profile) throw new Error("Mangler etikett-profil for varen — sett profil først.");
       const blob = await generateBlob();
       const url = URL.createObjectURL(blob);
       const win = window.open(url, "_blank");
@@ -313,6 +349,7 @@ export function PrintLabelDialog({
         document.body.removeChild(a);
       }
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      setAwaitingConfirm(true);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Kunne ikke generere etikett-PDF";
       setErrorMessage(msg);
@@ -320,20 +357,43 @@ export function PrintLabelDialog({
       try {
         await logJobs("failed");
       } catch { /* ignorer dobbel-feil */ }
+    } finally {
       setPrinting(false);
-      return;
     }
+  };
 
+  /** Steg 2: brukeren bekrefter at etikettene faktisk kom ut av skriveren. */
+  const handleConfirmPrinted = async () => {
+    setErrorMessage(null);
+    setPrinting(true);
     try {
       await logJobs("printed");
       await markLabelUnitsPrinted(selectedUnits);
+      setAwaitingConfirm(false);
       toast.success(
         selectedUnits.length > 0
-          ? `Etikett ${formatNumberRanges(selectedUnits.map((u) => u.number))} skrevet ut`
-          : "Etikett skrevet ut",
+          ? `Etikett ${formatNumberRanges(selectedUnits.map((u) => u.number))} registrert som skrevet ut`
+          : "Etikett registrert som skrevet ut",
       );
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Kunne ikke logge print-jobb";
+      const msg = e instanceof Error ? e.message : "Kunne ikke registrere utskriften";
+      setErrorMessage(msg);
+      toast.error(msg);
+    } finally {
+      setPrinting(false);
+    }
+  };
+
+  /** Steg 2b: utskriften mislyktes eller ble avbrutt — numrene forblir uutskrevne. */
+  const handleReportFailed = async () => {
+    setErrorMessage(null);
+    setPrinting(true);
+    try {
+      await logJobs("failed");
+      setAwaitingConfirm(false);
+      toast.message("Registrert som mislykket — numrene står fortsatt som uutskrevne.");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Kunne ikke logge mislykket utskrift";
       setErrorMessage(msg);
       toast.error(msg);
     } finally {
@@ -374,6 +434,52 @@ export function PrintLabelDialog({
           <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
             <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
             <span>{errorMessage}</span>
+          </div>
+        )}
+
+        {(gate.status === "loading" || gate.status === "error" || gate.status === "missing_data") && (
+          <div className="flex items-start gap-2 rounded-md border border-border bg-muted p-3 text-sm">
+            {gate.status === "loading" ? (
+              <Loader2 className="h-4 w-4 mt-0.5 shrink-0 animate-spin" />
+            ) : (
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
+            )}
+            <div className="space-y-2">
+              <p>{gate.reason}</p>
+              {gate.retryable && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void refetchLabelData()}
+                  disabled={labelDataFetching}
+                >
+                  Prøv igjen
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {awaitingConfirm && (
+          <div className="space-y-2 rounded-md border border-border bg-muted p-3 text-sm">
+            <p className="font-semibold">Kom etikettene ut av skriveren?</p>
+            <p className="text-xs text-muted-foreground">
+              Numrene registreres som skrevet ut først når du bekrefter. Avbrøt du
+              utskriften, velger du «Mislyktes».
+            </p>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleConfirmPrinted} disabled={printing}>
+                Ja, skrevet ut
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleReportFailed}
+                disabled={printing}
+              >
+                Mislyktes / avbrutt
+              </Button>
+            </div>
           </div>
         )}
 
@@ -508,7 +614,7 @@ export function PrintLabelDialog({
           <Button
             variant="outline"
             onClick={handleDownloadPdf}
-            disabled={downloading || !profile || nothingToPrint || blockedByMissing}
+            disabled={downloading || nothingToPrint || !gate.canPrint}
             className="gap-2"
             title={!profile ? "Sett etikett-profil for varen først" : undefined}
           >
@@ -521,11 +627,11 @@ export function PrintLabelDialog({
           </Button>
           <Button
             onClick={handlePrint}
-            disabled={!deptId || isWorking || nothingToPrint || blockedByMissing}
+            disabled={!deptId || isWorking || nothingToPrint || !gate.canPrint || awaitingConfirm}
             className="gap-2"
             title={
-              blockedByMissing
-                ? "Utskrift er sperret — kritiske deklarasjonsdata mangler"
+              !gate.canPrint
+                ? (gate.reason ?? undefined)
                 : nothingToPrint
                   ? "Alle numre er allerede skrevet ut"
                   : undefined

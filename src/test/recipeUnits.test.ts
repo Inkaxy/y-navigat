@@ -152,8 +152,12 @@ describe("ingen stille reset", () => {
   it("hydrerer en ny oppskrift", () => {
     expect(decideHydration({ ...base, loadedRecipeId: null, dirty: false })).toBe("hydrate");
   });
-  it("hydrerer når editoren er ren", () => {
-    expect(decideHydration({ ...base, dirty: false })).toBe("hydrate");
+  it("hydrerer ikke på nytt når samme versjon kommer inn igjen", () => {
+    // Hydrering på identiske data ga en evig oppdateringsløkke i editoren.
+    expect(decideHydration({ ...base, dirty: false })).toBe("skip");
+  });
+  it("hydrerer når serveren har en nyere versjon og editoren er ren", () => {
+    expect(decideHydration({ ...base, dirty: false, incomingUpdatedAt: "t2" })).toBe("hydrate");
   });
   it("rører ikke ulagrede endringer ved samme versjon", () => {
     expect(decideHydration({ ...base, dirty: true })).toBe("skip");

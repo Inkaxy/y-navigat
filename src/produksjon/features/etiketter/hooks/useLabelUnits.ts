@@ -129,11 +129,19 @@ export function cancelledGaps(units: LabelUnit[] | undefined): number[] {
 /**
  * Marker etikett-enheter som skrevet ut: status='printed',
  * first_printed_at settes første gang, print_count telles opp.
+ *
+ * Feil fra databasen svelges ikke: én mislykket oppdatering gjør at hele kallet
+ * kaster, slik at grensesnittet aldri melder «skrevet ut» for etiketter som
+ * fortsatt står som uutskrevne.
+ *
+ * Merk: opptellingen av `print_count` er lest-så-skrevet på klienten og er ikke
+ * atomisk. Sikker telling krever en RPC på serveren (se rapporten).
  */
 export async function markLabelUnitsPrinted(units: LabelUnit[]): Promise<void> {
   const now = new Date().toISOString();
+  const failed: number[] = [];
   for (const u of units) {
-    await supabase
+    const { error } = await supabase
       .from("label_units")
       .update({
         status: "printed",
@@ -141,5 +149,11 @@ export async function markLabelUnitsPrinted(units: LabelUnit[]): Promise<void> {
         print_count: (u.print_count ?? 0) + 1,
       } as never)
       .eq("id", u.id);
+    if (error) failed.push(u.number);
+  }
+  if (failed.length > 0) {
+    throw new Error(
+      `Klarte ikke å registrere utskrift for etikett ${formatNumberRanges(failed)}. Prøv igjen.`,
+    );
   }
 }
