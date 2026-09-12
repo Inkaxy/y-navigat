@@ -4,11 +4,8 @@ import { Loader2, Trash2, StickyNote } from "lucide-react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { restoreLoadedPrices, type LoadedLinePrice } from "@/ordre/lib/orderRepricing";
-import {
-  PricingRequestTracker,
-  pricesResolved,
-  type PricingStatus,
-} from "@/ordre/lib/pricingRequestState";
+import { pricesResolved } from "@/ordre/lib/pricingRequestState";
+import { usePricingTracker } from "@/ordre/hooks/usePricingTracker";
 import {
   Dialog,
   DialogContent,
