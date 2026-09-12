@@ -48,3 +48,23 @@ describe("resolveInternalPath", () => {
     expect(resolveInternalPath("/ordre/../varer")).toBe("/varer");
   });
 });
+
+describe("normalisert resultat kan ikke bli protokoll-relativt", () => {
+  it("avviser /ordre/..//evil.example", () => {
+    expect(resolveInternalPath("/ordre/..//evil.example")).toBeNull();
+  });
+
+  it("avviser prosentkodet variant /ordre/%2e%2e//evil.example", () => {
+    expect(resolveInternalPath("/ordre/%2e%2e//evil.example")).toBeNull();
+  });
+
+  it("avviser flere nivåer som ender protokoll-relativt", () => {
+    expect(resolveInternalPath("/ordre/a/../..//evil.example")).toBeNull();
+    expect(resolveInternalPath("/ordre/%2E%2E//evil.example")).toBeNull();
+  });
+
+  it("godtar vanlig opptrinn som blir en ekte intern rute", () => {
+    expect(resolveInternalPath("/ordre/../varer")).toBe("/varer");
+    expect(resolveInternalPath("/ordre/ordrer/../nye?fane=alle")).toBe("/ordre/nye?fane=alle");
+  });
+});
