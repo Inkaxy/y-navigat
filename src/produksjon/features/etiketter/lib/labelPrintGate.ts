@@ -68,6 +68,16 @@ export function evaluateLabelPrintGate(input: LabelGateInput): LabelGateResult {
     };
   }
 
+  if (input.requiredOrderLineIds.length === 0 && (input.unverifiableCount ?? 0) === 0) {
+    return {
+      status: "missing_data",
+      canPrint: false,
+      reason:
+        "Ingen etiketter med deklarasjonsgrunnlag å skrive ut. Utskrift er sperret.",
+      retryable: false,
+    };
+  }
+
   const resolved = new Set(input.resolvedOrderLineIds);
   const mangler = input.requiredOrderLineIds.filter((id) => id && !resolved.has(id));
   if (mangler.length > 0) {

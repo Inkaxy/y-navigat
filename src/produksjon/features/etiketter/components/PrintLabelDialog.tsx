@@ -314,8 +314,7 @@ export function PrintLabelDialog({
   /** Oppdaterer listene etter at serveren har registrert forsøket. */
   function invalidateAfterAttempt(a: LabelPrintAttempt) {
     qc.invalidateQueries({ queryKey: recentLabelJobsKey(a.departmentId) });
-    qc.invalidateQueries({ queryKey: labelUnitsKey(a.legalEntityId) .slice(0, 2) });
-    qc.invalidateQueries({ queryKey: ["label_units"] });
+    qc.invalidateQueries({ queryKey: labelUnitsKey(a.legalEntityId).slice(0, 2) });
   }
 
   /**
