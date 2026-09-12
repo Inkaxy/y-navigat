@@ -17,7 +17,7 @@ import {
 } from "@/varer/lib/bakers";
 import type { EditorLine } from "@/varer/components/recipes/RecipePartCard";
 
-const UNITS = ["g", "kg", "ml", "cl", "dl", "l", "stk"];
+import { unitOptionsFor } from "@/varer/components/recipes/unitOptions";
 
 export interface LineGridProps {
   partId: string;
@@ -319,7 +319,7 @@ const GridRow = memo(function GridRow({
           className="h-10 w-full rounded-md border border-input bg-background px-1 text-sm md:h-9"
         >
           {/* Eldre linjer kan ha lagrede enheter som «liter» — de skal vises, ikke bli tomme. */}
-          {(UNITS.includes(line.unit) ? UNITS : [line.unit, ...UNITS]).map((u) => (
+          {unitOptionsFor(line.unit).map((u) => (
             <option key={u} value={u}>{u}</option>
           ))}
         </select>

@@ -14,6 +14,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { supabase } from "@/integrations/supabase/client";
+import { parseNorwegianDecimal } from "@/varer/lib/norwegianNumber";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -680,7 +681,7 @@ function NewVariantDialog({
   const [submitting, setSubmitting] = useState(false);
 
   // Norsk tallformat: komma som desimalskille skal godtas («0,5»).
-  const factorNum = Number(factor.trim().replace(",", "."));
+  const factorNum = parseNorwegianDecimal(factor);
   const factorInvalid = factor.trim().length > 0 && !(Number.isFinite(factorNum) && factorNum > 0);
   const valid = variantLabel.trim().length > 0 && Number.isFinite(factorNum) && factorNum > 0;
 
