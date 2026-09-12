@@ -460,14 +460,14 @@ export function useUpdateCustomerOrder() {
       let lineRows: unknown[] = [];
       {
         if (input.lines.length > 0) {
+          // Id-en avgjør om linjen er ny eller eksisterende — ikke produktet.
+          const resolvedLineIds = input.lines.map((l) =>
+            resolveExistingLineId(l.id ?? null, existingIds),
+          );
           const newProductIds = Array.from(
             new Set(
               input.lines
-                .filter(
-                  (l) =>
-                    !existingByKey.has(`${l.product_id}|${merknadKey(l.merknad ?? null)}`) &&
-                    !cakePriceByProduct.has(l.product_id),
-                )
+                .filter((l, i) => resolvedLineIds[i] === null && !l.unit_price_source)
                 .map((l) => l.product_id),
             ),
           );
