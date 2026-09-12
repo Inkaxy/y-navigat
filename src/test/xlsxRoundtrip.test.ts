@@ -57,9 +57,13 @@ describe("xlsx-eksport", () => {
     expect(ws["D4"]?.v ?? "").toBe("");
   });
 
-  it("beholder tallformat og datotekst gjennom lagring og lesing", () => {
+  it("setter norsk tallformat på beløp og bevarer datotekst", () => {
+    const built = sheetOf(buildXlsxWorkbook("Rapport", columns, rows));
+    expect(built["C2"].z).toBe(FMT_NOK);
+    expect(built["B2"].z).toBe(FMT_QTY);
+    // Tekstceller får aldri tallformat.
+    expect(built["A2"].z).toBeUndefined();
     const ws = sheetOf(roundtrip(buildXlsxWorkbook("Rapport", columns, rows)));
-    expect(ws["C2"].z).toContain("0.00");
     expect(ws["D2"].v).toBe("2026-09-12");
   });
 
