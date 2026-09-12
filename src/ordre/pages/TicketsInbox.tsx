@@ -117,14 +117,20 @@ function useInboxTickets() {
   return query;
 }
 
-/** Desktop = tre paneler. Mindre skjermer går liste → full ticket-rute. */
+/**
+ * Desktop = tre paneler. Mindre skjermer går liste → full ticket-rute.
+ * Grensen må være den samme som `xl` i Tailwind (1280 px), ellers ville et klikk
+ * mellom 1024 og 1279 px bare endre URL-en uten å vise noe.
+ */
+const DESKTOP_QUERY = "(min-width: 1280px)";
+
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches,
+    () => typeof window !== "undefined" && window.matchMedia(DESKTOP_QUERY).matches,
   );
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(min-width: 1024px)");
+    const mq = window.matchMedia(DESKTOP_QUERY);
     const onChange = () => setIsDesktop(mq.matches);
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
