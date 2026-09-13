@@ -66,3 +66,39 @@ Merk:
 (store bokstaver, mengder og E-numre, «mel»/«nøtter»/E322, spelt, melkesyre/kokosmelk,
 raffinert soyaolje, gjentatte allergener, sulfitt, idempotens).
 Endres instruksjonsversjonen, skal disse fortsatt gi samme deterministiske resultat.
+
+## Hva assistenten IKKE avgjør (herdet 2026-09)
+
+- **Malt, maltekstrakt og semule** får aldri antatt kornslag. De blir et åpent spørsmål.
+  Navngitt korn («byggmalt», «durumsemule») gjenkjennes fortsatt.
+- **Spelt/durum** utløser bare hvete-påminnelsen når hveten hører til samme ingrediens.
+- **Helraffinert soyaolje og sulfitt under grenseverdi** er unntak som må bekreftes faglig.
+  Uten bekreftet grunnlag sperres automatisk innsetting — verken formatering eller AI
+  kan avgjøre dem.
+- **Helt fet ingrediensliste** regnes ikke som gyldig allergenutheving.
+- Modellens eget «bekreftet»-stempel gjelder ikke. Et funn står som bekreftet bare når både
+  koden og begrunnelsen gjenfinnes i de registrerte råvaredataene serveren faktisk hentet.
+  Råvaredata som ikke er gjennomgått, merkes som nettopp det.
+
+## Test tilkobling
+
+Knappen «Test tilkobling» på innstillingssiden sender **én liten, oppdiktet ingrediensliste**
+gjennom samme endepunkt, modell og kontroll som en vanlig kjøring. Ingen data om varer,
+oppskrifter eller kunder sendes. Det er et ekte, betalt kall på egen nøkkel, og det teller på
+dagens grense. «Nøkkel lagret» og «Test bestått» er to forskjellige ting — statusfeltet skiller
+dem.
+
+## Grenser og kvote
+
+- Dagens teller følger **Europa/Oslo-døgn**, ikke UTC.
+- Daglig grense er 1–500 og kontrolleres på serveren.
+- Lagring av nøkkel, modell, grense og husregler skjer i én låst operasjon per bruksområde.
+  Feiler noe, står hele det forrige oppsettet urørt.
+
+## Kjente begrensninger
+
+- `ai_usage_log` har ingen kolonne for instruksjonsversjon. Versjonen logges derfor i
+  serverloggen og vises på innstillingssiden, ikke i bruksloggen.
+- Ingen betalte kall er kjørt i utviklingen. Alt er verifisert med enhetstester og
+  etterlignede svar; den faktiske modellkvaliteten er ikke målt.
+- Assistenten er ingen juridisk kontroll av etiketten.
