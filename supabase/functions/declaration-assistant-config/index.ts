@@ -1,6 +1,10 @@
 // Oppsett for deklarasjonsassistenten. Kun plattformadministrator.
 // API-nøkkelen lagres kryptert i ai_provider_config (purpose = declaration_assistant)
 // og returneres ALDRI — verken i klartekst eller kryptert.
+//
+// All lagring går gjennom ÉN databasefunksjon som tar lås per bruksområde og
+// skriver nøkkel, modell, dagsgrense og stilnotater samlet. Feiler noe, står
+// hele det forrige oppsettet urørt.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { encryptWithKey } from "../_shared/crypto.ts";
@@ -38,64 +42,72 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const auth = req.headers.get("Authorization");
-    if (!auth) return jsonErr("Mangler pålogging", 401);
+    if (!auth) return jsonErr("Mangler pålogging", 401, "unauthenticated");
 
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: auth } },
     });
     const admin = createClient(supabaseUrl, serviceKey);
 
-    const { data: userRes } = await userClient.auth.getUser();
-    if (!userRes?.user) return jsonErr("Ikke pålogget", 401);
-    const { data: isAdmin } = await userClient.rpc("is_platform_admin");
-    if (!isAdmin) return jsonErr("Bare plattformadministrator har tilgang", 403);
+    const { data: userRes, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userRes?.user) return jsonErr("Ikke pålogget", 401, "unauthenticated");
+    const { data: isAdmin, error: adminErr } = await userClient.rpc("is_platform_admin");
+    if (adminErr) return jsonErr("Kunne ikke kontrollere tilgangen", 500, "access_check_failed");
+    if (!isAdmin) return jsonErr("Bare plattformadministrator har tilgang", 403, "forbidden");
 
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action ?? "get");
     const encryptionReady = !!Deno.env.get("AI_CONFIG_ENCRYPTION_KEY");
 
-    async function readSettings() {
-      const { data } = await admin
-        .from("platform_settings")
-        .select("value")
-        .eq("category", SETTINGS_CATEGORY)
-        .eq("key", SETTINGS_KEY)
-        .maybeSingle();
-      const v = (data?.value ?? {}) as Record<string, unknown>;
-      return {
-        model: typeof v.model === "string" ? v.model : DECLARATION_MODEL_ALLOWLIST[0],
-        daily_cap: Number.isFinite(Number(v.daily_cap)) ? Number(v.daily_cap) : 25,
-        style_notes: typeof v.style_notes === "string" ? v.style_notes : "",
-      };
-    }
-
-    async function readConfig() {
-      const { data } = await admin
-        .from("ai_provider_config")
-        .select("id, provider, model, max_tokens, is_active, updated_at, created_at")
-        .eq("purpose", PURPOSE)
-        .eq("is_active", true)
-        .maybeSingle();
-      return data;
-    }
-
     if (action === "get") {
-      const [settings, config] = await Promise.all([readSettings(), readConfig()]);
-      const today = new Date().toISOString().slice(0, 10);
-      const { data: quota } = await admin
-        .from("ai_declaration_quota")
-        .select("used_count")
-        .eq("quota_date", today)
-        .maybeSingle();
+      const [settingsRes, configRes, quotaRes] = await Promise.all([
+        admin
+          .from("platform_settings")
+          .select("value")
+          .eq("category", SETTINGS_CATEGORY)
+          .eq("key", SETTINGS_KEY)
+          .maybeSingle(),
+        admin
+          .from("ai_provider_config")
+          .select("id, provider, model, is_active, updated_at, created_at")
+          .eq("purpose", PURPOSE)
+          .eq("is_active", true)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        admin.rpc("ai_declaration_quota_status"),
+      ]);
+
+      // En databasefeil skal ALDRI vises som «ikke satt opp».
+      if (settingsRes.error || configRes.error || quotaRes.error) {
+        console.error("declaration-assistant-config: kunne ikke lese oppsettet");
+        return jsonErr("Kunne ikke lese oppsettet fra databasen.", 500, "read_failed");
+      }
+
+      const v = (settingsRes.data?.value ?? {}) as Record<string, unknown>;
+      const config = configRes.data;
+      const quota = (quotaRes.data ?? {}) as Record<string, unknown>;
+      const rawCap = Number(v.daily_cap);
+      const model = typeof v.model === "string" ? v.model : DECLARATION_MODEL_ALLOWLIST[0];
+
       return json({
-        configured: !!config && encryptionReady,
+        // «key_stored» sier bare at en nøkkel ligger lagret — ikke at den virker.
+        key_stored: !!config,
         encryption_ready: encryptionReady,
+        usable: !!config && encryptionReady,
         provider: "openai",
-        model: config?.model ?? settings.model,
-        daily_cap: settings.daily_cap,
-        style_notes: settings.style_notes,
-        used_today: quota?.used_count ?? 0,
+        model: config?.model ?? model,
+        model_valid: (DECLARATION_MODEL_ALLOWLIST as readonly string[]).includes(
+          config?.model ?? model,
+        ),
+        daily_cap: Number.isFinite(rawCap) ? Math.min(Math.max(Math.trunc(rawCap), 1), 500) : 25,
+        style_notes: typeof v.style_notes === "string" ? v.style_notes : "",
+        used_today: Number(quota.used ?? 0),
+        quota_date: String(quota.quota_date ?? ""),
         key_updated_at: config?.updated_at ?? null,
+        last_test_at: typeof v.last_test_at === "string" ? v.last_test_at : null,
+        last_test_ok: v.last_test_ok === true,
+        last_test_code: typeof v.last_test_code === "string" ? v.last_test_code : null,
         instruction_version: DECLARATION_INSTRUCTION_VERSION,
         model_options: DECLARATION_MODEL_ALLOWLIST,
       });
@@ -104,15 +116,16 @@ Deno.serve(async (req) => {
     if (action === "save") {
       const model = String(body?.model ?? "");
       if (!(DECLARATION_MODEL_ALLOWLIST as readonly string[]).includes(model)) {
-        return jsonErr("Modellen er ikke på den godkjente lista", 400);
+        return jsonErr("Modellen er ikke på den godkjente lista", 400, "bad_model");
       }
       const dailyCap = Number(body?.daily_cap);
       if (!Number.isInteger(dailyCap) || dailyCap < 1 || dailyCap > 500) {
-        return jsonErr("Daglig grense må være et helt tall mellom 1 og 500", 400);
+        return jsonErr("Daglig grense må være et helt tall mellom 1 og 500", 400, "bad_cap");
       }
       const styleNotes = String(body?.style_notes ?? "").slice(0, 2000);
       const apiKey = String(body?.api_key ?? "").trim();
 
+      let encrypted: string | null = null;
       if (apiKey) {
         if (!encryptionReady) {
           return jsonErr(
@@ -121,38 +134,23 @@ Deno.serve(async (req) => {
             "encryption_missing",
           );
         }
-        if (!apiKey.startsWith("sk-")) {
-          return jsonErr("OpenAI-nøkkelen skal starte med «sk-».", 400);
+        if (!apiKey.startsWith("sk-") || apiKey.length < 20) {
+          return jsonErr("OpenAI-nøkkelen skal starte med «sk-».", 400, "bad_key");
         }
-        const encrypted = await encryptWithKey(apiKey, "AI_CONFIG_ENCRYPTION_KEY");
-        const { error } = await admin.rpc("ai_config_replace_active", {
-          p_purpose: PURPOSE,
-          p_provider: "openai",
-          p_encrypted_api_key: encrypted,
-          p_model: model,
-          p_max_tokens: 1500,
-          p_temperature: 0,
-        });
-        // Feiler byttet, står det gamle oppsettet urørt.
-        if (error) return jsonErr("Kunne ikke lagre nøkkelen. Forrige oppsett er beholdt.", 500);
-      } else {
-        const existing = await readConfig();
-        if (existing && existing.model !== model) {
-          await admin.from("ai_provider_config").update({ model, updated_at: new Date().toISOString() })
-            .eq("id", existing.id);
-        }
+        encrypted = await encryptWithKey(apiKey, "AI_CONFIG_ENCRYPTION_KEY");
       }
 
-      const { error: sErr } = await admin.from("platform_settings").upsert(
-        {
-          category: SETTINGS_CATEGORY,
-          key: SETTINGS_KEY,
-          value: { model, daily_cap: dailyCap, style_notes: styleNotes },
-          updated_by: userRes.user.id,
-        },
-        { onConflict: "category,key" },
-      );
-      if (sErr) return jsonErr("Kunne ikke lagre innstillingene", 500);
+      const { error } = await admin.rpc("ai_declaration_config_save", {
+        p_model: model,
+        p_daily_cap: dailyCap,
+        p_style_notes: styleNotes,
+        p_updated_by: userRes.user.id,
+        p_encrypted_api_key: encrypted,
+      });
+      if (error) {
+        console.error("declaration-assistant-config: lagring feilet");
+        return jsonErr("Kunne ikke lagre. Hele det forrige oppsettet er beholdt.", 500, "save_failed");
+      }
       return json({ ok: true });
     }
 
@@ -162,13 +160,18 @@ Deno.serve(async (req) => {
         .update({ is_active: false, updated_at: new Date().toISOString() })
         .eq("purpose", PURPOSE)
         .eq("is_active", true);
-      if (error) return jsonErr("Kunne ikke koble fra", 500);
+      if (error) return jsonErr("Kunne ikke koble fra", 500, "disconnect_failed");
+      const { error: testErr } = await admin.rpc("ai_declaration_record_test", {
+        p_ok: false,
+        p_code: "disconnected",
+      });
+      if (testErr) console.error("declaration-assistant-config: kunne ikke nullstille teststatus");
       return json({ ok: true });
     }
 
-    return jsonErr("Ukjent handling", 400);
-  } catch (e) {
-    console.error("declaration-assistant-config feilet", (e as Error).message);
-    return jsonErr("Uventet feil i oppsettet", 500);
+    return jsonErr("Ukjent handling", 400, "bad_request");
+  } catch {
+    console.error("declaration-assistant-config feilet");
+    return jsonErr("Uventet feil i oppsettet", 500, "exception");
   }
 });
