@@ -244,10 +244,14 @@ describe("kontroll av AI-forslag", () => {
 
 describe("faglige grenser i formateringen", () => {
   it("generisk malt og semule gir tvetydighet, ikke antatt kornslag", () => {
-    for (const word of ["malt", "maltekstrakt", "semule"]) {
+    for (const [word, code] of [
+      ["malt", "ambiguous_malt"],
+      ["maltekstrakt", "ambiguous_malt"],
+      ["semule", "ambiguous_semolina"],
+    ] as const) {
       const r = formatDeclaration(`${word}, vann`);
       expect(r.allergenCodes).not.toContain("gluten_barley");
-      expect(r.issues.map((i) => i.code)).toContain("ambiguous_malt");
+      expect(r.issues.map((i) => i.code)).toContain(code);
     }
     // Navngitt korn skal fortsatt gjenkjennes.
     expect(formatDeclaration("byggmalt, vann").allergenCodes).toContain("gluten_barley");
