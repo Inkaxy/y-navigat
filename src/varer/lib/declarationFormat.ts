@@ -98,6 +98,8 @@ const ALLERGEN_TERMS: AllergenTerm[] = [
   { code: "eggs", term: "egg" },
   // Nøtter og peanøtter
   { code: "peanuts", term: "peanøtt" },
+  // Generisk «nøtter» framheves, men arten må navngis — se AMBIGUOUS_TERMS.
+  { code: "nuts_unspecified", term: "nøtt" },
   { code: "nuts_almond", term: "mandel" },
   { code: "nuts_almond", term: "mandler" },
   { code: "nuts_hazelnut", term: "hasselnøtt" },
