@@ -9,6 +9,7 @@ import {
   type DeclarationProposal,
 } from "@/varer/lib/declarationProposal";
 import { DECLARATION_CASES } from "@/varer/lib/__fixtures__/declarationCases";
+import { buildEffectiveDeclaration } from "@/varer/lib/effectiveDeclaration";
 
 function proposal(p: Partial<DeclarationProposal>): DeclarationProposal {
   return {
