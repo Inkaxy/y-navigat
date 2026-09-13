@@ -561,7 +561,15 @@ function PreviewDialog({ open, onClose, productName, computed }: { open: boolean
   function copyText() { navigator.clipboard.writeText(plainText()); toast.success("Kopiert til utklippstavle"); }
   function printNow() {
     // Ingen document.write: vi bygger et blob-dokument og åpner det.
-    const html = `<!doctype html><html lang="nb"><head><meta charset="utf-8"><title>Deklarasjon</title></head><body><pre style="font-family:Inter,system-ui;font-size:12px;white-space:pre-wrap;padding:16px">${plainText().replace(/</g, "&lt;")}</pre></body></html>`;
+    // Utskriften må vise allergenene uthevet, ellers er etiketten ikke i tråd
+    // med 1169/2011. Derfor skrives ingredienslinja som renset HTML, ikke som
+    // ren tekst slik den gjorde før.
+    const ingredientHtml = DOMPurify.sanitize(computed.ingredient_declaration_html || "—", {
+      ALLOWED_TAGS: ["strong", "b", "em", "i", "br"],
+      ALLOWED_ATTR: [],
+    });
+    const rest = plainText().split("\n").slice(3).join("\n").replace(/</g, "&lt;");
+    const html = `<!doctype html><html lang="nb"><head><meta charset="utf-8"><title>Deklarasjon</title></head><body style="font-family:Inter,system-ui;font-size:12px;padding:16px"><p style="font-weight:600">${productName.replace(/</g, "&lt;")}</p><p>Ingredienser: ${ingredientHtml}</p><pre style="font-family:inherit;font-size:12px;white-space:pre-wrap;margin:0">${rest}</pre></body></html>`;
     const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
     const w = window.open(url, "_blank", "width=600,height=800");
     if (!w) {
