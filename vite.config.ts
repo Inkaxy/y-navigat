@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, type PluginOption } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import svgr from "vite-plugin-svgr";
@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     // Bundle-analyse: kjør `ANALYZE=1 npm run build` for å generere stats.html
     !!process.env.ANALYZE &&
-      visualizer({ filename: "dist/stats.html", template: "raw-data", gzipSize: true }),
+      (visualizer({ filename: "dist/stats.html", template: "raw-data", gzipSize: true }) as PluginOption),
   ].filter(Boolean),
   build: {
     // "hidden": sourcemaps genereres, men refereres ikke fra bundlene.
