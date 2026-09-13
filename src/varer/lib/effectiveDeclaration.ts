@@ -14,6 +14,8 @@
  * `_shared/effective-declaration.ts`).
  */
 
+import { htmlToMarkerText } from "@/varer/lib/declarationFormat";
+
 export type DeclarationMode = "auto" | "manual" | "auto_with_overrides";
 
 export const NUTRITION_KEYS = [
@@ -169,7 +171,7 @@ export function buildEffectiveDeclaration(
     return {
       mode,
       source: useLink ? "link_manual" : "recipe_manual",
-      ingredientText: stripHtml(src?.manual_ingredient_declaration) || null,
+      ingredientText: declarationDisplayText(src?.manual_ingredient_declaration) || null,
       contains: allergens.contains,
       mayContain: allergens.may_contain,
       nutrition: pickNutrition(src?.manual_nutrition),
@@ -183,7 +185,7 @@ export function buildEffectiveDeclaration(
   return {
     mode,
     source: "calculated",
-    ingredientText: stripHtml(calculated?.ingredient_declaration) || null,
+    ingredientText: declarationDisplayText(calculated?.ingredient_declaration) || null,
     contains: calculated?.allergens?.contains ?? [],
     mayContain: calculated?.allergens?.may_contain ?? [],
     // Under 90 % dekning skal næringstabellen ikke ut på emballasje.
