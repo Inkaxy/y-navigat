@@ -240,3 +240,81 @@ describe("kontroll av AI-forslag", () => {
     expect(sourceFingerprint(source)).toBe(sourceFingerprint(source));
   });
 });
+
+describe("faglige grenser i formateringen", () => {
+  it("generisk malt og semule gir tvetydighet, ikke antatt kornslag", () => {
+    for (const word of ["malt", "maltekstrakt", "semule"]) {
+      const r = formatDeclaration(`${word}, vann`);
+      expect(r.allergenCodes).not.toContain("gluten_barley");
+      expect(r.issues.map((i) => i.code)).toContain("ambiguous_grain_source");
+    }
+    // Navngitt korn skal fortsatt gjenkjennes.
+    expect(formatDeclaration("byggmalt, vann").allergenCodes).toContain("gluten_barley");
+  });
+
+  it("spelt-påminnelsen krever hvete på samme ingrediens", () => {
+    const r = formatDeclaration("speltmel, hvetemel");
+    expect(r.issues.map((i) => i.code)).toContain("spelt_is_wheat");
+  });
+
+  it("raffinert soya krever bekreftet grunnlag og sperrer ellers automatikk", () => {
+    const unresolved = formatDeclaration("rapsolje, raffinert soyaolje");
+    expect(unresolved.blocked).toBe(true);
+    const confirmed = formatDeclaration("rapsolje, raffinert soyaolje", {
+      refinedSoyExemptionConfirmed: true,
+    });
+    expect(confirmed.blocked).toBe(false);
+  });
+
+  it("HTML-koder leses uansett store eller små bokstaver", () => {
+    const r = formatDeclaration("<STRONG>HVETE</STRONG>mel, vann");
+    expect(r.markerText).not.toMatch(/STRONG/i);
+    expect(r.markerText).toContain("*hvete*mel");
+  });
+
+  it("helt fet ingrediensliste teller ikke som allergenutheving", () => {
+    const r = formatDeclaration("<strong>hvetemel, vann, salt</strong>");
+    expect(r.issues.map((i) => i.code)).toContain("whole_list_bold");
+  });
+});
+
+describe("utheving overlever til etikett og utskrift", () => {
+  it("effektiv deklarasjon beholder uthevingen som markertekst", () => {
+    const eff = buildEffectiveDeclaration(
+      {
+        id: "l1",
+        product_id: "p1",
+        recipe_id: null,
+        declaration_mode: "manual",
+        manual_ingredient_declaration: "<p><strong>HVETEMEL</strong>, vann</p>",
+        manual_nutrition: null,
+        manual_allergen_summary: null,
+        recipes: null,
+      },
+      null,
+    );
+    expect(eff.ingredientText).toContain("*hvete*mel");
+  });
+
+  it("beregnet deklarasjon beholder også uthevingen", () => {
+    const eff = buildEffectiveDeclaration(
+      {
+        id: "l2",
+        product_id: "p2",
+        recipe_id: "r2",
+        declaration_mode: "auto",
+        manual_ingredient_declaration: null,
+        manual_nutrition: null,
+        manual_allergen_summary: null,
+        recipes: null,
+      },
+      {
+        ingredient_declaration: "<strong>HVETEMEL</strong>, vann",
+        allergens: { contains: ["hvete"] },
+        nutrition_per_100g: null,
+        coverage_by_weight_pct: 95,
+      },
+    );
+    expect(eff.ingredientText).toContain("*hvete*mel");
+  });
+});
