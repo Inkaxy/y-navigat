@@ -38,6 +38,8 @@ interface ConfigState {
   last_test_at: string | null;
   last_test_ok: boolean;
   last_test_code: string | null;
+  config_revision: number;
+  last_test_revision: number | null;
   instruction_version: string;
   model_options: string[];
 }
@@ -241,7 +243,7 @@ export default function SettingsDeclarationAssistant() {
                     <Badge variant="secondary">Ingen nøkkel lagret</Badge>
                   )}
                   {c.key_stored &&
-                    (c.last_test_ok ? (
+                    (testCurrent && c.last_test_ok ? (
                       <Badge variant="outline">Test bestått</Badge>
                     ) : (
                       <Badge variant="secondary">Ikke testet</Badge>
@@ -256,10 +258,16 @@ export default function SettingsDeclarationAssistant() {
                   Brukt i dag ({c.quota_date || "i dag"}): {c.used_today} av {c.daily_cap} kontroller.
                 </p>
                 {c.key_updated_at && <p>Nøkkel sist oppdatert: {formatOsloDateTime(c.key_updated_at)}</p>}
-                {c.last_test_at && (
+                {c.last_test_at && testCurrent && (
                   <p>
                     Siste test: {formatOsloDateTime(c.last_test_at)} —{" "}
                     {c.last_test_ok ? "gikk gjennom" : `feilet (${c.last_test_code ?? "ukjent"})`}
+                  </p>
+                )}
+                {!testCurrent && (
+                  <p>
+                    Oppsettet er endret siden forrige test. Statusen står som «ikke testet» til du kjører
+                    «Test tilkobling» på nytt.
                   </p>
                 )}
                 <p>Instruksjonsversjon: {c.instruction_version}</p>
