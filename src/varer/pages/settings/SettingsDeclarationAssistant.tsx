@@ -212,6 +212,9 @@ export default function SettingsDeclarationAssistant() {
   }
 
   const c = configQuery.data;
+  /** En test gjelder bare det oppsettet den faktisk ble kjørt mot. */
+  const testCurrent = !!c && c.last_test_revision !== null && c.last_test_revision === c.config_revision;
+
 
   return (
     <div className="space-y-6 px-page py-6">
