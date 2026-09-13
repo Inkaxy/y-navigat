@@ -58,6 +58,15 @@ export interface AllergenSummary {
   may_contain: string[];
 }
 
+/**
+ * Gjør lagret HTML om til markertekst (**uthevet**), slik at allergen-utheving
+ * overlever hele veien til forhåndsvisning, PDF og utskrift. Tidligere ble
+ * `<strong>` fjernet her, og etiketten mistet den lovpålagte uthevingen.
+ */
+export function declarationDisplayText(html: string | null | undefined): string {
+  return htmlToMarkerText(html);
+}
+
 /** Fjerner HTML-koder og normaliserer mellomrom. */
 export function stripHtml(html: string | null | undefined): string {
   if (!html) return "";
