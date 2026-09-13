@@ -23,6 +23,7 @@ import {
   substantiateFindings,
   validateProposals,
 } from "../_shared/declaration-proposal.ts";
+import { buildAllergenEvidence } from "../_shared/declaration-evidence.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -87,9 +88,28 @@ Deno.serve(async (req) => {
   let model = "";
   let selftest = false;
 
+  // Revisjonen av oppsettet testen gjelder. Endres oppsettet mens testen
+  // pagar, forkastes resultatet i stedet for a "godkjenne" et nytt oppsett.
+  let configRevision: number | null = null;
+  let testRecorded: boolean | null = null;
+  let testStale = false;
+
   const finishTest = async (ok: boolean, code: string) => {
     if (!selftest) return;
-    await admin.rpc("ai_declaration_record_test", { p_ok: ok, p_code: code }).catch(() => {});
+    const { data, error } = await admin.rpc("ai_declaration_record_test", {
+      p_ok: ok,
+      p_code: code,
+      p_expected_revision: configRevision,
+    });
+    if (error) {
+      // Ingen stille suksess: klienten far vite at statusen ikke ble lagret.
+      testRecorded = false;
+      console.error("record_test feilet", error.code ?? error.message);
+      return;
+    }
+    const res = (data ?? {}) as { recorded?: boolean; stale?: boolean };
+    testRecorded = res.recorded === true;
+    testStale = res.stale === true;
   };
 
   try {
@@ -114,6 +134,16 @@ Deno.serve(async (req) => {
       if (adminErr) return jsonErr("Kunne ikke kontrollere tilgangen", 500, "access_check_failed");
       if (!isAdmin) return jsonErr("Bare plattformadministrator kan teste tilkoblingen", 403, "forbidden");
       draftText = DECLARATION_SELFTEST_DRAFT;
+      const { data: revRow, error: revErr } = await admin
+        .from("platform_settings")
+        .select("value")
+        .eq("category", "varer_ai")
+        .eq("key", "declaration_assistant")
+        .maybeSingle();
+      if (revErr) return jsonErr("Kunne ikke lese oppsettet. Ingen test er kjørt.", 500, "read_failed");
+      const revValue = (revRow?.value ?? {}) as Record<string, unknown>;
+      const rev = Number(revValue.config_revision);
+      configRevision = Number.isFinite(rev) ? Math.trunc(rev) : 0;
     } else {
       target = body?.target === "product" ? "product" : body?.target === "recipe" ? "recipe" : null;
       id = String(body?.id ?? "");
@@ -271,14 +301,17 @@ Deno.serve(async (req) => {
             "context_failed",
           );
         }
-        for (const a of allergens ?? []) {
-          const row = a as { raw_material_id: string; allergen: string; presence: string };
-          const rm = names.get(row.raw_material_id);
-          const status = rm?.reviewed ? "gjennomgått" : "IKKE gjennomgått";
-          const line = `${rm?.name ?? "råvare"}: ${row.allergen} (${row.presence}, råvaredata ${status})`;
-          allergenContext.push(line);
-          verifiedAllergens.push({ code: row.allergen, evidence: line });
-          if (row.presence === "contains") registeredContains.push(row.allergen);
+        const evidence = buildAllergenEvidence(
+          (allergens ?? []) as { raw_material_id: string; allergen: string; presence: string }[],
+          names,
+        );
+        allergenContext.push(...evidence.context);
+        verifiedAllergens.push(...evidence.verified);
+        registeredContains.push(...evidence.registeredContains);
+        if (evidence.unconfirmedCount) {
+          contextNotes.push(
+            `${evidence.unconfirmedCount} registrerte allergenrader er enten ikke gjennomgått eller gjelder spor/kan inneholde. De kan ikke gjøre et funn bekreftet, og fravær av gjennomgang er ingen konklusjon om at allergenet mangler.`,
+          );
         }
       }
       const unreviewed = [...names.values()].filter((n) => !n.reviewed).length;
@@ -459,6 +492,8 @@ Deno.serve(async (req) => {
       instruction_version: DECLARATION_INSTRUCTION_VERSION,
       model,
       selftest,
+      test_recorded: testRecorded,
+      test_stale: testStale,
       source_fingerprint: fingerprint,
       context_notes: contextNotes,
       metadata_conflicts: metadataConflicts,

@@ -108,6 +108,10 @@ Deno.serve(async (req) => {
         last_test_at: typeof v.last_test_at === "string" ? v.last_test_at : null,
         last_test_ok: v.last_test_ok === true,
         last_test_code: typeof v.last_test_code === "string" ? v.last_test_code : null,
+        config_revision: Number.isFinite(Number(v.config_revision)) ? Number(v.config_revision) : 0,
+        last_test_revision: Number.isFinite(Number(v.last_test_revision))
+          ? Number(v.last_test_revision)
+          : null,
         instruction_version: DECLARATION_INSTRUCTION_VERSION,
         model_options: DECLARATION_MODEL_ALLOWLIST,
       });
@@ -155,17 +159,12 @@ Deno.serve(async (req) => {
     }
 
     if (action === "disconnect") {
-      const { error } = await admin
-        .from("ai_provider_config")
-        .update({ is_active: false, updated_at: new Date().toISOString() })
-        .eq("purpose", PURPOSE)
-        .eq("is_active", true);
-      if (error) return jsonErr("Kunne ikke koble fra", 500, "disconnect_failed");
-      const { error: testErr } = await admin.rpc("ai_declaration_record_test", {
-        p_ok: false,
-        p_code: "disconnected",
-      });
-      if (testErr) console.error("declaration-assistant-config: kunne ikke nullstille teststatus");
+      // Deaktivering og nullstilling av teststatus skjer atomisk i databasen.
+      const { error } = await admin.rpc("ai_declaration_config_disconnect");
+      if (error) {
+        console.error("declaration-assistant-config: frakobling feilet");
+        return jsonErr("Kunne ikke koble fra. Ingenting er endret.", 500, "disconnect_failed");
+      }
       return json({ ok: true });
     }
 

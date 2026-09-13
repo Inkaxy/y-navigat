@@ -14,6 +14,7 @@ import { AlertTriangle, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { nb } from "date-fns/locale";
+import { readFunctionError } from "@/varer/lib/functionError";
 
 /** Absolutt tidspunkt på norsk, f.eks. «tor 3. sep 2026, 14:05». */
 function formatOsloDateTime(iso: string): string {
@@ -37,22 +38,55 @@ interface ConfigState {
   last_test_at: string | null;
   last_test_ok: boolean;
   last_test_code: string | null;
+  config_revision: number;
+  last_test_revision: number | null;
   instruction_version: string;
   model_options: string[];
 }
 
-interface EdgeError {
-  error?: string;
-  code?: string;
+class ConfigError extends Error {
+  readonly code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
+/** Kjente feilkoder fra endepunktene, på norsk og handlingsrettet. */
+function messageForCode(code: string | undefined, fallback: string | undefined): string {
+  switch (code) {
+    case "not_configured":
+      return "Assistenten er ikke satt opp ennå. Lagre en API-nøkkel først.";
+    case "encryption_missing":
+      return "Serveren mangler krypteringsnøkkelen, så nøkkelen kan verken lagres eller brukes. Kontakt drift.";
+    case "quota_exceeded":
+      return fallback ?? "Dagens grense er brukt opp. Testen teller på den samme grensen.";
+    case "provider_error":
+      return fallback ?? "OpenAI svarte ikke som forventet. Nøkkelen er ikke merket som testet.";
+    case "bad_key":
+      return fallback ?? "Nøkkelen ser ikke gyldig ut. En OpenAI-nøkkel begynner med «sk-».";
+    case "bad_cap":
+      return fallback ?? "Dagsgrensen må være et helt tall mellom 1 og 500.";
+    case "bad_model":
+      return fallback ?? "Velg en av de godkjente modellene.";
+    case "forbidden":
+      return "Bare plattformadministratorer kan endre dette oppsettet.";
+    case "read_failed":
+      return "Oppsettet kunne ikke leses fra databasen. Ingenting er endret.";
+    case "save_failed":
+      return fallback ?? "Lagringen feilet. Det forrige oppsettet står urørt.";
+    default:
+      return fallback ?? "Kallet mot oppsettet feilet.";
+  }
 }
 
 async function callConfig<T>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke("declaration-assistant-config", { body });
   if (error) {
-    const payload = data as EdgeError | null;
-    throw new Error(payload?.error ?? "Kallet mot oppsettet feilet.");
+    const payload = await readFunctionError(error, data);
+    throw new ConfigError(messageForCode(payload.code, payload.message), payload.code);
   }
-  if (!data || typeof data !== "object") throw new Error("Ugyldig svar fra oppsettet.");
+  if (!data || typeof data !== "object") throw new ConfigError("Ugyldig svar fra oppsettet.");
   return data as T;
 }
 
@@ -121,8 +155,19 @@ export default function SettingsDeclarationAssistant() {
         body: { mode: "selftest" },
       });
       if (error) {
-        const payload = data as EdgeError | null;
-        throw new Error(payload?.error ?? "Testen mislyktes.");
+        const payload = await readFunctionError(error, data);
+        throw new ConfigError(messageForCode(payload.code, payload.message), payload.code);
+      }
+      const ok = data as { test_recorded?: boolean; test_stale?: boolean } | null;
+      if (ok?.test_stale) {
+        throw new ConfigError(
+          "Oppsettet ble endret mens testen pågikk. Resultatet er forkastet — kjør testen på nytt.",
+        );
+      }
+      if (ok?.test_recorded === false) {
+        throw new ConfigError(
+          "Kallet gikk gjennom, men resultatet kunne ikke lagres. Statusen står derfor som «ikke testet».",
+        );
       }
       return data as { suggestion?: { markerText?: string } };
     },
@@ -167,6 +212,9 @@ export default function SettingsDeclarationAssistant() {
   }
 
   const c = configQuery.data;
+  /** En test gjelder bare det oppsettet den faktisk ble kjørt mot. */
+  const testCurrent = !!c && c.last_test_revision !== null && c.last_test_revision === c.config_revision;
+
 
   return (
     <div className="space-y-6 px-page py-6">
@@ -198,7 +246,7 @@ export default function SettingsDeclarationAssistant() {
                     <Badge variant="secondary">Ingen nøkkel lagret</Badge>
                   )}
                   {c.key_stored &&
-                    (c.last_test_ok ? (
+                    (testCurrent && c.last_test_ok ? (
                       <Badge variant="outline">Test bestått</Badge>
                     ) : (
                       <Badge variant="secondary">Ikke testet</Badge>
@@ -213,10 +261,16 @@ export default function SettingsDeclarationAssistant() {
                   Brukt i dag ({c.quota_date || "i dag"}): {c.used_today} av {c.daily_cap} kontroller.
                 </p>
                 {c.key_updated_at && <p>Nøkkel sist oppdatert: {formatOsloDateTime(c.key_updated_at)}</p>}
-                {c.last_test_at && (
+                {c.last_test_at && testCurrent && (
                   <p>
                     Siste test: {formatOsloDateTime(c.last_test_at)} —{" "}
                     {c.last_test_ok ? "gikk gjennom" : `feilet (${c.last_test_code ?? "ukjent"})`}
+                  </p>
+                )}
+                {!testCurrent && (
+                  <p>
+                    Oppsettet er endret siden forrige test. Statusen står som «ikke testet» til du kjører
+                    «Test tilkobling» på nytt.
                   </p>
                 )}
                 <p>Instruksjonsversjon: {c.instruction_version}</p>
