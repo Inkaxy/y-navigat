@@ -25,7 +25,7 @@ interface ConfigState {
 }
 
 export default function SettingsDeclarationAssistant() {
-  const { isPlatformAdmin, loading: adminLoading } = usePlatformAdmin();
+  const { data: isPlatformAdmin, isLoading: adminLoading } = usePlatformAdmin();
   const [state, setState] = useState<ConfigState | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
