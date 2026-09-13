@@ -12,7 +12,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { QueryState } from "@/components/common/QueryState";
 import { AlertTriangle, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { formatOsloDateTime } from "@/lib/osloDate";
+import { format } from "date-fns";
+import { nb } from "date-fns/locale";
+
+/** Absolutt tidspunkt på norsk, f.eks. «tor 3. sep 2026, 14:05». */
+function formatOsloDateTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "ukjent";
+  return format(d, "EEE d. MMM yyyy, HH:mm", { locale: nb });
+}
 
 interface ConfigState {
   key_stored: boolean;
