@@ -1,239 +1,335 @@
 import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, CheckCircle2, Loader2, Unplug, WandSparkles } from "lucide-react";
+import { QueryState } from "@/components/common/QueryState";
+import { AlertTriangle, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
+import { formatOsloDateTime } from "@/lib/osloDate";
 
 interface ConfigState {
-  configured: boolean;
+  key_stored: boolean;
   encryption_ready: boolean;
+  usable: boolean;
+  provider: string;
   model: string;
+  model_valid: boolean;
   daily_cap: number;
   style_notes: string;
   used_today: number;
+  quota_date: string;
   key_updated_at: string | null;
+  last_test_at: string | null;
+  last_test_ok: boolean;
+  last_test_code: string | null;
   instruction_version: string;
   model_options: string[];
 }
 
+interface EdgeError {
+  error?: string;
+  code?: string;
+}
+
+async function callConfig<T>(body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke("declaration-assistant-config", { body });
+  if (error) {
+    const payload = data as EdgeError | null;
+    throw new Error(payload?.error ?? "Kallet mot oppsettet feilet.");
+  }
+  if (!data || typeof data !== "object") throw new Error("Ugyldig svar fra oppsettet.");
+  return data as T;
+}
+
 export default function SettingsDeclarationAssistant() {
-  const { data: isPlatformAdmin, isLoading: adminLoading } = usePlatformAdmin();
-  const [state, setState] = useState<ConfigState | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const queryClient = useQueryClient();
+
+  const adminQuery = useQuery({
+    queryKey: ["platform-admin"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("is_platform_admin");
+      if (error) throw error;
+      return data === true;
+    },
+  });
+  const isAdmin = adminQuery.data === true;
+
+  const configQuery = useQuery({
+    queryKey: ["declaration-assistant-config"],
+    enabled: isAdmin,
+    queryFn: () => callConfig<ConfigState>({ action: "get" }),
+  });
+
   const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState("gpt-4.1-mini");
+  const [model, setModel] = useState("");
   const [dailyCap, setDailyCap] = useState("25");
   const [styleNotes, setStyleNotes] = useState("");
-  const [loadError, setLoadError] = useState<string | null>(null);
 
+  // Skjemaet fylles fra serveren, men overskriver ikke det brukeren skriver.
   useEffect(() => {
-    if (!isPlatformAdmin) return;
-    void load();
-  }, [isPlatformAdmin]);
+    const c = configQuery.data;
+    if (!c) return;
+    setModel((prev) => prev || c.model);
+    setDailyCap((prev) => (prev === "25" ? String(c.daily_cap) : prev));
+    setStyleNotes((prev) => (prev === "" ? c.style_notes : prev));
+  }, [configQuery.data]);
 
-  async function load() {
-    setLoading(true);
-    setLoadError(null);
-    const { data, error } = await supabase.functions.invoke("declaration-assistant-config", {
-      body: { action: "get" },
-    });
-    if (error) {
-      setLoadError("Kunne ikke hente oppsettet.");
-    } else {
-      const c = data as ConfigState;
-      setState(c);
-      setModel(c.model);
-      setDailyCap(String(c.daily_cap));
-      setStyleNotes(c.style_notes ?? "");
-    }
-    setLoading(false);
-  }
-
-  async function save() {
-    setSaving(true);
-    const { data, error } = await supabase.functions.invoke("declaration-assistant-config", {
-      body: {
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      callConfig<{ ok: true }>({
         action: "save",
+        api_key: apiKey.trim() || undefined,
         model,
         daily_cap: Number(dailyCap),
         style_notes: styleNotes,
-        ...(apiKey.trim() ? { api_key: apiKey.trim() } : {}),
-      },
-    });
-    setSaving(false);
-    if (error) {
-      toast.error((data as { error?: string } | null)?.error ?? "Kunne ikke lagre. Forrige oppsett er beholdt.");
-      return;
-    }
-    setApiKey("");
-    toast.success("Oppsettet er lagret");
-    void load();
-  }
+      }),
+    onSuccess: () => {
+      setApiKey("");
+      toast.success("Oppsettet er lagret");
+      queryClient.invalidateQueries({ queryKey: ["declaration-assistant-config"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
-  async function disconnect() {
-    const { error } = await supabase.functions.invoke("declaration-assistant-config", {
-      body: { action: "disconnect" },
-    });
-    if (error) {
-      toast.error("Kunne ikke koble fra");
-      return;
-    }
-    toast.success("Nøkkelen er koblet fra. Assistenten er slått av.");
-    void load();
-  }
+  const disconnectMutation = useMutation({
+    mutationFn: () => callConfig<{ ok: true }>({ action: "disconnect" }),
+    onSuccess: () => {
+      toast.success("Nøkkelen er koblet fra");
+      queryClient.invalidateQueries({ queryKey: ["declaration-assistant-config"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
-  if (adminLoading || loading) {
+  const testMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("declaration-assistant", {
+        body: { mode: "selftest" },
+      });
+      if (error) {
+        const payload = data as EdgeError | null;
+        throw new Error(payload?.error ?? "Testen mislyktes.");
+      }
+      return data as { suggestion?: { markerText?: string } };
+    },
+    onSuccess: () => {
+      toast.success("Testen gikk gjennom — nøkkelen virker");
+      queryClient.invalidateQueries({ queryKey: ["declaration-assistant-config"] });
+    },
+    onError: (e: Error) => {
+      toast.error(e.message);
+      queryClient.invalidateQueries({ queryKey: ["declaration-assistant-config"] });
+    },
+  });
+
+  const busy = saveMutation.isPending || disconnectMutation.isPending || testMutation.isPending;
+
+  if (adminQuery.isError || adminQuery.isLoading) {
     return (
-      <div className="py-12 text-center">
-        <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
+      <div className="px-page py-6">
+        <QueryState
+          isLoading={adminQuery.isLoading}
+          isError={adminQuery.isError}
+          error={adminQuery.error}
+          scope="varer:deklarasjonsassistent-tilgang"
+          onRetry={() => adminQuery.refetch()}
+          skeletonRows={3}
+        />
       </div>
     );
   }
 
-  if (!isPlatformAdmin) {
+  if (!isAdmin) {
     return (
-      <Alert>
-        <AlertTriangle className="h-4 w-4" />
-        <AlertDescription>
-          Bare plattformadministrator kan sette opp deklarasjonsassistenten. Kontakt en administrator.
-        </AlertDescription>
-      </Alert>
+      <div className="px-page py-6">
+        <Alert>
+          <ShieldCheck className="h-4 w-4" />
+          <AlertDescription>
+            Bare en plattformadministrator kan endre oppsettet for deklarasjonsassistenten.
+          </AlertDescription>
+        </Alert>
+      </div>
     );
   }
 
+  const c = configQuery.data;
+
   return (
-    <div className="max-w-2xl space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <WandSparkles className="h-5 w-5" /> Deklarasjonsassistent
-          </CardTitle>
-          <CardDescription>
-            Hjelper med skrivemåte og kontrollpunkter i ingredienslister. Den lagrer og godkjenner aldri noe selv,
-            og den er ikke en garanti for at etiketten er lovlig.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {loadError && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>{loadError}</AlertDescription>
-            </Alert>
-          )}
+    <div className="space-y-6 px-page py-6">
+      <div>
+        <h1 className="text-title">Deklarasjonsassistent</h1>
+        <p className="text-caption text-muted-foreground">
+          Egen OpenAI-nøkkel for språkhjelp på ingredienslister. Nøkkelen deles ikke med fakturatolkningen,
+          og assistenten kan verken lagre, godkjenne eller endre tall i en deklarasjon.
+        </p>
+      </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {state?.configured ? (
-              <Badge variant="secondary" className="gap-1">
-                <CheckCircle2 className="h-3 w-3" /> Tilkoblet
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="gap-1 border-amber-300 text-amber-700">
-                <AlertTriangle className="h-3 w-3" /> Ikke satt opp — assistenten er slått av
-              </Badge>
-            )}
-            {state && (
-              <span className="text-xs text-muted-foreground">
-                Brukt i dag: {state.used_today} av {state.daily_cap}
-              </span>
-            )}
+      <QueryState
+        isLoading={configQuery.isLoading}
+        isError={configQuery.isError}
+        error={configQuery.error}
+        scope="varer:deklarasjonsassistent-oppsett"
+        onRetry={() => configQuery.refetch()}
+        skeletonRows={5}
+      >
+        {c && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex flex-wrap items-center gap-2">
+                  Status
+                  {c.key_stored ? (
+                    <Badge variant="outline">Nøkkel lagret</Badge>
+                  ) : (
+                    <Badge variant="secondary">Ingen nøkkel lagret</Badge>
+                  )}
+                  {c.key_stored &&
+                    (c.last_test_ok ? (
+                      <Badge variant="outline">Test bestått</Badge>
+                    ) : (
+                      <Badge variant="secondary">Ikke testet</Badge>
+                    ))}
+                </CardTitle>
+                <CardDescription>
+                  At en nøkkel er lagret betyr ikke at den virker. Kjør «Test tilkobling» for å bekrefte det.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 text-caption text-muted-foreground">
+                <p>
+                  Brukt i dag ({c.quota_date || "i dag"}): {c.used_today} av {c.daily_cap} kontroller.
+                </p>
+                {c.key_updated_at && <p>Nøkkel sist oppdatert: {formatOsloDateTime(c.key_updated_at)}</p>}
+                {c.last_test_at && (
+                  <p>
+                    Siste test: {formatOsloDateTime(c.last_test_at)} —{" "}
+                    {c.last_test_ok ? "gikk gjennom" : `feilet (${c.last_test_code ?? "ukjent"})`}
+                  </p>
+                )}
+                <p>Instruksjonsversjon: {c.instruction_version}</p>
+                {!c.encryption_ready && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      Serveren mangler krypteringsnøkkelen AI_CONFIG_ENCRYPTION_KEY. Nøkkelen kan ikke lagres
+                      trygt før den er lagt inn.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {c.key_stored && !c.model_valid && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>Lagret modell er ikke lenger godkjent. Velg en modell og lagre på nytt.</AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Nøkkel og grenser</CardTitle>
+                <CardDescription>
+                  Nøkkelen lagres kryptert og vises aldri igjen. La feltet stå tomt for å beholde den du har.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="api-key">OpenAI API-nøkkel</Label>
+                  <Input
+                    id="api-key"
+                    type="password"
+                    autoComplete="off"
+                    placeholder={c.key_stored ? "Nøkkel er lagret — skriv en ny for å bytte" : "sk-..."}
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                  />
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="model">Modell</Label>
+                    <Select value={model} onValueChange={setModel}>
+                      <SelectTrigger id="model">
+                        <SelectValue placeholder="Velg modell" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {c.model_options.map((m) => (
+                          <SelectItem key={m} value={m}>
+                            {m}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="cap">Maks kontroller per dag</Label>
+                    <Input
+                      id="cap"
+                      inputMode="numeric"
+                      value={dailyCap}
+                      onChange={(e) => setDailyCap(e.target.value.replace(/[^\d]/g, ""))}
+                    />
+                    <p className="text-caption text-muted-foreground">Mellom 1 og 500.</p>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="style">Husregler for språk</Label>
+                  <Textarea
+                    id="style"
+                    rows={3}
+                    value={styleNotes}
+                    onChange={(e) => setStyleNotes(e.target.value)}
+                    placeholder="F.eks. «skriv hvetemel i ett ord, ikke hvete mel»"
+                  />
+                  <p className="text-caption text-muted-foreground">
+                    Gjelder bare skrivemåte. Ingrediensrekkefølge, tall, prosent og E-numre kan aldri endres.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={() => saveMutation.mutate()} disabled={busy || !model}>
+                    {saveMutation.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+                    Lagre
+                  </Button>
+                  {c.key_stored && (
+                    <Button variant="outline" onClick={() => disconnectMutation.mutate()} disabled={busy}>
+                      {disconnectMutation.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+                      Koble fra nøkkelen
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Test tilkobling</CardTitle>
+                <CardDescription>
+                  Sender én liten, oppdiktet ingrediensliste til OpenAI med samme oppsett som vanlige
+                  kontroller. Ingen data om varer, oppskrifter eller kunder sendes. Dette er et ekte,
+                  betalt kall på din egen nøkkel, og det teller på dagens grense.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  variant="outline"
+                  onClick={() => testMutation.mutate()}
+                  disabled={busy || !c.key_stored || !c.encryption_ready}
+                >
+                  {testMutation.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+                  Test tilkobling
+                </Button>
+              </CardContent>
+            </Card>
           </div>
-
-          {state && !state.encryption_ready && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                Serveren mangler krypteringsnøkkelen <code>AI_CONFIG_ENCRYPTION_KEY</code>. API-nøkkelen kan ikke
-                lagres trygt før den er lagt inn under prosjektets secrets. Assistenten holdes avslått til da.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <div>
-            <Label className="text-xs">OpenAI API-nøkkel</Label>
-            <Input
-              type="password"
-              autoComplete="new-password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder={state?.configured ? "Lagret — fyll bare ut for å bytte nøkkel" : "sk-…"}
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              Nøkkelen lagres kryptert på serveren og vises aldri igjen. Lar du feltet stå tomt, beholdes nøkkelen
-              som allerede virker.
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <Label className="text-xs">Modell</Label>
-              <Select value={model} onValueChange={setModel}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {(state?.model_options ?? ["gpt-4.1-mini", "gpt-4.1"]).map((m) => (
-                    <SelectItem key={m} value={m}>{m}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Maks antall kontroller per dag</Label>
-              <Input
-                type="number"
-                min={1}
-                max={500}
-                value={dailyCap}
-                onChange={(e) => setDailyCap(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label className="text-xs">Stilnotater (valgfritt)</Label>
-            <Textarea
-              rows={3}
-              value={styleNotes}
-              onChange={(e) => setStyleNotes(e.target.value)}
-              placeholder="F.eks. «bruk alltid «gjær», ikke «bakegjær»»"
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              Stilnotater ligger alltid under de låste fagreglene og kan ikke overstyre dem.
-              Instruksjonsversjon: <code>{state?.instruction_version}</code>
-            </p>
-          </div>
-
-          <div className="flex justify-between gap-2">
-            <Button variant="ghost" onClick={disconnect} disabled={!state?.configured}>
-              <Unplug className="mr-1.5 h-4 w-4" /> Koble fra
-            </Button>
-            <Button onClick={save} disabled={saving}>
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Lagre
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Slik kommer du i gang</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>1. Lag en API-nøkkel hos OpenAI (platform.openai.com) og lim den inn over. Bare plattformadministrator kan gjøre dette.</p>
-          <p>2. Bruk av API-en faktureres av OpenAI og er noe helt annet enn et ChatGPT-abonnement.</p>
-          <p>3. Hver kontroll koster noen få øre. Dagsgrensen over er et tak som stopper bruken når den er nådd.</p>
-          <p>4. Nøkkelen kan i prinsippet brukes til hva som helst hos OpenAI — det er NBhub-serveren som begrenser den til deklarasjonskontroll, ikke nøkkelen selv.</p>
-          <p>5. Fakturatolkingen i Råvarer har sitt eget oppsett og påvirkes ikke av dette.</p>
-        </CardContent>
-      </Card>
+        )}
+      </QueryState>
     </div>
   );
 }
