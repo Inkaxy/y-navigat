@@ -66,7 +66,7 @@ export interface AllergenSummary {
  * `<strong>` fjernet her, og etiketten mistet den lovpålagte uthevingen.
  */
 export function declarationDisplayText(html: string | null | undefined): string {
-  return htmlToMarkerText(html);
+  return htmlToMarkerText(html).trim();
 }
 
 /** Fjerner HTML-koder og normaliserer mellomrom. */

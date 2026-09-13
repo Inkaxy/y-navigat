@@ -247,7 +247,7 @@ describe("faglige grenser i formateringen", () => {
     for (const word of ["malt", "maltekstrakt", "semule"]) {
       const r = formatDeclaration(`${word}, vann`);
       expect(r.allergenCodes).not.toContain("gluten_barley");
-      expect(r.issues.map((i) => i.code)).toContain("ambiguous_grain_source");
+      expect(r.issues.map((i) => i.code)).toContain("ambiguous_malt");
     }
     // Navngitt korn skal fortsatt gjenkjennes.
     expect(formatDeclaration("byggmalt, vann").allergenCodes).toContain("gluten_barley");
@@ -262,7 +262,7 @@ describe("faglige grenser i formateringen", () => {
     const unresolved = formatDeclaration("rapsolje, raffinert soyaolje");
     expect(unresolved.blocked).toBe(true);
     const confirmed = formatDeclaration("rapsolje, raffinert soyaolje", {
-      refinedSoyExemptionConfirmed: true,
+      context: { refinedSoyFullyRefined: true },
     });
     expect(confirmed.blocked).toBe(false);
   });
@@ -275,7 +275,7 @@ describe("faglige grenser i formateringen", () => {
 
   it("helt fet ingrediensliste teller ikke som allergenutheving", () => {
     const r = formatDeclaration("<strong>hvetemel, vann, salt</strong>");
-    expect(r.issues.map((i) => i.code)).toContain("whole_list_bold");
+    expect(r.issues.map((i) => i.code)).toContain("bold_whole_list");
   });
 });
 
@@ -294,7 +294,7 @@ describe("utheving overlever til etikett og utskrift", () => {
       },
       null,
     );
-    expect(eff.ingredientText).toContain("*hvete*mel");
+    expect(eff.ingredientText).toContain("*HVETEMEL*");
   });
 
   it("beregnet deklarasjon beholder også uthevingen", () => {
@@ -316,6 +316,6 @@ describe("utheving overlever til etikett og utskrift", () => {
         coverage_by_weight_pct: 95,
       },
     );
-    expect(eff.ingredientText).toContain("*hvete*mel");
+    expect(eff.ingredientText).toContain("*HVETEMEL*");
   });
 });
