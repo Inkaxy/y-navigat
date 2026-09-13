@@ -99,7 +99,12 @@ describe("konsolideringsmigrasjon for allerede anvendte sikkerhetsrettinger", ()
     expect(sql).toMatch(
       /PERFORM pg_advisory_xact_lock\(hashtextextended\(p_attempt_id::text, 0\)\)/,
     );
-    expect(sql).not.toMatch(/FOR UPDATE/);
+    // Kommentarlinjene nevner FOR UPDATE som bakgrunn — kontroller selve koden.
+    const executable = sql
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("--"))
+      .join("\n");
+    expect(executable).not.toMatch(/FOR UPDATE/);
   });
 
   it("utvider ingen rettigheter og rører ingen data eller tabeller", () => {
