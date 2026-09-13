@@ -26,6 +26,7 @@ import {
   type RecipeLabelSnapshot,
 } from "@/varer/lib/effectiveDeclaration";
 import { NUTRIENT_LABEL } from "@/varer/lib/nutritionFormat";
+import { DeclarationAssistantPanel } from "@/varer/components/declaration/DeclarationAssistantPanel";
 import { DiffNote, NUT_ROWS, SourceColumn, SourceSegmented, formatDateTimeNb, nutritionValueText } from "./labelShared";
 
 // Ordlyden kommer fra ÉN kilde (vedlegg XV), enheten legges på her.
@@ -379,6 +380,13 @@ export function DeclarationNutritionSection({
                 placeholder="Hvetemel, vann, salt, gjær …"
               />
             </div>
+            <DeclarationAssistantPanel
+              target="recipe"
+              targetId={recipeId}
+              value={form.ingredientText}
+              canWrite={canWrite}
+              onApply={(markerText) => setField("ingredientText", markerText)}
+            />
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <Label className="text-xs">Inneholder (kommaseparert)</Label>

@@ -66,6 +66,7 @@ const RULES: PageRule[] = [
   { test: (p) => p.startsWith("/ravarer/innstillinger/match-toleranser"), label: "Match-toleranser" },
   { test: (p) => p.startsWith("/ravarer/innstillinger/tripletex"), label: "Tripletex-tilkobling" },
   { test: (p) => p.startsWith("/ravarer/innstillinger/kategorier"), label: "Kategorier" },
+  { test: (p) => p.startsWith("/varer/innstillinger/deklarasjonsassistent"), label: "Deklarasjonsassistent" },
   { test: (p) => p.startsWith("/ravarer/innstillinger/ai-tjenester"), label: "AI-tjenester" },
   { test: (p) => p.startsWith("/ravarer/innstillinger"), label: "Innstillinger" },
   { test: (p) => p === "/ravarer", label: "Råvarer" },

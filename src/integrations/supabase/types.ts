@@ -241,6 +241,24 @@ export type Database = {
           },
         ]
       }
+      ai_declaration_quota: {
+        Row: {
+          quota_date: string
+          updated_at: string
+          used_count: number
+        }
+        Insert: {
+          quota_date: string
+          updated_at?: string
+          used_count?: number
+        }
+        Update: {
+          quota_date?: string
+          updated_at?: string
+          used_count?: number
+        }
+        Relationships: []
+      }
       ai_provider_config: {
         Row: {
           azure_deployment: string | null
@@ -15011,6 +15029,18 @@ export type Database = {
           resolved_unit_price: number
         }[]
       }
+      ai_config_replace_active: {
+        Args: {
+          p_encrypted_api_key: string
+          p_max_tokens?: number
+          p_model: string
+          p_provider: string
+          p_purpose: string
+          p_temperature?: number
+        }
+        Returns: string
+      }
+      ai_declaration_quota_consume: { Args: { p_limit: number }; Returns: Json }
       alert_email_subscription_failure: {
         Args: { p_detail?: string }
         Returns: undefined
