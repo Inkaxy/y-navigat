@@ -1,4 +1,4 @@
-// DENNE FILEN ER BYTE-IDENTISK MED src/varer/lib/declarationProposal.ts.
+// DENNE FILEN ER BYTE-IDENTISK MED supabase/functions/_shared/declaration-proposal.ts.
 //
 // DETERMINISTISK KONTROLL AV FORSLAG FRA DEKLARASJONSASSISTENTEN
 // ---------------------------------------------------------------------------
@@ -8,10 +8,13 @@
 // åpent spørsmål som mennesket må ta stilling til.
 //
 // Faste regler modellen ikke kan overstyre:
-//  - ingrediensrekkefølge, nesting, tall, prosent og E-numre er låst
+//  - ingrediensrekkefølge, nesting, tegnsetting, tall, prosent og E-numre er låst
 //  - ingredienser kan ikke legges til eller fjernes
-//  - kilde til E322, stivelse, gluten og nøtter kan ikke dikt es opp
+//  - kilde til E322, stivelse, gluten og nøtter kan ikke diktes opp
 //  - «kan inneholde spor av» kan aldri legges til av modellen
+
+/** Versjonen av svarformatet. Andre verdier avvises uten tolking. */
+export const ASSISTANT_SCHEMA_VERSION = "1";
 
 export type ProposalKind = "case" | "spelling" | "alias" | "spacing";
 
@@ -69,6 +72,11 @@ const ALIAS_MAP: Record<string, string[]> = {
   emulgator: ["emulgeringsmiddel"],
 };
 
+/** Alle aliaser, lengst først, slik at flerordsaliaser slår til før enkeltord. */
+const ALIAS_ENTRIES: { canonical: string; alias: string }[] = Object.entries(ALIAS_MAP)
+  .flatMap(([canonical, aliases]) => aliases.map((alias) => ({ canonical, alias })))
+  .sort((a, b) => b.alias.length - a.alias.length);
+
 function foldForCompare(value: string): string {
   return value
     .toLocaleLowerCase("nb-NO")
@@ -76,16 +84,27 @@ function foldForCompare(value: string): string {
     .trim();
 }
 
+/**
+ * Slår sammen kjente alias til kanonisk form FØR ordene telles, slik at
+ * «hvete mel» og «hvetemel» regnes som samme ingrediens. Aliasene inneholder
+ * bare bokstaver, mellomrom og bindestrek, så sammenslåingen kan aldri krysse
+ * komma, parentes eller tall.
+ */
+function canonicalizeAliasPhrases(text: string): string {
+  let out = text.toLocaleLowerCase("nb-NO");
+  for (const { canonical, alias } of ALIAS_ENTRIES) {
+    const pattern = alias
+      .split(/[\s-]+/)
+      .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("[\\s-]+");
+    out = out.replace(new RegExp(`(?<![\\p{L}])${pattern}(?![\\p{L}])`, "giu"), canonical);
+  }
+  return out;
+}
+
 /** Ordsekvensen som IKKE får endres (ingrediensidentitet og rekkefølge). */
 export function ingredientWordSequence(text: string): string[] {
-  const words = text.toLocaleLowerCase("nb-NO").match(/\p{L}+/gu) ?? [];
-  return words.map((w) => {
-    for (const [canonical, aliases] of Object.entries(ALIAS_MAP)) {
-      if (w === canonical) return canonical;
-      if (aliases.some((a) => a.replace(/[\s-]/g, "") === w)) return canonical;
-    }
-    return w;
-  });
+  return canonicalizeAliasPhrases(text).match(/\p{L}+/gu) ?? [];
 }
 
 /** Alle tall i teksten, i rekkefølge — «5,0» og «5.0» regnes likt. */
@@ -100,25 +119,36 @@ export function eNumberSequence(text: string): string[] {
   return hits.map((n) => n.toLowerCase().replace(/\s+/g, ""));
 }
 
+/** Tegnsetting og nesting — komma, parenteser og lignende er låst. */
+export function punctuationSequence(text: string): string[] {
+  return text.match(/[^\p{L}\p{N}\s*]/gu) ?? [];
+}
+
 function isAllowedChange(p: DeclarationProposal): string | null {
   const from = p.original;
   const to = p.suggested;
   if (!to.trim()) return "forslaget er tomt";
   if (to.length > from.length + 24) return "forslaget er vesentlig lengre enn kilden";
   if (/[<>*]/.test(to)) return "forslaget inneholder markup";
+  if (punctuationSequence(from).join("") !== punctuationSequence(to).join("")) {
+    return "tegnsetting eller nesting er endret";
+  }
   if (numberSequence(from).join("|") !== numberSequence(to).join("|")) return "tall er endret";
   if (eNumberSequence(from).join("|") !== eNumberSequence(to).join("|")) return "E-nummer er endret";
 
   // 1) Kun store/små bokstaver eller mellomrom
   if (foldForCompare(from) === foldForCompare(to)) return null;
 
-  // 2) Kjent alias
-  const target = foldForCompare(to);
-  const source = foldForCompare(from);
-  const aliases = ALIAS_MAP[target];
-  if (aliases && aliases.some((a) => foldForCompare(a) === source)) return null;
+  // 2) Kjent alias — begge veier gjennom den kanoniske formen
+  if (
+    canonicalizeAliasPhrases(foldForCompare(from)) === canonicalizeAliasPhrases(foldForCompare(to))
+  ) {
+    return null;
+  }
 
   // 3) Sammenskriving/deling av samme bokstaver (f.eks. «hvete mel» → «hvetemel»)
+  const source = foldForCompare(from);
+  const target = foldForCompare(to);
   if (source.replace(/[\s-]/g, "") === target.replace(/[\s-]/g, "")) return null;
 
   return "endringen er ikke en tillatt skrivemåtejustering";
@@ -179,9 +209,12 @@ export function validateProposals(
   }
   appliedText += sourceText.slice(cursor);
 
-  // Uavhengig sluttkontroll: identitet, rekkefølge, tall og E-numre er låst.
+  // Uavhengig sluttkontroll: identitet, rekkefølge, tegnsetting, tall og E-numre er låst.
   if (ingredientWordSequence(sourceText).join("|") !== ingredientWordSequence(appliedText).join("|")) {
     blocking.push("Ingredienser er lagt til, fjernet, byttet ut eller flyttet — forslaget kan ikke brukes.");
+  }
+  if (punctuationSequence(sourceText).join("") !== punctuationSequence(appliedText).join("")) {
+    blocking.push("Tegnsetting eller nesting er endret — forslaget kan ikke brukes.");
   }
   if (numberSequence(sourceText).join("|") !== numberSequence(appliedText).join("|")) {
     blocking.push("Mengder eller prosenter er endret — forslaget kan ikke brukes.");
@@ -208,50 +241,134 @@ export function sourceFingerprint(text: string): string {
   return `${h1.toString(16)}${h2.toString(16)}`;
 }
 
-/** Streng kontroll av rå modellrespons før den brukes til noe som helst. */
-export function parseAssistantOutput(raw: unknown): AssistantOutput {
-  if (!raw || typeof raw !== "object") throw new Error("Svaret fra modellen har feil form");
-  const o = raw as Record<string, unknown>;
-  const proposals = Array.isArray(o.proposals) ? o.proposals : [];
-  const findings = Array.isArray(o.allergen_findings) ? o.allergen_findings : [];
-  const questions = Array.isArray(o.questions) ? o.questions : [];
-  if (proposals.length > 60) throw new Error("For mange forslag i svaret");
+// --- Streng lesing av modellsvaret ----------------------------------------
+// Ingenting rettes opp, fylles ut eller tvinges til en verdi. Alt som ikke er
+// nøyaktig på avtalt form blir avvist, slik at et delvis eller oppdiktet svar
+// aldri kan bli til en endring i deklarasjonen.
 
-  const kinds: ProposalKind[] = ["case", "spelling", "alias", "spacing"];
-  const parsedProposals: DeclarationProposal[] = proposals.map((p) => {
-    const x = p as Record<string, unknown>;
-    const kind = kinds.includes(x.kind as ProposalKind) ? (x.kind as ProposalKind) : "spelling";
+const PROPOSAL_KEYS = ["kind", "source_start", "source_end", "original", "suggested", "reason"];
+const FINDING_KEYS = ["code", "basis", "evidence", "severity"];
+const QUESTION_KEYS = ["question", "severity"];
+const TOP_KEYS = [
+  "schema_version",
+  "proposals",
+  "allergen_findings",
+  "questions",
+  "source_fingerprint",
+];
+const KINDS: ProposalKind[] = ["case", "spelling", "alias", "spacing"];
+const SEVERITIES = ["info", "warning", "critical"];
+
+function fail(what: string): never {
+  throw new Error(`Svaret fra modellen har feil form: ${what}`);
+}
+
+function objectWithExactKeys(value: unknown, keys: string[], what: string): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) fail(what);
+  const o = value as Record<string, unknown>;
+  for (const k of keys) if (!(k in o)) fail(`${what} mangler «${k}»`);
+  for (const k of Object.keys(o)) if (!keys.includes(k)) fail(`${what} har ukjent felt «${k}»`);
+  return o;
+}
+
+function boundedString(value: unknown, max: number, what: string): string {
+  if (typeof value !== "string") fail(`${what} må være tekst`);
+  if (value.length > max) fail(`${what} er for lang`);
+  return value;
+}
+
+function enumValue<T extends string>(value: unknown, allowed: readonly T[], what: string): T {
+  if (typeof value !== "string" || !allowed.includes(value as T)) fail(`${what} har ugyldig verdi`);
+  return value as T;
+}
+
+function boundedArray(value: unknown, max: number, what: string): unknown[] {
+  if (!Array.isArray(value)) fail(`${what} må være en liste`);
+  if (value.length > max) fail(`${what} har for mange elementer`);
+  return value;
+}
+
+export interface ParseOptions {
+  /** Kontrollsummen forespørselen ble sendt med. Avvik avvises. */
+  expectedFingerprint?: string;
+}
+
+/** Streng kontroll av rå modellrespons før den brukes til noe som helst. */
+export function parseAssistantOutput(raw: unknown, options: ParseOptions = {}): AssistantOutput {
+  const o = objectWithExactKeys(raw, TOP_KEYS, "svaret");
+
+  const schemaVersion = boundedString(o.schema_version, 20, "schema_version");
+  if (schemaVersion !== ASSISTANT_SCHEMA_VERSION) fail("ukjent schema_version");
+
+  const fingerprint = boundedString(o.source_fingerprint, 64, "source_fingerprint");
+  if (options.expectedFingerprint && fingerprint !== options.expectedFingerprint) {
+    fail("kontrollsummen i svaret hører ikke til teksten som ble sendt");
+  }
+
+  const proposals = boundedArray(o.proposals, 60, "proposals").map((p) => {
+    const x = objectWithExactKeys(p, PROPOSAL_KEYS, "et forslag");
+    if (!Number.isInteger(x.source_start) || !Number.isInteger(x.source_end)) {
+      fail("posisjonene i et forslag må være hele tall");
+    }
     return {
-      kind,
-      source_start: Number(x.source_start),
-      source_end: Number(x.source_end),
-      original: String(x.original ?? ""),
-      suggested: String(x.suggested ?? ""),
-      reason: String(x.reason ?? "").slice(0, 300),
-    };
+      kind: enumValue(x.kind, KINDS, "kind"),
+      source_start: x.source_start as number,
+      source_end: x.source_end as number,
+      original: boundedString(x.original, 400, "original"),
+      suggested: boundedString(x.suggested, 400, "suggested"),
+      reason: boundedString(x.reason, 300, "reason"),
+    } satisfies DeclarationProposal;
+  });
+
+  const allergenFindings = boundedArray(o.allergen_findings, 30, "allergen_findings").map((f) => {
+    const x = objectWithExactKeys(f, FINDING_KEYS, "et allergenfunn");
+    return {
+      code: boundedString(x.code, 40, "code"),
+      basis: enumValue(x.basis, ["verified", "inferred"] as const, "basis"),
+      evidence: boundedString(x.evidence, 400, "evidence"),
+      severity: enumValue(x.severity, SEVERITIES as ("info" | "warning" | "critical")[], "severity"),
+    } satisfies AssistantFinding;
+  });
+
+  const questions = boundedArray(o.questions, 30, "questions").map((q) => {
+    const x = objectWithExactKeys(q, QUESTION_KEYS, "et spørsmål");
+    return {
+      question: boundedString(x.question, 400, "question"),
+      severity: enumValue(x.severity, SEVERITIES as ("info" | "warning" | "critical")[], "severity"),
+    } satisfies AssistantQuestion;
   });
 
   return {
-    schema_version: String(o.schema_version ?? "1"),
-    proposals: parsedProposals,
-    allergen_findings: findings.slice(0, 30).map((f) => {
-      const x = f as Record<string, unknown>;
-      return {
-        code: String(x.code ?? "").slice(0, 40),
-        basis: x.basis === "verified" ? "verified" : "inferred",
-        evidence: String(x.evidence ?? "").slice(0, 400),
-        severity:
-          x.severity === "critical" ? "critical" : x.severity === "warning" ? "warning" : "info",
-      };
-    }),
-    questions: questions.slice(0, 30).map((q) => {
-      const x = q as Record<string, unknown>;
-      return {
-        question: String(x.question ?? "").slice(0, 400),
-        severity:
-          x.severity === "critical" ? "critical" : x.severity === "warning" ? "warning" : "info",
-      };
-    }),
-    source_fingerprint: String(o.source_fingerprint ?? ""),
+    schema_version: schemaVersion,
+    proposals,
+    allergen_findings: allergenFindings,
+    questions,
+    source_fingerprint: fingerprint,
   };
+}
+
+/**
+ * Modellen kan ikke selv avgjøre at et allergenfunn er «bekreftet». Funnet får
+ * bare stå som bekreftet når koden OG beviset gjenfinnes i de registrerte
+ * allergendataene serveren faktisk har hentet. Ellers nedgraderes det.
+ */
+export function substantiateFindings(
+  findings: AssistantFinding[],
+  verified: { code: string; evidence: string }[],
+): AssistantFinding[] {
+  const codes = new Set(verified.map((v) => v.code.toLocaleLowerCase("nb-NO")));
+  const evidence = verified.map((v) => v.evidence.toLocaleLowerCase("nb-NO"));
+  return findings.map((f) => {
+    if (f.basis !== "verified") return f;
+    const code = f.code.toLocaleLowerCase("nb-NO");
+    const claim = f.evidence.toLocaleLowerCase("nb-NO").trim();
+    const codeKnown = codes.has(code);
+    const evidenceKnown = claim.length > 0 && evidence.some((e) => e.includes(code) || claim.includes(e));
+    if (codeKnown && evidenceKnown) return f;
+    return {
+      ...f,
+      basis: "inferred",
+      evidence: `${f.evidence} (ikke bekreftet mot registrerte allergendata)`,
+    };
+  });
 }

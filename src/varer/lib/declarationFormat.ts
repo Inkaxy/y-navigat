@@ -608,3 +608,70 @@ export function segmentsToPlainText(segments: DeclarationSegment[]): string {
 export function htmlToMarkerText(input: string | null | undefined): string {
   return segmentsToMarkerText(parseDeclarationInput(input));
 }
+
+/** Kobling mellom motorens koder og allergennavnene som er registrert på råvarene. */
+export const DECLARATION_CODE_TO_ALLERGEN: Record<string, string> = {
+  gluten_wheat: "hvete",
+  gluten_spelt: "spelt",
+  gluten_rye: "rug",
+  gluten_barley: "bygg",
+  gluten_oats: "havre",
+  milk: "melk",
+  eggs: "egg",
+  peanuts: "peanøtter",
+  soybeans: "soya",
+  sesame: "sesam",
+  celery: "selleri",
+  mustard: "sennep",
+  lupin: "lupin",
+  fish: "fisk",
+  crustaceans: "krepsdyr",
+  molluscs: "bløtdyr",
+  sulphites: "svoveldioksid",
+};
+
+export interface MetadataConflict {
+  allergen: string;
+  direction: "text_only" | "metadata_only";
+  message: string;
+}
+
+/**
+ * Deterministisk sammenligning mellom teksten og de registrerte allergendataene.
+ * Dette kjøres uavhengig av modellen, slik at et avvik aldri er avhengig av at
+ * modellen husket å nevne det.
+ */
+export function compareTextAgainstMetadata(
+  textAllergenCodes: readonly string[],
+  registeredAllergens: readonly string[],
+): MetadataConflict[] {
+  const inText = new Set<string>();
+  for (const code of textAllergenCodes) {
+    const name = DECLARATION_CODE_TO_ALLERGEN[code];
+    if (name) inText.add(name);
+  }
+  const registered = new Set(
+    registeredAllergens.map((a) => a.toLocaleLowerCase("nb-NO").trim()).filter(Boolean),
+  );
+
+  const out: MetadataConflict[] = [];
+  for (const name of inText) {
+    if (!registered.has(name)) {
+      out.push({
+        allergen: name,
+        direction: "text_only",
+        message: `Teksten nevner ${name}, men ${name} er ikke registrert som allergen på råvarene. Enten mangler teksten dekning, eller så mangler råvaredataene.`,
+      });
+    }
+  }
+  for (const name of registered) {
+    if (!inText.has(name) && Object.values(DECLARATION_CODE_TO_ALLERGEN).includes(name)) {
+      out.push({
+        allergen: name,
+        direction: "metadata_only",
+        message: `${name} er registrert som allergen på råvarene, men er ikke framhevet i teksten. Kontroller om ingrediensen mangler i deklarasjonen.`,
+      });
+    }
+  }
+  return out.sort((a, b) => a.allergen.localeCompare(b.allergen, "nb-NO"));
+}
