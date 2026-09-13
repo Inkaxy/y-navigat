@@ -105,6 +105,7 @@ const VarerSettingsProductPages = lazy(() => import("@/varer/pages/settings/Sett
 const VarerSettingsSalesGroups = lazy(() => import("@/varer/pages/settings/SettingsSalesGroups"));
 const VarerSettingsProductionGroups = lazy(() => import("@/varer/pages/settings/SettingsProductionGroups"));
 const VarerSettingsAI = lazy(() => import("@/varer/pages/settings/SettingsAI"));
+const VarerSettingsDeclarationAssistant = lazy(() => import("@/varer/pages/settings/SettingsDeclarationAssistant"));
 const VarerSettingsCalc = lazy(() => import("@/varer/pages/settings/SettingsCalc"));
 const VarerCakeBuilderEmbed = lazy(() => import("@/varer/pages/embed/CakeBuilderEmbed"));
 const KunderCustomerList = lazy(() => import("@/kunder/pages/CustomerList"));
@@ -379,6 +380,7 @@ const App = () => (
                 <Route path="produksjonsgrupper" element={<VarerSettingsProductionGroups />} />
                 <Route path="kalkyle" element={<VarerSettingsCalc />} />
                 <Route path="ai" element={<VarerSettingsAI />} />
+                <Route path="deklarasjonsassistent" element={<VarerSettingsDeclarationAssistant />} />
               </Route>
               {/* Kunder sub-routes */}
               <Route path="/kunder" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><Navigate to="/kunder/kundeliste" replace /></KunderEntityProvider></AppAccessGuard></Shell>} />
