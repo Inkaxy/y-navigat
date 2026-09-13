@@ -57,6 +57,11 @@ interface AllergenTerm {
   term: string;
   /** Etterfølgende bokstaver som betyr at treffet IKKE er allergenet. */
   notFollowedBy?: string[];
+  /**
+   * Sammensatte ord der allergenordet står SIST og likevel er allergenet
+   * («kulturmelk»). Ord som ikke står her – f.eks. «kokosmelk» – uthevet aldri.
+   */
+  compoundWords?: string[];
 }
 
 const ALLERGEN_TERMS: AllergenTerm[] = [
@@ -70,7 +75,21 @@ const ALLERGEN_TERMS: AllergenTerm[] = [
   { code: "gluten_barley", term: "malt" },
   { code: "gluten_oats", term: "havre" },
   // Melk og egg
-  { code: "milk", term: "melk", notFollowedBy: ["syre"] },
+  {
+    code: "milk",
+    term: "melk",
+    notFollowedBy: ["syre"],
+    compoundWords: [
+      "kulturmelk",
+      "helmelk",
+      "skummetmelk",
+      "lettmelk",
+      "surmelk",
+      "kjernemelk",
+      "tørrmelk",
+      "melkepulver",
+    ],
+  },
   { code: "milk", term: "fløte" },
   { code: "milk", term: "smør", notFollowedBy: ["brød"] },
   { code: "milk", term: "ost" },
