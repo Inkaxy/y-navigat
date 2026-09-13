@@ -273,9 +273,17 @@ function boldAllergensInText(text: string, found: Set<string>): DeclarationSegme
       const start = m.index;
       const end = start + m[0].length;
       // Treffet må starte på et ordstart — «kokosmelk» er ikke melk,
-      // mens «hvetemel» er hvete.
+      // mens «hvetemel» er hvete. Unntaket er kjente sammensatte ord der
+      // allergenordet står sist, f.eks. «kulturmelk».
       const before = text[start - 1];
-      if (before && /\p{L}/u.test(before)) continue;
+      if (before && /\p{L}/u.test(before)) {
+        const wordStart = text.slice(0, start).search(/\p{L}+$/u);
+        const tail = text.slice(end).match(/^\p{L}+/u);
+        const fullWord = text
+          .slice(wordStart < 0 ? start : wordStart, end + (tail ? tail[0].length : 0))
+          .toLocaleLowerCase("nb-NO");
+        if (!entry.compoundWords?.includes(fullWord)) continue;
+      }
       const after = text.slice(end);
       if (entry.notFollowedBy?.some((s) => after.toLocaleLowerCase("nb-NO").startsWith(s))) continue;
       hits.push({ start, end });
