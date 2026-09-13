@@ -11,6 +11,7 @@ import { sanitizeDeclarationHtml } from "@/varer/lib/declarationHtml";
 import { RichTextEditor } from "@/ordre/components/shell/RichTextEditor";
 import { toast } from "sonner";
 import { logAudit } from "@/varer/lib/audit";
+import { DeclarationAssistantPanel } from "@/varer/components/declaration/DeclarationAssistantPanel";
 
 // Feltlista kommer fra den delte katalogen (src/varer/lib/nutritionFields.ts),
 // slik at frontend og edge alltid har samme felt i samme rekkefølge.
@@ -152,6 +153,13 @@ export function ManualDeclarationEditor({
           <p className="text-xs text-muted-foreground">
             Marker allergener og bruk verktøylinjen for fet skrift, kursiv, lister m.m. — ingen HTML-koder nødvendig.
           </p>
+          <DeclarationAssistantPanel
+            target="product"
+            targetId={productId}
+            value={ingredient}
+            canWrite={canWrite}
+            onApply={(markerText) => setIngredient(markerText)}
+          />
         </CardContent>
       </Card>
 
