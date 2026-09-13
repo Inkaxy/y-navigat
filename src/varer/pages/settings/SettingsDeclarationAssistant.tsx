@@ -38,7 +38,6 @@ export default function SettingsDeclarationAssistant() {
   useEffect(() => {
     if (!isPlatformAdmin) return;
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlatformAdmin]);
 
   async function load() {
