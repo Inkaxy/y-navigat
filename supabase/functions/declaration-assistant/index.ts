@@ -49,8 +49,6 @@ Deno.serve(async (req) => {
   const admin = createClient(supabaseUrl, serviceKey);
 
   let usedQuota = false;
-  let configId: string | null = null;
-  let userId: string | null = null;
   let model = "";
 
   try {
@@ -61,7 +59,6 @@ Deno.serve(async (req) => {
     });
     const { data: userRes } = await userClient.auth.getUser();
     if (!userRes?.user) return jsonErr("Ikke pålogget", 401);
-    userId = userRes.user.id;
 
     const body = await req.json().catch(() => ({}));
     const target = body?.target === "product" ? "product" : body?.target === "recipe" ? "recipe" : null;
@@ -109,7 +106,6 @@ Deno.serve(async (req) => {
     if (!Deno.env.get("AI_CONFIG_ENCRYPTION_KEY")) {
       return jsonErr("Krypteringsnøkkelen mangler på serveren", 409, "encryption_missing");
     }
-    configId = config.id;
     model = (DECLARATION_MODEL_ALLOWLIST as readonly string[]).includes(config.model)
       ? config.model
       : DECLARATION_MODEL_ALLOWLIST[0];
@@ -224,8 +220,8 @@ Deno.serve(async (req) => {
       // Leverandørfeil logges uten innhold og uten nøkkel.
       console.error("declaration-assistant: leverandør svarte", res.status);
       await logUsage(admin, {
-      model,
-      success: false,
+        model,
+        success: false,
         input: null,
         output: null,
         error: `provider_${res.status}`,
@@ -247,7 +243,7 @@ Deno.serve(async (req) => {
       usage?: { input_tokens?: number; output_tokens?: number };
     };
     if (parsedResponse.status === "incomplete") {
-      await logUsage(admin, { userId, configId, model, success: false, input: null, output: null, error: "incomplete" });
+      await logUsage(admin, { model, success: false, input: null, output: null, error: "incomplete" });
       return jsonErr("Svaret fra modellen ble avkortet. Prøv med kortere tekst.", 502, "incomplete");
     }
 
@@ -260,7 +256,7 @@ Deno.serve(async (req) => {
       }
     }
     if (!text.trim()) {
-      await logUsage(admin, { userId, configId, model, success: false, input: null, output: null, error: "empty" });
+      await logUsage(admin, { model, success: false, input: null, output: null, error: "empty" });
       return jsonErr("Modellen svarte uten innhold. Ingen endring er gjort.", 502, "empty_output");
     }
 
@@ -268,7 +264,7 @@ Deno.serve(async (req) => {
     try {
       output = parseAssistantOutput(JSON.parse(text));
     } catch {
-      await logUsage(admin, { userId, configId, model, success: false, input: null, output: null, error: "malformed" });
+      await logUsage(admin, { model, success: false, input: null, output: null, error: "malformed" });
       return jsonErr("Svaret fra modellen kunne ikke leses. Ingen endring er gjort.", 502, "malformed");
     }
 
@@ -316,7 +312,7 @@ Deno.serve(async (req) => {
     console.error("declaration-assistant feilet", (e as Error).message);
     if (usedQuota) {
       // Kvoten er bevisst IKKE tilbakeført: også mislykkede kall koster hos leverandøren.
-      await logUsage(admin, { userId, configId, model, success: false, input: null, output: null, error: "exception" });
+      await logUsage(admin, { model, success: false, input: null, output: null, error: "exception" });
     }
     return jsonErr(message, 500);
   }
