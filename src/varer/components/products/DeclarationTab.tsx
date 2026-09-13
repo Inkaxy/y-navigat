@@ -1,6 +1,7 @@
 import { NUTRITION_FIELDS as NUTRITION_FIELD_CATALOG } from "@/varer/lib/nutritionFields";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { htmlToMarkerText } from "@/varer/lib/declarationFormat";
 import DOMPurify from "dompurify";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -331,7 +332,7 @@ function DeclarationView({ link, productName, canWrite, qc }: { link: any; produ
                       value={manualIngredient}
                       disabled={!canWrite}
                       onChange={(e) => setManualIngredient(e.target.value)}
-                      placeholder="Hvete<strong>mel</strong>, vann, salt …"
+                      placeholder="HVETEMEL, vann, salt — allergener skal utheves"
                     />
                   </div>
                 )}
