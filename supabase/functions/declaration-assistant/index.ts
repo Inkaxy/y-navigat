@@ -23,6 +23,7 @@ import {
   substantiateFindings,
   validateProposals,
 } from "../_shared/declaration-proposal.ts";
+import { buildAllergenEvidence } from "../_shared/declaration-evidence.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -300,29 +301,16 @@ Deno.serve(async (req) => {
             "context_failed",
           );
         }
-        let unconfirmedRows = 0;
-        for (const a of allergens ?? []) {
-          const row = a as { raw_material_id: string; allergen: string; presence: string };
-          const rm = names.get(row.raw_material_id);
-          const reviewed = !!rm?.reviewed;
-          const contains = row.presence === "contains";
-          // Bare gjennomgåtte råvarer med presence=contains kan underbygge et
-          // BEKREFTET funn. Alt annet (ikke gjennomgått, kan inneholde spor,
-          // fri for) er kontekst — ikke bevis, og ikke en juridisk konklusjon.
-          const status = reviewed ? "gjennomgått" : "IKKE gjennomgått";
-          const weight = reviewed && contains ? "kan underbygge bekreftet funn" : "kan IKKE underbygge bekreftet funn";
-          const line = `${rm?.name ?? "råvare"}: ${row.allergen} (${row.presence}, råvaredata ${status} — ${weight})`;
-          allergenContext.push(line);
-          if (reviewed && contains) {
-            verifiedAllergens.push({ code: row.allergen, evidence: line });
-          } else {
-            unconfirmedRows += 1;
-          }
-          if (contains) registeredContains.push(row.allergen);
-        }
-        if (unconfirmedRows) {
+        const evidence = buildAllergenEvidence(
+          (allergens ?? []) as { raw_material_id: string; allergen: string; presence: string }[],
+          names,
+        );
+        allergenContext.push(...evidence.context);
+        verifiedAllergens.push(...evidence.verified);
+        registeredContains.push(...evidence.registeredContains);
+        if (evidence.unconfirmedCount) {
           contextNotes.push(
-            `${unconfirmedRows} registrerte allergenrader er enten ikke gjennomgått eller gjelder spor/kan inneholde. De kan ikke gjøre et funn bekreftet, og fravær av gjennomgang er ingen konklusjon om at allergenet mangler.`,
+            `${evidence.unconfirmedCount} registrerte allergenrader er enten ikke gjennomgått eller gjelder spor/kan inneholde. De kan ikke gjøre et funn bekreftet, og fravær av gjennomgang er ingen konklusjon om at allergenet mangler.`,
           );
         }
       }
