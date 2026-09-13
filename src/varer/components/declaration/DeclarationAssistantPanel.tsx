@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { MarkedText } from "@/varer/components/label/MarkedText";
 import { formatDeclaration, type DeclarationIssue } from "@/varer/lib/declarationFormat";
 import { sourceFingerprint } from "@/varer/lib/declarationProposal";
+import { readFunctionError } from "@/varer/lib/functionError";
 
 interface AssistantResponse {
   instruction_version: string;
@@ -111,6 +112,21 @@ function errorFor(code: string | undefined, fallback: string | undefined): Panel
         message: fallback ?? "Dagens grense for AI-kontroller er brukt opp. Prøv igjen i morgen.",
         showSettingsLink: true,
       };
+    case "provider_error":
+      return {
+        message:
+          fallback ?? "OpenAI svarte ikke som forventet. Ingen endring er gjort — prøv igjen senere.",
+      };
+    case "bad_key":
+      return {
+        message: fallback ?? "API-nøkkelen i oppsettet ble avvist. En administrator må lagre en gyldig nøkkel.",
+        showSettingsLink: true,
+      };
+    case "bad_cap":
+      return {
+        message: fallback ?? "Dagsgrensen i oppsettet er ugyldig. En administrator må rette den.",
+        showSettingsLink: true,
+      };
     case "forbidden":
       return { message: fallback ?? "Du har ikke tilgang til å kjøre kontrollen her." };
     case "context_too_large":
@@ -183,12 +199,14 @@ export function DeclarationAssistantPanel({ target, targetId, value, canWrite, o
       const { data, error: fnError } = await supabase.functions.invoke("declaration-assistant", {
         body: { target, id: targetId, draft_text: value },
       });
-      if (!mountedRef.current || requestId !== requestRef.current) return;
-      const payload = data as { error?: string; code?: string } | null;
       if (fnError) {
-        setError(errorFor(payload?.code, payload?.error));
+        // Ved ikke-2xx er data null og hele feilen ligger i responsen.
+        const payload = await readFunctionError(fnError, data);
+        if (!mountedRef.current || requestId !== requestRef.current) return;
+        setError(errorFor(payload.code, payload.message));
         return;
       }
+      if (!mountedRef.current || requestId !== requestRef.current) return;
       const res = parseResponse(data);
       if (!res) {
         setError({ message: "Svaret fra AI-kontrollen kunne ikke leses. Ingen endring er gjort." });
