@@ -1,5 +1,5 @@
-// DENNE FILEN ER BYTE-IDENTISK MED supabase/functions/_shared/declaration-format.ts.
-// Endres den ene, må den andre endres likt — en vitest sammenligner filene.
+// DENNE MODULEN FINNES I TO BYTE-IDENTISKE KOPIER: src/varer/lib/declarationFormat.ts
+// og supabase/functions/_shared/declaration-format.ts. En vitest sammenligner filene.
 //
 // DETERMINISTISK FORMATERING AV INGREDIENSDEKLARASJON
 // ---------------------------------------------------------------------------

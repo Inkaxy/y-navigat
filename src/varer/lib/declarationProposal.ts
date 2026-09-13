@@ -1,5 +1,5 @@
-// DENNE FILEN ER BYTE-IDENTISK MED supabase/functions/_shared/declaration-proposal.ts.
-//
+// DENNE MODULEN FINNES I TO BYTE-IDENTISKE KOPIER: src/varer/lib/declarationProposal.ts
+// og supabase/functions/_shared/declaration-proposal.ts. En vitest sammenligner filene.
 // DETERMINISTISK KONTROLL AV FORSLAG FRA DEKLARASJONSASSISTENTEN
 // ---------------------------------------------------------------------------
 // Modellen får ALDRI skrive fritt over deklarasjonen. Den leverer avgrensede
