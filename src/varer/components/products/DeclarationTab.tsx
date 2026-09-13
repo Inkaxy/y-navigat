@@ -539,11 +539,9 @@ function DataQualityBanner({ computed }: { computed: ComputedDeclaration }) {
 }
 
 function PreviewDialog({ open, onClose, productName, computed }: { open: boolean; onClose: () => void; productName: string; computed: ComputedDeclaration }) {
+  /** Uthevede allergener beholdes som **markering** når teksten kopieres. */
   function plainText(): string {
-    const html = computed.ingredient_declaration_html || "";
-    const tmp = document.createElement("div");
-    tmp.innerHTML = html;
-    const text = tmp.textContent || "";
+    const text = htmlToMarkerText(computed.ingredient_declaration_html || "");
     const lines: string[] = [];
     lines.push(productName);
     lines.push("");
