@@ -59,7 +59,7 @@ export const DECLARATION_CASES: DeclarationCase[] = [
     note: "Unntaket for helraffinert soyaolje forklares, men bekreftes ikke av systemet.",
     input: "Rapsolje, raffinert soyaolje",
     expectedMarkerText: "rapsolje, raffinert *soya*olje",
-    expectedIssueCodes: ["soy_refined_exemption"],
+    expectedIssueCodes: ["soy_refined_unresolved"],
   },
   {
     id: "gjentatte-allergener",
@@ -72,7 +72,7 @@ export const DECLARATION_CASES: DeclarationCase[] = [
     note: "Sulfitt gir terskelpåminnelse.",
     input: "Tørket frukt, sulfitt",
     expectedMarkerText: "Tørket frukt, *sulfitt*",
-    expectedIssueCodes: ["sulphite_threshold"],
+    expectedIssueCodes: ["sulphite_threshold_unresolved"],
   },
   {
     id: "allerede-markert",

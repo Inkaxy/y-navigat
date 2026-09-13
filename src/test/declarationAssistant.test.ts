@@ -4,10 +4,12 @@ import { formatDeclaration, parseDeclarationInput, segmentsToHtml } from "@/vare
 import {
   parseAssistantOutput,
   sourceFingerprint,
+  substantiateFindings,
   validateProposals,
   type DeclarationProposal,
 } from "@/varer/lib/declarationProposal";
 import { DECLARATION_CASES } from "@/varer/lib/__fixtures__/declarationCases";
+import { buildEffectiveDeclaration } from "@/varer/lib/effectiveDeclaration";
 
 function proposal(p: Partial<DeclarationProposal>): DeclarationProposal {
   return {
@@ -134,19 +136,17 @@ describe("kontroll av AI-forslag", () => {
     expect(r.rejected[0].reason).toMatch(/kildeteksten/);
   });
 
-  it("modellens eget «gyldig»-felt har ingen virkning", () => {
-    const parsed = parseAssistantOutput({
-      schema_version: "1",
-      valid: true,
-      proposals: [
-        { kind: "spelling", source_start: 0, source_end: 8, original: "HVETEMEL", suggested: "sukker", reason: "" },
-      ],
-      allergen_findings: [],
-      questions: [],
-      source_fingerprint: "x",
-    });
-    const r = validateProposals(source, parsed.proposals);
-    expect(r.accepted).toHaveLength(0);
+  it("avviser svar med ukjente felter, som modellens eget «gyldig»-flagg", () => {
+    expect(() =>
+      parseAssistantOutput({
+        schema_version: "1",
+        valid: true,
+        proposals: [],
+        allergen_findings: [],
+        questions: [],
+        source_fingerprint: "x",
+      }),
+    ).toThrow(/ukjent felt/);
   });
 
   it("avviser rekkefølgeendring som blokkerende", () => {
@@ -165,15 +165,161 @@ describe("kontroll av AI-forslag", () => {
     expect(r.accepted).toHaveLength(0);
   });
 
-  it("tåler tull fra modellen uten å kaste", () => {
+  it("avviser tomt svar, feil schema-versjon og manglende felter", () => {
     expect(() => parseAssistantOutput(null)).toThrow();
-    const ok = parseAssistantOutput({ schema_version: "1" });
-    expect(ok.proposals).toEqual([]);
-    expect(ok.questions).toEqual([]);
+    expect(() => parseAssistantOutput({})).toThrow();
+    expect(() => parseAssistantOutput({ schema_version: "1" })).toThrow(/mangler/);
+    expect(() =>
+      parseAssistantOutput({
+        schema_version: "garbage",
+        proposals: [],
+        allergen_findings: [],
+        questions: [],
+        source_fingerprint: "wrong",
+      }),
+    ).toThrow(/schema_version/);
+  });
+
+  it("avviser svar med feil kontrollsum mot forespørselen", () => {
+    const body = {
+      schema_version: "1",
+      proposals: [],
+      allergen_findings: [],
+      questions: [],
+      source_fingerprint: "wrong",
+    };
+    expect(() => parseAssistantOutput(body, { expectedFingerprint: sourceFingerprint(source) })).toThrow(
+      /kontrollsummen/,
+    );
+    expect(
+      parseAssistantOutput(
+        { ...body, source_fingerprint: sourceFingerprint(source) },
+        { expectedFingerprint: sourceFingerprint(source) },
+      ).proposals,
+    ).toEqual([]);
+  });
+
+  it("avviser ugyldig type, enum-verdi og for lange verdier", () => {
+    const base = {
+      schema_version: "1",
+      allergen_findings: [],
+      questions: [],
+      source_fingerprint: "x",
+    };
+    expect(() =>
+      parseAssistantOutput({
+        ...base,
+        proposals: [{ kind: "hallucination", source_start: 0, source_end: 1, original: "a", suggested: "a", reason: "" }],
+      }),
+    ).toThrow(/kind/);
+    expect(() =>
+      parseAssistantOutput({
+        ...base,
+        proposals: [{ kind: "case", source_start: 0.5, source_end: 1, original: "a", suggested: "a", reason: "" }],
+      }),
+    ).toThrow(/hele tall/);
+    expect(() =>
+      parseAssistantOutput({
+        ...base,
+        proposals: [{ kind: "case", source_start: 0, source_end: 1, original: "a", suggested: "a", reason: "x".repeat(400) }],
+      }),
+    ).toThrow(/for lang/);
+  });
+
+  it("«bekreftet» krever dekning i faktiske råvaredata", () => {
+    const findings = [
+      { code: "hvete", basis: "verified" as const, evidence: "hvetemel i oppskriften", severity: "warning" as const },
+      { code: "soya", basis: "verified" as const, evidence: "gjetning", severity: "warning" as const },
+    ];
+    const out = substantiateFindings(findings, [{ code: "hvete", evidence: "hvete" }]);
+    expect(out[0].basis).toBe("verified");
+    expect(out[1].basis).toBe("inferred");
   });
 
   it("kontrollsummen endrer seg når teksten endres", () => {
     expect(sourceFingerprint("a")).not.toBe(sourceFingerprint("b"));
     expect(sourceFingerprint(source)).toBe(sourceFingerprint(source));
+  });
+});
+
+describe("faglige grenser i formateringen", () => {
+  it("generisk malt og semule gir tvetydighet, ikke antatt kornslag", () => {
+    for (const [word, code] of [
+      ["malt", "ambiguous_malt"],
+      ["maltekstrakt", "ambiguous_malt"],
+      ["semule", "ambiguous_semolina"],
+    ] as const) {
+      const r = formatDeclaration(`${word}, vann`);
+      expect(r.allergenCodes).not.toContain("gluten_barley");
+      expect(r.issues.map((i) => i.code)).toContain(code);
+    }
+    // Navngitt korn skal fortsatt gjenkjennes.
+    expect(formatDeclaration("byggmalt, vann").allergenCodes).toContain("gluten_barley");
+  });
+
+  it("spelt-påminnelsen krever hvete på samme ingrediens", () => {
+    const r = formatDeclaration("speltmel, hvetemel");
+    expect(r.issues.map((i) => i.code)).toContain("spelt_is_wheat");
+  });
+
+  it("raffinert soya krever bekreftet grunnlag og sperrer ellers automatikk", () => {
+    const unresolved = formatDeclaration("rapsolje, raffinert soyaolje");
+    expect(unresolved.blocked).toBe(true);
+    const confirmed = formatDeclaration("rapsolje, raffinert soyaolje", {
+      context: { refinedSoyFullyRefined: true },
+    });
+    expect(confirmed.blocked).toBe(false);
+  });
+
+  it("HTML-koder leses uansett store eller små bokstaver", () => {
+    const r = formatDeclaration("<STRONG>HVETE</STRONG>mel, vann");
+    expect(r.markerText).not.toMatch(/STRONG/i);
+    expect(r.markerText).toContain("*hvete*mel");
+  });
+
+  it("helt fet ingrediensliste teller ikke som allergenutheving", () => {
+    const r = formatDeclaration("<strong>hvetemel, vann, salt</strong>");
+    expect(r.issues.map((i) => i.code)).toContain("bold_whole_list");
+  });
+});
+
+describe("utheving overlever til etikett og utskrift", () => {
+  it("effektiv deklarasjon beholder uthevingen som markertekst", () => {
+    const eff = buildEffectiveDeclaration(
+      {
+        id: "l1",
+        product_id: "p1",
+        recipe_id: null,
+        declaration_mode: "manual",
+        manual_ingredient_declaration: "<p><strong>HVETEMEL</strong>, vann</p>",
+        manual_nutrition: null,
+        manual_allergen_summary: null,
+        recipes: null,
+      },
+      null,
+    );
+    expect(eff.ingredientText).toContain("*HVETEMEL*");
+  });
+
+  it("beregnet deklarasjon beholder også uthevingen", () => {
+    const eff = buildEffectiveDeclaration(
+      {
+        id: "l2",
+        product_id: "p2",
+        recipe_id: "r2",
+        declaration_mode: "auto",
+        manual_ingredient_declaration: null,
+        manual_nutrition: null,
+        manual_allergen_summary: null,
+        recipes: null,
+      },
+      {
+        ingredient_declaration: "<strong>HVETEMEL</strong>, vann",
+        allergens: { contains: ["hvete"] },
+        nutrition_per_100g: null,
+        coverage_by_weight_pct: 95,
+      },
+    );
+    expect(eff.ingredientText).toContain("*HVETEMEL*");
   });
 });

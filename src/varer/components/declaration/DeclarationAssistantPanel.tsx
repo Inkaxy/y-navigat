@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,14 +14,117 @@ interface AssistantResponse {
   instruction_version: string;
   model: string;
   source_fingerprint: string;
-  suggestion: { markerText: string; issues: DeclarationIssue[]; allergenCodes: string[] };
-  before: { markerText: string; issues: DeclarationIssue[]; allergenCodes: string[] };
+  context_notes: string[];
+  metadata_conflicts: { allergen: string; direction: string; message: string }[];
+  suggestion: { markerText: string; issues: DeclarationIssue[]; allergenCodes: string[]; blocked: boolean };
+  before: { markerText: string; issues: DeclarationIssue[]; allergenCodes: string[]; blocked: boolean };
   accepted: { original: string; suggested: string; reason: string }[];
   rejected: { proposal: { original: string; suggested: string }; reason: string }[];
   blocking: string[];
   findings: { code: string; basis: string; evidence: string; severity: string }[];
   questions: { question: string; severity: string }[];
   quota: { used: number; limit: number };
+}
+
+/** Svaret gjengis ALDRI før formen er kontrollert. */
+function parseResponse(raw: unknown): AssistantResponse | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const arr = (v: unknown) => (Array.isArray(v) ? v : null);
+  const suggestion = o.suggestion as Record<string, unknown> | undefined;
+  const before = o.before as Record<string, unknown> | undefined;
+  const quota = o.quota as Record<string, unknown> | undefined;
+  if (
+    typeof o.source_fingerprint !== "string" ||
+    typeof o.model !== "string" ||
+    !suggestion ||
+    typeof suggestion.markerText !== "string" ||
+    !before ||
+    typeof before.markerText !== "string" ||
+    !arr(suggestion.issues) ||
+    !arr(before.issues) ||
+    !arr(o.accepted) ||
+    !arr(o.rejected) ||
+    !arr(o.blocking) ||
+    !arr(o.findings) ||
+    !arr(o.questions) ||
+    !quota
+  ) {
+    return null;
+  }
+  return {
+    instruction_version: String(o.instruction_version ?? ""),
+    model: o.model,
+    source_fingerprint: o.source_fingerprint,
+    context_notes: (arr(o.context_notes) ?? []).map((n) => String(n)),
+    metadata_conflicts: (arr(o.metadata_conflicts) ?? []) as AssistantResponse["metadata_conflicts"],
+    suggestion: {
+      markerText: suggestion.markerText,
+      issues: suggestion.issues as DeclarationIssue[],
+      allergenCodes: (arr(suggestion.allergenCodes) ?? []).map((c) => String(c)),
+      blocked: suggestion.blocked === true,
+    },
+    before: {
+      markerText: before.markerText,
+      issues: before.issues as DeclarationIssue[],
+      allergenCodes: (arr(before.allergenCodes) ?? []).map((c) => String(c)),
+      blocked: before.blocked === true,
+    },
+    accepted: o.accepted as AssistantResponse["accepted"],
+    rejected: o.rejected as AssistantResponse["rejected"],
+    blocking: (arr(o.blocking) ?? []).map((b) => String(b)),
+    findings: o.findings as AssistantResponse["findings"],
+    questions: o.questions as AssistantResponse["questions"],
+    quota: { used: Number(quota.used ?? 0), limit: Number(quota.limit ?? 0) },
+  };
+}
+
+const SETTINGS_PATH = "/varer/innstillinger/deklarasjonsassistent";
+
+interface PanelError {
+  message: string;
+  showSettingsLink?: boolean;
+}
+
+/** Kjente feilkoder får en forklaring folk kan handle på. */
+function errorFor(code: string | undefined, fallback: string | undefined): PanelError {
+  switch (code) {
+    case "not_configured":
+      return {
+        message:
+          "Deklarasjonsassistenten er ikke satt opp ennå. Den deterministiske forhåndsvisningen under virker som normalt.",
+        showSettingsLink: true,
+      };
+    case "encryption_missing":
+      return {
+        message:
+          "Serveren mangler krypteringsnøkkelen, så AI-kontrollen er avslått. Forhåndsvisningen virker som normalt.",
+        showSettingsLink: true,
+      };
+    case "bad_model":
+      return {
+        message: "Modellen i oppsettet er ikke godkjent. En administrator må velge en godkjent modell.",
+        showSettingsLink: true,
+      };
+    case "quota_exceeded":
+      return {
+        message: fallback ?? "Dagens grense for AI-kontroller er brukt opp. Prøv igjen i morgen.",
+        showSettingsLink: true,
+      };
+    case "forbidden":
+      return { message: fallback ?? "Du har ikke tilgang til å kjøre kontrollen her." };
+    case "context_too_large":
+    case "context_failed":
+      return {
+        message:
+          fallback ??
+          "Grunnlaget for kontrollen kunne ikke hentes fullstendig. Ingen kontroll er kjørt.",
+      };
+    case "timeout":
+      return { message: "AI-kontrollen tok for lang tid og ble avbrutt. Ingen endring er gjort." };
+    default:
+      return { message: fallback ?? "AI-kontrollen kunne ikke kjøres akkurat nå." };
+  }
 }
 
 interface Props {
@@ -40,57 +144,93 @@ interface Props {
  */
 export function DeclarationAssistantPanel({ target, targetId, value, canWrite, onApply }: Props) {
   const [result, setResult] = useState<AssistantResponse | null>(null);
+  const [resultKey, setResultKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<PanelError | null>(null);
   const requestRef = useRef(0);
+  const mountedRef = useRef(true);
 
   const local = useMemo(() => formatDeclaration(value), [value]);
   const currentFingerprint = useMemo(() => sourceFingerprint(value), [value]);
-  const stale = !!result && result.source_fingerprint !== currentFingerprint;
+  /** Svaret hører til ÉN tekst på ÉN oppskrift/vare — ikke bare til en tekst. */
+  const currentKey = `${target}:${targetId}:${currentFingerprint}`;
+  const stale = !!result && resultKey !== currentKey;
 
-  // Bytter man oppskrift/vare, skal et gammelt svar aldri henge igjen.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      // Et svar som kommer etter at panelet er borte skal ikke gjøre noe.
+      requestRef.current += 1;
+    };
+  }, []);
+
+  // Bytter man oppskrift/vare, forkastes både svaret OG et kall som er underveis.
   useEffect(() => {
     requestRef.current += 1;
     setResult(null);
+    setResultKey(null);
     setError(null);
+    setLoading(false);
   }, [target, targetId]);
 
-  async function runCheck() {
+  const runCheck = useCallback(async () => {
     const requestId = ++requestRef.current;
-    const fingerprintAtRequest = currentFingerprint;
+    const keyAtRequest = `${target}:${targetId}:${sourceFingerprint(value)}`;
     setLoading(true);
     setError(null);
     try {
       const { data, error: fnError } = await supabase.functions.invoke("declaration-assistant", {
         body: { target, id: targetId, draft_text: value },
       });
-      if (requestId !== requestRef.current) return; // Avløst av et nyere kall
+      if (!mountedRef.current || requestId !== requestRef.current) return;
+      const payload = data as { error?: string; code?: string } | null;
       if (fnError) {
-        const detail = (data as { error?: string } | null)?.error;
-        setError(detail ?? "AI-kontrollen kunne ikke kjøres akkurat nå.");
+        setError(errorFor(payload?.code, payload?.error));
         return;
       }
-      const res = data as AssistantResponse;
-      if (res.source_fingerprint !== fingerprintAtRequest) {
-        setError("Teksten endret seg underveis. Kjør kontrollen på nytt.");
+      const res = parseResponse(data);
+      if (!res) {
+        setError({ message: "Svaret fra AI-kontrollen kunne ikke leses. Ingen endring er gjort." });
+        return;
+      }
+      if (res.source_fingerprint !== sourceFingerprint(value)) {
+        setError({ message: "Teksten endret seg underveis. Kjør kontrollen på nytt." });
         return;
       }
       setResult(res);
+      setResultKey(keyAtRequest);
     } catch {
-      if (requestId === requestRef.current) setError("AI-kontrollen kunne ikke kjøres akkurat nå.");
+      if (mountedRef.current && requestId === requestRef.current) {
+        setError({ message: "AI-kontrollen kunne ikke kjøres akkurat nå." });
+      }
     } finally {
-      if (requestId === requestRef.current) setLoading(false);
+      if (mountedRef.current && requestId === requestRef.current) setLoading(false);
     }
-  }
+  }, [target, targetId, value]);
 
   const criticalIssues = (result?.suggestion.issues ?? []).filter((i) => i.severity === "critical");
+  const criticalFindings = (result?.findings ?? []).filter((f) => f.severity === "critical");
+  const criticalQuestions = (result?.questions ?? []).filter((q) => q.severity === "critical");
+  const suggestionBlocked =
+    result?.suggestion.blocked === true ||
+    (result?.suggestion.issues ?? []).some((i) => i.blocksAutoApply);
+
   const canApply =
     canWrite &&
+    !loading &&
     !!result &&
     !stale &&
     result.blocking.length === 0 &&
     criticalIssues.length === 0 &&
+    criticalFindings.length === 0 &&
+    criticalQuestions.length === 0 &&
+    !suggestionBlocked &&
     result.suggestion.markerText.trim() !== value.trim();
+
+  // Uavklarte unntak/terskler (soya, sulfitt) og helfet liste sperrer også
+  // den lokale standardformateringen — de kan ikke «løses» av formatering.
+  const localBlocked = local.blocked;
 
   return (
     <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
@@ -101,7 +241,12 @@ export function DeclarationAssistantPanel({ target, targetId, value, canWrite, o
         </div>
         <div className="flex items-center gap-2">
           {canWrite && (
-            <Button variant="outline" size="sm" onClick={() => onApply(local.markerText)} disabled={!value.trim()}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onApply(local.markerText)}
+              disabled={!value.trim() || localBlocked}
+            >
               Bruk standardformat
             </Button>
           )}
@@ -121,10 +266,27 @@ export function DeclarationAssistantPanel({ target, targetId, value, canWrite, o
 
       <IssueList issues={local.issues} title="Kontrollpunkter i teksten" />
 
+      {localBlocked && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Noe må avklares faglig først (se punktene over). Formatering kan ikke avgjøre det, så teksten
+            kan ikke settes inn automatisk før avklaringen er gjort.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {error && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription className="space-y-1">
+            <p>{error.message}</p>
+            {error.showSettingsLink && (
+              <Link to={SETTINGS_PATH} className="underline underline-offset-2">
+                Åpne innstillingene for deklarasjonsassistenten
+              </Link>
+            )}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -134,7 +296,7 @@ export function DeclarationAssistantPanel({ target, targetId, value, canWrite, o
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                Teksten er endret etter kontrollen. Kjør kontrollen på nytt før du bruker forslaget.
+                Teksten eller varen er endret etter kontrollen. Kjør kontrollen på nytt før du bruker forslaget.
               </AlertDescription>
             </Alert>
           )}
@@ -145,6 +307,17 @@ export function DeclarationAssistantPanel({ target, targetId, value, canWrite, o
               <AlertDescription>
                 <ul className="list-disc pl-4">
                   {result.blocking.map((b, i) => <li key={i}>{b}</li>)}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {result.context_notes.length > 0 && (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                <ul className="list-disc pl-4">
+                  {result.context_notes.map((n, i) => <li key={i}>{n}</li>)}
                 </ul>
               </AlertDescription>
             </Alert>
@@ -177,7 +350,7 @@ export function DeclarationAssistantPanel({ target, targetId, value, canWrite, o
                 {result.findings.map((f, i) => (
                   <li key={i} className="flex items-start gap-1.5 text-muted-foreground">
                     <Badge variant="outline" className="shrink-0">
-                      {f.basis === "verified" ? "bekreftet" : "antatt"}
+                      {f.basis === "verified" ? "bekreftet mot råvaredata" : "antatt"}
                     </Badge>
                     <span>{f.code}: {f.evidence}</span>
                   </li>
@@ -197,7 +370,7 @@ export function DeclarationAssistantPanel({ target, targetId, value, canWrite, o
 
           <IssueList issues={result.suggestion.issues} title="Kontrollpunkter i forslaget" />
 
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">
               Brukt i dag: {result.quota.used} av {result.quota.limit}. Forslaget må vurderes faglig — det er
               ingen garanti for at etiketten er lovlig.
@@ -226,7 +399,7 @@ function IssueList({ issues, title }: { issues: DeclarationIssue[]; title: strin
             {i.severity === "info" ? (
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             ) : (
-              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
             )}
             <span>{i.message}</span>
           </li>

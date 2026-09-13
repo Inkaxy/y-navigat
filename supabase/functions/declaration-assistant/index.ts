@@ -3,6 +3,9 @@
 // Klienten sender bare: hva som kontrolleres (oppskrift eller produkt), id-en,
 // og det ulagrede utkastet til ingredienstekst. Alt annet hentes på serveren.
 // Svaret fra modellen kontrolleres deterministisk før det returneres.
+//
+// Feil logges KUN som korte koder. Verken deklarasjonstekst, prompt, råvaredata
+// eller nøkkel skal kunne havne i loggene.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { decryptWithKey } from "../_shared/crypto.ts";
@@ -11,11 +14,13 @@ import {
   DECLARATION_INSTRUCTION_VERSION,
   DECLARATION_MODEL_ALLOWLIST,
   DECLARATION_OUTPUT_SCHEMA,
+  DECLARATION_SELFTEST_DRAFT,
 } from "../_shared/declaration-instructions.ts";
-import { formatDeclaration } from "../_shared/declaration-format.ts";
+import { compareTextAgainstMetadata, formatDeclaration } from "../_shared/declaration-format.ts";
 import {
   parseAssistantOutput,
   sourceFingerprint,
+  substantiateFindings,
   validateProposals,
 } from "../_shared/declaration-proposal.ts";
 
@@ -29,6 +34,9 @@ const PURPOSE = "declaration_assistant";
 const MAX_INPUT_CHARS = 4000;
 const MAX_OUTPUT_TOKENS = 1500;
 const REQUEST_TIMEOUT_MS = 60_000;
+const MAX_RESPONSE_BYTES = 512 * 1024;
+/** Over dette antallet linjer/råvarer kan ikke konteksten hentes fullstendig. */
+const MAX_CONTEXT_LINES = 300;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -38,6 +46,33 @@ function json(body: unknown, status = 200) {
 }
 function jsonErr(message: string, status: number, code?: string) {
   return json({ error: message, code }, status);
+}
+
+/** Leser svarkroppen med tak på antall byte, uten å slippe timeouten før den er lest. */
+async function readBounded(res: Response, maxBytes: number): Promise<string> {
+  if (!res.body) return "";
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value) {
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        throw new Error("response_too_large");
+      }
+      chunks.push(value);
+    }
+  }
+  const buf = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) {
+    buf.set(c, at);
+    at += c.byteLength;
+  }
+  return new TextDecoder().decode(buf);
 }
 
 Deno.serve(async (req) => {
@@ -50,80 +85,222 @@ Deno.serve(async (req) => {
 
   let usedQuota = false;
   let model = "";
+  let selftest = false;
+
+  const finishTest = async (ok: boolean, code: string) => {
+    if (!selftest) return;
+    await admin.rpc("ai_declaration_record_test", { p_ok: ok, p_code: code }).catch(() => {});
+  };
 
   try {
     const auth = req.headers.get("Authorization");
-    if (!auth) return jsonErr("Mangler pålogging", 401);
+    if (!auth) return jsonErr("Mangler pålogging", 401, "unauthenticated");
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: auth } },
     });
-    const { data: userRes } = await userClient.auth.getUser();
-    if (!userRes?.user) return jsonErr("Ikke pålogget", 401);
+    const { data: userRes, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userRes?.user) return jsonErr("Ikke pålogget", 401, "unauthenticated");
 
     const body = await req.json().catch(() => ({}));
-    const target = body?.target === "product" ? "product" : body?.target === "recipe" ? "recipe" : null;
-    const id = String(body?.id ?? "");
-    const draftText = String(body?.draft_text ?? "");
+    selftest = body?.mode === "selftest";
 
-    if (!target) return jsonErr("Ugyldig mål for kontrollen", 400);
-    if (!/^[0-9a-f-]{36}$/i.test(id)) return jsonErr("Ugyldig id", 400);
-    if (!draftText.trim()) return jsonErr("Ingrediensteksten er tom", 400);
-    if (draftText.length > MAX_INPUT_CHARS) {
-      return jsonErr(`Teksten er for lang (maks ${MAX_INPUT_CHARS} tegn)`, 400);
+    let target: "recipe" | "product" | null = null;
+    let id = "";
+    let draftText = "";
+
+    if (selftest) {
+      // Testkallet bruker en fast, syntetisk tekst. Ingen forretningsdata sendes.
+      const { data: isAdmin, error: adminErr } = await userClient.rpc("is_platform_admin");
+      if (adminErr) return jsonErr("Kunne ikke kontrollere tilgangen", 500, "access_check_failed");
+      if (!isAdmin) return jsonErr("Bare plattformadministrator kan teste tilkoblingen", 403, "forbidden");
+      draftText = DECLARATION_SELFTEST_DRAFT;
+    } else {
+      target = body?.target === "product" ? "product" : body?.target === "recipe" ? "recipe" : null;
+      id = String(body?.id ?? "");
+      draftText = String(body?.draft_text ?? "");
+
+      if (!target) return jsonErr("Ugyldig mål for kontrollen", 400, "bad_request");
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return jsonErr("Ugyldig id", 400, "bad_request");
+      if (!draftText.trim()) return jsonErr("Ingrediensteksten er tom", 400, "bad_request");
+      if (draftText.length > MAX_INPUT_CHARS) {
+        return jsonErr(`Teksten er for lang (maks ${MAX_INPUT_CHARS} tegn)`, 400, "too_long");
+      }
     }
 
     // --- Tilgang kontrolleres med brukerens egen kontekst, før service-role brukes ---
     let recipeId: string | null = null;
+    const contextNotes: string[] = [];
+
     if (target === "recipe") {
-      const { data: canWrite } = await userClient.rpc("can_write_recipe", { _recipe_id: id });
-      if (!canWrite) return jsonErr("Du har ikke skrivetilgang til denne oppskriften", 403);
+      const { data: canWrite, error } = await userClient.rpc("can_write_recipe", { _recipe_id: id });
+      if (error) return jsonErr("Kunne ikke kontrollere tilgangen", 500, "access_check_failed");
+      if (!canWrite) return jsonErr("Du har ikke skrivetilgang til denne oppskriften", 403, "forbidden");
       recipeId = id;
-    } else {
-      const { data: canWrite } = await userClient.rpc("has_app_write_access", { p_app_code: "varer" });
-      if (!canWrite) return jsonErr("Du har ikke skrivetilgang i Varer", 403);
-      const { data: product } = await userClient
+    } else if (target === "product") {
+      const { data: canWrite, error: accessErr } = await userClient.rpc("has_app_write_access", {
+        p_app_code: "varer",
+      });
+      if (accessErr) return jsonErr("Kunne ikke kontrollere tilgangen", 500, "access_check_failed");
+      if (!canWrite) return jsonErr("Du har ikke skrivetilgang i Varer", 403, "forbidden");
+
+      const { data: product, error: prodErr } = await userClient
         .from("products")
         .select("id")
         .eq("id", id)
         .maybeSingle();
-      if (!product) return jsonErr("Fant ikke varen, eller du har ikke tilgang til den", 403);
-      const { data: link } = await userClient
+      if (prodErr) return jsonErr("Kunne ikke slå opp varen", 500, "lookup_failed");
+      if (!product) return jsonErr("Fant ikke varen, eller du har ikke tilgang til den", 403, "forbidden");
+
+      // Flere oppskriftskoblinger forekommer. Primærkoblingen velges bestemt,
+      // og de andre meldes fra om i stedet for å forsvinne i stillhet.
+      const { data: links, error: linkErr } = await userClient
         .from("product_recipe_links")
-        .select("recipe_id")
+        .select("recipe_id, is_primary, created_at")
         .eq("product_id", id)
-        .maybeSingle();
-      recipeId = link?.recipe_id ?? null;
+        .order("is_primary", { ascending: false })
+        .order("created_at", { ascending: true })
+        .limit(20);
+      if (linkErr) return jsonErr("Kunne ikke hente oppskriftskoblingen", 500, "lookup_failed");
+      const withRecipe = (links ?? []).filter((l) => (l as { recipe_id: string | null }).recipe_id);
+      recipeId = (withRecipe[0] as { recipe_id: string } | undefined)?.recipe_id ?? null;
+      if (withRecipe.length > 1) {
+        contextNotes.push(
+          `Varen har ${withRecipe.length} oppskriftskoblinger. Kontrollen bruker primærkoblingen; ingredienser fra de andre koblingene er ikke med i allergendataene.`,
+        );
+      }
     }
 
     // --- Oppsett og kvote ---
-    const { data: config } = await admin
+    const { data: config, error: configErr } = await admin
       .from("ai_provider_config")
-      .select("id, provider, model, encrypted_api_key, max_tokens")
+      .select("id, provider, model, encrypted_api_key")
       .eq("purpose", PURPOSE)
       .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
+    if (configErr) {
+      console.error("declaration-assistant: kunne ikke lese oppsettet");
+      return jsonErr("Kunne ikke lese AI-oppsettet. Ingen kontroll er kjørt.", 500, "config_read_failed");
+    }
     if (!config) return jsonErr("Deklarasjonsassistenten er ikke satt opp ennå", 409, "not_configured");
     if (!Deno.env.get("AI_CONFIG_ENCRYPTION_KEY")) {
       return jsonErr("Krypteringsnøkkelen mangler på serveren", 409, "encryption_missing");
     }
-    model = (DECLARATION_MODEL_ALLOWLIST as readonly string[]).includes(config.model)
-      ? config.model
-      : DECLARATION_MODEL_ALLOWLIST[0];
+    if (config.provider !== "openai") {
+      return jsonErr("Lagret leverandør støttes ikke av deklarasjonsassistenten", 409, "bad_provider");
+    }
+    if (!(DECLARATION_MODEL_ALLOWLIST as readonly string[]).includes(config.model)) {
+      // Ingen stille reservemodell: feil modell skal rettes i innstillingene.
+      return jsonErr(
+        "Lagret modell er ikke på den godkjente lista. Velg en godkjent modell i innstillingene.",
+        409,
+        "bad_model",
+      );
+    }
+    model = config.model;
 
-    const { data: settingsRow } = await admin
+    const { data: settingsRow, error: settingsErr } = await admin
       .from("platform_settings")
       .select("value")
       .eq("category", "varer_ai")
       .eq("key", "declaration_assistant")
       .maybeSingle();
+    if (settingsErr) {
+      return jsonErr("Kunne ikke lese innstillingene. Ingen kontroll er kjørt.", 500, "settings_read_failed");
+    }
     const settings = (settingsRow?.value ?? {}) as Record<string, unknown>;
-    const dailyCap = Number.isFinite(Number(settings.daily_cap)) ? Number(settings.daily_cap) : 25;
+    const rawCap = Number(settings.daily_cap);
+    const dailyCap = Number.isFinite(rawCap) ? Math.min(Math.max(Math.trunc(rawCap), 1), 500) : 25;
     const styleNotes = typeof settings.style_notes === "string" ? settings.style_notes.slice(0, 2000) : "";
+
+    // --- Kildekontekst hentes FØR kvoten brukes, slik at en ufullstendig
+    //     kontekst aldri koster et betalt kall ---
+    const verifiedAllergens: { code: string; evidence: string }[] = [];
+    const registeredContains: string[] = [];
+    const allergenContext: string[] = [];
+
+    if (recipeId) {
+      const {
+        data: lines,
+        error: lineErr,
+        count,
+      } = await userClient
+        .from("recipe_lines")
+        .select("raw_material_id, raw_materials(name, components_reviewed_at)", { count: "exact" })
+        .eq("recipe_id", recipeId)
+        .limit(MAX_CONTEXT_LINES);
+      if (lineErr) {
+        return jsonErr(
+          "Kunne ikke hente ingrediensene til kontrollen. Ingen kontroll er kjørt.",
+          500,
+          "context_failed",
+        );
+      }
+      if ((count ?? 0) > MAX_CONTEXT_LINES) {
+        return jsonErr(
+          `Oppskriften har ${count} linjer. Kontrollen kjører ikke på ufullstendig grunnlag (grense ${MAX_CONTEXT_LINES}).`,
+          400,
+          "context_too_large",
+        );
+      }
+
+      const names = new Map<string, { name: string; reviewed: boolean }>();
+      for (const l of lines ?? []) {
+        const row = l as {
+          raw_material_id: string | null;
+          raw_materials: { name: string; components_reviewed_at: string | null } | null;
+        };
+        if (row.raw_material_id && row.raw_materials?.name) {
+          names.set(row.raw_material_id, {
+            name: row.raw_materials.name,
+            reviewed: !!row.raw_materials.components_reviewed_at,
+          });
+        }
+      }
+      const rmIds = [...names.keys()];
+      if (rmIds.length) {
+        const { data: allergens, error: allergenErr } = await userClient
+          .from("raw_material_allergens")
+          .select("raw_material_id, allergen, presence")
+          .in("raw_material_id", rmIds);
+        if (allergenErr) {
+          return jsonErr(
+            "Kunne ikke hente allergendataene. Ingen kontroll er kjørt.",
+            500,
+            "context_failed",
+          );
+        }
+        for (const a of allergens ?? []) {
+          const row = a as { raw_material_id: string; allergen: string; presence: string };
+          const rm = names.get(row.raw_material_id);
+          const status = rm?.reviewed ? "gjennomgått" : "IKKE gjennomgått";
+          const line = `${rm?.name ?? "råvare"}: ${row.allergen} (${row.presence}, råvaredata ${status})`;
+          allergenContext.push(line);
+          verifiedAllergens.push({ code: row.allergen, evidence: line });
+          if (row.presence === "contains") registeredContains.push(row.allergen);
+        }
+      }
+      const unreviewed = [...names.values()].filter((n) => !n.reviewed).length;
+      if (unreviewed) {
+        contextNotes.push(
+          `${unreviewed} av råvarene er ikke gjennomgått. Allergendataene deres er registrert, men ikke kontrollert — de kan ikke regnes som bekreftet.`,
+        );
+      }
+    } else if (!selftest) {
+      contextNotes.push(
+        "Ingen oppskrift er koblet til. Kontrollen har ingen registrerte allergendata å sammenligne teksten med.",
+      );
+    }
+
+    // Deterministisk avvikskontroll — uavhengig av hva modellen måtte finne på.
+    const beforeLocal = formatDeclaration(draftText);
+    const metadataConflicts = compareTextAgainstMetadata(beforeLocal.allergenCodes, registeredContains);
 
     const { data: quota, error: quotaErr } = await admin.rpc("ai_declaration_quota_consume", {
       p_limit: dailyCap,
     });
-    if (quotaErr) return jsonErr("Kunne ikke kontrollere dagskvoten", 500);
+    if (quotaErr) return jsonErr("Kunne ikke kontrollere dagskvoten", 500, "quota_failed");
     const q = (quota ?? {}) as Record<string, unknown>;
     if (!q.allowed) {
       return jsonErr(
@@ -133,38 +310,6 @@ Deno.serve(async (req) => {
       );
     }
     usedQuota = true;
-
-    // --- Kildekontekst hentes på serveren med brukerens rekkevidde ---
-    const allergenContext: string[] = [];
-    if (recipeId) {
-      const { data: lines } = await userClient
-        .from("recipe_lines")
-        .select("raw_material_id, raw_materials(name)")
-        .eq("recipe_id", recipeId)
-        .limit(120);
-      const rmIds = (lines ?? [])
-        .map((l) => (l as { raw_material_id: string | null }).raw_material_id)
-        .filter((x): x is string => !!x);
-      if (rmIds.length) {
-        const { data: allergens } = await userClient
-          .from("raw_material_allergens")
-          .select("raw_material_id, allergen, presence")
-          .in("raw_material_id", rmIds.slice(0, 120));
-        const names = new Map<string, string>();
-        for (const l of lines ?? []) {
-          const row = l as { raw_material_id: string | null; raw_materials: { name: string } | null };
-          if (row.raw_material_id && row.raw_materials?.name) {
-            names.set(row.raw_material_id, row.raw_materials.name);
-          }
-        }
-        for (const a of allergens ?? []) {
-          const row = a as { raw_material_id: string; allergen: string; presence: string };
-          allergenContext.push(
-            `${names.get(row.raw_material_id) ?? "råvare"}: ${row.allergen} (${row.presence})`,
-          );
-        }
-      }
-    }
 
     // --- Kall til OpenAI (fast endepunkt, ingen verktøy, ingen lagring hos leverandør) ---
     const apiKey = await decryptWithKey(config.encrypted_api_key, "AI_CONFIG_ENCRYPTION_KEY");
@@ -178,9 +323,9 @@ Deno.serve(async (req) => {
       "Kontrollsum for kildeteksten som skal gjentas i svaret: " + fingerprint,
       "",
       allergenContext.length
-        ? "Registrerte allergendata på råvarene (fasit, skal ikke endres):\n" +
-          allergenContext.slice(0, 80).join("\n")
-        : "Ingen registrerte allergendata er tilgjengelig for denne oppskriften.",
+        ? "Registrerte allergendata på råvarene (kan være ufullstendige eller uriktige — ikke fasit, og skal ikke endres):\n" +
+          allergenContext.join("\n")
+        : "Ingen registrerte allergendata er tilgjengelig. Fravær av data betyr IKKE at allergenet ikke finnes.",
     ].join("\n");
 
     const instructions = styleNotes
@@ -189,9 +334,10 @@ Deno.serve(async (req) => {
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-    let res: Response;
+    let rawBody = "";
+    let status = 0;
     try {
-      res = await fetch("https://api.openai.com/v1/responses", {
+      const res = await fetch("https://api.openai.com/v1/responses", {
         method: "POST",
         signal: controller.signal,
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -211,40 +357,62 @@ Deno.serve(async (req) => {
           },
         }),
       });
+      status = res.status;
+      // Tidsavbruddet står på til kroppen faktisk er lest ferdig.
+      rawBody = await readBounded(res, MAX_RESPONSE_BYTES);
     } finally {
       clearTimeout(timer);
     }
 
-    const rawBody = await res.text();
-    if (!res.ok) {
-      // Leverandørfeil logges uten innhold og uten nøkkel.
-      console.error("declaration-assistant: leverandør svarte", res.status);
-      await logUsage(admin, {
-        model,
-        success: false,
-        input: null,
-        output: null,
-        error: `provider_${res.status}`,
-      });
+    if (status < 200 || status >= 300) {
+      console.error("declaration-assistant: leverandør svarte", status);
+      await logUsage(admin, { model, success: false, input: null, output: null, error: `provider_${status}` });
+      await finishTest(false, `provider_${status}`);
       const message =
-        res.status === 401
+        status === 401
           ? "OpenAI avviste nøkkelen. Kontroller oppsettet i innstillingene."
-          : res.status === 429
+          : status === 429
             ? "OpenAI er opptatt eller kvoten hos OpenAI er brukt opp. Prøv igjen senere."
             : "AI-tjenesten svarte ikke som forventet. Ingen endring er gjort.";
       return jsonErr(message, 502, "provider_error");
     }
 
-    const parsedResponse = JSON.parse(rawBody) as {
-      output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
+    let parsedResponse: {
+      output?: Array<{ content?: Array<{ type?: string; text?: string; refusal?: string }> }>;
       output_text?: string;
       status?: string;
-      incomplete_details?: { reason?: string };
       usage?: { input_tokens?: number; output_tokens?: number };
     };
-    if (parsedResponse.status === "incomplete") {
-      await logUsage(admin, { model, success: false, input: null, output: null, error: "incomplete" });
-      return jsonErr("Svaret fra modellen ble avkortet. Prøv med kortere tekst.", 502, "incomplete");
+    try {
+      parsedResponse = JSON.parse(rawBody);
+    } catch {
+      // Selve feilteksten logges ALDRI — den kan inneholde innhold fra svaret.
+      await logUsage(admin, { model, success: false, input: null, output: null, error: "provider_body_unreadable" });
+      await finishTest(false, "provider_body_unreadable");
+      return jsonErr("Svaret fra AI-tjenesten kunne ikke leses. Ingen endring er gjort.", 502, "malformed");
+    }
+
+    if (parsedResponse.status && parsedResponse.status !== "completed") {
+      const code = parsedResponse.status === "incomplete" ? "incomplete" : "not_completed";
+      await logUsage(admin, { model, success: false, input: null, output: null, error: code });
+      await finishTest(false, code);
+      return jsonErr(
+        parsedResponse.status === "incomplete"
+          ? "Svaret fra modellen ble avkortet. Prøv med kortere tekst."
+          : "Modellen fullførte ikke svaret. Ingen endring er gjort.",
+        502,
+        code,
+      );
+    }
+
+    for (const item of parsedResponse.output ?? []) {
+      for (const c of item.content ?? []) {
+        if (c.type === "refusal") {
+          await logUsage(admin, { model, success: false, input: null, output: null, error: "refusal" });
+          await finishTest(false, "refusal");
+          return jsonErr("Modellen avviste forespørselen. Ingen endring er gjort.", 502, "refusal");
+        }
+      }
     }
 
     let text = parsedResponse.output_text ?? "";
@@ -257,20 +425,26 @@ Deno.serve(async (req) => {
     }
     if (!text.trim()) {
       await logUsage(admin, { model, success: false, input: null, output: null, error: "empty" });
+      await finishTest(false, "empty_output");
       return jsonErr("Modellen svarte uten innhold. Ingen endring er gjort.", 502, "empty_output");
     }
 
     let output;
     try {
-      output = parseAssistantOutput(JSON.parse(text));
+      output = parseAssistantOutput(JSON.parse(text), { expectedFingerprint: fingerprint });
     } catch {
-      await logUsage(admin, { model, success: false, input: null, output: null, error: "malformed" });
-      return jsonErr("Svaret fra modellen kunne ikke leses. Ingen endring er gjort.", 502, "malformed");
+      await logUsage(admin, { model, success: false, input: null, output: null, error: "schema_rejected" });
+      await finishTest(false, "schema_rejected");
+      return jsonErr(
+        "Svaret fra modellen var ikke på avtalt form og ble forkastet. Ingen endring er gjort.",
+        502,
+        "malformed",
+      );
     }
 
     const validation = validateProposals(draftText, output.proposals);
     const formatted = formatDeclaration(validation.appliedText);
-    const before = formatDeclaration(draftText);
+    const findings = substantiateFindings(output.allergen_findings, verifiedAllergens);
 
     await logUsage(admin, {
       model,
@@ -279,25 +453,36 @@ Deno.serve(async (req) => {
       output: parsedResponse.usage?.output_tokens ?? null,
       error: null,
     });
+    await finishTest(true, "ok");
 
     return json({
       instruction_version: DECLARATION_INSTRUCTION_VERSION,
       model,
+      selftest,
       source_fingerprint: fingerprint,
-      before: { markerText: before.markerText, issues: before.issues, allergenCodes: before.allergenCodes },
+      context_notes: contextNotes,
+      metadata_conflicts: metadataConflicts,
+      before: {
+        markerText: beforeLocal.markerText,
+        issues: beforeLocal.issues,
+        allergenCodes: beforeLocal.allergenCodes,
+        blocked: beforeLocal.blocked,
+      },
       suggestion: {
         markerText: formatted.markerText,
         plainText: formatted.plainText,
         segments: formatted.segments,
         issues: formatted.issues,
         allergenCodes: formatted.allergenCodes,
+        blocked: formatted.blocked,
       },
       accepted: validation.accepted,
       rejected: validation.rejected,
       blocking: validation.blocking,
-      findings: output.allergen_findings,
+      findings,
       questions: [
         ...output.questions,
+        ...metadataConflicts.map((c) => ({ question: c.message, severity: "warning" as const })),
         ...validation.rejected.map((r) => ({
           question: `Ikke brukt automatisk (${r.reason}): «${r.proposal.original}» → «${r.proposal.suggested}». ${r.proposal.reason}`,
           severity: "warning" as const,
@@ -306,15 +491,25 @@ Deno.serve(async (req) => {
       quota: { used: q.used, limit: q.limit },
     });
   } catch (e) {
-    const message = (e as Error)?.name === "AbortError"
-      ? "AI-kontrollen tok for lang tid og ble avbrutt."
-      : "Uventet feil i AI-kontrollen.";
-    console.error("declaration-assistant feilet", (e as Error).message);
+    const aborted = (e as Error)?.name === "AbortError";
+    const tooLarge = (e as Error)?.message === "response_too_large";
+    const code = aborted ? "timeout" : tooLarge ? "response_too_large" : "exception";
+    // Bare koden logges — aldri meldingsteksten, som kan inneholde innhold.
+    console.error("declaration-assistant feilet:", code, DECLARATION_INSTRUCTION_VERSION);
     if (usedQuota) {
       // Kvoten er bevisst IKKE tilbakeført: også mislykkede kall koster hos leverandøren.
-      await logUsage(admin, { model, success: false, input: null, output: null, error: "exception" });
+      await logUsage(admin, { model, success: false, input: null, output: null, error: code });
     }
-    return jsonErr(message, 500);
+    await finishTest(false, code);
+    return jsonErr(
+      aborted
+        ? "AI-kontrollen tok for lang tid og ble avbrutt."
+        : tooLarge
+          ? "Svaret fra AI-tjenesten var uventet stort og ble forkastet."
+          : "Uventet feil i AI-kontrollen.",
+      500,
+      code,
+    );
   }
 });
 
@@ -329,6 +524,8 @@ async function logUsage(
   },
 ) {
   // Kun metadata — aldri deklarasjonstekst, prompt eller nøkkel.
+  // ai_usage_log har ingen kolonne for instruksjonsversjon; den følger derfor
+  // feilkoden ved feil, og er ellers dokumentert i docs/deklarasjonsassistent.md.
   try {
     await admin.from("ai_usage_log").insert({
       provider: "openai",
@@ -337,9 +534,9 @@ async function logUsage(
       input_tokens: p.input,
       output_tokens: p.output,
       success: p.success,
-      error_message: p.error,
+      error_message: p.error ? `${p.error}|${DECLARATION_INSTRUCTION_VERSION}` : null,
     });
-  } catch (e) {
-    console.error("kunne ikke logge AI-bruk", (e as Error).message);
+  } catch {
+    console.error("kunne ikke logge AI-bruk");
   }
 }

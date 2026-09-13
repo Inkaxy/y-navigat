@@ -1,5 +1,5 @@
-// DENNE FILEN ER BYTE-IDENTISK MED src/varer/lib/declarationFormat.ts.
-// Endres den ene, må den andre endres likt — en vitest sammenligner filene.
+// DENNE MODULEN FINNES I TO BYTE-IDENTISKE KOPIER: src/varer/lib/declarationFormat.ts
+// og supabase/functions/_shared/declaration-format.ts. En vitest sammenligner filene.
 //
 // DETERMINISTISK FORMATERING AV INGREDIENSDEKLARASJON
 // ---------------------------------------------------------------------------
@@ -16,6 +16,9 @@
 //
 // VIKTIG: motoren gir formateringshjelp og kontrollpunkter. Den avgjør ikke om
 // en etikett er lovlig — det er alltid en faglig vurdering hos bruker.
+//
+// MOTOREN GJETTER ALDRI KILDE. Generiske ord («mel», «malt», «semule»,
+// «stivelse», «nøtter», «gluten») gir kontrollpunkt, ikke et kornslag.
 
 export type DeclarationSeverity = "info" | "warning" | "critical";
 
@@ -30,6 +33,11 @@ export interface DeclarationIssue {
   message: string;
   /** Ordet/uttrykket i teksten som utløste punktet. */
   term?: string;
+  /**
+   * Sant når punktet må avklares av et menneske FØR teksten kan brukes
+   * automatisk (uavklart unntak eller uavklart terskel).
+   */
+  blocksAutoApply?: boolean;
 }
 
 export interface FormattedDeclaration {
@@ -47,8 +55,31 @@ export interface FormattedDeclaration {
   allergenCodes: string[];
   /** Kontrollpunkter — aldri en garanti for at etiketten er lovlig. */
   issues: DeclarationIssue[];
+  /** Punktene som må avklares før teksten kan brukes automatisk. */
+  requiresConfirmation: DeclarationIssue[];
+  /** Sant når minst ett punkt sperrer automatisk bruk. */
+  blocked: boolean;
   /** Sant når teksten allerede var på ønsket form. */
   unchanged: boolean;
+}
+
+/**
+ * Opplysninger motoren IKKE kan lese ut av teksten selv. Uten svar forblir
+ * spørsmålet uavklart, og teksten kan ikke brukes automatisk.
+ */
+export interface DeclarationContext {
+  /**
+   * Bekreftet fra leverandør at soyaolje/-fett er HELRAFFINERT (vedlegg II,
+   * unntak). true = unntaket gjelder, false = soya skal framheves,
+   * undefined = uavklart.
+   */
+  refinedSoyFullyRefined?: boolean;
+  /**
+   * Bekreftet nivå av sulfitt/svoveldioksid i ferdigvaren.
+   * true = over 10 mg/kg (skal merkes), false = under grensen,
+   * undefined = uavklart.
+   */
+  sulphitesAboveThreshold?: boolean;
 }
 
 /** Kjente allergener med det norske ordet som skal framheves. */
@@ -65,14 +96,13 @@ interface AllergenTerm {
 }
 
 const ALLERGEN_TERMS: AllergenTerm[] = [
-  // Glutenholdig korn
+  // Glutenholdig korn. «malt» og «semule» står bevisst IKKE her: de sier ikke
+  // hvilket korn kilden er, og motoren skal ikke gjette (se AMBIGUOUS_TERMS).
   { code: "gluten_wheat", term: "hvete" },
   { code: "gluten_wheat", term: "durum" },
-  { code: "gluten_wheat", term: "semule" },
   { code: "gluten_spelt", term: "spelt" },
   { code: "gluten_rye", term: "rug" },
   { code: "gluten_barley", term: "bygg", notFollowedBy: ["e", "et", "ing"] },
-  { code: "gluten_barley", term: "malt" },
   { code: "gluten_oats", term: "havre" },
   // Melk og egg
   {
@@ -124,6 +154,9 @@ const ALLERGEN_TERMS: AllergenTerm[] = [
   { code: "sulphites", term: "svoveldioksid" },
 ];
 
+/** Ord der soyaunntaket for helraffinert olje/fett kan være aktuelt. */
+const REFINED_SOY_WORDS = ["soyaolje", "soyafett", "soyaoljen"];
+
 /**
  * Kjente ingrediensord i NBhubs standardform: små bokstaver.
  * Ord som IKKE står her blir aldri endret — merkenavn, enheter og E-numre
@@ -135,7 +168,7 @@ const KNOWN_WORD_LIST = [
   "rug", "rugmel", "rugsikt", "rugkli",
   "havre", "havremel", "havregryn", "havrekli",
   "bygg", "byggmel", "byggmalt", "malt", "maltekstrakt",
-  "spelt", "speltmel", "durum", "durumhvete", "semulegryn",
+  "spelt", "speltmel", "durum", "durumhvete", "semule", "semulegryn",
   "vann", "salt", "gjær", "sukker", "surdeig", "vegetabilsk", "olje", "rapsolje",
   "solsikkeolje", "solsikkefrø", "linfrø", "sesamfrø", "sesam", "gresskarkjerner",
   "melk", "kulturmelk", "helmelk", "skummetmelk", "melkepulver", "melkesyre",
@@ -156,6 +189,18 @@ const AMBIGUOUS_TERMS: { pattern: RegExp; code: string; message: string }[] = [
     code: "ambiguous_flour",
     message:
       "«mel» uten kornslag: kilden må stå i teksten (f.eks. «hvetemel»). Motoren gjetter ikke kornslag.",
+  },
+  {
+    pattern: /(^|[^\p{L}])malt(ekstrakt|mel|sirup)?([^\p{L}]|$)/iu,
+    code: "ambiguous_malt",
+    message:
+      "«malt» uten kornslag: malt lages oftest av bygg, men kan også være hvete eller rug. Kornet må stå i teksten (f.eks. «byggmalt») — motoren gjetter ikke kilden.",
+  },
+  {
+    pattern: /(^|[^\p{L}])semule(gryn)?([^\p{L}]|$)/iu,
+    code: "ambiguous_semolina",
+    message:
+      "«semule/semulegryn» sier ikke hvilket korn kilden er. Er det durumhvete, skal hvete stå i teksten — motoren legger det ikke til selv.",
   },
   {
     pattern: /(^|[^\p{L}])nøtter([^\p{L}]|$)/iu,
@@ -204,10 +249,13 @@ export function parseDeclarationInput(input: string | null | undefined): Declara
   const raw = String(input ?? "");
   if (!raw) return [];
   let text = raw.replace(/<(script|style)[\s\S]*?<\/\1>/gi, "");
-  text = text.replace(/<\/?(b|em|i)\s*>/gi, (m) => (m.startsWith("</") ? "</strong>" : "<strong>"));
-  text = text.replace(/<br\s*\/?>/gi, " ");
-  text = text.replace(/<\/?p[^>]*>/gi, " ");
-  text = text.replace(/<(?!\/?strong\s*>)[^>]*>/gi, "");
+  // Kjente tagger normaliseres uansett skrivemåte: <STRONG>, <B >, </Em>.
+  text = text.replace(/<\s*(\/?)\s*(strong|b|em|i)\s*>/gi, (_m, slash: string) =>
+    slash ? "</strong>" : "<strong>",
+  );
+  text = text.replace(/<\s*br\s*\/?\s*>/gi, " ");
+  text = text.replace(/<\s*\/?\s*p[^>]*>/gi, " ");
+  text = text.replace(/<(?!\/?strong>)[^>]*>/g, "");
   text = text.replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&");
 
   const segments: DeclarationSegment[] = [];
@@ -264,8 +312,20 @@ function canonicalizeWords(text: string): string {
   });
 }
 
+/** Hele ordet et treff ligger inni, i små bokstaver. */
+function wordAround(text: string, start: number, end: number): string {
+  const head = text.slice(0, start).match(/\p{L}+$/u);
+  const tail = text.slice(end).match(/^\p{L}+/u);
+  return ((head?.[0] ?? "") + text.slice(start, end) + (tail?.[0] ?? "")).toLocaleLowerCase("nb-NO");
+}
+
 /** Deler ett segment i deler der allergenordene er uthevet. */
-function boldAllergensInText(text: string, found: Set<string>): DeclarationSegment[] {
+function boldAllergensInText(
+  text: string,
+  found: Set<string>,
+  ctx: DeclarationContext,
+  notes: Set<string>,
+): DeclarationSegment[] {
   interface Hit { start: number; end: number }
   const hits: Hit[] = [];
 
@@ -280,15 +340,26 @@ function boldAllergensInText(text: string, found: Set<string>): DeclarationSegme
       // allergenordet står sist, f.eks. «kulturmelk».
       const before = text[start - 1];
       if (before && /\p{L}/u.test(before)) {
-        const wordStart = text.slice(0, start).search(/\p{L}+$/u);
-        const tail = text.slice(end).match(/^\p{L}+/u);
-        const fullWord = text
-          .slice(wordStart < 0 ? start : wordStart, end + (tail ? tail[0].length : 0))
-          .toLocaleLowerCase("nb-NO");
+        const fullWord = wordAround(text, start, end);
         if (!entry.compoundWords?.includes(fullWord)) continue;
       }
       const after = text.slice(end);
       if (entry.notFollowedBy?.some((s) => after.toLocaleLowerCase("nb-NO").startsWith(s))) continue;
+
+      // Unntaket for helraffinert soyaolje gjelder BARE når det er bekreftet.
+      if (entry.code === "soybeans") {
+        const fullWord = wordAround(text, start, end);
+        if (REFINED_SOY_WORDS.includes(fullWord)) {
+          if (ctx.refinedSoyFullyRefined === true) {
+            notes.add("soy_refined_confirmed");
+            continue;
+          }
+          notes.add(
+            ctx.refinedSoyFullyRefined === false ? "soy_not_refined" : "soy_refined_unresolved",
+          );
+        }
+      }
+
       hits.push({ start, end });
       found.add(entry.code);
     }
@@ -309,9 +380,37 @@ function boldAllergensInText(text: string, found: Set<string>): DeclarationSegme
   return out;
 }
 
-function collectIssues(plain: string, codes: Set<string>): DeclarationIssue[] {
+/**
+ * Deler teksten i ingredienser på toppnivå. Komma inne i parentes hører til
+ * ingrediensen foran, slik at «speltmel (hvete), vann» blir to enheter.
+ */
+export function splitIngredientItems(text: string): string[] {
+  const items: string[] = [];
+  let depth = 0;
+  let buffer = "";
+  for (const ch of text) {
+    if (ch === "(" || ch === "[") depth++;
+    else if (ch === ")" || ch === "]") depth = Math.max(0, depth - 1);
+    if ((ch === "," || ch === ";") && depth === 0) {
+      items.push(buffer);
+      buffer = "";
+      continue;
+    }
+    buffer += ch;
+  }
+  items.push(buffer);
+  return items.filter((s) => s.trim());
+}
+
+function collectIssues(
+  plain: string,
+  codes: Set<string>,
+  ctx: DeclarationContext,
+  notes: Set<string>,
+): DeclarationIssue[] {
   const issues: DeclarationIssue[] = [];
   const lower = plain.toLocaleLowerCase("nb-NO");
+  const items = splitIngredientItems(plain);
 
   for (const a of AMBIGUOUS_TERMS) {
     if (a.pattern.test(plain)) {
@@ -319,23 +418,28 @@ function collectIssues(plain: string, codes: Set<string>): DeclarationIssue[] {
     }
   }
 
-  if (/(^|[^\p{L}])spelt/iu.test(plain) && !/hvete/i.test(plain)) {
+  // Hvetetilhørighet må stå på SAMME ingrediens — «speltmel, hvetemel» er ikke nok.
+  const speltItems = items.filter((i) => /(^|[^\p{L}])spelt/iu.test(i) && !/hvete/i.test(i));
+  if (speltItems.length) {
     issues.push({
       code: "spelt_is_wheat",
       severity: "warning",
       term: "spelt",
       message:
-        "Spelt er en hvetesort. Vurder å vise hvetetilhørigheten, f.eks. «speltmel (hvete)».",
+        "Spelt er en hvetesort. Hvetetilhørigheten må stå på samme ingrediens, f.eks. «speltmel (hvete)» — at hvete nevnes et annet sted i lista er ikke nok.",
     });
   }
-  if (/durum/i.test(plain) && !/hvete/i.test(plain)) {
+  const durumItems = items.filter((i) => /durum/i.test(i) && !/hvete/i.test(i));
+  if (durumItems.length) {
     issues.push({
       code: "durum_is_wheat",
       severity: "warning",
       term: "durum",
-      message: "Durum er hvete. Vurder «durumhvete» eller «durum (hvete)».",
+      message:
+        "Durum er hvete. Skriv «durumhvete» eller «durum (hvete)» på samme ingrediens — hvete nevnt lenger ned i lista teller ikke.",
     });
   }
+
   if (/melkesyre/i.test(plain)) {
     issues.push({
       code: "lactic_acid_not_milk",
@@ -353,23 +457,63 @@ function collectIssues(plain: string, codes: Set<string>): DeclarationIssue[] {
         "Kokos er ikke en nøtt i vedlegg II, og «kokosmelk» er ikke melk. Ingen utheving er lagt til.",
     });
   }
-  if (/raffinert\s+soya/i.test(plain) || /soyaolje/i.test(plain)) {
+
+  // Soya: unntaket for helraffinert olje krever bekreftelse fra leverandør.
+  if (notes.has("soy_refined_confirmed")) {
     issues.push({
-      code: "soy_refined_exemption",
+      code: "soy_refined_exempt",
       severity: "info",
       term: "soyaolje",
       message:
-        "Helraffinert soyaolje/-fett er unntatt i vedlegg II. Unntaket gjelder bare hvis leverandøren bekrefter at oljen er helraffinert — ellers skal soya utheves.",
+        "Helraffinert soyaolje/-fett er registrert som bekreftet og er derfor ikke uthevet (unntak i vedlegg II).",
     });
   }
-  if (codes.has("sulphites") || SULPHITE_E_NUMBERS.test(plain)) {
+  if (notes.has("soy_not_refined")) {
     issues.push({
-      code: "sulphite_threshold",
-      severity: "info",
-      term: "sulfitt",
+      code: "soy_not_refined",
+      severity: "warning",
+      term: "soyaolje",
       message:
-        "Svoveldioksid og sulfitt skal merkes ved mer enn 10 mg/kg eller 10 mg/l i ferdigvaren. Kontroller nivået mot datablad.",
+        "Soyaoljen er registrert som ikke helraffinert. Soya er derfor uthevet som allergen.",
     });
+  }
+  if (notes.has("soy_refined_unresolved")) {
+    issues.push({
+      code: "soy_refined_unresolved",
+      severity: "warning",
+      term: "soyaolje",
+      blocksAutoApply: true,
+      message:
+        "Uavklart: unntaket for helraffinert soyaolje gjelder bare når leverandøren har bekreftet at oljen er helraffinert. Til det er avklart holdes soya uthevet, og teksten kan ikke brukes automatisk.",
+    });
+  }
+
+  if (codes.has("sulphites") || SULPHITE_E_NUMBERS.test(plain)) {
+    if (ctx.sulphitesAboveThreshold === true) {
+      issues.push({
+        code: "sulphite_above_threshold",
+        severity: "info",
+        term: "sulfitt",
+        message: "Registrert over 10 mg/kg (10 mg/l): sulfitt/svoveldioksid skal merkes og er uthevet.",
+      });
+    } else if (ctx.sulphitesAboveThreshold === false) {
+      issues.push({
+        code: "sulphite_below_threshold",
+        severity: "info",
+        term: "sulfitt",
+        message:
+          "Registrert under 10 mg/kg (10 mg/l). Da er merkeplikten ikke utløst — vurder faglig om ordet likevel skal stå.",
+      });
+    } else {
+      issues.push({
+        code: "sulphite_threshold_unresolved",
+        severity: "warning",
+        term: "sulfitt",
+        blocksAutoApply: true,
+        message:
+          "Uavklart: sulfitt/svoveldioksid skal merkes over 10 mg/kg eller 10 mg/l i ferdigvaren. Nivået er ikke registrert, så teksten kan ikke brukes automatisk før det er kontrollert mot datablad.",
+      });
+    }
   }
   return issues;
 }
@@ -377,6 +521,8 @@ function collectIssues(plain: string, codes: Set<string>): DeclarationIssue[] {
 export interface FormatOptions {
   /** Slå av standardisering av ordform (bare utheving kjøres). */
   canonicalizeKnownWords?: boolean;
+  /** Opplysninger motoren ikke kan lese ut av teksten. */
+  context?: DeclarationContext;
 }
 
 /** Hovedinngangen: gjør en råtekst om til NBhubs standardform. */
@@ -386,8 +532,10 @@ export function formatDeclaration(
 ): FormattedDeclaration {
   const original = String(input ?? "");
   const canonicalize = options.canonicalizeKnownWords !== false;
+  const ctx = options.context ?? {};
   const parsed = parseDeclarationInput(original);
   const codes = new Set<string>();
+  const notes = new Set<string>();
 
   const segments: DeclarationSegment[] = [];
   for (const seg of parsed) {
@@ -395,16 +543,31 @@ export function formatDeclaration(
     if (seg.bold) {
       // Allerede uthevet tekst beholdes uthevet.
       segments.push({ text, bold: true });
-      boldAllergensInText(text, codes);
+      boldAllergensInText(text, codes, ctx, notes);
       continue;
     }
-    for (const part of boldAllergensInText(text, codes)) segments.push(part);
+    for (const part of boldAllergensInText(text, codes, ctx, notes)) segments.push(part);
   }
 
   const merged = mergeSegments(segments);
   const plainText = merged.map((s) => s.text).join("");
-  const issues = collectIssues(plainText, codes);
+  const issues = collectIssues(plainText, codes, ctx, notes);
+
+  // Er ALT uthevet, skiller ingenting allergenet fra resten av lista.
+  const hasText = merged.some((s) => s.text.trim());
+  const everythingBold = hasText && merged.every((s) => s.bold || !s.text.trim());
+  if (everythingBold) {
+    issues.unshift({
+      code: "bold_whole_list",
+      severity: "warning",
+      blocksAutoApply: true,
+      message:
+        "Hele ingredienslista er uthevet. Da skiller ingenting allergenene fra de andre ingrediensene (art. 21). Fjern uthevingen på det som ikke er allergen.",
+    });
+  }
+
   const markerText = segmentsToMarkerText(merged);
+  const requiresConfirmation = issues.filter((i) => i.blocksAutoApply);
 
   return {
     original,
@@ -414,6 +577,8 @@ export function formatDeclaration(
     plainText,
     allergenCodes: Array.from(codes).sort(),
     issues,
+    requiresConfirmation,
+    blocked: requiresConfirmation.length > 0,
     unchanged: original.trim() === markerText.trim(),
   };
 }
@@ -433,4 +598,80 @@ export function segmentsToHtml(segments: DeclarationSegment[]): string {
 /** Ren tekst for utskrift uten uthevingsstøtte. */
 export function segmentsToPlainText(segments: DeclarationSegment[]): string {
   return segments.map((s) => s.text).join("");
+}
+
+/**
+ * Gjør HTML eller ren tekst om til *stjernetekst* UTEN å endre ordform eller
+ * legge til utheving. Brukes der lagret tekst skal videre til forhåndsvisning,
+ * PDF og utskrift med uthevingen i behold.
+ */
+export function htmlToMarkerText(input: string | null | undefined): string {
+  return segmentsToMarkerText(parseDeclarationInput(input));
+}
+
+/** Kobling mellom motorens koder og allergennavnene som er registrert på råvarene. */
+export const DECLARATION_CODE_TO_ALLERGEN: Record<string, string> = {
+  gluten_wheat: "hvete",
+  gluten_spelt: "spelt",
+  gluten_rye: "rug",
+  gluten_barley: "bygg",
+  gluten_oats: "havre",
+  milk: "melk",
+  eggs: "egg",
+  peanuts: "peanøtter",
+  soybeans: "soya",
+  sesame: "sesam",
+  celery: "selleri",
+  mustard: "sennep",
+  lupin: "lupin",
+  fish: "fisk",
+  crustaceans: "krepsdyr",
+  molluscs: "bløtdyr",
+  sulphites: "svoveldioksid",
+};
+
+export interface MetadataConflict {
+  allergen: string;
+  direction: "text_only" | "metadata_only";
+  message: string;
+}
+
+/**
+ * Deterministisk sammenligning mellom teksten og de registrerte allergendataene.
+ * Dette kjøres uavhengig av modellen, slik at et avvik aldri er avhengig av at
+ * modellen husket å nevne det.
+ */
+export function compareTextAgainstMetadata(
+  textAllergenCodes: readonly string[],
+  registeredAllergens: readonly string[],
+): MetadataConflict[] {
+  const inText = new Set<string>();
+  for (const code of textAllergenCodes) {
+    const name = DECLARATION_CODE_TO_ALLERGEN[code];
+    if (name) inText.add(name);
+  }
+  const registered = new Set(
+    registeredAllergens.map((a) => a.toLocaleLowerCase("nb-NO").trim()).filter(Boolean),
+  );
+
+  const out: MetadataConflict[] = [];
+  for (const name of inText) {
+    if (!registered.has(name)) {
+      out.push({
+        allergen: name,
+        direction: "text_only",
+        message: `Teksten nevner ${name}, men ${name} er ikke registrert som allergen på råvarene. Enten mangler teksten dekning, eller så mangler råvaredataene.`,
+      });
+    }
+  }
+  for (const name of registered) {
+    if (!inText.has(name) && Object.values(DECLARATION_CODE_TO_ALLERGEN).includes(name)) {
+      out.push({
+        allergen: name,
+        direction: "metadata_only",
+        message: `${name} er registrert som allergen på råvarene, men er ikke framhevet i teksten. Kontroller om ingrediensen mangler i deklarasjonen.`,
+      });
+    }
+  }
+  return out.sort((a, b) => a.allergen.localeCompare(b.allergen, "nb-NO"));
 }

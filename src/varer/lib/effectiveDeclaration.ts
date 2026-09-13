@@ -14,6 +14,8 @@
  * `_shared/effective-declaration.ts`).
  */
 
+import { htmlToMarkerText } from "@/varer/lib/declarationFormat";
+
 export type DeclarationMode = "auto" | "manual" | "auto_with_overrides";
 
 export const NUTRITION_KEYS = [
@@ -56,6 +58,15 @@ export interface EffectiveDeclaration {
 export interface AllergenSummary {
   contains: string[];
   may_contain: string[];
+}
+
+/**
+ * Gjør lagret HTML om til markertekst (**uthevet**), slik at allergen-utheving
+ * overlever hele veien til forhåndsvisning, PDF og utskrift. Tidligere ble
+ * `<strong>` fjernet her, og etiketten mistet den lovpålagte uthevingen.
+ */
+export function declarationDisplayText(html: string | null | undefined): string {
+  return htmlToMarkerText(html).trim();
 }
 
 /** Fjerner HTML-koder og normaliserer mellomrom. */
@@ -160,7 +171,7 @@ export function buildEffectiveDeclaration(
     return {
       mode,
       source: useLink ? "link_manual" : "recipe_manual",
-      ingredientText: stripHtml(src?.manual_ingredient_declaration) || null,
+      ingredientText: declarationDisplayText(src?.manual_ingredient_declaration) || null,
       contains: allergens.contains,
       mayContain: allergens.may_contain,
       nutrition: pickNutrition(src?.manual_nutrition),
@@ -174,7 +185,7 @@ export function buildEffectiveDeclaration(
   return {
     mode,
     source: "calculated",
-    ingredientText: stripHtml(calculated?.ingredient_declaration) || null,
+    ingredientText: declarationDisplayText(calculated?.ingredient_declaration) || null,
     contains: calculated?.allergens?.contains ?? [],
     mayContain: calculated?.allergens?.may_contain ?? [],
     // Under 90 % dekning skal næringstabellen ikke ut på emballasje.

@@ -1,7 +1,9 @@
 import { NUTRITION_FIELDS as NUTRITION_FIELD_CATALOG } from "@/varer/lib/nutritionFields";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { htmlToMarkerText } from "@/varer/lib/declarationFormat";
 import DOMPurify from "dompurify";
+import { DeclarationAssistantPanel } from "@/varer/components/declaration/DeclarationAssistantPanel";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -331,8 +333,17 @@ function DeclarationView({ link, productName, canWrite, qc }: { link: any; produ
                       value={manualIngredient}
                       disabled={!canWrite}
                       onChange={(e) => setManualIngredient(e.target.value)}
-                      placeholder="Hvete<strong>mel</strong>, vann, salt …"
+                      placeholder="HVETEMEL, vann, salt — allergener skal utheves"
                     />
+                    <div className="mt-2">
+                      <DeclarationAssistantPanel
+                        target="product"
+                        targetId={link.product_id}
+                        value={manualIngredient}
+                        canWrite={canWrite}
+                        onApply={(markerText) => setManualIngredient(markerText)}
+                      />
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -539,11 +550,9 @@ function DataQualityBanner({ computed }: { computed: ComputedDeclaration }) {
 }
 
 function PreviewDialog({ open, onClose, productName, computed }: { open: boolean; onClose: () => void; productName: string; computed: ComputedDeclaration }) {
+  /** Uthevede allergener beholdes som **markering** når teksten kopieres. */
   function plainText(): string {
-    const html = computed.ingredient_declaration_html || "";
-    const tmp = document.createElement("div");
-    tmp.innerHTML = html;
-    const text = tmp.textContent || "";
+    const text = htmlToMarkerText(computed.ingredient_declaration_html || "");
     const lines: string[] = [];
     lines.push(productName);
     lines.push("");
@@ -563,7 +572,15 @@ function PreviewDialog({ open, onClose, productName, computed }: { open: boolean
   function copyText() { navigator.clipboard.writeText(plainText()); toast.success("Kopiert til utklippstavle"); }
   function printNow() {
     // Ingen document.write: vi bygger et blob-dokument og åpner det.
-    const html = `<!doctype html><html lang="nb"><head><meta charset="utf-8"><title>Deklarasjon</title></head><body><pre style="font-family:Inter,system-ui;font-size:12px;white-space:pre-wrap;padding:16px">${plainText().replace(/</g, "&lt;")}</pre></body></html>`;
+    // Utskriften må vise allergenene uthevet, ellers er etiketten ikke i tråd
+    // med 1169/2011. Derfor skrives ingredienslinja som renset HTML, ikke som
+    // ren tekst slik den gjorde før.
+    const ingredientHtml = DOMPurify.sanitize(computed.ingredient_declaration_html || "—", {
+      ALLOWED_TAGS: ["strong", "b", "em", "i", "br"],
+      ALLOWED_ATTR: [],
+    });
+    const rest = plainText().split("\n").slice(3).join("\n").replace(/</g, "&lt;");
+    const html = `<!doctype html><html lang="nb"><head><meta charset="utf-8"><title>Deklarasjon</title></head><body style="font-family:Inter,system-ui;font-size:12px;padding:16px"><p style="font-weight:600">${productName.replace(/</g, "&lt;")}</p><p>Ingredienser: ${ingredientHtml}</p><pre style="font-family:inherit;font-size:12px;white-space:pre-wrap;margin:0">${rest}</pre></body></html>`;
     const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
     const w = window.open(url, "_blank", "width=600,height=800");
     if (!w) {

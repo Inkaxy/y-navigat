@@ -148,7 +148,7 @@ export function ManualDeclarationEditor({
               // Behandle helt tom editor som tom streng
               setIngredient(html === "<p></p>" ? "" : html);
             }}
-            placeholder="Hvetemel, vann, salt, gjær, …"
+            placeholder="HVETEMEL, vann, salt, gjær — allergener skal utheves"
           />
           <p className="text-xs text-muted-foreground">
             Marker allergener og bruk verktøylinjen for fet skrift, kursiv, lister m.m. — ingen HTML-koder nødvendig.

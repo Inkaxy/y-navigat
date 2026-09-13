@@ -4,7 +4,11 @@
 // under disse reglene og kan ikke overstyre dem — verken teksten her eller den
 // deterministiske kontrollen i declaration-proposal.ts.
 
-export const DECLARATION_INSTRUCTION_VERSION = "decl-assistant-2026-09-13.1";
+export const DECLARATION_INSTRUCTION_VERSION = "decl-assistant-2026-09-13.2";
+
+/** Fast, syntetisk tekst for «Test tilkobling». Inneholder ingen forretningsdata. */
+export const DECLARATION_SELFTEST_DRAFT =
+  "HVETEMEL, vann, SUKKER 5,0 %, emulgator (E322), salt";
 
 export const DECLARATION_CORE_INSTRUCTIONS = `
 Du er en fagkontrollør for ingredienslister på norske bakerivarer.
@@ -32,7 +36,10 @@ FAGLIG BAKGRUNN (til vurdering av funn):
 - Spelt og durum er hvete. Melkesyre er ikke melk. Kokos er ikke en nøtt, og kokosmelk er ikke melk.
 - Helraffinert soyaolje er unntatt i vedlegg II, men bare når det er bekreftet at oljen er helraffinert.
 - Sulfitt/svoveldioksid merkes over 10 mg/kg eller 10 mg/l.
-- Generiske ord som «mel», «nøtter», «stivelse» eller «gluten» skal ha kilden navngitt.
+- Generiske ord som «mel», «malt», «semule», «nøtter», «stivelse» eller «gluten» skal ha
+  kilden navngitt. Malt er ofte bygg, men ikke alltid — det er et spørsmål, ikke et faktum.
+- Registrerte allergendata som følger med er IKKE fasit. De kan være ufullstendige eller
+  gjelde råvarer som ikke er gjennomgått. Manglende data betyr ikke at allergenet ikke finnes.
 
 EKSEMPLER
 Inndata: "HVETEMEL, VANN, SALT"
@@ -43,6 +50,16 @@ Riktig: ingen endring av 60, 5,0 eller E471. Eventuelt spørsmål om fettkilden 
 
 Inndata: "Mel, vann"
 Riktig: ingen endring av "Mel" til "Hvetemel". Det blir et åpent spørsmål om kornslag.
+
+Inndata: "hvete mel, vann"
+Riktig: ett forslag av typen "alias": "hvete mel" -> "hvetemel". Samme ingrediens, bare skrivemåte.
+
+Inndata: "Maltekstrakt, vann"
+Riktig: ingen endring til "byggmalt". Åpent spørsmål om hvilket korn malten kommer fra.
+
+Inndata: "rugmel, havregryn" med registrerte allergendata som bare nevner hvete og melk
+Riktig: ingen endring av teksten. Avviket meldes som funn/spørsmål — lagrede allergendata
+erstattes aldri, og fraværet av rug og havre i dataene gjør dem ikke usanne i teksten.
 `.trim();
 
 /** Strengt JSON-skjema for Responses API (structured outputs). */
