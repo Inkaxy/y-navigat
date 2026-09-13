@@ -15040,7 +15040,22 @@ export type Database = {
         }
         Returns: string
       }
+      ai_declaration_config_save: {
+        Args: {
+          p_daily_cap: number
+          p_encrypted_api_key?: string
+          p_model: string
+          p_style_notes: string
+          p_updated_by: string
+        }
+        Returns: Json
+      }
       ai_declaration_quota_consume: { Args: { p_limit: number }; Returns: Json }
+      ai_declaration_quota_status: { Args: never; Returns: Json }
+      ai_declaration_record_test: {
+        Args: { p_code: string; p_ok: boolean }
+        Returns: undefined
+      }
       alert_email_subscription_failure: {
         Args: { p_detail?: string }
         Returns: undefined
