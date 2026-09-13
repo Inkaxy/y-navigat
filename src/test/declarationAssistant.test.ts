@@ -4,6 +4,7 @@ import { formatDeclaration, parseDeclarationInput, segmentsToHtml } from "@/vare
 import {
   parseAssistantOutput,
   sourceFingerprint,
+  substantiateFindings,
   validateProposals,
   type DeclarationProposal,
 } from "@/varer/lib/declarationProposal";
@@ -134,19 +135,17 @@ describe("kontroll av AI-forslag", () => {
     expect(r.rejected[0].reason).toMatch(/kildeteksten/);
   });
 
-  it("modellens eget «gyldig»-felt har ingen virkning", () => {
-    const parsed = parseAssistantOutput({
-      schema_version: "1",
-      valid: true,
-      proposals: [
-        { kind: "spelling", source_start: 0, source_end: 8, original: "HVETEMEL", suggested: "sukker", reason: "" },
-      ],
-      allergen_findings: [],
-      questions: [],
-      source_fingerprint: "x",
-    });
-    const r = validateProposals(source, parsed.proposals);
-    expect(r.accepted).toHaveLength(0);
+  it("avviser svar med ukjente felter, som modellens eget «gyldig»-flagg", () => {
+    expect(() =>
+      parseAssistantOutput({
+        schema_version: "1",
+        valid: true,
+        proposals: [],
+        allergen_findings: [],
+        questions: [],
+        source_fingerprint: "x",
+      }),
+    ).toThrow(/ukjent felt/);
   });
 
   it("avviser rekkefølgeendring som blokkerende", () => {
@@ -165,11 +164,75 @@ describe("kontroll av AI-forslag", () => {
     expect(r.accepted).toHaveLength(0);
   });
 
-  it("tåler tull fra modellen uten å kaste", () => {
+  it("avviser tomt svar, feil schema-versjon og manglende felter", () => {
     expect(() => parseAssistantOutput(null)).toThrow();
-    const ok = parseAssistantOutput({ schema_version: "1" });
-    expect(ok.proposals).toEqual([]);
-    expect(ok.questions).toEqual([]);
+    expect(() => parseAssistantOutput({})).toThrow();
+    expect(() => parseAssistantOutput({ schema_version: "1" })).toThrow(/mangler/);
+    expect(() =>
+      parseAssistantOutput({
+        schema_version: "garbage",
+        proposals: [],
+        allergen_findings: [],
+        questions: [],
+        source_fingerprint: "wrong",
+      }),
+    ).toThrow(/schema_version/);
+  });
+
+  it("avviser svar med feil kontrollsum mot forespørselen", () => {
+    const body = {
+      schema_version: "1",
+      proposals: [],
+      allergen_findings: [],
+      questions: [],
+      source_fingerprint: "wrong",
+    };
+    expect(() => parseAssistantOutput(body, { expectedFingerprint: sourceFingerprint(source) })).toThrow(
+      /kontrollsummen/,
+    );
+    expect(
+      parseAssistantOutput(
+        { ...body, source_fingerprint: sourceFingerprint(source) },
+        { expectedFingerprint: sourceFingerprint(source) },
+      ).proposals,
+    ).toEqual([]);
+  });
+
+  it("avviser ugyldig type, enum-verdi og for lange verdier", () => {
+    const base = {
+      schema_version: "1",
+      allergen_findings: [],
+      questions: [],
+      source_fingerprint: "x",
+    };
+    expect(() =>
+      parseAssistantOutput({
+        ...base,
+        proposals: [{ kind: "hallucination", source_start: 0, source_end: 1, original: "a", suggested: "a", reason: "" }],
+      }),
+    ).toThrow(/kind/);
+    expect(() =>
+      parseAssistantOutput({
+        ...base,
+        proposals: [{ kind: "case", source_start: 0.5, source_end: 1, original: "a", suggested: "a", reason: "" }],
+      }),
+    ).toThrow(/hele tall/);
+    expect(() =>
+      parseAssistantOutput({
+        ...base,
+        proposals: [{ kind: "case", source_start: 0, source_end: 1, original: "a", suggested: "a", reason: "x".repeat(400) }],
+      }),
+    ).toThrow(/for lang/);
+  });
+
+  it("«bekreftet» krever dekning i faktiske råvaredata", () => {
+    const findings = [
+      { code: "hvete", basis: "verified" as const, evidence: "hvetemel i oppskriften", severity: "warning" as const },
+      { code: "soya", basis: "verified" as const, evidence: "gjetning", severity: "warning" as const },
+    ];
+    const out = substantiateFindings(findings, [{ code: "hvete", evidence: "hvete" }]);
+    expect(out[0].basis).toBe("verified");
+    expect(out[1].basis).toBe("inferred");
   });
 
   it("kontrollsummen endrer seg når teksten endres", () => {
