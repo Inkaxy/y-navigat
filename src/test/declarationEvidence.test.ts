@@ -62,7 +62,7 @@ describe("hvilke råvaredata kan gjøre et funn bekreftet", () => {
 });
 
 describe("funn nedgraderes når beviset ikke holder", () => {
-  const finding = { code: "gluten_wheat", basis: "confirmed" as const, evidence: "Hvetemel", severity: "critical" as const };
+  const finding = { code: "gluten_wheat", basis: "verified" as const, evidence: "Hvetemel", severity: "critical" as const };
 
   it("bekreftet funn står når en gjennomgått contains-rad finnes", () => {
     const e = buildAllergenEvidence(
@@ -70,7 +70,7 @@ describe("funn nedgraderes når beviset ikke holder", () => {
       materials,
     );
     const out = substantiateFindings([finding], e.verified);
-    expect(out[0].basis).toBe("confirmed");
+    expect(out[0].basis).toBe("verified");
   });
 
   it("bekreftet funn nedgraderes når bare ikke gjennomgåtte data finnes", () => {
@@ -79,7 +79,7 @@ describe("funn nedgraderes når beviset ikke holder", () => {
       materials,
     );
     const out = substantiateFindings([finding], e.verified);
-    expect(out[0].basis).not.toBe("confirmed");
+    expect(out[0].basis).not.toBe("verified");
   });
 
   it("bekreftet funn nedgraderes når bare «kan inneholde» finnes", () => {
@@ -88,6 +88,6 @@ describe("funn nedgraderes når beviset ikke holder", () => {
       materials,
     );
     const out = substantiateFindings([finding], e.verified);
-    expect(out[0].basis).not.toBe("confirmed");
+    expect(out[0].basis).not.toBe("verified");
   });
 });
