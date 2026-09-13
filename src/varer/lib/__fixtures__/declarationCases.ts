@@ -71,7 +71,7 @@ export const DECLARATION_CASES: DeclarationCase[] = [
     id: "sulfitt",
     note: "Sulfitt gir terskelpåminnelse.",
     input: "Tørket frukt, sulfitt",
-    expectedMarkerText: "tørket frukt, *sulfitt*",
+    expectedMarkerText: "Tørket frukt, *sulfitt*",
     expectedIssueCodes: ["sulphite_threshold"],
   },
   {

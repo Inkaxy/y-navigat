@@ -78,7 +78,7 @@ const ALLERGEN_TERMS: AllergenTerm[] = [
   {
     code: "milk",
     term: "melk",
-    notFollowedBy: ["syre"],
+    notFollowedBy: ["esyre", "syre"],
     compoundWords: [
       "kulturmelk",
       "helmelk",
