@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { htmlToMarkerText } from "@/varer/lib/declarationFormat";
 import DOMPurify from "dompurify";
+import { DeclarationAssistantPanel } from "@/varer/components/declaration/DeclarationAssistantPanel";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -334,6 +335,15 @@ function DeclarationView({ link, productName, canWrite, qc }: { link: any; produ
                       onChange={(e) => setManualIngredient(e.target.value)}
                       placeholder="HVETEMEL, vann, salt — allergener skal utheves"
                     />
+                    <div className="mt-2">
+                      <DeclarationAssistantPanel
+                        target="product"
+                        targetId={link.product_id}
+                        value={manualIngredient}
+                        canWrite={canWrite}
+                        onApply={(markerText) => setManualIngredient(markerText)}
+                      />
+                    </div>
                   </div>
                 )}
               </CardContent>
