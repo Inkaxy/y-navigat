@@ -224,10 +224,8 @@ Deno.serve(async (req) => {
       // Leverandørfeil logges uten innhold og uten nøkkel.
       console.error("declaration-assistant: leverandør svarte", res.status);
       await logUsage(admin, {
-        userId,
-        configId,
-        model,
-        success: false,
+      model,
+      success: false,
         input: null,
         output: null,
         error: `provider_${res.status}`,
@@ -279,8 +277,6 @@ Deno.serve(async (req) => {
     const before = formatDeclaration(draftText);
 
     await logUsage(admin, {
-      userId,
-      configId,
       model,
       success: true,
       input: parsedResponse.usage?.input_tokens ?? null,
@@ -329,8 +325,6 @@ Deno.serve(async (req) => {
 async function logUsage(
   admin: ReturnType<typeof createClient>,
   p: {
-    userId: string | null;
-    configId: string | null;
     model: string;
     success: boolean;
     input: number | null;
@@ -342,14 +336,12 @@ async function logUsage(
   try {
     await admin.from("ai_usage_log").insert({
       provider: "openai",
-      model: p.model,
+      model: p.model || "ukjent",
       purpose: PURPOSE,
       input_tokens: p.input,
       output_tokens: p.output,
       success: p.success,
       error_message: p.error,
-      config_id: p.configId,
-      user_id: p.userId,
     });
   } catch (e) {
     console.error("kunne ikke logge AI-bruk", (e as Error).message);
