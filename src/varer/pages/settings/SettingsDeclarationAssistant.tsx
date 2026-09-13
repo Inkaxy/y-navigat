@@ -14,6 +14,7 @@ import { AlertTriangle, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { nb } from "date-fns/locale";
+import { readFunctionError } from "@/varer/lib/functionError";
 
 /** Absolutt tidspunkt på norsk, f.eks. «tor 3. sep 2026, 14:05». */
 function formatOsloDateTime(iso: string): string {
@@ -41,18 +42,49 @@ interface ConfigState {
   model_options: string[];
 }
 
-interface EdgeError {
-  error?: string;
-  code?: string;
+class ConfigError extends Error {
+  readonly code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
+/** Kjente feilkoder fra endepunktene, på norsk og handlingsrettet. */
+function messageForCode(code: string | undefined, fallback: string | undefined): string {
+  switch (code) {
+    case "not_configured":
+      return "Assistenten er ikke satt opp ennå. Lagre en API-nøkkel først.";
+    case "encryption_missing":
+      return "Serveren mangler krypteringsnøkkelen, så nøkkelen kan verken lagres eller brukes. Kontakt drift.";
+    case "quota_exceeded":
+      return fallback ?? "Dagens grense er brukt opp. Testen teller på den samme grensen.";
+    case "provider_error":
+      return fallback ?? "OpenAI svarte ikke som forventet. Nøkkelen er ikke merket som testet.";
+    case "bad_key":
+      return fallback ?? "Nøkkelen ser ikke gyldig ut. En OpenAI-nøkkel begynner med «sk-».";
+    case "bad_cap":
+      return fallback ?? "Dagsgrensen må være et helt tall mellom 1 og 500.";
+    case "bad_model":
+      return fallback ?? "Velg en av de godkjente modellene.";
+    case "forbidden":
+      return "Bare plattformadministratorer kan endre dette oppsettet.";
+    case "read_failed":
+      return "Oppsettet kunne ikke leses fra databasen. Ingenting er endret.";
+    case "save_failed":
+      return fallback ?? "Lagringen feilet. Det forrige oppsettet står urørt.";
+    default:
+      return fallback ?? "Kallet mot oppsettet feilet.";
+  }
 }
 
 async function callConfig<T>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke("declaration-assistant-config", { body });
   if (error) {
-    const payload = data as EdgeError | null;
-    throw new Error(payload?.error ?? "Kallet mot oppsettet feilet.");
+    const payload = await readFunctionError(error, data);
+    throw new ConfigError(messageForCode(payload.code, payload.message), payload.code);
   }
-  if (!data || typeof data !== "object") throw new Error("Ugyldig svar fra oppsettet.");
+  if (!data || typeof data !== "object") throw new ConfigError("Ugyldig svar fra oppsettet.");
   return data as T;
 }
 
@@ -121,8 +153,19 @@ export default function SettingsDeclarationAssistant() {
         body: { mode: "selftest" },
       });
       if (error) {
-        const payload = data as EdgeError | null;
-        throw new Error(payload?.error ?? "Testen mislyktes.");
+        const payload = await readFunctionError(error, data);
+        throw new ConfigError(messageForCode(payload.code, payload.message), payload.code);
+      }
+      const ok = data as { test_recorded?: boolean; test_stale?: boolean } | null;
+      if (ok?.test_stale) {
+        throw new ConfigError(
+          "Oppsettet ble endret mens testen pågikk. Resultatet er forkastet — kjør testen på nytt.",
+        );
+      }
+      if (ok?.test_recorded === false) {
+        throw new ConfigError(
+          "Kallet gikk gjennom, men resultatet kunne ikke lagres. Statusen står derfor som «ikke testet».",
+        );
       }
       return data as { suggestion?: { markerText?: string } };
     },
