@@ -31,6 +31,14 @@ export const START_PRICE_BLOCKERS = [
   "mangler_leverandorkobling",
   "ukjent_pakning",
   "startpris_finnes_allerede",
+  "leverandor_i_annet_selskap",
+  "fakturaen_er_flagget",
+  "uavklart_gjennomgangsarsak",
+  "inkonsistent_gjennomgangsstatus",
+  "utdaterte_beregnede_verdier",
+  "mengden_stemmer_ikke_med_pakningen",
+  "enhet_endret_etter_fakturalinjen",
+  "pakning_ikke_bekreftet_etter_enhetsendring",
 ] as const;
 export type StartPriceBlocker = (typeof START_PRICE_BLOCKERS)[number];
 
@@ -55,6 +63,16 @@ const BLOCKER_LABELS: Record<StartPriceBlocker, string> = {
   mangler_leverandorkobling: "Varen er ikke koblet til denne leverandøren.",
   ukjent_pakning: "Pakningen er ikke bekreftet for denne leverandøren.",
   startpris_finnes_allerede: "Det finnes allerede en bekreftet startpris.",
+  leverandor_i_annet_selskap: "Leverandøren på fakturaen hører til et annet selskap.",
+  fakturaen_er_flagget: "Fakturaen er flagget og må avklares først.",
+  uavklart_gjennomgangsarsak: "Linjen har en uavklart gjennomgangsårsak.",
+  inkonsistent_gjennomgangsstatus:
+    "Linjen har en gjennomgangsårsak, men er ikke merket til gjennomgang. Kjør kontrollen på nytt.",
+  utdaterte_beregnede_verdier:
+    "Prisen per grunnenhet stemmer ikke med beløp og mengde på linjen. Kjør beregningen på nytt.",
+  mengden_stemmer_ikke_med_pakningen: "Mengden i grunnenhet stemmer ikke med den bekreftede pakningen.",
+  enhet_endret_etter_fakturalinjen: "Grunnenheten er endret etter at denne linjen ble hentet inn.",
+  pakning_ikke_bekreftet_etter_enhetsendring: "Pakningen må bekreftes på nytt etter enhetsendringen.",
 };
 
 export function blockerLabel(code: string): string {

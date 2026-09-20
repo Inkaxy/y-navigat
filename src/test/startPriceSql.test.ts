@@ -14,6 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const MIGRATIONS = [
   "supabase/migrations/20260920202427_5083c865-678d-415b-adaa-e6105b2ccc90.sql",
   "supabase/migrations/20260920203623_19d4672a-aa57-4677-826f-9f0ab71afb36.sql",
+  "supabase/migrations/20260920204910_a33720cc-66ed-4b7b-a92d-b47c32c7c901.sql",
 ].map((f) => path.join(process.cwd(), f));
 
 const ENTITY = "11111111-1111-1111-1111-111111111111";
@@ -43,7 +44,7 @@ create or replace function public.rm_is_finite(v numeric) returns boolean langua
 create table public.raw_materials(
   id uuid primary key, legal_entity_id uuid not null, name text, base_unit text);
 
-create table public.suppliers(id uuid primary key, name text);
+create table public.suppliers(id uuid primary key, name text, legal_entity_id uuid);
 
 create table public.invoices(
   id uuid primary key default gen_random_uuid(),
@@ -52,6 +53,7 @@ create table public.invoices(
   invoice_number text,
   invoice_date date,
   currency text default 'NOK',
+  flagged_at timestamptz,
   is_credit_note boolean default false);
 
 create table public.invoice_lines(
@@ -65,7 +67,9 @@ create table public.invoice_lines(
   price_per_base_unit numeric,
   match_confidence text,
   requires_review boolean default false,
-  created_at timestamptz not null default now());
+  review_reason text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now());
 
 create table public.raw_material_suppliers(
   id uuid primary key default gen_random_uuid(),
@@ -194,7 +198,7 @@ beforeAll(async () => {
     await db.exec(readFileSync(file, "utf8"));
   }
   await db.query("insert into public.raw_materials(id, legal_entity_id, name, base_unit) values ($1,$2,'Hvetemel','kg')", [RM, ENTITY]);
-  await db.query("insert into public.suppliers(id,name) values ($1,'Norgesmøllene'),($2,'Idun')", [SUPPLIER, SUPPLIER_B]);
+  await db.query("insert into public.suppliers(id,name,legal_entity_id) values ($1,'Norgesmøllene',$3),($2,'Idun',$3)", [SUPPLIER, SUPPLIER_B, ENTITY]);
   await setUser(USER);
 });
 
@@ -373,5 +377,115 @@ describe("startpris", () => {
       [ENTITY],
     );
     expect(after.rows[0].v).toHaveLength(0);
+  });
+
+  it("gjentatt bekreftelse gir strukturert svar uten SQL-feil", async () => {
+    await resetLinks();
+    const line = await makeLine({ price: 10, date: "2026-07-01" });
+    expect((await confirm(line, 10)).created).toBe(true);
+    const again = await confirm(line, 10);
+    expect(again.created).toBe(false);
+    const other = await makeLine({ price: 11, date: "2026-07-02" });
+    const e = await eligibility(other);
+    expect(e.blockers).toContain("startpris_finnes_allerede");
+    expect(e.eligible).toBe(false);
+  });
+
+  it("sperrer flagget faktura", async () => {
+    await resetLinks();
+    const line = await makeLine({ price: 10, date: "2026-07-03" });
+    await db.query(
+      "update public.invoices set flagged_at = now() where id = (select invoice_id from public.invoice_lines where id = $1)",
+      [line],
+    );
+    expect((await eligibility(line)).blockers).toContain("fakturaen_er_flagget");
+    expect((await confirm(line)).created).toBe(false);
+  });
+
+  it("feiler lukket på uavklart uttrekk selv om linjen ikke er merket til gjennomgang", async () => {
+    await resetLinks();
+    const line = await makeLine({ price: 10, date: "2026-07-04" });
+    await db.query(
+      "update public.invoice_lines set review_reason = 'extraction_unresolved', requires_review = false where id = $1",
+      [line],
+    );
+    const e = await eligibility(line);
+    expect(e.blockers).toContain("inkonsistent_gjennomgangsstatus");
+    expect((await confirm(line)).created).toBe(false);
+  });
+
+  it("stoler ikke på lagret pris når beløpet er endret", async () => {
+    await resetLinks();
+    const line = await makeLine({ price: 100, date: "2026-07-05" });
+    // base_quantity 50, total 5000, pris 100 → beløpet dobles uten omberegning
+    await db.query("update public.invoice_lines set total_amount = 10000 where id = $1", [line]);
+    const e = await eligibility(line);
+    expect(e.blockers).toContain("utdaterte_beregnede_verdier");
+    expect((await confirm(line, 100)).created).toBe(false);
+  });
+
+  it("avviser linje fra før en enhetsendring, også ved kg → g → kg", async () => {
+    await resetLinks();
+    const line = await makeLine({ price: 10, date: "2026-07-06" });
+    await db.query("update public.invoice_lines set created_at = now() - interval '2 days' where id = $1", [line]);
+    await db.query("update public.raw_material_suppliers set package_confirmed_at = now() - interval '2 days'");
+    await db.query(
+      "insert into public.raw_material_changelog(raw_material_id, field, created_at) values ($1,'base_unit', now() - interval '1 day')",
+      [RM],
+    );
+    const e = await eligibility(line);
+    expect(e.blockers).toContain("enhet_endret_etter_fakturalinjen");
+    expect(e.blockers).toContain("pakning_ikke_bekreftet_etter_enhetsendring");
+    expect((await confirm(line)).created).toBe(false);
+
+    // Ny bekreftet pakning etter endringen, og en ny linje, er igjen gyldig.
+    await db.query("update public.raw_material_suppliers set package_confirmed_at = now()");
+    const fresh = await makeLine({ price: 10, date: "2026-07-07" });
+    expect((await eligibility(fresh)).eligible).toBe(true);
+    expect((await confirm(fresh, 10)).created).toBe(true);
+
+    // Runde tur tilbake til kg er også en endring: startprisen faller ut av prisgrunnlaget.
+    await db.query("insert into public.raw_material_changelog(raw_material_id, field) values ($1,'base_unit')", [RM]);
+    expect((await reference("2026-08-01")).source).not.toBe("start_price");
+    await db.query("delete from public.raw_material_changelog");
+  });
+
+  it("lekker ikke kandidater fra et annet selskap", async () => {
+    await resetLinks();
+    await db.query("delete from public.invoice_lines");
+    const inv = await db.query<{ id: string }>(
+      `insert into public.invoices(legal_entity_id, supplier_id, invoice_number, invoice_date)
+       values ($1,$2,'HEMMELIG-1','2026-08-02') returning id`,
+      [OTHER_ENTITY, SUPPLIER],
+    );
+    await db.query(
+      `insert into public.invoice_lines(invoice_id, raw_material_id, description, quantity, total_amount,
+         base_quantity, price_per_base_unit, match_confidence) values ($1,$2,'Skjult',2,500,50,10,'manual')`,
+      [inv.rows[0].id, RM],
+    );
+    const res = await db.query<{ v: Array<{ invoice_number: string }> }>(
+      "select public.rm_start_price_candidates($1,null,100) as v",
+      [ENTITY],
+    );
+    expect(res.rows[0].v.map((c) => c.invoice_number)).not.toContain("HEMMELIG-1");
+    await db.query("delete from public.invoice_lines");
+  });
+
+  it("kan ikke sette startpris direkte i tabellen utenom bekreftelsesflyten", async () => {
+    await resetLinks();
+    await expect(
+      db.query("update public.raw_material_suppliers set start_price_per_base_unit = 1"),
+    ).rejects.toThrow();
+    // Andre kolonner kan fortsatt oppdateres som før.
+    await db.query("update public.raw_material_suppliers set supplier_sku = 'ABC-1'");
+  });
+
+  it("startprisen faller ut av prisgrunnlaget når pakningen endres", async () => {
+    await resetLinks();
+    const line = await makeLine({ price: 10, date: "2026-08-10" });
+    expect((await confirm(line, 10)).created).toBe(true);
+    expect((await reference("2026-09-01")).source).toBe("start_price");
+    await db.query("update public.raw_material_suppliers set base_units_per_package = 10, package_size = 10");
+    expect((await reference("2026-09-01")).source).not.toBe("start_price");
   });
 });
