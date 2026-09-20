@@ -15,8 +15,13 @@ const MIGRATIONS = [
   "supabase/migrations/20260920202427_5083c865-678d-415b-adaa-e6105b2ccc90.sql",
   "supabase/migrations/20260920203623_19d4672a-aa57-4677-826f-9f0ab71afb36.sql",
   "supabase/migrations/20260920204910_a33720cc-66ed-4b7b-a92d-b47c32c7c901.sql",
+  "supabase/migrations/20260920205532_677662bd-14da-46fc-91e6-f41c546e84aa.sql",
+  "supabase/migrations/20260920205737_1c7544f6-ddd2-431f-852c-6896f4dbb478.sql",
+  "supabase/migrations/20260920205812_84bee6de-64b0-4b9d-a660-08a9d17141c8.sql",
   "supabase/migrations/20260920211551_bf78ce3b-9c01-4d98-9513-751efeb84f9d.sql",
+  "supabase/migrations/20260920212203_5ab29731-41e5-47ee-b071-f849a1d513d6.sql",
 ].map((f) => path.join(process.cwd(), f));
+
 
 const ENTITY = "11111111-1111-1111-1111-111111111111";
 const OTHER_ENTITY = "1111111a-1111-1111-1111-111111111111";
