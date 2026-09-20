@@ -27,7 +27,10 @@ beforeAll(async () => {
       handler = fn;
     },
   };
-  await import("../../supabase/functions/match-invoice-lines/index.ts");
+  // Indirekte spesifikator: edge-modulen er Deno-kode og skal ikke inn i
+  // appens typekontroll, men den skal kjøres uendret her.
+  const modulePath = ["..", "..", "supabase", "functions", "match-invoice-lines", "index.ts"].join("/");
+  await import(/* @vite-ignore */ modulePath);
 });
 
 afterAll(() => {
