@@ -907,7 +907,7 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
     checks,
     alternatives,
     needsInput: null,
-    reason: packageNote ?? swapNote,
+    reason: packageNote ?? swapNote ?? historyNote,
 
   };
 }
