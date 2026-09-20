@@ -201,7 +201,7 @@ export default function FakturaerInboxPage() {
   const [creditNoteId, setCreditNoteId] = useState<string | null>(null);
   const [busyInvoice, setBusyInvoice] = useState<{ id: string; action: string } | null>(null);
   const anyDialogOpen =
-    matchOpen || createOpen || notRmOpen || conflictOpen || !!reconcileId || bulkCreateOpen || !!creditNoteId;
+    matchOpen || createOpen || notRmOpen || conflictOpen || !!reconcileId || bulkCreateOpen || !!creditNoteId || !!bulkLink;
 
   // Dokumentpanel
   const [docOpen, setDocOpen] = useState<boolean>(() => localStorage.getItem(LS_OPEN) === "1");
