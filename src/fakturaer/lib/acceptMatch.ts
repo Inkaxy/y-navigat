@@ -343,6 +343,18 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<AcceptMatch
   return { lineIds, rmsId, startPrice, recalculationPending: false, recalculationError: null };
 }
 
+/**
+ * Kjører reberegningen av prisavvik på nytt for bestemte linjer.
+ * Brukes av «Prøv igjen» etter en bekreftelse der reberegningen feilet.
+ * Kaster ved feil — kalleren skal ikke kunne vise falsk suksess.
+ */
+export async function recalculateLines(invoiceId: string, lineIds: string[]): Promise<void> {
+  const { error } = await supabase.functions.invoke("match-invoice-lines", {
+    body: { invoice_id: invoiceId, line_ids: lineIds },
+  });
+  if (error) throw new Error(`Reberegningen feilet: ${error.message}`);
+}
+
 /** Norsk forklaring på hva som skjedde med startprisen i bekreftelsen. */
 export function startPriceOutcomeLabel(sp: AcceptMatchStartPrice): string | null {
   if (sp.created) {
