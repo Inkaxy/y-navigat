@@ -157,10 +157,17 @@ export function PriceComparisonCard({
                       <td className="py-2 pr-3 whitespace-nowrap">{formatDate(o.effective_date)}</td>
                       <td className="py-2 pr-3 whitespace-nowrap">
                         {formatNok(o.price)}
-                        <span className="text-caption text-ink-secondary"> / {baseUnit}</span>
+                        <span className="text-caption text-ink-secondary">
+                          {" "}
+                          / {o.unit_changed_since ? "ukjent enhet" : baseUnit}
+                        </span>
                       </td>
                       <td className="py-2 pr-3 whitespace-nowrap">
-                        {o.base_quantity != null ? `${o.base_quantity} ${baseUnit}` : "ukjent"}
+                        {o.base_quantity == null
+                          ? "ukjent"
+                          : o.unit_changed_since
+                            ? `${o.base_quantity} (ukjent enhet)`
+                            : `${o.base_quantity} ${baseUnit}`}
                       </td>
                       <td className="py-2 pr-3">
                         {o.supplier_id ? (supplierNames.get(o.supplier_id) ?? "Ukjent leverandør") : "—"}
