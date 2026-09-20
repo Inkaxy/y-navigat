@@ -24,6 +24,9 @@ const SUPPLIER = "44444444-4444-4444-4444-444444444444";
 const SUPPLIER_B = "4444444b-4444-4444-4444-444444444444";
 
 const SCHEMA = `
+create role anon;
+create role authenticated;
+create role service_role;
 create schema if not exists auth;
 create table public._ctx(uid uuid, access boolean not null default true);
 insert into public._ctx(uid) values (null);
