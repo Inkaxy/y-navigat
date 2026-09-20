@@ -22,6 +22,7 @@ export const LINE_REASON_CODES = [
   "unsupported_currency",
   "agreement_conflict",
   "price_reference_error",
+  "recalculation_pending",
 ] as const;
 export type LineReasonCode = (typeof LINE_REASON_CODES)[number];
 
