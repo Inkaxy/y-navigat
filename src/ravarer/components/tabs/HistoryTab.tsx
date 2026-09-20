@@ -8,6 +8,7 @@ import { QueryState } from "@/components/common/QueryState";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate, formatNok, PRICE_SOURCES } from "@/ravarer/lib/constants";
 import { usePriceHistory } from "@/ravarer/hooks/useRmSuppliers";
+import { PriceComparisonCard } from "@/ravarer/components/PriceComparisonCard";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 
 type EventKind = "endring" | "omregning" | "pris";
