@@ -358,6 +358,8 @@ describe("startpris", () => {
 
   it("historikkforslag lister bare kvalifiserte kjøp og forsvinner etter bekreftelse", async () => {
     await resetLinks();
+    // Ett forslag per kobling (distinct on rms.id) — rydd linjer fra tidligere tester.
+    await db.query("delete from public.invoice_lines");
     const line = await makeLine({ price: 10, date: "2026-06-01" });
     const before = await db.query<{ v: Array<{ invoice_line_id: string }> }>(
       "select public.rm_start_price_candidates($1,null,100) as v",
