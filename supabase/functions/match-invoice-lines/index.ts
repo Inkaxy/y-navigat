@@ -119,35 +119,43 @@ Deno.serve(async (req) => {
     const currencyCode = String(inv.currency ?? "NOK").toUpperCase();
     const foreignCurrency = currencyCode !== "NOK";
 
+    // Alle nødvendige lesninger feiler LUKKET: en mislykket lesning ville gitt
+    // færre regler, færre treff og en faktura som ser ferdig ut uten å være det.
+    const required = <T>(what: string, res: { data: T; error: AnyRec | null }): T => {
+      if (res.error) throw new Error(`Kunne ikke lese ${what}: ${res.error.message}`);
+      return res.data;
+    };
+
     // Settings
-    const { data: settings } = await svc.from("invoice_match_settings").select("*").eq("legal_entity_id", inv.legal_entity_id).maybeSingle();
+    const settings = required("innstillinger for fakturamatching",
+      await svc.from("invoice_match_settings").select("*").eq("legal_entity_id", inv.legal_entity_id).maybeSingle());
     const tolDefault = Number(settings?.default_price_tolerance_pct ?? 2);
     const fuzzyThreshold = Number(settings?.fuzzy_match_threshold ?? 0.5);
     const fuzzyAuto = Number(settings?.fuzzy_auto_match_threshold ?? 0.85);
     const fuzzyDom = Number(settings?.fuzzy_auto_match_dominance_threshold ?? 0.65);
 
-    const { data: catTols } = await svc.from("invoice_match_category_tolerances")
-      .select("category, price_tolerance_pct").eq("legal_entity_id", inv.legal_entity_id);
+    const catTols = required("kategoritoleranser", await svc.from("invoice_match_category_tolerances")
+      .select("category, price_tolerance_pct").eq("legal_entity_id", inv.legal_entity_id));
     const catTolMap = new Map<string, number>();
     (catTols ?? []).forEach((c: AnyRec) => catTolMap.set(c.category, Number(c.price_tolerance_pct)));
 
     // Exclusion patterns for this supplier+entity (or supplier null)
-    const { data: exclusions } = await svc.from("invoice_line_exclusion_patterns")
+    const exclusions = required("eksklusjonsmønstre", await svc.from("invoice_line_exclusion_patterns")
       .select("*").eq("legal_entity_id", inv.legal_entity_id)
-      .or(`supplier_id.eq.${inv.supplier_id},supplier_id.is.null`);
+      .or(`supplier_id.eq.${inv.supplier_id},supplier_id.is.null`));
 
     // Supplier's raw_material_suppliers (with aliases)
-    const { data: rms } = await svc.from("raw_material_suppliers")
-      .select("id, raw_material_id, supplier_id, supplier_sku, supplier_product_name, agreed_price_per_base_unit, last_invoice_date, package_size, package_unit, base_units_per_package, package_confirmed_at, is_primary")
-      .eq("supplier_id", inv.supplier_id);
+    const rms = required("leverandørkoblinger", await svc.from("raw_material_suppliers")
+      .select("id, raw_material_id, supplier_id, supplier_sku, supplier_product_name, agreed_price_per_base_unit, agreement_valid_from, agreement_valid_to, last_invoice_date, package_size, package_unit, base_units_per_package, package_confirmed_at, is_primary")
+      .eq("supplier_id", inv.supplier_id));
     const rmsList = rms ?? [];
     const rmsIds = rmsList.map((r: AnyRec) => r.id);
 
     let aliases: AnyRec[] = [];
     if (rmsIds.length) {
-      const { data: aRows } = await svc.from("raw_material_supplier_aliases")
+      const aRows = required("alias", await svc.from("raw_material_supplier_aliases")
         .select("id, raw_material_supplier_id, alias_type, alias_value, alias_value_normalized, status, match_count")
-        .in("raw_material_supplier_id", rmsIds);
+        .in("raw_material_supplier_id", rmsIds));
       aliases = aRows ?? [];
     }
     const rmsById = new Map<string, AnyRec>(rmsList.map((r: AnyRec) => [r.id, r]));
@@ -170,15 +178,15 @@ Deno.serve(async (req) => {
       keys.some((k) => !!k && (rejectedKeysByRms.get(rmsId)?.has(k) ?? false));
 
     // Raw materials in legal entity (active) — for fuzzy
-    const { data: rmList } = await svc.from("raw_materials")
+    const rmList = required("råvarer", await svc.from("raw_materials")
       .select("id, name, sku, category, base_unit, current_cost_price, price_updated_at, primary_supplier_id, package_size, package_unit, base_units_per_package, package_confirmed_at")
-      .eq("legal_entity_id", inv.legal_entity_id).eq("is_active", true);
+      .eq("legal_entity_id", inv.legal_entity_id).eq("is_active", true));
     const rmById = new Map<string, AnyRec>((rmList ?? []).map((r: AnyRec) => [r.id, r]));
 
     // Lines
     let q = svc.from("invoice_lines").select("*").eq("invoice_id", invoiceId);
     if (lineIdFilter?.length) q = q.in("id", lineIdFilter);
-    const { data: lines } = await q;
+    const lines = required("fakturalinjer", await q);
     const allLines = lines ?? [];
 
     const results: AnyRec[] = [];
