@@ -21,6 +21,7 @@ const MIGRATIONS = [
   "supabase/migrations/20260920211551_bf78ce3b-9c01-4d98-9513-751efeb84f9d.sql",
   "supabase/migrations/20260920212203_5ab29731-41e5-47ee-b071-f849a1d513d6.sql",
   "supabase/migrations/20260920212421_1298de01-2a90-4ef8-859a-17e8d7747b63.sql",
+  "supabase/migrations/20260920213119_4723d056-d205-40e7-904b-8c117df27dbe.sql",
 ].map((f) => path.join(process.cwd(), f));
 
 
@@ -370,6 +371,62 @@ describe("startpris", () => {
     const ref = await reference("2026-05-01");
     expect(ref.source).not.toBe("start_price");
     await db.query("update public.raw_materials set base_unit = 'kg' where id = $1", [RM]);
+  });
+
+  it("ny avtalepris får ny startdato og arver aldri den gamle avtaleperioden", async () => {
+    await resetLinks();
+    // Gammel avtale med startdato langt tilbake i tid og utløpt sluttdato.
+    await db.query(
+      `update public.raw_material_suppliers
+          set agreed_price_per_base_unit = 8, agreement_valid_from = '2025-01-01',
+              agreement_valid_to = '2025-12-31'`,
+    );
+    const line = await makeLine({ price: 10, date: "2026-04-20" });
+    await confirm(line, 10);
+    const rms = await db.query<{ id: string }>("select id from public.raw_material_suppliers limit 1");
+    const id = rms.rows[0].id;
+
+    // Uten uttrykkelig bekreftelse skal en eksisterende avtalepris ikke erstattes.
+    await expect(
+      db.query("select public.rm_start_price_to_agreement($1,'Ny avtale') as v", [id]),
+    ).rejects.toThrow();
+
+    const res = await db.query<{ v: Record<string, unknown> }>(
+      `select public.rm_start_price_to_agreement($1,'Ny avtale',null,null,null,null,null,true,null) as v`,
+      [id],
+    );
+    const v = res.rows[0].v;
+    expect(v.updated).toBe(true);
+    expect(Number(v.agreed_price_per_base_unit)).toBe(10);
+    expect(v.replaced_existing).toBe(true);
+    const today = new Date().toISOString().slice(0, 10);
+    expect(String(v.agreement_valid_from)).toBe(today);
+    // Den utløpte sluttdatoen skal være ryddet bort, ikke bli stående med ny pris.
+    expect(v.agreement_valid_to).toBeNull();
+  });
+
+  it("avviser utdatert visning av startpris eller pakning", async () => {
+    await resetLinks();
+    const line = await makeLine({ price: 10, date: "2026-04-21" });
+    await confirm(line, 10);
+    const rms = await db.query<{ id: string }>("select id from public.raw_material_suppliers limit 1");
+    const id = rms.rows[0].id;
+
+    await expect(
+      db.query("select public.rm_start_price_to_agreement($1,'Ny avtale',9.5) as v", [id]),
+    ).rejects.toThrow();
+    await expect(
+      db.query(
+        "select public.rm_start_price_to_agreement($1,'Ny avtale',10,null,99,'kg',25) as v",
+        [id],
+      ),
+    ).rejects.toThrow();
+
+    const ok = await db.query<{ v: { updated: boolean } }>(
+      "select public.rm_start_price_to_agreement($1,'Ny avtale',10,null,25,'kg',25) as v",
+      [id],
+    );
+    expect(ok.rows[0].v.updated).toBe(true);
   });
 
   it("nekter å gjøre startpris til avtalepris uten begrunnelse eller etter enhetsendring", async () => {
