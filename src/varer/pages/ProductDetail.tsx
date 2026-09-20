@@ -558,15 +558,21 @@ export default function ProductDetail() {
           />
         )}
         {tab === "deklarasjon" && !product.variant_of_product_id && (
-          <DeclarationTab productId={product.id} productName={product.display_name} canWrite={canWrite} />
+          <div className="space-y-4">
+            <RecipeBasisNote productId={product.id} area="deklarasjon" />
+            <DeclarationTab productId={product.id} productName={product.display_name} canWrite={canWrite} />
+          </div>
         )}
         {tab === "kalkyle_pris" && !product.variant_of_product_id && (
-          <CostPriceTab
-            productId={product.id}
-            productName={product.display_name}
-            legalEntityId={legalEntityId}
-            canWrite={canWrite}
-          />
+          <div className="space-y-4">
+            <RecipeBasisNote productId={product.id} area="kalkyle" />
+            <CostPriceTab
+              productId={product.id}
+              productName={product.display_name}
+              legalEntityId={legalEntityId}
+              canWrite={canWrite}
+            />
+          </div>
         )}
         {tab === "sortiment" && (
           <Card><CardContent className="py-12 text-center text-muted-foreground">Sortimentsstyring kommer når Kunder-appen er bygget.</CardContent></Card>
