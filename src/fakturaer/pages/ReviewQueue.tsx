@@ -56,49 +56,31 @@ import {
 import { emptyQueueState, peekUndo, queueReducer } from "@/fakturaer/lib/queueReducer";
 import { supabase } from "@/integrations/supabase/client";
 
-type TabValue =
-  | "all"
-  | "unmatched"
-  | "low_confidence"
-  | "price_variance"
-  | "price_increase"
-  | "price_drop"
-  | "uncertain_cost"
-  | "unknown_package_size"
-  | "sku_collision"
-  | "unsupported_currency"
-  | "no_baseline";
+type TabValue = "all" | ReviewGroup;
 
-const TABS: { value: TabValue; label: string }[] = [
-  { value: "all", label: "Alle" },
-  { value: "unmatched", label: REASON_LABELS.unmatched },
-  { value: "low_confidence", label: REASON_LABELS.low_confidence },
-  { value: "price_variance", label: REASON_LABELS.price_variance },
-  { value: "price_increase", label: REASON_LABELS.price_increase },
-  { value: "price_drop", label: REASON_LABELS.price_drop },
-  { value: "uncertain_cost", label: REASON_LABELS.uncertain_cost },
-  { value: "unknown_package_size", label: REASON_LABELS.unknown_package_size },
-  { value: "sku_collision", label: REASON_LABELS.sku_collision },
-  { value: "unsupported_currency", label: REASON_LABELS.unsupported_currency },
-  { value: "no_baseline", label: REASON_LABELS.no_baseline },
+const TABS: { value: TabValue; label: string; hint: string }[] = [
+  { value: "all", label: "Alle", hint: "Alle linjer som venter på en avklaring." },
+  ...REVIEW_GROUPS.map((g) => ({ value: g as TabValue, label: GROUP_LABELS[g], hint: GROUP_DESCRIPTIONS[g] })),
 ];
-
-const KNOWN_REASONS = TABS.filter((t) => t.value !== "all" && t.value !== "no_baseline").map((t) => t.value);
 
 const LS_OPEN = "nbhub.faktura.docpanel.open";
 const LS_SIZE = "nbhub.faktura.docpanel.size";
 
-/** Hører linjen hjemme under fanen? review_reason kan inneholde flere årsaker. */
+const SORT_OPTIONS: { value: QueueSort; label: string }[] = [
+  { value: "invoice_date", label: "Nyeste faktura først" },
+  { value: "impact", label: "Størst kronepåvirkning først" },
+  { value: "repeats", label: "Går oftest igjen først" },
+];
+
+/**
+ * Hører linjen hjemme under fanen? En linje kan ha flere årsaker samtidig og
+ * dukker da opp i alle de tilhørende gruppene. Årsaker vi ikke kjenner igjen
+ * havner i «Ukjent årsak» — aldri skjult under «Ukjent vare».
+ */
 export function matchesTab(line: ReviewLineCountRow | ReviewLineRow, tab: TabValue): boolean {
-  if (tab === "all") return true;
-  if (tab === "no_baseline") return line.variance_status === "no_baseline" && !!line.raw_material_id;
-  const reasons = reasonsOf(line);
-  if (reasons.includes(tab)) return true;
-  // Ukjente årsaker samles under «Umatchet» slik at ingen linje forsvinner.
-  if (tab === "unmatched" && line.requires_review && reasons.every((r) => !KNOWN_REASONS.includes(r as TabValue)))
-    return true;
-  return false;
+  return matchesGroup(line, tab);
 }
+
 
 /** Samme vakter som i Vareliste: ingen hurtigtaster mens brukeren skriver eller i dialog. */
 function shouldIgnoreShortcut(e: KeyboardEvent): boolean {
