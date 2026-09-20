@@ -78,6 +78,7 @@ export const GROUP_LABELS: Record<ReviewGroup, string> = {
   currency: "Valuta",
   extraction: "Uttrekk og sum",
   conflict: "Konflikt",
+  recalculation: "Må beregnes på nytt",
   other: "Ukjent årsak",
 };
 
