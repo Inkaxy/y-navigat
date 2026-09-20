@@ -9,7 +9,7 @@ import {
   confirmStartPrice,
   fetchStartPriceEligibility,
 } from "@/fakturaer/lib/startPrice";
-import { REVIEW_QUERY_KEYS } from "@/fakturaer/components/BulkLinkPanel";
+import { REVIEW_QUERY_KEYS } from "@/fakturaer/components/BulkLinkDialog";
 
 interface Props {
   open: boolean;
