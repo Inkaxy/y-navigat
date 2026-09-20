@@ -11,19 +11,51 @@ export { EXCLUSION_LABELS, exclusionText } from "@/fakturaer/components/BulkLink
 type Candidate = BulkLinkCandidate;
 
 interface ApplyResult {
+  applied?: string[];
   applied_count?: number;
   skipped?: { line_id: string; reason: string }[];
   invoice_ids?: string[];
 }
 
+/** Omregning gjelder ALLTID bare de linjene databasen faktisk koblet. */
+export interface RecalcBatch {
+  invoiceId: string;
+  lineIds: string[];
+}
+
 /** Query-nøklene køen faktisk bruker (useReviewLines / useReviewCount). */
 export const REVIEW_QUERY_KEYS = ["fakturaer-review-lines", "fakturaer-review-count"] as const;
 
-async function recalculateInvoices(invoiceIds: readonly string[]): Promise<string[]> {
-  const failed: string[] = [];
-  for (const invoiceId of invoiceIds) {
-    const { error } = await supabase.functions.invoke("match-invoice-lines", { body: { invoice_id: invoiceId } });
-    if (error) failed.push(invoiceId);
+/**
+ * Grupperer de koblede linje-ID-ene på faktura ved hjelp av radene i
+ * forhåndsvisningen. Linjer vi ikke kjenner fakturaen til utelates helt —
+ * vi regner aldri om en hel faktura fra denne handlingen.
+ */
+export function groupAppliedLines(
+  appliedLineIds: readonly string[],
+  rows: readonly { line_id: string; invoice_id: string }[],
+): RecalcBatch[] {
+  const invoiceOf = new Map(rows.map((r) => [r.line_id, r.invoice_id]));
+  const byInvoice = new Map<string, string[]>();
+  for (const lineId of new Set(appliedLineIds)) {
+    const invoiceId = invoiceOf.get(lineId);
+    if (!invoiceId) continue;
+    const list = byInvoice.get(invoiceId);
+    if (list) list.push(lineId);
+    else byInvoice.set(invoiceId, [lineId]);
+  }
+  return [...byInvoice].map(([invoiceId, lineIds]) => ({ invoiceId, lineIds }));
+}
+
+/** Kjører omregning per faktura, men kun for de oppgitte linjene. */
+export async function recalculateBatches(batches: readonly RecalcBatch[]): Promise<RecalcBatch[]> {
+  const failed: RecalcBatch[] = [];
+  for (const batch of batches) {
+    if (batch.lineIds.length === 0) continue;
+    const { error } = await supabase.functions.invoke("match-invoice-lines", {
+      body: { invoice_id: batch.invoiceId, line_ids: batch.lineIds },
+    });
+    if (error) failed.push(batch);
   }
   return failed;
 }
@@ -53,7 +85,7 @@ export function BulkLinkDialog({
 }) {
   const qc = useQueryClient();
   const [selected, setSelected] = useState<Record<string, boolean>>({});
-  const [pendingInvoices, setPendingInvoices] = useState<string[]>([]);
+  const [pendingBatches, setPendingBatches] = useState<RecalcBatch[]>([]);
   const [appliedCount, setAppliedCount] = useState(0);
 
   const invalidateQueue = async () => {
@@ -86,13 +118,13 @@ export function BulkLinkDialog({
       `${applied} linjer koblet til ${rawMaterialName} og regnet om` +
         (skipped > 0 ? ` — ${skipped} ble hoppet over og står fortsatt til gjennomgang.` : ""),
     );
-    setPendingInvoices([]);
+    setPendingBatches([]);
     onApplied?.();
     onOpenChange(false);
   };
 
   const apply = useMutation({
-    mutationFn: async (): Promise<{ res: ApplyResult; failed: string[] }> => {
+    mutationFn: async (): Promise<{ res: ApplyResult; failed: RecalcBatch[] }> => {
       const snapshot = query.data?.snapshot;
       if (!snapshot) throw new Error("Fant ikke grunnlaget for forhåndsvisningen — hent den på nytt.");
       const { data, error } = await supabase.rpc("rm_apply_supplier_link_lines", {
@@ -103,16 +135,17 @@ export function BulkLinkDialog({
       });
       if (error) throw error;
       const res = (data ?? {}) as ApplyResult;
-      const invoiceIds = res.invoice_ids ?? [...new Set(chosen.map((r) => r.invoice_id))];
-      return { res, failed: await recalculateInvoices(invoiceIds) };
+      // Kun linjer databasen faktisk koblet skal regnes om — aldri hele fakturaen.
+      const batches = groupAppliedLines(res.applied ?? [], rows);
+      return { res, failed: await recalculateBatches(batches) };
     },
     onSuccess: async ({ res, failed }) => {
-      const applied = res.applied_count ?? 0;
+      const applied = res.applied_count ?? res.applied?.length ?? 0;
       const skipped = res.skipped?.length ?? 0;
       setAppliedCount(applied);
       await invalidateQueue();
       if (failed.length > 0) {
-        setPendingInvoices(failed);
+        setPendingBatches(failed);
         toast.error(
           `${applied} linjer ble koblet, men prisen er ikke regnet om for ${failed.length} faktura(er). ` +
             "Linjene står til gjennomgang til beregningen er kjørt.",
@@ -127,11 +160,11 @@ export function BulkLinkDialog({
   });
 
   const retry = useMutation({
-    mutationFn: async () => await recalculateInvoices(pendingInvoices),
+    mutationFn: async () => await recalculateBatches(pendingBatches),
     onSuccess: async (failed) => {
       await invalidateQueue();
       if (failed.length > 0) {
-        setPendingInvoices(failed);
+        setPendingBatches(failed);
         toast.error(`Beregningen feilet fortsatt for ${failed.length} faktura(er).`);
         return;
       }
@@ -155,7 +188,7 @@ export function BulkLinkDialog({
           onApply={() => apply.mutate()}
           onClose={() => onOpenChange(false)}
           applyPending={apply.isPending}
-          pendingInvoices={pendingInvoices}
+          pendingInvoices={pendingBatches.map((b) => b.invoiceId)}
           appliedCount={appliedCount}
           onRetry={() => retry.mutate()}
           retryPending={retry.isPending}
