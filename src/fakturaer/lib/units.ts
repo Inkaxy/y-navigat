@@ -718,10 +718,12 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
   // A — fakturaenhet: gyldig når enheten er en baseenhet i samme dimensjon.
   const directFactor = invoiceUnit && isBaseUnit(invoiceUnit) ? toBaseFactor(invoiceUnit, base) : null;
 
-  // Fakturaen er i en EKTE måleenhet (kg, l, stk …) som ikke kan regnes om til
+  // Fakturaen er ført i en EKTE måleenhet (kg, l …) som ikke kan regnes om til
   // varens basisenhet. En pakningsfaktor sier ingenting om forholdet mellom to
-  // ulike dimensjoner (liter mot kilo) — da må et menneske inn.
-  if (invoiceUnit && isBaseUnit(invoiceUnit) && (directFactor == null || directFactor <= 0)) {
+  // ulike dimensjoner (liter mot kilo) — da må et menneske inn. «stk» er unntatt:
+  // et antall stykk ER et antall pakninger, og pakningen kan brukes.
+  const measuredUnit = !!invoiceUnit && isBaseUnit(invoiceUnit) && invoiceUnit !== "stk";
+  if (measuredUnit && (directFactor == null || directFactor <= 0)) {
     return emptyResult(
       "package_size",
       `Fakturaen er i ${invoiceUnit}, men varen måles i ${base}. Omregningen mellom ${invoiceUnit} og ${base} er ikke kjent, ` +
