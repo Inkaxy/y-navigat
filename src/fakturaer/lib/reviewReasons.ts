@@ -22,6 +22,8 @@ export const LINE_REASON_CODES = [
   "unsupported_currency",
   "agreement_conflict",
   "price_reference_error",
+  "recalculation_pending",
+  "extraction_unresolved",
 ] as const;
 export type LineReasonCode = (typeof LINE_REASON_CODES)[number];
 
@@ -43,6 +45,8 @@ export const REASON_LABELS: Record<ReasonCode, string> = {
   unsupported_currency: "Valuta ikke støttet",
   agreement_conflict: "To likestilte avtaler",
   price_reference_error: "Prisgrunnlag kunne ikke hentes",
+  recalculation_pending: "Må beregnes på nytt",
+  extraction_unresolved: "Beløp mangler i dokumentet",
   no_baseline: "Uten prisgrunnlag",
   extraction_issue: "Uttrekk eller sum stemmer ikke",
   zero_quantity: "Mengde mangler eller er null",
@@ -60,6 +64,7 @@ export const REVIEW_GROUPS = [
   "currency",
   "extraction",
   "conflict",
+  "recalculation",
   "other",
 ] as const;
 export type ReviewGroup = (typeof REVIEW_GROUPS)[number];
@@ -75,6 +80,7 @@ export const GROUP_LABELS: Record<ReviewGroup, string> = {
   currency: "Valuta",
   extraction: "Uttrekk og sum",
   conflict: "Konflikt",
+  recalculation: "Må beregnes på nytt",
   other: "Ukjent årsak",
 };
 
@@ -89,6 +95,8 @@ export const GROUP_DESCRIPTIONS: Record<ReviewGroup, string> = {
   currency: "Fakturaen er i en annen valuta enn NOK, og omregnes ikke automatisk.",
   extraction: "Uttrekket fra dokumentet eller summen av linjene stemmer ikke med fakturaen.",
   conflict: "Samme varenummer eller navn peker på flere varer.",
+  recalculation:
+    "Linjen er nettopp koblet til en vare, men prisen er ikke regnet om ennå. Den kan ikke avstemmes før beregningen er kjørt.",
   other: "Linjen står til gjennomgang uten en årsak vi kjenner igjen.",
 };
 
@@ -107,6 +115,8 @@ const REASON_GROUP: Record<ReasonCode, ReviewGroup> = {
   price_reference_error: "no_baseline",
   extraction_issue: "extraction",
   sku_collision: "conflict",
+  recalculation_pending: "recalculation",
+  extraction_unresolved: "extraction",
 };
 
 const KNOWN: ReadonlySet<string> = new Set<string>([...LINE_REASON_CODES, ...DERIVED_REASON_CODES]);

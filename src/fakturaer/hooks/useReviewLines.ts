@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchAllRows } from "@/lib/supabasePaging";
+import { fetchAllRows, fetchPagesUpTo } from "@/lib/supabasePaging";
 
 export type ReviewReason =
   | "unmatched"
@@ -127,6 +127,9 @@ export function useReviewLines(filters: Filters) {
           .order("invoice(invoice_date)", { ascending: false })
           .order("invoice_id")
           .order("line_number", { nullsFirst: false })
+          // Stabil, unik siste sortering — uten den kan samme rad dukke opp i
+          // to sider (eller falle ut mellom dem) under paginering.
+          .order("id")
           .range(from, to);
 
 
@@ -141,10 +144,10 @@ export function useReviewLines(filters: Filters) {
       let rows: ReviewLineRow[];
       let hasMore = false;
       if (limit != null) {
-        // Ett ekstra treff avslører om det finnes flere linjer enn taket.
-        const { data, error } = await build(0, limit);
-        if (error) throw new Error(error.message);
-        rows = data ?? [];
+        // API-et returnerer maks 1000 rader per kall. Et tak over 1000 må
+        // derfor hentes side for side — ett enkelt range(0, limit) ville
+        // stoppet på 1000 og feilaktig meldt «ingen flere».
+        rows = await fetchPagesUpTo(build, limit + 1);
         hasMore = rows.length > limit;
         if (hasMore) rows = rows.slice(0, limit);
       } else {
@@ -211,6 +214,8 @@ export function useReviewLineCounts(filters: Omit<Filters, "limit">) {
           .or("requires_review.eq.true,variance_status.eq.no_baseline")
           .not("invoice.status", "in", `(${HIDDEN_INVOICE_STATUSES.join(",")})`)
           .order("invoice_id")
+          // Unik sekundærsortering: paginering uten den kan hoppe over rader.
+          .order("id")
           .range(from, to);
         if (filters.legalEntityId) q = q.eq("invoice.legal_entity_id", filters.legalEntityId);
         if (filters.supplierId) q = q.eq("invoice.supplier_id", filters.supplierId);

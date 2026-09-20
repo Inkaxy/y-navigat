@@ -237,8 +237,23 @@ Deno.serve(async (req) => {
         pickText(get(item, "Description")) ??
         `Linje ${idx + 1}`;
       const qty = pickNumber(get(ln, "InvoicedQuantity")) ?? 1;
-      const unitPrice = pickNumber(get(price, "PriceAmount")) ?? 0;
-      const lineNet = pickNumber(get(ln, "LineExtensionAmount")) ?? qty * unitPrice;
+
+      // EHF oppgir PriceAmount PER BaseQuantity (f.eks. 250 kr per 10 stk).
+      // Uten denne divisjonen blir enhetsprisen ti ganger for høy.
+      const priceAmount = pickNumber(get(price, "PriceAmount"));
+      const baseQty = pickNumber(get(price, "BaseQuantity"));
+      const baseOk = baseQty == null || (Number.isFinite(baseQty) && baseQty > 0);
+      const unitPrice = priceAmount == null || !baseOk ? null : priceAmount / (baseQty ?? 1);
+
+      // Linjerabatter/-tillegg gjør qty × pris ULIK linjebeløpet. Mangler
+      // LineExtensionAmount i et slikt tilfelle, gjetter vi ikke — linjen
+      // merkes for gjennomgang i stedet for å få et oppdiktet beløp.
+      const stated = pickNumber(get(ln, "LineExtensionAmount"));
+      const hasAllowance = asArray(get(ln, "AllowanceCharge")).length > 0;
+      const derivable = unitPrice != null && !hasAllowance;
+      const lineNet = stated ?? (derivable ? qty * unitPrice! : null);
+      const unresolved = lineNet == null || unitPrice == null;
+
       const supplierItemNumber =
         pickText(get(get(item, "SellersItemIdentification"), "ID")) ?? null;
       const unitCode =
@@ -254,6 +269,8 @@ Deno.serve(async (req) => {
         unit: normalizeUnit(unitCode) ?? unitCode,
         unit_price: unitPrice,
         total_amount: lineNet,
+        requires_review: unresolved ? true : null,
+        review_reason: unresolved ? "extraction_unresolved" : null,
       };
     });
 

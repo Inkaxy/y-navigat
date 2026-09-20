@@ -25,3 +25,27 @@ export async function fetchAllRows<T>(
   }
   return all;
 }
+
+/**
+ * Henter inntil `wanted` rader, side for side. Bruk denne når det finnes et
+ * tak: et enkelt `.range(0, tak)` stopper på API-ets radgrense (1000) og ser
+ * ut som om det ikke finnes flere rader.
+ */
+export async function fetchPagesUpTo<T>(
+  buildQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  wanted: number,
+  pageSize = 1000,
+): Promise<T[]> {
+  const all: T[] = [];
+  let from = 0;
+  while (all.length < wanted) {
+    const size = Math.min(pageSize, wanted - all.length);
+    const { data, error } = await buildQuery(from, from + size - 1);
+    if (error) throw new Error(error.message);
+    const rows = data ?? [];
+    all.push(...rows);
+    if (rows.length < size) break;
+    from += size;
+  }
+  return all.slice(0, wanted);
+}

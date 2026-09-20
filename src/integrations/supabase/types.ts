@@ -16775,7 +16775,7 @@ export type Database = {
           }
       rm_apply_supplier_link_lines: {
         Args: {
-          p_expected_updated_at: string
+          p_expected_snapshot: string
           p_line_ids: string[]
           p_rms_id: string
         }
@@ -16882,6 +16882,7 @@ export type Database = {
       rm_supplier_link_candidates: {
         Args: { p_rms_id: string }
         Returns: {
+          count_per_package: number
           description: string
           eligible: boolean
           exclusion_reason: string
@@ -16889,12 +16890,17 @@ export type Database = {
           invoice_id: string
           invoice_number: string
           line_id: string
+          match_confidence: string
+          package_size: number
+          package_unit: string
           quantity: number
+          raw_material_id: string
           supplier_sku: string
           total_amount: number
           unit: string
         }[]
       }
+      rm_supplier_link_snapshot: { Args: { p_rms_id: string }; Returns: string }
       rm_unit_factor: {
         Args: { p_base_unit: string; p_unit: string }
         Returns: number
