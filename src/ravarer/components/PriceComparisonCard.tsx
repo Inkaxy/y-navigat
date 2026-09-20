@@ -196,10 +196,14 @@ export function PriceComparisonCard({
             </div>
           )}
 
+          <p className="text-caption text-ink-secondary">
+            Prishistorikken lagrer ingen enhet. Tallene vises i varens grunnenhet i dag ({baseUnit}), og det er en
+            antakelse — ikke en bekreftet enhet på den enkelte observasjonen.
+          </p>
           {rows.some((o) => o.unit_changed_since) && (
             <p className="text-caption text-warning">
-              Grunnenheten på varen er endret etter noen av observasjonene. Historikken lagrer ingen egen enhet, så de
-              eldre prisene kan ikke sammenlignes direkte med de nye.
+              Grunnenheten på varen er endret etter noen av observasjonene. Disse er merket «Enhet ikke bekreftet» og
+              kan ikke sammenlignes direkte med de nyere prisene.
             </p>
           )}
         </>
