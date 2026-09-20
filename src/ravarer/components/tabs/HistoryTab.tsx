@@ -118,6 +118,8 @@ export function HistoryTab({ rm }: Props) {
   const error = changelog.error ?? recalcs.error ?? prices.error;
 
   return (
+    <div className="space-y-4">
+    <PriceComparisonCard rawMaterialId={rm.id} baseUnit={rm.base_unit} />
     <Card className="space-y-4 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-base font-semibold">Historikk</h3>
