@@ -18,7 +18,7 @@ import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, deriveLinePackage, parse
 import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
-import { acceptMatch, startPriceOutcomeLabel } from "@/fakturaer/lib/acceptMatch";
+import { acceptMatch, recalculateLines, startPriceOutcomeLabel } from "@/fakturaer/lib/acceptMatch";
 import { normalizeMatchKey } from "@/fakturaer/lib/matchNormalize";
 import { AI_REASON_LABELS, fetchAiLineSuggestion, type AiLineSuggestion } from "@/fakturaer/lib/aiLineSuggestion";
 import { Sparkles } from "lucide-react";
@@ -272,7 +272,7 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
       const agreed = parseDecimal(agreedPrice);
 
       // Én felles implementasjon for både enkelt- og massegodkjenning.
-      const { lineIds, startPrice } = await acceptMatch({
+      const { lineIds, startPrice, recalculationPending, recalculationError } = await acceptMatch({
         line,
         rawMaterialId: selectedRmId,
         userId: user.id,
@@ -292,13 +292,43 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
 
 
       const antall = lineIds.length;
-      toast.success(applyToAll ? `Matchet ${antall} ${antall === 1 ? "linje" : "linjer"}` : "Linje matchet", {
-        // Serveren avgjør om startprisen faktisk ble lagret — vi gjengir bare svaret.
-        description: startPriceOutcomeLabel(startPrice) ?? undefined,
-      });
+      const startPriceNote = startPriceOutcomeLabel(startPrice) ?? undefined;
+      const invoiceId = line.invoice_id;
+      if (recalculationPending) {
+        // Matchen står, men prisavviket er ikke regnet om. Vi later ikke som
+        // om linjen er ferdig — brukeren får prøve reberegningen på nytt.
+        toast.warning(
+          `Koblingen er lagret, men prisen er ikke regnet om for ${antall} ${antall === 1 ? "linje" : "linjer"}`,
+          {
+            description: [recalculationError, startPriceNote].filter(Boolean).join(" ") || undefined,
+            duration: 15000,
+            action: {
+              label: "Prøv igjen",
+              onClick: () => {
+                void (async () => {
+                  try {
+                    await recalculateLines(invoiceId, lineIds);
+                    toast.success("Prisen er regnet om");
+                    invalidateInvoice(qc, invoiceId);
+                  } catch (err: unknown) {
+                    showError("faktura-match", err, "Reberegningen feilet fortsatt");
+                  }
+                })();
+              },
+            },
+          },
+        );
+      } else {
+        toast.success(applyToAll ? `Matchet ${antall} ${antall === 1 ? "linje" : "linjer"}` : "Linje matchet", {
+          // Serveren avgjør om startprisen faktisk ble lagret — vi gjengir bare svaret.
+          description: startPriceNote,
+        });
+      }
       invalidateInvoice(qc, line.invoice_id);
       invalidateRawMaterial(qc, selectedRmId);
-      if (keepOpen && onAcceptedNext) {
+      if (recalculationPending) {
+        // Skuffen blir stående åpen så brukeren ser at noe gjenstår.
+      } else if (keepOpen && onAcceptedNext) {
         // Skuffen blir stående — neste linje lastes inn av kalleren.
         setSelectedRmId(null);
         setSearch("");

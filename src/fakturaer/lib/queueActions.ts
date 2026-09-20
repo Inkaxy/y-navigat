@@ -31,7 +31,13 @@ async function currentUserId(): Promise<string> {
 export async function acceptTopSuggestion(
   line: ReviewLineRow,
   opts?: { skipRematch?: boolean },
-): Promise<{ name: string; rmsId: string | null }> {
+): Promise<{
+  name: string;
+  rmsId: string | null;
+  lineIds: string[];
+  recalculationPending: boolean;
+  recalculationError: string | null;
+}> {
   const top = line.suggestions?.[0];
   if (!top) throw new Error("Linjen har ingen forslag å godta");
   const userId = await currentUserId();
@@ -71,14 +77,23 @@ export async function acceptTopSuggestion(
     skipRematch: opts?.skipRematch ?? false,
   });
 
-  return { name: top.raw_material?.name ?? "varen", rmsId: res.rmsId };
+  return {
+    name: top.raw_material?.name ?? "varen",
+    rmsId: res.rmsId,
+    lineIds: res.lineIds,
+    recalculationPending: res.recalculationPending,
+    recalculationError: res.recalculationError,
+  };
 }
 
 /**
  * Kjører matchemotoren ÉN gang per faktura for de oppgitte linjene.
  * Brukes etter masse-handlinger der hver linje ble lagret med `skipRematch`.
  */
-export async function rematchLines(lines: Array<{ invoice_id: string; id: string }>): Promise<void> {
+export async function rematchLines(
+  lines: Array<{ invoice_id: string; id: string }>,
+): Promise<Array<{ invoiceId: string; lineIds: string[]; message: string }>> {
+  const failures: Array<{ invoiceId: string; lineIds: string[]; message: string }> = [];
   const byInvoice = new Map<string, string[]>();
   for (const l of lines) {
     const arr = byInvoice.get(l.invoice_id) ?? [];
@@ -89,8 +104,10 @@ export async function rematchLines(lines: Array<{ invoice_id: string; id: string
     const { error } = await supabase.functions.invoke("match-invoice-lines", {
       body: { invoice_id: invoiceId, line_ids: lineIds },
     });
-    if (error) console.warn(`rematchLines: reberegning feilet for faktura ${invoiceId}: ${error.message}`);
+    if (error) failures.push({ invoiceId, lineIds, message: error.message });
   }
+  // Kalleren må få vite hvilke linjer som fortsatt står til ny beregning.
+  return failures;
 }
 
 /** Merker linjen som «ikke aktuell» (frakt, gebyr, pant og lignende). */

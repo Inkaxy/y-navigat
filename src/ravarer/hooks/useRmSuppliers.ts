@@ -46,6 +46,7 @@ export interface RmSupplierRow {
   start_price_effective_date?: string | null;
   start_price_confirmed_at?: string | null;
   start_price_confirmed_by?: string | null;
+  start_price_unit_change_at?: string | null;
 }
 
 export interface PriceHistoryRow {

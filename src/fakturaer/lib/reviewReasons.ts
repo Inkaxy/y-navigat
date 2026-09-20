@@ -26,6 +26,7 @@ export const LINE_REASON_CODES = [
   "extraction_unresolved",
   "missing_base_unit",
   "start_price_manual_check",
+  "no_automatic_basis",
 ] as const;
 export type LineReasonCode = (typeof LINE_REASON_CODES)[number];
 
@@ -51,6 +52,7 @@ export const REASON_LABELS: Record<ReasonCode, string> = {
   extraction_unresolved: "Beløp mangler i dokumentet",
   missing_base_unit: "Varen mangler grunnenhet",
   start_price_manual_check: "Startpris må kontrolleres manuelt",
+  no_automatic_basis: "Uten gyldig prisgrunnlag",
   no_baseline: "Uten prisgrunnlag",
   extraction_issue: "Uttrekk eller sum stemmer ikke",
   zero_quantity: "Mengde mangler eller er null",
@@ -127,6 +129,7 @@ const REASON_GROUP: Record<ReasonCode, ReviewGroup> = {
   extraction_unresolved: "extraction",
   missing_base_unit: "package_unit",
   start_price_manual_check: "start_price",
+  no_automatic_basis: "no_baseline",
 };
 
 const KNOWN: ReadonlySet<string> = new Set<string>([...LINE_REASON_CODES, ...DERIVED_REASON_CODES]);

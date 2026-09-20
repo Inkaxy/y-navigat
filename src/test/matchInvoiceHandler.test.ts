@@ -264,3 +264,67 @@ describe("matchemotoren: en fullt avklart linje går fortsatt gjennom", () => {
     expect(invoice.status).toBe("ready");
   });
 });
+
+/**
+ * Automatisk kobling uten gyldig prisgrunnlag skal aldri ferdigmerke linjen.
+ * Forrige kjøp er kun en sammenligning — det er ikke et godkjenningsgrunnlag.
+ */
+describe("matchemotoren: automatisk kobling krever gyldig prisgrunnlag", () => {
+  async function runAuto(reference: Record<string, unknown>) {
+    const tables = buildTables({ line: { match_confidence: null, raw_material_id: null } });
+    tables.raw_material_suppliers.push({
+      id: "rms-1",
+      raw_material_id: RM,
+      supplier_id: SUPPLIER,
+      supplier_sku: "SUK",
+      supplier_product_name: "Sukker",
+      agreed_price_per_base_unit: null,
+      agreement_valid_from: null,
+      agreement_valid_to: null,
+      last_invoice_date: null,
+      package_size: 1,
+      package_unit: "kg",
+      base_units_per_package: 1,
+      package_confirmed_at: "2026-08-01T00:00:00Z",
+      is_primary: true,
+    });
+    tables.raw_material_supplier_aliases.push({
+      id: "alias-1",
+      raw_material_supplier_id: "rms-1",
+      alias_type: "supplier_sku",
+      alias_value: "SUK",
+      alias_value_normalized: "suk",
+      status: "confirmed",
+      match_count: 5,
+    });
+    const client = createFakeClient(tables, { rpc: { rm_price_reference: reference } });
+    (globalThis as Record<string, unknown>).__EDGE_SUPABASE_FACTORY__ = () => client;
+    const res = await handler(
+      new Request("http://localhost/match-invoice-lines", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ invoice_id: INVOICE }),
+      }),
+    );
+    expect(res.status).toBe(200);
+    return { line: tables.invoice_lines[0], invoice: tables.invoices[0] };
+  }
+
+  it("forrige kjøp med lik pris blir stående til gjennomgang", async () => {
+    const { line, invoice } = await runAuto({ source: "last_purchase", price: 100 });
+    expect(line.requires_review).toBe(true);
+    expect(String(line.review_reason).split(",")).toContain("no_automatic_basis");
+    expect(invoice.status).toBe("needs_review");
+  });
+
+  it("gyldig avtalepris med lik pris ferdigmerker linjen", async () => {
+    const { line } = await runAuto({ source: "agreement", price: 100 });
+    expect(line.requires_review).toBe(false);
+    expect(String(line.review_reason ?? "")).not.toContain("no_automatic_basis");
+  });
+
+  it("bekreftet startpris er et gyldig grunnlag (men følger innstillingen for manuell kontroll)", async () => {
+    const { line } = await runAuto({ source: "start_price", price: 100 });
+    expect(String(line.review_reason ?? "")).not.toContain("no_automatic_basis");
+  });
+});

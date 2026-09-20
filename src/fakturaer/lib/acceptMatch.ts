@@ -69,6 +69,14 @@ export interface AcceptMatchResult {
   lineIds: string[];
   rmsId: string | null;
   startPrice: AcceptMatchStartPrice;
+  /**
+   * Sant når prisavviket ikke er regnet om ennå. Linjene står da til ny
+   * beregning på serveren, og kalleren må tilby å prøve igjen — aldri vise
+   * bekreftelsen som helt ferdig.
+   */
+  recalculationPending: boolean;
+  /** Feilmeldingen fra reberegningen, når den feilet. */
+  recalculationError: string | null;
 }
 
 function num(v: unknown): number | null {
@@ -313,18 +321,38 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<AcceptMatch
   // 4) Kjør pipeline på nytt for linjene (prisavvik regnes om).
   //    Feiler dette er matchen likevel lagret — linjen merkes til ny beregning
   //    av motoren neste kjøring, og kalleren får vite at det gjenstår.
-  if (skipRematch) return { lineIds, rmsId, startPrice };
+  // Masse-godkjenning kjører reberegningen samlet til slutt; linjene står
+  // fortsatt til ny beregning når denne funksjonen returnerer.
+  if (skipRematch) {
+    return { lineIds, rmsId, startPrice, recalculationPending: true, recalculationError: null };
+  }
 
   const { error: fnErr } = await supabase.functions.invoke("match-invoice-lines", {
     body: { invoice_id: line.invoice_id, line_ids: lineIds },
   });
   if (fnErr) {
-    console.warn(
-      `acceptMatch: matchen er lagret, men reberegning av prisavvik (match-invoice-lines) feilet: ${fnErr.message}`,
-    );
+    return {
+      lineIds,
+      rmsId,
+      startPrice,
+      recalculationPending: true,
+      recalculationError: fnErr.message,
+    };
   }
 
-  return { lineIds, rmsId, startPrice };
+  return { lineIds, rmsId, startPrice, recalculationPending: false, recalculationError: null };
+}
+
+/**
+ * Kjører reberegningen av prisavvik på nytt for bestemte linjer.
+ * Brukes av «Prøv igjen» etter en bekreftelse der reberegningen feilet.
+ * Kaster ved feil — kalleren skal ikke kunne vise falsk suksess.
+ */
+export async function recalculateLines(invoiceId: string, lineIds: string[]): Promise<void> {
+  const { error } = await supabase.functions.invoke("match-invoice-lines", {
+    body: { invoice_id: invoiceId, line_ids: lineIds },
+  });
+  if (error) throw new Error(`Reberegningen feilet: ${error.message}`);
 }
 
 /** Norsk forklaring på hva som skjedde med startprisen i bekreftelsen. */

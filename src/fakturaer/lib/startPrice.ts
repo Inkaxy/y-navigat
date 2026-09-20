@@ -265,17 +265,51 @@ export async function clearStartPrice(rmsId: string, reason: string): Promise<{ 
 }
 
 /**
- * Gjør en bekreftet startpris om til avtalepris. Avtalen gjelder fra i dag —
- * serveren tilbakedaterer aldri en avtaleperiode.
+ * Gjør en bekreftet startpris om til avtalepris.
+ *
+ * Avtalen får en NY gyldighetsdato (i dag som standard) — en ny pris arver
+ * aldri den gamle avtaleperioden. Skjermbildet sender med startprisen og
+ * pakningen brukeren faktisk så, slik at serveren kan avvise en utdatert
+ * visning, og en eksisterende avtalepris erstattes bare når brukeren
+ * uttrykkelig har bekreftet det.
  */
-export async function startPriceToAgreement(
-  rmsId: string,
-  reason: string,
-): Promise<{ updated: boolean; agreedPricePerBaseUnit: number | null }> {
-  const { data, error } = await supabase.rpc("rm_start_price_to_agreement", { p_rms_id: rmsId, p_reason: reason });
+export async function startPriceToAgreement(args: {
+  rmsId: string;
+  reason: string;
+  expectedStartPrice: number | null;
+  expectedUnitChangeAt: string | null;
+  expectedPackageSize: number | null;
+  expectedPackageUnit: string | null;
+  expectedBaseUnitsPerPackage: number | null;
+  replaceExisting: boolean;
+  validFrom?: string | null;
+}): Promise<{
+  updated: boolean;
+  agreedPricePerBaseUnit: number | null;
+  validFrom: string | null;
+  validTo: string | null;
+  replacedExisting: boolean;
+}> {
+  const { data, error } = await supabase.rpc("rm_start_price_to_agreement", {
+    p_rms_id: args.rmsId,
+    p_reason: args.reason,
+    p_expected_start_price: args.expectedStartPrice ?? undefined,
+    p_expected_unit_change_at: args.expectedUnitChangeAt ?? undefined,
+    p_expected_package_size: args.expectedPackageSize ?? undefined,
+    p_expected_package_unit: args.expectedPackageUnit ?? undefined,
+    p_expected_base_units_per_package: args.expectedBaseUnitsPerPackage ?? undefined,
+    p_replace_existing: args.replaceExisting,
+    p_valid_from: args.validFrom ?? undefined,
+  });
   if (error) throw error;
   const o = (data ?? {}) as Record<string, unknown>;
-  return { updated: o.updated === true, agreedPricePerBaseUnit: num(o.agreed_price_per_base_unit) };
+  return {
+    updated: o.updated === true,
+    agreedPricePerBaseUnit: num(o.agreed_price_per_base_unit),
+    validFrom: str(o.agreement_valid_from),
+    validTo: str(o.agreement_valid_to),
+    replacedExisting: o.replaced_existing === true,
+  };
 }
 
 /**

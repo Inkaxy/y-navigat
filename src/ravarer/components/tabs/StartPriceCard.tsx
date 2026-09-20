@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -45,6 +46,8 @@ export function StartPriceCard({
 
   const [dialog, setDialog] = useState<{ mode: "clear" | "agreement"; link: RmSupplierRow } | null>(null);
   const [reason, setReason] = useState("");
+  /** Erstatning av en eksisterende avtalepris krever en uttrykkelig bekreftelse. */
+  const [confirmReplace, setConfirmReplace] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const withStartPrice = links.filter((l) => l.start_price_per_base_unit != null);
@@ -58,9 +61,21 @@ export function StartPriceCard({
         const res = await clearStartPrice(dialog.link.id, reason);
         toast.success(res.cleared ? "Startprisen er fjernet" : "Det finnes ingen startpris å fjerne");
       } else {
-        await startPriceToAgreement(dialog.link.id, reason);
+        const l = dialog.link;
+        const res = await startPriceToAgreement({
+          rmsId: l.id,
+          reason,
+          // Verdiene brukeren faktisk så. Er noe endret i mellomtiden, avviser
+          // serveren handlingen i stedet for å erstatte avtaleprisen på feil grunnlag.
+          expectedStartPrice: l.start_price_per_base_unit ?? null,
+          expectedUnitChangeAt: l.start_price_unit_change_at ?? null,
+          expectedPackageSize: l.package_size,
+          expectedPackageUnit: l.package_unit,
+          expectedBaseUnitsPerPackage: l.base_units_per_package,
+          replaceExisting: l.agreed_price_per_base_unit != null,
+        });
         toast.success("Startprisen er satt som avtalepris", {
-          description: "Avtalen gjelder fra i dag. Eldre fakturaer påvirkes ikke.",
+          description: `Avtalen gjelder fra ${formatDate(res.validFrom)}. Eldre fakturaer påvirkes ikke.`,
         });
       }
       void qc.invalidateQueries({ queryKey: ["raw_material_suppliers", dialog.link.raw_material_id] });
@@ -126,6 +141,7 @@ export function StartPriceCard({
                       disabled={stale}
                       onClick={() => {
                         setReason("");
+                        setConfirmReplace(false);
                         setDialog({ mode: "agreement", link: l });
                       }}
                     >
@@ -136,6 +152,7 @@ export function StartPriceCard({
                       variant="ghost"
                       onClick={() => {
                         setReason("");
+                        setConfirmReplace(false);
                         setDialog({ mode: "clear", link: l });
                       }}
                     >
@@ -159,7 +176,7 @@ export function StartPriceCard({
               {dialog?.mode === "clear"
                 ? "Startprisen fjernes og kan bekreftes på nytt fra en fakturalinje senere."
                 : dialog?.link.agreed_price_per_base_unit != null
-                  ? "Leverandøren har allerede en avtalepris. Den blir erstattet av startprisen, og avtalen gjelder fra i dag."
+                  ? "Leverandøren har allerede en avtalepris. Den blir erstattet av startprisen, og den nye avtalen gjelder fra i dag — ikke fra den gamle avtaledatoen."
                   : "Startprisen blir avtalepris og gjelder fra i dag. Eldre fakturaer påvirkes ikke."}
             </DialogDescription>
           </DialogHeader>
@@ -173,11 +190,31 @@ export function StartPriceCard({
               placeholder="Hvorfor gjør du denne endringen?"
             />
           </div>
+          {dialog?.mode === "agreement" && dialog.link.agreed_price_per_base_unit != null && (
+            <label className="flex items-start gap-2 text-sm">
+              <Checkbox
+                checked={confirmReplace}
+                onCheckedChange={(v) => setConfirmReplace(v === true)}
+                aria-label="Bekreft at avtaleprisen skal erstattes"
+              />
+              <span>
+                Jeg bekrefter at dagens avtalepris ({formatNok(Number(dialog.link.agreed_price_per_base_unit))}) skal
+                erstattes av startprisen.
+              </span>
+            </label>
+          )}
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDialog(null)} disabled={busy}>
               Avbryt
             </Button>
-            <Button onClick={run} disabled={busy || reason.trim().length === 0}>
+            <Button
+              onClick={run}
+              disabled={
+                busy ||
+                reason.trim().length === 0 ||
+                (dialog?.mode === "agreement" && dialog.link.agreed_price_per_base_unit != null && !confirmReplace)
+              }
+            >
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}
               {dialog?.mode === "clear" ? "Fjern startpris" : "Sett som avtalepris"}
             </Button>
