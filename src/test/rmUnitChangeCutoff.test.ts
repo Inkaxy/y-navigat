@@ -12,10 +12,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
  * Testen kjører den faktisk kjørte migrasjonen.
  */
 
-const MIGRATION = path.join(
-  process.cwd(),
+const MIGRATIONS = [
+  "supabase/migrations/20260920193541_80292722-ede2-438f-8c3e-fd0c55e597cc.sql",
   "supabase/migrations/20260920200038_09112d2f-3ae1-4d38-a3b2-10bd4d5c8a86.sql",
-);
+].map((f) => path.join(process.cwd(), f));
 
 const ENTITY = "11111111-1111-1111-1111-111111111111";
 const RM = "33333333-3333-3333-3333-333333333333";
@@ -112,11 +112,13 @@ async function summary(onDate: string): Promise<Record<string, unknown>> {
 beforeAll(async () => {
   db = new PGlite();
   await db.exec(SCHEMA);
-  const sql = readFileSync(MIGRATION, "utf8")
-    .split("\n")
-    .filter((line) => !/^\s*(revoke|grant)\b/i.test(line))
-    .join("\n");
-  await db.exec(sql);
+  for (const file of MIGRATIONS) {
+    const sql = readFileSync(file, "utf8")
+      .split("\n")
+      .filter((line) => !/^\s*(revoke|grant)\b/i.test(line))
+      .join("\n");
+    await db.exec(sql);
+  }
 });
 
 afterAll(async () => {
