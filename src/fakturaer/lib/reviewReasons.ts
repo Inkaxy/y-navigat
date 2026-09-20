@@ -21,6 +21,7 @@ export const LINE_REASON_CODES = [
   "sku_collision",
   "unsupported_currency",
   "agreement_conflict",
+  "price_reference_error",
 ] as const;
 export type LineReasonCode = (typeof LINE_REASON_CODES)[number];
 
