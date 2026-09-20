@@ -39,6 +39,9 @@ const PRICE_REASONS: ReadonlySet<string> = new Set([
  * Årsaker som må løses FØR prisen betyr noe: uten riktig beløp, mengde,
  * pakning eller grunnenhet er kiloprisen ikke et tall man kan diskutere.
  */
+/** Koblinger motoren kan stå inne for: menneskelig bekreftet eller entydig varenummer/bekreftet alias. */
+const TRUSTED_MATCH: ReadonlySet<string> = new Set(["manual", "auto_high"]);
+
 const BLOCKING_DATA_REASONS: ReadonlySet<string> = new Set([
   "extraction_unresolved",
   "extraction_issue",
@@ -72,9 +75,11 @@ export function primaryActionFor(line: ReviewLineRow, startPriceLineIds?: Readon
   }
 
   const linked = !!line.raw_material_id;
-  // En automatisk kobling med lav tillit er IKKE en bekreftet kobling, selv om
-  // linjen har en vare på seg.
-  const confirmedLink = linked && line.match_confidence === "manual";
+  // Matchemotorens semantikk: «manual» er menneskelig bekreftet, «auto_high»
+  // kommer fra et bekreftet alias eller et entydig varenummer — begge er
+  // pålitelige koblinger. «auto_medium» og «auto_low» er gjetninger som må
+  // vurderes av et menneske.
+  const trustedLink = linked && TRUSTED_MATCH.has(String(line.match_confidence ?? ""));
 
   // 1) Uttrekk, mengde, pakning og grunnenhet først.
   if (reasons.some((r) => BLOCKING_DATA_REASONS.has(r))) {
@@ -86,7 +91,7 @@ export function primaryActionFor(line: ReviewLineRow, startPriceLineIds?: Readon
   }
 
   // 2) Deretter forslaget som venter på en menneskelig vurdering.
-  if (!confirmedLink) {
+  if (!trustedLink) {
     const hasSuggestion = (line.suggestions?.length ?? 0) > 0;
     if (hasSuggestion || linked) {
       return {

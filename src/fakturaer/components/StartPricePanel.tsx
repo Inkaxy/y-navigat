@@ -28,6 +28,16 @@ export interface StartPricePanelProps {
   onClose: () => void;
 }
 
+/**
+ * Merkelappen skal fortelle sannheten om koblingen. Sier serveren uttrykkelig
+ * at koblingen ikke er manuelt bekreftet, skal den ALDRI vises som bekreftet.
+ */
+export function linkBadgeLabel(eligibility: StartPriceEligibility): string {
+  if (eligibility.blockers.includes("koblingen_er_ikke_manuelt_bekreftet")) return "Kobling må bekreftes";
+  if (!eligibility.eligible) return "Til kontroll";
+  return "Bekreftet kobling";
+}
+
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-4 py-1">
@@ -68,7 +78,9 @@ export function StartPricePanel({
           <div className="space-y-4">
             <div className="rounded-md border border-line-subtle p-3">
               <div className="mb-2 flex flex-wrap items-center gap-2">
-                <Badge variant="outline">Bekreftet kobling</Badge>
+                <Badge variant={eligibility.eligible ? "outline" : "secondary"}>
+                  {linkBadgeLabel(eligibility)}
+                </Badge>
                 <span className="text-sm font-medium">{rawMaterialName ?? "Ukjent vare"}</span>
                 <span className="text-caption text-ink-secondary">{supplierName ?? "ukjent leverandør"}</span>
               </div>
@@ -96,7 +108,7 @@ export function StartPricePanel({
                   }
                 />
                 <Row
-                  label="Blir lagret som startpris"
+                  label={eligibility.eligible ? "Blir lagret som startpris" : "Beregnet pris per grunnenhet"}
                   value={
                     <span className="text-base">
                       {formatMoney(eligibility.price_per_base_unit, eligibility.currency)}
