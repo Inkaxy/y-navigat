@@ -16985,7 +16985,17 @@ export type Database = {
         Returns: Json
       }
       rm_start_price_to_agreement: {
-        Args: { p_reason: string; p_rms_id: string }
+        Args: {
+          p_expected_base_units_per_package?: number
+          p_expected_package_size?: number
+          p_expected_package_unit?: string
+          p_expected_start_price?: number
+          p_expected_unit_change_at?: string
+          p_reason: string
+          p_replace_existing?: boolean
+          p_rms_id: string
+          p_valid_from?: string
+        }
         Returns: Json
       }
       rm_stock_count_apply: {
