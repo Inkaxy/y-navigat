@@ -24,6 +24,7 @@ export const LINE_REASON_CODES = [
   "price_reference_error",
   "recalculation_pending",
   "extraction_unresolved",
+  "missing_base_unit",
 ] as const;
 export type LineReasonCode = (typeof LINE_REASON_CODES)[number];
 
