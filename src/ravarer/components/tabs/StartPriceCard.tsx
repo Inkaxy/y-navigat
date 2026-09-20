@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -175,7 +176,7 @@ export function StartPriceCard({
               {dialog?.mode === "clear"
                 ? "Startprisen fjernes og kan bekreftes på nytt fra en fakturalinje senere."
                 : dialog?.link.agreed_price_per_base_unit != null
-                  ? "Leverandøren har allerede en avtalepris. Den blir erstattet av startprisen, og avtalen gjelder fra i dag."
+                  ? "Leverandøren har allerede en avtalepris. Den blir erstattet av startprisen, og den nye avtalen gjelder fra i dag — ikke fra den gamle avtaledatoen."
                   : "Startprisen blir avtalepris og gjelder fra i dag. Eldre fakturaer påvirkes ikke."}
             </DialogDescription>
           </DialogHeader>
@@ -189,11 +190,31 @@ export function StartPriceCard({
               placeholder="Hvorfor gjør du denne endringen?"
             />
           </div>
+          {dialog?.mode === "agreement" && dialog.link.agreed_price_per_base_unit != null && (
+            <label className="flex items-start gap-2 text-sm">
+              <Checkbox
+                checked={confirmReplace}
+                onCheckedChange={(v) => setConfirmReplace(v === true)}
+                aria-label="Bekreft at avtaleprisen skal erstattes"
+              />
+              <span>
+                Jeg bekrefter at dagens avtalepris ({formatNok(Number(dialog.link.agreed_price_per_base_unit))}) skal
+                erstattes av startprisen.
+              </span>
+            </label>
+          )}
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDialog(null)} disabled={busy}>
               Avbryt
             </Button>
-            <Button onClick={run} disabled={busy || reason.trim().length === 0}>
+            <Button
+              onClick={run}
+              disabled={
+                busy ||
+                reason.trim().length === 0 ||
+                (dialog?.mode === "agreement" && dialog.link.agreed_price_per_base_unit != null && !confirmReplace)
+              }
+            >
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}
               {dialog?.mode === "clear" ? "Fjern startpris" : "Sett som avtalepris"}
             </Button>
