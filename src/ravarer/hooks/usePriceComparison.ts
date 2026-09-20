@@ -23,6 +23,8 @@ export interface PriceSummary {
   weighted_90d_quantity: number | null;
   weighted_90d_observations: number | null;
   weighted_90d_suppliers: number | null;
+  /** Datoen grunnenheten sist ble endret — eldre tall er holdt utenfor. */
+  unit_changed_at: string | null;
   on_date: string;
 }
 
@@ -60,7 +62,14 @@ interface LineJoin {
  * endret senere, kan eldre observasjoner ikke sammenlignes direkte — de
  * merkes derfor i stedet for å bli presentert som sammenlignbare.
  */
-export function usePriceComparison(rawMaterialId: string | undefined, supplierId: string | null) {
+/** Hvor mange observasjoner som hentes om gangen. */
+export const OBSERVATION_PAGE = 200;
+
+export function usePriceComparison(
+  rawMaterialId: string | undefined,
+  supplierId: string | null,
+  limit = OBSERVATION_PAGE,
+) {
   const onDate = osloTodayISO();
 
   const summary = useQuery({
@@ -78,7 +87,7 @@ export function usePriceComparison(rawMaterialId: string | undefined, supplierId
   });
 
   const observations = useQuery({
-    queryKey: ["rm-price-observations", rawMaterialId, supplierId],
+    queryKey: ["rm-price-observations", rawMaterialId, supplierId, limit],
     enabled: !!rawMaterialId,
     queryFn: async (): Promise<PriceObservation[]> => {
       let q = supabase
@@ -91,7 +100,7 @@ export function usePriceComparison(rawMaterialId: string | undefined, supplierId
         .eq("raw_material_id", rawMaterialId!)
         .order("effective_date", { ascending: false })
         .order("id", { ascending: false })
-        .limit(200);
+        .limit(limit);
       if (supplierId) q = q.eq("supplier_id", supplierId);
       const { data, error } = await q;
       if (error) throw error;

@@ -16902,6 +16902,10 @@ export type Database = {
         }[]
       }
       rm_supplier_link_snapshot: { Args: { p_rms_id: string }; Returns: string }
+      rm_unit_change_cutoff: {
+        Args: { p_raw_material_id: string }
+        Returns: string
+      }
       rm_unit_factor: {
         Args: { p_base_unit: string; p_unit: string }
         Returns: number
