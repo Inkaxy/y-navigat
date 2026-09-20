@@ -10,6 +10,11 @@ export default defineConfig({
     // Komponenttester setter selv `// @vitest-environment jsdom` øverst i fila.
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
+    // SQL-testene starter en ekte Postgres (PGlite) i en before-hook. Under full
+    // parallell kjøring bruker oppstarten mer enn standardgrensen på 10 s, og
+    // testene falt tilfeldig ut uten at noe var galt.
+    hookTimeout: 60_000,
+    testTimeout: 30_000,
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
     // RLS-røyktestene treffer den ekte Supabase-instansen og krever
     // konfigurasjon. De kjøres som egen jobb (`npm run test:rls`) slik at de
