@@ -649,35 +649,13 @@ export default function FakturaerInboxPage() {
 
       <Card className="p-4">
         <div className="flex flex-wrap items-center gap-3">
-          {entities.length > 1 && (
-            <Select
-              value={legalEntityId}
-              onValueChange={(v) => {
-                setLegalEntityId(v);
-                setSupplierId("all");
-              }}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Alle selskaper</SelectItem>
-                {entities.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
           <Popover open={supplierOpen} onOpenChange={setSupplierOpen}>
             <PopoverTrigger asChild>
               <Button
                 type="button"
                 variant="outline"
                 role="combobox"
-                disabled={legalEntityId === "all" && entities.length > 1}
+                disabled={!legalEntityId}
                 className="w-[260px] justify-between font-normal"
               >
                 <span className="truncate">
