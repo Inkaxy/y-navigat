@@ -711,6 +711,37 @@ async function insertSuggestions(svc: any, rows: AnyRec[]) {
   if (error) throw new Error(`Kunne ikke lagre forslag: ${error.message}`);
 }
 
+/** En kostpris er brukbar bare når den er ferdig avklart OG et endelig tall. */
+function costIsUsable(cost: AnyRec | null | undefined): boolean {
+  return (
+    !!cost &&
+    !cost.needsInput &&
+    cost.confidenceLevel !== "low" &&
+    typeof cost.pricePerBaseUnit === "number" &&
+    Number.isFinite(cost.pricePerBaseUnit)
+  );
+}
+
+/**
+ * Alle varianter av en ubrukelig kostpris skal gi en BLOKKERENDE årsak:
+ * manglende/nullbeløp, mengde 0, ukjent grunnenhet, ubekreftet pakning,
+ * lav tillit — eller et tall som ikke er endelig.
+ */
+function costReviewReasons(cost: AnyRec | null | undefined, actual: number | null): string[] {
+  const reasons: string[] = [];
+  if (!cost) return ["uncertain_cost"];
+  if (cost.needsInput === "package_size") reasons.push("unknown_package_size");
+  else if (cost.needsInput === "amount") reasons.push("extraction_unresolved");
+  else if (cost.needsInput === "base_unit") reasons.push("missing_base_unit");
+  else {
+    // Pakning som bare er tolket ut av varenavnet er ikke bekreftet.
+    if (packageNeedsConfirmation(cost)) reasons.push("unknown_package_size");
+    if (cost.confidenceLevel === "low") reasons.push("uncertain_cost");
+  }
+  if ((actual == null || !Number.isFinite(actual)) && reasons.length === 0) reasons.push("uncertain_cost");
+  return reasons;
+}
+
 /**
  * Kostpris for en fakturalinje — ÉN motor, samme som grensesnittet bruker.
  * Beløpet er grunnlaget; `unit_price` er kun kontrollverdi.
