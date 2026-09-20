@@ -247,3 +247,42 @@ export const START_PRICE_QUERY_KEYS = {
   candidates: (entityId: string | null, supplierId: string | null) =>
     ["start-price-candidates", entityId ?? "none", supplierId ?? "all"] as const,
 };
+
+/**
+ * Fjerner en bekreftet startpris. Krever godkjennerrettighet og begrunnelse —
+ * begge håndheves på serveren, som også skriver revisjonsspor.
+ */
+export async function clearStartPrice(rmsId: string, reason: string): Promise<{ cleared: boolean; reason: string | null }> {
+  const { data, error } = await supabase.rpc("rm_clear_start_price", { p_rms_id: rmsId, p_reason: reason });
+  if (error) throw error;
+  const o = (data ?? {}) as Record<string, unknown>;
+  return { cleared: o.cleared === true, reason: str(o.reason) };
+}
+
+/**
+ * Gjør en bekreftet startpris om til avtalepris. Avtalen gjelder fra i dag —
+ * serveren tilbakedaterer aldri en avtaleperiode.
+ */
+export async function startPriceToAgreement(
+  rmsId: string,
+  reason: string,
+): Promise<{ updated: boolean; agreedPricePerBaseUnit: number | null }> {
+  const { data, error } = await supabase.rpc("rm_start_price_to_agreement", { p_rms_id: rmsId, p_reason: reason });
+  if (error) throw error;
+  const o = (data ?? {}) as Record<string, unknown>;
+  return { updated: o.updated === true, agreedPricePerBaseUnit: num(o.agreed_price_per_base_unit) };
+}
+
+/**
+ * Startprisen er ugyldig som grunnlag når grunnenheten på varen er endret
+ * etter at den ble bekreftet. Da må den bekreftes på nytt.
+ */
+export function startPriceIsStale(args: {
+  startPriceBaseUnit: string | null;
+  currentBaseUnit: string | null;
+  startPrice: number | null;
+}): boolean {
+  if (args.startPrice == null) return false;
+  if (!args.startPriceBaseUnit || !args.currentBaseUnit) return true;
+  return args.startPriceBaseUnit !== args.currentBaseUnit;
+}

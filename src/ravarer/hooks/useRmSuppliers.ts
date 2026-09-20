@@ -34,6 +34,18 @@ export interface RmSupplierRow {
   last_invoice_price: number | null;
   last_invoice_date: string | null;
   notes: string | null;
+  // Startpris — settes kun av de godkjente RPC-ene, aldri direkte fra klienten.
+  start_price_per_base_unit?: number | null;
+  start_price_currency?: string | null;
+  start_price_base_unit?: string | null;
+  start_price_base_units_per_package?: number | null;
+  start_price_package_size?: number | null;
+  start_price_package_unit?: string | null;
+  start_price_invoice_id?: string | null;
+  start_price_invoice_line_id?: string | null;
+  start_price_effective_date?: string | null;
+  start_price_confirmed_at?: string | null;
+  start_price_confirmed_by?: string | null;
 }
 
 export interface PriceHistoryRow {

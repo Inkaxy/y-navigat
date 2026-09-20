@@ -18,8 +18,10 @@ import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, deriveLinePackage, parse
 import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
-import { acceptMatch } from "@/fakturaer/lib/acceptMatch";
+import { acceptMatch, startPriceOutcomeLabel } from "@/fakturaer/lib/acceptMatch";
 import { normalizeMatchKey } from "@/fakturaer/lib/matchNormalize";
+import { AI_REASON_LABELS, fetchAiLineSuggestion, type AiLineSuggestion } from "@/fakturaer/lib/aiLineSuggestion";
+import { Sparkles } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -70,6 +72,10 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
   const [packageSize, setPackageSize] = useState("");
   const [packageUnit, setPackageUnit] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  // AI-forslag hentes bare når brukeren ber om det, og er aldri en bekreftelse.
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<AiLineSuggestion | null>(null);
+  const [aiNotice, setAiNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -89,6 +95,8 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
     }) : null;
     setPackageSize(pkg ? String(pkg.size) : "");
     setPackageUnit(pkg?.unit ?? "");
+    setAiSuggestion(null);
+    setAiNotice(null);
   }, [open, line?.id]);
 
   const legalEntityId = line?.invoice.legal_entity_id;
@@ -264,7 +272,7 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
       const agreed = parseDecimal(agreedPrice);
 
       // Én felles implementasjon for både enkelt- og massegodkjenning.
-      const { lineIds } = await acceptMatch({
+      const { lineIds, startPrice } = await acceptMatch({
         line,
         rawMaterialId: selectedRmId,
         userId: user.id,
@@ -283,7 +291,11 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
       });
 
 
-      toast.success(applyToAll ? `Matchet ${lineIds.length} linjer` : "Linje matchet");
+      const antall = lineIds.length;
+      toast.success(applyToAll ? `Matchet ${antall} ${antall === 1 ? "linje" : "linjer"}` : "Linje matchet", {
+        // Serveren avgjør om startprisen faktisk ble lagret — vi gjengir bare svaret.
+        description: startPriceOutcomeLabel(startPrice) ?? undefined,
+      });
       invalidateInvoice(qc, line.invoice_id);
       invalidateRawMaterial(qc, selectedRmId);
       if (keepOpen && onAcceptedNext) {
@@ -298,6 +310,36 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
       showError("faktura-match", e, "Kunne ikke matche linjen");
     } finally {
       setBusy(false);
+    }
+  }
+
+  /**
+   * Henter et AI-forslag for linjen. Forslaget fyller bare ut skjemaet —
+   * bekreftelsen gjør brukeren selv, akkurat som før.
+   */
+  async function runAiSuggestion() {
+    if (!line) return;
+    setAiBusy(true);
+    setAiNotice(null);
+    try {
+      const { suggestion, reason } = await fetchAiLineSuggestion({
+        invoiceLineId: line.id,
+        candidateIds: suggestions.map((s) => s.raw_material_id).filter((id): id is string => !!id),
+      });
+      if (!suggestion) {
+        setAiSuggestion(null);
+        setAiNotice(reason ? AI_REASON_LABELS[reason] : AI_REASON_LABELS.ai_feilet);
+        return;
+      }
+      setAiSuggestion(suggestion);
+      if (suggestion.rawMaterialId) setSelectedRmId(suggestion.rawMaterialId);
+      if (suggestion.packageSize != null) setPackageSize(String(suggestion.packageSize));
+      if (suggestion.packageUnit) setPackageUnit(suggestion.packageUnit);
+      if (!suggestion.rawMaterialId) {
+        setAiNotice("AI-hjelpen fant ingen passende vare. Søk fram varen manuelt.");
+      }
+    } finally {
+      setAiBusy(false);
     }
   }
 
@@ -337,6 +379,38 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
 
           {/* Right – matching */}
           <div className="space-y-5">
+            {/*
+              AI-hjelp er valgfri og hentes på forespørsel. «AI-forslag» vises kun
+              når svaret faktisk kommer fra modellen — regelforslagene under heter
+              «Foreslåtte matcher» og er noe annet.
+            */}
+            <div className="rounded-lg border border-line-subtle p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm font-semibold">AI-hjelp</span>
+                <Button type="button" variant="outline" size="sm" onClick={runAiSuggestion} disabled={aiBusy || busy}>
+                  {aiBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  Hent AI-forslag
+                </Button>
+              </div>
+              {aiNotice && <p className="mt-2 text-xs text-ink-secondary">{aiNotice}</p>}
+              {aiSuggestion && (
+                <div className="mt-2 space-y-1 rounded-md bg-muted/40 p-2 text-xs">
+                  <div className="font-medium">
+                    AI-forslag{aiSuggestion.confidence != null ? ` • ${Math.round(aiSuggestion.confidence * 100)}% sikkerhet` : ""}
+                  </div>
+                  {aiSuggestion.explanation && <p>{aiSuggestion.explanation}</p>}
+                  {aiSuggestion.uncertainties.length > 0 && (
+                    <ul className="list-disc pl-4 text-ink-secondary">
+                      {aiSuggestion.uncertainties.map((u) => <li key={u}>{u}</li>)}
+                    </ul>
+                  )}
+                  <p className="text-ink-secondary">
+                    Forslaget er en gjetning og er ikke bekreftet. Du bekrefter vare og pakning selv.
+                  </p>
+                </div>
+              )}
+            </div>
+
             {suggestions.length > 0 && (
               <div>
                 <h4 className="mb-2 text-sm font-semibold">Foreslåtte matcher</h4>
@@ -499,6 +573,29 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
                     </label>
                   )}
                 </div>
+              </div>
+            )}
+
+            {selectedRmId && (
+              /* Én informert hovedhandling: brukeren ser hva som faktisk lagres. */
+              <div className="rounded-lg border border-line-subtle bg-muted/20 p-3 text-xs">
+                <div className="mb-1 text-sm font-semibold">Dette lagres når du bekrefter</div>
+                <ul className="list-disc space-y-0.5 pl-4">
+                  <li>Bekreftet kobling mellom linjen og «{selectedRm?.name ?? "valgt vare"}»</li>
+                  <li>
+                    Pakning: {packageSize ? `${packageSize} ${packageUnit || ""}`.trim() : "ikke satt"}
+                    {confirmPackage ? " (bekreftet for leverandøren)" : " (kun som forslag)"}
+                  </li>
+                  <li>
+                    Avtalepris: {parseDecimal(agreedPrice) != null
+                      ? `${formatNok(parseDecimal(agreedPrice) as number)} per ${selectedRm?.base_unit ?? "enhet"}`
+                      : "uendret"}
+                  </li>
+                  <li>
+                    Startpris: lagres bare hvis innstillingen er på, det ikke finnes avtalepris eller startpris
+                    fra før, og serveren godkjenner grunnlaget.
+                  </li>
+                </ul>
               </div>
             )}
 

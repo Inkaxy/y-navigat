@@ -8,8 +8,10 @@ import { allReasons } from "@/fakturaer/lib/reviewReasons";
  * uklart hva saksbehandleren faktisk skulle gjøre først. Her avgjør vi ÉN
  * hovedhandling; resten blir sekundære valg.
  *
- * Merk: et forslag fra matchemotoren er ALDRI en bekreftet kobling. Derfor
- * heter handlingen «Kontroller AI-forslag», ikke «Godta».
+ * Merk: matchemotoren er deterministisk (varenummer, alias, navnelikhet). Et
+ * forslag derfra er en regelbasert gjetning — ikke et AI-forslag og aldri en
+ * bekreftet kobling. Bare forslag som faktisk kommer fra en språkmodell
+ * merkes «AI-forslag», og det skjer i skuffen der modellsvaret vises.
  */
 export type PrimaryActionKind = "conflict" | "review_suggestion" | "confirm_link" | "start_price" | "variance";
 
@@ -20,13 +22,29 @@ export interface PrimaryAction {
   hint: string;
 }
 
-const PRICE_REASONS = new Set([
+/** Årsaker som handler om selve prisen, ikke om kobling, mengde eller pakning. */
+const PRICE_REASONS: ReadonlySet<string> = new Set([
   "price_variance",
+  "price_increase",
+  "price_drop",
   "agreement_conflict",
   "no_baseline",
-  "reference_error",
+  "price_reference_error",
   "unsupported_currency",
   "start_price_manual_check",
+]);
+
+/**
+ * Årsaker som må løses FØR prisen betyr noe: uten riktig beløp, mengde,
+ * pakning eller grunnenhet er kiloprisen ikke et tall man kan diskutere.
+ */
+const BLOCKING_DATA_REASONS: ReadonlySet<string> = new Set([
+  "extraction_unresolved",
+  "extraction_issue",
+  "zero_quantity",
+  "unknown_package_size",
+  "missing_base_unit",
+  "uncertain_cost",
 ]);
 
 /**
@@ -44,15 +62,38 @@ export function primaryActionFor(line: ReviewLineRow, startPriceLineIds?: Readon
     };
   }
 
-  const linked = !!line.raw_material_id;
+  if (reasons.includes("recalculation_pending")) {
+    return {
+      kind: "confirm_link",
+      label: "Kontroller linjen",
+      hint: "Linjen er nettopp endret og må beregnes på nytt før den kan avstemmes.",
+    };
+  }
 
-  if (!linked) {
-    const top = line.suggestions?.[0];
-    if (top) {
+  const linked = !!line.raw_material_id;
+  // En automatisk kobling med lav tillit er IKKE en bekreftet kobling, selv om
+  // linjen har en vare på seg.
+  const confirmedLink = linked && line.match_confidence === "manual";
+
+  // 1) Uttrekk, mengde, pakning og grunnenhet først.
+  if (reasons.some((r) => BLOCKING_DATA_REASONS.has(r))) {
+    return {
+      kind: "confirm_link",
+      label: linked ? "Bekreft pakning og mengde" : "Bekreft vare og pakning",
+      hint: "Beløp, mengde, pakning eller grunnenhet må avklares før prisen kan regnes om til grunnenhet.",
+    };
+  }
+
+  // 2) Deretter forslaget som venter på en menneskelig vurdering.
+  if (!confirmedLink) {
+    const hasSuggestion = (line.suggestions?.length ?? 0) > 0;
+    if (hasSuggestion || linked) {
       return {
         kind: "review_suggestion",
-        label: "Kontroller AI-forslag",
-        hint: "Forslaget er en gjetning fra matchemotoren. Du bekrefter vare og pakning selv.",
+        label: "Kontroller forslag",
+        hint: linked
+          ? "Matchemotoren har koblet linjen automatisk med lav tillit. Du bekrefter vare og pakning selv."
+          : "Forslaget er en regelbasert gjetning fra matchemotoren. Du bekrefter vare og pakning selv.",
       };
     }
     return {
@@ -62,14 +103,7 @@ export function primaryActionFor(line: ReviewLineRow, startPriceLineIds?: Readon
     };
   }
 
-  if (reasons.includes("unknown_package") || reasons.includes("missing_base_unit")) {
-    return {
-      kind: "confirm_link",
-      label: "Bekreft vare og pakning",
-      hint: "Pakningen må bekreftes før prisen kan regnes om til grunnenhet.",
-    };
-  }
-
+  // 3) Til slutt prisen.
   if (reasons.some((r) => PRICE_REASONS.has(r))) {
     return {
       kind: "variance",
@@ -88,7 +122,7 @@ export function primaryActionFor(line: ReviewLineRow, startPriceLineIds?: Readon
 
   return {
     kind: "confirm_link",
-    label: "Bekreft vare og pakning",
+    label: "Kontroller linjen",
     hint: "Kontroller koblingen og pakningen på linjen.",
   };
 }

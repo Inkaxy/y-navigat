@@ -46,6 +46,7 @@ import type {
   TimelineLink,
 } from "@/ravarer/lib/priceTimeline";
 import { PurchaseStatsCard } from "@/ravarer/components/PurchaseStatsCard";
+import { StartPriceCard } from "@/ravarer/components/tabs/StartPriceCard";
 import { osloTodayISO } from "@/lib/osloDate";
 import type { RmSupplierRow } from "@/ravarer/hooks/useRmSuppliers";
 import { useRawMaterialUnits } from "@/ravarer/hooks/useRawMaterialUnits";
@@ -117,6 +118,7 @@ export function SuppliersTab({ rm }: Props) {
   return (
     <div className="space-y-5">
       <PurchaseStatsCard rawMaterialId={rm.id} baseUnit={rm.base_unit} />
+      <StartPriceCard links={links} supplierNames={supplierNames} currentBaseUnit={rm.base_unit} />
       <Card className="p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-base font-semibold">Leverandører</h3>

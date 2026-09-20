@@ -16868,6 +16868,21 @@ export type Database = {
         Args: { p_reason: string; p_rms_id: string }
         Returns: Json
       }
+      rm_confirm_line_match: {
+        Args: {
+          p_agreed_price_per_base_unit?: number
+          p_apply_line_ids?: string[]
+          p_base_units_per_package?: number
+          p_confirm_package?: boolean
+          p_invoice_line_id: string
+          p_offer_start_price?: boolean
+          p_package_size?: number
+          p_package_unit?: string
+          p_raw_material_id: string
+          p_set_primary?: boolean
+        }
+        Returns: Json
+      }
       rm_confirm_start_price: {
         Args: { p_expected_price?: number; p_invoice_line_id: string }
         Returns: Json
