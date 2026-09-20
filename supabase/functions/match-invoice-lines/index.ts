@@ -566,12 +566,12 @@ Deno.serve(async (req) => {
         const expected = applyReference(update, ref);
 
         const cost = costForLine(line, rm, rmsRow);
-        const usable = cost && !cost.needsInput && cost.confidenceLevel !== "low";
+        const usable = costIsUsable(cost);
         const actual: number | null = usable ? cost!.pricePerBaseUnit : null;
         update.price_per_base_unit = actual;
         // Mengden i baseenheter skrives bare når motoren er trygg — et gjettet
         // tall her forplanter seg til lager og kalkyler.
-        update.base_quantity = cost && !cost.needsInput && cost.confidence >= 0.85 ? cost.baseQuantity : null;
+        update.base_quantity = usable && cost!.confidence >= 0.85 ? cost!.baseQuantity : null;
         update.expected_price_per_base_unit = expected;
 
         const addReason = (reason: string) => {
@@ -581,11 +581,9 @@ Deno.serve(async (req) => {
             : reason;
         };
 
-        // Aldri gjett: uten kjent pakningsinnhold, eller ved lav tillit, skal linja til gjennomgang.
-        if (cost && !cost.needsInput && packageNeedsConfirmation(cost)) addReason("unknown_package_size");
-        if (cost?.needsInput === "package_size") addReason("unknown_package_size");
-        else if (cost && !cost.needsInput && cost.confidenceLevel === "low") addReason("uncertain_cost");
-        else if (actual == null && isPackageUnit(normalizedUnit) && rm?.base_unit) addReason("unknown_package_size");
+        // Aldri gjett: enhver ubrukelig kostpris skal ha en blokkerende årsak.
+        for (const reason of costReviewReasons(cost, actual)) addReason(reason);
+        if (actual == null && isPackageUnit(normalizedUnit) && rm?.base_unit) addReason("unknown_package_size");
 
         if (expected != null && actual != null && expected !== 0) {
           const variance = ((actual - expected) / expected) * 100;
