@@ -167,6 +167,9 @@ Deno.serve(async (req) => {
       category: string | null,
       baseQuantity: number | null,
       target: AnyRec,
+      /** Sant kun når motoren koblet linjen selv. En menneskelig bekreftelse
+       *  skal ALDRI sendes tilbake til gjennomgang av mangel på grunnlag. */
+      automatic: boolean,
     ): string[] {
       const reasons: string[] = [];
       const isStart = String(ref.source ?? "") === "start_price";
@@ -180,13 +183,15 @@ Deno.serve(async (req) => {
       target.variance_status = over ? "over_tolerance" : "within_tolerance";
       if (over) reasons.push("price_variance");
       if (isStart && !startAutoCheck) reasons.push("start_price_manual_check");
-      // Forrige kjøp er KUN sammenligning. Et lite avvik mot forrige faktura er
-      // aldri en godkjenning, og et stort avvik skal fortsatt til gjennomgang.
-      if (!AUTOMATIC_CHECK_BASIS.has(String(ref.source ?? "")) && over && !reasons.includes("price_variance")) {
-        reasons.push("price_variance");
+      // Forrige kjøp er KUN sammenligning. Uten gyldig avtale eller bekreftet
+      // startpris kan en automatisk match aldri avsluttes av motoren — heller
+      // ikke når prisen ligger innenfor toleransen mot forrige faktura.
+      if (automatic && !AUTOMATIC_CHECK_BASIS.has(String(ref.source ?? ""))) {
+        reasons.push("no_automatic_basis");
       }
       return reasons;
     }
+
 
 
     // Exclusion patterns for this supplier+entity (or supplier null)
