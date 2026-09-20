@@ -22,7 +22,7 @@ function labelsFor(o: PriceObservation): { text: string; tone: "outline" | "seco
   if (o.is_credit) out.push({ text: "Kreditnota", tone: "destructive" });
   if (o.is_legacy) out.push({ text: "Historisk", tone: "secondary" });
   if (o.superseded_at) out.push({ text: "Erstattet", tone: "destructive" });
-  if (o.unit_changed_since) out.push({ text: "Enheten er endret senere", tone: "destructive" });
+  if (o.unit_changed_since) out.push({ text: "Enhet ikke bekreftet", tone: "destructive" });
   return out;
 }
 
