@@ -600,3 +600,143 @@ describe("startpris", () => {
     expect(e.blockers).toContain("ukjent_enhet_pa_linjen");
   });
 });
+
+/**
+ * Bekreftelses-RPC-en (rm_confirm_line_match) testet mot faktisk migrert SQL:
+ * fersk ukoblet linje uten beregnede felter, bevaring av uavklarte
+ * dokumentårsaker, og at linjen står til ny beregning etter bekreftelsen.
+ */
+describe("rm_confirm_line_match", () => {
+  async function freshLine(opts: {
+    quantity: number;
+    unit: string;
+    total: number;
+    date: string;
+    reviewReason?: string | null;
+    requiresReview?: boolean;
+  }): Promise<string> {
+    const inv = await db.query<{ id: string }>(
+      `insert into public.invoices(legal_entity_id, supplier_id, invoice_number, invoice_date)
+       values ($1,$2,$3,$4) returning id`,
+      [ENTITY, SUPPLIER, `M-${opts.date}-${opts.total}`, opts.date],
+    );
+    const line = await db.query<{ id: string }>(
+      `insert into public.invoice_lines(invoice_id, raw_material_id, supplier_sku, description, quantity, unit,
+         total_amount, base_quantity, price_per_base_unit, match_confidence, requires_review, review_reason)
+       values ($1,null,'SKU-1','Hvetemel',$2,$3,$4,null,null,null,$5,$6) returning id`,
+      [inv.rows[0].id, opts.quantity, opts.unit, opts.total, opts.requiresReview ?? true, opts.reviewReason ?? "unmatched"],
+    );
+    return line.rows[0].id;
+  }
+
+  async function confirmMatch(lineId: string, bupp = 1) {
+    const r = await db.query<{ v: Record<string, unknown> }>(
+      "select public.rm_confirm_line_match($1,$2,null,null,$3,true,null,false,null,true) as v",
+      [lineId, RM, bupp],
+    );
+    return r.rows[0].v as {
+      ok: boolean;
+      start_price: { attempted: boolean; created: boolean; reason: string | null; start_price?: number };
+      recalculation_pending?: boolean;
+    };
+  }
+
+  async function lineRow(id: string) {
+    const r = await db.query<{
+      base_quantity: number | null;
+      price_per_base_unit: number | null;
+      requires_review: boolean;
+      review_reason: string | null;
+      match_confidence: string | null;
+    }>(
+      `select base_quantity, price_per_base_unit, requires_review, review_reason, match_confidence
+         from public.invoice_lines where id = $1`,
+      [id],
+    );
+    return r.rows[0];
+  }
+
+  beforeAll(async () => {
+    await db.query(
+      `insert into public.invoice_match_settings(legal_entity_id, use_first_confirmed_price_as_start)
+       values ($1, true)
+       on conflict (legal_entity_id) do update set use_first_confirmed_price_as_start = true`,
+      [ENTITY],
+    );
+  });
+
+  it("regner ut mengde og pris i samme transaksjon og lagrer startpris", async () => {
+    await db.query("delete from public.raw_material_suppliers");
+    await db.query("delete from public.raw_material_changelog");
+    const line = await freshLine({ quantity: 10, unit: "kg", total: 1000, date: "2026-08-01" });
+
+    const res = await confirmMatch(line, 1);
+    expect(res.ok).toBe(true);
+    expect(res.start_price.created).toBe(true);
+    expect(Number(res.start_price.start_price)).toBe(100);
+
+    const row = await lineRow(line);
+    expect(Number(row.base_quantity)).toBe(10);
+    expect(Number(row.price_per_base_unit)).toBe(100);
+    expect(row.match_confidence).toBe("manual");
+
+    const rms = await db.query<{ p: number }>(
+      "select start_price_per_base_unit as p from public.raw_material_suppliers where raw_material_id = $1",
+      [RM],
+    );
+    expect(Number(rms.rows[0].p)).toBe(100);
+  });
+
+  it("bevarer uavklart uttrekk og lagrer ikke startpris fra en ugyldig kilde", async () => {
+    await db.query("delete from public.raw_material_suppliers");
+    const line = await freshLine({
+      quantity: 10,
+      unit: "kg",
+      total: 1000,
+      date: "2026-08-02",
+      reviewReason: "extraction_unresolved,unmatched",
+      requiresReview: true,
+    });
+
+    const res = await confirmMatch(line, 1);
+    expect(res.ok).toBe(true);
+    expect(res.start_price.created).toBe(false);
+    expect(res.start_price.reason).toBe("uavklart_gjennomgangsarsak");
+
+    const row = await lineRow(line);
+    expect(row.requires_review).toBe(true);
+    expect(row.review_reason?.split(",")).toContain("extraction_unresolved");
+
+    const rms = await db.query<{ p: number | null }>(
+      "select start_price_per_base_unit as p from public.raw_material_suppliers where raw_material_id = $1",
+      [RM],
+    );
+    expect(rms.rows[0].p).toBeNull();
+  });
+
+  it("lar linjen stå til ny beregning i stedet for å se ferdig kontrollert ut", async () => {
+    await db.query("delete from public.raw_material_suppliers");
+    const line = await freshLine({ quantity: 10, unit: "kg", total: 1000, date: "2026-08-03" });
+
+    const res = await confirmMatch(line, 1);
+    expect(res.recalculation_pending).toBe(true);
+    expect(res.start_price.created).toBe(true);
+
+    const row = await lineRow(line);
+    expect(row.requires_review).toBe(true);
+    expect(row.review_reason?.split(",")).toContain("recalculation_pending");
+  });
+
+  it("avviser feil enhet og lagrer verken mengde eller startpris", async () => {
+    await db.query("delete from public.raw_material_suppliers");
+    const line = await freshLine({ quantity: 10, unit: "l", total: 1000, date: "2026-08-04" });
+
+    const res = await confirmMatch(line, 1);
+    expect(res.ok).toBe(true);
+    expect(res.start_price.created).toBe(false);
+
+    const row = await lineRow(line);
+    expect(row.base_quantity).toBeNull();
+    expect(row.price_per_base_unit).toBeNull();
+  });
+});
