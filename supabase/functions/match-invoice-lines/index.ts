@@ -646,7 +646,7 @@ Deno.serve(async (req) => {
 
         if (expected != null && actual != null && expected !== 0) {
           for (const reason of evaluateVariance(
-            ref, expected, actual, rm?.category ?? null, update.base_quantity ?? null, update,
+            ref, expected, actual, rm?.category ?? null, update.base_quantity ?? null, update, true,
           )) {
             addReason(reason);
           }
@@ -654,6 +654,10 @@ Deno.serve(async (req) => {
           update.variance_status = "no_baseline";
           // Et gammelt avvik skal aldri bli stående når det ikke er regnet ut nå.
           update.price_variance_pct = null;
+          // Uten gyldig avtale eller bekreftet startpris finnes det ikke noe
+          // grunnlag en maskin kan godkjenne mot.
+          addReason("no_automatic_basis");
+
           if (ref.source === "conflict") addReason("agreement_conflict");
         }
         // Et ukjent prisgrunnlag er ikke «ingen avvik».
