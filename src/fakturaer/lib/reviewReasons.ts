@@ -46,6 +46,7 @@ export const REASON_LABELS: Record<ReasonCode, string> = {
   agreement_conflict: "To likestilte avtaler",
   price_reference_error: "Prisgrunnlag kunne ikke hentes",
   recalculation_pending: "Må beregnes på nytt",
+  extraction_unresolved: "Beløp mangler i dokumentet",
   no_baseline: "Uten prisgrunnlag",
   extraction_issue: "Uttrekk eller sum stemmer ikke",
   zero_quantity: "Mengde mangler eller er null",
