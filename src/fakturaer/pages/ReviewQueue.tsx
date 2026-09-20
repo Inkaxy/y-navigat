@@ -23,6 +23,7 @@ import { useSupplierLinkContext } from "@/fakturaer/hooks/useSupplierLinkContext
 import { useMatchTolerancesByEntity } from "@/fakturaer/hooks/useMatchTolerances";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { MatchDrawer } from "@/fakturaer/components/MatchDrawer";
+import { BulkLinkDialog } from "@/fakturaer/components/BulkLinkDialog";
 import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
 import { BulkCreateRawMaterialsDialog } from "@/fakturaer/components/BulkCreateRawMaterialsDialog";
 import { LinkCreditNoteDialog } from "@/fakturaer/components/LinkCreditNoteDialog";
@@ -196,6 +197,7 @@ export default function FakturaerInboxPage() {
   const [conflictOpen, setConflictOpen] = useState(false);
   const [reconcileId, setReconcileId] = useState<string | null>(null);
   const [bulkCreateOpen, setBulkCreateOpen] = useState(false);
+  const [bulkLink, setBulkLink] = useState<{ rmsId: string; name: string } | null>(null);
   const [creditNoteId, setCreditNoteId] = useState<string | null>(null);
   const [busyInvoice, setBusyInvoice] = useState<{ id: string; action: string } | null>(null);
   const anyDialogOpen =
@@ -237,10 +239,12 @@ export default function FakturaerInboxPage() {
       busyRef.current = true;
       const snapshot = snapshotOf(line);
       try {
-        const name = await acceptTopSuggestion(line);
+        const { name, rmsId } = await acceptTopSuggestion(line);
         dispatch({ type: "resolved", id: line.id, snapshot, label: name });
         toast.success(`Koblet til ${name}`);
         refresh(line.invoice_id);
+        // Tilby den samme koblingen på andre linjer — brukeren velger selv.
+        if (rmsId) setBulkLink({ rmsId, name });
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Kunne ikke godta forslaget");
       } finally {
@@ -824,6 +828,14 @@ export default function FakturaerInboxPage() {
           setDialogLine(next);
           if (!next) setMatchOpen(false);
         }}
+      />
+      <BulkLinkDialog
+        open={!!bulkLink}
+        onOpenChange={(v) => {
+          if (!v) setBulkLink(null);
+        }}
+        rmsId={bulkLink?.rmsId ?? null}
+        rawMaterialName={bulkLink?.name ?? ""}
       />
       <CreateRawMaterialDialog open={createOpen} onOpenChange={setCreateOpen} line={dialogLine} />
       <BulkCreateRawMaterialsDialog
