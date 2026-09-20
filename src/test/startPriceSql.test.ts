@@ -513,4 +513,79 @@ describe("startpris", () => {
     await db.query("update public.raw_material_suppliers set base_units_per_package = 10, package_size = 10");
     expect((await reference("2026-09-01")).source).not.toBe("start_price");
   });
+  // --- Enhetsbasert mengdekontroll (rm_expected_base_quantity) ---
+
+  /** Referanselinje: 10 enheter, base_quantity 10, 1000 kr, pakningsfaktor 6. */
+  async function unitLine(unit: string | null): Promise<string> {
+    await db.query("delete from public.raw_material_suppliers");
+    await db.query(
+      `insert into public.raw_material_suppliers(raw_material_id, supplier_id, package_size, package_unit,
+         base_units_per_package, package_confirmed_at) values ($1,$2,6,'kg',6, now())`,
+      [RM, SUPPLIER],
+    );
+    const inv = await db.query<{ id: string }>(
+      `insert into public.invoices(legal_entity_id, supplier_id, invoice_number, invoice_date)
+       values ($1,$2,$3,'2026-06-01') returning id`,
+      [ENTITY, SUPPLIER, `E-${unit ?? "null"}-${Math.random()}`],
+    );
+    const line = await db.query<{ id: string }>(
+      `insert into public.invoice_lines(invoice_id, raw_material_id, description, quantity, unit, total_amount,
+         base_quantity, price_per_base_unit, match_confidence, requires_review)
+       values ($1,$2,'Hvetemel',10,$3,1000,10,100,'manual',false) returning id`,
+      [inv.rows[0].id, RM, unit],
+    );
+    return line.rows[0].id;
+  }
+
+  it("godtar referanselinjen i grunnenheten", async () => {
+    const e = await eligibility(await unitLine("kg"));
+    expect(e.blockers).toEqual([]);
+    expect(e.eligible).toBe(true);
+  });
+
+  it("avviser liter mot en vare som måles i kilo", async () => {
+    const line = await unitLine("l");
+    const e = await eligibility(line);
+    expect(e.blockers).toContain("enhet_passer_ikke_med_grunnenheten");
+    expect(e.eligible).toBe(false);
+    expect((await confirm(line)).created).toBe(false);
+  });
+
+  it("avviser 10 kartonger à 6 kg når mengden fortsatt står som 10", async () => {
+    const line = await unitLine("kartong");
+    const e = await eligibility(line);
+    expect(e.blockers).toContain("mengden_stemmer_ikke_med_pakningen");
+    expect(e.eligible).toBe(false);
+    expect((await confirm(line)).created).toBe(false);
+  });
+
+  it("godtar 10 000 gram som 10 kilo", async () => {
+    await db.query("delete from public.raw_material_suppliers");
+    await db.query(
+      `insert into public.raw_material_suppliers(raw_material_id, supplier_id, package_size, package_unit,
+         base_units_per_package, package_confirmed_at) values ($1,$2,6,'kg',6, now())`,
+      [RM, SUPPLIER],
+    );
+    const inv = await db.query<{ id: string }>(
+      `insert into public.invoices(legal_entity_id, supplier_id, invoice_number, invoice_date)
+       values ($1,$2,'E-gram','2026-06-02') returning id`,
+      [ENTITY, SUPPLIER],
+    );
+    const line = await db.query<{ id: string }>(
+      `insert into public.invoice_lines(invoice_id, raw_material_id, description, quantity, unit, total_amount,
+         base_quantity, price_per_base_unit, match_confidence, requires_review)
+       values ($1,$2,'Hvetemel',10000,'g',1000,10,100,'manual',false) returning id`,
+      [inv.rows[0].id, RM],
+    );
+    const e = await eligibility(line.rows[0].id);
+    expect(e.blockers).toEqual([]);
+    const c = await confirm(line.rows[0].id, 100);
+    expect(c.created).toBe(true);
+    expect(Number(c.start_price)).toBe(100);
+  });
+
+  it("avviser linje uten enhet i stedet for å gjette", async () => {
+    const e = await eligibility(await unitLine(null));
+    expect(e.blockers).toContain("ukjent_enhet_pa_linjen");
+  });
 });
