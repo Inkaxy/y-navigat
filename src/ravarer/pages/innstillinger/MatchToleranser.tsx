@@ -24,6 +24,7 @@ import { showError } from "@/lib/userError";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { useMatchTolerances, FALLBACK_TOLERANCE_PCT } from "@/fakturaer/hooks/useMatchTolerances";
 import { QueryState } from "@/components/common/QueryState";
+import { StartPriceCandidatesCard } from "@/fakturaer/components/StartPriceCandidatesCard";
 
 interface ToleranceRow {
   id: string;
@@ -213,6 +214,53 @@ export default function MatchToleranserPage() {
           />
         </div>
       </Card>
+
+      <Card className="space-y-4 p-4">
+        <div>
+          <h2 className="text-title text-sm font-semibold">Startpris</h2>
+          <p className="text-caption text-ink-secondary">
+            Startprisen er den første kjøpsprisen et menneske har kontrollert og bekreftet hos en leverandør. Den er
+            fast, og en gyldig avtalepris går alltid foran. Startpris blir aldri automatisk til avtalepris.
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <ToggleRow
+            label="Bruk første bekreftede kjøpspris som startpris"
+            hint="Køen tilbyr «Bekreft startpris» på linjer der vare, pakning og nettopris er kontrollert. Ingenting lagres uten at du bekrefter."
+            checked={!!s?.use_first_confirmed_price_as_start}
+            disabled={!canWrite || tolerances.isLoading}
+            onChange={(v) => saveSettings.mutate({ use_first_confirmed_price_as_start: v })}
+          />
+          <ToggleRow
+            label="Tillat automatisk linjekontroll mot startpris"
+            hint="Når den er av, må hver linje som måles mot startpris kontrolleres manuelt. Slås den på, kan linjer innenfor grensene under bli ferdig kontrollert uten manuelt trykk — attestering og betaling er fortsatt en egen handling."
+            checked={!!s?.auto_check_against_start_price}
+            disabled={!canWrite || tolerances.isLoading}
+            onChange={(v) => saveSettings.mutate({ auto_check_against_start_price: v })}
+          />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <NumField
+            label="Toleranse mot startpris (%)"
+            hint="Avvik over denne grensen sendes alltid til gjennomgang."
+            value={s?.start_price_tolerance_pct ?? 2}
+            disabled={!canWrite || tolerances.isLoading}
+            onCommit={(v) => saveSettings.mutate({ start_price_tolerance_pct: v })}
+          />
+          <NumField
+            label="Maksimal kronepåvirkning (kr)"
+            hint="Valgfritt. Er avviket større i kroner enn dette, går linjen til gjennomgang selv om prosenten er innenfor. Tom = ingen kronegrense."
+            step={1}
+            value={s?.start_price_max_impact_nok ?? 0}
+            disabled={!canWrite || tolerances.isLoading}
+            onCommit={(v) => saveSettings.mutate({ start_price_max_impact_nok: v > 0 ? v : null })}
+          />
+        </div>
+      </Card>
+
+      <StartPriceCandidatesCard legalEntityId={legalEntityId} canWrite={canWrite} />
 
       <Card className="space-y-3 p-4">
         <div>
