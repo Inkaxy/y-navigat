@@ -285,7 +285,8 @@ Deno.serve(async (req) => {
         }
         if (expected != null && actual != null && expected !== 0) {
           for (const reason of evaluateVariance(
-            refM, expected, actual, rm?.category ?? null, manualUpdate.base_quantity ?? null, manualUpdate,
+            refM, expected, actual, rm?.category ?? null, manualUpdate.base_quantity ?? null, manualUpdate, false,
+
           )) {
             requiresReview = true;
             reviewReasons.add(reason);
