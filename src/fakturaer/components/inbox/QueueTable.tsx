@@ -109,7 +109,10 @@ export function QueueTable({
             <th className="px-3 py-3">Forslag</th>
             <th className="px-3 py-3 text-right">Siste pris</th>
             <th className="px-3 py-3 text-right">Avtalepris</th>
+            <th className="px-3 py-3">Grunnlag</th>
             <th className="px-3 py-3 text-right">Avvik</th>
+            <th className="px-3 py-3 text-right">Kroner</th>
+            <th className="px-3 py-3 text-right">Går igjen</th>
             <th className="px-3 py-3">Pakning</th>
             <th className="px-3 py-3">Årsaker</th>
             <th className="px-3 py-3 text-right">Handlinger</th>
@@ -128,7 +131,12 @@ export function QueueTable({
             const perBase = pricePerBaseUnitOf(l, link);
             const pkg = packageLabel(l, link);
             const isActive = activeLineId === l.id;
-            const reasons = reasonsOf(l);
+            // Alle årsaker — også de vi utleder av fakturaen (uttrekk, valuta, uten grunnlag).
+            const reasons = allReasons(l);
+            const currency = l.invoice.currency ?? "NOK";
+            const impact = financialImpact(l);
+            const rk = repeatKey(l);
+            const repeats = rk ? (repeatCounts?.get(rk) ?? 0) : 0;
 
             return (
               <tr
