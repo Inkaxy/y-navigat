@@ -894,6 +894,8 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
   }
   if (packageNote) explanation += ` ${packageNote}`;
   if (swapNote) explanation += ` ${swapNote}`;
+  if (historyNote) explanation += ` ${historyNote}`;
+
 
   return {
     ...chosen,
