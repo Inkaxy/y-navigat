@@ -29,7 +29,11 @@ const PRICE_REASONS = new Set([
   "start_price_manual_check",
 ]);
 
-export function primaryActionFor(line: ReviewLineRow): PrimaryAction {
+/**
+ * `startPriceLineIds` er linjene serveren har svart at kvalifiserer til
+ * startpris (`rm_start_price_candidates`). Klienten avgjør aldri dette selv.
+ */
+export function primaryActionFor(line: ReviewLineRow, startPriceLineIds?: ReadonlySet<string>): PrimaryAction {
   const reasons = allReasons(line);
 
   if (reasons.includes("sku_collision")) {
@@ -74,7 +78,7 @@ export function primaryActionFor(line: ReviewLineRow): PrimaryAction {
     };
   }
 
-  if (line.start_price_eligible) {
+  if (startPriceLineIds?.has(line.id)) {
     return {
       kind: "start_price",
       label: "Bekreft startpris",
