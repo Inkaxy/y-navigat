@@ -840,17 +840,9 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
     }
   }
 
-  // Pakning som KUN er lest ut av varenavnet er en tolkning av tekst, ikke en
-  // bekreftet opplysning. Den kan bare brukes når fakturaens egen regnestykke
-  // bekrefter den (mengde × innhold × pris = beløp). Ellers må den bekreftes.
-  if (chosen.basis === "pakning" && chosen.source === "description" && !checks.arithmeticPerBaseUnit) {
-    return emptyResult(
-      "package_size",
-      `Innholdet per pakning er bare tolket fra varenavnet (${fmtNum(chosen.baseUnitsPerPackage ?? 0)} ${base} per ` +
-        `${pkg?.packageUnitLabel ?? "pakning"}), og fakturabeløpet bekrefter den ikke. Bekreft pakningen før prisen kan brukes.`,
-      checks,
-    );
-  }
+  // Pakning som KUN er lest ut av varenavnet er en tolkning av tekst. Den kan
+  // brukes til å regne, men matcheren skal sende linja til gjennomgang inntil
+  // pakningen er bekreftet (se `packageNeedsConfirmation` under).
 
   if (chosen.baseUnitsPerPackage && chosen.baseUnitsPerPackage > 0) {
     checks.wholePackages = isWhole(chosen.baseQuantity / chosen.baseUnitsPerPackage);
@@ -919,6 +911,15 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
  * Innhold per pakning i basisenheter. Returnerer null når enhetene ikke kan
  * regnes om (f.eks. stk mot kg) — da skal ingen pakningsstørrelse lagres.
  */
+/**
+ * Sant når kostprisen hviler på en pakningsstørrelse som bare er tolket ut av
+ * varenavnet. Da er tallet brukbart, men ikke bekreftet — linja skal ses av et
+ * menneske før prisen får virkning.
+ */
+export function packageNeedsConfirmation(r: ResolveLineCostResult): boolean {
+  return r.basis === "pakning" && r.source === "description";
+}
+
 export function packageBaseUnits(
   size: number | null,
   packageUnit: string | null | undefined,
