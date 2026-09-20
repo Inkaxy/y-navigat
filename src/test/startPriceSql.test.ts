@@ -190,7 +190,9 @@ async function resetLinks() {
 beforeAll(async () => {
   db = new PGlite();
   await db.exec(SCHEMA);
-  await db.exec(readFileSync(MIGRATION, "utf8"));
+  for (const file of MIGRATIONS) {
+    await db.exec(readFileSync(file, "utf8"));
+  }
   await db.query("insert into public.raw_materials(id, legal_entity_id, name, base_unit) values ($1,$2,'Hvetemel','kg')", [RM, ENTITY]);
   await db.query("insert into public.suppliers(id,name) values ($1,'Norgesmøllene'),($2,'Idun')", [SUPPLIER, SUPPLIER_B]);
   await setUser(USER);
