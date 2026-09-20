@@ -31,6 +31,14 @@ export const START_PRICE_BLOCKERS = [
   "mangler_leverandorkobling",
   "ukjent_pakning",
   "startpris_finnes_allerede",
+  "leverandor_i_annet_selskap",
+  "fakturaen_er_flagget",
+  "uavklart_gjennomgangsarsak",
+  "inkonsistent_gjennomgangsstatus",
+  "utdaterte_beregnede_verdier",
+  "mengden_stemmer_ikke_med_pakningen",
+  "enhet_endret_etter_fakturalinjen",
+  "pakning_ikke_bekreftet_etter_enhetsendring",
 ] as const;
 export type StartPriceBlocker = (typeof START_PRICE_BLOCKERS)[number];
 
