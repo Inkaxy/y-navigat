@@ -3052,6 +3052,9 @@ export type Database = {
           package_size: number | null
           package_unit: string | null
           price_per_base_unit: number | null
+          price_reference_date: string | null
+          price_reference_id: string | null
+          price_reference_source: string | null
           price_variance_pct: number | null
           quantity: number | null
           raw_material_id: string | null
@@ -3082,6 +3085,9 @@ export type Database = {
           package_size?: number | null
           package_unit?: string | null
           price_per_base_unit?: number | null
+          price_reference_date?: string | null
+          price_reference_id?: string | null
+          price_reference_source?: string | null
           price_variance_pct?: number | null
           quantity?: number | null
           raw_material_id?: string | null
@@ -3112,6 +3118,9 @@ export type Database = {
           package_size?: number | null
           package_unit?: string | null
           price_per_base_unit?: number | null
+          price_reference_date?: string | null
+          price_reference_id?: string | null
+          price_reference_source?: string | null
           price_variance_pct?: number | null
           quantity?: number | null
           raw_material_id?: string | null
@@ -16764,6 +16773,14 @@ export type Database = {
             }
             Returns: Json
           }
+      rm_apply_supplier_link_lines: {
+        Args: {
+          p_expected_updated_at: string
+          p_line_ids: string[]
+          p_rms_id: string
+        }
+        Returns: Json
+      }
       rm_can_read: { Args: { _rm_id: string }; Returns: boolean }
       rm_can_write: { Args: { _rm_id: string }; Returns: boolean }
       rm_claim_invoice_line_extraction: {
@@ -16815,12 +16832,30 @@ export type Database = {
           price_per_base_unit: number
         }[]
       }
+      rm_match_key: { Args: { p: string }; Returns: string }
       rm_package_factor: {
         Args: { p_raw_material_id: string; p_supplier_id: string }
         Returns: {
           factor: number
           source: string
         }[]
+      }
+      rm_price_reference: {
+        Args: {
+          p_invoice_date: string
+          p_invoice_id: string
+          p_raw_material_id: string
+          p_supplier_id: string
+        }
+        Returns: Json
+      }
+      rm_price_summary: {
+        Args: {
+          p_on_date?: string
+          p_raw_material_id: string
+          p_supplier_id?: string
+        }
+        Returns: Json
       }
       rm_receive_invoice_line: {
         Args: {
@@ -16843,6 +16878,22 @@ export type Database = {
       rm_suggest_package_from_name: {
         Args: { p_base_unit: string; p_name: string }
         Returns: number
+      }
+      rm_supplier_link_candidates: {
+        Args: { p_rms_id: string }
+        Returns: {
+          description: string
+          eligible: boolean
+          exclusion_reason: string
+          invoice_date: string
+          invoice_id: string
+          invoice_number: string
+          line_id: string
+          quantity: number
+          supplier_sku: string
+          total_amount: number
+          unit: string
+        }[]
       }
       rm_unit_factor: {
         Args: { p_base_unit: string; p_unit: string }

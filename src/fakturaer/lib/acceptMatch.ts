@@ -55,9 +55,10 @@ interface AliasInsert {
  * match-skuffen (én linje) og masse-godkjenning bruker den, slik at de
  * garantert gjør nøyaktig det samme.
  *
- * Returnerer id-ene til linjene som ble matchet.
+ * Returnerer id-ene til linjene som ble matchet, og leverandørkoblingen de
+ * ble knyttet til — den trengs for å tilby samme kobling på flere linjer.
  */
-export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: string[] }> {
+export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: string[]; rmsId: string | null }> {
   const {
     line,
     rawMaterialId,
@@ -333,7 +334,7 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
 
   // 4) Kjør pipeline på nytt for linjene (prisavvik regnes om).
   //    Feiler dette er matchen likevel lagret — logg og gå videre.
-  if (skipRematch) return { lineIds };
+  if (skipRematch) return { lineIds, rmsId };
 
   const { error: fnErr } = await supabase.functions.invoke("match-invoice-lines", {
     body: { invoice_id: line.invoice_id, line_ids: lineIds },
@@ -344,6 +345,6 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
     );
   }
 
-  return { lineIds };
+  return { lineIds, rmsId };
 }
 

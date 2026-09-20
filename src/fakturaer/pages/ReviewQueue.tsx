@@ -23,6 +23,7 @@ import { useSupplierLinkContext } from "@/fakturaer/hooks/useSupplierLinkContext
 import { useMatchTolerancesByEntity } from "@/fakturaer/hooks/useMatchTolerances";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { MatchDrawer } from "@/fakturaer/components/MatchDrawer";
+import { BulkLinkDialog } from "@/fakturaer/components/BulkLinkDialog";
 import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
 import { BulkCreateRawMaterialsDialog } from "@/fakturaer/components/BulkCreateRawMaterialsDialog";
 import { LinkCreditNoteDialog } from "@/fakturaer/components/LinkCreditNoteDialog";
@@ -31,7 +32,17 @@ import { SkuConflictDialog } from "@/fakturaer/components/SkuConflictDialog";
 import { ConfirmReconcileDialog } from "@/fakturaer/components/ConfirmReconcileDialog";
 import { InvoiceDocumentPanel } from "@/fakturaer/components/InvoiceDocumentPanel";
 import { InboxInvoiceCard } from "@/fakturaer/components/inbox/InboxInvoiceCard";
-import { QueueTable, REASON_LABELS, reasonsOf } from "@/fakturaer/components/inbox/QueueTable";
+import { QueueTable } from "@/fakturaer/components/inbox/QueueTable";
+import {
+  GROUP_DESCRIPTIONS,
+  GROUP_LABELS,
+  REVIEW_GROUPS,
+  matchesGroup,
+  repeatCounts as computeRepeatCounts,
+  sortQueue,
+  type QueueSort,
+  type ReviewGroup,
+} from "@/fakturaer/lib/reviewReasons";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import {
@@ -46,49 +57,31 @@ import {
 import { emptyQueueState, peekUndo, queueReducer } from "@/fakturaer/lib/queueReducer";
 import { supabase } from "@/integrations/supabase/client";
 
-type TabValue =
-  | "all"
-  | "unmatched"
-  | "low_confidence"
-  | "price_variance"
-  | "price_increase"
-  | "price_drop"
-  | "uncertain_cost"
-  | "unknown_package_size"
-  | "sku_collision"
-  | "unsupported_currency"
-  | "no_baseline";
+type TabValue = "all" | ReviewGroup;
 
-const TABS: { value: TabValue; label: string }[] = [
-  { value: "all", label: "Alle" },
-  { value: "unmatched", label: REASON_LABELS.unmatched },
-  { value: "low_confidence", label: REASON_LABELS.low_confidence },
-  { value: "price_variance", label: REASON_LABELS.price_variance },
-  { value: "price_increase", label: REASON_LABELS.price_increase },
-  { value: "price_drop", label: REASON_LABELS.price_drop },
-  { value: "uncertain_cost", label: REASON_LABELS.uncertain_cost },
-  { value: "unknown_package_size", label: REASON_LABELS.unknown_package_size },
-  { value: "sku_collision", label: REASON_LABELS.sku_collision },
-  { value: "unsupported_currency", label: REASON_LABELS.unsupported_currency },
-  { value: "no_baseline", label: REASON_LABELS.no_baseline },
+const TABS: { value: TabValue; label: string; hint: string }[] = [
+  { value: "all", label: "Alle", hint: "Alle linjer som venter på en avklaring." },
+  ...REVIEW_GROUPS.map((g) => ({ value: g as TabValue, label: GROUP_LABELS[g], hint: GROUP_DESCRIPTIONS[g] })),
 ];
-
-const KNOWN_REASONS = TABS.filter((t) => t.value !== "all" && t.value !== "no_baseline").map((t) => t.value);
 
 const LS_OPEN = "nbhub.faktura.docpanel.open";
 const LS_SIZE = "nbhub.faktura.docpanel.size";
 
-/** Hører linjen hjemme under fanen? review_reason kan inneholde flere årsaker. */
+const SORT_OPTIONS: { value: QueueSort; label: string }[] = [
+  { value: "invoice_date", label: "Nyeste faktura først" },
+  { value: "impact", label: "Størst kronepåvirkning først" },
+  { value: "repeats", label: "Går oftest igjen først" },
+];
+
+/**
+ * Hører linjen hjemme under fanen? En linje kan ha flere årsaker samtidig og
+ * dukker da opp i alle de tilhørende gruppene. Årsaker vi ikke kjenner igjen
+ * havner i «Ukjent årsak» — aldri skjult under «Ukjent vare».
+ */
 export function matchesTab(line: ReviewLineCountRow | ReviewLineRow, tab: TabValue): boolean {
-  if (tab === "all") return true;
-  if (tab === "no_baseline") return line.variance_status === "no_baseline" && !!line.raw_material_id;
-  const reasons = reasonsOf(line);
-  if (reasons.includes(tab)) return true;
-  // Ukjente årsaker samles under «Umatchet» slik at ingen linje forsvinner.
-  if (tab === "unmatched" && line.requires_review && reasons.every((r) => !KNOWN_REASONS.includes(r as TabValue)))
-    return true;
-  return false;
+  return matchesGroup(line, tab);
 }
+
 
 /** Samme vakter som i Vareliste: ingen hurtigtaster mens brukeren skriver eller i dialog. */
 function shouldIgnoreShortcut(e: KeyboardEvent): boolean {
@@ -160,14 +153,19 @@ export default function FakturaerInboxPage() {
 
   const links = useSupplierLinkContext(invoices.map((i) => i.supplier_id));
 
-  const visibleLines = useMemo(() => {
-    const scoped = expandedId ? lines.filter((l) => l.invoice_id === expandedId) : lines;
-    return scoped.filter((l) => matchesTab(l, tab));
-  }, [lines, expandedId, tab]);
-
   // Tellerne skal gjelde HELE køen, ikke bare de linjene som er hentet inn.
   const countsQuery = useReviewLineCounts({ ...filters, invoiceId: expandedId, onlyReady });
   const countRows = useMemo(() => countsQuery.data ?? [], [countsQuery.data]);
+
+  // Gjentakelser telles over HELE køen — det er poenget med tallet.
+  const repeats = useMemo(() => computeRepeatCounts(countRows), [countRows]);
+
+  const [sort, setSort] = useState<QueueSort>("invoice_date");
+
+  const visibleLines = useMemo(() => {
+    const scoped = expandedId ? lines.filter((l) => l.invoice_id === expandedId) : lines;
+    return sortQueue(scoped.filter((l) => matchesTab(l, tab)), sort, repeats);
+  }, [lines, expandedId, tab, sort, repeats]);
 
   const counts = useMemo(() => {
     const c = {} as Record<TabValue, number>;
@@ -199,10 +197,11 @@ export default function FakturaerInboxPage() {
   const [conflictOpen, setConflictOpen] = useState(false);
   const [reconcileId, setReconcileId] = useState<string | null>(null);
   const [bulkCreateOpen, setBulkCreateOpen] = useState(false);
+  const [bulkLink, setBulkLink] = useState<{ rmsId: string; name: string } | null>(null);
   const [creditNoteId, setCreditNoteId] = useState<string | null>(null);
   const [busyInvoice, setBusyInvoice] = useState<{ id: string; action: string } | null>(null);
   const anyDialogOpen =
-    matchOpen || createOpen || notRmOpen || conflictOpen || !!reconcileId || bulkCreateOpen || !!creditNoteId;
+    matchOpen || createOpen || notRmOpen || conflictOpen || !!reconcileId || bulkCreateOpen || !!creditNoteId || !!bulkLink;
 
   // Dokumentpanel
   const [docOpen, setDocOpen] = useState<boolean>(() => localStorage.getItem(LS_OPEN) === "1");
@@ -240,10 +239,12 @@ export default function FakturaerInboxPage() {
       busyRef.current = true;
       const snapshot = snapshotOf(line);
       try {
-        const name = await acceptTopSuggestion(line);
+        const { name, rmsId } = await acceptTopSuggestion(line);
         dispatch({ type: "resolved", id: line.id, snapshot, label: name });
         toast.success(`Koblet til ${name}`);
         refresh(line.invoice_id);
+        // Tilby den samme koblingen på andre linjer — brukeren velger selv.
+        if (rmsId) setBulkLink({ rmsId, name });
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Kunne ikke godta forslaget");
       } finally {
@@ -478,15 +479,36 @@ export default function FakturaerInboxPage() {
 
   const queueEl = (
     <div className="space-y-4">
-      <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)}>
-        <TabsList className="flex-wrap">
-          {TABS.map((t) => (
-            <TabsTrigger key={t.value} value={t.value}>
-              {t.label} ({counts[t.value] ?? 0})
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)}>
+          <TabsList className="flex-wrap">
+            {TABS.map((t) => (
+              <TabsTrigger key={t.value} value={t.value} title={t.hint}>
+                {t.label} ({counts[t.value] ?? 0})
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <Select value={sort} onValueChange={(v) => setSort(v as QueueSort)}>
+          <SelectTrigger className="w-[240px]" aria-label="Sorter køen">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SORT_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {countsQuery.isError && (
+        <p className="text-caption text-destructive">
+          Tellerne kunne ikke hentes — tallene i fanene kan være ufullstendige.
+        </p>
+      )}
+
 
       {selectedLines.length > 0 && (
         <Card className="flex flex-wrap items-center gap-3 border-primary/30 bg-primary/5 p-3">
@@ -549,6 +571,7 @@ export default function FakturaerInboxPage() {
             onShowDocument={showDoc}
             onAction={openDialog}
             onAccept={(l) => void doAccept(l)}
+            repeatCounts={repeats}
             showInvoiceColumn={!expandedId}
             canWrite={canWrite}
           />
@@ -805,6 +828,14 @@ export default function FakturaerInboxPage() {
           setDialogLine(next);
           if (!next) setMatchOpen(false);
         }}
+      />
+      <BulkLinkDialog
+        open={!!bulkLink}
+        onOpenChange={(v) => {
+          if (!v) setBulkLink(null);
+        }}
+        rmsId={bulkLink?.rmsId ?? null}
+        rawMaterialName={bulkLink?.name ?? ""}
       />
       <CreateRawMaterialDialog open={createOpen} onOpenChange={setCreateOpen} line={dialogLine} />
       <BulkCreateRawMaterialsDialog

@@ -25,9 +25,13 @@ async function currentUserId(): Promise<string> {
 /**
  * Godtar det høyest rangerte forslaget på linjen — samme vei gjennom
  * acceptMatch som match-skuffen og masse-godkjenningen bruker.
- * Returnerer navnet på varen som ble koblet.
+ * Returnerer navnet på varen som ble koblet og leverandørkoblingen den fikk,
+ * slik at den samme koblingen kan tilbys på flere linjer.
  */
-export async function acceptTopSuggestion(line: ReviewLineRow, opts?: { skipRematch?: boolean }): Promise<string> {
+export async function acceptTopSuggestion(
+  line: ReviewLineRow,
+  opts?: { skipRematch?: boolean },
+): Promise<{ name: string; rmsId: string | null }> {
   const top = line.suggestions?.[0];
   if (!top) throw new Error("Linjen har ingen forslag å godta");
   const userId = await currentUserId();
@@ -55,7 +59,7 @@ export async function acceptTopSuggestion(line: ReviewLineRow, opts?: { skipRema
     : null;
   if (cost?.needsInput) throw new Error(cost.reason ?? "Mangler pakningsstørrelse");
 
-  await acceptMatch({
+  const res = await acceptMatch({
     line,
     rawMaterialId: top.raw_material_id,
     userId,
@@ -67,7 +71,7 @@ export async function acceptTopSuggestion(line: ReviewLineRow, opts?: { skipRema
     skipRematch: opts?.skipRematch ?? false,
   });
 
-  return top.raw_material?.name ?? "varen";
+  return { name: top.raw_material?.name ?? "varen", rmsId: res.rmsId };
 }
 
 /**

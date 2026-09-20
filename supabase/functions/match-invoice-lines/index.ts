@@ -70,10 +70,54 @@ Deno.serve(async (req) => {
     if (invErr || !inv) return json({ error: "Invoice not found" }, 404);
 
     if (!isServiceCall) {
-      const { data: accessLevel } = await userClient.rpc("app_access_level", { p_app_code: "ravarer" });
-      const lvl = (accessLevel as string) ?? "none";
-      if (!["write", "approve", "admin"].includes(lvl)) return json({ error: "Forbidden" }, 403);
+      // Tilgangen skal gjelde SELSKAPET fakturaen tilhører, ikke bare appen.
+      // Feiler sjekken, nekter vi — aldri åpne ved databasefeil.
+      const { data: allowed, error: accErr } = await userClient.rpc("has_ravarer_invoice_access", {
+        _legal_entity_id: inv.legal_entity_id,
+        _required_level: "write",
+      });
+      if (accErr) {
+        console.error("has_ravarer_invoice_access", accErr.message);
+        return json({ error: "Forbidden" }, 403);
+      }
+      if (allowed !== true) return json({ error: "Forbidden" }, 403);
     }
+
+    // Prisgrunnlag hentes fra databasen per vare, med FAKTISK leverandør og
+    // fakturadato. Én kilde, slik at kø, historikk og motor er enige.
+    const referenceCache = new Map<string, AnyRec>();
+    async function priceReference(rawMaterialId: string | null | undefined): Promise<AnyRec> {
+      if (!rawMaterialId) return { source: "none" };
+      const cached = referenceCache.get(rawMaterialId);
+      if (cached) return cached;
+      const { data, error } = await svc.rpc("rm_price_reference", {
+        p_raw_material_id: rawMaterialId,
+        p_supplier_id: inv.supplier_id,
+        p_invoice_id: inv.id,
+        p_invoice_date: inv.invoice_date,
+      });
+      if (error) {
+        console.error("rm_price_reference", error.message);
+        // Ukjent grunnlag skal aldri bli «ingen avvik».
+        return { source: "error" };
+      }
+      const ref = (data ?? { source: "none" }) as AnyRec;
+      referenceCache.set(rawMaterialId, ref);
+      return ref;
+    }
+
+    /** Skriver grunnlaget på linjen og returnerer forventet pris, om den finnes. */
+    function applyReference(target: AnyRec, ref: AnyRec): number | null {
+      const source = String(ref.source ?? "none");
+      target.price_reference_source = source === "error" ? null : source;
+      target.price_reference_id = ref.reference_id ?? null;
+      target.price_reference_date = ref.reference_date ?? null;
+      const price = ref.price == null ? null : Number(ref.price);
+      return price != null && Number.isFinite(price) ? price : null;
+    }
+
+    const currencyCode = String(inv.currency ?? "NOK").toUpperCase();
+    const foreignCurrency = currencyCode !== "NOK";
 
     // Settings
     const { data: settings } = await svc.from("invoice_match_settings").select("*").eq("legal_entity_id", inv.legal_entity_id).maybeSingle();
@@ -154,7 +198,8 @@ Deno.serve(async (req) => {
 
         const rm = rmById.get(line.raw_material_id);
         const rmsRow = rmsList.find((r: AnyRec) => r.raw_material_id === line.raw_material_id && r.supplier_id === inv.supplier_id);
-        const expected = rmsRow?.agreed_price_per_base_unit != null ? Number(rmsRow.agreed_price_per_base_unit) : null;
+        const refM = await priceReference(line.raw_material_id);
+        const expected = applyReference(manualUpdate, refM);
 
         const cost = costForLine(line, rm, rmsRow);
         const usable = cost && !cost.needsInput && cost.confidenceLevel !== "low";
@@ -189,6 +234,14 @@ Deno.serve(async (req) => {
         } else {
           manualUpdate.variance_status = "no_baseline";
           manualUpdate.price_variance_pct = null;
+          if (refM.source === "conflict") {
+            requiresReview = true;
+            reviewReasons.add("agreement_conflict");
+          }
+        }
+        if (foreignCurrency) {
+          requiresReview = true;
+          reviewReasons.add("unsupported_currency");
         }
         // Samme rekkefølge som i den automatiske grenen: sett flaggene først,
         // så får syncRegisteredPrices legge sine egne årsaker oppå.
@@ -213,6 +266,9 @@ Deno.serve(async (req) => {
         expected_price_per_base_unit: null,
         price_variance_pct: null,
         variance_status: null,
+        price_reference_source: null,
+        price_reference_id: null,
+        price_reference_date: null,
         resolution_note: null,
         resolved_at: null,
         resolved_by: null,
@@ -490,7 +546,8 @@ Deno.serve(async (req) => {
       if (update.raw_material_id) {
         const rm = rmById.get(update.raw_material_id);
         const rmsRow = rmsList.find((r: AnyRec) => r.raw_material_id === update.raw_material_id && r.supplier_id === inv.supplier_id);
-        const expected = rmsRow?.agreed_price_per_base_unit != null ? Number(rmsRow.agreed_price_per_base_unit) : null;
+        const ref = await priceReference(update.raw_material_id);
+        const expected = applyReference(update, ref);
 
         const cost = costForLine(line, rm, rmsRow);
         const usable = cost && !cost.needsInput && cost.confidenceLevel !== "low";
@@ -528,7 +585,9 @@ Deno.serve(async (req) => {
           }
         } else {
           update.variance_status = "no_baseline";
+          if (ref.source === "conflict") addReason("agreement_conflict");
         }
+        if (foreignCurrency) addReason("unsupported_currency");
 
         await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, update, catTolMap.get(rm?.category ?? "") ?? tolDefault);
       }
@@ -576,7 +635,9 @@ Deno.serve(async (req) => {
 });
 
 async function applyUpdate(svc: any, lineId: string, update: AnyRec) {
-  await svc.from("invoice_lines").update(update).eq("id", lineId);
+  const { error } = await svc.from("invoice_lines").update(update).eq("id", lineId);
+  // En tapt skriving ville gitt en linje som ser ferdig ut uten å være det.
+  if (error) throw new Error(`Kunne ikke lagre fakturalinje ${lineId}: ${error.message}`);
 }
 /**
  * Lærer leverandørens varenummer som bekreftet alias etter et direkte SKU-treff.

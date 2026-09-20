@@ -36,6 +36,10 @@ export interface ReviewLineRow {
   variance_status: string | null;
   review_reason: string | null;
   requires_review: boolean | null;
+  /** Hvilket prisgrunnlag avviket ble målt mot da linjen sist ble beregnet. */
+  price_reference_source: string | null;
+  price_reference_id: string | null;
+  price_reference_date: string | null;
   invoice: {
     id: string;
     invoice_number: string;
@@ -44,6 +48,8 @@ export interface ReviewLineRow {
     supplier_id: string;
     status: string | null;
     source: string | null;
+    currency: string | null;
+    is_credit_note: boolean | null;
     source_document_url: string | null;
     total_amount: number | null;
     total_vat: number | null;
@@ -72,7 +78,9 @@ const SELECT = `id, invoice_id, line_number, supplier_sku, description, quantity
    package_size, package_unit, count_per_package, base_quantity,
    match_confidence, raw_material_id, price_per_base_unit, expected_price_per_base_unit, price_variance_pct,
    variance_status, review_reason, requires_review,
+   price_reference_source, price_reference_id, price_reference_date,
    invoice:invoices!inner(id, invoice_number, invoice_date, legal_entity_id, supplier_id, status, source, source_document_url,
+     currency, is_credit_note,
      total_amount, total_vat, lines_sum_status, lines_sum_excl_vat, lines_sum_variance_pct, extraction_confidence,
      supplier:suppliers(name, contact_email),
      legal_entity:legal_entities(legal_name, short_code)),
@@ -166,6 +174,21 @@ export interface ReviewLineCountRow {
   requires_review: boolean | null;
   variance_status: string | null;
   raw_material_id: string | null;
+  quantity: number | null;
+  description: string | null;
+  supplier_sku: string | null;
+  total_amount: number | null;
+  price_per_base_unit: number | null;
+  expected_price_per_base_unit: number | null;
+  price_variance_pct: number | null;
+  base_quantity: number | null;
+  invoice: {
+    id: string;
+    supplier_id: string | null;
+    currency: string | null;
+    lines_sum_status: string | null;
+    extraction_confidence: number | null;
+  } | null;
 }
 
 /**
@@ -180,7 +203,10 @@ export function useReviewLineCounts(filters: Omit<Filters, "limit">) {
         let q = supabase
           .from("invoice_lines")
           .select(
-            "id, invoice_id, review_reason, requires_review, variance_status, raw_material_id, invoice:invoices!inner(id)",
+            `id, invoice_id, review_reason, requires_review, variance_status, raw_material_id,
+             quantity, description, supplier_sku, total_amount, price_per_base_unit,
+             expected_price_per_base_unit, price_variance_pct, base_quantity,
+             invoice:invoices!inner(id, supplier_id, currency, lines_sum_status, extraction_confidence)`,
           )
           .or("requires_review.eq.true,variance_status.eq.no_baseline")
           .not("invoice.status", "in", `(${HIDDEN_INVOICE_STATUSES.join(",")})`)
