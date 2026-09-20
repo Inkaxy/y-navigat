@@ -126,6 +126,9 @@ export default function InvoiceDetailPage() {
         variance_status: matchLineRaw.variance_status,
         review_reason: matchLineRaw.review_reason,
         requires_review: matchLineRaw.requires_review ?? null,
+        price_reference_source: matchLineRaw.price_reference_source ?? null,
+        price_reference_id: matchLineRaw.price_reference_id ?? null,
+        price_reference_date: matchLineRaw.price_reference_date ?? null,
         invoice: {
           id: data.id,
           invoice_number: data.invoice_number,
@@ -134,6 +137,8 @@ export default function InvoiceDetailPage() {
           supplier_id: data.supplier_id,
           status: data.status,
           source: data.source,
+          currency: data.currency ?? null,
+          is_credit_note: data.is_credit_note ?? null,
           source_document_url: data.source_document_url,
           total_amount: data.total_amount ?? null,
           total_vat: data.total_vat ?? null,
