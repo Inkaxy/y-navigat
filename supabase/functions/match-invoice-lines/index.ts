@@ -247,6 +247,11 @@ Deno.serve(async (req) => {
             reviewReasons.add("agreement_conflict");
           }
         }
+        // Et ukjent prisgrunnlag er ikke «ingen avvik» — linja må ses av et menneske.
+        if (refM.source === "error") {
+          requiresReview = true;
+          reviewReasons.add("price_reference_error");
+        }
         if (foreignCurrency) {
           requiresReview = true;
           reviewReasons.add("unsupported_currency");
@@ -255,15 +260,18 @@ Deno.serve(async (req) => {
         // så får syncRegisteredPrices legge sine egne årsaker oppå.
         manualUpdate.requires_review = requiresReview;
         manualUpdate.review_reason = reviewReasons.size ? Array.from(reviewReasons).join(",") : null;
-        await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, manualUpdate, catTolMap.get(rm?.category ?? "") ?? tolDefault);
+        await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, manualUpdate, catTolMap.get(rm?.category ?? "") ?? tolDefault, refM);
 
         await applyUpdate(svc, line.id, manualUpdate);
         results.push({ id: line.id, status: "manual", recomputed: true });
         continue;
       }
 
-      // Reset suggestions
-      await svc.from("invoice_line_match_suggestions").delete().eq("invoice_line_id", line.id);
+      // Reset suggestions. En mislykket sletting ville latt gamle forslag ligge igjen.
+      {
+        const { error: delErr } = await svc.from("invoice_line_match_suggestions").delete().eq("invoice_line_id", line.id);
+        if (delErr) throw new Error(`Kunne ikke nullstille forslag for linje ${line.id}: ${delErr.message}`);
+      }
 
       const update: AnyRec = {
         raw_material_id: null,
