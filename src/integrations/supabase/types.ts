@@ -10661,6 +10661,7 @@ export type Database = {
           start_price_package_size: number | null
           start_price_package_unit: string | null
           start_price_per_base_unit: number | null
+          start_price_unit_change_at: string | null
           supplier_id: string
           supplier_product_name: string | null
           supplier_sku: string | null
@@ -10699,6 +10700,7 @@ export type Database = {
           start_price_package_size?: number | null
           start_price_package_unit?: string | null
           start_price_per_base_unit?: number | null
+          start_price_unit_change_at?: string | null
           supplier_id: string
           supplier_product_name?: string | null
           supplier_sku?: string | null
@@ -10737,6 +10739,7 @@ export type Database = {
           start_price_package_size?: number | null
           start_price_package_unit?: string | null
           start_price_per_base_unit?: number | null
+          start_price_unit_change_at?: string | null
           supplier_id?: string
           supplier_product_name?: string | null
           supplier_sku?: string | null
