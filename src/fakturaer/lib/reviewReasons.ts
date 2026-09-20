@@ -62,6 +62,7 @@ export const REVIEW_GROUPS = [
   "currency",
   "extraction",
   "conflict",
+  "recalculation",
   "other",
 ] as const;
 export type ReviewGroup = (typeof REVIEW_GROUPS)[number];
