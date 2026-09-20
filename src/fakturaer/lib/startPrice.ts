@@ -39,6 +39,8 @@ export const START_PRICE_BLOCKERS = [
   "mengden_stemmer_ikke_med_pakningen",
   "enhet_endret_etter_fakturalinjen",
   "pakning_ikke_bekreftet_etter_enhetsendring",
+  "enhet_passer_ikke_med_grunnenheten",
+  "ukjent_enhet_pa_linjen",
 ] as const;
 export type StartPriceBlocker = (typeof START_PRICE_BLOCKERS)[number];
 
@@ -73,6 +75,9 @@ const BLOCKER_LABELS: Record<StartPriceBlocker, string> = {
   mengden_stemmer_ikke_med_pakningen: "Mengden i grunnenhet stemmer ikke med den bekreftede pakningen.",
   enhet_endret_etter_fakturalinjen: "Grunnenheten er endret etter at denne linjen ble hentet inn.",
   pakning_ikke_bekreftet_etter_enhetsendring: "Pakningen må bekreftes på nytt etter enhetsendringen.",
+  enhet_passer_ikke_med_grunnenheten:
+    "Enheten på fakturalinjen kan ikke regnes om til varens grunnenhet (for eksempel liter mot kilo).",
+  ukjent_enhet_pa_linjen: "Enheten på fakturalinjen mangler eller er ukjent, så mengden kan ikke kontrolleres.",
 };
 
 export function blockerLabel(code: string): string {
