@@ -809,8 +809,16 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
   // En fakturaenhet som ER en måleenhet i varens egen dimensjon (2 kg på en
   // vare som måles i kg) er en KJENT måling. Historikk er en pris, ikke en
   // måling, og skal aldri kunne gjøre om 2 kg til 20 kg.
+  // Den andre tolkningen teller bare som en reell motstridende opplysning når
+  // pakningen er BEKREFTET. Er den bare lest ut av varenavnet, kan historikken
+  // fortsatt brukes til å avgjøre hvilken av to tolkninger som er den riktige.
+  const confirmedAlternative = (chosen === candA ? candB : candA)?.source !== "description";
   const measurementKnown =
-    chosen === candA && directFactor != null && directFactor > 0 && checks.arithmeticPerInvoiceUnit;
+    chosen === candA &&
+    directFactor != null &&
+    directFactor > 0 &&
+    checks.arithmeticPerInvoiceUnit &&
+    confirmedAlternative;
 
   // Historikk avgjør ved tvil.
   const known = toNum(input.knownPricePerBaseUnit);
