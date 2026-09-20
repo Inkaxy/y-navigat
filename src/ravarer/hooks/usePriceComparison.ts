@@ -69,7 +69,7 @@ export function usePriceComparison(rawMaterialId: string | undefined, supplierId
     queryFn: async (): Promise<PriceSummary> => {
       const { data, error } = await supabase.rpc("rm_price_summary", {
         p_raw_material_id: rawMaterialId!,
-        p_supplier_id: supplierId,
+        p_supplier_id: supplierId ?? undefined,
         p_on_date: onDate,
       });
       if (error) throw error;
