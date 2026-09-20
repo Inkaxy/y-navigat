@@ -600,6 +600,8 @@ Deno.serve(async (req) => {
           }
         } else {
           update.variance_status = "no_baseline";
+          // Et gammelt avvik skal aldri bli stående når det ikke er regnet ut nå.
+          update.price_variance_pct = null;
           if (ref.source === "conflict") addReason("agreement_conflict");
         }
         // Et ukjent prisgrunnlag er ikke «ingen avvik».
