@@ -45,6 +45,8 @@ export function StartPriceCard({
 
   const [dialog, setDialog] = useState<{ mode: "clear" | "agreement"; link: RmSupplierRow } | null>(null);
   const [reason, setReason] = useState("");
+  /** Erstatning av en eksisterende avtalepris krever en uttrykkelig bekreftelse. */
+  const [confirmReplace, setConfirmReplace] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const withStartPrice = links.filter((l) => l.start_price_per_base_unit != null);
@@ -58,9 +60,21 @@ export function StartPriceCard({
         const res = await clearStartPrice(dialog.link.id, reason);
         toast.success(res.cleared ? "Startprisen er fjernet" : "Det finnes ingen startpris å fjerne");
       } else {
-        await startPriceToAgreement(dialog.link.id, reason);
+        const l = dialog.link;
+        const res = await startPriceToAgreement({
+          rmsId: l.id,
+          reason,
+          // Verdiene brukeren faktisk så. Er noe endret i mellomtiden, avviser
+          // serveren handlingen i stedet for å erstatte avtaleprisen på feil grunnlag.
+          expectedStartPrice: l.start_price_per_base_unit ?? null,
+          expectedUnitChangeAt: l.start_price_unit_change_at ?? null,
+          expectedPackageSize: l.package_size,
+          expectedPackageUnit: l.package_unit,
+          expectedBaseUnitsPerPackage: l.base_units_per_package,
+          replaceExisting: l.agreed_price_per_base_unit != null,
+        });
         toast.success("Startprisen er satt som avtalepris", {
-          description: "Avtalen gjelder fra i dag. Eldre fakturaer påvirkes ikke.",
+          description: `Avtalen gjelder fra ${formatDate(res.validFrom)}. Eldre fakturaer påvirkes ikke.`,
         });
       }
       void qc.invalidateQueries({ queryKey: ["raw_material_suppliers", dialog.link.raw_material_id] });
@@ -126,6 +140,7 @@ export function StartPriceCard({
                       disabled={stale}
                       onClick={() => {
                         setReason("");
+                        setConfirmReplace(false);
                         setDialog({ mode: "agreement", link: l });
                       }}
                     >
@@ -136,6 +151,7 @@ export function StartPriceCard({
                       variant="ghost"
                       onClick={() => {
                         setReason("");
+                        setConfirmReplace(false);
                         setDialog({ mode: "clear", link: l });
                       }}
                     >
