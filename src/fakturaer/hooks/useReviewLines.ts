@@ -127,6 +127,9 @@ export function useReviewLines(filters: Filters) {
           .order("invoice(invoice_date)", { ascending: false })
           .order("invoice_id")
           .order("line_number", { nullsFirst: false })
+          // Stabil, unik siste sortering — uten den kan samme rad dukke opp i
+          // to sider (eller falle ut mellom dem) under paginering.
+          .order("id")
           .range(from, to);
 
 
