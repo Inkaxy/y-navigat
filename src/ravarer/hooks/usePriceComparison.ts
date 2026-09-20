@@ -141,7 +141,7 @@ export function usePriceComparison(
         confirmed_link: r.line?.match_confidence === "manual",
         // Registreringstidspunktet avgjør, ikke bare fakturadatoen: en rad
         // som ble lagret før endringen samme dag er heller ikke sammenlignbar.
-        unit_changed_since: changedAt != null && r.created_at < changedAt,
+        unit_changed_since: changedAt != null && Date.parse(r.created_at) < Date.parse(changedAt),
       }));
     },
   });
