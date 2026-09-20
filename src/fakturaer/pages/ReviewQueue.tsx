@@ -152,14 +152,19 @@ export default function FakturaerInboxPage() {
 
   const links = useSupplierLinkContext(invoices.map((i) => i.supplier_id));
 
-  const visibleLines = useMemo(() => {
-    const scoped = expandedId ? lines.filter((l) => l.invoice_id === expandedId) : lines;
-    return scoped.filter((l) => matchesTab(l, tab));
-  }, [lines, expandedId, tab]);
-
   // Tellerne skal gjelde HELE køen, ikke bare de linjene som er hentet inn.
   const countsQuery = useReviewLineCounts({ ...filters, invoiceId: expandedId, onlyReady });
   const countRows = useMemo(() => countsQuery.data ?? [], [countsQuery.data]);
+
+  // Gjentakelser telles over HELE køen — det er poenget med tallet.
+  const repeats = useMemo(() => computeRepeatCounts(countRows), [countRows]);
+
+  const [sort, setSort] = useState<QueueSort>("invoice_date");
+
+  const visibleLines = useMemo(() => {
+    const scoped = expandedId ? lines.filter((l) => l.invoice_id === expandedId) : lines;
+    return sortQueue(scoped.filter((l) => matchesTab(l, tab)), sort, repeats);
+  }, [lines, expandedId, tab, sort, repeats]);
 
   const counts = useMemo(() => {
     const c = {} as Record<TabValue, number>;
