@@ -31,7 +31,17 @@ import { SkuConflictDialog } from "@/fakturaer/components/SkuConflictDialog";
 import { ConfirmReconcileDialog } from "@/fakturaer/components/ConfirmReconcileDialog";
 import { InvoiceDocumentPanel } from "@/fakturaer/components/InvoiceDocumentPanel";
 import { InboxInvoiceCard } from "@/fakturaer/components/inbox/InboxInvoiceCard";
-import { QueueTable, REASON_LABELS, reasonsOf } from "@/fakturaer/components/inbox/QueueTable";
+import { QueueTable } from "@/fakturaer/components/inbox/QueueTable";
+import {
+  GROUP_DESCRIPTIONS,
+  GROUP_LABELS,
+  REVIEW_GROUPS,
+  matchesGroup,
+  repeatCounts as computeRepeatCounts,
+  sortQueue,
+  type QueueSort,
+  type ReviewGroup,
+} from "@/fakturaer/lib/reviewReasons";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import {
