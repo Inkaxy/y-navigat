@@ -399,7 +399,8 @@ describe("startpris", () => {
     expect(v.updated).toBe(true);
     expect(Number(v.agreed_price_per_base_unit)).toBe(10);
     expect(v.replaced_existing).toBe(true);
-    const today = new Date().toISOString().slice(0, 10);
+    // Databasen bruker Oslo-dato, ikke UTC — sammenlign mot samme kilde.
+    const today = osloTodayISO();
     expect(String(v.agreement_valid_from)).toBe(today);
     // Den utløpte sluttdatoen skal være ryddet bort, ikke bli stående med ny pris.
     expect(v.agreement_valid_to).toBeNull();
