@@ -63,6 +63,8 @@ export function BulkLinkDialog({ open, onOpenChange, rmsId, rawMaterialName, onA
 
   const apply = useMutation({
     mutationFn: async () => {
+      const updatedAt = query.data?.updatedAt;
+      if (!updatedAt) throw new Error("Fant ikke leverandørkoblingen — hent forhåndsvisningen på nytt.");
       const { data, error } = await supabase.rpc("rm_apply_supplier_link_lines", {
         p_rms_id: rmsId!,
         p_line_ids: chosen.map((r) => r.line_id),
