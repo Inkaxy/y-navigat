@@ -475,15 +475,36 @@ export default function FakturaerInboxPage() {
 
   const queueEl = (
     <div className="space-y-4">
-      <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)}>
-        <TabsList className="flex-wrap">
-          {TABS.map((t) => (
-            <TabsTrigger key={t.value} value={t.value}>
-              {t.label} ({counts[t.value] ?? 0})
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)}>
+          <TabsList className="flex-wrap">
+            {TABS.map((t) => (
+              <TabsTrigger key={t.value} value={t.value} title={t.hint}>
+                {t.label} ({counts[t.value] ?? 0})
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <Select value={sort} onValueChange={(v) => setSort(v as QueueSort)}>
+          <SelectTrigger className="w-[240px]" aria-label="Sorter køen">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SORT_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {countsQuery.isError && (
+        <p className="text-caption text-destructive">
+          Tellerne kunne ikke hentes — tallene i fanene kan være ufullstendige.
+        </p>
+      )}
+
 
       {selectedLines.length > 0 && (
         <Card className="flex flex-wrap items-center gap-3 border-primary/30 bg-primary/5 p-3">
