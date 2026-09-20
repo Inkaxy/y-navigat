@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchAllRows } from "@/lib/supabasePaging";
+import { fetchAllRows, fetchPagesUpTo } from "@/lib/supabasePaging";
 
 export type ReviewReason =
   | "unmatched"
