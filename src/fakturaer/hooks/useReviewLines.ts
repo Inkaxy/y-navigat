@@ -144,10 +144,10 @@ export function useReviewLines(filters: Filters) {
       let rows: ReviewLineRow[];
       let hasMore = false;
       if (limit != null) {
-        // Ett ekstra treff avslører om det finnes flere linjer enn taket.
-        const { data, error } = await build(0, limit);
-        if (error) throw new Error(error.message);
-        rows = data ?? [];
+        // API-et returnerer maks 1000 rader per kall. Et tak over 1000 må
+        // derfor hentes side for side — ett enkelt range(0, limit) ville
+        // stoppet på 1000 og feilaktig meldt «ingen flere».
+        rows = await fetchPagesUpTo(build, limit + 1);
         hasMore = rows.length > limit;
         if (hasMore) rows = rows.slice(0, limit);
       } else {
