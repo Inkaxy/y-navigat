@@ -2,7 +2,7 @@
 // Input: { invoice_id: string, line_ids?: string[] }
 import { createClient } from "npm:@supabase/supabase-js@2.95.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2.95.0/cors";
-import { normalizeUnit, isPackageUnit, resolveLineCost, stripPackageTokens } from "../_shared/units.ts";
+import { normalizeUnit, isPackageUnit, packageNeedsConfirmation, resolveLineCost, stripPackageTokens } from "../_shared/units.ts";
 import { normalizeMatchKey } from "../_shared/matchNormalize.ts";
 import { syncRegisteredPrices, learnPendingAliases } from "../_shared/priceSync.ts";
 import { CREDIT_NOTE_REF_PREFIX, creditNoteOriginalRef } from "../_shared/creditNote.ts";
@@ -218,6 +218,12 @@ Deno.serve(async (req) => {
 
         const reviewReasons = new Set<string>();
         let requiresReview = false;
+        // Pakning som bare er tolket ut av varenavnet er ikke bekreftet — prisen
+        // regnes ut, men linja skal ses av et menneske.
+        if (cost && !cost.needsInput && packageNeedsConfirmation(cost)) {
+          requiresReview = true;
+          reviewReasons.add("unknown_package_size");
+        }
         if (cost?.needsInput === "package_size") {
           requiresReview = true;
           reviewReasons.add("unknown_package_size");
@@ -582,6 +588,7 @@ Deno.serve(async (req) => {
         };
 
         // Aldri gjett: uten kjent pakningsinnhold, eller ved lav tillit, skal linja til gjennomgang.
+        if (cost && !cost.needsInput && packageNeedsConfirmation(cost)) addReason("unknown_package_size");
         if (cost?.needsInput === "package_size") addReason("unknown_package_size");
         else if (cost && !cost.needsInput && cost.confidenceLevel === "low") addReason("uncertain_cost");
         else if (actual == null && isPackageUnit(normalizedUnit) && rm?.base_unit) addReason("unknown_package_size");
