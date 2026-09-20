@@ -693,7 +693,21 @@ async function upsertConfirmedSkuAlias(
 
 async function insertSuggestions(svc: any, rows: AnyRec[]) {
   if (!rows.length) return;
-  await svc.from("invoice_line_match_suggestions").insert(rows);
+  // Tabellen har unik (invoice_line_id, raw_material_id). Samme vare kan dukke
+  // opp både som alias-treff og fuzzy-treff — da beholder vi den beste raden,
+  // ellers ryker hele innsettingen på en duplikatfeil.
+  const best = new Map<string, AnyRec>();
+  for (const row of rows) {
+    const key = `${row.invoice_line_id}|${row.raw_material_id}`;
+    const prev = best.get(key);
+    if (!prev || Number(row.confidence ?? 0) > Number(prev.confidence ?? 0)) best.set(key, row);
+  }
+  const deduped = [...best.values()]
+    .sort((a, b) => Number(b.confidence ?? 0) - Number(a.confidence ?? 0))
+    .map((row, idx) => ({ ...row, rank: idx + 1 }));
+  const { error } = await svc.from("invoice_line_match_suggestions").insert(deduped);
+  // Uten forslag står saksbehandleren uten alternativer — det skal ikke gå stille.
+  if (error) throw new Error(`Kunne ikke lagre forslag: ${error.message}`);
 }
 
 /**
