@@ -4,31 +4,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { FileText } from "lucide-react";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
-import { formatNok } from "@/fakturaer/lib/constants";
+import { formatMoney, formatNok } from "@/fakturaer/lib/constants";
 import { resolveLineCost } from "@/fakturaer/lib/units";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import type { SupplierLinkContext, SupplierLinkRow } from "@/fakturaer/hooks/useSupplierLinkContext";
+import { allReasons, financialImpact, reasonLabel, repeatKey, storedReasons } from "@/fakturaer/lib/reviewReasons";
 import { cn } from "@/lib/utils";
 
-export const REASON_LABELS: Record<string, string> = {
-  unmatched: "Umatchet",
-  low_confidence: "Lav tillit",
-  price_variance: "Prisavvik",
-  price_increase: "Prisøkning",
-  price_drop: "Prisfall",
-  uncertain_cost: "Usikker kostpris",
-  unknown_package_size: "Ukjent pakningsstørrelse",
-  sku_collision: "Konflikt",
-  no_baseline: "Uten avtalepris",
-  // Prissynken setter denne når fakturaen er i annen valuta enn NOK.
-  unsupported_currency: "Valuta ikke støttet",
-};
+/** Bakoverkompatibel gjenbruk — én kilde til årsakstekstene ligger i reviewReasons.ts. */
+export { REASON_LABELS } from "@/fakturaer/lib/reviewReasons";
 
 export function reasonsOf(line: { review_reason: string | null }): string[] {
-  return (line.review_reason ?? "")
-    .split(",")
-    .map((r) => r.trim())
-    .filter(Boolean);
+  return storedReasons(line);
 }
 
 /** Pris per grunnenhet for linjen — lagret verdi, ellers beregnet. */
