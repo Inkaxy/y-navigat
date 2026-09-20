@@ -804,8 +804,15 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
     swapNote = "Antallet er i pakninger mens enhetsprisen er per baseenhet — regnestykket på fakturaen bekrefter det.";
   }
 
+  // En fakturaenhet som ER en måleenhet i varens egen dimensjon (2 kg på en
+  // vare som måles i kg) er en KJENT måling. Historikk er en pris, ikke en
+  // måling, og skal aldri kunne gjøre om 2 kg til 20 kg.
+  const measurementKnown =
+    chosen === candA && directFactor != null && directFactor > 0 && checks.arithmeticPerInvoiceUnit;
+
   // Historikk avgjør ved tvil.
   const known = toNum(input.knownPricePerBaseUnit);
+  let historyNote: string | null = null;
   if (known && known > 0) {
     const rel = (p: number) => Math.abs(p - known) / known;
     checks.matchesHistory = rel(chosen.pricePerBaseUnit) <= 0.35;
@@ -817,7 +824,11 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
           nearlyEqual(chosen.pricePerBaseUnit, known / bupp, 35);
         checks.historyOffByPackage = off;
       }
-      if (other && rel(other.pricePerBaseUnit) < rel(chosen.pricePerBaseUnit) && rel(other.pricePerBaseUnit) <= 0.35) {
+      if (measurementKnown) {
+        historyNote =
+          `Historikken ligger på ${fmtNum(known, 4)} kr/${base}, men fakturaen oppgir ${fmtNum(quantity)} ${invoiceUnit} ` +
+          `og regnestykket stemmer. Målingen på fakturaen beholdes.`;
+      } else if (other && rel(other.pricePerBaseUnit) < rel(chosen.pricePerBaseUnit) && rel(other.pricePerBaseUnit) <= 0.35) {
         swapNote =
           `Historikken ligger på ${fmtNum(known, 4)} kr/${base}. Den andre tolkningen treffer den, så den er valgt.`;
         chosen = other;
@@ -825,6 +836,17 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
         checks.historyOffByPackage = true;
       }
     }
+  }
+
+  // Pakning som KUN er lest ut av varenavnet er en tolkning av tekst, ikke en
+  // bekreftet opplysning. Den kan foreslås, men aldri brukes som grunnlag.
+  if (chosen.basis === "pakning" && chosen.source === "description") {
+    return emptyResult(
+      "package_size",
+      `Innholdet per pakning er bare tolket fra varenavnet (${fmtNum(chosen.baseUnitsPerPackage ?? 0)} ${base} per ` +
+        `${pkg?.packageUnitLabel ?? "pakning"}). Bekreft pakningen før prisen kan brukes.`,
+      checks,
+    );
   }
 
   if (chosen.baseUnitsPerPackage && chosen.baseUnitsPerPackage > 0) {
