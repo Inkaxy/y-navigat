@@ -15,6 +15,7 @@ const MIGRATIONS = [
   "supabase/migrations/20260920202427_5083c865-678d-415b-adaa-e6105b2ccc90.sql",
   "supabase/migrations/20260920203623_19d4672a-aa57-4677-826f-9f0ab71afb36.sql",
   "supabase/migrations/20260920204910_a33720cc-66ed-4b7b-a92d-b47c32c7c901.sql",
+  "supabase/migrations/20260920211551_bf78ce3b-9c01-4d98-9513-751efeb84f9d.sql",
 ].map((f) => path.join(process.cwd(), f));
 
 const ENTITY = "11111111-1111-1111-1111-111111111111";
@@ -62,6 +63,7 @@ create table public.invoice_lines(
   raw_material_id uuid,
   description text,
   quantity numeric,
+  unit text,
   total_amount numeric,
   base_quantity numeric,
   price_per_base_unit numeric,
@@ -110,6 +112,29 @@ create table public.audit_log(
   entity_display_reference text, legal_entity_id uuid, changes jsonb,
   reason text, source_app text, created_at timestamptz not null default now());
 
+-- Kopi av den faktiske definisjonen i databasen (eldre migrasjon).
+create or replace function public.rm_unit_factor(p_unit text, p_base_unit text)
+returns numeric language sql immutable as $$
+  with u as (select lower(btrim(coalesce(p_unit,''))) as u, lower(btrim(coalesce(p_base_unit,''))) as b)
+  select case
+    when u.u = '' or u.b = '' then null
+    when u.u = u.b then 1
+    when u.b = 'kg' and u.u in ('kilo','kilogram')            then 1
+    when u.b = 'kg' and u.u in ('g','gram')                   then 0.001
+    when u.b = 'kg' and u.u in ('hg','hekto')                 then 0.1
+    when u.b = 'kg' and u.u in ('t','tonn','ton')             then 1000
+    when u.b = 'g'  and u.u in ('kg','kilo','kilogram')       then 1000
+    when u.b = 'l'  and u.u in ('liter','ltr')                then 1
+    when u.b = 'l'  and u.u in ('ml','milliliter')            then 0.001
+    when u.b = 'l'  and u.u in ('dl')                         then 0.1
+    when u.b = 'l'  and u.u in ('cl')                         then 0.01
+    when u.b = 'ml' and u.u in ('l','liter','ltr')            then 1000
+    when u.b = 'stk' and u.u in ('stk','stykk','pcs','st')    then 1
+    else null
+  end
+  from u;
+$$;
+
 create or replace function public.rm_unit_change_at(p_raw_material_id uuid)
 returns timestamptz language sql stable as $$
   select max(created_at) from public.raw_material_changelog
@@ -142,9 +167,9 @@ async function makeLine(opts: {
     [ENTITY, opts.supplier ?? SUPPLIER, `F-${opts.date}-${opts.price}`, opts.date, opts.currency ?? "NOK", opts.credit ?? false],
   );
   const line = await db.query<{ id: string }>(
-    `insert into public.invoice_lines(invoice_id, raw_material_id, description, quantity, total_amount,
+    `insert into public.invoice_lines(invoice_id, raw_material_id, description, quantity, unit, total_amount,
        base_quantity, price_per_base_unit, match_confidence, requires_review)
-     values ($1,$2,'Hvetemel 25 kg',2,$3,50,$4,$5,$6) returning id`,
+     values ($1,$2,'Hvetemel 25 kg',2,'sekk',$3,50,$4,$5,$6) returning id`,
     [
       inv.rows[0].id,
       RM,
@@ -281,7 +306,7 @@ describe("startpris", () => {
     );
     const line = await db.query<{ id: string }>(
       `insert into public.invoice_lines(invoice_id, raw_material_id, quantity, total_amount, base_quantity,
-         price_per_base_unit, match_confidence) values ($1,$2,2,500,50,10,'manual') returning id`,
+         price_per_base_unit, match_confidence, unit) values ($1,$2,2,500,50,10,'manual','sekk') returning id`,
       [inv.rows[0].id, RM],
     );
     const e = await eligibility(line.rows[0].id);
@@ -460,7 +485,7 @@ describe("startpris", () => {
     );
     await db.query(
       `insert into public.invoice_lines(invoice_id, raw_material_id, description, quantity, total_amount,
-         base_quantity, price_per_base_unit, match_confidence) values ($1,$2,'Skjult',2,500,50,10,'manual')`,
+         base_quantity, price_per_base_unit, match_confidence, unit) values ($1,$2,'Skjult',2,500,50,10,'manual','sekk')`,
       [inv.rows[0].id, RM],
     );
     const res = await db.query<{ v: Array<{ invoice_number: string }> }>(
@@ -487,5 +512,80 @@ describe("startpris", () => {
     expect((await reference("2026-09-01")).source).toBe("start_price");
     await db.query("update public.raw_material_suppliers set base_units_per_package = 10, package_size = 10");
     expect((await reference("2026-09-01")).source).not.toBe("start_price");
+  });
+  // --- Enhetsbasert mengdekontroll (rm_expected_base_quantity) ---
+
+  /** Referanselinje: 10 enheter, base_quantity 10, 1000 kr, pakningsfaktor 6. */
+  async function unitLine(unit: string | null): Promise<string> {
+    await db.query("delete from public.raw_material_suppliers");
+    await db.query(
+      `insert into public.raw_material_suppliers(raw_material_id, supplier_id, package_size, package_unit,
+         base_units_per_package, package_confirmed_at) values ($1,$2,6,'kg',6, now())`,
+      [RM, SUPPLIER],
+    );
+    const inv = await db.query<{ id: string }>(
+      `insert into public.invoices(legal_entity_id, supplier_id, invoice_number, invoice_date)
+       values ($1,$2,$3,'2026-06-01') returning id`,
+      [ENTITY, SUPPLIER, `E-${unit ?? "null"}-${Math.random()}`],
+    );
+    const line = await db.query<{ id: string }>(
+      `insert into public.invoice_lines(invoice_id, raw_material_id, description, quantity, unit, total_amount,
+         base_quantity, price_per_base_unit, match_confidence, requires_review)
+       values ($1,$2,'Hvetemel',10,$3,1000,10,100,'manual',false) returning id`,
+      [inv.rows[0].id, RM, unit],
+    );
+    return line.rows[0].id;
+  }
+
+  it("godtar referanselinjen i grunnenheten", async () => {
+    const e = await eligibility(await unitLine("kg"));
+    expect(e.blockers).toEqual([]);
+    expect(e.eligible).toBe(true);
+  });
+
+  it("avviser liter mot en vare som måles i kilo", async () => {
+    const line = await unitLine("l");
+    const e = await eligibility(line);
+    expect(e.blockers).toContain("enhet_passer_ikke_med_grunnenheten");
+    expect(e.eligible).toBe(false);
+    expect((await confirm(line)).created).toBe(false);
+  });
+
+  it("avviser 10 kartonger à 6 kg når mengden fortsatt står som 10", async () => {
+    const line = await unitLine("kartong");
+    const e = await eligibility(line);
+    expect(e.blockers).toContain("mengden_stemmer_ikke_med_pakningen");
+    expect(e.eligible).toBe(false);
+    expect((await confirm(line)).created).toBe(false);
+  });
+
+  it("godtar 10 000 gram som 10 kilo", async () => {
+    await db.query("delete from public.raw_material_suppliers");
+    await db.query(
+      `insert into public.raw_material_suppliers(raw_material_id, supplier_id, package_size, package_unit,
+         base_units_per_package, package_confirmed_at) values ($1,$2,6,'kg',6, now())`,
+      [RM, SUPPLIER],
+    );
+    const inv = await db.query<{ id: string }>(
+      `insert into public.invoices(legal_entity_id, supplier_id, invoice_number, invoice_date)
+       values ($1,$2,'E-gram','2026-06-02') returning id`,
+      [ENTITY, SUPPLIER],
+    );
+    const line = await db.query<{ id: string }>(
+      `insert into public.invoice_lines(invoice_id, raw_material_id, description, quantity, unit, total_amount,
+         base_quantity, price_per_base_unit, match_confidence, requires_review)
+       values ($1,$2,'Hvetemel',10000,'g',1000,10,100,'manual',false) returning id`,
+      [inv.rows[0].id, RM],
+    );
+    const e = await eligibility(line.rows[0].id);
+    expect(e.blockers).toEqual([]);
+    const c = await confirm(line.rows[0].id, 100);
+    expect(c.created).toBe(true);
+    expect(Number(c.start_price)).toBe(100);
+  });
+
+  it("avviser linje uten enhet i stedet for å gjette", async () => {
+    const e = await eligibility(await unitLine(null));
+    expect(e.blockers).toContain("ukjent_enhet_pa_linjen");
   });
 });
