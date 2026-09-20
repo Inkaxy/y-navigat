@@ -179,5 +179,6 @@ export function HistoryTab({ rm }: Props) {
         </ol>
       </QueryState>
     </Card>
+    </div>
   );
 }
