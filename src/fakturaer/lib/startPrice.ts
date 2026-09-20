@@ -293,13 +293,13 @@ export async function startPriceToAgreement(args: {
   const { data, error } = await supabase.rpc("rm_start_price_to_agreement", {
     p_rms_id: args.rmsId,
     p_reason: args.reason,
-    p_expected_start_price: args.expectedStartPrice,
-    p_expected_unit_change_at: args.expectedUnitChangeAt,
-    p_expected_package_size: args.expectedPackageSize,
-    p_expected_package_unit: args.expectedPackageUnit,
-    p_expected_base_units_per_package: args.expectedBaseUnitsPerPackage,
+    p_expected_start_price: args.expectedStartPrice ?? undefined,
+    p_expected_unit_change_at: args.expectedUnitChangeAt ?? undefined,
+    p_expected_package_size: args.expectedPackageSize ?? undefined,
+    p_expected_package_unit: args.expectedPackageUnit ?? undefined,
+    p_expected_base_units_per_package: args.expectedBaseUnitsPerPackage ?? undefined,
     p_replace_existing: args.replaceExisting,
-    p_valid_from: args.validFrom ?? null,
+    p_valid_from: args.validFrom ?? undefined,
   });
   if (error) throw error;
   const o = (data ?? {}) as Record<string, unknown>;
