@@ -18,6 +18,8 @@ import { QueryState } from "@/components/common/QueryState";
 import { useReviewLines, useReviewLineCounts, type ReviewLineRow, type ReviewLineCountRow } from "@/fakturaer/hooks/useReviewLines";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
 import { useSuppliersFor } from "@/fakturaer/hooks/useSuppliersFor";
+import { useCompany } from "@/hooks/useCompany";
+import { resolveQueueEntityId } from "@/fakturaer/lib/queueEntity";
 import { useInboxInvoices } from "@/fakturaer/hooks/useInboxInvoices";
 import { useSupplierLinkContext } from "@/fakturaer/hooks/useSupplierLinkContext";
 import { useMatchTolerancesByEntity } from "@/fakturaer/hooks/useMatchTolerances";
@@ -106,16 +108,22 @@ export default function FakturaerInboxPage() {
   const onlyReady = searchParams.get("filter") === "klar";
 
   const { data: entities = [] } = useFakturaerLegalEntities();
-  const [legalEntityId, setLegalEntityId] = useState<string>("all");
+  const { data: company } = useCompany();
   const [supplierId, setSupplierId] = useState<string>("all");
   const [supplierOpen, setSupplierOpen] = useState(false);
   const [tab, setTab] = useState<TabValue>("all");
 
-  const { data: suppliers = [] } = useSuppliersFor(legalEntityId === "all" ? null : legalEntityId);
+  // Ett firma: selskapet kommer fra useCompany, ikke fra en velger.
+  const legalEntityId = useMemo(
+    () => resolveQueueEntityId(company?.id, entities.map((e) => e.id)),
+    [company?.id, entities],
+  );
+
+  const { data: suppliers = [] } = useSuppliersFor(legalEntityId);
 
   // Hver faktura vurderes mot sitt eget selskaps toleranser.
   const toleranceEntityIds = useMemo(
-    () => (legalEntityId !== "all" ? [legalEntityId] : entities.map((e) => e.id)),
+    () => (legalEntityId ? [legalEntityId] : entities.map((e) => e.id)),
     [legalEntityId, entities],
   );
   // Toleransen slås opp per linje, mot linjens EGET selskap.
@@ -123,7 +131,7 @@ export default function FakturaerInboxPage() {
 
   const filters = useMemo(
     () => ({
-      legalEntityId: legalEntityId === "all" ? null : legalEntityId,
+      legalEntityId,
       supplierId: supplierId === "all" ? null : supplierId,
     }),
     [legalEntityId, supplierId],
@@ -641,35 +649,13 @@ export default function FakturaerInboxPage() {
 
       <Card className="p-4">
         <div className="flex flex-wrap items-center gap-3">
-          {entities.length > 1 && (
-            <Select
-              value={legalEntityId}
-              onValueChange={(v) => {
-                setLegalEntityId(v);
-                setSupplierId("all");
-              }}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Alle selskaper</SelectItem>
-                {entities.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
           <Popover open={supplierOpen} onOpenChange={setSupplierOpen}>
             <PopoverTrigger asChild>
               <Button
                 type="button"
                 variant="outline"
                 role="combobox"
-                disabled={legalEntityId === "all" && entities.length > 1}
+                disabled={!legalEntityId}
                 className="w-[260px] justify-between font-normal"
               >
                 <span className="truncate">
