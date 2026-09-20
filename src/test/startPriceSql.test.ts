@@ -14,7 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const MIGRATIONS = [
   "supabase/migrations/20260920202427_5083c865-678d-415b-adaa-e6105b2ccc90.sql",
   "supabase/migrations/20260920203623_19d4672a-aa57-4677-826f-9f0ab71afb36.sql",
-  "supabase/migrations/pending_start_price_fixes.sql.tmp",
+  "supabase/migrations/20260920204910_a33720cc-66ed-4b7b-a92d-b47c32c7c901.sql",
 ].map((f) => path.join(process.cwd(), f));
 
 const ENTITY = "11111111-1111-1111-1111-111111111111";
