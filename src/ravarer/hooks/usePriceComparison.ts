@@ -25,6 +25,8 @@ export interface PriceSummary {
   weighted_90d_suppliers: number | null;
   /** Datoen grunnenheten sist ble endret — eldre tall er holdt utenfor. */
   unit_changed_at: string | null;
+  /** Nøyaktig tidspunkt for endringen; rader registrert før er holdt utenfor. */
+  unit_changed_at_ts: string | null;
   on_date: string;
 }
 
@@ -44,7 +46,9 @@ export interface PriceObservation {
   base_quantity: number | null;
   line_unit: string | null;
   confirmed_link: boolean;
-  /** Sann når enheten på råvaren er endret ETTER observasjonen. */
+  /** Tidspunktet observasjonen ble registrert. */
+  created_at: string;
+  /** Sann når enheten på råvaren er endret ETTER at observasjonen ble registrert. */
   unit_changed_since: boolean;
 }
 
@@ -93,7 +97,7 @@ export function usePriceComparison(
       let q = supabase
         .from("raw_material_price_history")
         .select(
-          `id, price, effective_date, source, supplier_id, invoice_id, invoice_line_id, currency,
+          `id, price, effective_date, created_at, source, supplier_id, invoice_id, invoice_line_id, currency,
            is_credit, is_legacy, superseded_at, superseded_reason,
            line:invoice_lines!raw_material_price_history_invoice_line_id_fkey(base_quantity, unit, match_confidence)`,
         )
@@ -130,11 +134,14 @@ export function usePriceComparison(
         is_credit: r.is_credit,
         is_legacy: r.is_legacy,
         superseded_at: r.superseded_at,
+        created_at: r.created_at,
         superseded_reason: r.superseded_reason,
         base_quantity: r.line?.base_quantity ?? null,
         line_unit: r.line?.unit ?? null,
         confirmed_link: r.line?.match_confidence === "manual",
-        unit_changed_since: changedAt != null && r.effective_date < changedAt.slice(0, 10),
+        // Registreringstidspunktet avgjør, ikke bare fakturadatoen: en rad
+        // som ble lagret før endringen samme dag er heller ikke sammenlignbar.
+        unit_changed_since: changedAt != null && r.created_at < changedAt,
       }));
     },
   });
