@@ -113,6 +113,7 @@ const REASON_GROUP: Record<ReasonCode, ReviewGroup> = {
   price_reference_error: "no_baseline",
   extraction_issue: "extraction",
   sku_collision: "conflict",
+  recalculation_pending: "recalculation",
 };
 
 const KNOWN: ReadonlySet<string> = new Set<string>([...LINE_REASON_CODES, ...DERIVED_REASON_CODES]);
