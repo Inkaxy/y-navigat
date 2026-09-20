@@ -57,6 +57,7 @@ import { LeveranseTab } from "@/varer/components/products/detail/tabs/LeveranseT
 import { PakkeTab, type PackageItem } from "@/varer/components/products/detail/tabs/PakkeTab";
 import { ReturTab } from "@/varer/components/products/detail/tabs/ReturTab";
 import { RecipeSummaryCard } from "@/varer/components/products/RecipeSummaryCard";
+import { RecipeBasisNote } from "@/varer/components/products/RecipeBasisNote";
 import { SelvStekingCard } from "@/varer/components/products/detail/SelvStekingCard";
 import { DeclarationTab } from "@/varer/components/products/DeclarationTab";
 import { CostPriceTab } from "@/varer/components/products/CostPriceTab";
