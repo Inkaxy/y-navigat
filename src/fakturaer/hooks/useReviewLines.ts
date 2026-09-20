@@ -214,6 +214,8 @@ export function useReviewLineCounts(filters: Omit<Filters, "limit">) {
           .or("requires_review.eq.true,variance_status.eq.no_baseline")
           .not("invoice.status", "in", `(${HIDDEN_INVOICE_STATUSES.join(",")})`)
           .order("invoice_id")
+          // Unik sekundærsortering: paginering uten den kan hoppe over rader.
+          .order("id")
           .range(from, to);
         if (filters.legalEntityId) q = q.eq("invoice.legal_entity_id", filters.legalEntityId);
         if (filters.supplierId) q = q.eq("invoice.supplier_id", filters.supplierId);
