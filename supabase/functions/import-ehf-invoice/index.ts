@@ -4,7 +4,7 @@
 // - Creates invoice + invoice_lines, returns invoice_id
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { parse as parseXml } from "../_shared/xml.ts";
+import { parse as parseXml } from "./xml.ts";
 import { normalizeUnit } from "../_shared/units.ts";
 
 const corsHeaders = {

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { parse as parseXmlStub } from "./edge/denoXmlStub";
 
 // XML-parseren hentes fra en Deno-URL i produksjon; i test bruker vi stubben.
-vi.mock("../../supabase/functions/_shared/xml.ts", () => ({ parse: parseXmlStub }));
+vi.mock("../../supabase/functions/import-ehf-invoice/xml.ts", () => ({ parse: parseXmlStub }));
 import { createFakeClient, type Row, type Tables } from "./edge/fakeSupabase";
 
 /**
