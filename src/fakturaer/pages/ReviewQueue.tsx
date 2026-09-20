@@ -567,6 +567,7 @@ export default function FakturaerInboxPage() {
             onShowDocument={showDoc}
             onAction={openDialog}
             onAccept={(l) => void doAccept(l)}
+            repeatCounts={repeats}
             showInvoiceColumn={!expandedId}
             canWrite={canWrite}
           />
