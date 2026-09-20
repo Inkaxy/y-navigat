@@ -45,8 +45,7 @@ describe("matchemotoren ruter usikre linjer til gjennomgang", () => {
       totalAmount: 200,
       description: "Sukker",
       baseUnit: "kg",
-      baseUnitsPerPackage: 10,
-      packageConfirmed: true,
+      supplierPackage: { baseUnitsPerPackage: 10, packageConfirmedAt: "2026-01-01" },
       knownPricePerBaseUnit: 10,
     });
     expect(r.baseQuantity).toBe(2);
@@ -61,8 +60,7 @@ describe("matchemotoren ruter usikre linjer til gjennomgang", () => {
       totalAmount: 200,
       description: "Olje",
       baseUnit: "kg",
-      baseUnitsPerPackage: 10,
-      packageConfirmed: true,
+      supplierPackage: { baseUnitsPerPackage: 10, packageConfirmedAt: "2026-01-01" },
     });
     expect(r.needsInput).toBe("package_size");
     expect(r.baseQuantity).toBeNull();
