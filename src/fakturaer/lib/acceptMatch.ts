@@ -337,6 +337,8 @@ export function startPriceOutcomeLabel(sp: AcceptMatchStartPrice): string | null
     case "ikke_slatt_pa":
     case "ikke_forespurt":
       return null;
+    case "uavklart_gjennomgangsarsak":
+      return "Startpris ble ikke lagret: linjen har fortsatt uavklarte beløp eller enheter fra dokumentet.";
     case "avtalepris_finnes":
       return "Startpris ble ikke lagret: varen har en gyldig avtalepris hos denne leverandøren.";
     case "startpris_finnes_allerede":
