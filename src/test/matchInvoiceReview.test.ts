@@ -66,9 +66,11 @@ describe("matchemotoren ruter usikre linjer til gjennomgang", () => {
     expect(r.baseQuantity).toBeFalsy();
   });
 
-  it("begge grenene i matchemotoren krever bekreftet pakning", () => {
-    const hits = FN.match(/packageNeedsConfirmation\(cost\)/g) ?? [];
-    expect(hits.length).toBe(2);
+  it("begge grenene bruker samme vurdering av ubrukelig kostpris", () => {
+    // Pakningskravet ligger nå i én delt hjelper som begge grenene kaller.
+    expect(FN).toContain("packageNeedsConfirmation(cost)");
+    expect((FN.match(/costReviewReasons\(cost, actual\)/g) ?? []).length).toBe(2);
+    expect((FN.match(/costIsUsable\(cost\)/g) ?? []).length).toBe(2);
   });
 
   it("ukjent prisgrunnlag blir en egen gjennomgangsårsak", () => {
