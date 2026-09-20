@@ -21,6 +21,7 @@ export const LINE_REASON_CODES = [
   "sku_collision",
   "unsupported_currency",
   "agreement_conflict",
+  "price_reference_error",
 ] as const;
 export type LineReasonCode = (typeof LINE_REASON_CODES)[number];
 
@@ -41,6 +42,7 @@ export const REASON_LABELS: Record<ReasonCode, string> = {
   sku_collision: "Konflikt",
   unsupported_currency: "Valuta ikke støttet",
   agreement_conflict: "To likestilte avtaler",
+  price_reference_error: "Prisgrunnlag kunne ikke hentes",
   no_baseline: "Uten prisgrunnlag",
   extraction_issue: "Uttrekk eller sum stemmer ikke",
   zero_quantity: "Mengde mangler eller er null",
@@ -102,6 +104,7 @@ const REASON_GROUP: Record<ReasonCode, ReviewGroup> = {
   price_variance: "price_variance",
   unsupported_currency: "currency",
   agreement_conflict: "conflict",
+  price_reference_error: "no_baseline",
   extraction_issue: "extraction",
   sku_collision: "conflict",
 };

@@ -687,7 +687,16 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
   let amount: number | null = null;
   let amountSource: ResolveLineCostResult["amountSource"] = null;
   let amountPenalty = 0;
-  if (total != null && total !== 0) {
+  if (total != null) {
+    // Et EKSPLISITT nullbeløp er en opplysning, ikke et hull: det skal aldri
+    // erstattes av mengde × enhetspris.
+    if (total === 0) {
+      return emptyResult(
+        "amount",
+        "Fakturalinjen er ført med beløp 0. Et nullbeløp kan ikke erstattes av mengde × enhetspris — kontroller linjen.",
+        checks,
+      );
+    }
     amount = total; // behold fortegn — negativt beløp = kreditnota
     amountSource = "total_amount";
   } else if (unitPrice != null) {
@@ -708,6 +717,20 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
 
   // A — fakturaenhet: gyldig når enheten er en baseenhet i samme dimensjon.
   const directFactor = invoiceUnit && isBaseUnit(invoiceUnit) ? toBaseFactor(invoiceUnit, base) : null;
+
+  // Fakturaen er ført i en EKTE måleenhet (kg, l …) som ikke kan regnes om til
+  // varens basisenhet. En pakningsfaktor sier ingenting om forholdet mellom to
+  // ulike dimensjoner (liter mot kilo) — da må et menneske inn. «stk» er unntatt:
+  // et antall stykk ER et antall pakninger, og pakningen kan brukes.
+  const measuredUnit = !!invoiceUnit && isBaseUnit(invoiceUnit) && invoiceUnit !== "stk";
+  if (measuredUnit && (directFactor == null || directFactor <= 0)) {
+    return emptyResult(
+      "package_size",
+      `Fakturaen er i ${invoiceUnit}, men varen måles i ${base}. Omregningen mellom ${invoiceUnit} og ${base} er ikke kjent, ` +
+        `og innholdet per pakning kan ikke brukes til å gjette den. Oppgi omregningen.`,
+      checks,
+    );
+  }
 
   // Uavklart pakning: når fakturaenheten ikke kan regnes direkte om til
   // basisenheten, må et menneske inn — vi gjetter aldri.
@@ -783,8 +806,23 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
     swapNote = "Antallet er i pakninger mens enhetsprisen er per baseenhet — regnestykket på fakturaen bekrefter det.";
   }
 
+  // En fakturaenhet som ER en måleenhet i varens egen dimensjon (2 kg på en
+  // vare som måles i kg) er en KJENT måling. Historikk er en pris, ikke en
+  // måling, og skal aldri kunne gjøre om 2 kg til 20 kg.
+  // Den andre tolkningen teller bare som en reell motstridende opplysning når
+  // pakningen er BEKREFTET. Er den bare lest ut av varenavnet, kan historikken
+  // fortsatt brukes til å avgjøre hvilken av to tolkninger som er den riktige.
+  const confirmedAlternative = (chosen === candA ? candB : candA)?.source !== "description";
+  const measurementKnown =
+    chosen === candA &&
+    directFactor != null &&
+    directFactor > 0 &&
+    checks.arithmeticPerInvoiceUnit &&
+    confirmedAlternative;
+
   // Historikk avgjør ved tvil.
   const known = toNum(input.knownPricePerBaseUnit);
+  let historyNote: string | null = null;
   if (known && known > 0) {
     const rel = (p: number) => Math.abs(p - known) / known;
     checks.matchesHistory = rel(chosen.pricePerBaseUnit) <= 0.35;
@@ -796,7 +834,11 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
           nearlyEqual(chosen.pricePerBaseUnit, known / bupp, 35);
         checks.historyOffByPackage = off;
       }
-      if (other && rel(other.pricePerBaseUnit) < rel(chosen.pricePerBaseUnit) && rel(other.pricePerBaseUnit) <= 0.35) {
+      if (measurementKnown) {
+        historyNote =
+          `Historikken ligger på ${fmtNum(known, 4)} kr/${base}, men fakturaen oppgir ${fmtNum(quantity)} ${invoiceUnit} ` +
+          `og regnestykket stemmer. Målingen på fakturaen beholdes.`;
+      } else if (other && rel(other.pricePerBaseUnit) < rel(chosen.pricePerBaseUnit) && rel(other.pricePerBaseUnit) <= 0.35) {
         swapNote =
           `Historikken ligger på ${fmtNum(known, 4)} kr/${base}. Den andre tolkningen treffer den, så den er valgt.`;
         chosen = other;
@@ -805,6 +847,10 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
       }
     }
   }
+
+  // Pakning som KUN er lest ut av varenavnet er en tolkning av tekst. Den kan
+  // brukes til å regne, men matcheren skal sende linja til gjennomgang inntil
+  // pakningen er bekreftet (se `packageNeedsConfirmation` under).
 
   if (chosen.baseUnitsPerPackage && chosen.baseUnitsPerPackage > 0) {
     checks.wholePackages = isWhole(chosen.baseQuantity / chosen.baseUnitsPerPackage);
@@ -818,9 +864,10 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
   else if (chosen.basis === "pakning" && checks.arithmeticPerInvoiceUnit) confidence = 0.8;
   else if (chosen.basis === "fakturaenhet" && !candB) confidence = 0.85;
 
-  if (chosen.basis === "pakning" && chosen.source === "description") confidence -= 0.1;
   if (checks.matchesHistory === true) confidence = Math.min(1, confidence + 0.05);
-  if (checks.matchesHistory === false) confidence -= 0.3;
+  // Når målingen på fakturaen er kjent og regnestykket stemmer, er et avvik fra
+  // historikken en PRISENDRING — ikke en grunn til å tvile på mengden.
+  if (checks.matchesHistory === false) confidence -= measurementKnown ? 0.1 : 0.3;
   if (chosen.baseUnitsPerPackage && !checks.wholePackages && chosen.basis === "fakturaenhet") confidence -= 0.05;
 
   // Uenighet mellom en ubekreftet leverandørpakning og varenavnet: beskrivelsen
@@ -850,6 +897,8 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
   }
   if (packageNote) explanation += ` ${packageNote}`;
   if (swapNote) explanation += ` ${swapNote}`;
+  if (historyNote) explanation += ` ${historyNote}`;
+
 
   return {
     ...chosen,
@@ -861,7 +910,7 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
     checks,
     alternatives,
     needsInput: null,
-    reason: packageNote ?? swapNote,
+    reason: packageNote ?? swapNote ?? historyNote,
 
   };
 }
@@ -870,6 +919,15 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
  * Innhold per pakning i basisenheter. Returnerer null når enhetene ikke kan
  * regnes om (f.eks. stk mot kg) — da skal ingen pakningsstørrelse lagres.
  */
+/**
+ * Sant når kostprisen hviler på en pakningsstørrelse som bare er tolket ut av
+ * varenavnet. Da er tallet brukbart, men ikke bekreftet — linja skal ses av et
+ * menneske før prisen får virkning.
+ */
+export function packageNeedsConfirmation(r: ResolveLineCostResult): boolean {
+  return r.basis === "pakning" && r.source === "description";
+}
+
 export function packageBaseUnits(
   size: number | null,
   packageUnit: string | null | undefined,

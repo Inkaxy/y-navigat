@@ -29,6 +29,12 @@ export async function syncRegisteredPrices(
   actual: number | null,
   update: AnyRec,
   tolPct = 2,
+  /**
+   * Prisgrunnlaget som `rm_price_reference` valgte for FAKTURADATOEN
+   * (avtale eller forrige kjøp). Når det finnes, er det dette avviket skal
+   * måles mot — en utløpt avtalepris skal ikke snike seg inn igjen her.
+   */
+  reference?: { source?: string | null; price?: number | string | null } | null,
 ): Promise<void> {
   if (!rm || actual == null || !Number.isFinite(actual)) return;
   // Registrerte priser skal aldri skrives fra et usikkert eller uegnet grunnlag.
@@ -47,9 +53,29 @@ export async function syncRegisteredPrices(
   const staleForRm = !!(invDate && rmPriceDate && invDate < rmPriceDate);
 
   const registered = rm.current_cost_price != null ? Number(rm.current_cost_price) : null;
-  const supplierRegistered = rmsRow?.agreed_price_per_base_unit != null
-    ? Number(rmsRow.agreed_price_per_base_unit)
-    : null;
+
+  // Leverandørens avtalepris teller BARE når avtalen faktisk gjelder på
+  // fakturadatoen. En utløpt avtale er ikke et sammenligningsgrunnlag.
+  const agreementValidOnInvoiceDate = (): boolean => {
+    if (rmsRow?.agreed_price_per_base_unit == null) return false;
+    if (!invDate) return false;
+    const from = rmsRow.agreement_valid_from ? String(rmsRow.agreement_valid_from) : null;
+    const to = rmsRow.agreement_valid_to ? String(rmsRow.agreement_valid_to) : null;
+    if (from && invDate < from) return false;
+    if (to && invDate > to) return false;
+    return true;
+  };
+
+  const refPrice = reference?.price == null ? null : Number(reference.price);
+  const refUsable = refPrice != null && Number.isFinite(refPrice) && refPrice > 0;
+
+  // Rekkefølge: (1) grunnlaget motoren allerede har valgt for datoen,
+  // (2) ellers en gyldig avtalepris, (3) alltid registrert kostpris i tillegg.
+  const supplierRegistered = refUsable
+    ? refPrice
+    : agreementValidOnInvoiceDate()
+      ? Number(rmsRow!.agreed_price_per_base_unit)
+      : null;
   // Både økning OG fall skal fanges: et prisfall på 96 % er signaturen til en pakningsfeil.
   const deviation = (base: number | null): number | null =>
     base != null && base !== 0 ? ((actual - base) / base) * 100 : null;

@@ -2,7 +2,7 @@
 // Input: { invoice_id: string, line_ids?: string[] }
 import { createClient } from "npm:@supabase/supabase-js@2.95.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2.95.0/cors";
-import { normalizeUnit, isPackageUnit, resolveLineCost, stripPackageTokens } from "../_shared/units.ts";
+import { normalizeUnit, isPackageUnit, packageNeedsConfirmation, resolveLineCost, stripPackageTokens } from "../_shared/units.ts";
 import { normalizeMatchKey } from "../_shared/matchNormalize.ts";
 import { syncRegisteredPrices, learnPendingAliases } from "../_shared/priceSync.ts";
 import { CREDIT_NOTE_REF_PREFIX, creditNoteOriginalRef } from "../_shared/creditNote.ts";
@@ -119,35 +119,43 @@ Deno.serve(async (req) => {
     const currencyCode = String(inv.currency ?? "NOK").toUpperCase();
     const foreignCurrency = currencyCode !== "NOK";
 
+    // Alle nødvendige lesninger feiler LUKKET: en mislykket lesning ville gitt
+    // færre regler, færre treff og en faktura som ser ferdig ut uten å være det.
+    const required = <T>(what: string, res: { data: T; error: AnyRec | null }): T => {
+      if (res.error) throw new Error(`Kunne ikke lese ${what}: ${res.error.message}`);
+      return res.data;
+    };
+
     // Settings
-    const { data: settings } = await svc.from("invoice_match_settings").select("*").eq("legal_entity_id", inv.legal_entity_id).maybeSingle();
+    const settings = required("innstillinger for fakturamatching",
+      await svc.from("invoice_match_settings").select("*").eq("legal_entity_id", inv.legal_entity_id).maybeSingle());
     const tolDefault = Number(settings?.default_price_tolerance_pct ?? 2);
     const fuzzyThreshold = Number(settings?.fuzzy_match_threshold ?? 0.5);
     const fuzzyAuto = Number(settings?.fuzzy_auto_match_threshold ?? 0.85);
     const fuzzyDom = Number(settings?.fuzzy_auto_match_dominance_threshold ?? 0.65);
 
-    const { data: catTols } = await svc.from("invoice_match_category_tolerances")
-      .select("category, price_tolerance_pct").eq("legal_entity_id", inv.legal_entity_id);
+    const catTols = required("kategoritoleranser", await svc.from("invoice_match_category_tolerances")
+      .select("category, price_tolerance_pct").eq("legal_entity_id", inv.legal_entity_id));
     const catTolMap = new Map<string, number>();
     (catTols ?? []).forEach((c: AnyRec) => catTolMap.set(c.category, Number(c.price_tolerance_pct)));
 
     // Exclusion patterns for this supplier+entity (or supplier null)
-    const { data: exclusions } = await svc.from("invoice_line_exclusion_patterns")
+    const exclusions = required("eksklusjonsmønstre", await svc.from("invoice_line_exclusion_patterns")
       .select("*").eq("legal_entity_id", inv.legal_entity_id)
-      .or(`supplier_id.eq.${inv.supplier_id},supplier_id.is.null`);
+      .or(`supplier_id.eq.${inv.supplier_id},supplier_id.is.null`));
 
     // Supplier's raw_material_suppliers (with aliases)
-    const { data: rms } = await svc.from("raw_material_suppliers")
-      .select("id, raw_material_id, supplier_id, supplier_sku, supplier_product_name, agreed_price_per_base_unit, last_invoice_date, package_size, package_unit, base_units_per_package, package_confirmed_at, is_primary")
-      .eq("supplier_id", inv.supplier_id);
+    const rms = required("leverandørkoblinger", await svc.from("raw_material_suppliers")
+      .select("id, raw_material_id, supplier_id, supplier_sku, supplier_product_name, agreed_price_per_base_unit, agreement_valid_from, agreement_valid_to, last_invoice_date, package_size, package_unit, base_units_per_package, package_confirmed_at, is_primary")
+      .eq("supplier_id", inv.supplier_id));
     const rmsList = rms ?? [];
     const rmsIds = rmsList.map((r: AnyRec) => r.id);
 
     let aliases: AnyRec[] = [];
     if (rmsIds.length) {
-      const { data: aRows } = await svc.from("raw_material_supplier_aliases")
+      const aRows = required("alias", await svc.from("raw_material_supplier_aliases")
         .select("id, raw_material_supplier_id, alias_type, alias_value, alias_value_normalized, status, match_count")
-        .in("raw_material_supplier_id", rmsIds);
+        .in("raw_material_supplier_id", rmsIds));
       aliases = aRows ?? [];
     }
     const rmsById = new Map<string, AnyRec>(rmsList.map((r: AnyRec) => [r.id, r]));
@@ -170,15 +178,15 @@ Deno.serve(async (req) => {
       keys.some((k) => !!k && (rejectedKeysByRms.get(rmsId)?.has(k) ?? false));
 
     // Raw materials in legal entity (active) — for fuzzy
-    const { data: rmList } = await svc.from("raw_materials")
+    const rmList = required("råvarer", await svc.from("raw_materials")
       .select("id, name, sku, category, base_unit, current_cost_price, price_updated_at, primary_supplier_id, package_size, package_unit, base_units_per_package, package_confirmed_at")
-      .eq("legal_entity_id", inv.legal_entity_id).eq("is_active", true);
+      .eq("legal_entity_id", inv.legal_entity_id).eq("is_active", true));
     const rmById = new Map<string, AnyRec>((rmList ?? []).map((r: AnyRec) => [r.id, r]));
 
     // Lines
     let q = svc.from("invoice_lines").select("*").eq("invoice_id", invoiceId);
     if (lineIdFilter?.length) q = q.in("id", lineIdFilter);
-    const { data: lines } = await q;
+    const lines = required("fakturalinjer", await q);
     const allLines = lines ?? [];
 
     const results: AnyRec[] = [];
@@ -210,6 +218,12 @@ Deno.serve(async (req) => {
 
         const reviewReasons = new Set<string>();
         let requiresReview = false;
+        // Pakning som bare er tolket ut av varenavnet er ikke bekreftet — prisen
+        // regnes ut, men linja skal ses av et menneske.
+        if (cost && !cost.needsInput && packageNeedsConfirmation(cost)) {
+          requiresReview = true;
+          reviewReasons.add("unknown_package_size");
+        }
         if (cost?.needsInput === "package_size") {
           requiresReview = true;
           reviewReasons.add("unknown_package_size");
@@ -239,6 +253,11 @@ Deno.serve(async (req) => {
             reviewReasons.add("agreement_conflict");
           }
         }
+        // Et ukjent prisgrunnlag er ikke «ingen avvik» — linja må ses av et menneske.
+        if (refM.source === "error") {
+          requiresReview = true;
+          reviewReasons.add("price_reference_error");
+        }
         if (foreignCurrency) {
           requiresReview = true;
           reviewReasons.add("unsupported_currency");
@@ -247,15 +266,18 @@ Deno.serve(async (req) => {
         // så får syncRegisteredPrices legge sine egne årsaker oppå.
         manualUpdate.requires_review = requiresReview;
         manualUpdate.review_reason = reviewReasons.size ? Array.from(reviewReasons).join(",") : null;
-        await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, manualUpdate, catTolMap.get(rm?.category ?? "") ?? tolDefault);
+        await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, manualUpdate, catTolMap.get(rm?.category ?? "") ?? tolDefault, refM);
 
         await applyUpdate(svc, line.id, manualUpdate);
         results.push({ id: line.id, status: "manual", recomputed: true });
         continue;
       }
 
-      // Reset suggestions
-      await svc.from("invoice_line_match_suggestions").delete().eq("invoice_line_id", line.id);
+      // Reset suggestions. En mislykket sletting ville latt gamle forslag ligge igjen.
+      {
+        const { error: delErr } = await svc.from("invoice_line_match_suggestions").delete().eq("invoice_line_id", line.id);
+        if (delErr) throw new Error(`Kunne ikke nullstille forslag for linje ${line.id}: ${delErr.message}`);
+      }
 
       const update: AnyRec = {
         raw_material_id: null,
@@ -566,6 +588,7 @@ Deno.serve(async (req) => {
         };
 
         // Aldri gjett: uten kjent pakningsinnhold, eller ved lav tillit, skal linja til gjennomgang.
+        if (cost && !cost.needsInput && packageNeedsConfirmation(cost)) addReason("unknown_package_size");
         if (cost?.needsInput === "package_size") addReason("unknown_package_size");
         else if (cost && !cost.needsInput && cost.confidenceLevel === "low") addReason("uncertain_cost");
         else if (actual == null && isPackageUnit(normalizedUnit) && rm?.base_unit) addReason("unknown_package_size");
@@ -587,9 +610,11 @@ Deno.serve(async (req) => {
           update.variance_status = "no_baseline";
           if (ref.source === "conflict") addReason("agreement_conflict");
         }
+        // Et ukjent prisgrunnlag er ikke «ingen avvik».
+        if (ref.source === "error") addReason("price_reference_error");
         if (foreignCurrency) addReason("unsupported_currency");
 
-        await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, update, catTolMap.get(rm?.category ?? "") ?? tolDefault);
+        await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, update, catTolMap.get(rm?.category ?? "") ?? tolDefault, ref);
       }
 
       // Lær av vellykket fuzzy-match: skriv pending alias (aldri degrader bekreftede)
@@ -607,11 +632,15 @@ Deno.serve(async (req) => {
     // et menneske har tatt et standpunkt, og motoren skal ikke overkjøre det.
     const lockedStatuses = ["flagged", "reconciled", "cancelled"];
     if (!lockedStatuses.includes(String(inv.status))) {
-      const { data: stillPending } = await svc.from("invoice_lines")
+      // Feiler disse lesningene, vet vi ikke om fakturaen er ferdig. Da skal den
+      // IKKE settes til «klar» — vi feiler heller kjøringen.
+      const { data: stillPending, error: pendErr } = await svc.from("invoice_lines")
         .select("id").eq("invoice_id", invoiceId).is("match_confidence", null).limit(1);
+      if (pendErr) throw new Error(`Kunne ikke sjekke ubehandlede linjer: ${pendErr.message}`);
       if (!stillPending || stillPending.length === 0) {
-        const { data: needsReview } = await svc.from("invoice_lines")
+        const { data: needsReview, error: revErr } = await svc.from("invoice_lines")
           .select("id").eq("invoice_id", invoiceId).eq("requires_review", true).limit(1);
+        if (revErr) throw new Error(`Kunne ikke sjekke linjer til gjennomgang: ${revErr.message}`);
 
         // Forhold ved selve fakturaen tvinger gjennomgang, uansett hvor pene linjene er.
         const invoiceLevelReview =
@@ -622,7 +651,8 @@ Deno.serve(async (req) => {
         const newStatus = (needsReview && needsReview.length > 0) || invoiceLevelReview
           ? "needs_review"
           : "ready";
-        await svc.from("invoices").update({ status: newStatus }).eq("id", invoiceId);
+        const { error: statusErr } = await svc.from("invoices").update({ status: newStatus }).eq("id", invoiceId);
+        if (statusErr) throw new Error(`Kunne ikke oppdatere fakturastatus: ${statusErr.message}`);
       }
     }
 
@@ -670,7 +700,21 @@ async function upsertConfirmedSkuAlias(
 
 async function insertSuggestions(svc: any, rows: AnyRec[]) {
   if (!rows.length) return;
-  await svc.from("invoice_line_match_suggestions").insert(rows);
+  // Tabellen har unik (invoice_line_id, raw_material_id). Samme vare kan dukke
+  // opp både som alias-treff og fuzzy-treff — da beholder vi den beste raden,
+  // ellers ryker hele innsettingen på en duplikatfeil.
+  const best = new Map<string, AnyRec>();
+  for (const row of rows) {
+    const key = `${row.invoice_line_id}|${row.raw_material_id}`;
+    const prev = best.get(key);
+    if (!prev || Number(row.confidence ?? 0) > Number(prev.confidence ?? 0)) best.set(key, row);
+  }
+  const deduped = [...best.values()]
+    .sort((a, b) => Number(b.confidence ?? 0) - Number(a.confidence ?? 0))
+    .map((row, idx) => ({ ...row, rank: idx + 1 }));
+  const { error } = await svc.from("invoice_line_match_suggestions").insert(deduped);
+  // Uten forslag står saksbehandleren uten alternativer — det skal ikke gå stille.
+  if (error) throw new Error(`Kunne ikke lagre forslag: ${error.message}`);
 }
 
 /**
