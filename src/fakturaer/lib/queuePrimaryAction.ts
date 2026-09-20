@@ -32,6 +32,7 @@ const PRICE_REASONS: ReadonlySet<string> = new Set([
   "price_reference_error",
   "unsupported_currency",
   "start_price_manual_check",
+  "no_automatic_basis",
 ]);
 
 /**
