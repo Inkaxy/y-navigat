@@ -48,6 +48,38 @@ import {
   type ReviewGroup,
 } from "@/fakturaer/lib/reviewReasons";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { recalculateLines } from "@/fakturaer/lib/acceptMatch";
+
+/** Kjører reberegningen på nytt for nøyaktig de linjene som står igjen. */
+function retryRecalculation(invoiceId: string, lineIds: string[]): void {
+  void (async () => {
+    try {
+      await recalculateLines(invoiceId, lineIds);
+      toast.success("Prisen er regnet om");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Reberegningen feilet fortsatt");
+    }
+  })();
+}
+
+/**
+ * Varsler om linjer som er koblet, men der prisavviket ikke er regnet om.
+ * Uten dette ville køen sett ferdig ut mens serveren fortsatt har arbeid igjen.
+ */
+function notifyPendingRecalculation(
+  pending: Array<{ invoiceId: string; lineIds: string[]; message: string }>,
+): void {
+  if (pending.length === 0) return;
+  const antall = pending.reduce((n, p) => n + p.lineIds.length, 0);
+  toast.warning(`${antall} ${antall === 1 ? "linje er" : "linjer er"} koblet, men prisen er ikke regnet om`, {
+    description: pending[0].message,
+    duration: 15000,
+    action: {
+      label: "Prøv igjen",
+      onClick: () => pending.forEach((p) => retryRecalculation(p.invoiceId, p.lineIds)),
+    },
+  });
+}
 import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import {
   acceptTopSuggestion,
