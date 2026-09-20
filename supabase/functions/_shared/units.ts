@@ -861,9 +861,10 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
   else if (chosen.basis === "pakning" && checks.arithmeticPerInvoiceUnit) confidence = 0.8;
   else if (chosen.basis === "fakturaenhet" && !candB) confidence = 0.85;
 
-  if (chosen.basis === "pakning" && chosen.source === "description") confidence -= 0.1;
   if (checks.matchesHistory === true) confidence = Math.min(1, confidence + 0.05);
-  if (checks.matchesHistory === false) confidence -= 0.3;
+  // Når målingen på fakturaen er kjent og regnestykket stemmer, er et avvik fra
+  // historikken en PRISENDRING — ikke en grunn til å tvile på mengden.
+  if (checks.matchesHistory === false) confidence -= measurementKnown ? 0.1 : 0.3;
   if (chosen.baseUnitsPerPackage && !checks.wholePackages && chosen.basis === "fakturaenhet") confidence -= 0.05;
 
   // Uenighet mellom en ubekreftet leverandørpakning og varenavnet: beskrivelsen
