@@ -44,6 +44,7 @@ export const REASON_LABELS: Record<ReasonCode, string> = {
   unsupported_currency: "Valuta ikke støttet",
   agreement_conflict: "To likestilte avtaler",
   price_reference_error: "Prisgrunnlag kunne ikke hentes",
+  recalculation_pending: "Må beregnes på nytt",
   no_baseline: "Uten prisgrunnlag",
   extraction_issue: "Uttrekk eller sum stemmer ikke",
   zero_quantity: "Mengde mangler eller er null",
