@@ -509,6 +509,13 @@ export default function FakturaerInboxPage() {
         </p>
       )}
 
+      {hasMoreLines && sort === "impact" && (
+        <p className="text-caption text-ink-secondary">
+          Sorteringen etter kroner gjelder bare de {lines.length} linjene som er lastet inn — ikke hele køen. Øk antall
+          linjer for å sortere over alt.
+        </p>
+      )}
+
 
       {selectedLines.length > 0 && (
         <Card className="flex flex-wrap items-center gap-3 border-primary/30 bg-primary/5 p-3">
