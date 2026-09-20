@@ -729,7 +729,8 @@ function costIsUsable(cost: AnyRec | null | undefined): boolean {
  */
 function costReviewReasons(cost: AnyRec | null | undefined, actual: number | null): string[] {
   const reasons: string[] = [];
-  if (!cost) return ["uncertain_cost"];
+  // costForLine gir null nettopp når varen mangler grunnenhet.
+  if (!cost) return ["missing_base_unit"];
   if (cost.needsInput === "package_size") reasons.push("unknown_package_size");
   else if (cost.needsInput === "amount") reasons.push("extraction_unresolved");
   else if (cost.needsInput === "base_unit") reasons.push("missing_base_unit");
