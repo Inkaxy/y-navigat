@@ -36,6 +36,10 @@ export interface ReviewLineRow {
   variance_status: string | null;
   review_reason: string | null;
   requires_review: boolean | null;
+  /** Hvilket prisgrunnlag avviket ble målt mot da linjen sist ble beregnet. */
+  price_reference_source: string | null;
+  price_reference_id: string | null;
+  price_reference_date: string | null;
   invoice: {
     id: string;
     invoice_number: string;
@@ -44,6 +48,8 @@ export interface ReviewLineRow {
     supplier_id: string;
     status: string | null;
     source: string | null;
+    currency: string | null;
+    is_credit_note: boolean | null;
     source_document_url: string | null;
     total_amount: number | null;
     total_vat: number | null;
