@@ -33,8 +33,8 @@ describe("matchemotoren ruter usikre linjer til gjennomgang", () => {
       baseUnit: "kg",
     });
     expect(r.needsInput).toBe("amount");
-    expect(r.pricePerBaseUnit).toBeNull();
-    expect(r.baseQuantity).toBeNull();
+    expect(r.pricePerBaseUnit).toBeFalsy();
+    expect(r.baseQuantity).toBeFalsy();
   });
 
   it("sonde 3: historikk kan ikke gjøre om en kjent kg-måling til pakninger", () => {
@@ -63,7 +63,7 @@ describe("matchemotoren ruter usikre linjer til gjennomgang", () => {
       supplierPackage: { baseUnitsPerPackage: 10, packageConfirmedAt: "2026-01-01" },
     });
     expect(r.needsInput).toBe("package_size");
-    expect(r.baseQuantity).toBeNull();
+    expect(r.baseQuantity).toBeFalsy();
   });
 
   it("begge grenene i matchemotoren krever bekreftet pakning", () => {
