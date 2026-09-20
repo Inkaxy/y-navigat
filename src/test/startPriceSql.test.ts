@@ -20,6 +20,7 @@ const MIGRATIONS = [
   "supabase/migrations/20260920205812_84bee6de-64b0-4b9d-a660-08a9d17141c8.sql",
   "supabase/migrations/20260920211551_bf78ce3b-9c01-4d98-9513-751efeb84f9d.sql",
   "supabase/migrations/20260920212203_5ab29731-41e5-47ee-b071-f849a1d513d6.sql",
+  "supabase/migrations/20260920212421_1298de01-2a90-4ef8-859a-17e8d7747b63.sql",
 ].map((f) => path.join(process.cwd(), f));
 
 
