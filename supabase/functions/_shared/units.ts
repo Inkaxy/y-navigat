@@ -687,7 +687,16 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
   let amount: number | null = null;
   let amountSource: ResolveLineCostResult["amountSource"] = null;
   let amountPenalty = 0;
-  if (total != null && total !== 0) {
+  if (total != null) {
+    // Et EKSPLISITT nullbeløp er en opplysning, ikke et hull: det skal aldri
+    // erstattes av mengde × enhetspris.
+    if (total === 0) {
+      return emptyResult(
+        "amount",
+        "Fakturalinjen er ført med beløp 0. Et nullbeløp kan ikke erstattes av mengde × enhetspris — kontroller linjen.",
+        checks,
+      );
+    }
     amount = total; // behold fortegn — negativt beløp = kreditnota
     amountSource = "total_amount";
   } else if (unitPrice != null) {
@@ -708,6 +717,18 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
 
   // A — fakturaenhet: gyldig når enheten er en baseenhet i samme dimensjon.
   const directFactor = invoiceUnit && isBaseUnit(invoiceUnit) ? toBaseFactor(invoiceUnit, base) : null;
+
+  // Fakturaen er i en EKTE måleenhet (kg, l, stk …) som ikke kan regnes om til
+  // varens basisenhet. En pakningsfaktor sier ingenting om forholdet mellom to
+  // ulike dimensjoner (liter mot kilo) — da må et menneske inn.
+  if (invoiceUnit && isBaseUnit(invoiceUnit) && (directFactor == null || directFactor <= 0)) {
+    return emptyResult(
+      "package_size",
+      `Fakturaen er i ${invoiceUnit}, men varen måles i ${base}. Omregningen mellom ${invoiceUnit} og ${base} er ikke kjent, ` +
+        `og innholdet per pakning kan ikke brukes til å gjette den. Oppgi omregningen.`,
+      checks,
+    );
+  }
 
   // Uavklart pakning: når fakturaenheten ikke kan regnes direkte om til
   // basisenheten, må et menneske inn — vi gjetter aldri.
