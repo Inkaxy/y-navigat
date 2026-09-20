@@ -106,6 +106,14 @@ Deno.serve(async (req) => {
       return ref;
     }
 
+    /**
+     * Gyldig grunnlag for AUTOMATISK linjekontroll er avtalepris og bekreftet
+     * startpris. Forrige kjøp er kun sammenligning: en linje blir aldri
+     * ferdigkontrollert av motoren fordi den ligner på forrige faktura, og
+     * forrige kjøp kan heller aldri bli startpris eller avtalepris av seg selv.
+     */
+    const AUTOMATIC_CHECK_BASIS = new Set(["agreement", "start_price"]);
+
     /** Skriver grunnlaget på linjen og returnerer forventet pris, om den finnes. */
     function applyReference(target: AnyRec, ref: AnyRec): number | null {
       const source = String(ref.source ?? "none");
@@ -172,6 +180,11 @@ Deno.serve(async (req) => {
       target.variance_status = over ? "over_tolerance" : "within_tolerance";
       if (over) reasons.push("price_variance");
       if (isStart && !startAutoCheck) reasons.push("start_price_manual_check");
+      // Forrige kjøp er KUN sammenligning. Et lite avvik mot forrige faktura er
+      // aldri en godkjenning, og et stort avvik skal fortsatt til gjennomgang.
+      if (!AUTOMATIC_CHECK_BASIS.has(String(ref.source ?? "")) && over && !reasons.includes("price_variance")) {
+        reasons.push("price_variance");
+      }
       return reasons;
     }
 

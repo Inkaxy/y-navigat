@@ -340,7 +340,11 @@ function QueueRowActions({
 
   const run = (kind: PrimaryActionKind) => {
     if (kind === "conflict") return onAction("conflict", line);
-    if (kind === "review_suggestion") return onAccept(line);
+    // «Kontroller forslag» godtar toppforslaget. Finnes det ikke noe forslag
+    // (f.eks. automatisk kobling med lav tillit) åpnes matchevinduet i stedet.
+    if (kind === "review_suggestion") {
+      return (line.suggestions?.length ?? 0) > 0 ? onAccept(line) : onAction("match", line);
+    }
     if (kind === "start_price") return onAction("start_price", line);
     return onAction("match", line);
   };

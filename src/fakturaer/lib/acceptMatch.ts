@@ -7,7 +7,7 @@ export interface AcceptMatchOptions {
   line: ReviewLineRow;
   /** Råvaren (eller varen) linjen matches mot. */
   rawMaterialId: string;
-  /** Innlogget bruker — brukes til resolved_by og alias-bekreftelse. */
+  /** Innlogget bruker — brukes til alias-bekreftelse. Serveren stempler selv resolved_by. */
   userId: string;
   packageSize?: number | null;
   packageUnit?: string | null;
@@ -36,6 +36,11 @@ export interface AcceptMatchOptions {
   setAsPrimary?: boolean;
   /** Match også søsterlinjer på samme faktura med lik SKU/beskrivelse. */
   applyToAll?: boolean;
+  /**
+   * Sett til false når bekreftelsen ikke skal kunne lagre startpris (f.eks. en
+   * ren opprydning). Serveren avgjør uansett selv om startpris er slått på.
+   */
+  offerStartPrice?: boolean;
 }
 
 interface AliasInsert {
@@ -48,17 +53,71 @@ interface AliasInsert {
   first_seen_invoice_id: string;
 }
 
+/** Hva serveren gjorde med startpris i samme bekreftelse. */
+export interface AcceptMatchStartPrice {
+  /** Sant når serveren faktisk forsøkte å lagre startpris. */
+  attempted: boolean;
+  created: boolean;
+  reason: string | null;
+  price: number | null;
+  currency: string | null;
+  baseUnit: string | null;
+  effectiveDate: string | null;
+}
+
+export interface AcceptMatchResult {
+  lineIds: string[];
+  rmsId: string | null;
+  startPrice: AcceptMatchStartPrice;
+}
+
+function num(v: unknown): number | null {
+  if (v == null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function str(v: unknown): string | null {
+  return typeof v === "string" && v.length > 0 ? v : null;
+}
+
+function parseStartPrice(raw: unknown): AcceptMatchStartPrice {
+  const o = (raw ?? {}) as Record<string, unknown>;
+  return {
+    attempted: o.attempted === true,
+    created: o.created === true,
+    reason: str(o.reason),
+    price: num(o.start_price),
+    currency: str(o.currency),
+    baseUnit: str(o.base_unit),
+    effectiveDate: str(o.start_price_effective_date),
+  };
+}
+
+/** Feilkoder serveren kan svare med når bekreftelsen ikke ble gjennomført. */
+const CONFIRM_FAILURE_LABELS: Record<string, string> = {
+  linjen_finnes_ikke: "Fakturalinjen finnes ikke lenger.",
+  fakturaen_finnes_ikke: "Fakturaen finnes ikke lenger.",
+  fakturaen_mangler_selskap: "Fakturaen mangler selskap.",
+  fakturaen_er_flagget: "Fakturaen er flagget og må avklares først.",
+  fakturaen_mangler_leverandor: "Fakturaen mangler leverandør.",
+  varen_finnes_ikke: "Varen finnes ikke lenger.",
+  faktura_og_vare_i_ulike_selskap: "Fakturaen og varen hører til ulike selskap.",
+  leverandor_i_annet_selskap: "Leverandøren hører til et annet selskap.",
+};
+
 /**
  * Bekrefter en match mellom en fakturalinje og en vare.
  *
- * Dette er den ENESTE implementasjonen av match-bekreftelse — både
- * match-skuffen (én linje) og masse-godkjenning bruker den, slik at de
- * garantert gjør nøyaktig det samme.
+ * Selve bekreftelsen er ÉN atomisk serveroperasjon (`rm_confirm_line_match`):
+ * leverandørkobling, pakning, avtalepris, linjene og en eventuell startpris
+ * skjer i samme transaksjon. Klienten gjør ingen delvise skriv av dette —
+ * enten står alt, eller ingenting.
  *
- * Returnerer id-ene til linjene som ble matchet, og leverandørkoblingen de
- * ble knyttet til — den trengs for å tilby samme kobling på flere linjer.
+ * Alias-læring skjer etterpå. Den er lærdom for neste faktura, ikke en del av
+ * selve bekreftelsen, og en feil der endrer ikke matchen.
  */
-export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: string[]; rmsId: string | null }> {
+export async function acceptMatch(opts: AcceptMatchOptions): Promise<AcceptMatchResult> {
   const {
     line,
     rawMaterialId,
@@ -74,6 +133,7 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
     rememberName = false,
     setAsPrimary = false,
     applyToAll = false,
+    offerStartPrice = true,
   } = opts;
 
   const supplierId = line.invoice.supplier_id;
@@ -87,96 +147,53 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
   const agreed =
     agreedPricePerBaseUnit != null && Number.isFinite(agreedPricePerBaseUnit) ? agreedPricePerBaseUnit : null;
 
-  // 1) Sørg for kobling mellom vare og leverandør
-  const { data: existingLinks, error: linksErr } = await supabase
-    .from("raw_material_suppliers")
-    .select("id, supplier_id, agreed_price_per_base_unit, is_primary")
-    .eq("raw_material_id", rawMaterialId);
-  if (linksErr) {
-    throw new Error(`Kunne ikke hente eksisterende leverandørkoblinger for varen: ${linksErr.message}`);
-  }
-
-  const links = existingLinks ?? [];
-  const anyPrimary = links.some((l) => l.is_primary);
-  let rmsId = links.find((l) => l.supplier_id === supplierId)?.id ?? null;
-
-  if (!rmsId) {
-    const { data: ins, error } = await supabase
-      .from("raw_material_suppliers")
-      .insert({
-        raw_material_id: rawMaterialId,
-        supplier_id: supplierId,
-        supplier_sku: line.supplier_sku,
-        supplier_product_name: line.description,
-        package_size: pkgSize,
-        package_unit: pkgUnit,
-        base_units_per_package: confirmPackage ? bupp : null,
-        ...(confirmPackage && bupp != null ? { package_confirmed_at: nowIso, package_confirmed_by: userId } : {}),
-        ...(agreed != null ? { agreed_price_per_base_unit: agreed } : {}),
-        is_primary: setAsPrimary && !anyPrimary,
+  // 1) Søsterlinjer: klienten foreslår, serveren kontrollerer at de faktisk
+  //    står på samme faktura.
+  let siblingIds: string[] = [];
+  if (applyToAll) {
+    const { data: sib, error: sibErr } = await supabase
+      .from("invoice_lines")
+      .select("id, supplier_sku, description")
+      .eq("invoice_id", line.invoice_id);
+    if (sibErr) {
+      throw new Error(`Kunne ikke hente søsterlinjer på fakturaen for «match alle like»: ${sibErr.message}`);
+    }
+    siblingIds = (sib ?? [])
+      .filter((s) => {
+        if (s.id === line.id) return false;
+        const bothHaveSku = !!line.supplier_sku && !!s.supplier_sku;
+        return bothHaveSku
+          ? s.supplier_sku === line.supplier_sku
+          : !line.supplier_sku && !s.supplier_sku && !!line.description && s.description === line.description;
       })
-      .select("id")
-      .single();
-    if (error) throw new Error(`Kunne ikke opprette leverandørkobling for varen: ${error.message}`);
-    rmsId = ins.id;
-  } else {
-    const upd: {
-      package_size?: number;
-      package_unit?: string;
-      base_units_per_package?: number;
-      package_confirmed_at?: string;
-      package_confirmed_by?: string;
-      agreed_price_per_base_unit?: number;
-    } = {};
-    if (pkgSize != null) upd.package_size = pkgSize;
-    if (pkgUnit) upd.package_unit = pkgUnit;
-    if (confirmPackage && bupp != null) {
-      upd.base_units_per_package = bupp;
-      upd.package_confirmed_at = nowIso;
-      upd.package_confirmed_by = userId;
-    }
-    if (agreed != null) upd.agreed_price_per_base_unit = agreed;
-    if (Object.keys(upd).length > 0) {
-      const { error: updLinkErr } = await supabase.from("raw_material_suppliers").update(upd).eq("id", rmsId);
-      if (updLinkErr) {
-        throw new Error(`Kunne ikke oppdatere leverandørkoblingen (pakning/avtalepris): ${updLinkErr.message}`);
-      }
-    }
+      .map((s) => s.id);
   }
 
-  if (setAsPrimary && !anyPrimary) {
-    // Opprydning: at hovedleverandøren ikke ble satt gjør ikke matchen ugyldig.
-    const { error: clearErr } = await supabase
-      .from("raw_material_suppliers")
-      .update({ is_primary: false })
-      .eq("raw_material_id", rawMaterialId)
-      .neq("id", rmsId);
-    if (clearErr) {
-      console.warn(
-        `acceptMatch: kunne ikke nullstille tidligere hovedleverandør for vare ${rawMaterialId}: ${clearErr.message}`,
-      );
-    }
-    const { error: setErr } = await supabase
-      .from("raw_material_suppliers")
-      .update({ is_primary: true })
-      .eq("id", rmsId);
-    if (setErr) {
-      console.warn(
-        `acceptMatch: kunne ikke sette leverandørkobling ${rmsId} som hovedleverandør: ${setErr.message}`,
-      );
-    }
-    const { error: rmErr } = await supabase
-      .from("raw_materials")
-      .update({ primary_supplier_id: supplierId })
-      .eq("id", rawMaterialId);
-    if (rmErr) {
-      console.warn(
-        `acceptMatch: kunne ikke oppdatere hovedleverandør på vare ${rawMaterialId}: ${rmErr.message}`,
-      );
-    }
-  }
+  // 2) ÉN atomisk bekreftelse på serveren.
+  const { data: raw, error: rpcErr } = await supabase.rpc("rm_confirm_line_match", {
+    p_invoice_line_id: line.id,
+    p_raw_material_id: rawMaterialId,
+    p_package_size: pkgSize ?? undefined,
+    p_package_unit: pkgUnit ?? undefined,
+    p_base_units_per_package: bupp ?? undefined,
+    p_confirm_package: confirmPackage,
+    p_agreed_price_per_base_unit: agreed ?? undefined,
+    p_set_primary: setAsPrimary,
+    p_apply_line_ids: siblingIds.length > 0 ? siblingIds : undefined,
+    p_offer_start_price: offerStartPrice,
+  });
+  if (rpcErr) throw new Error(`Kunne ikke bekrefte matchen: ${rpcErr.message}`);
 
-  // 2) Alias — hvilke som skal bekreftes bestemmes av planen (aliasLearning.ts),
+  const res = (raw ?? {}) as Record<string, unknown>;
+  if (res.ok !== true) {
+    const code = str(res.reason) ?? "ukjent";
+    throw new Error(CONFIRM_FAILURE_LABELS[code] ?? `Bekreftelsen ble avvist av serveren (${code}).`);
+  }
+  const lineIds = Array.isArray(res.line_ids) ? res.line_ids.map((v) => String(v)) : [line.id];
+  const rmsId = str(res.raw_material_supplier_id);
+  const startPrice = parseStartPrice(res.start_price);
+
+  // 3) Alias — hvilke som skal bekreftes bestemmes av planen (aliasLearning.ts),
   // slik at det er samme kode som avgjør hva som skal skrives og hva som skal læres.
   const confirmedAliasValues: Array<{ alias_type: "supplier_sku" | "product_name"; alias_value: string }> = [];
   if (rememberSku && line.supplier_sku) {
@@ -185,9 +202,7 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
   if (rememberName && line.description) {
     confirmedAliasValues.push({ alias_type: "product_name", alias_value: line.description });
   }
-  // Leverandørens koblinger og alias hentes ÉN gang; all sammenligning skjer i minnet
-  // på normalisert nøkkel (databasen normaliserer bare lower/trim).
-  const needsAliasWork = confirmedAliasValues.length > 0 || rejectedRawMaterialIds.length > 0;
+  const needsAliasWork = (confirmedAliasValues.length > 0 || rejectedRawMaterialIds.length > 0) && !!rmsId;
   let supplierRmsRows: Array<{ id: string; raw_material_id: string }> = [];
   let supplierAliases: Array<{
     id: string;
@@ -220,11 +235,10 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
     }
   }
 
-
-  // 2a-2c) Selve læringen er ren logikk (se aliasLearning.ts): hvilke alias som
+  // 3a-3c) Selve læringen er ren logikk (se aliasLearning.ts): hvilke alias som
   // skal bekreftes, hvilke som skal pensjoneres, og hvilke som skal avvises
-  // fordi brukeren valgte varen bort.
-  if (needsAliasWork) {
+  // fordi brukeren valgte varen bort. Matchen står allerede — feil her logges.
+  if (needsAliasWork && rmsId) {
     const lineValues: Array<{ alias_type: "supplier_sku" | "product_name"; alias_value: string }> = [];
     if (line.supplier_sku) lineValues.push({ alias_type: "supplier_sku", alias_value: line.supplier_sku });
     if (line.description) lineValues.push({ alias_type: "product_name", alias_value: line.description });
@@ -241,10 +255,8 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
 
     if (plan.confirmRows.length > 0) {
       const aliasInserts: AliasInsert[] = plan.confirmRows.map((r) => ({
-        raw_material_supplier_id: r.raw_material_supplier_id,
-        alias_type: r.alias_type,
-        alias_value: r.alias_value,
-        status: "confirmed",
+        ...r,
+        status: "confirmed" as const,
         confirmed_by: userId,
         confirmed_at: nowIso,
         first_seen_invoice_id: line.invoice_id,
@@ -253,7 +265,7 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
         onConflict: "alias_type,alias_value_normalized,raw_material_supplier_id",
       });
       if (aliasErr) {
-        throw new Error(`Kunne ikke lagre alias (${aliasInserts.length} rader): ${aliasErr.message}`);
+        console.warn(`acceptMatch: matchen er lagret, men alias kunne ikke lagres: ${aliasErr.message}`);
       }
     }
 
@@ -298,43 +310,10 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
     }
   }
 
-
-  // 3) Skriv matchen på linjen (og evt. søsterlinjer)
-  const lineIds: string[] = [line.id];
-  if (applyToAll) {
-    const { data: sib, error: sibErr } = await supabase
-      .from("invoice_lines")
-      .select("id, supplier_sku, description")
-      .eq("invoice_id", line.invoice_id);
-    if (sibErr) {
-      throw new Error(`Kunne ikke hente søsterlinjer på fakturaen for «match alle like»: ${sibErr.message}`);
-    }
-    (sib ?? []).forEach((s) => {
-      if (s.id === line.id) return;
-      const bothHaveSku = !!line.supplier_sku && !!s.supplier_sku;
-      const same = bothHaveSku
-        ? s.supplier_sku === line.supplier_sku
-        : !line.supplier_sku && !s.supplier_sku && !!line.description && s.description === line.description;
-      if (same) lineIds.push(s.id);
-    });
-  }
-
-  const { error: updErr } = await supabase
-    .from("invoice_lines")
-    .update({
-      raw_material_id: rawMaterialId,
-      match_confidence: "manual",
-      requires_review: false,
-      review_reason: null,
-      resolved_by: userId,
-      resolved_at: nowIso,
-    })
-    .in("id", lineIds);
-  if (updErr) throw new Error(`Kunne ikke lagre matchen på fakturalinjen(e): ${updErr.message}`);
-
   // 4) Kjør pipeline på nytt for linjene (prisavvik regnes om).
-  //    Feiler dette er matchen likevel lagret — logg og gå videre.
-  if (skipRematch) return { lineIds, rmsId };
+  //    Feiler dette er matchen likevel lagret — linjen merkes til ny beregning
+  //    av motoren neste kjøring, og kalleren får vite at det gjenstår.
+  if (skipRematch) return { lineIds, rmsId, startPrice };
 
   const { error: fnErr } = await supabase.functions.invoke("match-invoice-lines", {
     body: { invoice_id: line.invoice_id, line_ids: lineIds },
@@ -345,6 +324,27 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<{ lineIds: 
     );
   }
 
-  return { lineIds, rmsId };
+  return { lineIds, rmsId, startPrice };
 }
 
+/** Norsk forklaring på hva som skjedde med startprisen i bekreftelsen. */
+export function startPriceOutcomeLabel(sp: AcceptMatchStartPrice): string | null {
+  if (sp.created) {
+    const unit = sp.baseUnit ? ` / ${sp.baseUnit}` : "";
+    return `Startpris lagret: ${sp.price ?? "?"} ${sp.currency ?? "NOK"}${unit}.`;
+  }
+  switch (sp.reason) {
+    case "ikke_slatt_pa":
+    case "ikke_forespurt":
+      return null;
+    case "avtalepris_finnes":
+      return "Startpris ble ikke lagret: varen har en gyldig avtalepris hos denne leverandøren.";
+    case "startpris_finnes_allerede":
+    case "allerede_bekreftet_fra_denne_linjen":
+      return "Startpris ble ikke lagret: det finnes allerede en startpris.";
+    case null:
+      return null;
+    default:
+      return `Startpris ble ikke lagret (${sp.reason}). Du kan bekrefte den manuelt senere.`;
+  }
+}
