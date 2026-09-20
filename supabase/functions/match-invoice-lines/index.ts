@@ -603,9 +603,11 @@ Deno.serve(async (req) => {
           update.variance_status = "no_baseline";
           if (ref.source === "conflict") addReason("agreement_conflict");
         }
+        // Et ukjent prisgrunnlag er ikke «ingen avvik».
+        if (ref.source === "error") addReason("price_reference_error");
         if (foreignCurrency) addReason("unsupported_currency");
 
-        await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, update, catTolMap.get(rm?.category ?? "") ?? tolDefault);
+        await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, update, catTolMap.get(rm?.category ?? "") ?? tolDefault, ref);
       }
 
       // Lær av vellykket fuzzy-match: skriv pending alias (aldri degrader bekreftede)
@@ -623,11 +625,15 @@ Deno.serve(async (req) => {
     // et menneske har tatt et standpunkt, og motoren skal ikke overkjøre det.
     const lockedStatuses = ["flagged", "reconciled", "cancelled"];
     if (!lockedStatuses.includes(String(inv.status))) {
-      const { data: stillPending } = await svc.from("invoice_lines")
+      // Feiler disse lesningene, vet vi ikke om fakturaen er ferdig. Da skal den
+      // IKKE settes til «klar» — vi feiler heller kjøringen.
+      const { data: stillPending, error: pendErr } = await svc.from("invoice_lines")
         .select("id").eq("invoice_id", invoiceId).is("match_confidence", null).limit(1);
+      if (pendErr) throw new Error(`Kunne ikke sjekke ubehandlede linjer: ${pendErr.message}`);
       if (!stillPending || stillPending.length === 0) {
-        const { data: needsReview } = await svc.from("invoice_lines")
+        const { data: needsReview, error: revErr } = await svc.from("invoice_lines")
           .select("id").eq("invoice_id", invoiceId).eq("requires_review", true).limit(1);
+        if (revErr) throw new Error(`Kunne ikke sjekke linjer til gjennomgang: ${revErr.message}`);
 
         // Forhold ved selve fakturaen tvinger gjennomgang, uansett hvor pene linjene er.
         const invoiceLevelReview =
@@ -638,7 +644,8 @@ Deno.serve(async (req) => {
         const newStatus = (needsReview && needsReview.length > 0) || invoiceLevelReview
           ? "needs_review"
           : "ready";
-        await svc.from("invoices").update({ status: newStatus }).eq("id", invoiceId);
+        const { error: statusErr } = await svc.from("invoices").update({ status: newStatus }).eq("id", invoiceId);
+        if (statusErr) throw new Error(`Kunne ikke oppdatere fakturastatus: ${statusErr.message}`);
       }
     }
 
