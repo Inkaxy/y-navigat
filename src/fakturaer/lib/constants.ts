@@ -25,6 +25,21 @@ export function formatNok(value: number | null | undefined): string {
   if (value == null) return "—";
   return new Intl.NumberFormat("nb-NO", { style: "currency", currency: "NOK", maximumFractionDigits: 2 }).format(value);
 }
+/**
+ * Beløp i fakturaens EGEN valuta. Køen viser tall fra fakturaer som kan være
+ * i annen valuta enn NOK — da skal det ikke stå «kr».
+ */
+export function formatMoney(value: number | null | undefined, currency: string | null | undefined): string {
+  if (value == null) return "—";
+  const code = (currency ?? "NOK").toUpperCase();
+  try {
+    return new Intl.NumberFormat("nb-NO", { style: "currency", currency: code, maximumFractionDigits: 2 }).format(value);
+  } catch {
+    // Ukjent valutakode skal vises, ikke skjules bak en feil.
+    return `${new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 2 }).format(value)} ${code}`;
+  }
+}
+
 export function formatDate(value: string | Date | null | undefined): string {
   if (!value) return "—";
   const d = typeof value === "string" ? new Date(value) : value;
