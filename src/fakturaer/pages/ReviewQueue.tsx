@@ -106,16 +106,22 @@ export default function FakturaerInboxPage() {
   const onlyReady = searchParams.get("filter") === "klar";
 
   const { data: entities = [] } = useFakturaerLegalEntities();
-  const [legalEntityId, setLegalEntityId] = useState<string>("all");
+  const { data: company } = useCompany();
   const [supplierId, setSupplierId] = useState<string>("all");
   const [supplierOpen, setSupplierOpen] = useState(false);
   const [tab, setTab] = useState<TabValue>("all");
 
-  const { data: suppliers = [] } = useSuppliersFor(legalEntityId === "all" ? null : legalEntityId);
+  // Ett firma: selskapet kommer fra useCompany, ikke fra en velger.
+  const legalEntityId = useMemo(
+    () => resolveQueueEntityId(company?.id, entities.map((e) => e.id)),
+    [company?.id, entities],
+  );
+
+  const { data: suppliers = [] } = useSuppliersFor(legalEntityId);
 
   // Hver faktura vurderes mot sitt eget selskaps toleranser.
   const toleranceEntityIds = useMemo(
-    () => (legalEntityId !== "all" ? [legalEntityId] : entities.map((e) => e.id)),
+    () => (legalEntityId ? [legalEntityId] : entities.map((e) => e.id)),
     [legalEntityId, entities],
   );
   // Toleransen slås opp per linje, mot linjens EGET selskap.
@@ -123,7 +129,7 @@ export default function FakturaerInboxPage() {
 
   const filters = useMemo(
     () => ({
-      legalEntityId: legalEntityId === "all" ? null : legalEntityId,
+      legalEntityId,
       supplierId: supplierId === "all" ? null : supplierId,
     }),
     [legalEntityId, supplierId],
