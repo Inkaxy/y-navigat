@@ -134,10 +134,47 @@ Deno.serve(async (req) => {
     const fuzzyAuto = Number(settings?.fuzzy_auto_match_threshold ?? 0.85);
     const fuzzyDom = Number(settings?.fuzzy_auto_match_dominance_threshold ?? 0.65);
 
+    // Startpris-policy hentes ALLTID fra serveren — klienten kan ikke slå den på.
+    // Nye automasjonsvalg er av som standard.
+    const startAutoCheck = settings?.auto_check_against_start_price === true;
+    const startTolPct = Number(settings?.start_price_tolerance_pct ?? 2);
+    const startMaxImpact =
+      settings?.start_price_max_impact_nok == null ? null : Number(settings.start_price_max_impact_nok);
+
     const catTols = required("kategoritoleranser", await svc.from("invoice_match_category_tolerances")
       .select("category, price_tolerance_pct").eq("legal_entity_id", inv.legal_entity_id));
     const catTolMap = new Map<string, number>();
     (catTols ?? []).forEach((c: AnyRec) => catTolMap.set(c.category, Number(c.price_tolerance_pct)));
+
+    /**
+     * Avviksvurdering mot ETT prisgrunnlag. Startpris har sin egen toleranse og
+     * en valgfri kronegrense, og godkjenner aldri en linje automatisk før
+     * selskapet uttrykkelig har slått på automatisk kontroll mot startpris.
+     * Returnerer blokkerende årsaker; skriver status og avvik på `target`.
+     */
+    function evaluateVariance(
+      ref: AnyRec,
+      expected: number,
+      actual: number,
+      category: string | null,
+      baseQuantity: number | null,
+      target: AnyRec,
+    ): string[] {
+      const reasons: string[] = [];
+      const isStart = String(ref.source ?? "") === "start_price";
+      const tol = isStart ? startTolPct : (catTolMap.get(category ?? "") ?? tolDefault);
+      const variance = ((actual - expected) / expected) * 100;
+      target.price_variance_pct = Number(variance.toFixed(3));
+      let over = Math.abs(variance) > tol;
+      if (isStart && startMaxImpact != null && baseQuantity != null && Number.isFinite(baseQuantity)) {
+        if (Math.abs((actual - expected) * baseQuantity) > startMaxImpact) over = true;
+      }
+      target.variance_status = over ? "over_tolerance" : "within_tolerance";
+      if (over) reasons.push("price_variance");
+      if (isStart && !startAutoCheck) reasons.push("start_price_manual_check");
+      return reasons;
+    }
+
 
     // Exclusion patterns for this supplier+entity (or supplier null)
     const exclusions = required("eksklusjonsmønstre", await svc.from("invoice_line_exclusion_patterns")
@@ -229,15 +266,11 @@ Deno.serve(async (req) => {
           reviewReasons.add("unknown_package_size");
         }
         if (expected != null && actual != null && expected !== 0) {
-          const variance = ((actual - expected) / expected) * 100;
-          manualUpdate.price_variance_pct = Number(variance.toFixed(3));
-          const tol = catTolMap.get(rm?.category ?? "") ?? tolDefault;
-          if (Math.abs(variance) <= tol) {
-            manualUpdate.variance_status = "within_tolerance";
-          } else {
-            manualUpdate.variance_status = "over_tolerance";
+          for (const reason of evaluateVariance(
+            refM, expected, actual, rm?.category ?? null, manualUpdate.base_quantity ?? null, manualUpdate,
+          )) {
             requiresReview = true;
-            reviewReasons.add("price_variance");
+            reviewReasons.add(reason);
           }
         } else {
           manualUpdate.variance_status = "no_baseline";
@@ -593,17 +626,10 @@ Deno.serve(async (req) => {
         if (actual == null && isPackageUnit(normalizedUnit) && rm?.base_unit) addReason("unknown_package_size");
 
         if (expected != null && actual != null && expected !== 0) {
-          const variance = ((actual - expected) / expected) * 100;
-          update.price_variance_pct = Number(variance.toFixed(3));
-          const tol = catTolMap.get(rm?.category ?? "") ?? tolDefault;
-          if (Math.abs(variance) <= tol) {
-            update.variance_status = "within_tolerance";
-          } else {
-            update.variance_status = "over_tolerance";
-            update.requires_review = true;
-            update.review_reason = update.review_reason
-              ? Array.from(new Set(`${update.review_reason},price_variance`.split(","))).join(",")
-              : "price_variance";
+          for (const reason of evaluateVariance(
+            ref, expected, actual, rm?.category ?? null, update.base_quantity ?? null, update,
+          )) {
+            addReason(reason);
           }
         } else {
           update.variance_status = "no_baseline";

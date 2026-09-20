@@ -25,6 +25,7 @@ export const LINE_REASON_CODES = [
   "recalculation_pending",
   "extraction_unresolved",
   "missing_base_unit",
+  "start_price_manual_check",
 ] as const;
 export type LineReasonCode = (typeof LINE_REASON_CODES)[number];
 
@@ -49,6 +50,7 @@ export const REASON_LABELS: Record<ReasonCode, string> = {
   recalculation_pending: "Må beregnes på nytt",
   extraction_unresolved: "Beløp mangler i dokumentet",
   missing_base_unit: "Varen mangler grunnenhet",
+  start_price_manual_check: "Startpris må kontrolleres manuelt",
   no_baseline: "Uten prisgrunnlag",
   extraction_issue: "Uttrekk eller sum stemmer ikke",
   zero_quantity: "Mengde mangler eller er null",
@@ -67,6 +69,7 @@ export const REVIEW_GROUPS = [
   "extraction",
   "conflict",
   "recalculation",
+  "start_price",
   "other",
 ] as const;
 export type ReviewGroup = (typeof REVIEW_GROUPS)[number];
@@ -83,6 +86,7 @@ export const GROUP_LABELS: Record<ReviewGroup, string> = {
   extraction: "Uttrekk og sum",
   conflict: "Konflikt",
   recalculation: "Må beregnes på nytt",
+  start_price: "Startpris",
   other: "Ukjent årsak",
 };
 
@@ -99,6 +103,8 @@ export const GROUP_DESCRIPTIONS: Record<ReviewGroup, string> = {
   conflict: "Samme varenummer eller navn peker på flere varer.",
   recalculation:
     "Linjen er nettopp koblet til en vare, men prisen er ikke regnet om ennå. Den kan ikke avstemmes før beregningen er kjørt.",
+  start_price:
+    "Linjen måles mot en bekreftet startpris, og selskapet har ikke slått på automatisk kontroll mot startpris.",
   other: "Linjen står til gjennomgang uten en årsak vi kjenner igjen.",
 };
 
@@ -120,6 +126,7 @@ const REASON_GROUP: Record<ReasonCode, ReviewGroup> = {
   recalculation_pending: "recalculation",
   extraction_unresolved: "extraction",
   missing_base_unit: "package_unit",
+  start_price_manual_check: "start_price",
 };
 
 const KNOWN: ReadonlySet<string> = new Set<string>([...LINE_REASON_CODES, ...DERIVED_REASON_CODES]);

@@ -36,12 +36,14 @@ const summary: PriceSummary = {
   weighted_90d_observations: 6,
   weighted_90d_suppliers: 2,
   unit_changed_at: "2026-03-01",
+  unit_changed_at_ts: "2026-03-01T12:00:00Z",
   on_date: "2026-09-20",
 };
 
 function obs(o: Partial<PriceObservation> & { id: string }): PriceObservation {
   return {
     price: 15.2,
+    created_at: "2026-09-08T09:00:00Z",
     effective_date: "2026-09-08",
     source: "invoice",
     supplier_id: "sup-1",
