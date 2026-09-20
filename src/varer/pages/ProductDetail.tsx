@@ -492,6 +492,7 @@ export default function ProductDetail() {
         )}
         {tab === "produksjon" && lookups && (
           <div className="space-y-4">
+            {!product.variant_of_product_id && <RecipeBasisNote productId={product.id} area="produksjon" />}
             <ProduksjonTab
               productId={product.id}
               canWrite={canWrite}
@@ -512,17 +513,23 @@ export default function ProductDetail() {
           </div>
         )}
         {tab === "varedetaljer" && (
-          <VaredetaljerTab canWrite={canWrite} keywords={keywords} onKeywordsChange={setKeywords} productId={product.id} />
+          <div className="space-y-4">
+            {!product.variant_of_product_id && <RecipeBasisNote productId={product.id} area="varedetaljer" />}
+            <VaredetaljerTab canWrite={canWrite} keywords={keywords} onKeywordsChange={setKeywords} productId={product.id} />
+          </div>
         )}
         {tab === "leveranse" && <LeveranseTab canWrite={canWrite} />}
         {tab === "pakke" && (
-          <PakkeTab
-            productId={product.id}
-            canWrite={canWrite}
-            productOptions={productOptions}
-            items={packageItems}
-            onItemsChange={setPackageItems}
-          />
+          <div className="space-y-4">
+            {!product.variant_of_product_id && <RecipeBasisNote productId={product.id} area="pakke" />}
+            <PakkeTab
+              productId={product.id}
+              canWrite={canWrite}
+              productOptions={productOptions}
+              items={packageItems}
+              onItemsChange={setPackageItems}
+            />
+          </div>
         )}
         {tab === "retur" && <ReturTab productId={product.id} canWrite={canWrite} />}
         {tab === "lager" && (
