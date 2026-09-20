@@ -465,6 +465,16 @@ function isWhole(n: number, tol = 0.02): boolean {
   return Math.abs(n - Math.round(n)) <= tol;
 }
 
+/**
+ * Sann når feltet FAKTISK er utfylt, men ikke er et brukbart tall
+ * (Infinity, -Infinity, "NaN", "tolv"). Et slikt felt er en feil i kilden —
+ * det skal aldri behandles som «mangler verdi» og erstattes av et anslag.
+ */
+function isNonFiniteValue(v: unknown): boolean {
+  if (v == null || v === "") return false;
+  return !Number.isFinite(Number(v));
+}
+
 function toNum(v: unknown): number | null {
   if (v == null || v === "") return null;
   const n = Number(v);
@@ -689,6 +699,15 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
 
   const unitPrice = toNum(input.unitPrice);
   const total = toNum(input.totalAmount);
+  if (isNonFiniteValue(input.totalAmount)) {
+    // Et eksplisitt ubrukelig beløp (Infinity/NaN) er IKKE et manglende beløp:
+    // det må ikke falle tilbake til mengde × enhetspris.
+    return emptyResult(
+      "amount",
+      "Fakturalinjen har et ugyldig beløp som ikke kan regnes med. Oppgi det faktiske beløpet.",
+      checks,
+    );
+  }
 
   // 1) Beløp
   let amount: number | null = null;

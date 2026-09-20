@@ -156,6 +156,28 @@ const CASES: Array<{ name: string; scenario: Scenario; reason: string }> = [
     reason: "extraction_unresolved",
   },
   {
+    // Et uendelig beløp er et ugyldig beløp, ikke et manglende beløp: det skal
+    // ikke erstattes av mengde × enhetspris.
+    name: "beløp er Infinity",
+    scenario: { line: { total_amount: Number.POSITIVE_INFINITY, quantity: 2, unit_price: 100 } },
+    reason: "extraction_unresolved",
+  },
+  {
+    name: "beløp er -Infinity",
+    scenario: { line: { total_amount: Number.NEGATIVE_INFINITY, quantity: 2, unit_price: 100 } },
+    reason: "extraction_unresolved",
+  },
+  {
+    name: "beløp er NaN",
+    scenario: { line: { total_amount: Number.NaN, quantity: 2, unit_price: 100 } },
+    reason: "extraction_unresolved",
+  },
+  {
+    name: "beløp er teksten «NaN»",
+    scenario: { line: { total_amount: "NaN", quantity: 2, unit_price: 100 } },
+    reason: "extraction_unresolved",
+  },
+  {
     name: "varen mangler grunnenhet",
     scenario: { line: {}, rawMaterial: { base_unit: null } },
     reason: "missing_base_unit",
