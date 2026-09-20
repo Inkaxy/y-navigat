@@ -210,27 +210,21 @@ Deno.serve(async (req) => {
         const expected = applyReference(manualUpdate, refM);
 
         const cost = costForLine(line, rm, rmsRow);
-        const usable = cost && !cost.needsInput && cost.confidenceLevel !== "low";
+        const usable = costIsUsable(cost);
         const actual: number | null = usable ? cost!.pricePerBaseUnit : null;
         manualUpdate.price_per_base_unit = actual;
-        manualUpdate.base_quantity = cost && !cost.needsInput && cost.confidence >= 0.85 ? cost.baseQuantity : null;
+        manualUpdate.base_quantity = usable && cost!.confidence >= 0.85 ? cost!.baseQuantity : null;
         manualUpdate.expected_price_per_base_unit = expected;
 
         const reviewReasons = new Set<string>();
         let requiresReview = false;
-        // Pakning som bare er tolket ut av varenavnet er ikke bekreftet — prisen
-        // regnes ut, men linja skal ses av et menneske.
-        if (cost && !cost.needsInput && packageNeedsConfirmation(cost)) {
+        // Enhver ubrukelig kostpris — manglende beløp, mengde 0, ukjent
+        // grunnenhet, ubekreftet pakning eller lav tillit — er blokkerende.
+        for (const reason of costReviewReasons(cost, actual)) {
           requiresReview = true;
-          reviewReasons.add("unknown_package_size");
+          reviewReasons.add(reason);
         }
-        if (cost?.needsInput === "package_size") {
-          requiresReview = true;
-          reviewReasons.add("unknown_package_size");
-        } else if (cost && !cost.needsInput && cost.confidenceLevel === "low") {
-          requiresReview = true;
-          reviewReasons.add("uncertain_cost");
-        } else if (actual == null && isPackageUnit(normalizedUnitM) && rm?.base_unit) {
+        if (actual == null && isPackageUnit(normalizedUnitM) && rm?.base_unit) {
           requiresReview = true;
           reviewReasons.add("unknown_package_size");
         }
