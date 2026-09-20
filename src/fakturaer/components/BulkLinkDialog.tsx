@@ -67,7 +67,7 @@ export function BulkLinkDialog({ open, onOpenChange, rmsId, rawMaterialName, onA
         p_rms_id: rmsId!,
         p_line_ids: chosen.map((r) => r.line_id),
         // Optimistisk lås: er koblingen endret siden forhåndsvisningen, avbryter databasen.
-        p_expected_updated_at: query.data?.updatedAt ?? undefined,
+        p_expected_updated_at: updatedAt,
       });
       if (error) throw error;
       return (data ?? {}) as { applied_count?: number; skipped?: { line_id: string; reason: string }[] };
