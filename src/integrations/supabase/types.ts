@@ -8515,7 +8515,12 @@ export type Database = {
           price_overrides: Json
           product_id: string
           recipe_id: string
+          sales_unit_basis: string | null
+          sales_unit_confirmed_at: string | null
+          sales_unit_confirmed_by: string | null
+          sales_unit_weight_g: number | null
           units_per_batch_override: number | null
+          units_per_sales_unit: number | null
           updated_at: string
           yield_weight_g_override: number | null
         }
@@ -8537,7 +8542,12 @@ export type Database = {
           price_overrides?: Json
           product_id: string
           recipe_id: string
+          sales_unit_basis?: string | null
+          sales_unit_confirmed_at?: string | null
+          sales_unit_confirmed_by?: string | null
+          sales_unit_weight_g?: number | null
           units_per_batch_override?: number | null
+          units_per_sales_unit?: number | null
           updated_at?: string
           yield_weight_g_override?: number | null
         }
@@ -8559,7 +8569,12 @@ export type Database = {
           price_overrides?: Json
           product_id?: string
           recipe_id?: string
+          sales_unit_basis?: string | null
+          sales_unit_confirmed_at?: string | null
+          sales_unit_confirmed_by?: string | null
+          sales_unit_weight_g?: number | null
           units_per_batch_override?: number | null
+          units_per_sales_unit?: number | null
           updated_at?: string
           yield_weight_g_override?: number | null
         }

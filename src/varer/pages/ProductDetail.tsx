@@ -57,6 +57,7 @@ import { LeveranseTab } from "@/varer/components/products/detail/tabs/LeveranseT
 import { PakkeTab, type PackageItem } from "@/varer/components/products/detail/tabs/PakkeTab";
 import { ReturTab } from "@/varer/components/products/detail/tabs/ReturTab";
 import { RecipeSummaryCard } from "@/varer/components/products/RecipeSummaryCard";
+import { RecipeBasisNote } from "@/varer/components/products/RecipeBasisNote";
 import { SelvStekingCard } from "@/varer/components/products/detail/SelvStekingCard";
 import { DeclarationTab } from "@/varer/components/products/DeclarationTab";
 import { CostPriceTab } from "@/varer/components/products/CostPriceTab";
@@ -492,6 +493,7 @@ export default function ProductDetail() {
         )}
         {tab === "produksjon" && lookups && (
           <div className="space-y-4">
+            {!product.variant_of_product_id && <RecipeBasisNote productId={product.id} area="produksjon" />}
             <ProduksjonTab
               productId={product.id}
               canWrite={canWrite}
@@ -512,17 +514,23 @@ export default function ProductDetail() {
           </div>
         )}
         {tab === "varedetaljer" && (
-          <VaredetaljerTab canWrite={canWrite} keywords={keywords} onKeywordsChange={setKeywords} productId={product.id} />
+          <div className="space-y-4">
+            {!product.variant_of_product_id && <RecipeBasisNote productId={product.id} area="varedetaljer" />}
+            <VaredetaljerTab canWrite={canWrite} keywords={keywords} onKeywordsChange={setKeywords} productId={product.id} />
+          </div>
         )}
         {tab === "leveranse" && <LeveranseTab canWrite={canWrite} />}
         {tab === "pakke" && (
-          <PakkeTab
-            productId={product.id}
-            canWrite={canWrite}
-            productOptions={productOptions}
-            items={packageItems}
-            onItemsChange={setPackageItems}
-          />
+          <div className="space-y-4">
+            {!product.variant_of_product_id && <RecipeBasisNote productId={product.id} area="pakke" />}
+            <PakkeTab
+              productId={product.id}
+              canWrite={canWrite}
+              productOptions={productOptions}
+              items={packageItems}
+              onItemsChange={setPackageItems}
+            />
+          </div>
         )}
         {tab === "retur" && <ReturTab productId={product.id} canWrite={canWrite} />}
         {tab === "lager" && (
@@ -550,15 +558,21 @@ export default function ProductDetail() {
           />
         )}
         {tab === "deklarasjon" && !product.variant_of_product_id && (
-          <DeclarationTab productId={product.id} productName={product.display_name} canWrite={canWrite} />
+          <div className="space-y-4">
+            <RecipeBasisNote productId={product.id} area="deklarasjon" />
+            <DeclarationTab productId={product.id} productName={product.display_name} canWrite={canWrite} />
+          </div>
         )}
         {tab === "kalkyle_pris" && !product.variant_of_product_id && (
-          <CostPriceTab
-            productId={product.id}
-            productName={product.display_name}
-            legalEntityId={legalEntityId}
-            canWrite={canWrite}
-          />
+          <div className="space-y-4">
+            <RecipeBasisNote productId={product.id} area="kalkyle" />
+            <CostPriceTab
+              productId={product.id}
+              productName={product.display_name}
+              legalEntityId={legalEntityId}
+              canWrite={canWrite}
+            />
+          </div>
         )}
         {tab === "sortiment" && (
           <Card><CardContent className="py-12 text-center text-muted-foreground">Sortimentsstyring kommer når Kunder-appen er bygget.</CardContent></Card>
