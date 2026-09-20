@@ -22,7 +22,7 @@ function labelsFor(o: PriceObservation): { text: string; tone: "outline" | "seco
   if (o.is_credit) out.push({ text: "Kreditnota", tone: "destructive" });
   if (o.is_legacy) out.push({ text: "Historisk", tone: "secondary" });
   if (o.superseded_at) out.push({ text: "Erstattet", tone: "destructive" });
-  if (o.unit_changed_since) out.push({ text: "Enheten er endret senere", tone: "destructive" });
+  if (o.unit_changed_since) out.push({ text: "Enhet ikke bekreftet", tone: "destructive" });
   return out;
 }
 
@@ -157,10 +157,17 @@ export function PriceComparisonCard({
                       <td className="py-2 pr-3 whitespace-nowrap">{formatDate(o.effective_date)}</td>
                       <td className="py-2 pr-3 whitespace-nowrap">
                         {formatNok(o.price)}
-                        <span className="text-caption text-ink-secondary"> / {baseUnit}</span>
+                        <span className="text-caption text-ink-secondary">
+                          {" "}
+                          / {o.unit_changed_since ? "ukjent enhet" : baseUnit}
+                        </span>
                       </td>
                       <td className="py-2 pr-3 whitespace-nowrap">
-                        {o.base_quantity != null ? `${o.base_quantity} ${baseUnit}` : "ukjent"}
+                        {o.base_quantity == null
+                          ? "ukjent"
+                          : o.unit_changed_since
+                            ? `${o.base_quantity} (ukjent enhet)`
+                            : `${o.base_quantity} ${baseUnit}`}
                       </td>
                       <td className="py-2 pr-3">
                         {o.supplier_id ? (supplierNames.get(o.supplier_id) ?? "Ukjent leverandør") : "—"}
@@ -189,10 +196,14 @@ export function PriceComparisonCard({
             </div>
           )}
 
+          <p className="text-caption text-ink-secondary">
+            Prishistorikken lagrer ingen enhet. Tallene vises i varens grunnenhet i dag ({baseUnit}), og det er en
+            antakelse — ikke en bekreftet enhet på den enkelte observasjonen.
+          </p>
           {rows.some((o) => o.unit_changed_since) && (
             <p className="text-caption text-warning">
-              Grunnenheten på varen er endret etter noen av observasjonene. Historikken lagrer ingen egen enhet, så de
-              eldre prisene kan ikke sammenlignes direkte med de nye.
+              Grunnenheten på varen er endret etter noen av observasjonene. Disse er merket «Enhet ikke bekreftet» og
+              kan ikke sammenlignes direkte med de nyere prisene.
             </p>
           )}
         </>
