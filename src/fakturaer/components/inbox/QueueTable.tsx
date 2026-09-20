@@ -73,6 +73,8 @@ interface Props {
   /** Vises som fakturakolonne når køen ikke er begrenset til én faktura. */
   showInvoiceColumn: boolean;
   canWrite: boolean;
+  /** Hvor mange linjer i HELE køen som deler samme leverandør og vareidentitet. */
+  repeatCounts?: Map<string, number>;
 }
 
 export function QueueTable({
@@ -89,6 +91,7 @@ export function QueueTable({
   onAccept,
   showInvoiceColumn,
   canWrite,
+  repeatCounts,
 }: Props) {
   const allSelected = lines.length > 0 && lines.every((l) => selected[l.id]);
 
