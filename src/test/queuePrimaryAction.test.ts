@@ -129,3 +129,44 @@ describe("primaryActionFor", () => {
     expect(a.label).toBe("Kontroller linjen");
   });
 });
+
+/**
+ * Tillitsnivået fra matchemotoren avgjør om linjen er en gjetning eller en
+ * pålitelig kobling. «auto_high» kommer fra bekreftet alias eller entydig
+ * varenummer og skal ikke merkes som et usikkert forslag.
+ */
+describe("hovedhandling: pålitelig kobling mot usikkert forslag", () => {
+  it("auto_high med prisavvik peker på prisen, ikke på forslagskontroll", () => {
+    const a = primaryActionFor(
+      line({ raw_material_id: "rm1", match_confidence: "auto_high", review_reason: "price_variance" }),
+    );
+    expect(a.kind).toBe("variance");
+    expect(a.label).toBe("Se prisavvik");
+    expect(a.hint).not.toContain("lav tillit");
+  });
+
+  it("auto_low med prisavvik må fortsatt kontrolleres som forslag", () => {
+    const a = primaryActionFor(
+      line({ raw_material_id: "rm1", match_confidence: "auto_low", review_reason: "price_variance" }),
+    );
+    expect(a.kind).toBe("review_suggestion");
+    expect(a.label).toBe("Kontroller forslag");
+  });
+
+  it("auto_medium er en gjetning og behandles som forslag", () => {
+    const a = primaryActionFor(line({ raw_material_id: "rm1", match_confidence: "auto_medium" }));
+    expect(a.kind).toBe("review_suggestion");
+  });
+
+  it("ukoblet linje med forslag er fortsatt forslagskontroll", () => {
+    const a = primaryActionFor(line({ raw_material_id: null, match_confidence: null }));
+    expect(a.kind).toBe("confirm_link");
+  });
+
+  it("manglende pakning går foran prisen også på en pålitelig kobling", () => {
+    const a = primaryActionFor(
+      line({ raw_material_id: "rm1", match_confidence: "auto_high", review_reason: "unknown_package_size,price_variance" }),
+    );
+    expect(a.kind).toBe("confirm_link");
+  });
+});
