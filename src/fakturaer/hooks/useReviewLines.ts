@@ -174,6 +174,21 @@ export interface ReviewLineCountRow {
   requires_review: boolean | null;
   variance_status: string | null;
   raw_material_id: string | null;
+  quantity: number | null;
+  description: string | null;
+  supplier_sku: string | null;
+  total_amount: number | null;
+  price_per_base_unit: number | null;
+  expected_price_per_base_unit: number | null;
+  price_variance_pct: number | null;
+  base_quantity: number | null;
+  invoice: {
+    id: string;
+    supplier_id: string | null;
+    currency: string | null;
+    lines_sum_status: string | null;
+    extraction_confidence: number | null;
+  } | null;
 }
 
 /**
@@ -188,7 +203,10 @@ export function useReviewLineCounts(filters: Omit<Filters, "limit">) {
         let q = supabase
           .from("invoice_lines")
           .select(
-            "id, invoice_id, review_reason, requires_review, variance_status, raw_material_id, invoice:invoices!inner(id)",
+            `id, invoice_id, review_reason, requires_review, variance_status, raw_material_id,
+             quantity, description, supplier_sku, total_amount, price_per_base_unit,
+             expected_price_per_base_unit, price_variance_pct, base_quantity,
+             invoice:invoices!inner(id, supplier_id, currency, lines_sum_status, extraction_confidence)`,
           )
           .or("requires_review.eq.true,variance_status.eq.no_baseline")
           .not("invoice.status", "in", `(${HIDDEN_INVOICE_STATUSES.join(",")})`)
