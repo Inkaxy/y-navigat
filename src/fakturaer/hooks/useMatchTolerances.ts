@@ -11,6 +11,12 @@ export interface MatchSettings {
   fuzzy_auto_match_dominance_threshold: number | null;
   auto_approve_within_tolerance: boolean;
   auto_reconcile_clean_imports: boolean;
+  /** Startpris: bruk første bekreftede kjøpspris som startpris. */
+  use_first_confirmed_price_as_start: boolean;
+  /** Startpris: la linjer kontrolleres automatisk mot startprisen. */
+  auto_check_against_start_price: boolean;
+  start_price_tolerance_pct: number | null;
+  start_price_max_impact_nok: number | null;
 }
 
 export interface MatchTolerances {
@@ -34,7 +40,7 @@ async function fetchTolerances(legalEntityId: string): Promise<ToleranceData> {
     supabase
       .from("invoice_match_settings")
       .select(
-        "default_price_tolerance_pct, fuzzy_match_threshold, fuzzy_auto_match_threshold, fuzzy_auto_match_dominance_threshold, auto_approve_within_tolerance, auto_reconcile_clean_imports",
+        "default_price_tolerance_pct, fuzzy_match_threshold, fuzzy_auto_match_threshold, fuzzy_auto_match_dominance_threshold, auto_approve_within_tolerance, auto_reconcile_clean_imports, use_first_confirmed_price_as_start, auto_check_against_start_price, start_price_tolerance_pct, start_price_max_impact_nok",
       )
       .eq("legal_entity_id", legalEntityId)
       .maybeSingle(),
@@ -65,6 +71,12 @@ async function fetchTolerances(legalEntityId: string): Promise<ToleranceData> {
               : Number(s.fuzzy_auto_match_dominance_threshold),
           auto_approve_within_tolerance: !!s.auto_approve_within_tolerance,
           auto_reconcile_clean_imports: !!s.auto_reconcile_clean_imports,
+          use_first_confirmed_price_as_start: !!s.use_first_confirmed_price_as_start,
+          auto_check_against_start_price: !!s.auto_check_against_start_price,
+          start_price_tolerance_pct:
+            s.start_price_tolerance_pct == null ? null : Number(s.start_price_tolerance_pct),
+          start_price_max_impact_nok:
+            s.start_price_max_impact_nok == null ? null : Number(s.start_price_max_impact_nok),
         } satisfies MatchSettings)
       : null,
   };

@@ -3221,36 +3221,48 @@ export type Database = {
       invoice_match_settings: {
         Row: {
           auto_approve_within_tolerance: boolean | null
+          auto_check_against_start_price: boolean
           auto_reconcile_clean_imports: boolean
           default_price_tolerance_pct: number | null
           fuzzy_auto_match_dominance_threshold: number | null
           fuzzy_auto_match_threshold: number | null
           fuzzy_match_threshold: number | null
           legal_entity_id: string
+          start_price_max_impact_nok: number | null
+          start_price_tolerance_pct: number
           updated_at: string | null
           updated_by: string | null
+          use_first_confirmed_price_as_start: boolean
         }
         Insert: {
           auto_approve_within_tolerance?: boolean | null
+          auto_check_against_start_price?: boolean
           auto_reconcile_clean_imports?: boolean
           default_price_tolerance_pct?: number | null
           fuzzy_auto_match_dominance_threshold?: number | null
           fuzzy_auto_match_threshold?: number | null
           fuzzy_match_threshold?: number | null
           legal_entity_id: string
+          start_price_max_impact_nok?: number | null
+          start_price_tolerance_pct?: number
           updated_at?: string | null
           updated_by?: string | null
+          use_first_confirmed_price_as_start?: boolean
         }
         Update: {
           auto_approve_within_tolerance?: boolean | null
+          auto_check_against_start_price?: boolean
           auto_reconcile_clean_imports?: boolean
           default_price_tolerance_pct?: number | null
           fuzzy_auto_match_dominance_threshold?: number | null
           fuzzy_auto_match_threshold?: number | null
           fuzzy_match_threshold?: number | null
           legal_entity_id?: string
+          start_price_max_impact_nok?: number | null
+          start_price_tolerance_pct?: number
           updated_at?: string | null
           updated_by?: string | null
+          use_first_confirmed_price_as_start?: boolean
         }
         Relationships: [
           {
@@ -10638,6 +10650,17 @@ export type Database = {
           package_size: number | null
           package_unit: string | null
           raw_material_id: string
+          start_price_base_unit: string | null
+          start_price_base_units_per_package: number | null
+          start_price_confirmed_at: string | null
+          start_price_confirmed_by: string | null
+          start_price_currency: string | null
+          start_price_effective_date: string | null
+          start_price_invoice_id: string | null
+          start_price_invoice_line_id: string | null
+          start_price_package_size: number | null
+          start_price_package_unit: string | null
+          start_price_per_base_unit: number | null
           supplier_id: string
           supplier_product_name: string | null
           supplier_sku: string | null
@@ -10665,6 +10688,17 @@ export type Database = {
           package_size?: number | null
           package_unit?: string | null
           raw_material_id: string
+          start_price_base_unit?: string | null
+          start_price_base_units_per_package?: number | null
+          start_price_confirmed_at?: string | null
+          start_price_confirmed_by?: string | null
+          start_price_currency?: string | null
+          start_price_effective_date?: string | null
+          start_price_invoice_id?: string | null
+          start_price_invoice_line_id?: string | null
+          start_price_package_size?: number | null
+          start_price_package_unit?: string | null
+          start_price_per_base_unit?: number | null
           supplier_id: string
           supplier_product_name?: string | null
           supplier_sku?: string | null
@@ -10692,6 +10726,17 @@ export type Database = {
           package_size?: number | null
           package_unit?: string | null
           raw_material_id?: string
+          start_price_base_unit?: string | null
+          start_price_base_units_per_package?: number | null
+          start_price_confirmed_at?: string | null
+          start_price_confirmed_by?: string | null
+          start_price_currency?: string | null
+          start_price_effective_date?: string | null
+          start_price_invoice_id?: string | null
+          start_price_invoice_line_id?: string | null
+          start_price_package_size?: number | null
+          start_price_package_unit?: string | null
+          start_price_per_base_unit?: number | null
           supplier_id?: string
           supplier_product_name?: string | null
           supplier_sku?: string | null
@@ -10739,6 +10784,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "resale_stock_status"
             referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_material_suppliers_start_price_invoice_id_fkey"
+            columns: ["start_price_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_material_suppliers_start_price_invoice_line_id_fkey"
+            columns: ["start_price_invoice_line_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_lines"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "raw_material_suppliers_supplier_id_fkey"
@@ -16802,6 +16861,14 @@ export type Database = {
           tripletex_supplier_invoice_id: string
         }[]
       }
+      rm_clear_start_price: {
+        Args: { p_reason: string; p_rms_id: string }
+        Returns: Json
+      }
+      rm_confirm_start_price: {
+        Args: { p_expected_price?: number; p_invoice_line_id: string }
+        Returns: Json
+      }
       rm_effective_agreement: {
         Args: { p_on_date?: string; p_raw_material_id: string }
         Returns: {
@@ -16868,6 +16935,22 @@ export type Database = {
         Returns: Json
       }
       rm_reconcile_invoice: { Args: { p_invoice_id: string }; Returns: Json }
+      rm_start_price_candidates: {
+        Args: {
+          p_legal_entity_id: string
+          p_limit?: number
+          p_supplier_id?: string
+        }
+        Returns: Json
+      }
+      rm_start_price_eligibility: {
+        Args: { p_invoice_line_id: string }
+        Returns: Json
+      }
+      rm_start_price_to_agreement: {
+        Args: { p_reason: string; p_rms_id: string }
+        Returns: Json
+      }
       rm_stock_count_apply: {
         Args: { p_lines: Json; p_note?: string }
         Returns: Json

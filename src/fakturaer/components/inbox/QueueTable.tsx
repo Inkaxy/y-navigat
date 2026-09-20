@@ -9,6 +9,7 @@ import { resolveLineCost } from "@/fakturaer/lib/units";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import type { SupplierLinkContext, SupplierLinkRow } from "@/fakturaer/hooks/useSupplierLinkContext";
 import { allReasons, financialImpact, reasonLabel, repeatKey, storedReasons } from "@/fakturaer/lib/reviewReasons";
+import { primaryActionFor, type PrimaryActionKind } from "@/fakturaer/lib/queuePrimaryAction";
 import { cn } from "@/lib/utils";
 
 /** Bakoverkompatibel gjenbruk — én kilde til årsakstekstene ligger i reviewReasons.ts. */
@@ -68,13 +69,15 @@ interface Props {
   onToggleSelectAll: (value: boolean) => void;
   onFocusLine: (line: ReviewLineRow) => void;
   onShowDocument: (line: ReviewLineRow) => void;
-  onAction: (a: "match" | "create" | "not_rm" | "conflict", line: ReviewLineRow) => void;
+  onAction: (a: "match" | "create" | "not_rm" | "conflict" | "start_price", line: ReviewLineRow) => void;
   onAccept: (line: ReviewLineRow) => void;
   /** Vises som fakturakolonne når køen ikke er begrenset til én faktura. */
   showInvoiceColumn: boolean;
   canWrite: boolean;
   /** Hvor mange linjer i HELE køen som deler samme leverandør og vareidentitet. */
   repeatCounts?: Map<string, number>;
+  /** Linjer serveren har svart at kvalifiserer til startpris. */
+  startPriceLineIds?: ReadonlySet<string>;
 }
 
 export function QueueTable({
@@ -92,6 +95,7 @@ export function QueueTable({
   showInvoiceColumn,
   canWrite,
   repeatCounts,
+  startPriceLineIds,
 }: Props) {
   const allSelected = lines.length > 0 && lines.every((l) => selected[l.id]);
 
@@ -193,6 +197,7 @@ export function QueueTable({
                 <td className="px-3 py-3">
                   {l.matched_raw_material ? (
                     <span className="inline-flex items-center gap-1.5">
+                      <Badge variant="outline" className="text-[10px]">Bekreftet</Badge>
                       {l.matched_raw_material.name}
                       <ItemTypeBadge itemType={l.matched_raw_material.item_type} />
                     </span>
@@ -261,30 +266,13 @@ export function QueueTable({
                   </div>
                 </td>
                 <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex justify-end gap-1.5">
-                    {reasons.includes("sku_collision") ? (
-                      <Button size="sm" disabled={!canWrite} onClick={() => onAction("conflict", l)}>
-                        Løs konflikt
-                      </Button>
-                    ) : (
-                      <>
-                        {top && (
-                          <Button size="sm" disabled={!canWrite} onClick={() => onAccept(l)}>
-                            Godta
-                          </Button>
-                        )}
-                        <Button size="sm" variant="outline" disabled={!canWrite} onClick={() => onAction("match", l)}>
-                          Match
-                        </Button>
-                        <Button size="sm" variant="outline" disabled={!canWrite} onClick={() => onAction("create", l)}>
-                          Ny vare
-                        </Button>
-                        <Button size="sm" variant="ghost" disabled={!canWrite} onClick={() => onAction("not_rm", l)}>
-                          Ikke aktuell
-                        </Button>
-                      </>
-                    )}
-                  </div>
+                  <QueueRowActions
+                    line={l}
+                    canWrite={canWrite}
+                    startPriceLineIds={startPriceLineIds}
+                    onAction={onAction}
+                    onAccept={onAccept}
+                  />
                 </td>
               </tr>
             );
@@ -315,6 +303,13 @@ function ReferenceCell({ line }: { line: ReviewLineRow }) {
       </span>
     );
   }
+  if (src === "start_price") {
+    return (
+      <span className="text-ink-secondary">
+        Startpris{line.price_reference_date ? ` fra ${line.price_reference_date}` : ""}
+      </span>
+    );
+  }
   if (src === "conflict") {
     return <span className="text-destructive">To likestilte avtaler</span>;
   }
@@ -322,4 +317,61 @@ function ReferenceCell({ line }: { line: ReviewLineRow }) {
     return <span className="text-warning">Vare matchet – prisgrunnlag mangler</span>;
   }
   return <span className="text-ink-secondary">—</span>;
+}
+
+/**
+ * Én tydelig hovedhandling per linje; resten er sekundære valg. Et forslag
+ * fra matchemotoren presenteres aldri som bekreftet data.
+ */
+function QueueRowActions({
+  line,
+  canWrite,
+  startPriceLineIds,
+  onAction,
+  onAccept,
+}: {
+  line: ReviewLineRow;
+  canWrite: boolean;
+  startPriceLineIds?: ReadonlySet<string>;
+  onAction: (a: "match" | "create" | "not_rm" | "conflict" | "start_price", line: ReviewLineRow) => void;
+  onAccept: (line: ReviewLineRow) => void;
+}) {
+  const primary = primaryActionFor(line, startPriceLineIds);
+
+  const run = (kind: PrimaryActionKind) => {
+    if (kind === "conflict") return onAction("conflict", line);
+    if (kind === "review_suggestion") return onAccept(line);
+    if (kind === "start_price") return onAction("start_price", line);
+    return onAction("match", line);
+  };
+
+  return (
+    <div className="flex flex-wrap justify-end gap-1.5">
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button size="sm" disabled={!canWrite} onClick={() => run(primary.kind)}>
+              {primary.label}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{primary.hint}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      {primary.kind !== "conflict" && (
+        <>
+          {primary.kind !== "confirm_link" && (
+            <Button size="sm" variant="outline" disabled={!canWrite} onClick={() => onAction("match", line)}>
+              Match
+            </Button>
+          )}
+          <Button size="sm" variant="outline" disabled={!canWrite} onClick={() => onAction("create", line)}>
+            Ny vare
+          </Button>
+          <Button size="sm" variant="ghost" disabled={!canWrite} onClick={() => onAction("not_rm", line)}>
+            Ikke aktuell
+          </Button>
+        </>
+      )}
+    </div>
+  );
 }

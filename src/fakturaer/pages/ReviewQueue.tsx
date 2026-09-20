@@ -11,7 +11,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Check, ChevronsUpDown, Keyboard, Loader2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { QueryState } from "@/components/common/QueryState";
@@ -20,6 +20,8 @@ import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEn
 import { useSuppliersFor } from "@/fakturaer/hooks/useSuppliersFor";
 import { useCompany } from "@/hooks/useCompany";
 import { resolveQueueEntityId } from "@/fakturaer/lib/queueEntity";
+import { StartPriceDialog } from "@/fakturaer/components/StartPriceDialog";
+import { START_PRICE_QUERY_KEYS, fetchStartPriceCandidates } from "@/fakturaer/lib/startPrice";
 import { useInboxInvoices } from "@/fakturaer/hooks/useInboxInvoices";
 import { useSupplierLinkContext } from "@/fakturaer/hooks/useSupplierLinkContext";
 import { useMatchTolerancesByEntity } from "@/fakturaer/hooks/useMatchTolerances";
@@ -207,9 +209,11 @@ export default function FakturaerInboxPage() {
   const [bulkCreateOpen, setBulkCreateOpen] = useState(false);
   const [bulkLink, setBulkLink] = useState<{ rmsId: string; name: string } | null>(null);
   const [creditNoteId, setCreditNoteId] = useState<string | null>(null);
+  const [startPriceOpen, setStartPriceOpen] = useState(false);
   const [busyInvoice, setBusyInvoice] = useState<{ id: string; action: string } | null>(null);
   const anyDialogOpen =
-    matchOpen || createOpen || notRmOpen || conflictOpen || !!reconcileId || bulkCreateOpen || !!creditNoteId || !!bulkLink;
+    matchOpen || createOpen || notRmOpen || conflictOpen || !!reconcileId || bulkCreateOpen || !!creditNoteId || !!bulkLink ||
+    startPriceOpen;
 
   // Dokumentpanel
   const [docOpen, setDocOpen] = useState<boolean>(() => localStorage.getItem(LS_OPEN) === "1");
@@ -220,13 +224,32 @@ export default function FakturaerInboxPage() {
   }, [docOpen]);
   const docLine = useMemo(() => lines.find((l) => l.id === docLineId) ?? null, [lines, docLineId]);
 
-  const openDialog = useCallback((action: "match" | "create" | "not_rm" | "conflict", line: ReviewLineRow) => {
-    setDialogLine(line);
-    setMatchOpen(action === "match");
-    setCreateOpen(action === "create");
-    setNotRmOpen(action === "not_rm");
-    setConflictOpen(action === "conflict");
-  }, []);
+  const openDialog = useCallback(
+    (action: "match" | "create" | "not_rm" | "conflict" | "start_price", line: ReviewLineRow) => {
+      setDialogLine(line);
+      setMatchOpen(action === "match");
+      setCreateOpen(action === "create");
+      setNotRmOpen(action === "not_rm");
+      setConflictOpen(action === "conflict");
+      setStartPriceOpen(action === "start_price");
+    },
+    [],
+  );
+
+  /**
+   * Hvilke linjer som kvalifiserer til startpris avgjøres av serveren.
+   * Klienten viser bare svaret — den regner aldri ut kvalifisering selv.
+   */
+  const startPriceCandidatesQuery = useQuery({
+    queryKey: START_PRICE_QUERY_KEYS.candidates(legalEntityId, null),
+    enabled: !!legalEntityId,
+    staleTime: 60 * 1000,
+    queryFn: () => fetchStartPriceCandidates(legalEntityId as string, null, 500),
+  });
+  const startPriceLineIds = useMemo(
+    () => new Set((startPriceCandidatesQuery.data ?? []).map((c) => c.invoice_line_id)),
+    [startPriceCandidatesQuery.data],
+  );
 
   const refresh = useCallback(
     (invoiceId?: string) => {
@@ -587,6 +610,7 @@ export default function FakturaerInboxPage() {
             onAction={openDialog}
             onAccept={(l) => void doAccept(l)}
             repeatCounts={repeats}
+            startPriceLineIds={startPriceLineIds}
             showInvoiceColumn={!expandedId}
             canWrite={canWrite}
           />
@@ -829,6 +853,15 @@ export default function FakturaerInboxPage() {
         }}
         rmsId={bulkLink?.rmsId ?? null}
         rawMaterialName={bulkLink?.name ?? ""}
+      />
+      <StartPriceDialog
+        open={startPriceOpen}
+        onOpenChange={setStartPriceOpen}
+        invoiceLineId={dialogLine?.id ?? null}
+        description={dialogLine?.description ?? null}
+        rawMaterialName={dialogLine?.matched_raw_material?.name ?? null}
+        supplierName={dialogLine?.invoice.supplier?.name ?? null}
+        canWrite={canWrite}
       />
       <CreateRawMaterialDialog open={createOpen} onOpenChange={setCreateOpen} line={dialogLine} />
       <BulkCreateRawMaterialsDialog

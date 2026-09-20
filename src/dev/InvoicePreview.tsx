@@ -6,6 +6,8 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { PriceComparisonView } from "@/ravarer/components/PriceComparisonView";
 import { QueueTable } from "@/fakturaer/components/inbox/QueueTable";
 import { BulkLinkPanel, type BulkLinkCandidate } from "@/fakturaer/components/BulkLinkPanel";
+import { StartPricePanel } from "@/fakturaer/components/StartPricePanel";
+import type { StartPriceEligibility } from "@/fakturaer/lib/startPrice";
 import type { PriceObservation, PriceSummary } from "@/ravarer/hooks/usePriceComparison";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import type { SupplierLinkContext, SupplierLinkRow } from "@/fakturaer/hooks/useSupplierLinkContext";
@@ -36,12 +38,14 @@ const summary: PriceSummary = {
   weighted_90d_observations: 6,
   weighted_90d_suppliers: 2,
   unit_changed_at: "2026-03-01",
+  unit_changed_at_ts: "2026-03-01T12:00:00Z",
   on_date: "2026-09-20",
 };
 
 function obs(o: Partial<PriceObservation> & { id: string }): PriceObservation {
   return {
     price: 15.2,
+    created_at: "2026-09-08T09:00:00Z",
     effective_date: "2026-09-08",
     source: "invoice",
     supplier_id: "sup-1",
@@ -168,6 +172,18 @@ const lines: ReviewLineRow[] = [
     ],
   }),
   line({
+    id: "l-4",
+    description: "Havregryn 20 kg",
+    supplier_sku: "HAV-20",
+    match_confidence: "manual",
+    review_reason: "start_price_manual_check",
+    price_reference_source: "start_price",
+    price_reference_date: "2026-04-10",
+    expected_price_per_base_unit: 15.2,
+    price_variance_pct: 0,
+    variance_status: null,
+  }),
+  line({
     id: "l-3",
     description: "Smør 5 kg",
     supplier_sku: "SMR-5",
@@ -177,6 +193,34 @@ const lines: ReviewLineRow[] = [
     price_reference_source: "error",
   }),
 ];
+
+const eligibility: StartPriceEligibility = {
+  eligible: true,
+  blockers: [],
+  raw_material_supplier_id: "rms-1",
+  raw_material_id: "rm-1",
+  supplier_id: "sup-1",
+  legal_entity_id: "le-1",
+  invoice_id: "inv-1",
+  invoice_number: "F-10231",
+  invoice_date: "2026-09-08",
+  price_per_base_unit: 15.2,
+  base_quantity: 500,
+  total_amount: 7600,
+  currency: "NOK",
+  base_unit: "kg",
+  base_units_per_package: 25,
+  package_size: 25,
+  package_unit: "kg",
+  existing_start_price: null,
+};
+
+const blockedEligibility: StartPriceEligibility = {
+  ...eligibility,
+  eligible: false,
+  blockers: ["ukjent_pakning", "koblingen_er_ikke_manuelt_bekreftet"],
+  existing_start_price: 14.2,
+};
 
 const candidates: BulkLinkCandidate[] = [
   {
@@ -266,6 +310,45 @@ function Preview() {
               showInvoiceColumn
               canWrite
               repeatCounts={new Map([["sup-1|mel-25", 4]])}
+              startPriceLineIds={new Set(["l-4"])}
+            />
+          </div>
+
+          <div className="rounded-md border border-line-subtle p-4">
+            <StartPricePanel
+              isLoading={false}
+              isError={false}
+              error={null}
+              onRetry={noop}
+              eligibility={eligibility}
+              description="Hvetemel 25 kg"
+              rawMaterialName="Hvetemel"
+              supplierName="Norgesmøllene"
+              canWrite
+              isSaving={false}
+              failure={null}
+              confirmed={false}
+              onConfirm={noop}
+              onClose={noop}
+            />
+          </div>
+
+          <div className="rounded-md border border-line-subtle p-4">
+            <StartPricePanel
+              isLoading={false}
+              isError={false}
+              error={null}
+              onRetry={noop}
+              eligibility={blockedEligibility}
+              description="Hvetemel 6x2kg"
+              rawMaterialName="Hvetemel"
+              supplierName="Idun Industri"
+              canWrite
+              isSaving={false}
+              failure="Forslaget er utdatert. Prisen på linjen er endret siden du åpnet den."
+              confirmed={false}
+              onConfirm={noop}
+              onClose={noop}
             />
           </div>
 

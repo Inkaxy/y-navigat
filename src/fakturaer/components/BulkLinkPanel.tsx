@@ -103,7 +103,7 @@ export function BulkLinkPanel({
           <p className="flex items-start gap-2 text-sm">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
             <span>
-              {appliedCount} linjer er koblet, men prisen er <strong>ikke</strong> regnet om for{" "}
+              {appliedCount} {appliedCount === 1 ? "linje" : "linjer"} er koblet, men prisen er <strong>ikke</strong> regnet om for{" "}
               {pendingInvoices.length} faktura(er). Linjene står merket «må beregnes på nytt» og kan ikke avstemmes før
               beregningen er kjørt.
             </span>
@@ -163,7 +163,7 @@ export function BulkLinkPanel({
         {pendingInvoices.length === 0 && (
           <Button onClick={onApply} disabled={busy || chosenCount === 0}>
             {applyPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Koble {chosenCount} linjer
+            Koble {chosenCount} {chosenCount === 1 ? "linje" : "linjer"}
           </Button>
         )}
       </DialogFooter>

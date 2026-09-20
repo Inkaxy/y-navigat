@@ -1,0 +1,231 @@
+import { supabase } from "@/integrations/supabase/client";
+
+/**
+ * Startpris — ÉN kilde til hva klienten kan si om startpris.
+ *
+ * Alle regler avgjøres på serveren (`rm_start_price_eligibility`,
+ * `rm_confirm_start_price`). Denne filen oversetter bare serverens svar til
+ * norsk og gir typede kall. Klienten bestemmer ALDRI selv om en linje er
+ * kvalifisert — den viser bare det serveren har svart.
+ */
+
+/** Sperrene serveren kan returnere. Ukjente koder vises ærlig som ukjente. */
+export const START_PRICE_BLOCKERS = [
+  "mangler_linje",
+  "linjen_finnes_ikke",
+  "fakturaen_finnes_ikke",
+  "linjen_er_ikke_koblet_til_vare",
+  "varen_finnes_ikke",
+  "faktura_og_vare_i_ulike_selskap",
+  "fakturaen_mangler_leverandor",
+  "kreditnota",
+  "annen_valuta",
+  "fakturaen_mangler_dato",
+  "varen_mangler_grunnenhet",
+  "linjen_star_til_gjennomgang",
+  "koblingen_er_ikke_manuelt_bekreftet",
+  "ugyldig_nettobelop",
+  "ugyldig_mengde",
+  "ukjent_mengde_i_grunnenhet",
+  "ugyldig_pris_per_grunnenhet",
+  "mangler_leverandorkobling",
+  "ukjent_pakning",
+  "startpris_finnes_allerede",
+] as const;
+export type StartPriceBlocker = (typeof START_PRICE_BLOCKERS)[number];
+
+const BLOCKER_LABELS: Record<StartPriceBlocker, string> = {
+  mangler_linje: "Ingen fakturalinje er valgt.",
+  linjen_finnes_ikke: "Fakturalinjen finnes ikke lenger.",
+  fakturaen_finnes_ikke: "Fakturaen finnes ikke lenger.",
+  linjen_er_ikke_koblet_til_vare: "Linjen er ikke koblet til en vare ennå.",
+  varen_finnes_ikke: "Varen finnes ikke lenger.",
+  faktura_og_vare_i_ulike_selskap: "Fakturaen og varen hører til ulike selskap.",
+  fakturaen_mangler_leverandor: "Fakturaen mangler leverandør.",
+  kreditnota: "Kreditnota kan ikke gi startpris.",
+  annen_valuta: "Fakturaen er ikke i norske kroner.",
+  fakturaen_mangler_dato: "Fakturaen mangler dato.",
+  varen_mangler_grunnenhet: "Varen mangler grunnenhet.",
+  linjen_star_til_gjennomgang: "Linjen står fortsatt til gjennomgang.",
+  koblingen_er_ikke_manuelt_bekreftet: "Koblingen mellom linje og vare må bekreftes manuelt først.",
+  ugyldig_nettobelop: "Nettobeløpet på linjen er ikke et gyldig positivt tall.",
+  ugyldig_mengde: "Mengden på linjen er ikke et gyldig positivt tall.",
+  ukjent_mengde_i_grunnenhet: "Mengden i grunnenhet er ikke avklart.",
+  ugyldig_pris_per_grunnenhet: "Prisen per grunnenhet er ikke et gyldig positivt tall.",
+  mangler_leverandorkobling: "Varen er ikke koblet til denne leverandøren.",
+  ukjent_pakning: "Pakningen er ikke bekreftet for denne leverandøren.",
+  startpris_finnes_allerede: "Det finnes allerede en bekreftet startpris.",
+};
+
+export function blockerLabel(code: string): string {
+  return (BLOCKER_LABELS as Record<string, string>)[code] ?? `Ukjent sperre (${code})`;
+}
+
+export interface StartPriceEligibility {
+  eligible: boolean;
+  blockers: string[];
+  raw_material_supplier_id: string | null;
+  raw_material_id: string | null;
+  supplier_id: string | null;
+  legal_entity_id: string | null;
+  invoice_id: string | null;
+  invoice_number: string | null;
+  invoice_date: string | null;
+  price_per_base_unit: number | null;
+  base_quantity: number | null;
+  total_amount: number | null;
+  currency: string;
+  base_unit: string | null;
+  base_units_per_package: number | null;
+  package_size: number | null;
+  package_unit: string | null;
+  existing_start_price: number | null;
+}
+
+function num(v: unknown): number | null {
+  if (v == null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function str(v: unknown): string | null {
+  return typeof v === "string" && v.length > 0 ? v : null;
+}
+
+export function parseEligibility(raw: unknown): StartPriceEligibility {
+  const o = (raw ?? {}) as Record<string, unknown>;
+  const blockers = Array.isArray(o.blockers) ? o.blockers.map((b) => String(b)) : [];
+  return {
+    eligible: o.eligible === true,
+    blockers,
+    raw_material_supplier_id: str(o.raw_material_supplier_id),
+    raw_material_id: str(o.raw_material_id),
+    supplier_id: str(o.supplier_id),
+    legal_entity_id: str(o.legal_entity_id),
+    invoice_id: str(o.invoice_id),
+    invoice_number: str(o.invoice_number),
+    invoice_date: str(o.invoice_date),
+    price_per_base_unit: num(o.price_per_base_unit),
+    base_quantity: num(o.base_quantity),
+    total_amount: num(o.total_amount),
+    currency: str(o.currency) ?? "NOK",
+    base_unit: str(o.base_unit),
+    base_units_per_package: num(o.base_units_per_package),
+    package_size: num(o.package_size),
+    package_unit: str(o.package_unit),
+    existing_start_price: num(o.existing_start_price),
+  };
+}
+
+export async function fetchStartPriceEligibility(invoiceLineId: string): Promise<StartPriceEligibility> {
+  const { data, error } = await supabase.rpc("rm_start_price_eligibility", { p_invoice_line_id: invoiceLineId });
+  if (error) throw error;
+  return parseEligibility(data);
+}
+
+export interface StartPriceConfirmResult {
+  created: boolean;
+  reason: string | null;
+  start_price: number | null;
+  currency: string | null;
+  base_unit: string | null;
+  effective_date: string | null;
+  check: StartPriceEligibility | null;
+}
+
+const CONFIRM_REASON_LABELS: Record<string, string> = {
+  allerede_bekreftet_fra_denne_linjen: "Startprisen var allerede bekreftet fra denne linjen.",
+  startpris_finnes_allerede: "En annen bekreftelse rakk først — startprisen står allerede.",
+  ikke_kvalifisert: "Linjen kvalifiserer ikke lenger til startpris.",
+  utdatert_forslag: "Forslaget var utdatert — prisen på linjen er endret. Kontroller på nytt.",
+  ugyldig_linje: "Fakturalinjen kunne ikke leses.",
+  mangler_leverandorkobling: "Varen er ikke koblet til denne leverandøren.",
+};
+
+export function confirmReasonLabel(code: string | null): string {
+  if (!code) return "Startprisen ble ikke lagret.";
+  return CONFIRM_REASON_LABELS[code] ?? `Startprisen ble ikke lagret (${code}).`;
+}
+
+/**
+ * Bekrefter startpris. Serveren låser koblingen, vurderer på nytt og er
+ * idempotent: gjentatt bekreftelse gir `created: false` uten å endre noe.
+ */
+export async function confirmStartPrice(
+  invoiceLineId: string,
+  expectedPrice: number | null,
+): Promise<StartPriceConfirmResult> {
+  const { data, error } = await supabase.rpc("rm_confirm_start_price", {
+    p_invoice_line_id: invoiceLineId,
+    p_expected_price: expectedPrice ?? undefined,
+  });
+  if (error) throw error;
+  const o = (data ?? {}) as Record<string, unknown>;
+  return {
+    created: o.created === true,
+    reason: str(o.reason),
+    start_price: num(o.start_price),
+    currency: str(o.currency),
+    base_unit: str(o.base_unit),
+    effective_date: str(o.start_price_effective_date),
+    check: o.check ? parseEligibility(o.check) : null,
+  };
+}
+
+export interface StartPriceCandidate {
+  raw_material_supplier_id: string;
+  raw_material_id: string;
+  raw_material_name: string | null;
+  base_unit: string | null;
+  supplier_id: string;
+  supplier_name: string | null;
+  invoice_line_id: string;
+  description: string | null;
+  price_per_base_unit: number | null;
+  base_quantity: number | null;
+  total_amount: number | null;
+  invoice_id: string;
+  invoice_number: string | null;
+  invoice_date: string | null;
+  currency: string;
+}
+
+export async function fetchStartPriceCandidates(
+  legalEntityId: string,
+  supplierId: string | null,
+  limit = 100,
+): Promise<StartPriceCandidate[]> {
+  const { data, error } = await supabase.rpc("rm_start_price_candidates", {
+    p_legal_entity_id: legalEntityId,
+    p_supplier_id: supplierId ?? undefined,
+    p_limit: limit,
+  });
+  if (error) throw error;
+  const rows = Array.isArray(data) ? data : [];
+  return rows.map((r) => {
+    const o = (r ?? {}) as Record<string, unknown>;
+    return {
+      raw_material_supplier_id: String(o.raw_material_supplier_id ?? ""),
+      raw_material_id: String(o.raw_material_id ?? ""),
+      raw_material_name: str(o.raw_material_name),
+      base_unit: str(o.base_unit),
+      supplier_id: String(o.supplier_id ?? ""),
+      supplier_name: str(o.supplier_name),
+      invoice_line_id: String(o.invoice_line_id ?? ""),
+      description: str(o.description),
+      price_per_base_unit: num(o.price_per_base_unit),
+      base_quantity: num(o.base_quantity),
+      total_amount: num(o.total_amount),
+      invoice_id: String(o.invoice_id ?? ""),
+      invoice_number: str(o.invoice_number),
+      invoice_date: str(o.invoice_date),
+      currency: str(o.currency) ?? "NOK",
+    } satisfies StartPriceCandidate;
+  });
+}
+
+export const START_PRICE_QUERY_KEYS = {
+  eligibility: (lineId: string) => ["start-price-eligibility", lineId] as const,
+  candidates: (entityId: string | null, supplierId: string | null) =>
+    ["start-price-candidates", entityId ?? "none", supplierId ?? "all"] as const,
+};
