@@ -62,7 +62,7 @@ export function StartPricePanel({
         error={error}
         onRetry={onRetry}
         isEmpty={!isLoading && !isError && !eligibility}
-        emptyText="Fant ikke grunnlaget for denne linjen."
+        emptyTitle="Fant ikke grunnlaget for denne linjen."
       >
         {eligibility && (
           <div className="space-y-4">
