@@ -45,7 +45,9 @@ import {
 import {
   SALES_UNIT_BASIS_HELP,
   SALES_UNIT_BASIS_LABEL,
+  approvedDeclarationNeedsReview,
   isSalesUnitBasis,
+  recipeChangedSinceConfirm,
   type SalesUnitBasis,
 } from "@/varer/lib/recipeLinkBasis";
 import { LinkRecipeDialog, type RecipeLinkSelection } from "./LinkRecipeDialog";
@@ -275,11 +277,9 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
   const trackedCount = lines.filter((l) => l.raw_material_id && trackedIds?.has(l.raw_material_id)).length;
   const subRecipeCount = lines.filter((l) => l.sub_product_id || l._rm?.produced_by_recipe_id).length;
   const confirmedAt = link?.sales_unit_confirmed_at ?? null;
-  const recipeChangedAfterConfirm =
-    !!confirmedAt && !!recipe.updated_at && new Date(recipe.updated_at) > new Date(confirmedAt);
+  const recipeChangedAfterConfirm = recipeChangedSinceConfirm(recipe.updated_at, confirmedAt);
   const approved = approvedQuery.data;
-  const approvedNeedsReview =
-    !!approved?.approved_at && !!recipe.updated_at && new Date(recipe.updated_at) > new Date(approved.approved_at);
+  const approvedNeedsReview = approvedDeclarationNeedsReview(recipe.updated_at, approved?.approved_at);
 
   return (
     <div className="space-y-4">
