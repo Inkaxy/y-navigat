@@ -269,6 +269,8 @@ Deno.serve(async (req) => {
         unit: normalizeUnit(unitCode) ?? unitCode,
         unit_price: unitPrice,
         total_amount: lineNet,
+        requires_review: unresolved ? true : null,
+        review_reason: unresolved ? "extraction_unresolved" : null,
       };
     });
 
