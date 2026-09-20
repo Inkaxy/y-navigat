@@ -188,8 +188,8 @@ export function QueueTable({
                 <td className="px-3 py-3 text-right tabular-nums">
                   {l.quantity ?? "—"} {l.unit ?? ""}
                 </td>
-                <td className="px-3 py-3 text-right tabular-nums">{formatNok(l.total_amount)}</td>
-                <td className="px-3 py-3 text-right tabular-nums">{formatNok(perBase)}</td>
+                <td className="px-3 py-3 text-right tabular-nums">{formatMoney(l.total_amount, currency)}</td>
+                <td className="px-3 py-3 text-right tabular-nums">{formatMoney(perBase, currency)}</td>
                 <td className="px-3 py-3">
                   {l.matched_raw_material ? (
                     <span className="inline-flex items-center gap-1.5">
@@ -212,6 +212,9 @@ export function QueueTable({
                 <td className="px-3 py-3 text-right tabular-nums">
                   {formatNok(link?.agreed_price_per_base_unit ?? l.expected_price_per_base_unit ?? null)}
                 </td>
+                <td className="px-3 py-3 text-xs">
+                  <ReferenceCell line={l} />
+                </td>
                 <td className={cn("px-3 py-3 text-right font-medium tabular-nums", varColor)}>
                   <TooltipProvider>
                     <Tooltip>
@@ -221,6 +224,16 @@ export function QueueTable({
                       <TooltipContent>Toleranse for {category ?? "uten kategori"}: {tol} %</TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
+                </td>
+                <td className="px-3 py-3 text-right tabular-nums">
+                  {impact == null ? (
+                    <span className="text-xs text-ink-secondary">ukjent</span>
+                  ) : (
+                    formatMoney(impact, currency)
+                  )}
+                </td>
+                <td className="px-3 py-3 text-right tabular-nums text-xs">
+                  {repeats > 1 ? `${repeats}×` : "—"}
                 </td>
                 <td className="px-3 py-3 text-xs">
                   {pkg.text}
@@ -232,19 +245,19 @@ export function QueueTable({
                 </td>
                 <td className="px-3 py-3">
                   <div className="flex flex-wrap gap-1">
-                    {reasons.length === 0 && l.variance_status !== "no_baseline" && (
-                      <span className="text-xs text-ink-secondary">—</span>
-                    )}
+                    {reasons.length === 0 && <span className="text-xs text-ink-secondary">—</span>}
                     {reasons.map((r) => (
-                      <Badge key={r} variant="outline" className="text-[10px]">
-                        {REASON_LABELS[r] ?? r}
+                      <Badge
+                        key={r}
+                        variant="outline"
+                        className={cn(
+                          "text-[10px]",
+                          r === "no_baseline" && "border-warning/40 bg-warning/10 text-warning",
+                        )}
+                      >
+                        {reasonLabel(r)}
                       </Badge>
                     ))}
-                    {l.variance_status === "no_baseline" && l.raw_material_id && (
-                      <Badge variant="outline" className="border-warning/40 bg-warning/10 text-[10px] text-warning">
-                        Uten avtalepris
-                      </Badge>
-                    )}
                   </div>
                 </td>
                 <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
@@ -280,4 +293,33 @@ export function QueueTable({
       </table>
     </div>
   );
+}
+
+/**
+ * Hvilket prisgrunnlag avviket faktisk ble målt mot. «Mangler» skal ALDRI
+ * kunne forveksles med «prismatch OK».
+ */
+function ReferenceCell({ line }: { line: ReviewLineRow }) {
+  const src = line.price_reference_source;
+  if (src === "agreement") {
+    return (
+      <span className="text-ink-secondary">
+        Avtale{line.price_reference_date ? ` fra ${line.price_reference_date}` : ""}
+      </span>
+    );
+  }
+  if (src === "last_purchase") {
+    return (
+      <span className="text-ink-secondary">
+        Forrige kjøp{line.price_reference_date ? ` ${line.price_reference_date}` : ""}
+      </span>
+    );
+  }
+  if (src === "conflict") {
+    return <span className="text-destructive">To likestilte avtaler</span>;
+  }
+  if (line.raw_material_id) {
+    return <span className="text-warning">Vare matchet – prisgrunnlag mangler</span>;
+  }
+  return <span className="text-ink-secondary">—</span>;
 }
