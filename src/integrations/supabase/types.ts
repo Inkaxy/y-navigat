@@ -16843,6 +16843,16 @@ export type Database = {
         }
         Returns: Json
       }
+      rm_base_quantity_matches: {
+        Args: {
+          p_base_quantity: number
+          p_base_unit: string
+          p_base_units_per_package: number
+          p_quantity: number
+          p_unit: string
+        }
+        Returns: boolean
+      }
       rm_can_read: { Args: { _rm_id: string }; Returns: boolean }
       rm_can_write: { Args: { _rm_id: string }; Returns: boolean }
       rm_claim_invoice_line_extraction: {
@@ -16901,6 +16911,15 @@ export type Database = {
           package_unit: string
           supplier_id: string
         }[]
+      }
+      rm_expected_base_quantity: {
+        Args: {
+          p_base_unit: string
+          p_base_units_per_package: number
+          p_quantity: number
+          p_unit: string
+        }
+        Returns: Json
       }
       rm_is_finite: { Args: { p: number }; Returns: boolean }
       rm_line_base: {
@@ -17011,6 +17030,7 @@ export type Database = {
         Args: { p_raw_material_id: string }
         Returns: string
       }
+      rm_unit_dimension: { Args: { p_unit: string }; Returns: string }
       rm_unit_factor: {
         Args: { p_base_unit: string; p_unit: string }
         Returns: number
