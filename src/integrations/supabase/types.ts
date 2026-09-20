@@ -16840,6 +16840,7 @@ export type Database = {
           source: string
         }[]
       }
+      rm_parse_package_text: { Args: { p_text: string }; Returns: Json }
       rm_price_reference: {
         Args: {
           p_invoice_date: string
