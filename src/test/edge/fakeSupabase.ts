@@ -49,7 +49,10 @@ export function createFakeClient(tables: Tables, options: FakeClientOptions = {}
       if (failure) return { data: null, error: { message: failure } };
       const rows = rowsOf(table);
       if (mode === "insert" || mode === "upsert") {
-        const list = Array.isArray(payload) ? payload : payload ? [payload] : [];
+        const src = Array.isArray(payload) ? payload : payload ? [payload] : [];
+        // Databasen gir radene en id. Uten den kan ikke en importert faktura
+        // sendes videre til matchemotoren i en integrasjonstest.
+        const list = src.map((r, i) => ({ id: r.id ?? `${table}-${rows.length + i + 1}`, ...r }));
         rows.push(...list.map((r) => ({ ...r })));
         return { data: list, error: null };
       }

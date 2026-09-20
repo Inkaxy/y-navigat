@@ -396,6 +396,13 @@ export interface ResolveLineCostInput {
   } | null;
   /** Historisk pris per baseenhet — brukes kun som rimelighetssjekk. */
   knownPricePerBaseUnit?: number | null;
+  /**
+   * Satt når kilden (f.eks. EHF-dokumentet) IKKE oppgir linjebeløpet og
+   * beløpet heller ikke kan utledes — typisk linjerabatt/-tillegg uten
+   * LineExtensionAmount. Da skal beløpet ALDRI erstattes av mengde ×
+   * enhetspris; linjen forblir uavklart til et faktisk beløp foreligger.
+   */
+  amountUnresolved?: boolean;
 }
 
 const PLURALS: Record<string, string> = {
@@ -699,6 +706,14 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
     }
     amount = total; // behold fortegn — negativt beløp = kreditnota
     amountSource = "total_amount";
+  } else if (input.amountUnresolved) {
+    // Kilden mangler linjebeløpet (rabatt/tillegg uten LineExtensionAmount).
+    // Mengde × enhetspris ville gitt beløpet FØR rabatt — et oppdiktet tall.
+    return emptyResult(
+      "amount",
+      "Linjebeløpet mangler i dokumentet og kan ikke utledes fra enhetsprisen når linjen har rabatt eller tillegg. Oppgi det faktiske beløpet.",
+      checks,
+    );
   } else if (unitPrice != null) {
     amount = quantity * unitPrice;
     amountSource = "quantity_x_unit_price";
