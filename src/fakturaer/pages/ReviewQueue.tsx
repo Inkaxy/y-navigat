@@ -270,9 +270,17 @@ export default function FakturaerInboxPage() {
       busyRef.current = true;
       const snapshot = snapshotOf(line);
       try {
-        const { name, rmsId } = await acceptTopSuggestion(line);
+        const { name, rmsId, lineIds, recalculationPending, recalculationError } = await acceptTopSuggestion(line);
         dispatch({ type: "resolved", id: line.id, snapshot, label: name });
-        toast.success(`Koblet til ${name}`);
+        if (recalculationPending) {
+          toast.warning(`Koblet til ${name}, men prisen er ikke regnet om`, {
+            description: recalculationError ?? undefined,
+            duration: 15000,
+            action: { label: "Prøv igjen", onClick: () => retryRecalculation(line.invoice_id, lineIds) },
+          });
+        } else {
+          toast.success(`Koblet til ${name}`);
+        }
         refresh(line.invoice_id);
         // Tilby den samme koblingen på andre linjer — brukeren velger selv.
         if (rmsId) setBulkLink({ rmsId, name });
@@ -342,11 +350,12 @@ export default function FakturaerInboxPage() {
         }
       }
       // Én kjøring av matchemotoren for hele bunken, ikke én per linje.
-      if (accepted.length > 0) await rematchLines(accepted);
+      const pending = accepted.length > 0 ? await rematchLines(accepted) : [];
       setBulkBusy(false);
       refresh();
       if (failures.length === 0) toast.success(`${ok} linjer godtatt`);
       else toast.warning(`${ok} godtatt, ${failures.length} feilet`);
+      notifyPendingRecalculation(pending);
     },
     [canWrite, visibleLines, refresh],
   );
@@ -373,10 +382,11 @@ export default function FakturaerInboxPage() {
       }
     }
     // Én kjøring av matchemotoren for hele bunken, ikke én per linje.
-    if (accepted.length > 0) await rematchLines(accepted);
+    const pending = accepted.length > 0 ? await rematchLines(accepted) : [];
     setBulkBusy(false);
     setSelected({});
     refresh();
+    notifyPendingRecalculation(pending);
     const skipped = selectedLines.length - candidates.length;
     toast[failed ? "warning" : "success"](
       `${ok} godtatt${failed ? `, ${failed} feilet` : ""}${skipped ? `, ${skipped} under terskelen` : ""}`,
