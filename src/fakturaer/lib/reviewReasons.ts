@@ -93,6 +93,8 @@ export const GROUP_DESCRIPTIONS: Record<ReviewGroup, string> = {
   currency: "Fakturaen er i en annen valuta enn NOK, og omregnes ikke automatisk.",
   extraction: "Uttrekket fra dokumentet eller summen av linjene stemmer ikke med fakturaen.",
   conflict: "Samme varenummer eller navn peker på flere varer.",
+  recalculation:
+    "Linjen er nettopp koblet til en vare, men prisen er ikke regnet om ennå. Den kan ikke avstemmes før beregningen er kjørt.",
   other: "Linjen står til gjennomgang uten en årsak vi kjenner igjen.",
 };
 
