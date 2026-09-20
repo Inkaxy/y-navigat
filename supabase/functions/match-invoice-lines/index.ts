@@ -258,6 +258,13 @@ Deno.serve(async (req) => {
         }
         // Samme rekkefølge som i den automatiske grenen: sett flaggene først,
         // så får syncRegisteredPrices legge sine egne årsaker oppå.
+        // Uavklart beløp fra importen kan ikke «matches bort».
+        if (importAmountUnresolved(line)) {
+          requiresReview = true;
+          reviewReasons.add("extraction_unresolved");
+          manualUpdate.price_per_base_unit = null;
+          manualUpdate.base_quantity = null;
+        }
         manualUpdate.requires_review = requiresReview;
         manualUpdate.review_reason = reviewReasons.size ? Array.from(reviewReasons).join(",") : null;
         await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, manualUpdate, catTolMap.get(rm?.category ?? "") ?? tolDefault, refM);
@@ -617,6 +624,17 @@ Deno.serve(async (req) => {
         if (learnRms) await learnPendingAliases(svc, learnRms.id, line, inv.id);
       }
 
+      // Uavklart beløp fra importen overlever ENHVER ny kjøring — også for
+      // linjer som ikke ble matchet og derfor aldri nådde prisberegningen.
+      if (importAmountUnresolved(line)) {
+        update.requires_review = true;
+        update.review_reason = Array.from(
+          new Set(`${update.review_reason ?? ""},extraction_unresolved`.split(",").filter(Boolean)),
+        ).join(",");
+        update.price_per_base_unit = null;
+        update.base_quantity = null;
+      }
+
       await applyUpdate(svc, line.id, update);
       await insertSuggestions(svc, suggestionsToInsert);
       results.push({ id: line.id, status: update.match_confidence, requires_review: update.requires_review });
@@ -711,6 +729,20 @@ async function insertSuggestions(svc: any, rows: AnyRec[]) {
   if (error) throw new Error(`Kunne ikke lagre forslag: ${error.message}`);
 }
 
+/**
+ * Sann når importen fant at linjebeløpet IKKE lar seg lese ut av dokumentet.
+ * Flagget er «klebrig»: det gjelder helt til et faktisk beløp er lagt inn, og
+ * en ny kjøring av matchemotoren skal verken fjerne det eller regne seg fram
+ * til beløpet via enhetsprisen.
+ */
+function importAmountUnresolved(line: AnyRec): boolean {
+  if (line.total_amount != null) return false;
+  return String(line.review_reason ?? "")
+    .split(",")
+    .map((r) => r.trim())
+    .includes("extraction_unresolved");
+}
+
 /** En kostpris er brukbar bare når den er ferdig avklart OG et endelig tall. */
 function costIsUsable(cost: AnyRec | null | undefined): boolean {
   return (
@@ -750,6 +782,7 @@ function costReviewReasons(cost: AnyRec | null | undefined, actual: number | nul
 function costForLine(line: AnyRec, rm: AnyRec | undefined, rmsRow: AnyRec | undefined) {
   if (!rm?.base_unit) return null;
   return resolveLineCost({
+    amountUnresolved: importAmountUnresolved(line),
     quantity: line.quantity,
     unit: line.unit,
     unitPrice: line.unit_price,

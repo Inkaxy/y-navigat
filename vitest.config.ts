@@ -23,6 +23,7 @@ export default defineConfig({
       // FAKTISKE handleren kan kjøres i vitest mot en mocket transport.
       "npm:@supabase/supabase-js@2.95.0/cors": path.resolve(__dirname, "./src/test/edge/npmSupabaseCorsStub.ts"),
       "npm:@supabase/supabase-js@2.95.0": path.resolve(__dirname, "./src/test/edge/npmSupabaseStub.ts"),
+      "npm:@supabase/supabase-js@2": path.resolve(__dirname, "./src/test/edge/npmSupabaseStub.ts"),
     },
   },
 });

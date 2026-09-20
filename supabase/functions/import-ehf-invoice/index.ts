@@ -4,7 +4,7 @@
 // - Creates invoice + invoice_lines, returns invoice_id
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { parse as parseXml } from "https://deno.land/x/xml@2.1.3/mod.ts";
+import { parse as parseXml } from "../_shared/xml.ts";
 import { normalizeUnit } from "../_shared/units.ts";
 
 const corsHeaders = {
@@ -236,30 +236,43 @@ Deno.serve(async (req) => {
         pickText(get(item, "Name")) ??
         pickText(get(item, "Description")) ??
         `Linje ${idx + 1}`;
-      const qty = pickNumber(get(ln, "InvoicedQuantity")) ?? 1;
+      // En mengde som mangler eller ikke er et tall skal IKKE bli 1. Da er
+      // linjen uavklart, og et menneske må oppgi mengden.
+      const qtyNode = get(ln, "InvoicedQuantity");
+      const qtyRaw = pickNumber(qtyNode);
+      const qty = qtyRaw != null && Number.isFinite(qtyRaw) ? qtyRaw : null;
+
+      const unitCode = (typeof qtyNode === "object" ? (qtyNode as any)["@unitCode"] : null) ?? null;
 
       // EHF oppgir PriceAmount PER BaseQuantity (f.eks. 250 kr per 10 stk).
       // Uten denne divisjonen blir enhetsprisen ti ganger for høy.
       const priceAmount = pickNumber(get(price, "PriceAmount"));
-      const baseQty = pickNumber(get(price, "BaseQuantity"));
+      const baseQtyNode = get(price, "BaseQuantity");
+      const baseQty = pickNumber(baseQtyNode);
+      const baseQtyUnit =
+        (typeof baseQtyNode === "object" ? (baseQtyNode as any)["@unitCode"] : null) ?? null;
+      // Er BaseQuantity oppgitt i en ANNEN enhet enn den fakturerte mengden,
+      // er ikke divisjonen gyldig — da later vi ikke som vi har enhetsprisen.
+      const baseUnitCompatible =
+        baseQtyUnit == null ||
+        unitCode == null ||
+        (normalizeUnit(baseQtyUnit) ?? String(baseQtyUnit).toLowerCase()) ===
+          (normalizeUnit(unitCode) ?? String(unitCode).toLowerCase());
       const baseOk = baseQty == null || (Number.isFinite(baseQty) && baseQty > 0);
-      const unitPrice = priceAmount == null || !baseOk ? null : priceAmount / (baseQty ?? 1);
+      const unitPrice =
+        priceAmount == null || !baseOk || !baseUnitCompatible ? null : priceAmount / (baseQty ?? 1);
 
       // Linjerabatter/-tillegg gjør qty × pris ULIK linjebeløpet. Mangler
       // LineExtensionAmount i et slikt tilfelle, gjetter vi ikke — linjen
       // merkes for gjennomgang i stedet for å få et oppdiktet beløp.
       const stated = pickNumber(get(ln, "LineExtensionAmount"));
       const hasAllowance = asArray(get(ln, "AllowanceCharge")).length > 0;
-      const derivable = unitPrice != null && !hasAllowance;
-      const lineNet = stated ?? (derivable ? qty * unitPrice! : null);
-      const unresolved = lineNet == null || unitPrice == null;
+      const derivable = unitPrice != null && qty != null && !hasAllowance;
+      const lineNet = stated ?? (derivable ? qty! * unitPrice! : null);
+      const unresolved = lineNet == null || unitPrice == null || qty == null;
 
       const supplierItemNumber =
         pickText(get(get(item, "SellersItemIdentification"), "ID")) ?? null;
-      const unitCode =
-        (typeof get(ln, "InvoicedQuantity") === "object"
-          ? (get(ln, "InvoicedQuantity") as any)["@unitCode"]
-          : null) ?? null;
       return {
         invoice_id: invoice.id,
         line_number: idx + 1,
