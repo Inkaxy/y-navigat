@@ -839,12 +839,13 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
   }
 
   // Pakning som KUN er lest ut av varenavnet er en tolkning av tekst, ikke en
-  // bekreftet opplysning. Den kan foreslås, men aldri brukes som grunnlag.
-  if (chosen.basis === "pakning" && chosen.source === "description") {
+  // bekreftet opplysning. Den kan bare brukes når fakturaens egen regnestykke
+  // bekrefter den (mengde × innhold × pris = beløp). Ellers må den bekreftes.
+  if (chosen.basis === "pakning" && chosen.source === "description" && !checks.arithmeticPerBaseUnit) {
     return emptyResult(
       "package_size",
       `Innholdet per pakning er bare tolket fra varenavnet (${fmtNum(chosen.baseUnitsPerPackage ?? 0)} ${base} per ` +
-        `${pkg?.packageUnitLabel ?? "pakning"}). Bekreft pakningen før prisen kan brukes.`,
+        `${pkg?.packageUnitLabel ?? "pakning"}), og fakturabeløpet bekrefter den ikke. Bekreft pakningen før prisen kan brukes.`,
       checks,
     );
   }
