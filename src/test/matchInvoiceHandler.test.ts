@@ -323,8 +323,8 @@ describe("matchemotoren: automatisk kobling krever gyldig prisgrunnlag", () => {
     expect(String(line.review_reason ?? "")).not.toContain("no_automatic_basis");
   });
 
-  it("bekreftet startpris med lik pris ferdigmerker linjen", async () => {
+  it("bekreftet startpris er et gyldig grunnlag (men følger innstillingen for manuell kontroll)", async () => {
     const { line } = await runAuto({ source: "start_price", price: 100 });
-    expect(line.requires_review).toBe(false);
+    expect(String(line.review_reason ?? "")).not.toContain("no_automatic_basis");
   });
 });
