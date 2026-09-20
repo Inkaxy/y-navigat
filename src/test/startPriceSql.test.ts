@@ -48,7 +48,8 @@ create or replace function public.rm_is_finite(v numeric) returns boolean langua
   select v is not null and v = v and v <> 'Infinity'::numeric and v <> '-Infinity'::numeric $$;
 
 create table public.raw_materials(
-  id uuid primary key, legal_entity_id uuid not null, name text, base_unit text);
+  id uuid primary key, legal_entity_id uuid not null, name text, base_unit text,
+  primary_supplier_id uuid);
 
 create table public.suppliers(id uuid primary key, name text, legal_entity_id uuid);
 
@@ -75,6 +76,8 @@ create table public.invoice_lines(
   match_confidence text,
   requires_review boolean default false,
   review_reason text,
+  resolved_by uuid,
+  resolved_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now());
 
@@ -83,6 +86,9 @@ create table public.raw_material_suppliers(
   raw_material_id uuid not null,
   supplier_id uuid not null,
   supplier_sku text,
+  supplier_product_name text,
+  is_primary boolean not null default false,
+  package_confirmed_by uuid,
   agreed_price_per_base_unit numeric,
   agreed_price_set_by uuid,
   agreed_price_set_at timestamptz,
