@@ -195,3 +195,27 @@ export const FIELD_ORIGIN_LABEL: Record<FieldOrigin, string> = {
   manuell: "Manuelt satt på varen",
   mangler: "Mangler",
 };
+
+/** Sann når oppskriften er endret etter at koblingen sist ble bekreftet. */
+export function recipeChangedSinceConfirm(
+  recipeUpdatedAt: string | null | undefined,
+  confirmedAt: string | null | undefined,
+): boolean {
+  if (!recipeUpdatedAt || !confirmedAt) return false;
+  const changed = new Date(recipeUpdatedAt).getTime();
+  const confirmed = new Date(confirmedAt).getTime();
+  if (!Number.isFinite(changed) || !Number.isFinite(confirmed)) return false;
+  return changed > confirmed;
+}
+
+/**
+ * Sann når en godkjent deklarasjon må gjennomgås på nytt fordi oppskriften er
+ * endret etter godkjenningen. Den godkjente versjonen beholdes uansett.
+ */
+export function approvedDeclarationNeedsReview(
+  recipeUpdatedAt: string | null | undefined,
+  approvedAt: string | null | undefined,
+): boolean {
+  if (!approvedAt) return false;
+  return recipeChangedSinceConfirm(recipeUpdatedAt, approvedAt);
+}
