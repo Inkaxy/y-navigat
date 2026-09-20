@@ -119,6 +119,7 @@ const REASON_GROUP: Record<ReasonCode, ReviewGroup> = {
   sku_collision: "conflict",
   recalculation_pending: "recalculation",
   extraction_unresolved: "extraction",
+  missing_base_unit: "package_unit",
 };
 
 const KNOWN: ReadonlySet<string> = new Set<string>([...LINE_REASON_CODES, ...DERIVED_REASON_CODES]);
