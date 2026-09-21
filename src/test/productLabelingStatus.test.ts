@@ -23,6 +23,7 @@ const baseProduct = {
   in_pos: null,
   manual_ingredient_declaration: null as string | null,
   declaration_needs_review: null as boolean | null,
+  declaration_version_id: null as string | null,
   calc_type: null,
   manual_cost_price: null,
 };
@@ -30,6 +31,16 @@ const baseProduct = {
 describe("productLabelingStatus", () => {
   it("gir «missing» når det ikke finnes noen deklarasjon", () => {
     expect(productLabelingStatus(baseProduct, undefined)).toBe("missing");
+  });
+
+  it("beholder en eksplisitt godkjent versjon som godkjent selv om beregningen er gammel", () => {
+    const p = {
+      ...baseProduct,
+      manual_ingredient_declaration: "Hvetemel, vann, salt",
+      declaration_needs_review: false,
+      declaration_version_id: "version-1",
+    };
+    expect(productLabelingStatus(p, { computed_at: new Date().toISOString(), is_stale: true })).toBe("approved");
   });
 
   it("gir «approved» når deklarasjon finnes og ingen beregnet rad krever ny gjennomgang", () => {

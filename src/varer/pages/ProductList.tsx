@@ -47,6 +47,7 @@ type ProductRow = {
   in_pos: boolean | null;
   manual_ingredient_declaration: string | null;
   declaration_needs_review: boolean | null;
+  declaration_version_id: string | null;
   calc_type: string | null;
   manual_cost_price: number | null;
 };
@@ -57,6 +58,10 @@ export function productLabelingStatus(
   labelRow: { computed_at: string | null; is_stale: boolean } | undefined,
 ): LabelingStatus {
   if (!p.manual_ingredient_declaration) return "missing";
+  if (p.declaration_needs_review) return "stale";
+  // En godkjent versjon er et eksplisitt snapshot. Det gjelder også manuelle
+  // deklarasjoner og skal ikke nedgraderes av en eldre beregningsrad.
+  if (p.declaration_version_id) return "approved";
   if (!labelRow) return p.declaration_needs_review ? "stale" : "approved";
   return deriveLabelingStatusFromDb({
     // Ingen eget godkjenningstidspunkt på produktet ennå — deklarasjonen regnes
@@ -139,7 +144,7 @@ export default function ProductList() {
         supabase
           .from("products")
           .select(
-            "id, display_number, code, display_name, product_category, product_subcategory, unit_of_sale, status, variant_of_product_id, variant_label, label_mode, is_cake_component, cake_role, image_url, mva_rate, pieces_per_tray, in_web_shop, in_pos, manual_ingredient_declaration, declaration_needs_review, calc_type, manual_cost_price, main_category:product_main_categories(code, display_name), sub_category:product_sub_categories(code, display_name)",
+            "id, display_number, code, display_name, product_category, product_subcategory, unit_of_sale, status, variant_of_product_id, variant_label, label_mode, is_cake_component, cake_role, image_url, mva_rate, pieces_per_tray, in_web_shop, in_pos, manual_ingredient_declaration, declaration_needs_review, declaration_version_id, calc_type, manual_cost_price, main_category:product_main_categories(code, display_name), sub_category:product_sub_categories(code, display_name)",
           )
           .eq("legal_entity_id", legalEntityId!)
           .order("display_number", { ascending: true })

@@ -236,7 +236,11 @@ export function LabelTab({
         claimKeyhole: !!recipe.label_claim_keyhole,
         keyholeQualifies: keyhole?.status === "oppfylt",
       })
-        .errors.map((e) => `${e.label}: ${e.detail}`);
+        // Godkjenningen gjelder deklarasjon og næringsinnhold. Nettovekt,
+        // holdbarhet, produsent og allergenpresentasjon kontrolleres fortsatt
+        // i etikettkontrollen, men skal ikke sperre et gyldig manuelt snapshot.
+        .errors.filter((e) => e.key === "ingredients" || e.key === "nutrition")
+        .map((e) => `${e.label}: ${e.detail}`);
     return {
       auto: issuesFor(
         {
