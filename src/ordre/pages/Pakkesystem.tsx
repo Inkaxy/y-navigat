@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -16,6 +17,14 @@ import { SettKriteriaDialog } from "@/produksjon/features/produksjonsplan/compon
 import { DEFAULT_CRITERIA, type ProduksjonsplanCriteria } from "@/produksjon/features/produksjonsplan/types";
 
 const FUNCTIONS_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+
+/** Hva en API-nøkkel gir tilgang til. */
+export type KeyScope = "pakkesystem" | "declarations";
+
+export const KEY_SCOPE_LABEL: Record<KeyScope, string> = {
+  pakkesystem: "Pakkesystem",
+  declarations: "Deklarasjoner",
+};
 
 function criteriaToQuery(c: ProduksjonsplanCriteria): string {
   const qs = new URLSearchParams();
@@ -66,6 +75,10 @@ export default function PakkesystemPage() {
   const [newKeyOpen, setNewKeyOpen] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
   const [newKeyNote, setNewKeyNote] = useState("");
+  const [newKeyScopes, setNewKeyScopes] = useState<Record<KeyScope, boolean>>({
+    pakkesystem: true,
+    declarations: false,
+  });
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
 
   const [downloadCriteria, setDownloadCriteria] = useState<ProduksjonsplanCriteria>(DEFAULT_CRITERIA);
@@ -88,7 +101,7 @@ export default function PakkesystemPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("pakkesystem_api_keys")
-        .select("id, name, note, key_prefix, created_at, last_used_at, revoked_at")
+        .select("id, name, note, key_prefix, scopes, created_at, last_used_at, revoked_at")
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -126,7 +139,12 @@ export default function PakkesystemPage() {
   const createKey = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("pakkesystem-create-key", {
-        body: { legal_entity_id: NB_LEGAL_ENTITY_ID, name: newKeyName, note: newKeyNote || null },
+        body: {
+          legal_entity_id: NB_LEGAL_ENTITY_ID,
+          name: newKeyName,
+          note: newKeyNote || null,
+          scopes: (Object.keys(newKeyScopes) as KeyScope[]).filter((s) => newKeyScopes[s]),
+        },
       });
       if (error) throw error;
       return data as { id: string; api_key: string; name: string };
@@ -135,6 +153,7 @@ export default function PakkesystemPage() {
       setRevealedKey(data.api_key);
       setNewKeyName("");
       setNewKeyNote("");
+      setNewKeyScopes({ pakkesystem: true, declarations: false });
       qc.invalidateQueries({ queryKey: ["pakkesystem-keys"] });
     },
     onError: (e: any) => toast.error("Kunne ikke opprette nøkkel: " + (e?.message ?? "ukjent")),
@@ -253,6 +272,8 @@ export default function PakkesystemPage() {
 
   const apiUrl = useMemo(() => `${FUNCTIONS_BASE}/pakkesystem-export?date=YYYY-MM-DD`, []);
   const schemaUrl = useMemo(() => `${FUNCTIONS_BASE}/pakkesystem-export?schema=1`, []);
+  const declarationsUrl = useMemo(() => `${FUNCTIONS_BASE}/declarations-export`, []);
+  const declarationsSchemaUrl = useMemo(() => `${FUNCTIONS_BASE}/declarations-export?schema=1`, []);
 
   return (
     <div className="space-y-6">
@@ -332,6 +353,25 @@ export default function PakkesystemPage() {
                     <Label>Notat (valgfritt)</Label>
                     <Textarea value={newKeyNote} onChange={(e) => setNewKeyNote(e.target.value)} rows={2} />
                   </div>
+                  <div className="space-y-2">
+                    <Label>Hva nøkkelen gir tilgang til</Label>
+                    {(Object.keys(KEY_SCOPE_LABEL) as KeyScope[]).map((scope) => (
+                      <label key={scope} className="flex items-start gap-2 text-sm">
+                        <Checkbox
+                          checked={newKeyScopes[scope]}
+                          onCheckedChange={(v) => setNewKeyScopes((s) => ({ ...s, [scope]: v === true }))}
+                        />
+                        <span>
+                          {KEY_SCOPE_LABEL[scope]}
+                          <span className="block text-xs text-muted-foreground">
+                            {scope === "pakkesystem"
+                              ? "Dagens ordre, kunder og varer for pakking."
+                              : "Ingrediensliste, allergener og næringsinnhold for varer med godkjent merking."}
+                          </span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -346,7 +386,16 @@ export default function PakkesystemPage() {
               )}
               <DialogFooter>
                 {!revealedKey ? (
-                  <Button onClick={() => createKey.mutate()} disabled={!newKeyName || createKey.isPending}>Opprett</Button>
+                  <Button
+                    onClick={() => createKey.mutate()}
+                    disabled={
+                      !newKeyName ||
+                      createKey.isPending ||
+                      !(Object.keys(newKeyScopes) as KeyScope[]).some((s) => newKeyScopes[s])
+                    }
+                  >
+                    Opprett
+                  </Button>
                 ) : (
                   <Button onClick={() => { setNewKeyOpen(false); setRevealedKey(null); }}>Ferdig</Button>
                 )}
@@ -364,6 +413,13 @@ export default function PakkesystemPage() {
                   {k.revoked_at && <Badge variant="destructive" className="ml-2">Tilbakekalt</Badge>}
                 </div>
                 <div className="text-xs text-muted-foreground font-mono">{k.key_prefix}…</div>
+                <div className="flex flex-wrap gap-1">
+                  {((k.scopes ?? ["pakkesystem"]) as string[]).map((s) => (
+                    <Badge key={s} variant="outline">
+                      {KEY_SCOPE_LABEL[s as KeyScope] ?? s}
+                    </Badge>
+                  ))}
+                </div>
                 {k.note && <div className="text-xs text-muted-foreground">{k.note}</div>}
                 <div className="text-xs text-muted-foreground">
                   Opprettet {format(new Date(k.created_at), "yyyy-MM-dd HH:mm")}
@@ -380,6 +436,27 @@ export default function PakkesystemPage() {
           {(keys.data ?? []).length === 0 && (
             <p className="text-sm text-muted-foreground">Ingen nøkler opprettet enda.</p>
           )}
+        </div>
+      </Card>
+
+      {/* Deklarasjoner */}
+      <Card className="p-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <ExternalLink className="w-5 h-5" />
+          <h2 className="text-lg font-semibold">Deklarasjoner og næringsinnhold</h2>
+        </div>
+        <div className="space-y-2 text-sm">
+          <CopyRow label="Endepunkt (GET)" value={declarationsUrl} />
+          <CopyRow label="JSON Schema" value={declarationsSchemaUrl} />
+          <p className="text-muted-foreground">
+            Krever en nøkkel med rettigheten «Deklarasjoner» i{" "}
+            <code className="bg-muted px-1 rounded">Authorization: Bearer nbps_...</code>. Kun varer med godkjent merking
+            følger med. Valgfrie parametere: <code className="bg-muted px-1 rounded">updated_since</code> (kun endringer
+            etter et tidspunkt), <code className="bg-muted px-1 rounded">product_ids</code>,{" "}
+            <code className="bg-muted px-1 rounded">page</code> og <code className="bg-muted px-1 rounded">page_size</code>{" "}
+            (maks 500). Hver vare har <code className="bg-muted px-1 rounded">content_hash</code> så mottaker kan hoppe
+            over uendrede varer.
+          </p>
         </div>
       </Card>
 
