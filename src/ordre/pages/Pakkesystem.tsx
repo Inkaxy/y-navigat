@@ -406,30 +406,41 @@ export default function PakkesystemPage() {
 
         <div className="space-y-2">
           {(keys.data ?? []).map((k) => (
-            <div key={k.id} className="flex items-center justify-between border rounded p-3">
-              <div className="space-y-0.5">
-                <div className="font-medium">
-                  {k.name}
-                  {k.revoked_at && <Badge variant="destructive" className="ml-2">Tilbakekalt</Badge>}
+            <div key={k.id} className="border rounded p-3 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="font-medium">
+                    {k.name}
+                    {k.revoked_at && <Badge variant="destructive" className="ml-2">Tilbakekalt</Badge>}
+                  </div>
+                  <div className="text-xs text-muted-foreground font-mono">{k.key_prefix}…</div>
+                  <div className="flex flex-wrap gap-1">
+                    {((k.scopes ?? ["pakkesystem"]) as string[]).map((s) => (
+                      <Badge key={s} variant="outline">
+                        {KEY_SCOPE_LABEL[s as KeyScope] ?? s}
+                      </Badge>
+                    ))}
+                  </div>
+                  {k.note && <div className="text-xs text-muted-foreground">{k.note}</div>}
+                  <div className="text-xs text-muted-foreground">
+                    Opprettet {format(new Date(k.created_at), "yyyy-MM-dd HH:mm")}
+                    {k.last_used_at && ` · sist brukt ${format(new Date(k.last_used_at), "yyyy-MM-dd HH:mm")}`}
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground font-mono">{k.key_prefix}…</div>
-                <div className="flex flex-wrap gap-1">
-                  {((k.scopes ?? ["pakkesystem"]) as string[]).map((s) => (
-                    <Badge key={s} variant="outline">
-                      {KEY_SCOPE_LABEL[s as KeyScope] ?? s}
-                    </Badge>
-                  ))}
-                </div>
-                {k.note && <div className="text-xs text-muted-foreground">{k.note}</div>}
-                <div className="text-xs text-muted-foreground">
-                  Opprettet {format(new Date(k.created_at), "yyyy-MM-dd HH:mm")}
-                  {k.last_used_at && ` · sist brukt ${format(new Date(k.last_used_at), "yyyy-MM-dd HH:mm")}`}
-                </div>
+                {!k.revoked_at && (
+                  <Button variant="ghost" size="sm" onClick={() => revokeKey.mutate(k.id)}>
+                    <Trash2 className="w-4 h-4 mr-1" /> Tilbakekall
+                  </Button>
+                )}
               </div>
               {!k.revoked_at && (
-                <Button variant="ghost" size="sm" onClick={() => revokeKey.mutate(k.id)}>
-                  <Trash2 className="w-4 h-4 mr-1" /> Tilbakekall
-                </Button>
+                <KeyConnectionGuide
+                  name={k.name}
+                  keyPrefix={k.key_prefix}
+                  scopes={((k.scopes ?? ["pakkesystem"]) as string[]).filter(
+                    (s): s is KeyScope => s === "pakkesystem" || s === "declarations",
+                  )}
+                />
               )}
             </div>
           ))}
