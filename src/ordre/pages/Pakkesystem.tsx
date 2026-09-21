@@ -174,6 +174,19 @@ export default function PakkesystemPage() {
     },
   });
 
+  const deleteKey = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("pakkesystem_api_keys").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Nøkkel slettet");
+      qc.invalidateQueries({ queryKey: ["pakkesystem-keys"] });
+    },
+    onError: (e: unknown) =>
+      toast.error("Kunne ikke slette nøkkel: " + (e instanceof Error ? e.message : "ukjent feil")),
+  });
+
   const createDest = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("pakkesystem_push_destinations").insert({
