@@ -3,14 +3,16 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
-const invoke = vi.fn().mockResolvedValue({
-  data: {
-    available: false,
-    code: "not_configured",
-    message: "Deklarasjonsassistenten er ikke satt opp ennå",
-  },
-  error: null,
-});
+const { invoke } = vi.hoisted(() => ({
+  invoke: vi.fn().mockResolvedValue({
+    data: {
+      available: false,
+      code: "not_configured",
+      message: "Deklarasjonsassistenten er ikke satt opp ennå",
+    },
+    error: null,
+  }),
+}));
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { functions: { invoke } },
