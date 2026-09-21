@@ -441,11 +441,38 @@ export default function PakkesystemPage() {
                     {k.last_used_at && ` · sist brukt ${format(new Date(k.last_used_at), "yyyy-MM-dd HH:mm")}`}
                   </div>
                 </div>
-                {!k.revoked_at && (
-                  <Button variant="ghost" size="sm" onClick={() => revokeKey.mutate(k.id)}>
-                    <Trash2 className="w-4 h-4 mr-1" /> Tilbakekall
-                  </Button>
-                )}
+                <div className="flex items-center gap-1 shrink-0">
+                  {!k.revoked_at && (
+                    <Button variant="ghost" size="sm" onClick={() => revokeKey.mutate(k.id)}>
+                      <XCircle className="w-4 h-4 mr-1" /> Tilbakekall
+                    </Button>
+                  )}
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="sm" aria-label={`Slett nøkkel ${k.name}`}>
+                        <Trash2 className="w-4 h-4 mr-1" /> Slett
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Slette nøkkelen «{k.name}»?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Nøkkelen fjernes helt og kan ikke gjenopprettes. Alle som bruker den, mister tilgangen
+                          umiddelbart. Vil du bare stanse tilgangen midlertidig, bruk «Tilbakekall» i stedet.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => deleteKey.mutate(k.id)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Slett nøkkel
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </div>
               {!k.revoked_at && (
                 <KeyConnectionGuide
