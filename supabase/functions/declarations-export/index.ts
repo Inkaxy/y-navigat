@@ -238,6 +238,7 @@ Deno.serve(async (req) => {
       ean: p.ean_code ?? null,
       unit_of_sale: p.unit_of_sale ?? null,
       in_web_shop: p.in_web_shop ?? null,
+      keywords: ((p.keywords as string[] | null) ?? []).map((k) => String(k).trim()).filter(Boolean),
       ingredient_text: text,
       ingredient_text_plain: stripMarkers(text),
       allergens_contains: (p.manual_allergens_contains as string[] | null) ?? [],
