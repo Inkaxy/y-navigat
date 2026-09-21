@@ -213,7 +213,19 @@ Deno.serve(async (req) => {
       console.error("declaration-assistant: kunne ikke lese oppsettet");
       return jsonErr("Kunne ikke lese AI-oppsettet. Ingen kontroll er kjørt.", 500, "config_read_failed");
     }
-    if (!config) return jsonErr("Deklarasjonsassistenten er ikke satt opp ennå", 409, "not_configured");
+    if (!config) {
+      // Manglende frivillig oppsett er en tilgjengelighetsstatus i det vanlige
+      // panelet, ikke en kjøretidsfeil. Selvtesten beholder ikke-2xx slik at
+      // innstillingssiden aldri kan melde falsk suksess.
+      if (selftest) {
+        return jsonErr("Deklarasjonsassistenten er ikke satt opp ennå", 409, "not_configured");
+      }
+      return json({
+        available: false,
+        code: "not_configured",
+        message: "Deklarasjonsassistenten er ikke satt opp ennå",
+      });
+    }
     if (!Deno.env.get("AI_CONFIG_ENCRYPTION_KEY")) {
       return jsonErr("Krypteringsnøkkelen mangler på serveren", 409, "encryption_missing");
     }
