@@ -133,9 +133,14 @@ export function ApproveDeclarationDialog({
         </div>
 
         {blocked && (
-          <p className="text-xs text-destructive">
-            Godkjenning er sperret — pliktfelt mangler på etiketten. Rett de røde punktene først.
-          </p>
+          <div className="text-xs text-destructive">
+            <p>Godkjenning er sperret — dette mangler på etiketten med valgt kilde:</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-4">
+              {modeIssues.map((t) => (
+                <li key={t}>{t}</li>
+              ))}
+            </ul>
+          </div>
         )}
 
         <DialogFooter>
