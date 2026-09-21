@@ -49,6 +49,8 @@ const JSON_SCHEMA = {
           ean: { type: ["string", "null"] },
           unit_of_sale: { type: ["string", "null"] },
           in_web_shop: { type: ["boolean", "null"] },
+          /** Søkeord lagret på varekortet — alternative navn mottaker kan søke på. */
+          keywords: { type: "array", items: { type: "string" } },
           /** Ingrediensliste med allergener uthevet som *stjerner*. */
           ingredient_text: { type: "string" },
           /** Samme tekst uten uthevingsmarkører. */
