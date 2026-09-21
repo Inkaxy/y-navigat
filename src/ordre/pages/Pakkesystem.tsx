@@ -439,6 +439,27 @@ export default function PakkesystemPage() {
         </div>
       </Card>
 
+      {/* Deklarasjoner */}
+      <Card className="p-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <ExternalLink className="w-5 h-5" />
+          <h2 className="text-lg font-semibold">Deklarasjoner og næringsinnhold</h2>
+        </div>
+        <div className="space-y-2 text-sm">
+          <CopyRow label="Endepunkt (GET)" value={declarationsUrl} />
+          <CopyRow label="JSON Schema" value={declarationsSchemaUrl} />
+          <p className="text-muted-foreground">
+            Krever en nøkkel med rettigheten «Deklarasjoner» i{" "}
+            <code className="bg-muted px-1 rounded">Authorization: Bearer nbps_...</code>. Kun varer med godkjent merking
+            følger med. Valgfrie parametere: <code className="bg-muted px-1 rounded">updated_since</code> (kun endringer
+            etter et tidspunkt), <code className="bg-muted px-1 rounded">product_ids</code>,{" "}
+            <code className="bg-muted px-1 rounded">page</code> og <code className="bg-muted px-1 rounded">page_size</code>{" "}
+            (maks 500). Hver vare har <code className="bg-muted px-1 rounded">content_hash</code> så mottaker kan hoppe
+            over uendrede varer.
+          </p>
+        </div>
+      </Card>
+
       {/* Push-destinasjoner */}
       <Card className="p-6 space-y-4">
         <div className="flex items-center justify-between">
