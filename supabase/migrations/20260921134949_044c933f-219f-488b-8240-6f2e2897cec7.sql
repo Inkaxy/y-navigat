@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS platform_settings_category_key_uidx ON public.platform_settings (category, key);
