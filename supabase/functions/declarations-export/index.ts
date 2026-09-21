@@ -49,6 +49,8 @@ const JSON_SCHEMA = {
           ean: { type: ["string", "null"] },
           unit_of_sale: { type: ["string", "null"] },
           in_web_shop: { type: ["boolean", "null"] },
+          /** Søkeord lagret på varekortet — alternative navn mottaker kan søke på. */
+          keywords: { type: "array", items: { type: "string" } },
           /** Ingrediensliste med allergener uthevet som *stjerner*. */
           ingredient_text: { type: "string" },
           /** Samme tekst uten uthevingsmarkører. */
@@ -149,7 +151,7 @@ Deno.serve(async (req) => {
   let productQuery = admin
     .from("products")
     .select(
-      "id, code, display_number, display_name, ean_code, unit_of_sale, in_web_shop, status, weight_per_unit_grams, " +
+      "id, code, display_number, display_name, ean_code, unit_of_sale, in_web_shop, status, weight_per_unit_grams, keywords, " +
         "manual_ingredient_declaration, manual_allergens_contains, manual_allergens_may_contain, " +
         "manual_nutrition_per_100g, manual_declaration_updated_at, declaration_needs_review, updated_at",
     )
@@ -236,6 +238,7 @@ Deno.serve(async (req) => {
       ean: p.ean_code ?? null,
       unit_of_sale: p.unit_of_sale ?? null,
       in_web_shop: p.in_web_shop ?? null,
+      keywords: ((p.keywords as string[] | null) ?? []).map((k) => String(k).trim()).filter(Boolean),
       ingredient_text: text,
       ingredient_text_plain: stripMarkers(text),
       allergens_contains: (p.manual_allergens_contains as string[] | null) ?? [],

@@ -725,7 +725,7 @@ function guideText(name: string, scopes: KeyScope[]): string {
       "  - Valgfrie parametere: updated_since=<ISO-tidspunkt> (kun endringer etter tidspunktet), product_ids=<id,id>, page og page_size (maks 500, standard 200).",
       "  - Svaret har has_more=true når det finnes flere sider — hent page=2, page=3 osv.",
       "  - Hver vare har content_hash. Lagre den, og hopp over varer der den er uendret.",
-      "  - Felt per vare: navn, varenummer, strekkode, ingrediensliste (med *uthevede* allergener og som ren tekst), allergener, «kan inneholde spor av», næringsinnhold per 100 g, nettovekt, holdbarhet, oppbevaring, opprinnelsesland og tidspunkt for godkjenning.",
+      "  - Felt per vare: navn, søkeord (alternative navn fra varekortet), varenummer, strekkode, ingrediensliste (med *uthevede* allergener og som ren tekst), allergener, «kan inneholde spor av», næringsinnhold per 100 g, nettovekt, holdbarhet, oppbevaring, opprinnelsesland og tidspunkt for godkjenning.",
       "",
     );
   }
