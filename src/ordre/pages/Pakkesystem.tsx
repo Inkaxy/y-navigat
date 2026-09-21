@@ -138,7 +138,12 @@ export default function PakkesystemPage() {
   const createKey = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("pakkesystem-create-key", {
-        body: { legal_entity_id: NB_LEGAL_ENTITY_ID, name: newKeyName, note: newKeyNote || null },
+        body: {
+          legal_entity_id: NB_LEGAL_ENTITY_ID,
+          name: newKeyName,
+          note: newKeyNote || null,
+          scopes: (Object.keys(newKeyScopes) as KeyScope[]).filter((s) => newKeyScopes[s]),
+        },
       });
       if (error) throw error;
       return data as { id: string; api_key: string; name: string };
@@ -147,6 +152,7 @@ export default function PakkesystemPage() {
       setRevealedKey(data.api_key);
       setNewKeyName("");
       setNewKeyNote("");
+      setNewKeyScopes({ pakkesystem: true, declarations: false });
       qc.invalidateQueries({ queryKey: ["pakkesystem-keys"] });
     },
     onError: (e: any) => toast.error("Kunne ikke opprette nøkkel: " + (e?.message ?? "ukjent")),
