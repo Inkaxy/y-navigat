@@ -272,6 +272,8 @@ export default function PakkesystemPage() {
 
   const apiUrl = useMemo(() => `${FUNCTIONS_BASE}/pakkesystem-export?date=YYYY-MM-DD`, []);
   const schemaUrl = useMemo(() => `${FUNCTIONS_BASE}/pakkesystem-export?schema=1`, []);
+  const declarationsUrl = useMemo(() => `${FUNCTIONS_BASE}/declarations-export`, []);
+  const declarationsSchemaUrl = useMemo(() => `${FUNCTIONS_BASE}/declarations-export?schema=1`, []);
 
   return (
     <div className="space-y-6">
@@ -411,6 +413,13 @@ export default function PakkesystemPage() {
                   {k.revoked_at && <Badge variant="destructive" className="ml-2">Tilbakekalt</Badge>}
                 </div>
                 <div className="text-xs text-muted-foreground font-mono">{k.key_prefix}…</div>
+                <div className="flex flex-wrap gap-1">
+                  {((k.scopes ?? ["pakkesystem"]) as string[]).map((s) => (
+                    <Badge key={s} variant="outline">
+                      {KEY_SCOPE_LABEL[s as KeyScope] ?? s}
+                    </Badge>
+                  ))}
+                </div>
                 {k.note && <div className="text-xs text-muted-foreground">{k.note}</div>}
                 <div className="text-xs text-muted-foreground">
                   Opprettet {format(new Date(k.created_at), "yyyy-MM-dd HH:mm")}
