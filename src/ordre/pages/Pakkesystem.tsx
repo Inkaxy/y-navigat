@@ -10,6 +10,17 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Copy, Download, Key, PlusCircle, Trash2, Zap, ExternalLink, Clock, CheckCircle2, XCircle, SlidersHorizontal, ChevronDown } from "lucide-react";
@@ -172,6 +183,19 @@ export default function PakkesystemPage() {
       toast.success("Nøkkel tilbakekalt");
       qc.invalidateQueries({ queryKey: ["pakkesystem-keys"] });
     },
+  });
+
+  const deleteKey = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("pakkesystem_api_keys").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Nøkkel slettet");
+      qc.invalidateQueries({ queryKey: ["pakkesystem-keys"] });
+    },
+    onError: (e: unknown) =>
+      toast.error("Kunne ikke slette nøkkel: " + (e instanceof Error ? e.message : "ukjent feil")),
   });
 
   const createDest = useMutation({
@@ -428,11 +452,38 @@ export default function PakkesystemPage() {
                     {k.last_used_at && ` · sist brukt ${format(new Date(k.last_used_at), "yyyy-MM-dd HH:mm")}`}
                   </div>
                 </div>
-                {!k.revoked_at && (
-                  <Button variant="ghost" size="sm" onClick={() => revokeKey.mutate(k.id)}>
-                    <Trash2 className="w-4 h-4 mr-1" /> Tilbakekall
-                  </Button>
-                )}
+                <div className="flex items-center gap-1 shrink-0">
+                  {!k.revoked_at && (
+                    <Button variant="ghost" size="sm" onClick={() => revokeKey.mutate(k.id)}>
+                      <XCircle className="w-4 h-4 mr-1" /> Tilbakekall
+                    </Button>
+                  )}
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="sm" aria-label={`Slett nøkkel ${k.name}`}>
+                        <Trash2 className="w-4 h-4 mr-1" /> Slett
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Slette nøkkelen «{k.name}»?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Nøkkelen fjernes helt og kan ikke gjenopprettes. Alle som bruker den, mister tilgangen
+                          umiddelbart. Vil du bare stanse tilgangen midlertidig, bruk «Tilbakekall» i stedet.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => deleteKey.mutate(k.id)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Slett nøkkel
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </div>
               {!k.revoked_at && (
                 <KeyConnectionGuide
