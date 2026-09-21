@@ -619,3 +619,164 @@ function CopyRow({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+/** Adressene mottakeren av en nøkkel trenger, avhengig av rettighetene. */
+function endpointsForScopes(scopes: KeyScope[]): { label: string; url: string; note: string }[] {
+  const out: { label: string; url: string; note: string }[] = [];
+  if (scopes.includes("pakkesystem")) {
+    out.push({
+      label: "Pakkedata",
+      url: `${FUNCTIONS_BASE}/pakkesystem-export?date=YYYY-MM-DD`,
+      note: "Alle pakksedler for leveringsdagen. Bytt YYYY-MM-DD med datoen. Kan hentes så ofte dere vil.",
+    });
+    out.push({
+      label: "Beskrivelse (JSON Schema)",
+      url: `${FUNCTIONS_BASE}/pakkesystem-export?schema=1`,
+      note: "Beskriver feltene i svaret. Krever ingen nøkkel.",
+    });
+  }
+  if (scopes.includes("declarations")) {
+    out.push({
+      label: "Deklarasjoner",
+      url: `${FUNCTIONS_BASE}/declarations-export`,
+      note: "Ingrediensliste, allergener og næringsinnhold for varer med godkjent merking.",
+    });
+    out.push({
+      label: "Beskrivelse (JSON Schema)",
+      url: `${FUNCTIONS_BASE}/declarations-export?schema=1`,
+      note: "Beskriver feltene i svaret. Krever ingen nøkkel.",
+    });
+  }
+  return out;
+}
+
+function guideText(name: string, scopes: KeyScope[]): string {
+  const lines = [
+    `Oppkobling mot Nøtterø Bakeri (nøkkel: ${name})`,
+    "",
+    "1. Dere får en hemmelig nøkkel som starter med nbps_. Den sendes separat og skal lagres som en hemmelighet på serveren deres — aldri i nettleseren, i kildekoden eller i et delt dokument.",
+    "2. Send nøkkelen med i hver forespørsel som HTTP-headeren:",
+    "     Authorization: Bearer nbps_...",
+    "3. Alle adressene under besvares med GET og svarer med JSON i UTF-8.",
+    "",
+    "Adresser:",
+    ...endpointsForScopes(scopes).map((e) => `  ${e.label}: ${e.url}\n     ${e.note}`),
+    "",
+    "Eksempel:",
+    `  curl -H "Authorization: Bearer nbps_..." "${endpointsForScopes(scopes)[0]?.url ?? ""}"`,
+    "",
+  ];
+  if (scopes.includes("declarations")) {
+    lines.push(
+      "Om deklarasjoner:",
+      "  - Kun varer som står som «Merking: Godkjent» følger med. Utdaterte eller ufullstendige varer utelates bevisst.",
+      "  - Valgfrie parametere: updated_since=<ISO-tidspunkt> (kun endringer etter tidspunktet), product_ids=<id,id>, page og page_size (maks 500, standard 200).",
+      "  - Svaret har has_more=true når det finnes flere sider — hent page=2, page=3 osv.",
+      "  - Hver vare har content_hash. Lagre den, og hopp over varer der den er uendret.",
+      "  - Felt per vare: navn, varenummer, strekkode, ingrediensliste (med *uthevede* allergener og som ren tekst), allergener, «kan inneholde spor av», næringsinnhold per 100 g, nettovekt, holdbarhet, oppbevaring, opprinnelsesland og tidspunkt for godkjenning.",
+      "",
+    );
+  }
+  lines.push(
+    "Feilmeldinger:",
+    "  401 = nøkkel mangler, er ukjent eller tilbakekalt.",
+    "  403 = nøkkelen mangler riktig rettighet.",
+    "  400 = ugyldig parameter (svaret sier hvilken).",
+    "",
+    "Nøkkelen kan når som helst trekkes tilbake av Nøtterø Bakeri. Da slutter henting å virke umiddelbart, og dere må få en ny nøkkel.",
+  );
+  return lines.join("\n");
+}
+
+/** Forklaring til den som skal koble seg opp med akkurat denne nøkkelen. */
+function KeyConnectionGuide({ name, keyPrefix, scopes }: { name: string; keyPrefix: string; scopes: KeyScope[] }) {
+  const [open, setOpen] = useState(false);
+  const endpoints = useMemo(() => endpointsForScopes(scopes), [scopes]);
+  const example = endpoints[0]?.url ?? "";
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <Button variant="outline" size="sm">
+          <ChevronDown className={`w-4 h-4 mr-2 transition-transform ${open ? "rotate-180" : ""}`} />
+          Slik kobler mottaker seg opp
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pt-3 space-y-3 text-sm">
+        <ol className="list-decimal pl-5 space-y-1 text-muted-foreground">
+          <li>
+            Send den hemmelige nøkkelen (<span className="font-mono">{keyPrefix}…</span>) til mottakeren på en trygg måte.
+            Den vises kun én gang ved opprettelsen — er den mistet, lag en ny og trekk denne tilbake.
+          </li>
+          <li>
+            Mottaker lagrer nøkkelen som en hemmelighet på sin egen server — aldri i nettleseren eller i kildekoden.
+          </li>
+          <li>
+            Nøkkelen sendes med i hver forespørsel som headeren{" "}
+            <code className="bg-muted px-1 rounded">Authorization: Bearer nbps_…</code>.
+          </li>
+          <li>Alle adressene under hentes med GET og svarer med JSON (UTF-8).</li>
+        </ol>
+
+        <div className="space-y-2">
+          {endpoints.map((e) => (
+            <div key={e.label + e.url} className="space-y-1">
+              <CopyRow label={e.label} value={e.url} />
+              <p className="text-xs text-muted-foreground pl-[8.5rem]">{e.note}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-xs font-medium">Eksempel på en forespørsel</p>
+          <CopyRow label="curl" value={`curl -H "Authorization: Bearer nbps_..." "${example}"`} />
+        </div>
+
+        {scopes.includes("declarations") && (
+          <div className="space-y-1">
+            <p className="text-xs font-medium">Om deklarasjonene</p>
+            <ul className="list-disc pl-5 text-xs text-muted-foreground space-y-1">
+              <li>Kun varer med godkjent merking følger med — utdaterte eller ufullstendige varer utelates bevisst.</li>
+              <li>
+                Hent bare endringer med <code className="bg-muted px-1 rounded">updated_since</code> (ISO-tidspunkt), eller
+                enkeltvarer med <code className="bg-muted px-1 rounded">product_ids</code>.
+              </li>
+              <li>
+                Store uttrekk deles i sider: <code className="bg-muted px-1 rounded">page</code> og{" "}
+                <code className="bg-muted px-1 rounded">page_size</code> (maks 500). Hent neste side så lenge{" "}
+                <code className="bg-muted px-1 rounded">has_more</code> er sann.
+              </li>
+              <li>
+                Hver vare har <code className="bg-muted px-1 rounded">content_hash</code> — lagre den og hopp over varer
+                som er uendret.
+              </li>
+            </ul>
+          </div>
+        )}
+
+        <div className="space-y-1">
+          <p className="text-xs font-medium">Hvis noe feiler</p>
+          <ul className="list-disc pl-5 text-xs text-muted-foreground space-y-1">
+            <li>401 — nøkkelen mangler, er ukjent eller er trukket tilbake.</li>
+            <li>403 — nøkkelen mangler riktig rettighet for denne adressen.</li>
+            <li>400 — en parameter er ugyldig; svaret forteller hvilken.</li>
+          </ul>
+        </div>
+
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => {
+            navigator.clipboard.writeText(guideText(name, scopes));
+            toast.success("Oppsettet er kopiert — lim det inn til mottakeren");
+          }}
+        >
+          <Copy className="w-4 h-4 mr-2" /> Kopier hele oppsettet
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          Teksten inneholder ikke selve nøkkelen — send den separat.
+        </p>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
