@@ -49,10 +49,19 @@ Deno.serve(async (req) => {
 
   let body: any;
   try { body = await req.json(); } catch { body = {}; }
-  const { legal_entity_id, name, note } = body ?? {};
+  const { legal_entity_id, name, note, scopes } = body ?? {};
   if (!legal_entity_id || !name) {
     return new Response(JSON.stringify({ error: "legal_entity_id og name kreves" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
+
+  // Rettigheter: «pakkesystem» som før, «declarations» for deklarasjonseksporten.
+  const ALLOWED_SCOPES = ["pakkesystem", "declarations"];
+  const requested: string[] = Array.isArray(scopes) ? scopes.map((s: unknown) => String(s)) : [];
+  const invalid = requested.filter((s) => !ALLOWED_SCOPES.includes(s));
+  if (invalid.length) {
+    return new Response(JSON.stringify({ error: `Ukjent rettighet: ${invalid.join(", ")}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+  const keyScopes = requested.length ? [...new Set(requested)] : ["pakkesystem"];
 
   const key = genKey();
   const keyHash = await sha256Hex(key);
@@ -66,9 +75,10 @@ Deno.serve(async (req) => {
       note: note ?? null,
       key_prefix: keyPrefix,
       key_hash: keyHash,
+      scopes: keyScopes,
       created_by: userRes.user.id,
     })
-    .select("id, name, key_prefix, created_at")
+    .select("id, name, key_prefix, scopes, created_at")
     .single();
 
   if (error) {
