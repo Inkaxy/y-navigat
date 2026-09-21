@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
   let productQuery = admin
     .from("products")
     .select(
-      "id, code, display_number, display_name, ean_code, unit_of_sale, in_web_shop, status, weight_per_unit_grams, " +
+      "id, code, display_number, display_name, ean_code, unit_of_sale, in_web_shop, status, weight_per_unit_grams, keywords, " +
         "manual_ingredient_declaration, manual_allergens_contains, manual_allergens_may_contain, " +
         "manual_nutrition_per_100g, manual_declaration_updated_at, declaration_needs_review, updated_at",
     )
