@@ -17,6 +17,14 @@ import { DEFAULT_CRITERIA, type ProduksjonsplanCriteria } from "@/produksjon/fea
 
 const FUNCTIONS_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
 
+/** Hva en API-nøkkel gir tilgang til. */
+export type KeyScope = "pakkesystem" | "declarations";
+
+export const KEY_SCOPE_LABEL: Record<KeyScope, string> = {
+  pakkesystem: "Pakkesystem",
+  declarations: "Deklarasjoner",
+};
+
 function criteriaToQuery(c: ProduksjonsplanCriteria): string {
   const qs = new URLSearchParams();
   if (c.tour_numbers?.length) qs.set("tours", c.tour_numbers.join(","));
@@ -66,6 +74,10 @@ export default function PakkesystemPage() {
   const [newKeyOpen, setNewKeyOpen] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
   const [newKeyNote, setNewKeyNote] = useState("");
+  const [newKeyScopes, setNewKeyScopes] = useState<Record<KeyScope, boolean>>({
+    pakkesystem: true,
+    declarations: false,
+  });
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
 
   const [downloadCriteria, setDownloadCriteria] = useState<ProduksjonsplanCriteria>(DEFAULT_CRITERIA);
@@ -88,7 +100,7 @@ export default function PakkesystemPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("pakkesystem_api_keys")
-        .select("id, name, note, key_prefix, created_at, last_used_at, revoked_at")
+        .select("id, name, note, key_prefix, scopes, created_at, last_used_at, revoked_at")
         .eq("legal_entity_id", NB_LEGAL_ENTITY_ID)
         .order("created_at", { ascending: false });
       if (error) throw error;
