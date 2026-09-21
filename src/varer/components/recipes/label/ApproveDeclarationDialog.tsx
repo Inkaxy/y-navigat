@@ -28,7 +28,8 @@ interface Props {
   manual: ApproveSourceData | null;
   /** Gjeldende kilde før godkjenning. */
   currentMode: "auto" | "manual";
-  blocked: boolean;
+  /** Pliktfelt som mangler per kilde — sperrer bare den kilden de gjelder. */
+  issues: { auto: string[]; manual: string[] };
   saving: boolean;
   onApprove: (mode: "auto" | "manual", adopt: ApproveSourceData | null) => void;
 }
@@ -44,11 +45,13 @@ export function ApproveDeclarationDialog({
   calculated,
   manual,
   currentMode,
-  blocked,
+  issues,
   saving,
   onApprove,
 }: Props) {
   const [mode, setMode] = useState<"auto" | "manual">(currentMode);
+  const modeIssues = mode === "auto" ? issues.auto : issues.manual;
+  const blocked = modeIssues.length > 0;
 
   const manualText = stripHtml(manual?.ingredientText ?? "");
   const calcText = stripHtml(calculated?.ingredientText ?? "");
