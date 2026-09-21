@@ -12,9 +12,11 @@ import {
 import type { FlourLine } from "@/varer/lib/breadscale";
 import {
   buildEffectiveDeclaration,
+  declarationDisplayText,
   type DeclarationMode,
   type RecipeLabelSnapshot,
 } from "@/varer/lib/effectiveDeclaration";
+import { buildLabelChecklist } from "@/varer/lib/labelChecklist";
 import { useApproveDeclaration } from "@/varer/hooks/useLabelApproval";
 import { useRecipeLabelProfile } from "@/varer/hooks/useRecipeLabelProfile";
 import { useUserDisplayName } from "@/varer/hooks/useRecipeLabel";
@@ -203,6 +205,67 @@ export function LabelTab({
     };
   }, [recipe.manual_allergen_summary, recipe.manual_ingredient_declaration, recipe.manual_nutrition]);
 
+  const entity = entityQuery.data ?? null;
+  const producerAddress = entity
+    ? [entity.address_line1, [entity.postal_code, entity.city].filter(Boolean).join(" ")]
+        .filter(Boolean)
+        .join(", ")
+    : null;
+
+  /**
+   * Pliktfeltene vurderes per kilde. En sperret beregning skal ikke hindre
+   * godkjenning av en komplett manuell deklarasjon.
+   */
+  const approveIssues = useMemo(() => {
+    const issuesFor = (src: ApproveSourceData, isManual: boolean) =>
+      buildLabelChecklist({
+        productName: recipeName,
+        ingredientText: declarationDisplayText(src.ingredientText) || null,
+        contains: src.contains,
+        mayContain: src.mayContain,
+        netWeightGrams: recipe.unit_weight_grams ?? null,
+        shelfLifeDays: recipe.shelf_life_days ?? null,
+        storageInstructions: recipe.storage_instructions ?? null,
+        producerName: entity?.name ?? null,
+        producerAddress: producerAddress || null,
+        nutrition: isManual ? src.nutrition : coverageOk ? src.nutrition : null,
+        coveragePct: isManual ? null : coveragePct,
+        blocked: isManual ? false : !!missing?.blocked,
+        claimGrain: !!recipe.label_claim_grain,
+        grainPct: label?.grain_score_pct ?? null,
+        claimKeyhole: !!recipe.label_claim_keyhole,
+        keyholeQualifies: keyhole?.status === "oppfylt",
+      })
+        .errors.map((e) => `${e.label}: ${e.detail}`);
+    return {
+      auto: issuesFor(
+        {
+          ingredientText: label?.ingredient_declaration ?? null,
+          contains: label?.allergens?.contains ?? [],
+          mayContain: label?.allergens?.may_contain ?? [],
+          nutrition: (label?.nutrition_per_100g ?? null) as Record<string, number | null> | null,
+        },
+        false,
+      ),
+      manual: issuesFor(manualSource, true),
+    };
+  }, [
+    coverageOk,
+    coveragePct,
+    entity,
+    keyhole,
+    label,
+    manualSource,
+    missing,
+    producerAddress,
+    recipe.label_claim_grain,
+    recipe.label_claim_keyhole,
+    recipe.shelf_life_days,
+    recipe.storage_instructions,
+    recipe.unit_weight_grams,
+    recipeName,
+  ]);
+
   if (labelQuery.isLoading) {
     return (
       <div className="flex h-40 items-center justify-center">
@@ -237,7 +300,7 @@ export function LabelTab({
         open={approveOpen}
         onOpenChange={setApproveOpen}
         currentMode={declarationManual ? "manual" : "auto"}
-        blocked={checklistBlocked}
+        issues={approveIssues}
         saving={approve.isPending}
         calculated={{
           ingredientText: label?.ingredient_declaration ?? null,
@@ -347,7 +410,7 @@ export function LabelTab({
         countryOfOrigin={recipe.country_of_origin ?? null}
         entity={entityQuery.data ?? null}
         profile={labelProfileQuery.data ?? null}
-        blocked={!!missing?.blocked}
+        blocked={declarationManual ? false : !!missing?.blocked}
         keyholeQualifies={keyhole?.status === "oppfylt"}
         coveragePct={coveragePct}
         onChecklistChange={onChecklistChange}
