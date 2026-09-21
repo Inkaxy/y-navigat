@@ -350,6 +350,25 @@ export default function PakkesystemPage() {
                     <Label>Notat (valgfritt)</Label>
                     <Textarea value={newKeyNote} onChange={(e) => setNewKeyNote(e.target.value)} rows={2} />
                   </div>
+                  <div className="space-y-2">
+                    <Label>Hva nøkkelen gir tilgang til</Label>
+                    {(Object.keys(KEY_SCOPE_LABEL) as KeyScope[]).map((scope) => (
+                      <label key={scope} className="flex items-start gap-2 text-sm">
+                        <Checkbox
+                          checked={newKeyScopes[scope]}
+                          onCheckedChange={(v) => setNewKeyScopes((s) => ({ ...s, [scope]: v === true }))}
+                        />
+                        <span>
+                          {KEY_SCOPE_LABEL[scope]}
+                          <span className="block text-xs text-muted-foreground">
+                            {scope === "pakkesystem"
+                              ? "Dagens ordre, kunder og varer for pakking."
+                              : "Ingrediensliste, allergener og næringsinnhold for varer med godkjent merking."}
+                          </span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -364,7 +383,16 @@ export default function PakkesystemPage() {
               )}
               <DialogFooter>
                 {!revealedKey ? (
-                  <Button onClick={() => createKey.mutate()} disabled={!newKeyName || createKey.isPending}>Opprett</Button>
+                  <Button
+                    onClick={() => createKey.mutate()}
+                    disabled={
+                      !newKeyName ||
+                      createKey.isPending ||
+                      !(Object.keys(newKeyScopes) as KeyScope[]).some((s) => newKeyScopes[s])
+                    }
+                  >
+                    Opprett
+                  </Button>
                 ) : (
                   <Button onClick={() => { setNewKeyOpen(false); setRevealedKey(null); }}>Ferdig</Button>
                 )}
