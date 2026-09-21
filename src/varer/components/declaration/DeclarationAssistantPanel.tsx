@@ -87,6 +87,23 @@ interface PanelError {
   showSettingsLink?: boolean;
 }
 
+interface AssistantUnavailable {
+  available: false;
+  code: string;
+  message?: string;
+}
+
+export function parseAssistantUnavailable(raw: unknown): AssistantUnavailable | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+  if (value.available !== false || typeof value.code !== "string") return null;
+  return {
+    available: false,
+    code: value.code,
+    message: typeof value.message === "string" ? value.message : undefined,
+  };
+}
+
 /** Kjente feilkoder får en forklaring folk kan handle på. */
 function errorFor(code: string | undefined, fallback: string | undefined): PanelError {
   switch (code) {
@@ -207,6 +224,11 @@ export function DeclarationAssistantPanel({ target, targetId, value, canWrite, o
         return;
       }
       if (!mountedRef.current || requestId !== requestRef.current) return;
+      const unavailable = parseAssistantUnavailable(data);
+      if (unavailable) {
+        setError(errorFor(unavailable.code, unavailable.message));
+        return;
+      }
       const res = parseResponse(data);
       if (!res) {
         setError({ message: "Svaret fra AI-kontrollen kunne ikke leses. Ingen endring er gjort." });

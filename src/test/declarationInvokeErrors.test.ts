@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFunctionError } from "@/varer/lib/functionError";
+import { parseAssistantUnavailable } from "@/varer/components/declaration/DeclarationAssistantPanel";
 
 /**
  * Ved ikke-2xx gir supabase.functions.invoke `data: null` og en
@@ -70,5 +71,24 @@ describe("feillesing fra functions.invoke", () => {
     const payload = await readFunctionError(new Error("nettverksfeil"), null);
     expect(payload.message).toBe("nettverksfeil");
     expect(payload.code).toBeUndefined();
+  });
+});
+
+describe("forventet utilgjengelig deklarasjonsassistent", () => {
+  it("leser ikke-oppsatt som en håndtert tilgjengelighetsstatus", () => {
+    expect(parseAssistantUnavailable({
+      available: false,
+      code: "not_configured",
+      message: "Deklarasjonsassistenten er ikke satt opp ennå",
+    })).toEqual({
+      available: false,
+      code: "not_configured",
+      message: "Deklarasjonsassistenten er ikke satt opp ennå",
+    });
+  });
+
+  it("forveksler ikke et vanlig assistentsvar med utilgjengelig status", () => {
+    expect(parseAssistantUnavailable({ available: true, code: "not_configured" })).toBeNull();
+    expect(parseAssistantUnavailable({ suggestion: {} })).toBeNull();
   });
 });
