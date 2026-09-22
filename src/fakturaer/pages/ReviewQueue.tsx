@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { Check, ChevronsUpDown, Keyboard, Loader2, Undo2 } from "lucide-react";
+import { Check, ChevronsUpDown, Keyboard, Loader2, RotateCw, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -243,6 +243,7 @@ export default function FakturaerInboxPage() {
   const [creditNoteId, setCreditNoteId] = useState<string | null>(null);
   const [startPriceOpen, setStartPriceOpen] = useState(false);
   const [busyInvoice, setBusyInvoice] = useState<{ id: string; action: string } | null>(null);
+  const [runAllProgress, setRunAllProgress] = useState<{ done: number; total: number } | null>(null);
   const anyDialogOpen =
     matchOpen || createOpen || notRmOpen || conflictOpen || !!reconcileId || bulkCreateOpen || !!creditNoteId || !!bulkLink ||
     startPriceOpen;
@@ -477,6 +478,37 @@ export default function FakturaerInboxPage() {
       toast.error(e instanceof Error ? e.message : "Handlingen feilet");
     } finally {
       setBusyInvoice(null);
+    }
+  }
+
+  /**
+   * Kjører auto-match én faktura av gangen for alle fakturaene i lista.
+   * Ingen faktura godkjennes, attesteres eller betales — kun matching kjøres.
+   */
+  async function runMatchOnAll() {
+    const targets = invoices.filter((i) => i.status !== "flagged" && i.line_count > 0);
+    if (targets.length === 0) {
+      toast.info("Ingen fakturaer med linjer å behandle");
+      return;
+    }
+    setRunAllProgress({ done: 0, total: targets.length });
+    let ok = 0;
+    const failed: string[] = [];
+    for (const inv of targets) {
+      try {
+        await runAutoMatch(inv.id);
+        ok++;
+      } catch {
+        failed.push(inv.invoice_number);
+      }
+      setRunAllProgress((p) => (p ? { ...p, done: p.done + 1 } : p));
+    }
+    setRunAllProgress(null);
+    refresh();
+    if (failed.length > 0) {
+      toast.warning(`${ok} fakturaer behandlet, ${failed.length} feilet (${failed.slice(0, 3).join(", ")}${failed.length > 3 ? " m.fl." : ""})`);
+    } else {
+      toast.success(`${ok} fakturaer behandlet`);
     }
   }
 
@@ -776,6 +808,24 @@ export default function FakturaerInboxPage() {
             }}
           >
             Klar for prismatch
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={() => void runMatchOnAll()}
+            disabled={!!runAllProgress || invoices.length === 0}
+          >
+            {runAllProgress ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Behandler {runAllProgress.done}/{runAllProgress.total}
+              </>
+            ) : (
+              <>
+                <RotateCw className="h-3.5 w-3.5" /> Behandle alle
+              </>
+            )}
           </Button>
 
           {undoEntry && (
