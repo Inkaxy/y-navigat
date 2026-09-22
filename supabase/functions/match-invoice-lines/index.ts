@@ -108,11 +108,14 @@ Deno.serve(async (req) => {
 
     /**
      * Gyldig grunnlag for AUTOMATISK linjekontroll er avtalepris og bekreftet
-     * startpris. Forrige kjøp er kun sammenligning: en linje blir aldri
-     * ferdigkontrollert av motoren fordi den ligner på forrige faktura, og
-     * forrige kjøp kan heller aldri bli startpris eller avtalepris av seg selv.
+     * startpris. Forrige registrerte kjøpspris teller kun når selskapet
+     * uttrykkelig har slått på `auto_check_against_last_purchase` i
+     * innstillingene — den slås aldri på av klienten, og et avvik over
+     * toleransen går fortsatt til gjennomgang. Forrige kjøp kan heller aldri
+     * bli startpris eller avtalepris av seg selv.
      */
     const AUTOMATIC_CHECK_BASIS = new Set(["agreement", "start_price"]);
+
 
     /** Skriver grunnlaget på linjen og returnerer forventet pris, om den finnes. */
     function applyReference(target: AnyRec, ref: AnyRec): number | null {
