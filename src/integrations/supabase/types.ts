@@ -3221,6 +3221,7 @@ export type Database = {
       invoice_match_settings: {
         Row: {
           auto_approve_within_tolerance: boolean | null
+          auto_check_against_last_purchase: boolean
           auto_check_against_start_price: boolean
           auto_reconcile_clean_imports: boolean
           default_price_tolerance_pct: number | null
@@ -3236,6 +3237,7 @@ export type Database = {
         }
         Insert: {
           auto_approve_within_tolerance?: boolean | null
+          auto_check_against_last_purchase?: boolean
           auto_check_against_start_price?: boolean
           auto_reconcile_clean_imports?: boolean
           default_price_tolerance_pct?: number | null
@@ -3251,6 +3253,7 @@ export type Database = {
         }
         Update: {
           auto_approve_within_tolerance?: boolean | null
+          auto_check_against_last_purchase?: boolean
           auto_check_against_start_price?: boolean
           auto_reconcile_clean_imports?: boolean
           default_price_tolerance_pct?: number | null

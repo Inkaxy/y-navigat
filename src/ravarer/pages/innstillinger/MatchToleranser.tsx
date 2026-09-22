@@ -206,6 +206,13 @@ export default function MatchToleranserPage() {
             onChange={(v) => saveSettings.mutate({ auto_approve_within_tolerance: v })}
           />
           <ToggleRow
+            label="Godkjenn automatisk mot tidligere registrert pris"
+            hint="Linjer som er koblet automatisk og har samme pris som forrige registrerte kjøp (innenfor toleransen) blir ferdig kontrollert. Avvik over toleransen blir alltid liggende til behandling. Attestering og betaling er fortsatt en egen handling."
+            checked={!!s?.auto_check_against_last_purchase}
+            disabled={!canWrite || tolerances.isLoading}
+            onChange={(v) => saveSettings.mutate({ auto_check_against_last_purchase: v })}
+          />
+          <ToggleRow
             label="Avstem rene importer automatisk"
             hint="Fakturaer der alle linjer matcher og summene stemmer avstemmes uten manuelt trykk."
             checked={!!s?.auto_reconcile_clean_imports}

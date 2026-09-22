@@ -108,11 +108,14 @@ Deno.serve(async (req) => {
 
     /**
      * Gyldig grunnlag for AUTOMATISK linjekontroll er avtalepris og bekreftet
-     * startpris. Forrige kjøp er kun sammenligning: en linje blir aldri
-     * ferdigkontrollert av motoren fordi den ligner på forrige faktura, og
-     * forrige kjøp kan heller aldri bli startpris eller avtalepris av seg selv.
+     * startpris. Forrige registrerte kjøpspris teller kun når selskapet
+     * uttrykkelig har slått på `auto_check_against_last_purchase` i
+     * innstillingene — den slås aldri på av klienten, og et avvik over
+     * toleransen går fortsatt til gjennomgang. Forrige kjøp kan heller aldri
+     * bli startpris eller avtalepris av seg selv.
      */
     const AUTOMATIC_CHECK_BASIS = new Set(["agreement", "start_price"]);
+
 
     /** Skriver grunnlaget på linjen og returnerer forventet pris, om den finnes. */
     function applyReference(target: AnyRec, ref: AnyRec): number | null {
@@ -148,6 +151,14 @@ Deno.serve(async (req) => {
     const startTolPct = Number(settings?.start_price_tolerance_pct ?? 2);
     const startMaxImpact =
       settings?.start_price_max_impact_nok == null ? null : Number(settings.start_price_max_impact_nok);
+
+    // Forrige registrerte kjøpspris som automatisk grunnlag — kun når selskapet
+    // har slått det på i innstillingene. Serverstyrt, aldri av klienten.
+    if (settings?.auto_check_against_last_purchase === true) {
+      AUTOMATIC_CHECK_BASIS.add("last_purchase");
+    }
+
+
 
     const catTols = required("kategoritoleranser", await svc.from("invoice_match_category_tolerances")
       .select("category, price_tolerance_pct").eq("legal_entity_id", inv.legal_entity_id));
