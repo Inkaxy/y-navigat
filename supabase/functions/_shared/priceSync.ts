@@ -52,7 +52,6 @@ export async function syncRegisteredPrices(
   const rmPriceDate = rm.price_updated_at ? String(rm.price_updated_at).slice(0, 10) : null;
   const staleForRm = !!(invDate && rmPriceDate && invDate < rmPriceDate);
 
-  const registered = rm.current_cost_price != null ? Number(rm.current_cost_price) : null;
 
   // Leverandørens avtalepris teller BARE når avtalen faktisk gjelder på
   // fakturadatoen. En utløpt avtale er ikke et sammenligningsgrunnlag.
