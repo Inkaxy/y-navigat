@@ -311,12 +311,33 @@ describe("matchemotoren: automatisk kobling krever gyldig prisgrunnlag", () => {
     return { line: tables.invoice_lines[0], invoice: tables.invoices[0] };
   }
 
-  it("forrige kjøp med lik pris blir stående til gjennomgang", async () => {
+  it("forrige kjøp med lik pris blir stående til gjennomgang når innstillingen er av", async () => {
     const { line, invoice } = await runAuto({ source: "last_purchase", price: 100 });
     expect(line.requires_review).toBe(true);
     expect(String(line.review_reason).split(",")).toContain("no_automatic_basis");
     expect(invoice.status).toBe("needs_review");
   });
+
+  it("forrige registrert pris innenfor toleransen går automatisk når innstillingen er på", async () => {
+    const { line, invoice } = await runAuto(
+      { source: "last_purchase", price: 100 },
+      { auto_check_against_last_purchase: true },
+    );
+    expect(line.requires_review).toBe(false);
+    expect(String(line.review_reason ?? "")).not.toContain("no_automatic_basis");
+    expect(invoice.status).toBe("ready");
+  });
+
+  it("forrige registrert pris med avvik over toleransen blir liggende til behandling", async () => {
+    const { line, invoice } = await runAuto(
+      { source: "last_purchase", price: 50 },
+      { auto_check_against_last_purchase: true },
+    );
+    expect(line.requires_review).toBe(true);
+    expect(String(line.review_reason).split(",")).toContain("price_variance");
+    expect(invoice.status).toBe("needs_review");
+  });
+
 
   it("gyldig avtalepris med lik pris ferdigmerker linjen", async () => {
     const { line } = await runAuto({ source: "agreement", price: 100 });
