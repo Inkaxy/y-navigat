@@ -270,8 +270,9 @@ describe("matchemotoren: en fullt avklart linje går fortsatt gjennom", () => {
  * Forrige kjøp er kun en sammenligning — det er ikke et godkjenningsgrunnlag.
  */
 describe("matchemotoren: automatisk kobling krever gyldig prisgrunnlag", () => {
-  async function runAuto(reference: Record<string, unknown>) {
+  async function runAuto(reference: Record<string, unknown>, settings?: Record<string, unknown>) {
     const tables = buildTables({ line: { match_confidence: null, raw_material_id: null } });
+    if (settings) tables.invoice_match_settings.push({ legal_entity_id: ENTITY, ...settings });
     tables.raw_material_suppliers.push({
       id: "rms-1",
       raw_material_id: RM,
