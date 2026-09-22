@@ -15,6 +15,8 @@ export interface MatchSettings {
   use_first_confirmed_price_as_start: boolean;
   /** Startpris: la linjer kontrolleres automatisk mot startprisen. */
   auto_check_against_start_price: boolean;
+  /** Forrige registrerte kjøpspris kan avslutte en automatisk koblet linje innenfor toleransen. */
+  auto_check_against_last_purchase: boolean;
   start_price_tolerance_pct: number | null;
   start_price_max_impact_nok: number | null;
 }
