@@ -70,8 +70,14 @@ export async function syncRegisteredPrices(
   const refUsable = refPrice != null && Number.isFinite(refPrice) && refPrice > 0;
 
   // Rekkefølge: (1) grunnlaget motoren allerede har valgt for datoen,
-  // (2) ellers en gyldig avtalepris, (3) alltid registrert kostpris i tillegg.
-  const supplierRegistered = refUsable
+  // (2) ellers en gyldig avtalepris.
+  //
+  // Registrert kostpris (`raw_materials.current_cost_price`) brukes IKKE som
+  // avvikskilde. Den er en avledet, ofte gammel verdi som kan ligge på et helt
+  // annet grunnlag enn pris per grunnenhet, og sammenligningen sendte da linjer
+  // til gjennomgang selv når de lå innenfor toleransen mot det grunnlaget
+  // motoren faktisk valgte — også etter at et menneske hadde bekreftet dem.
+  const comparisonBase = refUsable
     ? refPrice
     : agreementValidOnInvoiceDate()
       ? Number(rmsRow!.agreed_price_per_base_unit)
@@ -79,12 +85,9 @@ export async function syncRegisteredPrices(
   // Både økning OG fall skal fanges: et prisfall på 96 % er signaturen til en pakningsfeil.
   const deviation = (base: number | null): number | null =>
     base != null && base !== 0 ? ((actual - base) / base) * 100 : null;
-  const devs = [deviation(registered), deviation(supplierRegistered)].filter(
-    (d): d is number => d != null && Math.abs(d) > tolPct,
-  );
-  if (devs.length > 0) {
-    const worst = devs.reduce((a, b) => (Math.abs(b) > Math.abs(a) ? b : a));
-    addReason(update, worst > 0 ? "price_increase" : "price_drop");
+  const dev = deviation(comparisonBase);
+  if (dev != null && Math.abs(dev) > tolPct) {
+    addReason(update, dev > 0 ? "price_increase" : "price_drop");
   }
 
   // Avviket over kan i seg selv ha sendt linja til gjennomgang. Da skal ingen
