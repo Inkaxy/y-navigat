@@ -152,6 +152,14 @@ Deno.serve(async (req) => {
     const startMaxImpact =
       settings?.start_price_max_impact_nok == null ? null : Number(settings.start_price_max_impact_nok);
 
+    // Forrige registrerte kjøpspris som automatisk grunnlag — kun når selskapet
+    // har slått det på i innstillingene. Serverstyrt, aldri av klienten.
+    if (settings?.auto_check_against_last_purchase === true) {
+      AUTOMATIC_CHECK_BASIS.add("last_purchase");
+    }
+
+
+
     const catTols = required("kategoritoleranser", await svc.from("invoice_match_category_tolerances")
       .select("category, price_tolerance_pct").eq("legal_entity_id", inv.legal_entity_id));
     const catTolMap = new Map<string, number>();
