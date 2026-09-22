@@ -17258,6 +17258,7 @@ export type Database = {
       }
       user_has_invoice_access: { Args: never; Returns: boolean }
       user_has_legal_entity_access: { Args: { _le: string }; Returns: boolean }
+      user_holds_position: { Args: { _position_id: string }; Returns: boolean }
       user_outlet_ids: { Args: never; Returns: string[] }
       validate_order_delivery_rules: {
         Args: {

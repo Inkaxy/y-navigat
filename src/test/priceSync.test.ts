@@ -83,6 +83,27 @@ describe("syncRegisteredPrices", () => {
     expect(update.review_reason).toBe("price_drop");
     expect(svc.calls).toHaveLength(0);
   });
+
+  it("lar en gammel registrert kostpris være uten å flagge når grunnlaget stemmer", async () => {
+    const svc = mockClient();
+    const update: AnyRec = { requires_review: false, review_reason: null };
+    // Registrert kostpris (288) ligger på et helt annet grunnlag enn prisen per
+    // grunnenhet. Avtalen (19,98) er grunnlaget, og 20,29 er innenfor 2 %.
+    await syncRegisteredPrices(
+      svc,
+      baseInv,
+      line,
+      { ...rm, current_cost_price: 288 },
+      { ...rmsRow, agreed_price_per_base_unit: 19.98 },
+      20.29,
+      update,
+      2,
+      { source: "agreement", price: 19.98 },
+    );
+    expect(update.requires_review).toBe(false);
+    expect(update.review_reason).toBeNull();
+    expect(svc.calls.map((c) => c.table)).toContain("raw_material_suppliers");
+  });
 });
 
 describe("learnPendingAliases", () => {
