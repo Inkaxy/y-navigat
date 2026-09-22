@@ -243,6 +243,7 @@ export default function FakturaerInboxPage() {
   const [creditNoteId, setCreditNoteId] = useState<string | null>(null);
   const [startPriceOpen, setStartPriceOpen] = useState(false);
   const [busyInvoice, setBusyInvoice] = useState<{ id: string; action: string } | null>(null);
+  const [runAllProgress, setRunAllProgress] = useState<{ done: number; total: number } | null>(null);
   const anyDialogOpen =
     matchOpen || createOpen || notRmOpen || conflictOpen || !!reconcileId || bulkCreateOpen || !!creditNoteId || !!bulkLink ||
     startPriceOpen;
