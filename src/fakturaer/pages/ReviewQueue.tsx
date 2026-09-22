@@ -481,6 +481,37 @@ export default function FakturaerInboxPage() {
     }
   }
 
+  /**
+   * Kjører auto-match én faktura av gangen for alle fakturaene i lista.
+   * Ingen faktura godkjennes, attesteres eller betales — kun matching kjøres.
+   */
+  async function runMatchOnAll() {
+    const targets = invoices.filter((i) => i.status !== "flagged" && i.line_count > 0);
+    if (targets.length === 0) {
+      toast.info("Ingen fakturaer med linjer å behandle");
+      return;
+    }
+    setRunAllProgress({ done: 0, total: targets.length });
+    let ok = 0;
+    const failed: string[] = [];
+    for (const inv of targets) {
+      try {
+        await runAutoMatch(inv.id);
+        ok++;
+      } catch {
+        failed.push(inv.invoice_number);
+      }
+      setRunAllProgress((p) => (p ? { ...p, done: p.done + 1 } : p));
+    }
+    setRunAllProgress(null);
+    refresh();
+    if (failed.length > 0) {
+      toast.warning(`${ok} fakturaer behandlet, ${failed.length} feilet (${failed.slice(0, 3).join(", ")}${failed.length > 3 ? " m.fl." : ""})`);
+    } else {
+      toast.success(`${ok} fakturaer behandlet`);
+    }
+  }
+
   // --- Hurtigtaster --------------------------------------------------------
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
