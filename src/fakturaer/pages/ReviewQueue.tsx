@@ -810,23 +810,30 @@ export default function FakturaerInboxPage() {
             Klar for prismatch
           </Button>
 
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5"
-            onClick={() => void runMatchOnAll()}
-            disabled={!!runAllProgress || invoices.length === 0}
-          >
-            {runAllProgress ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Behandler {runAllProgress.done}/{runAllProgress.total}
-              </>
-            ) : (
-              <>
-                <RotateCw className="h-3.5 w-3.5" /> Behandle alle
-              </>
-            )}
-          </Button>
+          {onlyReady ? (
+            <span className="text-sm text-ink-secondary">
+              Disse er ferdig matchet — de forsvinner fra lista når du trykker «Avstem».
+            </span>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => void runMatchOnAll()}
+              disabled={!!runAllProgress || invoices.length === 0}
+            >
+              {runAllProgress ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Behandler {runAllProgress.done}/{runAllProgress.total}
+                </>
+              ) : (
+                <>
+                  <RotateCw className="h-3.5 w-3.5" /> Behandle alle
+                </>
+              )}
+            </Button>
+          )}
+
 
           {undoEntry && (
             <Button size="sm" variant="ghost" onClick={() => void doUndo()} className="gap-1.5">
