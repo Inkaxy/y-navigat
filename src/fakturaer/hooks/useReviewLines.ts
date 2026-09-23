@@ -72,7 +72,7 @@ export interface ReviewLineRow {
 }
 
 /** Fakturastatuser som ikke skal kunne behandles fra køen. */
-export const HIDDEN_INVOICE_STATUSES = ["flagged", "reconciled"];
+export const HIDDEN_INVOICE_STATUSES = ["flagged", "reconciled", "ready"];
 
 const SELECT = `id, invoice_id, line_number, supplier_sku, description, quantity, unit, unit_price, total_amount,
    package_size, package_unit, count_per_package, base_quantity,
@@ -120,7 +120,11 @@ export function useReviewLines(filters: Filters) {
           // Ta også med matchede linjer uten avtalepris — de utgjør arbeidslisten
           // «Uten avtalepris», selv om de ikke er merket for gjennomgang.
           .or("requires_review.eq.true,variance_status.eq.no_baseline")
-          .not("invoice.status", "in", `(${HIDDEN_INVOICE_STATUSES.join(",")})`)
+          .not(
+            "invoice.status",
+            "in",
+            `(${(filters.onlyReady ? HIDDEN_INVOICE_STATUSES.filter((status) => status !== "ready") : HIDDEN_INVOICE_STATUSES).join(",")})`,
+          )
           // Nyeste faktura først — sorteringen MÅ skje i databasen. Med et tak
           // på f.eks. 200 linjer ville en klientsortering bare sortert de
           // vilkårlige 200 første radene.
@@ -212,7 +216,11 @@ export function useReviewLineCounts(filters: Omit<Filters, "limit">) {
              invoice:invoices!inner(id, supplier_id, currency, lines_sum_status, extraction_confidence)`,
           )
           .or("requires_review.eq.true,variance_status.eq.no_baseline")
-          .not("invoice.status", "in", `(${HIDDEN_INVOICE_STATUSES.join(",")})`)
+          .not(
+            "invoice.status",
+            "in",
+            `(${(filters.onlyReady ? HIDDEN_INVOICE_STATUSES.filter((status) => status !== "ready") : HIDDEN_INVOICE_STATUSES).join(",")})`,
+          )
           .order("invoice_id")
           // Unik sekundærsortering: paginering uten den kan hoppe over rader.
           .order("id")
