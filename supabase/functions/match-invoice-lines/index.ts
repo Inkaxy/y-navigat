@@ -127,6 +127,29 @@ Deno.serve(async (req) => {
       return price != null && Number.isFinite(price) ? price : null;
     }
 
+    /**
+     * Pris-RPC-en bruker autoritativ prishistorikk. For oppstartsdata finnes den
+     * forrige, allerede registrerte fakturaprisen ofte bare på leverandørkoblingen.
+     * Når innstillingen er slått på, kan den brukes dersom den faktisk er eldre
+     * enn fakturaen som behandles. Dagens faktura kan dermed aldri bli sitt eget
+     * sammenligningsgrunnlag.
+     */
+    function withRegisteredLastPurchase(ref: AnyRec, rmsRow: AnyRec | undefined): AnyRec {
+      if (String(ref.source ?? "none") !== "none") return ref;
+      if (settings?.auto_check_against_last_purchase !== true) return ref;
+      const price = rmsRow?.last_invoice_price == null ? null : Number(rmsRow.last_invoice_price);
+      const date = rmsRow?.last_invoice_date ? String(rmsRow.last_invoice_date) : null;
+      if (price == null || !Number.isFinite(price) || price <= 0 || !date || date >= String(inv.invoice_date)) {
+        return ref;
+      }
+      return {
+        source: "last_purchase",
+        price,
+        reference_id: rmsRow.id ?? null,
+        reference_date: date,
+      };
+    }
+
     const currencyCode = String(inv.currency ?? "NOK").toUpperCase();
     const foreignCurrency = currencyCode !== "NOK";
 
@@ -212,7 +235,7 @@ Deno.serve(async (req) => {
 
     // Supplier's raw_material_suppliers (with aliases)
     const rms = required("leverandørkoblinger", await svc.from("raw_material_suppliers")
-      .select("id, raw_material_id, supplier_id, supplier_sku, supplier_product_name, agreed_price_per_base_unit, agreement_valid_from, agreement_valid_to, last_invoice_date, package_size, package_unit, base_units_per_package, package_confirmed_at, is_primary")
+      .select("id, raw_material_id, supplier_id, supplier_sku, supplier_product_name, agreed_price_per_base_unit, agreement_valid_from, agreement_valid_to, last_invoice_price, last_invoice_date, package_size, package_unit, base_units_per_package, package_confirmed_at, is_primary")
       .eq("supplier_id", inv.supplier_id));
     const rmsList = rms ?? [];
     const rmsIds = rmsList.map((r: AnyRec) => r.id);
@@ -272,7 +295,7 @@ Deno.serve(async (req) => {
 
         const rm = rmById.get(line.raw_material_id);
         const rmsRow = rmsList.find((r: AnyRec) => r.raw_material_id === line.raw_material_id && r.supplier_id === inv.supplier_id);
-        const refM = await priceReference(line.raw_material_id);
+        const refM = withRegisteredLastPurchase(await priceReference(line.raw_material_id), rmsRow);
         const expected = applyReference(manualUpdate, refM);
 
         const cost = costForLine(line, rm, rmsRow);
@@ -632,7 +655,7 @@ Deno.serve(async (req) => {
       if (update.raw_material_id) {
         const rm = rmById.get(update.raw_material_id);
         const rmsRow = rmsList.find((r: AnyRec) => r.raw_material_id === update.raw_material_id && r.supplier_id === inv.supplier_id);
-        const ref = await priceReference(update.raw_material_id);
+        const ref = withRegisteredLastPurchase(await priceReference(update.raw_material_id), rmsRow);
         const expected = applyReference(update, ref);
 
         const cost = costForLine(line, rm, rmsRow);

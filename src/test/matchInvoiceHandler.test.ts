@@ -282,6 +282,7 @@ describe("matchemotoren: automatisk kobling krever gyldig prisgrunnlag", () => {
       agreed_price_per_base_unit: null,
       agreement_valid_from: null,
       agreement_valid_to: null,
+      last_invoice_price: null,
       last_invoice_date: null,
       package_size: 1,
       package_unit: "kg",
@@ -326,6 +327,48 @@ describe("matchemotoren: automatisk kobling krever gyldig prisgrunnlag", () => {
     expect(line.requires_review).toBe(false);
     expect(String(line.review_reason ?? "")).not.toContain("no_automatic_basis");
     expect(invoice.status).toBe("ready");
+  });
+
+  it("bruker eldre registrert fakturapris når prishistorikken ennå mangler", async () => {
+    const tables = buildTables({ line: { match_confidence: null, raw_material_id: null } });
+    tables.invoice_match_settings.push({ legal_entity_id: ENTITY, auto_check_against_last_purchase: true });
+    tables.raw_material_suppliers.push({
+      id: "rms-1",
+      raw_material_id: RM,
+      supplier_id: SUPPLIER,
+      supplier_sku: "SUK",
+      supplier_product_name: "Sukker",
+      agreed_price_per_base_unit: null,
+      agreement_valid_from: null,
+      agreement_valid_to: null,
+      last_invoice_price: 100,
+      last_invoice_date: "2026-08-01",
+      package_size: 1,
+      package_unit: "kg",
+      base_units_per_package: 1,
+      package_confirmed_at: "2026-08-01T00:00:00Z",
+      is_primary: true,
+    });
+    tables.raw_material_supplier_aliases.push({
+      id: "alias-1",
+      raw_material_supplier_id: "rms-1",
+      alias_type: "supplier_sku",
+      alias_value: "SUK",
+      alias_value_normalized: "suk",
+      status: "confirmed",
+      match_count: 5,
+    });
+    const client = createFakeClient(tables, { rpc: { rm_price_reference: { source: "none" } } });
+    (globalThis as Record<string, unknown>).__EDGE_SUPABASE_FACTORY__ = () => client;
+    const res = await handler(new Request("http://localhost/match-invoice-lines", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ invoice_id: INVOICE }),
+    }));
+    expect(res.status).toBe(200);
+    expect(tables.invoice_lines[0].price_reference_source).toBe("last_purchase");
+    expect(tables.invoice_lines[0].requires_review).toBe(false);
+    expect(tables.invoices[0].status).toBe("ready");
   });
 
   it("forrige registrert pris med avvik over toleransen blir liggende til behandling", async () => {

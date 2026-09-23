@@ -81,7 +81,7 @@ export function useInboxInvoices(
            line_extraction_status, line_extraction_attempts, source, notes, paid_at, tripletex_is_paid, suppliers(name),
            invoice_lines(raw_material_id, requires_review, price_variance_pct, variance_status, raw_materials(category))`,
         )
-        .in("status", filters.onlyReady ? ["ready"] : ["imported", "needs_review", "ready", "flagged"])
+        .in("status", filters.onlyReady ? ["ready"] : ["imported", "needs_review", "flagged"])
         .order("invoice_date", { ascending: false })
         .limit(100);
 
