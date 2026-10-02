@@ -48,7 +48,7 @@ interface Form {
 const splitList = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean);
 const parseNum = (v: string) => (v !== "" && Number.isFinite(Number(v.replace(",", "."))) ? Number(v.replace(",", ".")) : null);
 
-export function formToDoc(f: Form): DeclarationDoc {
+function formToDoc(f: Form): DeclarationDoc {
   const nutrition: Record<string, number | null> = {};
   for (const k of NUTRITION_KEYS) nutrition[k] = parseNum(f.nutrition[k] ?? "");
   return { ingredientText: f.ingredientText.trim() || null, contains: splitList(f.contains), mayContain: splitList(f.mayContain), nutrition };
