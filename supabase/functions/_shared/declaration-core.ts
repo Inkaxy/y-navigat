@@ -483,7 +483,7 @@ export function nutritionIsComplete(row: any): boolean {
   });
 }
 
-const RM_SELECT = "id, name, declaration_name, is_composite, grain_classification, cereal_type, water_content_pct, components_reviewed_at, unit_weight_grams";
+const RM_SELECT = "id, name, declaration_name, is_composite, grain_classification, cereal_type, water_content_pct, components_reviewed_at, allergens_reviewed_at, unit_weight_grams";
 
 const PACKAGING_RE =
   /(,\s*)?\b(sekk|kartong|container|pose|spann|eske|bøtte|kasse|dunk|flaske|boks|pk|pakke|krt|ctn|bulk|palleboks|kanne|bib|slim|brett|beger|glass|hylse|rull)\b[^,]*/g;
@@ -1055,6 +1055,8 @@ export async function computeDeclarationCore(
     if (!rmId || seenAllergenRm.has(rmId)) continue;
     seenAllergenRm.add(rmId);
     if ((allergensByRm.get(rmId) ?? []).length > 0) continue;
+    // Eksplisitt bekreftet «ingen allergener» (allergens_reviewed_at) teller som gjennomgått.
+    if (rmMap.get(rmId)?.allergens_reviewed_at) continue;
     if (isWaterRow(rmId, a.name)) continue;
     missing_allergens.push({
       raw_material_id: rmId,
