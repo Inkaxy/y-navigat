@@ -60,7 +60,7 @@ export function LinkedProductsCard({ recipeId, links, canWrite }: Props) {
       </CardHeader>
       <CardContent className="space-y-1">
         {links.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Ingen produkter er koblet til denne oppskriften ennå.</p>
+          <p className="text-sm text-muted-foreground">Ingen varer er koblet til oppskriften. Endringer her oppdaterer derfor ingen varer.</p>
         ) : (
           links.map((l) => {
             const p = l.products;

@@ -372,7 +372,7 @@ export function DataQualityCard({
                               <Pencil className="mr-1.5 h-4 w-4" /> Legg inn manuelt
                             </Button>
                             <Link
-                              to={`/ravarer/${m.raw_material_id}?tab=nutrition`}
+                              to={`/ravarer/vareliste/${m.raw_material_id}?tab=nutrition`}
                               className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
                             >
                               Åpne råvarekortet <ExternalLink className="h-3 w-3" />

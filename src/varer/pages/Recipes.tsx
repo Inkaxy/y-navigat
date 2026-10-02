@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { copyRecipe } from "@/varer/lib/copyRecipe";
 import { fetchAllRows } from "@/lib/supabasePaging";
-import { deriveLabelingStatus, LABELING_STATUS_LABEL, type LabelingStatus } from "@/varer/lib/labelStaleness";
+import { deriveLabelingStatusFromDb, LABELING_STATUS_LABEL, type LabelingStatus } from "@/varer/lib/labelStaleness";
 import { format } from "date-fns";
 import { nb } from "date-fns/locale";
 
@@ -180,24 +180,28 @@ export default function Recipes() {
     },
   });
 
-  /** Merkestatus pr oppskrift: godkjenning vs. siste beregning og siste endring. */
+  /**
+   * Merkestatus pr oppskrift — samme grunnlag som Merking-fanen og varelisten:
+   * databasens `is_stale` på beregningen + godkjenningstidspunktet.
+   */
   const labelingQuery = useQuery({
     queryKey: ["recipes-labeling-status", legalEntityId],
     queryFn: async () => {
       const [calcRes, recRes] = await Promise.all([
-        supabase.from("recipe_label_calculated").select("recipe_id, computed_at"),
-        supabase.from("recipes").select("id, updated_at, declaration_updated_at").is("valid_to", null),
+        supabase.from("recipe_label_calculated").select("recipe_id, computed_at, is_stale"),
+        supabase.from("recipes").select("id, declaration_updated_at").is("valid_to", null),
       ]);
       if (calcRes.error) throw calcRes.error;
       if (recRes.error) throw recRes.error;
-      const computedBy = new Map<string, string | null>();
-      for (const c of calcRes.data ?? []) computedBy.set(c.recipe_id, c.computed_at);
+      const calcBy = new Map<string, { computed_at: string | null; is_stale: boolean | null }>();
+      for (const c of calcRes.data ?? []) calcBy.set(c.recipe_id, c);
       const out: Record<string, LabelingStatus> = {};
       for (const r of recRes.data ?? []) {
-        out[r.id] = deriveLabelingStatus({
+        const c = calcBy.get(r.id);
+        out[r.id] = deriveLabelingStatusFromDb({
           approvedAt: r.declaration_updated_at,
-          computedAt: computedBy.get(r.id) ?? null,
-          sources: [{ name: "Oppskriften", updatedAt: r.updated_at }],
+          computedAt: c?.computed_at ?? null,
+          isStale: c?.is_stale ?? null,
         });
       }
       return out;
