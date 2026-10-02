@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AlertTriangle, CheckCircle2, ChevronDown, ExternalLink, FileText, Link2, Loader2, Pencil } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { FoodPickerDialog } from "@/ravarer/components/matvaretabellen/FoodPickerDialog";
 import { cn } from "@/lib/utils";
 import { fmtGrams, fmtPct } from "@/varer/lib/breadscale";
@@ -86,7 +88,27 @@ export function DataQualityCard({
 }: Props) {
   const pct = coveragePct ?? 0;
   const ok = pct >= 90;
-  const { tasks, recipeTasks } = useMemo(() => buildQualityTasks(missingData), [missingData]);
+  // Oppskriftens fritekstlinjer: stabile id-er for å slå sammen beregningens rapporter om samme linje.
+  const freeTextQuery = useQuery({
+    queryKey: ["recipe-free-text-lines", recipeId],
+    enabled: !!recipeId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("recipe_lines")
+        .select("id, ingredient_name")
+        .eq("recipe_id", recipeId!)
+        .is("raw_material_id", null)
+        .limit(500);
+      if (error) throw error;
+      return (data ?? [])
+        .filter((r) => !!r.ingredient_name)
+        .map((r) => ({ id: r.id as string, name: r.ingredient_name as string }));
+    },
+  });
+  const { tasks, recipeTasks } = useMemo(
+    () => buildQualityTasks(missingData, freeTextQuery.data ?? []),
+    [missingData, freeTextQuery.data],
+  );
   const messages = useMemo(
     () => dedupeMessages(missingData?.block_reasons, warnings),
     [missingData?.block_reasons, warnings],
@@ -201,11 +223,10 @@ export function DataQualityCard({
                   {!ok && " Under 90 % dekning kan næringstabellen ikke brukes på emballasje."}
                 </p>
               </div>
-              {canWrite && (
-                <Button variant="outline" size="sm" onClick={onRecalculate} disabled={recalculating}>
-                  {recalculating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Beregn på nytt
-                </Button>
+              {recalculating && (
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground" aria-live="polite">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Beregner …
+                </span>
               )}
               {taskCount + messages.length > 0 && (
                 <CollapsibleTrigger asChild>
