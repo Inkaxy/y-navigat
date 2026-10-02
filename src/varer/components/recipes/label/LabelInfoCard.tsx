@@ -107,8 +107,9 @@ export function LabelInfoCard({
       <CardContent className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <Label className="text-xs">Nettovekt per enhet (g)</Label>
+            <Label htmlFor="etikett-nettovekt" className="text-xs">Nettovekt per enhet (g)</Label>
             <Input
+              id="etikett-nettovekt"
               inputMode="decimal"
               value={form.weight}
               disabled={!canWrite}
@@ -120,8 +121,9 @@ export function LabelInfoCard({
             </p>
           </div>
           <div>
-            <Label className="text-xs">Holdbarhet (dager)</Label>
+            <Label htmlFor="etikett-holdbarhet" className="text-xs">Holdbarhet (dager)</Label>
             <Input
+              id="etikett-holdbarhet"
               inputMode="numeric"
               value={form.shelf}
               disabled={!canWrite}
@@ -133,8 +135,9 @@ export function LabelInfoCard({
             </p>
           </div>
           <div>
-            <Label className="text-xs">Oppbevaring</Label>
+            <Label htmlFor="etikett-oppbevaring" className="text-xs">Oppbevaring</Label>
             <Textarea
+              id="etikett-oppbevaring"
               rows={2}
               value={form.storage}
               disabled={!canWrite}

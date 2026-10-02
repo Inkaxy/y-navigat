@@ -98,6 +98,7 @@ export function useApproveDeclaration() {
       qc.invalidateQueries({ queryKey: ["recipe-linked-products", input.recipeId] });
       qc.invalidateQueries({ queryKey: ["recipe-declaration-versions", input.recipeId] });
       qc.invalidateQueries({ queryKey: ["recipes"] });
+      qc.invalidateQueries({ queryKey: ["recipes-labeling-status"] });
       qc.invalidateQueries({ queryKey: ["products"] });
       toast.success(
         res.productsUpdated > 0
