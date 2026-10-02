@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { nutritionDiff, wordDiff } from "@/varer/lib/declarationDiff";
+import { diffSegments, nutritionDiff } from "@/varer/lib/declarationDiff";
 import { stripHtml } from "@/varer/lib/effectiveDeclaration";
 
 export interface DeclarationDoc {
@@ -42,7 +42,7 @@ interface Props {
 
 /** Ord-, allergen- og næringsdiff mellom to deklarasjoner. */
 export function DeclarationDiffView({ from, to, fromLabel, toLabel }: Props) {
-  const parts = wordDiff(stripHtml(from?.ingredientText ?? ""), stripHtml(to.ingredientText ?? ""));
+  const segs = diffSegments(stripHtml(from?.ingredientText ?? ""), stripHtml(to.ingredientText ?? ""));
   const nutRows = nutritionDiff(from?.nutrition ?? null, to.nutrition).filter((r) => r.changed);
   const contains = setDiff(from?.contains ?? [], to.contains);
   const may = setDiff(from?.mayContain ?? [], to.mayContain);
@@ -56,25 +56,35 @@ export function DeclarationDiffView({ from, to, fromLabel, toLabel }: Props) {
   return (
     <div className="space-y-3 text-sm">
       <p className="text-xs text-muted-foreground">
-        Fra <b>{fromLabel}</b> til <b>{toLabel}</b>. Grønt legges til, rødt fjernes.
+        Fra <b>{fromLabel}</b> til <b>{toLabel}</b>. Gjennomstreket fjernes, innrammet legges til; allergenmarkering (*…*) er utelatt i sammenligningen.
       </p>
       <div>
         <div className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Ingrediensliste</div>
-        {parts.every((p) => p.op === "same") ? (
+        {segs.every((p) => p.op === "same") ? (
           <p className="text-xs text-muted-foreground">Ingen endring i teksten.</p>
         ) : (
           <p className="leading-relaxed">
-            {parts.map((p, i) => (
-              <span
-                key={i}
-                className={cn(
-                  p.op === "added" && "rounded bg-emerald-500/15 text-emerald-800 dark:text-emerald-300",
-                  p.op === "removed" && "rounded bg-destructive/15 text-destructive line-through",
-                )}
-              >
-                {p.text}
-              </span>
-            ))}
+            {segs.map((p, i) =>
+              p.op === "same" ? (
+                <span key={i}>{p.text}</span>
+              ) : (
+                <span key={i} className="mx-0.5 inline">
+                  {p.removed && (
+                    <del className="rounded bg-destructive/15 px-1 text-foreground decoration-destructive decoration-2">
+                      <span className="sr-only">fjernet: </span>
+                      {p.removed}
+                    </del>
+                  )}
+                  {p.removed && p.added && <span aria-hidden="true" className="px-1 text-muted-foreground">→</span>}
+                  {p.added && (
+                    <ins className="rounded bg-emerald-500/20 px-1 text-foreground no-underline ring-1 ring-emerald-600/40">
+                      <span className="sr-only">lagt til: </span>
+                      {p.added}
+                    </ins>
+                  )}{" "}
+                </span>
+              ),
+            )}
           </p>
         )}
       </div>
@@ -98,8 +108,8 @@ export function DeclarationDiffView({ from, to, fromLabel, toLabel }: Props) {
           <ul className="space-y-0.5 text-xs">
             {nutRows.map((r) => (
               <li key={r.key}>
-                {r.label}: <span className="text-destructive line-through">{fmtNum(r.from)}</span>{" "}
-                <span className="text-emerald-700 dark:text-emerald-300">→ {fmtNum(r.to)}</span>
+                {r.label}: <del className="text-foreground decoration-destructive decoration-2">{fmtNum(r.from)}</del>{" "}
+                <span className="font-medium text-foreground">→ {fmtNum(r.to)}</span>
               </li>
             ))}
           </ul>
