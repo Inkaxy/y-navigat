@@ -12,7 +12,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { saveAsHalvfabrikat } from "@/varer/lib/saveAsHalvfabrikat";
-import { AlertTriangle, ArrowLeft, Copy, FileText, Loader2, Lock, Package, Pencil, Plus, Printer, RefreshCw, Layers, Save, Share2, Wheat } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Copy, FileText, Loader2, Lock, MoreHorizontal, Package, Pencil, Plus, Printer, RefreshCw, Layers, Save, Share2, Wheat } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { logAudit } from "@/varer/lib/audit";
 import { RecipeProductLinks } from "@/varer/components/products/RecipeProductLinks";
 import { RecipeStatsBar } from "@/varer/components/recipes/RecipeStatsBar";
@@ -849,99 +856,104 @@ export default function RecipeDetail() {
 
   return (
     <>
-      <AppHeaderBanner
-        title={header.name || "Oppskrift"}
-        subtitle={`v${recipe.version ?? 1}${header.category ? ` · ${header.category}` : ""}`}
-      />
-      <div className="space-y-4 px-6 py-6 pb-24">
-        {/* Navnet skal være åpenbart redigerbart — klikk på tittelen eller blyanten. */}
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="space-y-4 px-6 py-5 pb-24">
+        {/* Én kompakt oppskriftsheader: navn, versjon, oppskriftsstatus og handlinger. */}
+        <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line-subtle pb-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Tilbake til alle oppskrifter"
+            onClick={() => navigate("/varer/oppskrifter")}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
           {titleEditing && editable ? (
             <Input
               autoFocus
+              aria-label="Navn på oppskriften"
               value={header.name ?? ""}
               onChange={(e) => patchHeader({ name: e.target.value })}
               onBlur={() => setTitleEditing(false)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === "Escape") setTitleEditing(false);
               }}
-              className="h-11 max-w-md text-xl font-semibold"
+              className="h-10 max-w-md text-lg font-semibold"
               placeholder="Navn på oppskriften"
             />
           ) : (
-            <button
-              type="button"
-              onClick={() => editable && setTitleEditing(true)}
-              className="group flex items-center gap-2 rounded-md px-1 text-left text-2xl font-semibold tracking-tight hover:bg-muted/50 disabled:cursor-default"
-              disabled={!editable}
-              title={editable ? "Klikk for å endre navnet" : undefined}
-            >
-              {header.name || "Uten navn"}
-              {editable && <Pencil className="h-4 w-4 text-muted-foreground opacity-0 transition group-hover:opacity-100" />}
-            </button>
+            <h1 className="min-w-0">
+              <button
+                type="button"
+                onClick={() => editable && setTitleEditing(true)}
+                className="group flex items-center gap-2 rounded-md px-1 text-left text-xl font-semibold tracking-tight hover:bg-muted/50 disabled:cursor-default"
+                disabled={!editable}
+                title={editable ? "Klikk for å endre navnet" : undefined}
+              >
+                <span className="truncate">{header.name || "Uten navn"}</span>
+                {editable && <Pencil className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100" />}
+              </button>
+            </h1>
           )}
+          <span className="text-sm text-muted-foreground tabular-nums">
+            v{recipe.version ?? 1}{header.category ? ` · ${header.category}` : ""}
+          </span>
+          <Badge variant="outline" title="Oppskriftsstatus (ikke merkestatus)">
+            {RECIPE_STATUS_OPTIONS.find((s) => s.value === header.status)?.label ?? "Utkast"}
+          </Badge>
           {isBaseRecipe && (
             <Badge variant="outline" className="gap-1 border-app/50 text-app">
               <Wheat className="h-3.5 w-3.5" /> Grunnoppskrift
             </Badge>
           )}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/varer/oppskrifter")}>
-            <ArrowLeft className="mr-1 h-4 w-4" /> Alle oppskrifter
-          </Button>
-          <Badge variant="outline">{RECIPE_STATUS_OPTIONS.find((s) => s.value === header.status)?.label ?? "Utkast"}</Badge>
           <div className="flex-1" />
-          {canWrite && (
-            <Button variant="outline" onClick={handleCopy} disabled={copying}>
-              {copying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Copy className="mr-2 h-4 w-4" />}
-              Lag kopi
-            </Button>
-          )}
-          {canWrite && (
-            <Button variant="outline" onClick={handleSaveAsTemplate} disabled={copying}>
-              <FileText className="mr-2 h-4 w-4" /> Lagre som mal
-            </Button>
-          )}
-
-          <Button
-            variant="outline"
-            onClick={() => setProductionDialogOpen(true)}
-            disabled={generating !== null}
-          >
-            {generating === "production" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
-            Skriv ut produksjonsark
-          </Button>
-          <Button variant="outline" onClick={() => setCardDialogOpen(true)} disabled={generating !== null}>
-            <FileText className="mr-2 h-4 w-4" /> Oppskriftskort
-          </Button>
-          <Button variant="outline" onClick={() => setShareOpen(true)}>
-            <Share2 className="mr-2 h-4 w-4" /> Del
-          </Button>
-
-
-
-
-
-          {canWrite && (
-            <Button variant="outline" onClick={() => setRawMatOpen(true)}>
-              <Package className="mr-2 h-4 w-4" /> Lagre som råvare
-            </Button>
-          )}
-          {canWrite && (
-            <Button variant="outline" onClick={handleSaveAsHalvfabrikat} disabled={savingHalvfabrikat}>
-              {savingHalvfabrikat ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Layers className="mr-2 h-4 w-4" />}
-              Lagre som halvfabrikat
-            </Button>
-          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" disabled={generating !== null || copying || savingHalvfabrikat}>
+                {generating !== null || copying || savingHalvfabrikat ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <MoreHorizontal className="mr-2 h-4 w-4" />
+                )}
+                Flere handlinger
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-60">
+              <DropdownMenuItem onSelect={() => setProductionDialogOpen(true)}>
+                <Printer className="mr-2 h-4 w-4" /> Skriv ut produksjonsark
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setCardDialogOpen(true)}>
+                <FileText className="mr-2 h-4 w-4" /> Oppskriftskort
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setShareOpen(true)}>
+                <Share2 className="mr-2 h-4 w-4" /> Del
+              </DropdownMenuItem>
+              {canWrite && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => void handleCopy()}>
+                    <Copy className="mr-2 h-4 w-4" /> Lag kopi
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => void handleSaveAsTemplate()}>
+                    <FileText className="mr-2 h-4 w-4" /> Lagre som mal
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setRawMatOpen(true)}>
+                    <Package className="mr-2 h-4 w-4" /> Lagre som råvare
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => void handleSaveAsHalvfabrikat()}>
+                    <Layers className="mr-2 h-4 w-4" /> Lagre som halvfabrikat
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
           {canWrite && (
             <Button onClick={save} disabled={saving || !dirty || isScaled}>
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              Lagre
+              Lagre oppskrift
             </Button>
           )}
-        </div>
+        </header>
+
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList>
