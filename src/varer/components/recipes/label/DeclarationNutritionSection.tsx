@@ -255,7 +255,7 @@ export function DeclarationNutritionSection(p: Props) {
             varer.
           </p>
         </div>
-        <SourceSegmented value={candidate} disabled={busy} onChange={p.onCandidateChange} />
+        <SourceSegmented caption="Vis og rediger:" value={candidate} disabled={busy} onChange={p.onCandidateChange} />
       </CardHeader>
       <CardContent className="space-y-4">
         {candidate !== savedMode && (
