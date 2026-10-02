@@ -21,12 +21,14 @@ export function SourceSegmented({
   disabled,
   autoLabel = "Beregnet av NBhub",
   manualLabel = "Manuell",
+  caption = "Følger produktet:",
 }: {
   value: LabelSource;
   onChange: (v: LabelSource) => void;
   disabled?: boolean;
   autoLabel?: string;
   manualLabel?: string;
+  caption?: string;
 }) {
   const opts: Array<{ key: LabelSource; label: string }> = [
     { key: "auto", label: autoLabel },
@@ -34,7 +36,7 @@ export function SourceSegmented({
   ];
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-xs text-muted-foreground">Følger produktet:</span>
+      <span className="text-xs text-muted-foreground">{caption}</span>
       <div className="inline-flex rounded-md border bg-background p-0.5" role="group">
         {opts.map((o) => (
           <Button

@@ -48,6 +48,9 @@ interface Props {
   coveragePct?: number | null;
   /** Sjekklisten rapporteres opp slik at godkjenning kan sperres likt. */
   onChecklistChange?: (blocked: boolean) => void;
+  /** «Rett felt»: etiketten for snarveien til feltet, eller null når den ikke kan rettes her. */
+  fixLabelFor?: (key: string) => string | null;
+  onFixField?: (key: string) => void;
 }
 
 async function toDataUrl(url: string): Promise<string | null> {
@@ -85,6 +88,8 @@ export function ConsumerLabelSection({
   keyholeQualifies,
   coveragePct,
   onChecklistChange,
+  fixLabelFor,
+  onFixField,
 }: Props) {
   const [size, setSize] = useState<LabelSizeKey | "profile">(profile ? "profile" : "100x70");
   const [printing, setPrinting] = useState(false);
@@ -136,6 +141,8 @@ export function ConsumerLabelSection({
     onChecklistChange?.(checklist.blocked);
   }, [checklist.blocked, onChecklistChange]);
 
+  const fixable = (key: string) => (onFixField && fixLabelFor ? fixLabelFor(key) : null);
+  const printBlockers = checklist.errors;
   const canPrint = !!(effective.ingredientText && effective.ingredientText.trim()) && !checklist.blocked;
 
   async function printLabel() {
@@ -226,6 +233,31 @@ export function ConsumerLabelSection({
             </p>
           )}
         </div>
+
+        {printBlockers.length > 0 && (
+          <div role="note" aria-label="Rett felt før utskrift" className="rounded-md border border-destructive/40 bg-destructive/5 p-2">
+            <p className="text-xs font-medium">Rett dette før utskrift:</p>
+            <ul className="mt-1 space-y-1">
+              {printBlockers.map((item) => {
+                const label = fixable(item.key);
+                return (
+                  <li key={item.key} className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span>
+                      <b>{item.label}:</b> {item.detail}
+                    </span>
+                    {label ? (
+                      <Button size="sm" variant="outline" className="h-7" onClick={() => onFixField?.(item.key)}>
+                        {label}
+                      </Button>
+                    ) : item.key === "producer" ? (
+                      <span className="text-muted-foreground">Rettes i firmaopplysningene</span>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
         {profile && (
           <p className="text-xs text-muted-foreground">
@@ -328,9 +360,18 @@ export function ConsumerLabelSection({
                 ) : (
                   <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
                 )}
-                <span>
+                <span className="flex-1">
                   <b>{item.label}:</b> {item.detail}
                 </span>
+                {item.level !== "ok" && fixable(item.key) && (
+                  <button
+                    type="button"
+                    className="shrink-0 font-medium underline underline-offset-2"
+                    onClick={() => onFixField?.(item.key)}
+                  >
+                    Rett felt
+                  </button>
+                )}
               </li>
             ))}
           </ul>

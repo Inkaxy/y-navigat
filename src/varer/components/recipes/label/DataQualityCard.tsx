@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,8 +13,15 @@ import {
   useExtractNutritionFromDatasheet,
   type MissingNutritionRow,
 } from "@/varer/hooks/useMissingNutrition";
+import {
+  ISSUE_LABEL,
+  buildQualityTasks,
+  dedupeMessages,
+  type QualityIssueKind,
+  type QualityTask,
+} from "@/varer/lib/labelQualityTasks";
 import { ManualNutritionDialog } from "./ManualNutritionDialog";
-import { MissingDeclarationNames, type MissingDeclarationNameRow } from "./MissingDeclarationNames";
+import { DeclarationNameInline, type MissingDeclarationNameRow } from "./MissingDeclarationNames";
 import {
   ConfirmAllergensInline,
   FreeTextLinkInline,
@@ -34,7 +41,7 @@ export interface MissingData {
   lines_without_nutrition_over_pct?: Array<{ name: string; pct_of_weight?: number }>;
   /** Salt, vann eller gjær uten næringsrad — hard sperre. */
   critical_missing_nutrition?: string[];
-  /** Råvarer uten en eneste allergenrad — allergener ikke gjennomgått. */
+  /** Råvarer som ikke er gjennomgått for allergener. */
   allergens_unreviewed?: Array<{ raw_material_id?: string | null; name: string; pct_of_weight?: number }>;
   /** Ukjent enhet eller stk uten stykkvekt. */
   unit_problems?: Array<{ name: string; reason?: string }>;
@@ -57,31 +64,15 @@ interface Props {
   onGoToRecipeTab?: () => void;
   /** Oppskriften kortet gjelder — kreves for inline-kobling av fritekstlinjer. */
   recipeId?: string;
+  /** Økes av forelderen for å åpne oppgavelisten (f.eks. «Se hva som mangler»). */
+  openSignal?: number;
 }
 
-function nameList(items: MissingData["water_content"]): string[] {
-  return (items ?? []).map((x) => (typeof x === "string" ? x : x?.name ?? "Uten navn")).filter(Boolean);
+function rmLink(id: string, tab?: string): string {
+  return `/ravarer/vareliste/${id}${tab ? `?tab=${tab}` : ""}`;
 }
 
-/** Navn + eventuell råvare-id for inline-retting. */
-function idList(items: MissingData["water_content"]): Array<{ name: string; raw_material_id: string | null }> {
-  return (items ?? []).map((x) =>
-    typeof x === "string"
-      ? { name: x, raw_material_id: null }
-      : { name: x?.name ?? "Uten navn", raw_material_id: x?.raw_material_id ?? null },
-  );
-}
-
-function Group({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1">
-      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
-      {children}
-    </div>
-  );
-}
-
-/** Datakvalitet — dekning, manglende næringsdata og ALLE advarsler fra beregningen. */
+/** Datakvalitet — ÉN oppgaveliste, én rad per ingrediens, samme rettehandlinger overalt. */
 export function DataQualityCard({
   coveragePct,
   missingData,
@@ -91,70 +82,112 @@ export function DataQualityCard({
   canWrite,
   onGoToRecipeTab,
   recipeId,
+  openSignal,
 }: Props) {
   const pct = coveragePct ?? 0;
   const ok = pct >= 90;
-  const missing = missingData?.nutrition ?? [];
-  const water = nameList(missingData?.water_content);
-  const waterRows = idList(missingData?.water_content);
-  const unclassified = missingData?.unclassified_grain_names ?? [];
-  const compositeUnreviewed = nameList(missingData?.composite_unreviewed);
-  const compositeTextOnly = nameList(missingData?.composite_text_only);
-  const missingDeclNames = missingData?.declaration_names ?? [];
-  const unlinked = missingData?.lines_without_raw_material ?? 0;
-  const criticalMissing = missingData?.critical_missing_nutrition ?? [];
-  const smallButMissing = missingData?.lines_without_nutrition_over_pct ?? [];
-  const allergensUnreviewed = missingData?.allergens_unreviewed ?? [];
-  const unitProblems = missingData?.unit_problems ?? [];
-  const freeTextLines = missingData?.free_text_lines ?? [];
+  const { tasks, recipeTasks } = useMemo(() => buildQualityTasks(missingData), [missingData]);
+  const messages = useMemo(
+    () => dedupeMessages(missingData?.block_reasons, warnings),
+    [missingData?.block_reasons, warnings],
+  );
   const blocked = missingData?.blocked === true;
-  const blockReasons = missingData?.block_reasons ?? [];
-  const warns = warnings ?? [];
+  const blockingCount = tasks.filter((t) => t.blocking).length;
+  const taskCount = tasks.length + recipeTasks.length;
 
-  const hasIssues =
-    !ok ||
-    blocked ||
-    criticalMissing.length > 0 ||
-    allergensUnreviewed.length > 0 ||
-    smallButMissing.length > 0 ||
-    unitProblems.length > 0 ||
-    freeTextLines.length > 0 ||
-    missing.length > 0 ||
-    water.length > 0 ||
-    unclassified.length > 0 ||
-    compositeUnreviewed.length > 0 ||
-    compositeTextOnly.length > 0 ||
-    missingDeclNames.length > 0 ||
-    unlinked > 0 ||
-    warns.length > 0;
-
-  const [open, setOpen] = useState(hasIssues);
-  const rmIds = missing.map((m) => m.raw_material_id).filter((x): x is string => !!x);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (openSignal) setOpen(true);
+  }, [openSignal]);
+  const rmIds = tasks
+    .filter((t) => t.rawMaterialId && t.issues.some((i) => i.kind === "nutrition" || i.kind === "critical_nutrition"))
+    .map((t) => t.rawMaterialId as string);
   const datasheets = useDatasheetsFor(rmIds);
   const extract = useExtractNutritionFromDatasheet();
-  const [manualFor, setManualFor] = useState<MissingNutritionRow | null>(null);
-  const [foodPickerFor, setFoodPickerFor] = useState<MissingNutritionRow | null>(null);
+  const [manualFor, setManualFor] = useState<QualityTask | null>(null);
+  const [foodPickerFor, setFoodPickerFor] = useState<QualityTask | null>(null);
   const [busyRm, setBusyRm] = useState<string | null>(null);
 
-  async function runExtract(row: MissingNutritionRow) {
-    const ds = row.raw_material_id ? datasheets.data?.get(row.raw_material_id) : null;
-    if (!ds || !row.raw_material_id) return;
-    setBusyRm(row.raw_material_id);
+  async function runExtract(t: QualityTask) {
+    const ds = t.rawMaterialId ? datasheets.data?.get(t.rawMaterialId) : null;
+    if (!ds || !t.rawMaterialId) return;
+    setBusyRm(t.rawMaterialId);
     try {
-      await extract.mutateAsync({ datasheet: ds, raw_material_id: row.raw_material_id });
+      await extract.mutateAsync({ datasheet: ds, raw_material_id: t.rawMaterialId });
       onRecalculate();
     } finally {
       setBusyRm(null);
     }
   }
 
+  const summary =
+    taskCount === 0
+      ? "Ingen oppgaver — beregningsgrunnlaget er komplett."
+      : `${taskCount} oppgave${taskCount === 1 ? "" : "r"}${blockingCount ? ` · ${blockingCount} sperrer beregnet deklarasjon` : ""}`;
+
+  function fixFor(t: QualityTask, kind: QualityIssueKind) {
+    const id = t.rawMaterialId;
+    switch (kind) {
+      case "free_text":
+        return recipeId ? (
+          <FreeTextLinkInline recipeId={recipeId} name={t.name} disabled={!canWrite} onSaved={onRecalculate} />
+        ) : onGoToRecipeTab ? (
+          <Button size="sm" variant="outline" className="h-8" onClick={onGoToRecipeTab}>
+            Koble i Oppskrift-fanen
+          </Button>
+        ) : null;
+      case "nutrition":
+      case "critical_nutrition": {
+        if (!id) return null;
+        const ds = datasheets.data?.get(id);
+        const busy = busyRm === id;
+        return (
+          <div className="flex flex-wrap items-center gap-2">
+            {ds && (
+              <Button size="sm" variant="outline" className="h-8" disabled={!canWrite || busy} onClick={() => runExtract(t)}>
+                {busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileText className="mr-1.5 h-4 w-4" />}
+                Les ut fra datablad
+              </Button>
+            )}
+            <Button size="sm" variant="outline" className="h-8" disabled={!canWrite} onClick={() => setFoodPickerFor(t)}>
+              <Link2 className="mr-1.5 h-4 w-4" /> Koble Matvaretabellen
+            </Button>
+            <Button size="sm" variant="outline" className="h-8" disabled={!canWrite} onClick={() => setManualFor(t)}>
+              <Pencil className="mr-1.5 h-4 w-4" /> Legg inn manuelt
+            </Button>
+          </div>
+        );
+      }
+      case "allergens":
+        return (
+          <ConfirmAllergensInline rawMaterialId={id} name={t.name} disabled={!canWrite} onSaved={onRecalculate} />
+        );
+      case "declaration_name":
+        return id ? (
+          <DeclarationNameInline rawMaterialId={id} fallback={t.fallbackName} disabled={!canWrite} onSaved={onRecalculate} />
+        ) : null;
+      case "water":
+        return <WaterContentInline rawMaterialId={id} name={t.name} disabled={!canWrite} onSaved={onRecalculate} />;
+      case "grain_class":
+        return <GrainClassInline name={t.name} disabled={!canWrite} onSaved={onRecalculate} />;
+      case "unit":
+        return onGoToRecipeTab ? (
+          <Button size="sm" variant="outline" className="h-8" onClick={onGoToRecipeTab}>
+            Rett i Oppskrift-fanen
+          </Button>
+        ) : null;
+      default:
+        return null;
+    }
+  }
+
   return (
     <>
-      <Card className={cn("border-2", ok ? "border-emerald-600/40" : "border-amber-500/60")}>
+      <Card className={cn("border-2", ok && !blocked ? "border-emerald-600/40" : "border-amber-500/60")}>
         <Collapsible open={open} onOpenChange={setOpen}>
           <CardContent className="space-y-3 pt-5">
             <div className="flex flex-wrap items-center gap-3">
-              {ok ? (
+              {ok && !blocked ? (
                 <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-600" />
               ) : (
                 <AlertTriangle className="h-6 w-6 shrink-0 text-amber-600" />
@@ -163,11 +196,10 @@ export function DataQualityCard({
                 <p className="text-lg font-semibold tracking-tight">
                   Næringsberegningen dekker {fmtPct(coveragePct)} av deigvekten
                 </p>
-                {!ok && (
-                  <p className="text-sm text-muted-foreground">
-                    Under 90 % dekning kan næringstabellen <b>ikke</b> brukes på emballasje.
-                  </p>
-                )}
+                <p className="text-sm text-muted-foreground">
+                  {summary}
+                  {!ok && " Under 90 % dekning kan næringstabellen ikke brukes på emballasje."}
+                </p>
               </div>
               {canWrite && (
                 <Button variant="outline" size="sm" onClick={onRecalculate} disabled={recalculating}>
@@ -175,12 +207,14 @@ export function DataQualityCard({
                   Beregn på nytt
                 </Button>
               )}
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  Datakvalitet
-                  <ChevronDown className={cn("ml-1.5 h-4 w-4 transition-transform", open && "rotate-180")} />
-                </Button>
-              </CollapsibleTrigger>
+              {taskCount + messages.length > 0 && (
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" aria-expanded={open}>
+                    {open ? "Skjul oppgaver" : "Vis oppgaver"}
+                    <ChevronDown className={cn("ml-1.5 h-4 w-4 transition-transform", open && "rotate-180")} />
+                  </Button>
+                </CollapsibleTrigger>
+              )}
             </div>
 
             <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
@@ -190,270 +224,69 @@ export function DataQualityCard({
               />
             </div>
 
-            {blocked && (
-              <div className="rounded-md border-2 border-destructive/60 bg-destructive/10 p-3">
-                <p className="text-sm font-semibold">Deklarasjonen kan ikke brukes ennå</p>
-                <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm">
-                  {blockReasons.map((r, i) => (
-                    <li key={i}>{r}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <CollapsibleContent className="space-y-4 pt-2">
-              {criticalMissing.length > 0 && (
-                <Group title="Kritiske ingredienser uten næringsdata">
-                  <p className="text-sm">{criticalMissing.join(", ")}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Salt, vann og gjær må ha næringsdata. Uten dem vises saltet som «ukjent», ikke som 0 g.
-                  </p>
-                </Group>
-              )}
-
-              {allergensUnreviewed.length > 0 && (
-                <Group title="Allergener ikke gjennomgått">
-                  <ul className="space-y-1 text-sm">
-                    {allergensUnreviewed.map((r) => (
-                      <li key={r.raw_material_id ?? r.name} className="flex items-center justify-between gap-2">
-                        <span>
-                          {r.name}
-                          {r.pct_of_weight != null ? ` (${fmtPct(r.pct_of_weight)})` : ""}
+            <CollapsibleContent className="space-y-3 pt-1">
+              {tasks.length > 0 && (
+                <ul aria-label="Oppgaver i datakvalitet" className="divide-y divide-border/60 rounded-md border">
+                  {tasks.map((t) => (
+                    <li key={t.key} className="space-y-2 p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                          {t.name}
+                          <span className="ml-2 text-xs font-normal tabular-nums text-muted-foreground">
+                            {[t.grams != null ? fmtGrams(t.grams) : null, t.pctOfWeight != null ? `${fmtPct(t.pctOfWeight)} av vekten` : null]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </span>
                         </span>
-                        <div className="flex items-center gap-2">
-                          <ConfirmAllergensInline
-                            rawMaterialId={r.raw_material_id}
-                            name={r.name}
-                            disabled={!canWrite}
-                            onSaved={onRecalculate}
-                          />
-                          {r.raw_material_id && (
-                            <a
-                              className="text-xs underline underline-offset-2"
-                              href={`/ravarer/${r.raw_material_id}?tab=nutrition`}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Åpne råvaren
-                            </a>
-                          )}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="text-xs text-muted-foreground">
-                    Råvarer uten allergenrader regnes ikke som allergenfrie — de må gjennomgås før godkjenning.
-                  </p>
-                </Group>
-              )}
-
-              {smallButMissing.length > 0 && (
-                <Group title="Linjer over 0,25 % uten komplett næring">
-                  <p className="text-sm">
-                    {smallButMissing
-                      .map((l) => (l.pct_of_weight != null ? `${l.name} (${fmtPct(l.pct_of_weight)})` : l.name))
-                      .join(", ")}
-                  </p>
-                </Group>
-              )}
-
-              {unitProblems.length > 0 && (
-                <Group title="Enheter som ikke kan regnes om">
-                  <p className="text-sm">
-                    {unitProblems.map((u) => (u.reason ? `${u.name} — ${u.reason}` : u.name)).join(", ")}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Linjen settes aldri stille til 0 g. Sett stykkvekt eller bytt til en kjent enhet.
-                  </p>
-                </Group>
-              )}
-
-              {freeTextLines.length > 0 && (
-                <Group title="Fritekstlinjer sperrer automatisk deklarasjon">
-                  <ul className="space-y-1.5 text-sm">
-                    {freeTextLines.map((f) => (
-                      <li key={f.name} className="flex flex-wrap items-center justify-between gap-2">
-                        <span>{f.name}</span>
-                        {recipeId ? (
-                          <FreeTextLinkInline
-                            recipeId={recipeId}
-                            name={f.name}
-                            disabled={!canWrite}
-                            onSaved={onRecalculate}
-                          />
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                  {onGoToRecipeTab && (
-                    <Button size="sm" variant="link" className="h-auto p-0 text-xs" onClick={onGoToRecipeTab}>
-                      Åpne Oppskrift-fanen
-                    </Button>
-                  )}
-                </Group>
-              )}
-
-              {missingData?.missing_bake_loss && (
-                <Group title="Stektap mangler">
-                  <p className="text-sm">
-                    Oppskriften har 0 % stektap og ingen ferdigvekt. BKLF antar ca. 12 % for brød — uten det blir
-                    næring per 100 g for lav.
-                  </p>
-                </Group>
-              )}
-
-              {!hasIssues && (
-                <p className="text-sm text-muted-foreground">
-                  Ingen mangler funnet — beregningsgrunnlaget er komplett.
-                </p>
-              )}
-
-              {missingDeclNames.length > 0 && (
-                <MissingDeclarationNames
-                  rows={missingDeclNames}
-                  canWrite={canWrite}
-                  onSaved={onRecalculate}
-                />
-              )}
-
-
-              {missing.length > 0 && (
-                <div id="mangler-naeringsdata" className="space-y-1 scroll-mt-24">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Mangler næringsdata
-                    </span>
-                    <Badge variant="outline">{missing.length} råvarer</Badge>
-                  </div>
-                  <p className="pb-1 text-xs text-muted-foreground">
-                    Tyngste råvare først — den øverste gir størst utslag på dekningen.
-                  </p>
-                  {[...missing]
-                    .sort((a, b) => (b.pct_of_dough ?? 0) - (a.pct_of_dough ?? 0))
-                    .map((m, i) => {
-                    const ds = m.raw_material_id ? datasheets.data?.get(m.raw_material_id) : null;
-                    const busy = busyRm === m.raw_material_id;
-                    return (
-                      <div
-                        key={`${m.raw_material_id ?? "x"}-${i}`}
-                        className="flex flex-wrap items-center gap-2 border-b border-border/50 py-2 last:border-0"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-medium">{m.name}</div>
-                          <div className="text-xs tabular-nums text-muted-foreground">
-                            {fmtGrams(m.grams)} · {fmtPct(m.pct_of_dough)} av deigvekten
-                          </div>
-                        </div>
-                        {!m.raw_material_id ? (
-                          <Badge variant="outline" className="text-amber-700">
-                            Fritekstlinje — ikke koblet til råvare
-                          </Badge>
-                        ) : ds ? (
-                          <Button size="sm" variant="outline" disabled={!canWrite || busy} onClick={() => runExtract(m)}>
-                            {busy ? (
-                              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                            ) : (
-                              <FileText className="mr-1.5 h-4 w-4" />
-                            )}
-                            Les ut fra datablad
-                          </Button>
-                        ) : null}
-                        {m.raw_material_id && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={!canWrite}
-                              onClick={() => setFoodPickerFor(m)}
-                            >
-                              <Link2 className="mr-1.5 h-4 w-4" /> Koble Matvaretabellen
-                            </Button>
-                            <Button size="sm" variant="outline" disabled={!canWrite} onClick={() => setManualFor(m)}>
-                              <Pencil className="mr-1.5 h-4 w-4" /> Legg inn manuelt
-                            </Button>
-                            <Link
-                              to={`/ravarer/vareliste/${m.raw_material_id}?tab=nutrition`}
-                              className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
-                            >
-                              Åpne råvarekortet <ExternalLink className="h-3 w-3" />
-                            </Link>
-                          </>
+                        {t.blocking && <Badge variant="destructive">Sperrer</Badge>}
+                        {t.rawMaterialId && (
+                          <Link
+                            to={rmLink(t.rawMaterialId, "nutrition")}
+                            className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
+                          >
+                            Åpne råvarekortet <ExternalLink className="h-3 w-3" />
+                          </Link>
                         )}
                       </div>
-                    );
-                  })}
-                </div>
+                      <ul className="space-y-1.5">
+                        {t.issues.map((i) => (
+                          <li key={i.kind} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                            <span className="text-muted-foreground">
+                              {ISSUE_LABEL[i.kind]}
+                              {i.detail ? ` — ${i.detail}` : ""}
+                            </span>
+                            {fixFor(t, i.kind)}
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ul>
               )}
 
-              {water.length > 0 && (
-                <Group title="Mangler vanninnhold">
-                  <ul className="space-y-1.5 text-sm">
-                    {waterRows.map((w) => (
-                      <li key={`${w.raw_material_id ?? "n"}-${w.name}`} className="flex flex-wrap items-center justify-between gap-2">
-                        <span>{w.name}</span>
-                        <WaterContentInline
-                          rawMaterialId={w.raw_material_id}
-                          name={w.name}
-                          disabled={!canWrite}
-                          onSaved={onRecalculate}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="text-xs text-muted-foreground">
-                    Uten vanninnhold antas 0 % — det påvirker tørrstoff, grovhet og næring per 100 g.
-                  </p>
-                </Group>
-              )}
-
-              {unclassified.length > 0 && (
-                <Group title="Uten kornklassifisering">
-                  <ul className="space-y-1.5 text-sm">
-                    {unclassified.map((n) => (
-                      <li key={n} className="flex flex-wrap items-center justify-between gap-2">
-                        <span>{n}</span>
-                        <GrainClassInline name={n} disabled={!canWrite} onSaved={onRecalculate} />
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="text-xs text-muted-foreground">Grovheten kan bli feil før disse er klassifisert.</p>
-                </Group>
-              )}
-
-              {compositeUnreviewed.length > 0 && (
-                <Group title="Sammensatte råvarer uten gjennomgang">
-                  <p className="text-sm">{compositeUnreviewed.join(", ")}</p>
-                </Group>
-              )}
-
-              {compositeTextOnly.length > 0 && (
-                <Group title="Sammensatte råvarer kun som fritekst">
-                  <p className="text-sm">{compositeTextOnly.join(", ")}</p>
-                </Group>
-              )}
-
-              {unlinked > 0 && (
-                <Group title="Fritekstlinjer uten råvarekobling">
-                  <p className="text-sm">
-                    {unlinked} ingrediens{unlinked === 1 ? "" : "er"} er fritekst. De teller <b>ikke</b> i næring,
-                    allergener eller grovhet.
-                  </p>
-                  {onGoToRecipeTab && (
+              {recipeTasks.map((r) => (
+                <div key={r.key} className="rounded-md border p-3 text-sm">
+                  <p className="font-medium">{r.title}</p>
+                  <p className="text-muted-foreground">{r.detail}</p>
+                  {r.key === "unlinked_lines" && onGoToRecipeTab && (
                     <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={onGoToRecipeTab}>
                       Gå til Oppskrift-fanen og koble dem
                     </Button>
                   )}
-                </Group>
-              )}
+                </div>
+              ))}
 
-              {warns.length > 0 && (
-                <Group title="Advarsler fra beregningen">
-                  <ul className="list-disc space-y-1 pl-5 text-sm">
-                    {warns.map((w, i) => (
-                      <li key={i}>{w}</li>
+              {messages.length > 0 && (
+                <details className="rounded-md border p-3 text-sm">
+                  <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Meldinger fra beregningen ({messages.length})
+                  </summary>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    {messages.map((w) => (
+                      <li key={w}>{w}</li>
                     ))}
                   </ul>
-                </Group>
+                </details>
               )}
             </CollapsibleContent>
           </CardContent>
@@ -463,12 +296,12 @@ export function DataQualityCard({
       <ManualNutritionDialog
         open={!!manualFor}
         onOpenChange={(v) => !v && setManualFor(null)}
-        rawMaterialId={manualFor?.raw_material_id ?? null}
+        rawMaterialId={manualFor?.rawMaterialId ?? null}
         rawMaterialName={manualFor?.name ?? ""}
         onSaved={onRecalculate}
       />
 
-      {foodPickerFor?.raw_material_id && (
+      {foodPickerFor?.rawMaterialId && (
         <FoodPickerDialog
           open
           onOpenChange={(v) => {
@@ -478,7 +311,7 @@ export function DataQualityCard({
               onRecalculate();
             }
           }}
-          rawMaterialId={foodPickerFor.raw_material_id}
+          rawMaterialId={foodPickerFor.rawMaterialId}
         />
       )}
     </>
