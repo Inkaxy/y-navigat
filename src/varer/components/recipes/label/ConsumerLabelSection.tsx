@@ -249,9 +249,9 @@ export function ConsumerLabelSection({
                       <Button size="sm" variant="outline" className="h-7" onClick={() => onFixField?.(item.key)}>
                         {label}
                       </Button>
-                    ) : (
-                      <span className="text-muted-foreground">Rettes i firmainnstillingene</span>
-                    )}
+                    ) : item.key === "producer" ? (
+                      <span className="text-muted-foreground">Rettes i firmaopplysningene</span>
+                    ) : null}
                   </li>
                 );
               })}
