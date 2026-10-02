@@ -107,20 +107,60 @@ function itemOf(x: NameItem): { name: string; id: string | null } {
     : { name: x?.name ?? "Uten navn", id: x?.raw_material_id ?? null };
 }
 
-export function buildQualityTasks(md: QualityInput | null | undefined): {
+/** Fritekstlinje i oppskriften — stabil id brukes til å slå sammen beregningens rapporter. */
+export interface RecipeFreeTextLine {
+  id: string;
+  name: string;
+}
+
+/**
+ * Finner oppskriftslinjen en fritekstrapport gjelder. Eksakt navn først;
+ * ellers navnet før pakningsangivelsen («…, kartong 10 kg») — kun ved ett treff.
+ * Gram må stemme når begge rapportene har gram.
+ */
+export function resolveFreeTextLine(
+  name: string,
+  grams: number | null | undefined,
+  lines: RecipeFreeTextLine[],
+  gramsByLine: Map<string, number>,
+): string | null {
+  const n = normName(name);
+  const exact = lines.filter((l) => normName(l.name) === n);
+  if (exact.length === 1) return exact[0].id;
+  if (exact.length > 1) return null;
+  const base = lines.filter((l) => normName(l.name.split(",")[0]) === n);
+  if (base.length !== 1) return null;
+  const g = gramsByLine.get(base[0].id);
+  if (g != null && grams != null && Math.abs(g - grams) > 0.5) return null;
+  return base[0].id;
+}
+
+export function buildQualityTasks(
+  md: QualityInput | null | undefined,
+  freeTextLines: RecipeFreeTextLine[] = [],
+): {
   tasks: QualityTask[];
   recipeTasks: RecipeLevelTask[];
 } {
   const byKey = new Map<string, QualityTask>();
   const nameToKey = new Map<string, string>();
 
+  const lineName = new Map(freeTextLines.map((l) => [l.id, l.name]));
+  const gramsByLine = new Map<string, number>();
+  for (const f of md?.free_text_lines ?? []) {
+    const exact = freeTextLines.filter((l) => normName(l.name) === normName(f.name));
+    if (exact.length === 1 && f.grams != null) gramsByLine.set(exact[0].id, f.grams);
+  }
   const upsert = (
-    name: string,
+    rawName: string,
     id: string | null,
     issue: QualityIssue,
     extra?: { pct?: number | null; grams?: number | null; fallback?: string | null },
   ) => {
-    const n = normName(name);
+    // Fritekst uten råvare: bruk oppskriftslinjens id og navn som nøkkel.
+    const lineId = !id ? resolveFreeTextLine(rawName, extra?.grams ?? null, freeTextLines, gramsByLine) : null;
+    const name = lineId ? lineName.get(lineId) ?? rawName : rawName;
+    const n = lineId ? `line:${lineId}` : normName(name);
     let key = id ? `rm:${id}` : nameToKey.get(n) ?? `name:${n}`;
     // Navnet ble først sett uten id — flytt oppgaven over til id-nøkkelen.
     if (id && !byKey.has(key)) {
@@ -178,7 +218,8 @@ export function buildQualityTasks(md: QualityInput | null | undefined): {
     }
   }
   for (const r of m.lines_without_nutrition_over_pct ?? []) {
-    const key = nameToKey.get(normName(r.name));
+    const lid = resolveFreeTextLine(r.name, null, freeTextLines, gramsByLine);
+    const key = nameToKey.get(lid ? `line:${lid}` : normName(r.name));
     const t = key ? byKey.get(key) : undefined;
     if (t && t.issues.some((i) => i.kind === "nutrition" || i.kind === "critical_nutrition" || i.kind === "free_text")) {
       if (r.pct_of_weight != null && t.pctOfWeight == null) t.pctOfWeight = r.pct_of_weight;
