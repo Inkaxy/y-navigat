@@ -63,7 +63,8 @@ export function ApproveDeclarationDialog(p: Props) {
   const noCandidate = !candidate || !stripHtml(candidate.ingredientText ?? "").trim();
   const blocked = modeIssues.length > 0 || dirtyBlock || noCandidate;
   // Hele kandidatens næringstabell — vises alltid, også ved første godkjenning.
-  const candidateNutrition = candidate?.nutrition ? nutritionDiff(null, candidate.nutrition) : [];
+  const nutRowsAll = candidate?.nutrition ? nutritionDiff(null, candidate.nutrition) : [];
+  const candidateNutrition = nutRowsAll.some((r) => r.to != null) ? nutRowsAll : [];
   const unchanged = !!p.previous && !!candidate && !declarationDocsDiffer(p.previous.doc, candidate);
 
   return (
