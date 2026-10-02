@@ -187,19 +187,27 @@ export default function Recipes() {
   const labelingQuery = useQuery({
     queryKey: ["recipes-labeling-status", legalEntityId],
     queryFn: async () => {
-      const [calcRes, recRes] = await Promise.all([
-        supabase.from("recipe_label_calculated").select("recipe_id, computed_at, is_stale"),
-        supabase.from("recipes").select("id, declaration_updated_at").is("valid_to", null),
+      // Godkjenning = nyeste deklarasjonsversjon. Lagringsdatoen på oppskriften
+      // flyttes også av «Lagre kladd» og kan derfor ikke brukes som bevis.
+      const [calcRows, recRows, verRows] = await Promise.all([
+        fetchAllRows<{ recipe_id: string; computed_at: string | null; is_stale: boolean | null }>((from, to) =>
+          supabase.from("recipe_label_calculated").select("recipe_id, computed_at, is_stale").range(from, to),
+        ),
+        fetchAllRows<{ id: string }>((from, to) =>
+          supabase.from("recipes").select("id").is("valid_to", null).range(from, to),
+        ),
+        fetchAllRows<{ recipe_id: string; approved_at: string | null }>((from, to) =>
+          supabase.from("recipe_declaration_versions").select("recipe_id, approved_at").range(from, to),
+        ),
       ]);
-      if (calcRes.error) throw calcRes.error;
-      if (recRes.error) throw recRes.error;
       const calcBy = new Map<string, { computed_at: string | null; is_stale: boolean | null }>();
-      for (const c of calcRes.data ?? []) calcBy.set(c.recipe_id, c);
+      for (const c of calcRows) calcBy.set(c.recipe_id, c);
+      const approvedBy = latestApprovalByRecipe(verRows);
       const out: Record<string, LabelingStatus> = {};
-      for (const r of recRes.data ?? []) {
+      for (const r of recRows) {
         const c = calcBy.get(r.id);
         out[r.id] = deriveLabelingStatusFromDb({
-          approvedAt: r.declaration_updated_at,
+          approvedAt: approvedBy.get(r.id) ?? null,
           computedAt: c?.computed_at ?? null,
           isStale: c?.is_stale ?? null,
         });
