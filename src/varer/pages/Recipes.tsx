@@ -23,6 +23,7 @@ import {
 import { copyRecipe } from "@/varer/lib/copyRecipe";
 import { fetchAllRows } from "@/lib/supabasePaging";
 import { deriveLabelingStatusFromDb, LABELING_STATUS_LABEL, type LabelingStatus } from "@/varer/lib/labelStaleness";
+import { latestApprovalByRecipe } from "@/varer/lib/labelWorkspace";
 import { format } from "date-fns";
 import { nb } from "date-fns/locale";
 
