@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -64,6 +64,8 @@ interface Props {
   onGoToRecipeTab?: () => void;
   /** Oppskriften kortet gjelder — kreves for inline-kobling av fritekstlinjer. */
   recipeId?: string;
+  /** Økes av forelderen for å åpne oppgavelisten (f.eks. «Se hva som mangler»). */
+  openSignal?: number;
 }
 
 function rmLink(id: string, tab?: string): string {
@@ -80,6 +82,7 @@ export function DataQualityCard({
   canWrite,
   onGoToRecipeTab,
   recipeId,
+  openSignal,
 }: Props) {
   const pct = coveragePct ?? 0;
   const ok = pct >= 90;
@@ -93,6 +96,9 @@ export function DataQualityCard({
   const taskCount = tasks.length + recipeTasks.length;
 
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (openSignal) setOpen(true);
+  }, [openSignal]);
   const rmIds = tasks
     .filter((t) => t.rawMaterialId && t.issues.some((i) => i.kind === "nutrition" || i.kind === "critical_nutrition"))
     .map((t) => t.rawMaterialId as string);
