@@ -68,3 +68,54 @@ export function deriveNextAction(input: {
   if (input.approveIssues.length > 0) return "show_missing";
   return "review";
 }
+
+/** Hvor et pliktfelt fra etikettkontrollen rettes i Merking. */
+export type FixTarget =
+  | { section: "deklarasjon"; anchor: string; label: string }
+  | { section: "datakvalitet"; anchor: string; label: string }
+  | { section: "etikett"; anchor: string; label: string }
+  | { section: "merker"; anchor: string; label: string };
+
+export function fixTargetForChecklistKey(key: string, declarationManual: boolean): FixTarget | null {
+  switch (key) {
+    case "ingredients":
+    case "allergens":
+    case "may_contain":
+      return declarationManual
+        ? { section: "deklarasjon", anchor: "merking-editor", label: "Rett i deklarasjonen" }
+        : { section: "datakvalitet", anchor: "merking-datakvalitet", label: "Rett i datakvalitet" };
+    case "nutrition":
+      return declarationManual
+        ? { section: "deklarasjon", anchor: "merking-editor-naering", label: "Rett næringsinnhold" }
+        : { section: "datakvalitet", anchor: "merking-datakvalitet", label: "Rett i datakvalitet" };
+    case "net_weight":
+      return { section: "etikett", anchor: "etikett-nettovekt", label: "Rett nettovekt" };
+    case "shelf_life":
+      return { section: "etikett", anchor: "etikett-holdbarhet", label: "Rett holdbarhet" };
+    case "storage":
+      return { section: "etikett", anchor: "etikett-oppbevaring", label: "Rett oppbevaring" };
+    case "mark_grain":
+      return { section: "merker", anchor: "merking-grovhet", label: "Rett grovhetsmerket" };
+    case "mark_keyhole":
+      return { section: "merker", anchor: "merking-nokkelhull", label: "Rett Nøkkelhullet" };
+    default:
+      return null;
+  }
+}
+
+/**
+ * Siste godkjenning = nyeste rad i deklarasjonsversjonene. Lagringsdatoen på
+ * oppskriften (declaration_updated_at) settes også ved «Lagre kladd» og er
+ * derfor aldri bevis på godkjenning.
+ */
+export function latestApprovalByRecipe(
+  rows: Array<{ recipe_id: string; approved_at: string | null }>,
+): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const r of rows) {
+    if (!r.approved_at) continue;
+    const prev = out.get(r.recipe_id);
+    if (!prev || new Date(r.approved_at).getTime() > new Date(prev).getTime()) out.set(r.recipe_id, r.approved_at);
+  }
+  return out;
+}
