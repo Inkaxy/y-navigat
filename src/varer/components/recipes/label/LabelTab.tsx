@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,10 +16,11 @@ import {
   type RecipeLabelSnapshot,
 } from "@/varer/lib/effectiveDeclaration";
 import { buildLabelChecklist } from "@/varer/lib/labelChecklist";
-import { useApproveDeclaration } from "@/varer/hooks/useLabelApproval";
+import { useApproveDeclaration, useRecipeDeclarationVersions } from "@/varer/hooks/useLabelApproval";
 import { useRecipeLabelProfile } from "@/varer/hooks/useRecipeLabelProfile";
 import { useUserDisplayName } from "@/varer/hooks/useRecipeLabel";
-import { checkState, deriveLabelState, deriveNextAction } from "@/varer/lib/labelWorkspace";
+import { checkState, deriveLabelState, deriveNextAction, fixTargetForChecklistKey } from "@/varer/lib/labelWorkspace";
+import type { LabelSource } from "./labelShared";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsDesktop } from "@/varer/hooks/useIsDesktop";
 import { parseAllergenSummary, pickNutrition, type NutritionPer100g } from "@/varer/lib/effectiveDeclaration";
@@ -151,8 +152,11 @@ export function LabelTab({
   const links = linksQuery.data ?? [];
   const primaryCount = links.filter((l) => l.is_primary).length;
 
-  const approvedAt = recipe.declaration_updated_at ?? null;
-  const approverQuery = useUserDisplayName(recipe.declaration_updated_by ?? null);
+  // Godkjenningsgrunnlag = nyeste deklarasjonsversjon, aldri lagringsdatoen.
+  const versionsQuery = useRecipeDeclarationVersions(recipeId);
+  const latestVersion = versionsQuery.data?.[0] ?? null;
+  const approvedAt = latestVersion?.approved_at ?? null;
+  const approverQuery = useUserDisplayName(latestVersion?.approved_by ?? null);
   const missing = (label?.missing_data ?? null) as MissingData | null;
   const labelState = deriveLabelState({
     computedAt: label?.computed_at ?? null,
@@ -164,6 +168,11 @@ export function LabelTab({
   const isDesktop = useIsDesktop();
 
   const declarationManual = ((recipe.declaration_mode as DeclarationMode | null) ?? "auto") === "manual";
+  const savedSource: LabelSource = declarationManual ? "manual" : "auto";
+  const [candidate, setCandidate] = useState<LabelSource>(savedSource);
+  useEffect(() => setCandidate(savedSource), [savedSource]);
+  const [manualDirty, setManualDirty] = useState(false);
+  const [qualitySignal, setQualitySignal] = useState(0);
   const breadscaleMode: "auto" | "manual" = recipe.breadscale_mode === "manual" ? "manual" : "auto";
 
   const recompute = () =>
@@ -292,11 +301,22 @@ export function LabelTab({
 
   const onNextAction = () => {
     if (nextAction === "compute") recompute();
-    else if (nextAction === "show_missing") goTo("datakvalitet", "merking-datakvalitet");
+    else if (nextAction === "show_missing") {
+      setQualitySignal((n) => n + 1);
+      goTo("datakvalitet", "merking-datakvalitet");
+    }
     else setApproveOpen(true);
   };
 
-  if (labelQuery.isLoading) {
+  const onFixField = (key: string) => {
+    const t = fixTargetForChecklistKey(key, declarationManual);
+    if (!t) return;
+    if (t.section === "deklarasjon") setCandidate(savedSource);
+    if (t.section === "datakvalitet") setQualitySignal((n) => n + 1);
+    goTo(t.section, t.anchor);
+  };
+
+  if (labelQuery.isLoading || versionsQuery.isLoading) {
     return (
       <div className="space-y-3" aria-busy="true" aria-label="Laster merkedata">
         <div className="h-24 animate-pulse rounded-lg bg-muted motion-reduce:animate-none" />
@@ -305,11 +325,14 @@ export function LabelTab({
     );
   }
 
-  if (labelQuery.isError) {
+  if (labelQuery.isError || versionsQuery.isError) {
     return (
       <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
         Kunne ikke hente merkedata.
-        <button type="button" className="font-medium underline" onClick={() => void labelQuery.refetch()}>
+        <button type="button" className="font-medium underline" onClick={() => {
+            void labelQuery.refetch();
+            void versionsQuery.refetch();
+          }}>
           Prøv igjen
         </button>
       </div>
@@ -337,6 +360,8 @@ export function LabelTab({
       keyholeQualifies={keyhole?.status === "oppfylt"}
       coveragePct={coveragePct}
       onChecklistChange={onChecklistChange}
+      fixLabelFor={(key) => fixTargetForChecklistKey(key, declarationManual)?.label ?? null}
+      onFixField={onFixField}
       nutritionUsable={declarationManual ? !!effective.nutrition : coverageOk && !!effective.nutrition}
     />
   );
@@ -377,8 +402,29 @@ export function LabelTab({
       <ApproveDeclarationDialog
         open={approveOpen}
         onOpenChange={setApproveOpen}
-        currentMode={declarationManual ? "manual" : "auto"}
+        currentMode={candidate}
         issues={approveIssues}
+        manualDirty={manualDirty}
+        previous={
+          latestVersion
+            ? {
+                version: latestVersion.version,
+                approvedAt: latestVersion.approved_at,
+                source: latestVersion.source,
+                doc: {
+                  ingredientText: latestVersion.ingredient_text,
+                  contains: latestVersion.allergens_contains ?? [],
+                  mayContain: latestVersion.allergens_may_contain ?? [],
+                  nutrition: (latestVersion.nutrition_per_100g ?? null) as Record<string, number | null> | null,
+                },
+              }
+            : null
+        }
+        affected={links.map((l) => ({
+          id: l.product_id,
+          name: l.products?.display_name ?? "Uten navn",
+          number: l.products?.display_number ?? null,
+        }))}
         saving={approve.isPending}
         calculated={{
           ingredientText: label?.ingredient_declaration ?? null,
@@ -425,6 +471,11 @@ export function LabelTab({
               linkedProductCount={links.length}
               computing={compute.isPending}
               onRecompute={recompute}
+              candidate={candidate}
+              onCandidateChange={setCandidate}
+              approvedManualActive={declarationManual && labelState === "approved"}
+              onDirtyChange={setManualDirty}
+              onOpenApprove={() => setApproveOpen(true)}
             />
             <div id="merking-koblede-varer" tabIndex={-1} className="scroll-mt-4 outline-none">
               <LinkedProductsCard recipeId={recipeId} links={links} canWrite={canWrite} />
@@ -442,6 +493,7 @@ export function LabelTab({
                 canWrite={canWrite}
                 onGoToRecipeTab={onGoToRecipeTab}
                 recipeId={recipeId}
+                openSignal={qualitySignal}
               />
             </div>
           </TabsContent>
@@ -464,7 +516,7 @@ export function LabelTab({
           </TabsContent>
 
           <TabsContent value="merker" forceMount className={tabContentClass}>
-            <details open={grainRelevant} className="group rounded-lg border bg-card">
+            <details id="merking-grovhet" open={grainRelevant} className="group scroll-mt-4 rounded-lg border bg-card">
               <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium">
                 Grovhet / Brødskala&apos;n
                 {!grainRelevant && (
@@ -496,7 +548,7 @@ export function LabelTab({
                 />
               </div>
             </details>
-            <details open={!!keyholeRelevant} className="group rounded-lg border bg-card">
+            <details id="merking-nokkelhull" open={!!keyholeRelevant} className="group scroll-mt-4 rounded-lg border bg-card">
               <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium">
                 Nøkkelhullet
                 {!keyholeRelevant && (
