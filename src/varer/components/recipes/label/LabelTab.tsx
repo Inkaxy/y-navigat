@@ -2,7 +2,6 @@ import { useCallback, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
 import {
   useComputeRecipeLabel,
   useRecipeBreadscaleEffective,
@@ -20,10 +19,14 @@ import { buildLabelChecklist } from "@/varer/lib/labelChecklist";
 import { useApproveDeclaration } from "@/varer/hooks/useLabelApproval";
 import { useRecipeLabelProfile } from "@/varer/hooks/useRecipeLabelProfile";
 import { useUserDisplayName } from "@/varer/hooks/useRecipeLabel";
-import { deriveLabelingStatusFromDb } from "@/varer/lib/labelStaleness";
+import { checkState, deriveLabelState, deriveNextAction } from "@/varer/lib/labelWorkspace";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useIsDesktop } from "@/varer/hooks/useIsDesktop";
 import { parseAllergenSummary, pickNutrition, type NutritionPer100g } from "@/varer/lib/effectiveDeclaration";
 import { ApproveDeclarationDialog, type ApproveSourceData } from "./ApproveDeclarationDialog";
-import { LabelStatusBar } from "./LabelStatusBar";
+import { LabelSummaryPanel } from "./LabelSummaryPanel";
+
+type LabelSection = "deklarasjon" | "datakvalitet" | "etikett" | "merker";
 import { DataQualityCard, type MissingData } from "./DataQualityCard";
 import { DeclarationNutritionSection } from "./DeclarationNutritionSection";
 import { GrainSection } from "./GrainSection";
@@ -151,13 +154,14 @@ export function LabelTab({
   const approvedAt = recipe.declaration_updated_at ?? null;
   const approverQuery = useUserDisplayName(recipe.declaration_updated_by ?? null);
   const missing = (label?.missing_data ?? null) as MissingData | null;
-  // Utdatert-vurderingen kommer nå fra basen (trigger på recipe_label_calculated).
-  const status = deriveLabelingStatusFromDb({
-    approvedAt,
+  const labelState = deriveLabelState({
     computedAt: label?.computed_at ?? null,
     isStale: label?.is_stale ?? null,
-    blocked: !!missing?.blocked || checklistBlocked,
+    approvedAt,
   });
+  const hasCalc = !!label?.computed_at;
+  const [section, setSection] = useState<LabelSection>("deklarasjon");
+  const isDesktop = useIsDesktop();
 
   const declarationManual = ((recipe.declaration_mode as DeclarationMode | null) ?? "auto") === "manual";
   const breadscaleMode: "auto" | "manual" = recipe.breadscale_mode === "manual" ? "manual" : "auto";
@@ -270,34 +274,104 @@ export function LabelTab({
     recipeName,
   ]);
 
+  const sourceIssues = declarationManual ? approveIssues.manual : approveIssues.auto;
+  const nextAction = deriveNextAction({ state: labelState, approveIssues: sourceIssues });
+  const keyholeRelevant = recipe.label_claim_keyhole || keyhole?.status === "oppfylt";
+  const grainRelevant = !!recipe.label_claim_grain || (label?.grain_score_pct ?? null) != null;
+
+  const goTo = (s: LabelSection, anchor?: string) => {
+    setSection(s);
+    if (anchor) {
+      window.setTimeout(() => {
+        const el = document.getElementById(anchor);
+        el?.scrollIntoView({ block: "start" });
+        el?.focus({ preventScroll: true });
+      }, 50);
+    }
+  };
+
+  const onNextAction = () => {
+    if (nextAction === "compute") recompute();
+    else if (nextAction === "show_missing") goTo("datakvalitet", "merking-datakvalitet");
+    else setApproveOpen(true);
+  };
+
   if (labelQuery.isLoading) {
     return (
-      <div className="flex h-40 items-center justify-center">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      <div className="space-y-3" aria-busy="true" aria-label="Laster merkedata">
+        <div className="h-24 animate-pulse rounded-lg bg-muted motion-reduce:animate-none" />
+        <div className="h-64 animate-pulse rounded-lg bg-muted motion-reduce:animate-none" />
       </div>
     );
   }
 
+  if (labelQuery.isError) {
+    return (
+      <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
+        Kunne ikke hente merkedata.
+        <button type="button" className="font-medium underline" onClick={() => void labelQuery.refetch()}>
+          Prøv igjen
+        </button>
+      </div>
+    );
+  }
+
+  const preview = (
+    <ConsumerLabelSection
+      recipeName={recipeName}
+      effective={effective}
+      effectiveGrainPct={
+        effectiveGrain.data ?? (breadscaleMode === "manual" ? recipe.manual_breadscale_pct ?? null : label?.grain_score_pct ?? null)
+      }
+      declarationManual={declarationManual}
+      breadscaleManual={breadscaleMode === "manual"}
+      claimGrain={!!recipe.label_claim_grain}
+      claimKeyhole={!!recipe.label_claim_keyhole}
+      unitWeightGrams={recipe.unit_weight_grams ?? null}
+      shelfLifeDays={recipe.shelf_life_days ?? null}
+      storageInstructions={recipe.storage_instructions ?? null}
+      countryOfOrigin={recipe.country_of_origin ?? null}
+      entity={entityQuery.data ?? null}
+      profile={labelProfileQuery.data ?? null}
+      blocked={declarationManual ? false : !!missing?.blocked}
+      keyholeQualifies={keyhole?.status === "oppfylt"}
+      coveragePct={coveragePct}
+      onChecklistChange={onChecklistChange}
+      nutritionUsable={declarationManual ? !!effective.nutrition : coverageOk && !!effective.nutrition}
+    />
+  );
+
+  const previewNote = (
+    <p className="text-xs text-muted-foreground">
+      Forhåndsvisningen viser lagret kilde ({declarationManual ? "manuell" : "beregnet"}). Ulagrede endringer i
+      redigeringsfeltene vises ikke her og påvirker ikke utskrift eller API.
+    </p>
+  );
+
+  const tabContentClass = "mt-4 space-y-4 data-[state=inactive]:hidden";
+
   return (
     <div className="space-y-4">
-      <LabelStatusBar
-        computedAt={label?.computed_at}
+      <LabelSummaryPanel
+        state={labelState}
+        computedAt={label?.computed_at ?? null}
         coveragePct={coveragePct}
         declarationManual={declarationManual}
         breadscaleManual={breadscaleMode === "manual"}
-        linkedProducts={links}
-        canWrite={canWrite}
-        computing={compute.isPending}
-        onRecompute={recompute}
-        status={status}
         approvedAt={approvedAt}
         approvedByName={approverQuery.data ?? null}
-        staleSourceName={label?.stale_reason ?? null}
-        staleSourceAt={null}
-        allergenReviewed={(missing?.allergens_unreviewed?.length ?? 0) === 0}
-        declarationNamed={(missing?.declaration_names?.length ?? 0) === 0}
+        staleReason={label?.stale_reason ?? null}
+        linkedCount={links.length}
+        allergenCheck={checkState(hasCalc, missing ? missing.allergens_unreviewed?.length ?? 0 : null)}
+        nameCheck={checkState(hasCalc, missing ? missing.declaration_names?.length ?? 0 : null)}
+        sourceIssues={sourceIssues}
+        nextAction={nextAction}
+        canWrite={canWrite}
+        computing={compute.isPending}
         approving={approve.isPending}
-        onApprove={() => setApproveOpen(true)}
+        onNextAction={onNextAction}
+        onRecompute={recompute}
+        onShowLinked={() => goTo("deklarasjon", "merking-koblede-varer")}
       />
 
       <ApproveDeclarationDialog
@@ -318,9 +392,7 @@ export function LabelTab({
             {
               recipeId,
               source: mode === "manual" ? "manual" : "calculated",
-              // Skrives til recipes.label_claim_* før RPC-en leser dem.
               claims: { grain: !!recipe.label_claim_grain, keyhole: !!recipe.label_claim_keyhole },
-              // p_overrides sendes alltid – tomt objekt når ingenting overstyres.
               overrides: adopt
                 ? {
                     ingredient_text: adopt.ingredientText,
@@ -335,93 +407,129 @@ export function LabelTab({
         }
       />
 
-      <DataQualityCard
-        coveragePct={coveragePct}
-        missingData={(label?.missing_data ?? null) as MissingData | null}
-        warnings={label?.warnings ?? null}
-        onRecalculate={recompute}
-        recalculating={compute.isPending}
-        canWrite={canWrite}
-        onGoToRecipeTab={onGoToRecipeTab}
-        recipeId={recipeId}
-      />
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
+        <Tabs value={section} onValueChange={(v) => setSection(v as LabelSection)} className="min-w-0">
+          <TabsList aria-label="Deler av merkingen" className="flex h-auto flex-wrap justify-start">
+            <TabsTrigger value="deklarasjon">Deklarasjon</TabsTrigger>
+            <TabsTrigger value="datakvalitet">Datakvalitet</TabsTrigger>
+            <TabsTrigger value="etikett">Etikett</TabsTrigger>
+            <TabsTrigger value="merker">Merker</TabsTrigger>
+          </TabsList>
 
-      <DeclarationNutritionSection
-        recipeId={recipeId}
-        recipe={recipe}
-        calculated={label}
-        canWrite={canWrite}
-        linkedProductCount={links.length}
-        computing={compute.isPending}
-        onRecompute={recompute}
-      />
+          <TabsContent value="deklarasjon" forceMount className={tabContentClass}>
+            <DeclarationNutritionSection
+              recipeId={recipeId}
+              recipe={recipe}
+              calculated={label}
+              canWrite={canWrite}
+              linkedProductCount={links.length}
+              computing={compute.isPending}
+              onRecompute={recompute}
+            />
+            <div id="merking-koblede-varer" tabIndex={-1} className="scroll-mt-4 outline-none">
+              <LinkedProductsCard recipeId={recipeId} links={links} canWrite={canWrite} />
+            </div>
+          </TabsContent>
 
-      <GrainSection
-        recipeId={recipeId}
-        breadscaleMode={breadscaleMode}
-        manualPct={recipe.manual_breadscale_pct ?? null}
-        claimGrain={!!recipe.label_claim_grain}
-        approvedAt={recipe.label_claims_approved_at ?? null}
-        approvedBy={recipe.label_claims_approved_by ?? null}
-        grainPct={label?.grain_score_pct ?? null}
-        grainCategory={label?.grain_category ?? null}
-        flourGrams={label?.flour_grams ?? null}
-        coarseWeightedGrams={label?.lines?.coarse_weighted_grams ?? null}
-        wholeGrainPctOfDry={label?.whole_grain_pct_of_dry ?? null}
-        dryMatterPct={label?.dry_matter_pct ?? null}
-        finalWeightGrams={label?.final_weight_grams ?? null}
-        warnings={label?.warnings ?? null}
-        flourLines={flourLines}
-        canWrite={canWrite}
-        savingClaim={saveClaim.isPending}
-        onToggleClaim={(value) => saveClaim.mutate({ field: "label_claim_grain", value })}
-      />
+          <TabsContent value="datakvalitet" forceMount className={tabContentClass}>
+            <div id="merking-datakvalitet" tabIndex={-1} className="scroll-mt-4 outline-none">
+              <DataQualityCard
+                coveragePct={coveragePct}
+                missingData={missing}
+                warnings={label?.warnings ?? null}
+                onRecalculate={recompute}
+                recalculating={compute.isPending}
+                canWrite={canWrite}
+                onGoToRecipeTab={onGoToRecipeTab}
+                recipeId={recipeId}
+              />
+            </div>
+          </TabsContent>
 
-      <KeyholeSection
-        keyhole={keyhole}
-        coverageOk={coverageOk}
-        claimKeyhole={!!recipe.label_claim_keyhole}
-        approvedBy={recipe.label_claims_approved_by ?? null}
-        approvedAt={recipe.label_claims_approved_at ?? null}
-        canWrite={canWrite}
-        saving={saveClaim.isPending}
-        primaryProductCount={primaryCount}
-        onToggleClaim={(value) => saveClaim.mutate({ field: "label_claim_keyhole", value })}
-      />
+          <TabsContent value="etikett" forceMount className={tabContentClass}>
+            <LabelInfoCard
+              recipeId={recipeId}
+              unitWeightGrams={recipe.unit_weight_grams ?? null}
+              shelfLifeDays={recipe.shelf_life_days ?? null}
+              storageInstructions={recipe.storage_instructions ?? null}
+              countryOfOrigin={recipe.country_of_origin ?? null}
+              canWrite={canWrite}
+            />
+            {!isDesktop && (
+              <>
+                {previewNote}
+                {preview}
+              </>
+            )}
+          </TabsContent>
 
-      <LabelInfoCard
-        recipeId={recipeId}
-        unitWeightGrams={recipe.unit_weight_grams ?? null}
-        shelfLifeDays={recipe.shelf_life_days ?? null}
-        storageInstructions={recipe.storage_instructions ?? null}
-        countryOfOrigin={recipe.country_of_origin ?? null}
-        canWrite={canWrite}
-      />
+          <TabsContent value="merker" forceMount className={tabContentClass}>
+            <details open={grainRelevant} className="group rounded-lg border bg-card">
+              <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium">
+                Grovhet / Brødskala&apos;n
+                {!grainRelevant && (
+                  <span className="ml-2 font-normal text-muted-foreground">
+                    — ikke beregnet for denne oppskriften. Åpne for detaljer.
+                  </span>
+                )}
+              </summary>
+              <div className="p-2 pt-0">
+                <GrainSection
+                  recipeId={recipeId}
+                  breadscaleMode={breadscaleMode}
+                  manualPct={recipe.manual_breadscale_pct ?? null}
+                  claimGrain={!!recipe.label_claim_grain}
+                  approvedAt={recipe.label_claims_approved_at ?? null}
+                  approvedBy={recipe.label_claims_approved_by ?? null}
+                  grainPct={label?.grain_score_pct ?? null}
+                  grainCategory={label?.grain_category ?? null}
+                  flourGrams={label?.flour_grams ?? null}
+                  coarseWeightedGrams={label?.lines?.coarse_weighted_grams ?? null}
+                  wholeGrainPctOfDry={label?.whole_grain_pct_of_dry ?? null}
+                  dryMatterPct={label?.dry_matter_pct ?? null}
+                  finalWeightGrams={label?.final_weight_grams ?? null}
+                  warnings={label?.warnings ?? null}
+                  flourLines={flourLines}
+                  canWrite={canWrite}
+                  savingClaim={saveClaim.isPending}
+                  onToggleClaim={(value) => saveClaim.mutate({ field: "label_claim_grain", value })}
+                />
+              </div>
+            </details>
+            <details open={!!keyholeRelevant} className="group rounded-lg border bg-card">
+              <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium">
+                Nøkkelhullet
+                {!keyholeRelevant && (
+                  <span className="ml-2 font-normal text-muted-foreground">
+                    — {!keyhole ? "ingen vurdering ennå" : keyhole.status === "ukjent" ? "kan ikke vurderes ennå" : "kriteriene er ikke oppfylt, ikke aktuelt å merke"}. Åpne
+                    for detaljer.
+                  </span>
+                )}
+              </summary>
+              <div className="p-2 pt-0">
+                <KeyholeSection
+                  keyhole={keyhole}
+                  coverageOk={coverageOk}
+                  claimKeyhole={!!recipe.label_claim_keyhole}
+                  approvedBy={recipe.label_claims_approved_by ?? null}
+                  approvedAt={recipe.label_claims_approved_at ?? null}
+                  canWrite={canWrite}
+                  saving={saveClaim.isPending}
+                  primaryProductCount={primaryCount}
+                  onToggleClaim={(value) => saveClaim.mutate({ field: "label_claim_keyhole", value })}
+                />
+              </div>
+            </details>
+          </TabsContent>
+        </Tabs>
 
-      <ConsumerLabelSection
-        recipeName={recipeName}
-        effective={effective}
-        effectiveGrainPct={
-          effectiveGrain.data ?? (breadscaleMode === "manual" ? recipe.manual_breadscale_pct ?? null : label?.grain_score_pct ?? null)
-        }
-        declarationManual={declarationManual}
-        breadscaleManual={breadscaleMode === "manual"}
-        claimGrain={!!recipe.label_claim_grain}
-        claimKeyhole={!!recipe.label_claim_keyhole}
-        unitWeightGrams={recipe.unit_weight_grams ?? null}
-        shelfLifeDays={recipe.shelf_life_days ?? null}
-        storageInstructions={recipe.storage_instructions ?? null}
-        countryOfOrigin={recipe.country_of_origin ?? null}
-        entity={entityQuery.data ?? null}
-        profile={labelProfileQuery.data ?? null}
-        blocked={declarationManual ? false : !!missing?.blocked}
-        keyholeQualifies={keyhole?.status === "oppfylt"}
-        coveragePct={coveragePct}
-        onChecklistChange={onChecklistChange}
-        nutritionUsable={declarationManual ? !!effective.nutrition : coverageOk && !!effective.nutrition}
-      />
-
-      <LinkedProductsCard recipeId={recipeId} links={links} canWrite={canWrite} />
+        {isDesktop && (
+          <aside aria-label="Etikettforhåndsvisning" className="space-y-2 lg:sticky lg:top-4 lg:self-start">
+            {previewNote}
+            {preview}
+          </aside>
+        )}
+      </div>
     </div>
   );
 }
