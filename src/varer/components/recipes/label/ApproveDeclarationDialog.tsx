@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
 import { stripHtml } from "@/varer/lib/effectiveDeclaration";
+import { nutritionDiff } from "@/varer/lib/declarationDiff";
 import { DeclarationDiffView, declarationDocsDiffer, type DeclarationDoc } from "./DeclarationDiffView";
 import { formatDateTimeNb } from "./labelShared";
 
@@ -61,6 +62,8 @@ export function ApproveDeclarationDialog(p: Props) {
   const dirtyBlock = mode === "manual" && p.manualDirty;
   const noCandidate = !candidate || !stripHtml(candidate.ingredientText ?? "").trim();
   const blocked = modeIssues.length > 0 || dirtyBlock || noCandidate;
+  // Hele kandidatens næringstabell — vises alltid, også ved første godkjenning.
+  const candidateNutrition = candidate?.nutrition ? nutritionDiff(null, candidate.nutrition) : [];
   const unchanged = !!p.previous && !!candidate && !declarationDocsDiffer(p.previous.doc, candidate);
 
   return (
@@ -96,6 +99,25 @@ export function ApproveDeclarationDialog(p: Props) {
           {candidate && candidate.mayContain.length > 0 && (
             <p className="text-xs">Kan inneholde spor av: {candidate.mayContain.join(", ")}</p>
           )}
+          <div className="pt-2">
+            <div className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Næringsinnhold per 100 g</div>
+            {candidateNutrition.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Kandidaten har ingen næringstall.</p>
+            ) : (
+              <table className="w-full text-xs">
+                <tbody>
+                  {candidateNutrition.map((r) => (
+                    <tr key={r.key} className="border-b last:border-0">
+                      <td className="py-0.5 pr-2">{r.label}</td>
+                      <td className="py-0.5 text-right tabular-nums">
+                        {r.to == null ? "—" : r.to.toLocaleString("nb-NO", { maximumFractionDigits: 1 })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </section>
 
         <section aria-label="Endringer siden sist" className="rounded-lg border p-3">

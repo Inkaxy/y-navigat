@@ -262,7 +262,7 @@ export function DeclarationNutritionSection(p: Props) {
           <div role="note" className="flex flex-wrap items-center gap-2 rounded-md border border-dashed p-2 text-xs">
             <span className="flex-1">
               Du ser på <b>{candidate === "manual" ? "manuell" : "beregnet"}</b>. Gjeldende kilde er fortsatt{" "}
-              <b>{savedMode === "manual" ? "manuell" : "beregnet"}</b> — ingenting endres før du godkjenner.
+              <b>{savedMode === "manual" ? "manuell" : "beregnet"}</b> — visningen alene endrer ingenting. «Lagre som gjeldende kilde» bytter kilde uten å godkjenne; «Godkjenn denne» åpner godkjenningen.
             </span>
             {canWrite && (
               <>
