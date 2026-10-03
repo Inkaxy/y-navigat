@@ -10,6 +10,7 @@ import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import type { SupplierLinkRow } from "@/fakturaer/hooks/useSupplierLinkContext";
 import { useLineMatchForm } from "@/fakturaer/hooks/useLineMatchForm";
 import { recalculateLines } from "@/fakturaer/lib/acceptMatch";
+import { acceptPriceVariance, canAcceptPriceVariance } from "@/fakturaer/lib/queueActions";
 import type { LineStatus } from "@/fakturaer/lib/lineStatus";
 import { costOf } from "@/fakturaer/lib/lineControl";
 import { LineStatusBadge } from "@/fakturaer/components/inbox/LineStatusBadge";
@@ -91,6 +92,25 @@ export function LineTask(p: LineTaskProps) {
     }
   }
 
+  const priceAcceptable = canAcceptPriceVariance(line);
+  const [acceptBusy, setAcceptBusy] = useState(false);
+  async function acceptPrice() {
+    setError(null);
+    setNotice(null);
+    setAcceptBusy(true);
+    try {
+      await acceptPriceVariance(line);
+      setNotice("Prisen er godtatt. Henter oppdatert status …");
+      await p.onSaved(line.id);
+      setNotice("Prisen er godtatt.");
+    } catch (e) {
+      console.error("[fakturakontroll-godta-pris]", e);
+      setError(`${GENERIC_ERROR_MESSAGE} Linjen står åpen.`);
+    } finally {
+      setAcceptBusy(false);
+    }
+  }
+
   async function retryRecalc(ids: string[] | undefined = recalc?.lineIds) {
     if (!ids) return;
     setRecalcBusy(true);
@@ -136,11 +156,17 @@ export function LineTask(p: LineTaskProps) {
     primary = { label: "Bekreft startpris", run: () => p.onSecondary("start_price", line), hint: copy.missing };
   } else if (status.key === "recalculate") {
     primary = { label: "Beregn prisen på nytt", run: () => void retryRecalc([line.id]), hint: copy.missing };
+  } else if (mode === "price" && p.canWrite && priceAcceptable) {
+    primary = {
+      label: "Prisen er riktig",
+      run: () => void acceptPrice(),
+      hint: "Godtar prisen på denne linjen. Avtaleprisen endres ikke.",
+    };
   } else if (mode === "price" && p.canWrite) {
     primary = {
       label: "Kontroller pakningen",
       run: form.selectedRmId ? () => setEditPackage(true) : null,
-      hint: "Prisavviket godkjennes ikke her. Stemmer pakning og råvare, må avviket avklares med leverandøren eller i avtalegrunnlaget — linjen står åpen.",
+      hint: "Prisen kan ikke sammenlignes ennå. Kontroller pakning, råvare eller avtalepris.",
     };
   } else if (mode === "done" && p.reconcileReady) {
     primary = { label: "Gå til bekreft prismatch", run: p.onReconcile, hint: "Alle linjer er avklart." };

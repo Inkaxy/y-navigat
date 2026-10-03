@@ -3,6 +3,7 @@ import { acceptMatch } from "@/fakturaer/lib/acceptMatch";
 import { deriveLinePackage, resolveLineCost } from "@/fakturaer/lib/units";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import type { QueueLineSnapshot } from "@/fakturaer/lib/queueReducer";
+import { allReasons } from "@/fakturaer/lib/reviewReasons";
 
 /** Tilstanden linjen hadde før handlingen — grunnlaget for «angre». */
 export function snapshotOf(line: ReviewLineRow): QueueLineSnapshot {
