@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { formatMoney } from "@/fakturaer/lib/constants";
-import { fmtNum } from "@/fakturaer/lib/units";
+import { fmtNum, invoiceArithmeticMismatch } from "@/fakturaer/lib/units";
 import { GENERIC_ERROR_MESSAGE } from "@/lib/userError";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import type { SupplierLinkRow } from "@/fakturaer/hooks/useSupplierLinkContext";

@@ -95,3 +95,21 @@ describe("Innboks og fokus teller likt", () => {
     expect(focus).toBe(inbox);
   });
 });
+
+import { invoiceArithmeticMismatch, resolveLineCost } from "@/fakturaer/lib/units";
+
+describe("Regneavvik vs ukjent pakning", () => {
+  it("KARAMELLSIRUP 6 flaske × 121,41 = 728,46 med ukjent pakning: ingen advarsel, pakning gjenstår", () => {
+    const line = { quantity: 6, unitPrice: 121.41, totalAmount: 728.46 };
+    const cost = resolveLineCost({ ...line, unit: "flaske", baseUnit: "l", description: "KARAMELLSIRUP MONIN" });
+    expect(cost.needsInput).toBeTruthy();
+    expect(invoiceArithmeticMismatch(line, cost.checks)).toBe(false);
+  });
+  it("Oatly 6 × 23,69 mot 1279,26: advarsel", () => {
+    expect(invoiceArithmeticMismatch({ quantity: 6, unitPrice: 23.69, totalAmount: 1279.26 }, null)).toBe(true);
+  });
+  it("forklart av kjent pakning eller manglende tall: ingen advarsel", () => {
+    expect(invoiceArithmeticMismatch({ quantity: 2, unitPrice: 10, totalAmount: 240 }, { arithmeticPerBaseUnit: true })).toBe(false);
+    expect(invoiceArithmeticMismatch({ quantity: 2, unitPrice: null, totalAmount: 240 }, null)).toBe(false);
+  });
+});
