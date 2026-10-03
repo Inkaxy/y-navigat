@@ -3051,6 +3051,7 @@ export type Database = {
           match_confidence: string | null
           package_size: number | null
           package_unit: string | null
+          price_acceptance: Json | null
           price_per_base_unit: number | null
           price_reference_date: string | null
           price_reference_id: string | null
@@ -3084,6 +3085,7 @@ export type Database = {
           match_confidence?: string | null
           package_size?: number | null
           package_unit?: string | null
+          price_acceptance?: Json | null
           price_per_base_unit?: number | null
           price_reference_date?: string | null
           price_reference_id?: string | null
@@ -3117,6 +3119,7 @@ export type Database = {
           match_confidence?: string | null
           package_size?: number | null
           package_unit?: string | null
+          price_acceptance?: Json | null
           price_per_base_unit?: number | null
           price_reference_date?: string | null
           price_reference_id?: string | null
@@ -15117,6 +15120,14 @@ export type Database = {
           resolved_product_id: string
           resolved_unit_price: number
         }[]
+      }
+      accept_invoice_line_price_variance: {
+        Args: {
+          p_expected_price_per_base_unit: number
+          p_expected_reference_price: number
+          p_line_id: string
+        }
+        Returns: Json
       }
       ai_config_replace_active: {
         Args: {
