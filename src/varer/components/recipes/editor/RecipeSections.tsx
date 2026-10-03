@@ -23,7 +23,7 @@ export function goToSection(id: string, root: ParentNode = document): boolean {
 /** Seksjon med fokuserbar overskrift — mål for «Gå til». */
 export function RecipeSection({ id, title, actions, children }: { id: RecipeSectionId; title: string; actions?: ReactNode; children: ReactNode }) {
   return (
-    <section id={id} aria-labelledby={`${id}-tittel`} className="scroll-mt-48 space-y-3">
+    <section id={id} aria-labelledby={`${id}-tittel`} className="scroll-mt-4 space-y-3 lg:scroll-mt-48">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-subtle pb-1.5">
         <h2 id={`${id}-tittel`} data-section-heading tabIndex={-1} className="font-display text-title text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           {title}
@@ -38,8 +38,8 @@ export function RecipeSection({ id, title, actions, children }: { id: RecipeSect
 /** Kompakt «Gå til»-navigasjon, rullbar på mobil. */
 export function RecipeSectionNav() {
   return (
-    <nav aria-label="Gå til i oppskriften" className="-mx-1 overflow-x-auto">
-      <ul className="flex items-center gap-1.5 px-1 py-0.5">
+    <nav aria-label="Gå til i oppskriften">
+      <ul className="flex flex-wrap items-center gap-1.5 py-0.5">
         <li className="shrink-0 text-caption text-muted-foreground">Gå til:</li>
         {RECIPE_SECTIONS.map((s) => (
           <li key={s.id} className="shrink-0">
