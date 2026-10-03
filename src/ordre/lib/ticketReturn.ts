@@ -11,6 +11,8 @@ import { resolveInternalPath } from "@/lib/safeInternalPath";
 import { TICKET_PRIORITIES } from "@/ordre/lib/ticketFormat";
 
 export const TICKET_RETURN_PARAM = "fra";
+/** Flat, opprinnelig innboks-kontekst som følger hele rundreisen. */
+export const INBOX_ORIGIN_PARAM = "innboks";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const QUEUE_VALUE = /^[a-z_]{1,30}(:[a-z_]{1,30})?$/;
 // eslint-disable-next-line no-control-regex -- kontrolltegn skal fjernes
@@ -59,21 +61,56 @@ function parse(raw: string | null | undefined, allowNested: boolean): ReturnTarg
   }
   const ticket = /^\/ordre\/ticket\/([^/]+)$/.exec(path);
   if (ticket && isUuid(ticket[1])) {
-    let href = `/ordre/ticket/${ticket[1]}`;
+    const qs = new URLSearchParams();
     if (allowNested) {
       const nested = parse(url.searchParams.get(TICKET_RETURN_PARAM), false);
-      if (nested?.kind === "inbox") {
-        href += `?${TICKET_RETURN_PARAM}=${encodeURIComponent(nested.href)}`;
-      }
+      if (nested?.kind === "inbox") qs.set(TICKET_RETURN_PARAM, nested.href);
     }
-    return { kind: "ticket", href, label: "Tilbake til saken" };
+    const origin = inboxOriginFromParams(url.searchParams);
+    if (origin) qs.set(INBOX_ORIGIN_PARAM, origin);
+    const s = qs.toString();
+    return { kind: "ticket", href: `/ordre/ticket/${ticket[1]}${s ? `?${s}` : ""}`, label: "Tilbake til saken" };
   }
   const order = /^\/ordre\/ordrer\/([^/]+)$/.exec(path);
   if (order && isUuid(order[1])) {
-    const tab = url.searchParams.get("tab") === "samtaler" ? "?tab=samtaler" : "";
-    return { kind: "order", href: `/ordre/ordrer/${order[1]}${tab}`, label: "Tilbake til ordren" };
+    const qs = new URLSearchParams();
+    if (url.searchParams.get("tab") === "samtaler") qs.set("tab", "samtaler");
+    const origin = inboxOriginFromParams(url.searchParams);
+    if (origin) qs.set(INBOX_ORIGIN_PARAM, origin);
+    const s = qs.toString();
+    return { kind: "order", href: `/ordre/ordrer/${order[1]}${s ? `?${s}` : ""}`, label: "Tilbake til ordren" };
   }
   return null;
+}
+
+/** Validert opprinnelig innboks fra `innboks`-parameteret (aldri nestet). */
+export function inboxOriginFromParams(params: URLSearchParams): string | null {
+  const raw = params.get(INBOX_ORIGIN_PARAM);
+  if (!raw || raw.length > MAX_RAW) return null;
+  const resolved = resolveInternalPath(raw);
+  if (!resolved) return null;
+  const url = new URL(resolved, "https://internal.invalid");
+  if (url.pathname.replace(/\/+$/, "") !== "/ordre/ticket") return null;
+  return `/ordre/ticket${sanitizeInboxSearch(url.searchParams)}`;
+}
+
+/** Opprinnelig innboks for en `from`-adresse: innboksen selv eller dens `innboks`. */
+function originOf(from: string | null | undefined): string | null {
+  if (!from) return null;
+  const t = parse(from, false);
+  if (!t) return null;
+  if (t.kind === "inbox") return t.href;
+  return inboxOriginFromParams(new URL(t.href, "https://internal.invalid").searchParams);
+}
+
+/** «Tilbake til innboksen» når nærmeste retur ikke allerede er innboksen. */
+export function inboxOriginTarget(
+  params: URLSearchParams,
+  nearest: ReturnTarget | null,
+): ReturnTarget | null {
+  const origin = inboxOriginFromParams(params);
+  if (!origin || nearest?.kind === "inbox") return null;
+  return { kind: "inbox", href: origin, label: "Tilbake til innboksen" };
 }
 
 /** Returmål for full sak: innboks eller ordre. Ellers standard innboks. */
@@ -92,13 +129,17 @@ export function orderBackTarget(raw: string | null | undefined): ReturnTarget | 
 function withReturn(base: string, from: string | null | undefined, allowNested: boolean): string {
   const target = from ? parse(from, allowNested) : null;
   if (!target) return base;
-  const sep = base.includes("?") ? "&" : "?";
-  return `${base}${sep}${TICKET_RETURN_PARAM}=${encodeURIComponent(target.href)}`;
+  const url = new URL(base, "https://internal.invalid");
+  url.searchParams.set(TICKET_RETURN_PARAM, target.href);
+  const origin = originOf(from);
+  if (origin) url.searchParams.set(INBOX_ORIGIN_PARAM, origin);
+  return `${url.pathname}${url.search}`;
 }
 
 /** Lenke til full sak. `from` er innboksen eller en ordre. */
 export function ticketHref(ticketId: string, from?: string | null): string {
-  const base = `/ordre/ticket/${encodeURIComponent(ticketId)}`;
+  if (!isUuid(ticketId)) return "/ordre/ticket";
+  const base = `/ordre/ticket/${ticketId}`;
   const target = from ? parse(from, false) : null;
   if (target?.kind === "ticket") return base;
   return withReturn(base, from, false);
@@ -110,7 +151,8 @@ export function orderHref(
   from?: string | null,
   opts: { tab?: "samtaler" } = {},
 ): string {
-  const base = `/ordre/ordrer/${encodeURIComponent(orderId)}${opts.tab ? `?tab=${opts.tab}` : ""}`;
+  if (!isUuid(orderId)) return "/ordre/ordrer";
+  const base = `/ordre/ordrer/${orderId}${opts.tab ? `?tab=${opts.tab}` : ""}`;
   const target = from ? parse(from, true) : null;
   if (target?.kind === "order") return base;
   return withReturn(base, from, true);

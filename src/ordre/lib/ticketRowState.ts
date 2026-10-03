@@ -50,3 +50,20 @@ export function pruneSelection(selection: Set<string>, visibleIds: Iterable<stri
   }
   return changed ? next : selection;
 }
+
+/**
+ * Operativ ventetekst for en sak. Avsluttede saker (løst/lukket/søppel) har
+ * aldri aktiv venting, selv om et gammelt flagg står igjen i dataene.
+ */
+export function activeWaitingState(t: {
+  status: TicketStatus;
+  awaitingCustomer?: boolean;
+  awaiting_internal?: boolean | null;
+  awaiting_external?: boolean | null;
+}): "customer" | "internal" | "external" | null {
+  if (isTerminalTicket(t.status)) return null;
+  if (t.awaitingCustomer) return "customer";
+  if (t.awaiting_internal) return "internal";
+  if (t.awaiting_external) return "external";
+  return null;
+}
