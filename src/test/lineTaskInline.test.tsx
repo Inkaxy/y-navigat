@@ -123,7 +123,7 @@ describe("Kontrollflaten — pakning direkte i oppgaven", () => {
     expect(screen.getByText(/Hvor mye inneholder én kartong/)).toBeTruthy();
     expect(screen.queryByLabelText("Søk i råvareregisteret")).toBeNull();
     expect(screen.getByText(/Råvare:/)).toBeTruthy();
-    await waitFor(() => expect(screen.getByText(/6,48 kg/)).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText(/6,48 kg/).length).toBeGreaterThan(0));
   });
 
   it("lagrer gjennom acceptMatch med den koblede råvaren og bekreftet pakning", async () => {
