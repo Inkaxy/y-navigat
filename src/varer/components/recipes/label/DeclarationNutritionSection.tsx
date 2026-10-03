@@ -320,6 +320,29 @@ export function DeclarationNutritionSection(p: Props) {
             canWrite={canWrite}
             onApply={onAssistant}
           />
+          {canWrite && (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs text-muted-foreground">
+                Allergenene kan hentes fra råvarene i oppskriften. Ingenting lagres før du trykker «Lagre kladd».
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy || !calculated}
+                onClick={() => {
+                  setForm((f) => ({
+                    ...f,
+                    contains: (calculated?.allergens?.contains ?? []).join(", "),
+                    mayContain: (calculated?.allergens?.may_contain ?? []).join(", "),
+                  }));
+                  p.onCandidateChange("manual");
+                  toast.success("Allergenene er hentet fra råvarene — husk «Lagre kladd»");
+                }}
+              >
+                <ClipboardCopy className="mr-1.5 h-4 w-4" /> Hent allergener fra råvarene
+              </Button>
+            </div>
+          )}
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <Label className="text-xs">Inneholder (kommaseparert)</Label>
