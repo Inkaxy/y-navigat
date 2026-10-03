@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { Check, ChevronsUpDown, Loader2, RotateCw, Undo2 } from "lucide-react";
+import { Check, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
-import { QueryState } from "@/components/common/QueryState";
 import { QueueWorkspace } from "@/fakturaer/components/inbox/QueueWorkspace";
 import { isBulkAcceptable, lineStatus } from "@/fakturaer/lib/lineStatus";
 import { useReviewLines, useReviewLineCounts, type ReviewLineRow, type ReviewLineCountRow } from "@/fakturaer/hooks/useReviewLines";
