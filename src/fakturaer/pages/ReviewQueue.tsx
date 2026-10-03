@@ -35,6 +35,7 @@ import { SkuConflictDialog } from "@/fakturaer/components/SkuConflictDialog";
 import { ConfirmReconcileDialog } from "@/fakturaer/components/ConfirmReconcileDialog";
 import { InvoiceDocumentPanel } from "@/fakturaer/components/InvoiceDocumentPanel";
 import { InboxInvoiceCard } from "@/fakturaer/components/inbox/InboxInvoiceCard";
+import { FocusHeader } from "@/fakturaer/components/inbox/FocusHeader";
 import {
   matchesGroup,
   repeatCounts as computeRepeatCounts,
@@ -342,39 +343,6 @@ export default function FakturaerInboxPage() {
     }
   }, [queue, refresh]);
 
-  /** Samlegodkjenning: bare linjer der det eneste som gjenstår er å bekrefte råvareforslaget. */
-  const acceptAllVisible = useCallback(
-    async () => {
-      if (!canWrite) return;
-      const candidates = visibleLines.filter(isBulkAcceptable);
-      if (candidates.length === 0) {
-        toast.info("Ingen synlige linjer har et forslag uten andre avvik");
-        return;
-      }
-      setBulkBusy(true);
-      let ok = 0;
-      const failures: string[] = [];
-      const accepted: Array<{ invoice_id: string; id: string }> = [];
-      for (const line of candidates) {
-        try {
-          await acceptTopSuggestion(line, { skipRematch: true });
-          accepted.push({ invoice_id: line.invoice_id, id: line.id });
-          ok++;
-        } catch (e) {
-          failures.push(e instanceof Error ? e.message : "ukjent feil");
-        }
-      }
-      // Én kjøring av matchemotoren for hele bunken, ikke én per linje.
-      const pending = accepted.length > 0 ? await rematchLines(accepted) : [];
-      setBulkBusy(false);
-      refresh();
-      if (failures.length === 0) toast.success(`${ok} linjer godtatt`);
-      else toast.warning(`${ok} godtatt, ${failures.length} feilet`);
-      notifyPendingRecalculation(pending);
-    },
-    [canWrite, visibleLines, refresh],
-  );
-
   // --- Masse-handlinger ----------------------------------------------------
   async function bulkAcceptSelected() {
     const candidates = selectedLines.filter(isBulkAcceptable);
@@ -679,6 +647,24 @@ export default function FakturaerInboxPage() {
 
   return (
     <div className="space-y-5">
+      {expandedId ? (
+        <FocusHeader
+          invoice={expandedInvoice}
+          fallback={lines.find((l) => l.invoice_id === expandedId)?.invoice ?? null}
+          progress={progress}
+          reconcileReady={reconcileReady}
+          undoLabel={undoEntry?.label ?? null}
+          onUndo={() => void doUndo()}
+          onBack={() => openInvoice(null)}
+          onReconcile={() => setReconcileId(expandedId)}
+          onShowDocument={() => {
+            const l = activeLine ?? lines.find((x) => x.invoice_id === expandedId);
+            if (l) showDoc(l);
+          }}
+        />
+      ) : null}
+      {expandedId ? queueEl : (
+      <>
       <FakturaerHeaderBanner
         title="Fakturainnboks"
         subtitle="Fakturaer som trenger handling — match, avstem og lukk uten å bytte side"
@@ -785,17 +771,6 @@ export default function FakturaerInboxPage() {
           </span>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line-subtle pt-3 text-xs text-ink-secondary">
-          <span className="inline-flex items-center gap-1.5 font-medium">
-            <Keyboard className="h-3.5 w-3.5" /> Hurtigtaster
-          </span>
-          <span>↑ / ↓ marker</span>
-          <span>Enter godta råvareforslag</span>
-          <span>m velg råvare</span>
-          <span>n ny råvare</span>
-          <span>x ikke råvare</span>
-          <span>u angre</span>
-        </div>
       </Card>
 
       <QueryState
@@ -816,7 +791,7 @@ export default function FakturaerInboxPage() {
                 canWrite={canWrite}
                 canReconcile={canReconcile}
                 busyAction={busyInvoice?.id === inv.id ? busyInvoice.action : null}
-                onToggle={() => setExpandedId((cur) => (cur === inv.id ? null : inv.id))}
+                onToggle={() => openInvoice(inv.id)}
                 onFetchLines={() => void invoiceAction(inv.id, "fetch")}
                 onRegisterLines={() => navigate(`/ravarer/fakturaer/${inv.id}/registrer-linjer`)}
                 onRunMatch={() => void invoiceAction(inv.id, "match")}
@@ -825,15 +800,18 @@ export default function FakturaerInboxPage() {
                 onReconcile={() => setReconcileId(inv.id)}
                 onOpen={() => navigate(`/ravarer/fakturaer/${inv.id}`)}
               />
-              {expandedId === inv.id && <div className="pl-4">{queueEl}</div>}
             </div>
           ))}
         </div>
       </QueryState>
 
-      {!expandedId && (
+      <div>
+        <Button variant="outline" size="sm" aria-expanded={showGlobalLines} onClick={() => setShowGlobalLines((v) => !v)}>
+          {showGlobalLines ? "Skjul linjer på tvers av fakturaer" : "Kontroller linjer på tvers av fakturaer"}
+        </Button>
+      </div>
+      {showGlobalLines && (
         <>
-          <h2 className="text-title">Alle linjer til behandling</h2>
           {hasMoreLines && sort === "impact" && (
             <p className="text-caption text-ink-secondary">
               Sorteringen etter kroner gjelder bare de {lines.length} linjene som er lastet inn — ikke hele køen.
@@ -848,6 +826,9 @@ export default function FakturaerInboxPage() {
             </div>
           )}
         </>
+      )}
+
+      </>
       )}
 
       {panelActive && (
