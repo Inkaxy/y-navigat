@@ -15,6 +15,7 @@ const L = (o: Partial<InboxLine> = {}): InboxLine => ({
   requires_review: false,
   review_reason: null,
   match_confidence: "manual",
+  price_per_base_unit: 10,
   price_variance_pct: null,
   variance_status: null,
   category: null,
@@ -156,7 +157,7 @@ describe("Oppdater matching med delvis feil", () => {
         <InvoiceInbox
           tab="open" onTabChange={() => {}} invoices={[mk("a", "1"), mk("b", "2")]} isLoading={false} isError={false}
           error={null} onRetry={() => {}} legalEntityId="le" supplierId={null} supplierFilter={null} canWrite canReconcile
-          busyId={null} onPrimary={() => {}} onRematch={() => {}} onOpenDetail={() => {}} onFlag={() => {}} onBatchMatch={batch}
+          busyId={null} onPrimary={() => {}} onRematch={() => {}} onOpenDetail={() => {}} onFlag={() => {}} onUnflag={() => {}} onBatchMatch={batch}
         />
       </QueryClientProvider>,
     );

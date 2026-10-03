@@ -190,7 +190,9 @@ const ACCEPTABLE_PRICE_REASONS: ReadonlySet<string> = new Set(["price_variance",
  * er beregnet, og det ENESTE som gjenstår er selve avviket.
  */
 export function canAcceptPriceVariance(line: ReviewLineRow): boolean {
-  if (line.price_per_base_unit == null || line.expected_price_per_base_unit == null) return false;
+  const pos = (v: number | null) => v != null && Number.isFinite(Number(v)) && Number(v) > 0;
+  if (!pos(line.price_per_base_unit) || !pos(line.expected_price_per_base_unit)) return false;
+  if (!line.raw_material_id || !["manual", "auto_high"].includes(line.match_confidence ?? "")) return false;
   const reasons = allReasons(line);
   return reasons.length > 0 && reasons.every((r) => ACCEPTABLE_PRICE_REASONS.has(r));
 }
@@ -212,6 +214,26 @@ export function acceptPriceErrorMessage(message: string | undefined): string {
   return key ? ACCEPT_ERRORS[key] : "Kunne ikke godta prisen. Prøv igjen.";
 }
 
+/** Grunnlaget brukeren så. Serveren avviser godkjenningen hvis noe av dette er endret. */
+export function observedPriceBasis(line: ReviewLineRow): Record<string, string | number | null> {
+  return {
+    raw_material_id: line.raw_material_id,
+    quantity: line.quantity,
+    unit: line.unit,
+    unit_price: line.unit_price,
+    total_amount: line.total_amount,
+    base_quantity: line.base_quantity,
+    package_size: line.package_size,
+    package_unit: line.package_unit,
+    count_per_package: line.count_per_package,
+    price_per_base_unit: line.price_per_base_unit,
+    expected_price_per_base_unit: line.expected_price_per_base_unit,
+    price_reference_source: line.price_reference_source,
+    price_reference_id: line.price_reference_id,
+    price_reference_date: line.price_reference_date,
+  };
+}
+
 /**
  * Godtar prisavviket på ÉN linje via serveren. Serveren låser linjen, sjekker
  * tilgang, at tallene er de samme som brukeren så, og at prisavvik er det
@@ -222,8 +244,7 @@ export async function acceptPriceVariance(line: ReviewLineRow): Promise<void> {
   if (!canAcceptPriceVariance(line)) throw new Error("Prisavviket kan ikke godtas på denne linjen");
   const { error } = await supabase.rpc("accept_invoice_line_price_variance", {
     p_line_id: line.id,
-    p_expected_price_per_base_unit: Number(line.price_per_base_unit),
-    p_expected_reference_price: Number(line.expected_price_per_base_unit),
+    p_observed: observedPriceBasis(line),
   });
   if (error) throw new Error(acceptPriceErrorMessage(error.message));
 }

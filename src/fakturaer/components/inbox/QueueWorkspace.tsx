@@ -51,6 +51,7 @@ export interface QueueWorkspaceProps {
   isMobile: boolean;
   countsError: boolean;
   onSaved: (lineId: string) => Promise<void>;
+  onLinked?: (rmsId: string, name: string) => void;
   onSecondary: (a: SecondaryAction, l: ReviewLineRow) => void;
   onShowDocument: (l: ReviewLineRow) => void;
   onReconcile: () => void;
@@ -73,6 +74,7 @@ export function QueueWorkspace(p: QueueWorkspaceProps) {
       onPrev={p.onPrev}
       onNext={p.onNext}
       onSaved={p.onSaved}
+      onLinked={p.onLinked}
       onSecondary={p.onSecondary}
       onShowDocument={p.onShowDocument}
       onReconcile={p.onReconcile}

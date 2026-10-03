@@ -8,6 +8,7 @@
  */
 
 import { CREDIT_NOTE_REF_PREFIX, creditNoteOriginalRef } from "@/fakturaer/lib/creditNote";
+import { lineStatus } from "@/fakturaer/lib/lineStatus";
 export { CREDIT_NOTE_REF_PREFIX, creditNoteOriginalRef };
 
 export type InboxIssue =
@@ -33,6 +34,14 @@ export interface InboxLine {
   category: string | null;
   match_confidence?: string | null;
   review_reason?: string | null;
+  id?: string;
+  quantity?: number | null;
+  price_per_base_unit?: number | null;
+  invoice?: {
+    currency?: string | null;
+    lines_sum_status?: string | null;
+    extraction_confidence?: number | null;
+  } | null;
 }
 
 export interface InboxInvoiceInput {
@@ -42,6 +51,7 @@ export interface InboxInvoiceInput {
   /** Fritekst på fakturaen — koblingen til opprinnelig faktura lagres her. */
   notes?: string | null;
   line_extraction_status?: string | null;
+  currency?: string | null;
   lines: InboxLine[];
 }
 
@@ -70,10 +80,26 @@ const reasonsOf = (l: InboxLine) =>
 
 const isNotApplicable = (l: InboxLine) => l.match_confidence === "not_applicable";
 
-/** Linjen står åpen når serveren sier den krever gjennomgang, eller den mangler kobling. */
+/**
+ * Samme linjevurdering som kontrollflaten (lineStatus): bare en bekreftet
+ * kobling med beregnet pris og uten årsaker er avklart. auto_low/medium,
+ * manglende pris eller usikkert uttrekk står åpne.
+ */
 export function lineIsOpen(l: InboxLine): boolean {
-  if (isNotApplicable(l)) return false;
-  return !l.raw_material_id || !!l.requires_review || reasonsOf(l).length > 0;
+  return (
+    lineStatus({
+      id: l.id ?? "",
+      review_reason: l.review_reason ?? null,
+      requires_review: l.requires_review,
+      variance_status: l.variance_status,
+      raw_material_id: l.raw_material_id,
+      match_confidence: l.match_confidence ?? null,
+      quantity: l.quantity ?? null,
+      price_per_base_unit: l.price_per_base_unit ?? null,
+      suggestions: null,
+      invoice: l.invoice ?? null,
+    }).bucket === "needs"
+  );
 }
 
 export function assessInboxInvoice(
@@ -106,6 +132,7 @@ export function assessInboxInvoice(
   if (inv.lines_sum_status == null && lines.length > 0) blockers.push("linjesummen er ikke kontrollert");
   if (inv.is_credit_note && !creditNoteOriginalRef(inv.notes))
     blockers.push("kreditnotaen er ikke knyttet til en opprinnelig faktura");
+  if (inv.currency && inv.currency.toUpperCase() !== "NOK") blockers.push(`fakturaen er i ${inv.currency.toUpperCase()}`);
 
   const locked = inv.status === "reconciled" || inv.status === "flagged" || inv.status === "cancelled";
   return {
@@ -140,7 +167,7 @@ export function inboxTabOf(inv: { status: string; assessment: InboxAssessment })
   return inv.assessment.canReconcile ? "ready" : "open";
 }
 
-export type InboxPrimaryAction = "fetch_lines" | "register_lines" | "link_credit_note" | "unflag" | "resolve" | "finish";
+export type InboxPrimaryAction = "fetch_lines" | "register_lines" | "link_credit_note" | "view_flag" | "resolve" | "finish";
 
 /** ÉN meningsfull handling per rad, og en kort forklaring. */
 export function inboxPrimaryAction(inv: {
@@ -151,7 +178,7 @@ export function inboxPrimaryAction(inv: {
   assessment: InboxAssessment;
 }): { action: InboxPrimaryAction; label: string; hint: string } {
   const a = inv.assessment;
-  if (inv.status === "flagged") return { action: "unflag", label: "Se flagget", hint: "Fakturaen er flagget" };
+  if (inv.status === "flagged") return { action: "view_flag", label: "Se flagget", hint: "Fakturaen er flagget" };
   const missing = inv.line_count === 0 || ["pending", "failed"].includes(inv.line_extraction_status ?? "");
   if (missing) {
     return inv.source === "tripletex"

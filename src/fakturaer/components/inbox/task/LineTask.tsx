@@ -34,6 +34,8 @@ export interface LineTaskProps {
   onNext: () => void;
   /** Kalles etter vellykket lagring. Kalleren henter serverens tilstand og avgjør neste linje. */
   onSaved: (lineId: string) => Promise<void>;
+  /** Etter bekreftet kobling: koblingen som kan brukes på like linjer. */
+  onLinked?: (rmsId: string, name: string) => void;
   onSecondary: (a: SecondaryAction, line: ReviewLineRow) => void;
   onShowDocument: (line: ReviewLineRow) => void;
   onReconcile: () => void;
@@ -81,6 +83,7 @@ export function LineTask(p: LineTaskProps) {
         setRecalc({ lineIds: r.lineIds });
         return;
       }
+      if (r.rmsId && form.selectedRm) p.onLinked?.(r.rmsId, form.selectedRm.name);
       setNotice("Lagret. Henter oppdatert status …");
       setEditMaterial(false);
       setEditPackage(false);

@@ -5,6 +5,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2.95.0/cors";
 import { normalizeUnit, isPackageUnit, packageNeedsConfirmation, resolveLineCost, stripPackageTokens } from "../_shared/units.ts";
 import { normalizeMatchKey } from "../_shared/matchNormalize.ts";
 import { syncRegisteredPrices, learnPendingAliases } from "../_shared/priceSync.ts";
+import { pickPackageRow } from "../_shared/packageSignature.ts";
 import { reconcileAcceptance } from "../_shared/priceAcceptance.ts";
 import { CREDIT_NOTE_REF_PREFIX, creditNoteOriginalRef } from "../_shared/creditNote.ts";
 
@@ -258,30 +259,13 @@ Deno.serve(async (req) => {
     }
     const rmsById = new Map<string, AnyRec>(rmsList.map((r: AnyRec) => [r.id, r]));
 
-    /**
-     * Leverandørkoblingen som er pakningskilden for linjen: den koblingen
-     * motoren faktisk traff, ellers samme varenummer, ellers den ENESTE
-     * koblingen. Flere koblinger med ulik pakning gir konflikt — aldri «første rad».
-     */
+    /** Pakningskilden for linjen — felles regel med skjermen (packageSignature.ts). */
     function pickRmsRow(
       rawMaterialId: string,
-      preferredRmsId: string | null,
+      exactRmsId: string | null,
       sku: string | null,
     ): { row: AnyRec | undefined; conflict: boolean } {
-      if (preferredRmsId) {
-        const hit = rmsById.get(preferredRmsId);
-        if (hit && hit.raw_material_id === rawMaterialId) return { row: hit, conflict: false };
-      }
-      const rows = rmsList.filter((r: AnyRec) => r.raw_material_id === rawMaterialId);
-      if (rows.length <= 1) return { row: rows[0], conflict: false };
-      const skuN = norm(sku);
-      if (skuN) {
-        const bySku = rows.filter((r: AnyRec) => norm(r.supplier_sku) === skuN);
-        if (bySku.length === 1) return { row: bySku[0], conflict: false };
-      }
-      const sizes = new Set(rows.map((r: AnyRec) => (r.base_units_per_package == null ? "-" : String(Number(r.base_units_per_package)))));
-      if (sizes.size === 1) return { row: rows[0], conflict: false };
-      return { row: undefined, conflict: true };
+      return pickPackageRow(rmsList.filter((r: AnyRec) => r.raw_material_id === rawMaterialId), sku, exactRmsId);
     }
 
     // Avviste og erstattede alias er lærdom om hva som IKKE stemmer — de skal aldri matche.
@@ -325,6 +309,7 @@ Deno.serve(async (req) => {
         const rm = rmById.get(line.raw_material_id);
         const pickedM = pickRmsRow(line.raw_material_id, null, line.supplier_sku);
         const rmsRow = pickedM.row;
+        manualUpdate.package_source_rms_id = rmsRow?.id ?? null;
         const refM = withRegisteredLastPurchase(await priceReference(line.raw_material_id), rmsRow);
         const expected = applyReference(manualUpdate, refM);
 
@@ -388,7 +373,7 @@ Deno.serve(async (req) => {
         manualUpdate.requires_review = requiresReview;
         manualUpdate.review_reason = reviewReasons.size ? Array.from(reviewReasons).join(",") : null;
         await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, manualUpdate, catTolMap.get(rm?.category ?? "") ?? tolDefault, refM);
-        reconcileAcceptance(line, manualUpdate, line.raw_material_id);
+        reconcileAcceptance(line, manualUpdate, line.raw_material_id, rmsRow ?? null);
 
         await applyUpdate(svc, line.id, manualUpdate);
         results.push({ id: line.id, status: "manual", recomputed: true });
@@ -416,6 +401,7 @@ Deno.serve(async (req) => {
         resolution_note: null,
         resolved_at: null,
         resolved_by: null,
+        package_source_rms_id: null,
       };
       const suggestionsToInsert: AnyRec[] = [];
 
@@ -453,7 +439,15 @@ Deno.serve(async (req) => {
           .map((a) => rmsById.get(a.raw_material_supplier_id)?.raw_material_id)
           .filter(Boolean) as string[],
       );
-      const confirmedHits = confirmedRmIds.size <= 1 ? confirmedHitsRaw.slice(0, 1) : [];
+      // Varenummer-alias foretrekkes foran produktnavn. Radpresist bare når
+      // varenummeret peker på nøyaktig ÉN leverandørkobling.
+      const skuAliasRowIds = new Set(
+        confirmedHitsRaw.filter((a) => a.alias_type === "supplier_sku").map((a) => a.raw_material_supplier_id),
+      );
+      const orderedHits = [...confirmedHitsRaw].sort(
+        (a, b) => Number(b.alias_type === "supplier_sku") - Number(a.alias_type === "supplier_sku"),
+      );
+      const confirmedHits = confirmedRmIds.size <= 1 ? orderedHits.slice(0, 1) : [];
 
       // Ekte tvetydighet: samme alias er bekreftet på flere ULIKE råvarer (dublett i råvareregisteret).
       if (confirmedRmIds.size > 1) {
@@ -478,7 +472,7 @@ Deno.serve(async (req) => {
         const hit = confirmedHits[0];
         const rmsRow = rmsById.get(hit.raw_material_supplier_id);
         if (rmsRow) {
-          matchedRmsId = rmsRow.id;
+          matchedRmsId = hit.alias_type === "supplier_sku" && skuAliasRowIds.size === 1 ? rmsRow.id : null;
           matchedRmId = rmsRow.raw_material_id;
           matchedAliasId = hit.id;
           confidenceLabel = "auto_high";
@@ -520,11 +514,12 @@ Deno.serve(async (req) => {
         const skuRmIds = new Set(skuRows.map((r: AnyRec) => r.raw_material_id));
         if (skuRmIds.size === 1) {
           const rmsRow = skuRows[0];
-          matchedRmsId = rmsRow.id;
+          // Flere rader med samme varenummer: pakningen avgjøres av signaturen, ikke rekkefølgen.
+          matchedRmsId = skuRows.length === 1 ? rmsRow.id : null;
           matchedRmId = rmsRow.raw_material_id;
           confidenceLabel = "auto_high";
           // Lær varenummeret som bekreftet alias, slik at neste faktura går rett gjennom.
-          await upsertConfirmedSkuAlias(svc, usableAliases, rmsRow.id, line.supplier_sku, inv.id);
+          if (skuRows.length === 1) await upsertConfirmedSkuAlias(svc, usableAliases, rmsRow.id, line.supplier_sku, inv.id);
         } else if (skuRmIds.size > 1) {
           let rank = suggestionsToInsert.length + 1;
           for (const rmId of skuRmIds) {
@@ -565,7 +560,8 @@ Deno.serve(async (req) => {
           strippedRms = r;
         }
         if (strippedRmIds.size === 1 && strippedRms) {
-          matchedRmsId = strippedRms.id;
+          // Navnetreff er aldri radpresist — pakningen velges etter signatur.
+          matchedRmsId = null;
           matchedRmId = strippedRms.raw_material_id;
           confidenceLabel = "auto_medium";
         }
@@ -691,6 +687,7 @@ Deno.serve(async (req) => {
         const rm = rmById.get(update.raw_material_id);
         const picked = pickRmsRow(update.raw_material_id, matchedRmsId, line.supplier_sku);
         const rmsRow = picked.row;
+        update.package_source_rms_id = rmsRow?.id ?? null;
         const ref = withRegisteredLastPurchase(await priceReference(update.raw_material_id), rmsRow);
         const expected = applyReference(update, ref);
 
@@ -736,7 +733,7 @@ Deno.serve(async (req) => {
         if (foreignCurrency) addReason("unsupported_currency");
 
         await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, update, catTolMap.get(rm?.category ?? "") ?? tolDefault, ref);
-        reconcileAcceptance(line, update, update.raw_material_id);
+        reconcileAcceptance(line, update, update.raw_material_id, rmsRow ?? null);
       }
 
       // Lær av vellykket fuzzy-match: skriv pending alias (aldri degrader bekreftede)

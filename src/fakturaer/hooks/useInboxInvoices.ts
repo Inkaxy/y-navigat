@@ -38,8 +38,8 @@ export const OPEN_INVOICE_STATUSES = ["imported", "needs_review", "flagged", "re
 
 const SELECT = `id, invoice_number, invoice_date, status, legal_entity_id, supplier_id, is_credit_note,
   total_amount, total_vat, lines_sum_status, lines_sum_variance_pct, source_document_url,
-  line_extraction_status, line_extraction_attempts, source, notes, paid_at, tripletex_is_paid, suppliers(name),
-  invoice_lines(raw_material_id, requires_review, review_reason, match_confidence, price_variance_pct, variance_status, raw_materials(category))`;
+  line_extraction_status, line_extraction_attempts, source, notes, paid_at, tripletex_is_paid, currency, extraction_confidence, suppliers(name),
+  invoice_lines(id, quantity, price_per_base_unit, raw_material_id, requires_review, review_reason, match_confidence, price_variance_pct, variance_status, raw_materials(category))`;
 
 interface RawInvoice {
   id: string;
@@ -60,8 +60,13 @@ interface RawInvoice {
   paid_at: string | null;
   tripletex_is_paid: boolean | null;
   line_extraction_attempts: number;
+  currency?: string | null;
+  extraction_confidence?: number | null;
   suppliers: { name: string } | null;
   invoice_lines: Array<{
+    id?: string;
+    quantity?: number | null;
+    price_per_base_unit?: number | null;
     raw_material_id: string | null;
     requires_review: boolean | null;
     review_reason: string | null;
@@ -81,6 +86,10 @@ export function toInboxInvoice(r: RawInvoice): InboxInvoice {
     price_variance_pct: l.price_variance_pct == null ? null : Number(l.price_variance_pct),
     variance_status: l.variance_status,
     category: l.raw_materials?.category ?? null,
+    id: l.id,
+    quantity: l.quantity == null ? null : Number(l.quantity),
+    price_per_base_unit: l.price_per_base_unit == null ? null : Number(l.price_per_base_unit),
+    invoice: { currency: r.currency ?? null, lines_sum_status: r.lines_sum_status, extraction_confidence: r.extraction_confidence ?? null },
   }));
   const assessment = assessInboxInvoice({
     status: r.status,
@@ -88,6 +97,7 @@ export function toInboxInvoice(r: RawInvoice): InboxInvoice {
     lines_sum_status: r.lines_sum_status,
     notes: r.notes,
     line_extraction_status: r.line_extraction_status,
+    currency: r.currency ?? null,
     lines,
   });
   return {

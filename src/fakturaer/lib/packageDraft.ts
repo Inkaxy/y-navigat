@@ -1,3 +1,4 @@
+import { pickPackageRow } from "@/fakturaer/lib/packageSignature";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { deriveLinePackage, normalizeUnit, parseDecimal, parsePackageFromDescription, toBaseFactor } from "@/fakturaer/lib/units";
 
@@ -10,18 +11,11 @@ export interface SupplierPackageLink {
 }
 
 /**
- * Leverandørkoblingen som gjelder linjen: samme varenummer, ellers den eneste.
- * Flere koblinger med ulik pakning gir null — aldri «første rad».
+ * Leverandørkoblingen som gjelder linjen — samme regel som matchemotoren
+ * (packageSignature.ts). Flere rader med ulik pakning gir undefined.
  */
 export function pickSupplierLink<T extends SupplierPackageLink>(rows: T[], sku: string | null): T | undefined {
-  if (rows.length <= 1) return rows[0];
-  const s = (sku ?? "").trim().toLowerCase();
-  if (s) {
-    const hit = rows.filter((r) => (r.supplier_sku ?? "").trim().toLowerCase() === s);
-    if (hit.length === 1) return hit[0];
-  }
-  const sizes = new Set(rows.map((r) => String(r.base_units_per_package ?? "-")));
-  return sizes.size === 1 ? rows[0] : undefined;
+  return pickPackageRow(rows, sku).row;
 }
 
 /** Bekreftet innhold per pakning i grunnenheten, om koblingen har det. */

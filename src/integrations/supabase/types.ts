@@ -3050,6 +3050,7 @@ export type Database = {
           line_number: number | null
           match_confidence: string | null
           package_size: number | null
+          package_source_rms_id: string | null
           package_unit: string | null
           price_acceptance: Json | null
           price_per_base_unit: number | null
@@ -3084,6 +3085,7 @@ export type Database = {
           line_number?: number | null
           match_confidence?: string | null
           package_size?: number | null
+          package_source_rms_id?: string | null
           package_unit?: string | null
           price_acceptance?: Json | null
           price_per_base_unit?: number | null
@@ -3118,6 +3120,7 @@ export type Database = {
           line_number?: number | null
           match_confidence?: string | null
           package_size?: number | null
+          package_source_rms_id?: string | null
           package_unit?: string | null
           price_acceptance?: Json | null
           price_per_base_unit?: number | null
@@ -15090,6 +15093,7 @@ export type Database = {
         Args: { p_price: number; p_price_list_id: string; p_product_id: string }
         Returns: number
       }
+      _normalize_price_basis: { Args: { p: Json }; Returns: Json }
       _notify_ordre_team: {
         Args: {
           p_body: string
@@ -15122,11 +15126,7 @@ export type Database = {
         }[]
       }
       accept_invoice_line_price_variance: {
-        Args: {
-          p_expected_price_per_base_unit: number
-          p_expected_reference_price: number
-          p_line_id: string
-        }
+        Args: { p_line_id: string; p_observed: Json }
         Returns: Json
       }
       ai_config_replace_active: {
@@ -15905,6 +15905,10 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      invoice_line_price_basis: {
+        Args: { p_line: Database["public"]["Tables"]["invoice_lines"]["Row"] }
+        Returns: Json
       }
       is_internal_user: { Args: never; Returns: boolean }
       is_kiosk_user: { Args: never; Returns: boolean }

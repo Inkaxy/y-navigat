@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,7 @@ interface Props {
   onRematch: (inv: InboxInvoice) => void;
   onOpenDetail: (inv: InboxInvoice) => void;
   onFlag: (inv: InboxInvoice) => void;
+  onUnflag: (inv: InboxInvoice) => void;
   /** Kjører matching for de oppgitte fakturaene og returnerer de som feilet. */
   onBatchMatch: (targets: InboxInvoice[], onProgress: (done: number) => void) => Promise<BatchFailure[]>;
 }
@@ -65,10 +66,16 @@ export function InvoiceInbox(p: Props) {
     enabled: p.tab === "done",
   });
 
+  // Nytt filter eller søk starter på første side; en side utenfor totalen klemmes.
+  useEffect(() => setDonePage(0), [p.supplierId, p.legalEntityId, debounced]);
+
   const rows = p.tab === "open" ? openRows : p.tab === "ready" ? readyRows : (completed.data?.rows ?? []);
   const shown = p.tab === "done" ? rows : rows.slice(0, visible);
   const doneTotal = completed.data?.total ?? null;
   const doneLastPage = doneTotal == null ? 0 : Math.max(0, Math.ceil(doneTotal / COMPLETED_PAGE_SIZE) - 1);
+  useEffect(() => {
+    if (doneTotal != null && donePage > doneLastPage) setDonePage(doneLastPage);
+  }, [doneTotal, donePage, doneLastPage]);
 
   async function runBatch(targets: InboxInvoice[]) {
     if (targets.length === 0) return;
@@ -178,6 +185,7 @@ export function InvoiceInbox(p: Props) {
                 onRematch={() => p.onRematch(inv)}
                 onOpenDetail={() => p.onOpenDetail(inv)}
                 onFlag={() => p.onFlag(inv)}
+                onUnflag={() => p.onUnflag(inv)}
               />
             ))}
           </ul>

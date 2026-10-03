@@ -34,6 +34,7 @@ import { SkuConflictDialog } from "@/fakturaer/components/SkuConflictDialog";
 import { ConfirmReconcileDialog } from "@/fakturaer/components/ConfirmReconcileDialog";
 import { InvoiceDocumentPanel } from "@/fakturaer/components/InvoiceDocumentPanel";
 import { InvoiceInbox, type BatchFailure } from "@/fakturaer/components/inbox/InvoiceInbox";
+import { SimilarLinesHint } from "@/fakturaer/components/inbox/SimilarLinesHint";
 import { FlagInvoiceDialog } from "@/fakturaer/components/FlagInvoiceDialog";
 import type { InboxPrimaryAction, InboxTab } from "@/fakturaer/lib/inbox";
 import { FocusHeader } from "@/fakturaer/components/inbox/FocusHeader";
@@ -122,6 +123,7 @@ export default function FakturaerInboxPage() {
     setSearchParams(next, { replace: true });
   };
   const [flagId, setFlagId] = useState<string | null>(null);
+  const [lastLinked, setLastLinked] = useState<{ rmsId: string; name: string } | null>(null);
 
   const { data: entities = [] } = useFakturaerLegalEntities();
   const { data: company } = useCompany();
@@ -451,7 +453,8 @@ export default function FakturaerInboxPage() {
     if (action === "fetch_lines") void invoiceAction(inv.id, "fetch");
     else if (action === "register_lines") navigate(`/ravarer/fakturaer/${inv.id}/registrer-linjer`);
     else if (action === "link_credit_note") setCreditNoteId(inv.id);
-    else if (action === "unflag") void invoiceAction(inv.id, "unflag");
+    // «Se flagget» viser flagget og detaljene — fjerner det ALDRI.
+    else if (action === "view_flag") navigate(`/ravarer/fakturaer/${inv.id}`);
     else if (action === "finish") setReconcileId(inv.id);
     else openInvoice(inv.id);
   }
@@ -563,6 +566,7 @@ export default function FakturaerInboxPage() {
       isMobile={isMobile}
       countsError={countsQuery.isError}
       onSaved={handleSaved}
+      onLinked={(rmsId, name) => setLastLinked({ rmsId, name })}
       onSecondary={(a, l) => openDialog(a, l)}
       onShowDocument={showDoc}
       onReconcile={() => expandedId && setReconcileId(expandedId)}
@@ -624,6 +628,14 @@ export default function FakturaerInboxPage() {
           }}
         />
       ) : null}
+      {expandedId && lastLinked && (
+        <SimilarLinesHint
+          rmsId={lastLinked.rmsId}
+          name={lastLinked.name}
+          onOpen={() => setBulkLink(lastLinked)}
+          onDismiss={() => setLastLinked(null)}
+        />
+      )}
       {expandedId ? queueEl : (
       <>
       <FakturaerHeaderBanner
@@ -701,6 +713,7 @@ export default function FakturaerInboxPage() {
         onRematch={(inv) => void invoiceAction(inv.id, "match")}
         onOpenDetail={(inv) => navigate(`/ravarer/fakturaer/${inv.id}`)}
         onFlag={(inv) => setFlagId(inv.id)}
+        onUnflag={(inv) => void invoiceAction(inv.id, "unflag")}
         onBatchMatch={batchMatch}
       />
 
@@ -760,7 +773,11 @@ export default function FakturaerInboxPage() {
       <BulkLinkDialog
         open={!!bulkLink}
         onOpenChange={(v) => {
-          if (!v) setBulkLink(null);
+          if (!v) {
+            setBulkLink(null);
+            setLastLinked(null);
+            void qc.invalidateQueries({ queryKey: ["similar-lines-count"] });
+          }
         }}
         rmsId={bulkLink?.rmsId ?? null}
         rawMaterialName={bulkLink?.name ?? ""}

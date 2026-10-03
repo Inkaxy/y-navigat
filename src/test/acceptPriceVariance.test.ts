@@ -3,7 +3,7 @@ import { canAcceptPriceVariance } from "@/fakturaer/lib/queueActions";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 
 const line = (o: Partial<ReviewLineRow>): ReviewLineRow =>
-  ({ id: "l", review_reason: "price_variance", requires_review: true, variance_status: "over", raw_material_id: "rm",
+  ({ id: "l", review_reason: "price_variance", requires_review: true, variance_status: "over", raw_material_id: "rm", match_confidence: "manual",
      price_per_base_unit: 35.54, expected_price_per_base_unit: 23.82, quantity: 6, invoice: null, ...o }) as unknown as ReviewLineRow;
 
 describe("canAcceptPriceVariance", () => {

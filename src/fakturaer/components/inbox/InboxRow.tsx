@@ -19,16 +19,21 @@ interface Props {
   onRematch: () => void;
   onOpenDetail: () => void;
   onFlag: () => void;
+  onUnflag: () => void;
 }
 
 /** Én rolig rad: leverandør først, ÉN handling, én kort forklaring. */
-export function InboxRow({ invoice, canWrite, canReconcile, busy, onPrimary, onRematch, onOpenDetail, onFlag }: Props) {
+export function InboxRow({ invoice, canWrite, canReconcile, busy, onPrimary, onRematch, onOpenDetail, onFlag, onUnflag }: Props) {
   const done = invoice.status === "reconciled";
   const primary = inboxPrimaryAction(invoice);
   const a = invoice.assessment;
   const total = invoice.line_count;
   const allowed =
-    primary.action === "finish" ? canReconcile : primary.action === "resolve" ? true : canWrite;
+    primary.action === "finish"
+      ? canReconcile
+      : primary.action === "resolve" || primary.action === "view_flag"
+        ? true
+        : canWrite;
 
   return (
     <li className="flex flex-col gap-2 border-b border-line-subtle px-3 py-3 last:border-b-0 sm:flex-row sm:items-center sm:gap-4">
@@ -87,6 +92,9 @@ export function InboxRow({ invoice, canWrite, canReconcile, busy, onPrimary, onR
               )}
               {canWrite && !done && invoice.status !== "flagged" && (
                 <DropdownMenuItem onSelect={onFlag}>Flagg fakturaen</DropdownMenuItem>
+              )}
+              {canWrite && invoice.status === "flagged" && (
+                <DropdownMenuItem onSelect={onUnflag}>Fjern flagg</DropdownMenuItem>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
