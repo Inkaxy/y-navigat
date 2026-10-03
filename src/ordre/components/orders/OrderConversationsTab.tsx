@@ -25,10 +25,12 @@ function ConversationRow({
   t,
   orderId,
   assigneeName,
+  returnFrom,
 }: {
   t: OrderConversation;
   orderId: string;
   assigneeName: string | null;
+  returnFrom?: string;
 }) {
   const intent = normalizeAiSuggestion(t.ai_suggestion)?.request_type ?? null;
   const terminal = isTerminalTicket(t.status);
@@ -85,6 +87,9 @@ function ConversationRow({
 }
 
 export function OrderConversationsTab({ orderId }: { orderId: string }) {
+  const location = useLocation();
+  // Nåværende ordreadresse bærer ev. opprinnelig innboks videre til saken.
+  const returnFrom = `${location.pathname}${location.search}`;
   const { data: conversations = [], isLoading, isError, error, refetch, isSuccess } =
     useOrderConversations(orderId);
   const { data: names = {} } = useUserNames(conversations.map((c) => c.assigned_to));
@@ -127,6 +132,7 @@ export function OrderConversationsTab({ orderId }: { orderId: string }) {
                   key={t.id}
                   t={t}
                   orderId={orderId}
+                  returnFrom={returnFrom}
                   assigneeName={t.assigned_to ? (names[t.assigned_to] ?? null) : null}
                 />
               ))}
