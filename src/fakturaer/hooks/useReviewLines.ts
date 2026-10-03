@@ -88,6 +88,8 @@ const SELECT = `id, invoice_id, line_number, supplier_sku, description, quantity
      raw_material:raw_materials(name, sku, category, current_cost_price, base_unit, item_type)),
    matched_raw_material:raw_materials!invoice_lines_raw_material_id_fkey(name, sku, category, item_type)`;
 
+const REVIEW_FILTER = "requires_review.eq.true,variance_status.eq.no_baseline";
+
 interface Filters {
   legalEntityId?: string | null;
   supplierId?: string | null;
@@ -100,6 +102,11 @@ interface Filters {
    * spørringen dra inn titusenvis av rader. `null` henter alt.
    */
   limit?: number | null;
+  /**
+   * Ta også med linjer som ikke trenger gjennomgang (klare og «ikke råvare»).
+   * Brukes bare når køen er begrenset til én faktura, for å vise fremdrift.
+   */
+  includeResolved?: boolean;
 }
 
 /**
@@ -117,9 +124,6 @@ export function useReviewLines(filters: Filters) {
         let q = supabase
           .from("invoice_lines")
           .select(SELECT)
-          // Ta også med matchede linjer uten avtalepris — de utgjør arbeidslisten
-          // «Uten avtalepris», selv om de ikke er merket for gjennomgang.
-          .or("requires_review.eq.true,variance_status.eq.no_baseline")
           .not(
             "invoice.status",
             "in",
@@ -137,6 +141,9 @@ export function useReviewLines(filters: Filters) {
           .range(from, to);
 
 
+        // Matchede linjer uten avtalepris er med — de utgjør arbeidslisten
+        // «Uten avtalepris», selv om de ikke er merket for gjennomgang.
+        if (!(filters.includeResolved && filters.invoiceId)) q = q.or(REVIEW_FILTER);
         if (filters.legalEntityId) q = q.eq("invoice.legal_entity_id", filters.legalEntityId);
         if (filters.supplierId) q = q.eq("invoice.supplier_id", filters.supplierId);
         if (filters.invoiceId) q = q.eq("invoice_id", filters.invoiceId);
@@ -181,6 +188,7 @@ export interface ReviewLineCountRow {
   requires_review: boolean | null;
   variance_status: string | null;
   raw_material_id: string | null;
+  match_confidence: string | null;
   quantity: number | null;
   description: string | null;
   supplier_sku: string | null;
@@ -210,12 +218,11 @@ export function useReviewLineCounts(filters: Omit<Filters, "limit">) {
         let q = supabase
           .from("invoice_lines")
           .select(
-            `id, invoice_id, review_reason, requires_review, variance_status, raw_material_id,
+            `id, invoice_id, review_reason, requires_review, variance_status, raw_material_id, match_confidence,
              quantity, description, supplier_sku, total_amount, price_per_base_unit,
              expected_price_per_base_unit, price_variance_pct, base_quantity,
              invoice:invoices!inner(id, supplier_id, currency, lines_sum_status, extraction_confidence)`,
           )
-          .or("requires_review.eq.true,variance_status.eq.no_baseline")
           .not(
             "invoice.status",
             "in",
@@ -225,6 +232,7 @@ export function useReviewLineCounts(filters: Omit<Filters, "limit">) {
           // Unik sekundærsortering: paginering uten den kan hoppe over rader.
           .order("id")
           .range(from, to);
+        if (!(filters.includeResolved && filters.invoiceId)) q = q.or(REVIEW_FILTER);
         if (filters.legalEntityId) q = q.eq("invoice.legal_entity_id", filters.legalEntityId);
         if (filters.supplierId) q = q.eq("invoice.supplier_id", filters.supplierId);
         if (filters.invoiceId) q = q.eq("invoice_id", filters.invoiceId);
