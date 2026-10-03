@@ -22,13 +22,13 @@ import { useAppContext } from "@/varer/context/AppContext";
 import { useUiPreference } from "@/hooks/useUiPreference";
 import { toast } from "sonner";
 import { osloTodayISO } from "@/lib/osloDate";
-import { QueryState } from "@/components/common/QueryState";
+import { QueryErrorState, QueryState } from "@/components/common/QueryState";
 import {
   parseProductListParams, writeProductListParams,
   type ProductStatusFilter, type ProductVariantFilter,
 } from "@/varer/lib/listUrlState";
 import { detailHref } from "@/varer/lib/listReturn";
-import { filterProducts } from "@/varer/lib/productListFilter";
+import { filterProducts, productListLoadState } from "@/varer/lib/productListFilter";
 import { useListUrlState, useReturnFocus } from "@/varer/hooks/useListUrlState";
 import { FilterDisclosure } from "@/varer/components/lists/FilterDisclosure";
 import { ListResultSummary, type ActiveFilter } from "@/varer/components/lists/ActiveFilterChips";
@@ -190,6 +190,12 @@ export default function ProductList() {
     [labelCalcMap, readinessMap],
   );
 
+  const load = productListLoadState({
+    products: productsQuery,
+    readiness: readinessQuery,
+    labelCalc: labelCalcQuery,
+    labelingFilterActive: state.labeling !== "all",
+  });
   const filtered = useMemo(() => filterProducts(all, state, labelingOf), [all, state, labelingOf]);
 
   /** «Beregn nå» — kjører batch-jobben på kostbufferen og oppsummerer på norsk. */
@@ -285,12 +291,13 @@ export default function ProductList() {
   const ctxFor = (p: ProductRow): RowCtx => ({
     parent: p.variant_of_product_id ? parentMap.get(p.variant_of_product_id) ?? null : null,
     price: priceMap.get(p.id),
+    priceLoading: priceItems.isLoading,
     costCache: costCacheMap.get(p.id),
     readiness: readinessMap.get(p.id),
-    labeling: labelingOf(p),
+    labeling: load.labelingPending ? null : labelingOf(p),
   });
 
-  useReturnFocus(!productsQuery.isLoading && !productsQuery.isError);
+  useReturnFocus(!load.isLoading && !load.isError);
 
   function onRowClick(e: MouseEvent, id: string) {
     if (editingCol) return; // ikke navigér i redigeringsmodus
@@ -311,7 +318,8 @@ export default function ProductList() {
   ].filter((f): f is ActiveFilter => !!f);
   const resetFilters = () => update({ q: "", category: "all", labeling: "all", status: "all", variant: "all" });
 
-  const isError = productsQuery.isError || readinessQuery.isError || labelCalcQuery.isError;
+  const { isError } = load;
+  const secondaryError = !isError && (priceItems.isError || costCacheQuery.isError);
   const retry = () => {
     for (const q of [productsQuery, readinessQuery, labelCalcQuery, costCacheQuery, priceItems]) if (q.isError) void q.refetch();
   };
@@ -379,7 +387,7 @@ export default function ProductList() {
               </LabeledSelect>
             </FilterDisclosure>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <ListResultSummary count={filtered.length} noun={["vare", "varer"]} isLoading={productsQuery.isLoading} isError={isError} filters={activeFilters} onReset={resetFilters} />
+              <ListResultSummary count={filtered.length} noun={["vare", "varer"]} isLoading={load.isLoading} isError={isError} filters={activeFilters} onReset={resetFilters} />
               <div className="flex flex-wrap items-center gap-2">
                 <div className="hidden lg:block">
                   <ColumnPicker columns={pickerOptions} visible={pref.visible ?? DEFAULT_VISIBLE} onChange={(next) => setPref({ visible: next })} onReset={() => setPref({ visible: DEFAULT_VISIBLE })} />
@@ -399,9 +407,20 @@ export default function ProductList() {
             </div>
           </section>
 
+          {secondaryError && (
+            <QueryErrorState
+              compact
+              className="mx-4 mt-4"
+              scope="varer:vareliste:pris-kost"
+              error={priceItems.error ?? costCacheQuery.error}
+              title={priceItems.isError ? "Kunne ikke hente prisene" : "Kunne ikke hente kalkyledata"}
+              description="Varene vises, men pris- eller kalkylekolonnen kan være ufullstendig."
+              onRetry={retry}
+            />
+          )}
           <QueryState
             scope="varer:vareliste"
-            isLoading={productsQuery.isLoading}
+            isLoading={load.isLoading}
             isError={isError}
             error={productsQuery.error ?? readinessQuery.error ?? labelCalcQuery.error}
             onRetry={retry}

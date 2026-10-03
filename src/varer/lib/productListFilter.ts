@@ -52,3 +52,25 @@ export function filterProducts<T extends FilterableProduct>(
     return true;
   });
 }
+
+type QueryFlags = { isLoading: boolean; isError: boolean };
+
+/**
+ * Laste-/feiltilstand for varelisten. Merkestatus avhenger av readiness og
+ * merkeberegning; er merkingfilteret aktivt, må listen vente på dem så den
+ * aldri viser falske «0 treff». `isLoading` er false for deaktiverte spørringer,
+ * så de gir ikke evig lasting. Feil vinner alltid.
+ */
+export function productListLoadState(q: {
+  products: QueryFlags;
+  readiness: QueryFlags;
+  labelCalc: QueryFlags;
+  labelingFilterActive: boolean;
+}) {
+  const labelingPending = q.readiness.isLoading || q.labelCalc.isLoading;
+  return {
+    labelingPending,
+    isLoading: q.products.isLoading || (q.labelingFilterActive && labelingPending),
+    isError: q.products.isError || q.readiness.isError || q.labelCalc.isError,
+  };
+}
