@@ -30,6 +30,7 @@ import {
 import { detailHref } from "@/varer/lib/listReturn";
 import { filterProducts } from "@/varer/lib/productListFilter";
 import { useListUrlState, useReturnFocus } from "@/varer/hooks/useListUrlState";
+import { FilterDisclosure } from "@/varer/components/lists/FilterDisclosure";
 import { ListResultSummary, type ActiveFilter } from "@/varer/components/lists/ActiveFilterChips";
 import {
   buildProductColumns, BULK_EDITABLE,
@@ -343,14 +344,15 @@ export default function ProductList() {
           )}
 
           <section aria-label="Søk og filtre" className="space-y-3 border-b border-border bg-muted/30 px-4 py-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-              <div className="min-w-0 flex-1 sm:min-w-[220px] sm:max-w-md">
+            <FilterDisclosure activeCount={activeFilters.length} search={
+              <div className="min-w-0 sm:min-w-[220px]">
                 <Label htmlFor="product-search" className="text-caption text-muted-foreground">Søk</Label>
                 <div className="relative mt-1">
                   <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
                   <Input id="product-search" type="search" placeholder="Navn, kode, nr, 1791-1800 eller 12, 15" value={state.q} onChange={(e) => update({ q: e.target.value })} className="pl-8" />
                 </div>
               </div>
+            }>
               <LabeledSelect id="product-category" label="Kategori" value={state.category} onChange={(v) => update({ category: v })}>
                 <SelectItem value="all">Alle kategorier</SelectItem>
                 {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
@@ -372,10 +374,10 @@ export default function ProductList() {
               <LabeledSelect id="product-variant" label="Varianter" value={state.variant} onChange={(v) => update({ variant: v as ProductVariantFilter })}>
                 {(Object.keys(VARIANT_LABEL) as ProductVariantFilter[]).map((k) => <SelectItem key={k} value={k}>{VARIANT_LABEL[k]}</SelectItem>)}
               </LabeledSelect>
-              <LabeledSelect id="product-pricelist" label="Prisliste for priskolonnen" value={priceListId ?? ""} onChange={setPriceListId} disabled={(priceListsQuery.data ?? []).length === 0}>
+              <LabeledSelect id="product-pricelist" label="Prisliste" value={priceListId ?? ""} onChange={setPriceListId} disabled={(priceListsQuery.data ?? []).length === 0}>
                 {(priceListsQuery.data ?? []).map((l) => <SelectItem key={l.id} value={l.id}>{l.display_name}</SelectItem>)}
               </LabeledSelect>
-            </div>
+            </FilterDisclosure>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <ListResultSummary count={filtered.length} noun={["vare", "varer"]} isLoading={productsQuery.isLoading} isError={isError} filters={activeFilters} onReset={resetFilters} />
               <div className="flex flex-wrap items-center gap-2">

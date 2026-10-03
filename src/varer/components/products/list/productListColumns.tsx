@@ -1,3 +1,4 @@
+import { formatKr } from "@/varer/lib/pricing";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Cake, ImageIcon, Tag } from "lucide-react";
@@ -153,7 +154,7 @@ export function buildProductColumns({
     { key: "unit", label: "Salgsenhet", render: (p) => p.unit_of_sale },
     {
       key: "price", label: "Pris", headerClassName: "text-right", cellClassName: "text-right tabular-nums",
-      render: (_p, ctx) => (ctx.price !== undefined ? `kr ${ctx.price.toFixed(2)}` : <span className="text-muted-foreground">—</span>),
+      render: (_p, ctx) => (ctx.price !== undefined ? `${formatKr(ctx.price)} kr` : <span className="text-muted-foreground">—</span>),
     },
     { key: "calc", label: "Kalkyle", render: (_p, ctx) => <CalcBadge readiness={ctx.readiness} costStale={!!ctx.costCache?.is_stale} /> },
     { key: "mva", label: "MVA", headerClassName: "text-right", cellClassName: "text-right tabular-nums text-muted-foreground", render: (p) => (p.mva_rate != null ? `${p.mva_rate}%` : "—") },

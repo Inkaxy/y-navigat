@@ -92,7 +92,7 @@ export function RecipeStatsBar({
   }
 
   return (
-    <Card className={cn("sticky top-0 z-10 border-app/30 bg-app/[0.04]", className)}>
+    <Card className={cn("lg:sticky lg:top-0 lg:z-10 lg:max-h-[45vh] lg:overflow-y-auto border-app/30 bg-app/[0.04]", className)}>
       <CardContent className="grid grid-cols-2 gap-x-6 gap-y-3 py-3 sm:grid-cols-3 lg:grid-cols-6">
         {items.map((it) => (
           <div key={it.label}>

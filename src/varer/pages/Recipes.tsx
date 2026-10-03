@@ -26,6 +26,7 @@ import { useRecipeListData } from "@/varer/hooks/useRecipeListData";
 import { RecipeListCard } from "@/varer/components/recipes/RecipeListCard";
 import { RecipeListTable } from "@/varer/components/recipes/list/RecipeListTable";
 import { DeleteRecipeDialog } from "@/varer/components/recipes/list/DeleteRecipeDialog";
+import { FilterDisclosure } from "@/varer/components/lists/FilterDisclosure";
 import { ListResultSummary, type ActiveFilter } from "@/varer/components/lists/ActiveFilterChips";
 
 /** Valgene i segmentkontrollen for avdeling. */
@@ -169,14 +170,15 @@ export default function Recipes() {
         )}
 
         <section aria-label="Søk og filtre" className="space-y-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-            <div className="min-w-0 flex-1 sm:max-w-sm">
+          <FilterDisclosure activeCount={activeFilters.length} search={
+            <div className="min-w-0">
               <Label htmlFor="recipe-search" className="text-caption text-muted-foreground">Søk</Label>
               <div className="relative mt-1">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
                 <Input id="recipe-search" type="search" placeholder="Navn, kategori eller produkt" value={state.q} onChange={(e) => update({ q: e.target.value })} className="pl-8" />
               </div>
             </div>
+          }>
             <FilterSelect id="recipe-status" label="Status" value={state.status} onChange={(v) => update({ status: v as RecipeStatusFilter })}>
               <option value="all">Alle statuser</option>
               <option value="draft">Utkast</option>
@@ -197,8 +199,7 @@ export default function Recipes() {
               )}
               <option value="none">Uten kategori</option>
             </FilterSelect>
-          </div>
-          <div role="group" aria-label="Avdeling" className="inline-flex max-w-full overflow-x-auto rounded-lg border border-border bg-muted/30 p-0.5">
+          <div role="group" aria-label="Avdeling" className="col-span-2 inline-flex max-w-full overflow-x-auto rounded-lg border border-border bg-muted/30 p-0.5">
             {DEPARTMENT_FILTERS.map((f) => (
               <button
                 key={f.value}
@@ -213,6 +214,7 @@ export default function Recipes() {
               </button>
             ))}
           </div>
+          </FilterDisclosure>
           <ListResultSummary
             count={rows.length}
             noun={["oppskrift", "oppskrifter"]}
