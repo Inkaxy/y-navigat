@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -53,6 +53,11 @@ import TimelineEvent, {
 import TicketActionBar from "@/ordre/components/tickets/TicketActionBar";
 import TicketComposer from "@/ordre/components/tickets/TicketComposer";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsDesktop } from "@/varer/hooks/useIsDesktop";
+import { useLinkedOrder } from "@/ordre/hooks/useTicketDetailData";
+import { QueryErrorState } from "@/components/common/QueryState";
+import { ticketBackTarget, TICKET_RETURN_PARAM } from "@/ordre/lib/ticketReturn";
+import { isTerminalTicket } from "@/ordre/lib/ticketRowState";
 import OrderLinkCard from "@/ordre/components/tickets/OrderLinkCard";
 import EmailBody, { sanitizeEmailHtml, extractCidRefs } from "@/ordre/components/tickets/EmailBody";
 import ChangeIntentCard from "@/ordre/components/tickets/ChangeIntentCard";
@@ -134,46 +139,6 @@ function useCustomerCard(senderEmail: string | undefined) {
         .eq("customer_id", customer.id)
         .gte("ordered_at", since.toISOString());
       return { customer, orderCount: count ?? 0 };
-    },
-  });
-}
-
-function useLinkedOrder(orderId: string | null) {
-  return useQuery({
-    enabled: !!orderId,
-    queryKey: ["ticket-linked-order", orderId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("orders")
-        .select(
-          "id, order_number, status, delivery_date, delivery_time, customer_id, subtotal_excl_vat, total_incl_vat, legal_entity_id",
-        )
-        .eq("id", orderId!)
-        .maybeSingle();
-      if (error) throw error;
-      const { data: lines } = await supabase
-        .from("order_lines")
-        .select("quantity, product_snapshot, notes")
-        .eq("order_id", orderId!)
-        .limit(6);
-      let customerName: string | null = null;
-      if (data?.customer_id) {
-        const { data: c } = await supabase
-          .from("customers")
-          .select("display_name")
-          .eq("id", data.customer_id)
-          .maybeSingle();
-        customerName = c?.display_name ?? null;
-      }
-      return {
-        order: data,
-        customerName,
-        lines: (lines ?? []) as Array<{
-          quantity: number;
-          product_snapshot: { name?: string } | null;
-          notes: string | null;
-        }>,
-      };
     },
   });
 }
@@ -291,8 +256,17 @@ export default function TicketDetail() {
   const { data: access } = useUserAccess(user);
   const canWrite = access?.hasOrdreWrite ?? false;
   const isMobile = useIsMobile();
+  const isLarge = useIsDesktop();
+  const [searchParams] = useSearchParams();
+  const back = ticketBackTarget(searchParams.get(TICKET_RETURN_PARAM));
 
-  const { data: ticketData, isLoading } = useTicket(id);
+  const {
+    data: ticketData,
+    isLoading,
+    isError: ticketError,
+    error: ticketQueryError,
+    refetch: refetchTicket,
+  } = useTicket(id);
   const ticket = ticketData?.ticket ?? null;
   const attachments = useMemo(() => ticketData?.attachments ?? [], [ticketData]);
   const { data: replies = [] } = useTicketReplies(id);
@@ -300,7 +274,8 @@ export default function TicketDetail() {
   const { data: events = [] } = useTicketEvents(id);
   const { data: inboundMessages = [] } = useInboundMessages(id);
   const { data: customerCard } = useCustomerCard(ticket?.sender_email);
-  const { data: linked } = useLinkedOrder(ticket?.related_order_id ?? null);
+  const linkedQuery = useLinkedOrder(ticket?.related_order_id ?? null);
+  const linked = linkedQuery.data;
   const { data: sla } = useSlaSettings();
 
   const [reanalyzing, setReanalyzing] = useState(false);
@@ -583,6 +558,29 @@ export default function TicketDetail() {
     linked?.order,
   ]);
 
+  if (!isLoading && (ticketError || !ticket)) {
+    return (
+      <div className="mx-auto max-w-[1400px] space-y-3 px-4 py-6 md:px-6">
+        <Link
+          to={back.href}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" /> {back.label}
+        </Link>
+        {ticketError ? (
+          <QueryErrorState
+            error={ticketQueryError}
+            scope="ordre:sak"
+            title="Kunne ikke hente henvendelsen"
+            onRetry={() => void refetchTicket()}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">Henvendelsen finnes ikke eller er slettet.</p>
+        )}
+      </div>
+    );
+  }
+
   if (isLoading || !ticket) {
     return (
       <div className="flex h-64 items-center justify-center text-muted-foreground">
@@ -621,19 +619,58 @@ export default function TicketDetail() {
     />
   );
 
+  // Én instans av oversikten: før samtalen på smal skjerm, i høyrekolonnen på stor.
+  const orderOverview = (
+          <OrderLinkCard
+            ticket={ticket}
+            linked={linked}
+            linkedState={linkedQuery}
+            ai={ai}
+            attachments={attachments}
+            canWrite={canWrite}
+          >
+            {linked?.order && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-2 w-full gap-2"
+                  onClick={() => setRefundOpen(true)}
+                  disabled={!canWrite}
+                >
+                  Opprett tilbakebetaling
+                </Button>
+                {ai?.change_intent && id && (
+                  <ChangeIntentCard
+                    ticketId={id}
+                    orderId={linked.order.id}
+                    orderNumber={linked.order.order_number}
+                    ai={ai}
+                    onApplied={() => {
+                      qc.invalidateQueries({ queryKey: ["ticket-linked-order", linked.order!.id] });
+                      qc.invalidateQueries({ queryKey: ["ticket-events", id] });
+                      qc.invalidateQueries({ queryKey: ["ticket", id] });
+                    }}
+                  />
+                )}
+              </>
+            )}
+          </OrderLinkCard>
+  );
+
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-6 md:px-6">
       {id && <TicketPresenceBanner ticketId={id} />}
 
       <Link
-        to="/ordre/ticket"
+        to={back.href}
         className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="h-3.5 w-3.5" /> Tilbake til innboksen
+        <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" /> {back.label}
       </Link>
 
-      {/* A) Topplinje */}
-      <div className="sticky top-0 z-20 -mx-4 mb-4 border-b bg-[hsl(var(--background))]/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
+      {/* A) Topplinje — normal flyt, ingen sticky som kan havne under appmenyen. */}
+      <div className="mb-4 border-b pb-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-xl font-semibold tracking-tight md:text-2xl">
@@ -680,7 +717,7 @@ export default function TicketDetail() {
                   Venter på ekstern: {ticket.awaiting_external_email ?? "ukjent"}
                 </span>
               )}
-              {countdown?.overdue && (
+              {countdown?.overdue && !isTerminalTicket(ticket.status) && (
                 <span
                   className="inline-flex items-center gap-1 rounded border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-300"
                   title={deadline ? `Frist: ${formatTicketTime(deadline)}` : undefined}
@@ -724,6 +761,7 @@ export default function TicketDetail() {
       <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
         {/* B) Samtalen */}
         <div className="min-w-0 space-y-3">
+          {!isLarge && orderOverview}
           <div className="flex items-center gap-2 rounded-md border bg-[hsl(var(--brand-cream))] px-3 py-2">
             <Switch
               id="show-events"
@@ -754,40 +792,7 @@ export default function TicketDetail() {
 
         {/* D) Høyre kolonne */}
         <div className="space-y-3">
-          <OrderLinkCard
-            ticket={ticket}
-            linked={linked}
-            ai={ai}
-            attachments={attachments}
-            canWrite={canWrite}
-          >
-            {linked?.order && (
-              <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="mt-2 w-full gap-2"
-                  onClick={() => setRefundOpen(true)}
-                  disabled={!canWrite}
-                >
-                  Opprett tilbakebetaling
-                </Button>
-                {ai?.change_intent && id && (
-                  <ChangeIntentCard
-                    ticketId={id}
-                    orderId={linked.order.id}
-                    orderNumber={linked.order.order_number}
-                    ai={ai}
-                    onApplied={() => {
-                      qc.invalidateQueries({ queryKey: ["ticket-linked-order", linked.order!.id] });
-                      qc.invalidateQueries({ queryKey: ["ticket-events", id] });
-                      qc.invalidateQueries({ queryKey: ["ticket", id] });
-                    }}
-                  />
-                )}
-              </>
-            )}
-          </OrderLinkCard>
+          {isLarge && orderOverview}
 
           <SideCard label="Kunde">
             {customerCard?.customer ? (
