@@ -56,8 +56,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useIsDesktop } from "@/varer/hooks/useIsDesktop";
 import { useLinkedOrder } from "@/ordre/hooks/useTicketDetailData";
 import { QueryErrorState } from "@/components/common/QueryState";
-import { ticketBackTarget, TICKET_RETURN_PARAM } from "@/ordre/lib/ticketReturn";
-import { isTerminalTicket } from "@/ordre/lib/ticketRowState";
+import { inboxOriginTarget, ticketBackTarget, TICKET_RETURN_PARAM } from "@/ordre/lib/ticketReturn";
+import { activeWaitingState, isTerminalTicket } from "@/ordre/lib/ticketRowState";
 import OrderLinkCard from "@/ordre/components/tickets/OrderLinkCard";
 import EmailBody, { sanitizeEmailHtml, extractCidRefs } from "@/ordre/components/tickets/EmailBody";
 import ChangeIntentCard from "@/ordre/components/tickets/ChangeIntentCard";
@@ -259,6 +259,7 @@ export default function TicketDetail() {
   const isLarge = useIsDesktop();
   const [searchParams] = useSearchParams();
   const back = ticketBackTarget(searchParams.get(TICKET_RETURN_PARAM));
+  const inboxBack = inboxOriginTarget(searchParams, back);
 
   const {
     data: ticketData,
@@ -662,12 +663,22 @@ export default function TicketDetail() {
     <div className="mx-auto max-w-[1400px] px-4 py-6 md:px-6">
       {id && <TicketPresenceBanner ticketId={id} />}
 
-      <Link
-        to={back.href}
-        className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" /> {back.label}
-      </Link>
+      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1">
+        <Link
+          to={back.href}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" /> {back.label}
+        </Link>
+        {inboxBack && (
+          <Link
+            to={inboxBack.href}
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" /> {inboxBack.label}
+          </Link>
+        )}
+      </div>
 
       {/* A) Topplinje — normal flyt, ingen sticky som kan havne under appmenyen. */}
       <div className="mb-4 border-b pb-3">
@@ -699,12 +710,12 @@ export default function TicketDetail() {
                   {REQUEST_TYPE_LABEL[intent]}
                 </span>
               )}
-              {awaitingCustomer && (
+              {awaitingCustomer && !isTerminalTicket(ticket.status) && (
                 <span className="inline-flex items-center rounded border border-sky-500/40 bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
                   Venter på kunde
                 </span>
               )}
-              {ticket.awaiting_internal && (
+              {activeWaitingState(ticket) === "internal" && (
                 <span className="inline-flex items-center rounded border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
                   Venter på @
                   {ticket.assigned_team
@@ -712,7 +723,7 @@ export default function TicketDetail() {
                     : names[ticket.assigned_to ?? ""] ?? "intern"}
                 </span>
               )}
-              {ticket.awaiting_external && (
+              {activeWaitingState(ticket) === "external" && (
                 <span className="inline-flex items-center rounded border border-purple-500/40 bg-purple-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-300">
                   Venter på ekstern: {ticket.awaiting_external_email ?? "ukjent"}
                 </span>

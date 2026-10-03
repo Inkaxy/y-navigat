@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { MessageSquare, ArrowUpRight, Paperclip } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import {
 import { normalizeAiSuggestion, REQUEST_TYPE_LABEL } from "@/ordre/lib/aiSuggestion";
 import { isTerminalTicket } from "@/ordre/lib/ticketRowState";
 import { ticketHref } from "@/ordre/lib/ticketReturn";
+import { activeWaitingState } from "@/ordre/lib/ticketRowState";
 import {
   useOrderConversations,
   type OrderConversation,
@@ -24,19 +25,19 @@ function ConversationRow({
   t,
   orderId,
   assigneeName,
+  returnFrom,
 }: {
   t: OrderConversation;
   orderId: string;
   assigneeName: string | null;
+  returnFrom?: string;
 }) {
   const intent = normalizeAiSuggestion(t.ai_suggestion)?.request_type ?? null;
   const terminal = isTerminalTicket(t.status);
-  const waiting = t.awaiting_internal
-    ? "Venter internt"
-    : t.awaiting_external
-      ? "Venter på ekstern part"
-      : null;
-  const href = ticketHref(t.id, `/ordre/ordrer/${orderId}?tab=samtaler`);
+  const waitState = activeWaitingState(t);
+  const waiting =
+    waitState === "internal" ? "Venter internt" : waitState === "external" ? "Venter på ekstern part" : null;
+  const href = ticketHref(t.id, returnFrom ?? `/ordre/ordrer/${orderId}?tab=samtaler`);
 
   return (
     <li className="flex flex-wrap items-start gap-3 border-t border-border px-3 py-3 first:border-t-0">
@@ -69,7 +70,7 @@ function ConversationRow({
           <span>Ansvarlig: {t.assigned_to ? (assigneeName ?? "Ukjent bruker") : "ingen"}</span>
           <span className="inline-flex items-center gap-1">
             <MessageSquare className="h-3 w-3" aria-hidden="true" />
-            {t.message_count} meldinger
+            {t.message_count} {t.message_count === 1 ? "melding" : "meldinger"}
           </span>
           <span title={formatTicketRelative(t.last_activity_at)}>
             Sist aktivitet {formatTicketTime(t.last_activity_at)}
@@ -86,6 +87,9 @@ function ConversationRow({
 }
 
 export function OrderConversationsTab({ orderId }: { orderId: string }) {
+  const location = useLocation();
+  // Nåværende ordreadresse bærer ev. opprinnelig innboks videre til saken.
+  const returnFrom = `${location.pathname}${location.search}`;
   const { data: conversations = [], isLoading, isError, error, refetch, isSuccess } =
     useOrderConversations(orderId);
   const { data: names = {} } = useUserNames(conversations.map((c) => c.assigned_to));
@@ -128,6 +132,7 @@ export function OrderConversationsTab({ orderId }: { orderId: string }) {
                   key={t.id}
                   t={t}
                   orderId={orderId}
+                  returnFrom={returnFrom}
                   assigneeName={t.assigned_to ? (names[t.assigned_to] ?? null) : null}
                 />
               ))}
