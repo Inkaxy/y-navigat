@@ -61,5 +61,8 @@ export function useInvalidateTicketLinks() {
     qc.invalidateQueries({ queryKey: ["cake-images-for", ticketId] });
     qc.invalidateQueries({ queryKey: ["tickets"] });
     qc.invalidateQueries({ queryKey: ["tickets-counts"] });
+    qc.invalidateQueries({ queryKey: ["ticket-linked-order"] });
+    qc.invalidateQueries({ queryKey: ["order-conversations"] });
+    qc.invalidateQueries({ queryKey: ["order-conversation-counts"] });
   };
 }

@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { OrderConversationsTab } from "@/ordre/components/orders/OrderConversationsTab";
 import { useOrderConversations } from "@/ordre/hooks/useOrderConversations";
+import { orderBackTarget, TICKET_RETURN_PARAM } from "@/ordre/lib/ticketReturn";
 import {
   ArrowLeft,
   Loader2,
@@ -93,12 +94,15 @@ export default function OrderDetail() {
   // Kun interne stier: `//evil` og `/\evil` starter også med «/», men ville
   // sendt brukeren ut av NBhub.
   const backUrl = resolveInternalPath(backParam);
+  // Åpnet fra en sak eller innboksen: egen, avgrenset retur (ikke fakturering).
+  const ticketBack = backUrl ? null : orderBackTarget(searchParams.get(TICKET_RETURN_PARAM));
 
   const { data: order, isLoading, error } = useOrderDetail(id);
   const { data: lines = [] } = useOrderLines(id);
   const { data: events = [] } = useOrderEvents(id);
   const { remoteUpdated, acknowledge } = useOrderRealtime(id);
-  const { data: conversations = [] } = useOrderConversations(id);
+  const conversationsQuery = useOrderConversations(id);
+  const conversations = conversationsQuery.data ?? [];
 
   const userIds = useMemo(
     () => [
@@ -282,6 +286,13 @@ export default function OrderDetail() {
                 <ArrowLeft className="h-4 w-4" /> Ferdig — tilbake til fakturering
               </Button>
             )}
+            {ticketBack && (
+              <Button asChild size="sm" className="gap-2">
+                <Link to={ticketBack.href}>
+                  <ArrowLeft className="h-4 w-4" aria-hidden="true" /> {ticketBack.label}
+                </Link>
+              </Button>
+            )}
             {order.customer_id && (
               <Button asChild variant="outline" size="sm" className="gap-2">
                 <Link to={`/kunder/kundeliste/${order.customer_id}`}>
@@ -454,9 +465,11 @@ export default function OrderDetail() {
             <TabsTrigger value="samtaler" className="gap-2">
               <MessageSquare className="h-3.5 w-3.5" />
               Samtaler
-              <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[10px]">
-                {conversations.length}
-              </Badge>
+              {conversationsQuery.isSuccess && (
+                <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[10px]">
+                  {conversations.length}
+                </Badge>
+              )}
             </TabsTrigger>
           </TabsList>
 
