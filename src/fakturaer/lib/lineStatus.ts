@@ -126,8 +126,9 @@ export function lineStatus(line: LineStatusInput, startPriceLineIds?: ReadonlySe
   if (reasons.includes("recalculation_pending"))
     return { ...base, key: "recalculate", label: "Beregnes på nytt", tone: "warning" };
   if (price === "action") return { ...base, key: "review_price", label: "Se over pris", tone: "warning" };
-  if (startPriceLineIds?.has(line.id))
-    return { ...base, key: "start_price", label: "Bekreft startpris", tone: "warning" };
+  // Et startprisforslag er frivillig: serverens avstemming krever det ikke, så det
+  // gjør aldri linjen uavklart. Forslaget tilbys fortsatt som eget valg i køen.
+  void startPriceLineIds;
   if (line.requires_review || reasons.some((r) => !MATERIAL_REASONS.has(r)))
     return { ...base, key: "check_line", label: "Kontroller linjen", tone: "warning" };
 

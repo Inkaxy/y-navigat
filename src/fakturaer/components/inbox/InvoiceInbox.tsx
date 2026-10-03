@@ -17,6 +17,14 @@ import { useDebouncedValue } from "@/kunder/hooks/useDebouncedValue";
 
 export const OPEN_PAGE_SIZE = 25;
 
+/** Matching kjøres bare for det brukeren ser: aktiv fane + søk (leverandørfilteret er allerede brukt). */
+export function batchMatchTargets(invoices: InboxInvoice[], search: string, tab: InboxTab): InboxInvoice[] {
+  if (tab === "done") return [];
+  return invoices.filter(
+    (i) => i.tab === tab && i.status !== "flagged" && i.line_count > 0 && matchesInboxSearch(i, search),
+  );
+}
+
 export interface BatchFailure {
   id: string;
   label: string;
@@ -86,7 +94,7 @@ export function InvoiceInbox(p: Props) {
     setFailures(failed);
   }
 
-  const matchTargets = p.invoices.filter((i) => i.tab !== "done" && i.status !== "flagged" && i.line_count > 0);
+  const matchTargets = batchMatchTargets(p.invoices, search, p.tab);
   const isDone = p.tab === "done";
 
   return (
@@ -114,7 +122,9 @@ export function InvoiceInbox(p: Props) {
             onClick={() => void runBatch(matchTargets)}
           >
             {batch ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCw className="h-3.5 w-3.5" />}
-            {batch ? `Oppdaterer ${batch.done} av ${batch.total}` : "Oppdater matching"}
+            {batch
+              ? `Oppdaterer ${batch.done} av ${batch.total}`
+              : `Oppdater matching (${matchTargets.length} ${matchTargets.length === 1 ? "faktura" : "fakturaer"})`}
           </Button>
         )}
       </div>
