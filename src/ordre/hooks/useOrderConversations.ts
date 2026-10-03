@@ -5,6 +5,8 @@ import type { Ticket } from "@/ordre/hooks/useTickets";
 export type OrderConversation = Ticket & {
   message_count: number;
   last_activity_at: string;
+  /** «primary» = sakens hovedordre (related_order_id), «link» = delt kobling. */
+  relation: "primary" | "link";
 };
 
 /** Fetch tickets linked to this order via related_order_id OR ticket_order_links. */
@@ -16,10 +18,11 @@ export function useOrderConversations(orderId: string | null | undefined) {
       if (!orderId) return [];
 
       // 1. Ticket IDs koblet via link-tabellen
-      const { data: links } = await supabase
+      const { data: links, error: linksError } = await supabase
         .from("ticket_order_links")
         .select("ticket_id")
         .eq("order_id", orderId);
+      if (linksError) throw linksError;
       const linkedIds = (links ?? []).map((l) => l.ticket_id as string);
 
       // 2. Tickets med related_order_id ELLER i lenkede IDer
@@ -39,10 +42,11 @@ export function useOrderConversations(orderId: string | null | undefined) {
 
       // 3. Meldingstellinger (svar) per ticket
       const ticketIds = rows.map((t) => t.id);
-      const { data: replies } = await supabase
+      const { data: replies, error: repliesError } = await supabase
         .from("ticket_replies")
         .select("ticket_id, sent_at, created_at")
         .in("ticket_id", ticketIds);
+      if (repliesError) throw repliesError;
 
       const replyCount = new Map<string, number>();
       const lastReplyAt = new Map<string, string>();
@@ -65,6 +69,7 @@ export function useOrderConversations(orderId: string | null | undefined) {
           ...t,
           message_count: 1 + rc,
           last_activity_at: last,
+          relation: t.related_order_id === orderId ? ("primary" as const) : ("link" as const),
         };
       });
     },
