@@ -27,6 +27,8 @@ import { useMatchTolerancesByEntity } from "@/fakturaer/hooks/useMatchTolerances
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { MatchDrawer } from "@/fakturaer/components/MatchDrawer";
 import { BulkLinkDialog } from "@/fakturaer/components/BulkLinkDialog";
+import { handleQueueShortcut } from "@/fakturaer/lib/queueShortcuts";
+import { notifyAccepted } from "@/fakturaer/lib/acceptNotice";
 import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
 import { BulkCreateRawMaterialsDialog } from "@/fakturaer/components/BulkCreateRawMaterialsDialog";
 import { LinkCreditNoteDialog } from "@/fakturaer/components/LinkCreditNoteDialog";
@@ -102,19 +104,6 @@ export function matchesTab(line: ReviewLineCountRow | ReviewLineRow, tab: TabVal
   return matchesGroup(line, tab);
 }
 
-/** Samme vakter som i Vareliste: ingen hurtigtaster mens brukeren skriver eller i dialog. */
-function shouldIgnoreShortcut(e: KeyboardEvent): boolean {
-  if (e.ctrlKey || e.metaKey || e.altKey) return true;
-  const el = e.target as HTMLElement | null;
-  if (!el) return false;
-  if (el.isContentEditable) return true;
-  if (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName)) return true;
-  // En knapp med fokus skal bare svelge Enter og mellomrom — den er knappens
-  // egen aktivering. Alle andre hurtigtaster skal fortsatt virke.
-  if (el.closest("button") && (e.key === "Enter" || e.key === " ")) return true;
-  if (el.closest('[role="combobox"], [role="dialog"], [role="menu"], [role="listbox"]')) return true;
-  return false;
-}
 
 export default function FakturaerInboxPage() {
   const navigate = useNavigate();
@@ -313,11 +302,9 @@ export default function FakturaerInboxPage() {
             action: { label: "Prøv igjen", onClick: () => retryRecalculation(line.invoice_id, lineIds) },
           });
         } else {
-          toast.success(`Koblet til ${name}`);
+          notifyAccepted(name, rmsId ?? null, (id, n) => setBulkLink({ rmsId: id, name: n }));
         }
         refresh(line.invoice_id);
-        // Tilby den samme koblingen på andre linjer — brukeren velger selv.
-        if (rmsId) setBulkLink({ rmsId, name });
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Kunne ikke godta forslaget");
       } finally {
@@ -468,58 +455,21 @@ export default function FakturaerInboxPage() {
         setDocOpen(false);
         return;
       }
-      if (anyDialogOpen || shouldIgnoreShortcut(e)) return;
-
-      switch (e.key) {
-        case "ArrowDown":
-          e.preventDefault();
-          dispatch({ type: "next" });
-          break;
-        case "ArrowUp":
-          e.preventDefault();
-          dispatch({ type: "prev" });
-          break;
-        case "Enter":
-          e.preventDefault();
-          // Enter godtar bare et råvareforslag — aldri en linje med pakning eller prisavvik.
-          if (!e.shiftKey && activeLine && !activeLine.raw_material_id && statusOf(activeLine).key === "confirm_material") {
-            void doAccept(activeLine);
-          }
-          break;
-        case "m":
-        case "M":
-          if (activeLine) {
-            e.preventDefault();
-            openDialog("match", activeLine);
-          }
-          break;
-        case "n":
-        case "N":
-          if (activeLine) {
-            e.preventDefault();
-            openDialog("create", activeLine);
-          }
-          break;
-        case "x":
-        case "X":
-          // Utelatelse krever en grunn — åpne dialogen i stedet for å markere direkte.
-          if (activeLine) {
-            e.preventDefault();
-            openDialog("not_rm", activeLine);
-          }
-          break;
-        case "u":
-        case "U":
-          e.preventDefault();
-          void doUndo();
-          break;
-        default:
-          break;
-      }
+      handleQueueShortcut(e, {
+        queueVisible: !!expandedId || showGlobalLines,
+        dialogOpen: anyDialogOpen,
+        activeLine,
+        canAcceptWithEnter: (l) => !l.raw_material_id && statusOf(l).key === "confirm_material",
+        next: () => dispatch({ type: "next" }),
+        prev: () => dispatch({ type: "prev" }),
+        accept: (l) => void doAccept(l),
+        openDialog: (kind, l) => openDialog(kind, l),
+        undo: () => void doUndo(),
+      });
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [activeLine, anyDialogOpen, docOpen, doAccept, doUndo, openDialog, statusOf]);
+  }, [activeLine, anyDialogOpen, docOpen, doAccept, doUndo, openDialog, statusOf, expandedId, showGlobalLines]);
 
   // Aktiv linje følger dokumentpanelet.
   useEffect(() => {
