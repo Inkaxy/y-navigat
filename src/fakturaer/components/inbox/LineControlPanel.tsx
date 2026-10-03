@@ -5,8 +5,9 @@ import { fmtNum } from "@/fakturaer/lib/units";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import type { SupplierLinkRow } from "@/fakturaer/hooks/useSupplierLinkContext";
 import type { LineStatus } from "@/fakturaer/lib/lineStatus";
-import { LineStatusBadge } from "@/fakturaer/components/inbox/LineList";
-import { MaterialBody, PackageBody, PriceBody, StepSection, costOf } from "@/fakturaer/components/inbox/LineControlSections";
+import { LineStatusBadge } from "@/fakturaer/components/inbox/LineStatusBadge";
+import { MaterialBody, PackageBody, PriceBody, StepSection } from "@/fakturaer/components/inbox/LineControlSections";
+import { costOf } from "@/fakturaer/lib/lineControl";
 
 export type LineDialogAction = "match" | "create" | "not_rm" | "conflict" | "start_price";
 

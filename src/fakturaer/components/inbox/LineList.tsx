@@ -1,37 +1,10 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatMoney } from "@/fakturaer/lib/constants";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
-import type { LineStatus, StatusTone } from "@/fakturaer/lib/lineStatus";
+import type { LineStatus } from "@/fakturaer/lib/lineStatus";
+import { LineStatusBadge } from "@/fakturaer/components/inbox/LineStatusBadge";
 import { cn } from "@/lib/utils";
-
-const TONE_CLASS: Record<StatusTone, string> = {
-  success: "border-success/30 bg-success/10 text-success",
-  warning: "border-warning/30 bg-warning/10 text-warning",
-  danger: "border-destructive/30 bg-destructive/10 text-destructive",
-  muted: "border-line-subtle bg-muted text-ink-secondary",
-};
-
-export function LineStatusBadge({ status, className }: { status: Pick<LineStatus, "label" | "tone">; className?: string }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex shrink-0 items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold",
-        TONE_CLASS[status.tone],
-        className,
-      )}
-    >
-      {status.label}
-    </span>
-  );
-}
-
-/** Kort tekst for hvilken råvare linjen peker på — skiller bekreftet kobling fra forslag. */
-export function materialSummary(line: ReviewLineRow): string {
-  if (line.match_confidence === "not_applicable") return "Utelatt — ikke råvare";
-  if (line.matched_raw_material) return line.matched_raw_material.name;
-  const top = line.suggestions?.[0]?.raw_material?.name;
-  return top ? `Forslag: ${top}` : "Ingen råvare valgt";
-}
+import { materialSummary } from "@/fakturaer/lib/lineControl";
 
 interface Props {
   lines: ReviewLineRow[];
