@@ -343,6 +343,7 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
       }
       setAiSuggestion(suggestion);
       if (suggestion.rawMaterialId) setSelectedRmId(suggestion.rawMaterialId);
+      if (suggestion.packageSize != null || suggestion.packageUnit) setPackageTouched(true);
       if (suggestion.packageSize != null) setPackageSize(String(suggestion.packageSize));
       if (suggestion.packageUnit) setPackageUnit(suggestion.packageUnit);
       if (!suggestion.rawMaterialId) setAiNotice("AI-hjelpen fant ingen passende vare. Søk fram varen manuelt.");
