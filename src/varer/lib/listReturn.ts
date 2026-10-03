@@ -21,7 +21,7 @@ export function sanitizeListSearch(raw: string | null | undefined): string {
   if (typeof raw !== "string" || raw.length === 0 || raw.length > MAX_RETURN_LENGTH) return "";
   const body = raw.startsWith("?") ? raw.slice(1) : raw;
   // Bare et rent spørreuttrykk: ingen skråstrek-start, ingen fragment.
-  if (body.startsWith("/") || body.includes("#")) return "";
+  if (body.startsWith("/") || body.includes("#") || /^[a-z][a-z0-9+.-]*:/i.test(body)) return "";
   const params = new URLSearchParams(body);
   // Returkonteksten skal ikke kjedes inn i seg selv.
   params.delete(RETURN_PARAM);
