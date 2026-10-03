@@ -114,9 +114,10 @@ export default function OrderLinkCard({
   };
 
   const assignee = ticket.assigned_to ? (names[ticket.assigned_to] ?? "Ukjent bruker") : null;
-  const waiting = ticket.awaiting_internal
+  const waitState = activeWaitingState(ticket);
+  const waiting = waitState === "internal"
     ? `Venter på ${ticket.assigned_team ? TEAM_LABEL[ticket.assigned_team] : "intern avklaring"}`
-    : ticket.awaiting_external
+    : waitState === "external"
       ? "Venter på ekstern part"
       : null;
 

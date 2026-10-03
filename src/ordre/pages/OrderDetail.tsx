@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { OrderConversationsTab } from "@/ordre/components/orders/OrderConversationsTab";
 import { useOrderConversations } from "@/ordre/hooks/useOrderConversations";
-import { orderBackTarget, TICKET_RETURN_PARAM } from "@/ordre/lib/ticketReturn";
+import { inboxOriginTarget, orderBackTarget, TICKET_RETURN_PARAM } from "@/ordre/lib/ticketReturn";
 import {
   ArrowLeft,
   Loader2,
@@ -96,6 +96,7 @@ export default function OrderDetail() {
   const backUrl = resolveInternalPath(backParam);
   // Åpnet fra en sak eller innboksen: egen, avgrenset retur (ikke fakturering).
   const ticketBack = backUrl ? null : orderBackTarget(searchParams.get(TICKET_RETURN_PARAM));
+  const inboxBack = backUrl ? null : inboxOriginTarget(searchParams, ticketBack);
 
   const { data: order, isLoading, error } = useOrderDetail(id);
   const { data: lines = [] } = useOrderLines(id);
@@ -290,6 +291,13 @@ export default function OrderDetail() {
               <Button asChild size="sm" className="gap-2">
                 <Link to={ticketBack.href}>
                   <ArrowLeft className="h-4 w-4" aria-hidden="true" /> {ticketBack.label}
+                </Link>
+              </Button>
+            )}
+            {inboxBack && (
+              <Button asChild variant="outline" size="sm" className="gap-2">
+                <Link to={inboxBack.href}>
+                  <ArrowLeft className="h-4 w-4" aria-hidden="true" /> {inboxBack.label}
                 </Link>
               </Button>
             )}
