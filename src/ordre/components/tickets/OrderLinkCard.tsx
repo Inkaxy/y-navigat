@@ -25,6 +25,7 @@ import OrderLinkMenu from "@/ordre/components/tickets/OrderLinkMenu";
 import OrderLinkCandidates from "@/ordre/components/tickets/OrderLinkCandidates";
 import type { Ticket, TicketAttachment } from "@/ordre/hooks/useTickets";
 import type { AiSuggestion } from "@/ordre/lib/aiSuggestion";
+import { activeWaitingState } from "@/ordre/lib/ticketRowState";
 
 export interface LinkedOrderData {
   order: {
