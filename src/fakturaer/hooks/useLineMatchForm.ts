@@ -304,9 +304,12 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
         line,
         rawMaterialId: selectedRmId,
         userId: user.id,
-        packageSize: packageDraft.state === "valid" ? packageDraft.size : null,
-        packageUnit: packageDraft.state === "valid" ? packageDraft.unit : null,
-        baseUnitsPerPackage: packageDraft.state === "valid" ? packageDraft.baseUnitsPerPackage : cost?.baseUnitsPerPackage ?? null,
+        // Bare et bevisst utkast (bekreftet eller endret) sendes som pakning;
+        // ellers samme forslag som før, så en lagring av f.eks. avtalepris ikke
+        // overskriver kjent pakning med et ubekreftet standardforslag.
+        ...(packageDraft.state === "valid" && (wantsConfirm || packageTouched)
+          ? { packageSize: packageDraft.size, packageUnit: packageDraft.unit, baseUnitsPerPackage: packageDraft.baseUnitsPerPackage }
+          : { packageSize: parseDecimal(packageSize), packageUnit: packageUnit.trim() || null, baseUnitsPerPackage: cost?.baseUnitsPerPackage ?? null }),
         agreedPricePerBaseUnit: parseDecimal(agreedPrice),
         rememberSku,
         rememberName,
