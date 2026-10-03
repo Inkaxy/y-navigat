@@ -68,6 +68,7 @@ export function useComputeRecipeLabel() {
     },
     onSuccess: (_d, recipeId) => {
       qc.invalidateQueries({ queryKey: ["recipe-label-calculated", recipeId] });
+      qc.invalidateQueries({ queryKey: ["recipe-free-text-lines", recipeId] });
     },
     onError: (e: any) => toast.error(e.message ?? "Kunne ikke beregne merkedata"),
   });

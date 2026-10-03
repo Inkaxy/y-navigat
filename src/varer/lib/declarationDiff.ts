@@ -101,3 +101,41 @@ export function nutritionDiffSummary(rows: NutritionDiffRow[]): string[] {
       return `${r.label}: ${f} → ${t}`;
     });
 }
+
+export type DiffSegment = { op: "same"; text: string } | { op: "change"; removed: string; added: string };
+
+/** Fjerner allergenmarkering (*hvete*) så bare innholdsendringer vises i diffen. */
+export function stripAllergenMarkers(text: string): string {
+  return (text ?? "").replace(/\*+([^*]+?)\*+/g, "$1").replace(/\*/g, "");
+}
+
+/**
+ * Grupperer ord-diffen i lesbare bolker: tilstøtende fjernede/tilføyde ord blir
+ * ÉN endring «fra → til» med normale mellomrom, i stedet for sammenlimte ord.
+ */
+export function diffSegments(oldText: string, newText: string): DiffSegment[] {
+  const parts = wordDiff(stripAllergenMarkers(oldText), stripAllergenMarkers(newText));
+  const out: DiffSegment[] = [];
+  let removed: string[] = [];
+  let added: string[] = [];
+  const flush = () => {
+    if (removed.length || added.length) {
+      out.push({ op: "change", removed: removed.join(" "), added: added.join(" ") });
+      removed = [];
+      added = [];
+    }
+  };
+  for (const p of parts) {
+    const words = p.text.split(/\s+/).filter(Boolean);
+    if (p.op === "same") {
+      if (!words.length && (removed.length || added.length)) continue; // mellomrom inne i en endring
+      flush();
+      const last = out[out.length - 1];
+      if (last && last.op === "same") last.text += p.text;
+      else out.push({ op: "same", text: p.text });
+    } else if (p.op === "removed") removed.push(...words);
+    else added.push(...words);
+  }
+  flush();
+  return out;
+}
