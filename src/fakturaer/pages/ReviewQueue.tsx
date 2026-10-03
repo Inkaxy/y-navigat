@@ -12,7 +12,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { QueryState } from "@/components/common/QueryState";
-import { QueueWorkspace, type BucketTab } from "@/fakturaer/components/inbox/QueueWorkspace";
+import { QueueWorkspace } from "@/fakturaer/components/inbox/QueueWorkspace";
 import { isBulkAcceptable, lineStatus } from "@/fakturaer/lib/lineStatus";
 import { useReviewLines, useReviewLineCounts, type ReviewLineRow, type ReviewLineCountRow } from "@/fakturaer/hooks/useReviewLines";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
@@ -127,7 +127,9 @@ export default function FakturaerInboxPage() {
   const { data: company } = useCompany();
   const [supplierId, setSupplierId] = useState<string>("all");
   const [supplierOpen, setSupplierOpen] = useState(false);
-  const [bucket, setBucket] = useState<BucketTab>("needs");
+  const [showAll, setShowAll] = useState(false);
+  const [multiSelect, setMultiSelect] = useState(false);
+  const [showGlobalLines, setShowGlobalLines] = useState(false);
   const [reason, setReason] = useState<TabValue>("all");
 
   // Ett firma: selskapet kommer fra useCompany, ikke fra en velger.
@@ -159,11 +161,18 @@ export default function FakturaerInboxPage() {
 
   // Ekspandert faktura — innboksen viser linjene for én faktura om gangen.
   const [lineLimit, setLineLimit] = useState(200);
-  const [expandedId, setExpandedId] = useState<string | null>(searchParams.get("faktura"));
-  useEffect(() => {
-    const wanted = searchParams.get("faktura");
-    if (wanted) setExpandedId(wanted);
-  }, [searchParams]);
+  // Valgt faktura ligger i adressen, så tilbakeknappen og delte lenker virker.
+  const expandedId = searchParams.get("faktura");
+  const openInvoice = useCallback(
+    (id: string | null) => {
+      const next = new URLSearchParams(searchParams);
+      if (id) next.set("faktura", id);
+      else next.delete("faktura");
+      setSearchParams(next);
+      window.scrollTo({ top: 0 });
+    },
+    [searchParams, setSearchParams],
+  );
 
   // Når et fakturakort er åpent henter vi bare den fakturaens linjer.
   // Listen over «alle linjer» har et tak slik at spørringen holder seg rask.
@@ -197,20 +206,10 @@ export default function FakturaerInboxPage() {
   const visibleLines = useMemo(() => {
     const scoped = expandedId ? lines.filter((l) => l.invoice_id === expandedId) : lines;
     const filtered = scoped.filter(
-      (l) => matchesTab(l, reason) && (bucket === "all" || statusOf(l).bucket === bucket),
+      (l) => matchesTab(l, reason) && (showAll || statusOf(l).bucket === "needs"),
     );
     return sortQueue(filtered, sort, repeats);
-  }, [lines, expandedId, reason, bucket, sort, repeats, statusOf]);
-
-  const counts = useMemo(() => {
-    const c: Record<BucketTab, number> = { all: 0, needs: 0, ready: 0, done: 0 };
-    for (const l of countRows) {
-      if (!matchesTab(l, reason)) continue;
-      c.all++;
-      c[statusOf(l).bucket]++;
-    }
-    return c;
-  }, [countRows, reason, statusOf]);
+  }, [lines, expandedId, reason, showAll, sort, repeats, statusOf]);
 
   const progress = useMemo(() => {
     if (!expandedId || countRows.length === 0) return null;
@@ -567,28 +566,51 @@ export default function FakturaerInboxPage() {
   // --- Render --------------------------------------------------------------
   const expandedInvoice = invoices.find((i) => i.id === expandedId) ?? null;
 
+  const reconcileReady = !!expandedId && !!progress && progress.needs === 0 && canReconcile;
+
+  /**
+   * Etter lagring: hent serverens tilstand. Står linjen fortsatt til avklaring
+   * (pris, pakning, reberegning), blir den værende. Ellers går vi til neste
+   * linje som trenger hjelp — aldri ved å regne en uferdig linje som ferdig.
+   */
+  const handleSaved = useCallback(
+    async (lineId: string) => {
+      const ids = queue.ids;
+      const idx = ids.indexOf(lineId);
+      const r = await linesQuery.refetch();
+      void countsQuery.refetch();
+      const rows = r.data?.rows ?? [];
+      const needs = (id: string) => {
+        const row = rows.find((x) => x.id === id);
+        return !!row && statusOf(row).bucket === "needs";
+      };
+      if (needs(lineId)) return;
+      const nextId = [...ids.slice(idx + 1), ...ids.slice(0, Math.max(idx, 0))].find((id) => id !== lineId && needs(id));
+      if (nextId) dispatch({ type: "focus", id: nextId });
+    },
+    [queue.ids, linesQuery, countsQuery, statusOf],
+  );
+
   const queueEl = (
     <QueueWorkspace
       lines={visibleLines}
       statusOf={statusOf}
-      counts={counts}
-      bucket={bucket}
-      onBucket={setBucket}
+      showAll={showAll}
+      onShowAll={setShowAll}
+      needsCount={progress?.needs ?? countRows.length}
       reason={reason}
       onReason={setReason}
       sort={sort}
       onSort={setSort}
-      progress={progress}
+      multiSelect={multiSelect}
+      onMultiSelect={(v) => {
+        setMultiSelect(v);
+        if (!v) setSelected({});
+      }}
       loading={linesQuery.isLoading}
       error={linesQuery.isError ? linesQuery.error : null}
       onRetry={() => void linesQuery.refetch()}
-      emptyTitle={
-        bucket === "needs"
-          ? "Ingen linjer må avklares her — godt jobbet!"
-          : expandedInvoice
-            ? "Ingen linjer i dette utvalget på fakturaen"
-            : "Ingen linjer i dette utvalget"
-      }
+      emptyTitle={showAll ? "Ingen linjer i dette utvalget" : reconcileReady ? "Alle linjer er avklart" : "Ingen linjer må avklares her"}
       activeLine={activeLine}
       onSelect={(l) => dispatch({ type: "focus", id: l.id })}
       onPrev={() => dispatch({ type: "prev" })}
@@ -604,17 +626,17 @@ export default function FakturaerInboxPage() {
         onCreate: bulkCreate,
         onClear: () => setSelected({}),
       }}
-      readyToAccept={{ count: visibleLines.filter(isBulkAcceptable).length, onAccept: () => void acceptAllVisible() }}
       links={links}
       toleranceFor={toleranceForEntity}
       showInvoice={!expandedId}
       canWrite={canWrite}
-      busy={bulkBusy}
+      reconcileReady={reconcileReady}
       isMobile={isMobile}
       countsError={countsQuery.isError}
-      onAction={openDialog}
-      onAccept={(l) => void doAccept(l)}
+      onSaved={handleSaved}
+      onSecondary={(a, l) => openDialog(a, l)}
       onShowDocument={showDoc}
+      onReconcile={() => expandedId && setReconcileId(expandedId)}
     />
   );
 
