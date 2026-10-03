@@ -94,6 +94,18 @@ const TABS: TabConfig[] = [
   { type: "tab", id: "avvik", label: "Avvik", icon: AlertTriangle },
 ];
 
+/** Feltene variantdialogen arver fra morvaren. */
+type VariantParent = {
+  id: string;
+  code: string;
+  display_name: string;
+  legal_entity_id: string;
+  main_category_id: string | null;
+  mva_rate: number | null;
+  product_category: string;
+  unit_of_sale: string;
+};
+
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -618,7 +630,7 @@ function VariantsTab({
   variants,
   onVariantCreated,
 }: {
-  product: { variant_of_product_id: string | null };
+  product: VariantParent & { variant_of_product_id: string | null };
   variants: { id: string; display_name: string; display_number: number; variant_label: string | null }[];
   onVariantCreated: () => void;
 }) {
@@ -694,16 +706,7 @@ function NewVariantDialog({
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  parent: {
-    id: string;
-    code: string;
-    display_name: string;
-    legal_entity_id: string;
-    main_category_id: string | null;
-    mva_rate: number | null;
-    product_category: string;
-    unit_of_sale: string;
-  };
+  parent: VariantParent;
   onCreated: (id: string) => void;
 }) {
   const [variantLabel, setVariantLabel] = useState("");
