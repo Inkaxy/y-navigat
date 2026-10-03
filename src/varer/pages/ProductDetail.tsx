@@ -326,7 +326,7 @@ export default function ProductDetail() {
 
       // Pakkeinnhold: delete+insert i ÉN transaksjon (aldri tomt pakkeinnhold ved feil)
       if (JSON.stringify(packageItems) !== JSON.stringify(originalPackageItems)) {
-        const { error: e } = await (supabase as any).rpc("replace_child_rows", {
+        const { error: e } = await supabase.rpc("replace_child_rows", {
           p_table: "product_package_items",
           p_parent_column: "package_product_id",
           p_parent_id: product.id,
@@ -618,8 +618,8 @@ function VariantsTab({
   variants,
   onVariantCreated,
 }: {
-  product: any;
-  variants: any[];
+  product: { variant_of_product_id: string | null };
+  variants: { id: string; display_name: string; display_number: number; variant_label: string | null }[];
   onVariantCreated: () => void;
 }) {
   const navigate = useNav();
@@ -694,7 +694,16 @@ function NewVariantDialog({
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  parent: any;
+  parent: {
+    id: string;
+    code: string;
+    display_name: string;
+    legal_entity_id: string;
+    main_category_id: string | null;
+    mva_rate: number | null;
+    product_category: string;
+    unit_of_sale: string;
+  };
   onCreated: (id: string) => void;
 }) {
   const [variantLabel, setVariantLabel] = useState("");
