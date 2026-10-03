@@ -39,3 +39,39 @@ describe("Frivillig startprisforslag gjør ikke linjen uavklart", () => {
     expect(lineStatus(blocked, new Set(["smoremyk"])).bucket).toBe("needs");
   });
 });
+
+import { assessInboxInvoice } from "@/fakturaer/lib/inbox";
+
+describe("Fakturanivåavvik skilt fra linjene", () => {
+  const known = {
+    id: "karamell",
+    raw_material_id: "rm",
+    match_confidence: "manual",
+    requires_review: false,
+    review_reason: null,
+    price_per_base_unit: 121.41,
+    price_variance_pct: null,
+    variance_status: null,
+    category: null,
+    quantity: 6,
+  };
+  for (const [name, invoice] of [
+    ["sumavvik", { lines_sum_status: "mismatch", extraction_confidence: 0.95 }],
+    ["lavt uttrekk", { lines_sum_status: "ok", extraction_confidence: 0.4 }],
+  ] as const) {
+    it(`${name}: bekreftet linje er klar, fakturaen sperret med én fakturaoppgave`, () => {
+      expect(lineStatus({ ...known, invoice } as unknown as LineStatusInput).bucket).toBe("ready");
+      const a = assessInboxInvoice({
+        status: "needs_review",
+        is_credit_note: false,
+        lines_sum_status: invoice.lines_sum_status,
+        extraction_confidence: invoice.extraction_confidence,
+        currency: "NOK",
+        lines: [{ ...known, invoice }],
+      });
+      expect(a.openCount).toBe(0);
+      expect(a.canReconcile).toBe(false);
+      expect(a.invoiceLevelIssues).toHaveLength(1);
+    });
+  }
+});

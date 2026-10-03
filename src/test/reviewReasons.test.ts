@@ -47,10 +47,10 @@ describe("årsaker på fakturalinjer", () => {
     expect(allReasons(line({ variance_status: "no_baseline" }))).not.toContain("no_baseline");
   });
 
-  it("utleder uttrekksproblem fra fakturaens sum og tillit", () => {
-    expect(allReasons(line({ invoice: { lines_sum_status: "mismatch" } }))).toContain("extraction_issue");
-    expect(allReasons(line({ invoice: { extraction_confidence: 0.4 } }))).toContain("extraction_issue");
-    expect(allReasons(line({ invoice: { extraction_confidence: 0.9 } }))).not.toContain("extraction_issue");
+  it("legger ikke fakturaens sumavvik eller lave uttrekk på hver linje", () => {
+    expect(allReasons(line({ invoice: { lines_sum_status: "mismatch" } }))).not.toContain("extraction_issue");
+    expect(allReasons(line({ invoice: { extraction_confidence: 0.4 } }))).not.toContain("extraction_issue");
+    expect(allReasons(line({ review_reason: "extraction_issue" }))).toContain("extraction_issue");
   });
 });
 
