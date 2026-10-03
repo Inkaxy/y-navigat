@@ -15,7 +15,8 @@ import "@/index.css";
  */
 const qc = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
 const rms = [
-  { id: "rm-kaffe", name: "Kaffe, malt", sku: "R-1042", category: null, current_cost_price: 212, base_unit: "kg", primary_supplier_id: null, item_type: null },
+  { id: "rm-kaffe", name: "Ali Original finmalt 90 g", sku: "R-1042", category: null, current_cost_price: 15, base_unit: "stk", primary_supplier_id: null, item_type: null },
+  { id: "rm-mel", name: "Hvetemel, siktet", sku: "R-3", category: null, current_cost_price: 11.2, base_unit: "kg", primary_supplier_id: null, item_type: null },
   { id: "rm-havre", name: "Havredrikk, barista", sku: "R-2001", category: null, current_cost_price: 23, base_unit: "l", primary_supplier_id: null, item_type: null },
 ];
 rms.forEach((r) => qc.setQueryData(["rm-detail", r.id], r));
@@ -38,12 +39,12 @@ function l(o: Partial<ReviewLineRow> & { id: string }): ReviewLineRow {
 const lines: ReviewLineRow[] = [
   l({ id: "a", line_number: 1, supplier_sku: "110482", description: "ALI ORIGINAL FINMALT 36X90G", quantity: 1, unit: "eske", unit_price: 541.03, total_amount: 8115.45,
       match_confidence: "auto_high", raw_material_id: "rm-kaffe", review_reason: "unknown_package_size",
-      matched_raw_material: { name: "Kaffe, malt", sku: "R-1042", category: null, base_unit: "kg" } }),
+      matched_raw_material: { name: "Ali Original finmalt 90 g", sku: "R-1042", category: null, base_unit: "stk" } }),
   l({ id: "b", line_number: 2, supplier_sku: "217753", description: "HAVREDRIKK BARISTA 1 L OATLY", quantity: 6, unit: "stk", unit_price: 23.82, total_amount: 142.92,
       review_reason: "unmatched", suggestions: [{ raw_material_id: "rm-havre", confidence: 0.92, match_reason: "Navnelikhet med registrert vare", rank: 1,
       raw_material: { name: "Havredrikk, barista", sku: "R-2001", category: null, current_cost_price: 23, base_unit: "l" } }] }),
   l({ id: "c", line_number: 3, description: "HVETEMEL SIKTET 25 KG", quantity: 2, unit: "sekk", unit_price: 310, total_amount: 620, match_confidence: "manual",
-      raw_material_id: "rm-kaffe", review_reason: "price_increase", price_per_base_unit: 12.4, expected_price_per_base_unit: 11.2, price_variance_pct: 10.7,
+      raw_material_id: "rm-mel", review_reason: "price_increase", price_per_base_unit: 12.4, expected_price_per_base_unit: 11.2, price_variance_pct: 10.7,
       price_reference_source: "last_purchase", price_reference_date: "2026-09-12", base_quantity: 50,
       matched_raw_material: { name: "Hvetemel, siktet", sku: "R-3", category: null, base_unit: "kg" } }),
 ];
