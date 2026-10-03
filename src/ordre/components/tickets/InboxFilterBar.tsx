@@ -29,13 +29,13 @@ export default function InboxFilterBar({
 }) {
   const [open, setOpen] = useState(false);
   const activeCount = (search.trim() ? 1 : 0) + (priority !== "all" ? 1 : 0);
-  const prioritySelect = (
+  const renderPrioritySelect = (id: string) => (
     <div className="flex flex-col gap-1">
-      <label htmlFor="inbox-priority" className="text-caption font-medium text-muted-foreground lg:sr-only">
+      <label htmlFor={id} className="text-caption font-medium text-muted-foreground lg:sr-only">
         Prioritet
       </label>
       <select
-        id="inbox-priority"
+        id={id}
         value={priority}
         onChange={(e) => onPriority(parsePriorityParam(e.target.value))}
         className="h-9 rounded-[10px] border border-border bg-background px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -72,7 +72,7 @@ export default function InboxFilterBar({
             />
           </div>
         </div>
-        <div className="hidden lg:block">{prioritySelect}</div>
+        <div className="hidden lg:block">{renderPrioritySelect("inbox-priority-desktop")}</div>
         <Button
           type="button"
           variant="outline"
@@ -89,7 +89,7 @@ export default function InboxFilterBar({
 
       {open && (
         <div id="inbox-more-filters" className="lg:hidden">
-          {prioritySelect}
+          {renderPrioritySelect("inbox-priority-mobile")}
         </div>
       )}
 
