@@ -52,11 +52,16 @@ export interface InboxInvoiceInput {
   notes?: string | null;
   line_extraction_status?: string | null;
   currency?: string | null;
+  /** Fakturanivå: lav sikkerhet sperrer fullføring, men legges ikke på hver linje. */
+  extraction_confidence?: number | null;
+  lines_sum_variance_pct?: number | null;
   lines: InboxLine[];
 }
 
 export interface InboxAssessment {
   issues: InboxIssue[];
+  /** Fakturanivåproblemer (sum/uttrekk) — vises som ÉN fakturaoppgave, ikke på linjene. */
+  invoiceLevelIssues?: string[];
   unmatchedCount: number;
   reviewCount: number;
   varianceCount: number;
@@ -102,6 +107,9 @@ export function lineIsOpen(l: InboxLine): boolean {
   );
 }
 
+/** Samme grense som tidligere lå på linjenivå; nå bare fakturanivå. */
+export const LOW_EXTRACTION_CONFIDENCE = 0.6;
+
 export function assessInboxInvoice(
   inv: InboxInvoiceInput,
   /** Beholdt for bakoverkompatibilitet — avvik avgjøres av serverens årsaker. */
@@ -130,13 +138,27 @@ export function assessInboxInvoice(
   if (openCount > 0) blockers.push(`${openCount} linje(r) må avklares`);
   if (inv.lines_sum_status === "mismatch") blockers.push("linjene summerer seg ikke til fakturabeløpet");
   if (inv.lines_sum_status == null && lines.length > 0) blockers.push("linjesummen er ikke kontrollert");
+  if (inv.extraction_confidence != null && Number(inv.extraction_confidence) < LOW_EXTRACTION_CONFIDENCE)
+    blockers.push("fakturaen er lest med lav sikkerhet og må kontrolleres mot originalen");
   if (inv.is_credit_note && !creditNoteOriginalRef(inv.notes))
     blockers.push("kreditnotaen er ikke knyttet til en opprinnelig faktura");
   if (inv.currency && inv.currency.toUpperCase() !== "NOK") blockers.push(`fakturaen er i ${inv.currency.toUpperCase()}`);
 
+  const invoiceLevelIssues: string[] = [];
+  if (inv.lines_sum_status === "mismatch") {
+    const pct = inv.lines_sum_variance_pct;
+    invoiceLevelIssues.push(
+      pct != null && Number.isFinite(Number(pct))
+        ? `Summen av linjene avviker ${Math.abs(Number(pct)).toLocaleString("nb-NO", { maximumFractionDigits: 1 })} % fra fakturabeløpet.`
+        : "Summen av linjene stemmer ikke med fakturabeløpet.",
+    );
+  }
+  if (inv.extraction_confidence != null && Number(inv.extraction_confidence) < LOW_EXTRACTION_CONFIDENCE)
+    invoiceLevelIssues.push("Fakturaen er lest med lav sikkerhet. Kontroller linjene mot originalen.");
   const locked = inv.status === "reconciled" || inv.status === "flagged" || inv.status === "cancelled";
   return {
     issues,
+    invoiceLevelIssues,
     unmatchedCount: unmatched.length,
     reviewCount,
     varianceCount: varianceLines.length,

@@ -179,12 +179,9 @@ export function storedReasons(line: Pick<ClassifiableLine, "review_reason">): st
 export function derivedReasons(line: ClassifiableLine): DerivedReasonCode[] {
   const out: DerivedReasonCode[] = [];
   if (line.variance_status === "no_baseline" && line.raw_material_id) out.push("no_baseline");
-  const inv = line.invoice;
-  if (inv) {
-    const sumMismatch = inv.lines_sum_status === "mismatch";
-    const lowExtraction = inv.extraction_confidence != null && Number(inv.extraction_confidence) < 0.6;
-    if (sumMismatch || lowExtraction) out.push("extraction_issue");
-  }
+  // Fakturanivåets sumavvik/lave uttrekkssikkerhet legges IKKE på hver linje: det
+  // sperrer fullføring av fakturaen (se invoiceLevelIssue), men gjør ikke en
+  // bekreftet vare/pakning uavklart. Bare linjens egne lagrede årsaker teller.
   const q = line.quantity == null ? null : Number(line.quantity);
   if (line.requires_review && (q === 0 || (q != null && !Number.isFinite(q)))) out.push("zero_quantity");
   return out;
