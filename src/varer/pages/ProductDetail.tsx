@@ -94,6 +94,18 @@ const TABS: TabConfig[] = [
   { type: "tab", id: "avvik", label: "Avvik", icon: AlertTriangle },
 ];
 
+/** Feltene variantdialogen arver fra morvaren. */
+type VariantParent = {
+  id: string;
+  code: string;
+  display_name: string;
+  legal_entity_id: string;
+  main_category_id: string | null;
+  mva_rate: number | null;
+  product_category: string;
+  unit_of_sale: string;
+};
+
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -103,6 +115,13 @@ export default function ProductDetail() {
   const rawTab = params.get("tab") ?? "navn";
   // Gamle lenker til «Kalkyle» og «Priser» peker til den sammenslåtte fanen.
   const tab = rawTab === "kalkyle" || rawTab === "priser" ? "kalkyle_pris" : rawTab;
+  /** Bytter fane uten å miste returkonteksten til listen (`?fra=`). */
+  const setTab = (next: string) =>
+    setParams((prev) => {
+      const sp = new URLSearchParams(prev);
+      sp.set("tab", next);
+      return sp;
+    });
   const [saving, setSaving] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
   const [keywords, setKeywords] = useState<string[]>([]);
@@ -319,7 +338,7 @@ export default function ProductDetail() {
 
       // Pakkeinnhold: delete+insert i ÉN transaksjon (aldri tomt pakkeinnhold ved feil)
       if (JSON.stringify(packageItems) !== JSON.stringify(originalPackageItems)) {
-        const { error: e } = await (supabase as any).rpc("replace_child_rows", {
+        const { error: e } = await supabase.rpc("replace_child_rows", {
           p_table: "product_package_items",
           p_parent_column: "package_product_id",
           p_parent_id: product.id,
@@ -392,7 +411,7 @@ export default function ProductDetail() {
       (errors) => {
         const firstField = Object.keys(errors)[0];
         const firstTab = firstField ? FIELD_TO_TAB[firstField as keyof ProductFormValues] : null;
-        if (firstTab) setParams({ tab: firstTab });
+        if (firstTab) setTab(firstTab);
         toast.error("Det er valideringsfeil. Sjekk markerte tabs.");
       },
     )();
@@ -464,7 +483,7 @@ export default function ProductDetail() {
         }}
         tabs={visibleTabs}
         activeTab={tab}
-        onTabChange={(id) => setParams({ tab: id })}
+        onTabChange={setTab}
         dirtyTabs={dirtyTabs}
         errorTabs={errorTabs}
         isDirty={isDirty}
@@ -611,8 +630,8 @@ function VariantsTab({
   variants,
   onVariantCreated,
 }: {
-  product: any;
-  variants: any[];
+  product: VariantParent & { variant_of_product_id: string | null };
+  variants: { id: string; display_name: string; display_number: number; variant_label: string | null }[];
   onVariantCreated: () => void;
 }) {
   const navigate = useNav();
@@ -687,7 +706,7 @@ function NewVariantDialog({
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  parent: any;
+  parent: VariantParent;
   onCreated: (id: string) => void;
 }) {
   const [variantLabel, setVariantLabel] = useState("");

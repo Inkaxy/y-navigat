@@ -1,33 +1,91 @@
-import { AlertTriangle } from "lucide-react";
+import { useId, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { WARNING_TITLE, type RecipeWarning } from "@/varer/hooks/useRecipeWarnings";
+import { AlertTriangle, ChevronDown, Crosshair } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { WARNING_TITLE, type RecipeWarning, type RecipeWarningKind } from "@/varer/hooks/useRecipeWarnings";
+import { distinctActions, groupRecipeWarnings } from "@/varer/lib/recipeWarningGroups";
 
 /**
- * Samlebanner for live-advarslene i oppskriftseditoren.
- * Rådgivende: det blokkerer aldri lagring, men peker rett på stedet feilen rettes.
+ * Kompakt sammendrag av live-advarslene i oppskriftseditoren. Viser antall
+ * problemer og berørte ingredienser; detaljene er gruppert per linje og kan
+ * foldes ut. Rådgivende: blokkerer aldri lagring.
  */
-export function RecipeWarningsBanner({ warnings }: { warnings: RecipeWarning[] }) {
-  if (warnings.length === 0) return null;
+export function RecipeWarningsBanner({
+  warnings,
+  open,
+  onOpenChange,
+  onFocusLine,
+}: {
+  warnings: RecipeWarning[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onFocusLine: (lineId: string) => void;
+}) {
+  const panelId = useId();
+  const summary = useMemo(() => groupRecipeWarnings(warnings), [warnings]);
+  if (summary.problemCount === 0) return null;
+
+  const kinds = Object.entries(summary.byKind) as [RecipeWarningKind, number][];
+  const headline =
+    summary.affectedLineCount > 0
+      ? `${summary.problemCount} ${summary.problemCount === 1 ? "problem" : "problemer"} på ${summary.affectedLineCount} ${summary.affectedLineCount === 1 ? "ingrediens" : "ingredienser"}`
+      : `${summary.problemCount} ting bør ses på`;
 
   return (
-    <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
-        {warnings.length === 1 ? "1 ting bør ses på" : `${warnings.length} ting bør ses på`}
+    <section id="oppskrift-advarsler" aria-label="Ting som bør ses på" className="scroll-mt-48 rounded-md border border-warning/40 bg-warning/10">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2">
+        <AlertTriangle className="h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
+        <p className="text-sm font-medium">{headline}</p>
+        <ul className="flex flex-wrap gap-1.5" aria-label="Fordelt på type">
+          {kinds.map(([kind, n]) => (
+            <li key={kind} className="rounded-full border border-warning/30 bg-background/60 px-2 py-0.5 text-caption text-muted-foreground">
+              {WARNING_TITLE[kind]}: {n}
+            </li>
+          ))}
+        </ul>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="ml-auto h-8 gap-1"
+          aria-expanded={open}
+          aria-controls={panelId}
+          onClick={() => onOpenChange(!open)}
+        >
+          {open ? "Skjul detaljer" : "Vis detaljer"}
+          <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} aria-hidden="true" />
+        </Button>
       </div>
-      <ul className="mt-1.5 space-y-1 text-sm">
-        {warnings.map((w, i) => (
-          <li key={`${w.kind}-${w.lineId ?? i}`} className="flex flex-wrap items-center gap-2">
-            <span className="text-muted-foreground">{WARNING_TITLE[w.kind]}:</span>
-            <span>{w.message}</span>
-            {w.action && (
-              <Link to={w.action.href} className="underline underline-offset-2 hover:text-foreground">
-                {w.action.label}
-              </Link>
-            )}
-          </li>
-        ))}
-      </ul>
-    </div>
+
+      <div id={panelId} hidden={!open} className="border-t border-warning/30 px-3 py-2">
+        <ul className="divide-y divide-warning/20">
+          {summary.groups.map((g) => (
+            <li key={g.key} className="py-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium">{g.name ?? "Hele oppskriften"}</span>
+                {g.lineId && (
+                  <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-caption" onClick={() => onFocusLine(g.lineId!)}>
+                    <Crosshair className="h-3.5 w-3.5" aria-hidden="true" /> Gå til linjen
+                  </Button>
+                )}
+                {distinctActions(g.items).map((a) => (
+                  <Link key={a.href} to={a.href} className="text-caption underline underline-offset-2 hover:text-foreground">
+                    {a.label}
+                  </Link>
+                ))}
+              </div>
+              <ul className="mt-1 space-y-0.5 text-sm">
+                {g.items.map((w, i) => (
+                  <li key={`${w.kind}-${i}`} className="flex flex-wrap gap-x-2">
+                    <span className="text-muted-foreground">{WARNING_TITLE[w.kind]}:</span>
+                    <span>{w.message}</span>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
   );
 }

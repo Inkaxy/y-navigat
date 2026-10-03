@@ -1,118 +1,77 @@
-import { useEffect, useMemo, useState } from "react";
-import { useAppContext } from "@/varer/context/AppContext";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { ChefHat, ChevronLeft, ChevronRight, FileStack, Loader2, Plus, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAppContext } from "@/varer/context/AppContext";
 import { AppHeaderBanner } from "@/varer/components/layout/AppHeaderBanner";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, ChefHat, Plus, Link2, Copy, MoreHorizontal, Wheat, ArrowUp, ArrowDown, ChevronsUpDown, Trash2, ChevronLeft, ChevronRight, FileStack } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { QueryState } from "@/components/common/QueryState";
 import { copyRecipe } from "@/varer/lib/copyRecipe";
-import { fetchAllRows } from "@/lib/supabasePaging";
-import { deriveLabelingStatusFromDb, LABELING_STATUS_LABEL, type LabelingStatus } from "@/varer/lib/labelStaleness";
-import { latestApprovalByRecipe } from "@/varer/lib/labelWorkspace";
-import { format } from "date-fns";
-import { nb } from "date-fns/locale";
-
+import { LABELING_STATUS_LABEL, type LabelingStatus } from "@/varer/lib/labelStaleness";
+import { RECIPE_STATUS_LABEL } from "@/varer/lib/bakers";
 import {
-  computeTotalsForRecipe, fmtG, fmtPercent, RECIPE_STATUS_LABEL, type BakersLine, type BakersRawMaterial,
-} from "@/varer/lib/bakers";
-import { BASE_RECIPE_CATEGORY } from "@/varer/lib/halvfabrikat";
-import {
-  asDepartment, RECIPE_DEPARTMENT_BADGE, RECIPE_DEPARTMENT_LABEL, type RecipeDepartment,
-} from "@/varer/lib/departments";
+  parseRecipeListParams, writeRecipeListParams, RECIPE_LIST_DEFAULTS,
+  type RecipeDeptFilter, type RecipeSortKey, type RecipeStatusFilter,
+} from "@/varer/lib/listUrlState";
+import { detailHref } from "@/varer/lib/listReturn";
+import { filterAndSortRecipes } from "@/varer/lib/recipeListFilter";
+import { useListUrlState, useReturnFocus } from "@/varer/hooks/useListUrlState";
+import { useRecipeListData } from "@/varer/hooks/useRecipeListData";
 import { RecipeListCard } from "@/varer/components/recipes/RecipeListCard";
+import { RecipeListTable } from "@/varer/components/recipes/list/RecipeListTable";
+import { DeleteRecipeDialog } from "@/varer/components/recipes/list/DeleteRecipeDialog";
+import { ListResultSummary, type ActiveFilter } from "@/varer/components/lists/ActiveFilterChips";
 
 /** Valgene i segmentkontrollen for avdeling. */
-const DEPARTMENT_FILTERS: { value: "all" | RecipeDepartment | "none"; label: string }[] = [
+const DEPARTMENT_FILTERS: { value: RecipeDeptFilter; label: string }[] = [
   { value: "all", label: "Alle" },
   { value: "bakeri", label: "Bakeri" },
   { value: "konditori", label: "Konditori" },
   { value: "none", label: "Uten avdeling" },
 ];
 
-/** Rå rad fra listespørringen — modulen bruker ikke de genererte Supabase-typene. */
-type RecipeLineRow = BakersLine & { id: string; raw_material_id: string | null };
-type RecipeListRow = {
-  id: string;
-  name: string | null;
-  image_url: string | null;
-  category: string | null;
-  status: string | null;
-  department: string | null;
-  version: number | null;
-  updated_at: string | null;
-  unit_weight_grams: number | null;
-  units_per_batch: number | null;
-  dough_piece_grams: number | null;
-  dough_waste_pct: number | null;
-  product_id: string | null;
-  is_template: boolean | null;
-  recipe_lines: RecipeLineRow[] | null;
-  product_recipe_links: { product_id: string; products: { display_name: string | null } | null }[] | null;
-};
-type RecipeRow = RecipeListRow & {
-  totals: ReturnType<typeof computeTotalsForRecipe>;
-  products: string[];
-  labeling: LabelingStatus;
-};
-
-/** Kolonner som kan sorteres i oppskriftslisten. */
-type SortKey = "name" | "category" | "department" | "hydration" | "dough" | "products" | "status" | "labeling" | "updated";
+const PAGE_SIZE = 50;
+const SELECT_CLS = "h-10 w-full rounded-md border border-input bg-background px-3 text-sm sm:w-auto";
 
 export default function Recipes() {
   const { legalEntityId, canWrite } = useAppContext();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [deptFilter, setDeptFilter] = useState<"all" | RecipeDepartment | "none">("all");
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [labelingFilter, setLabelingFilter] = useState<"all" | LabelingStatus>("all");
-  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "name", dir: "asc" });
-  const [page, setPage] = useState(1);
-  const [creatingFromTemplate, setCreatingFromTemplate] = useState(false);
-  const PAGE_SIZE = 50;
-
-  /** Klikk på kolonne: samme kolonne snur retning, ny kolonne starter stigende. */
-  const toggleSort = (key: SortKey) =>
-    setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
+  const { state, update, search } = useListUrlState(parseRecipeListParams, writeRecipeListParams);
+  const data = useRecipeListData(legalEntityId);
   const [creating, setCreating] = useState(false);
+  const [creatingFromTemplate, setCreatingFromTemplate] = useState(false);
   const [copyingId, setCopyingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState("");
-  const [deleteBusy, setDeleteBusy] = useState(false);
 
-  /** Slett oppskrift etter at brukeren har skrevet «slett». */
-  async function handleDelete() {
-    if (!deleting || deleteConfirm.trim().toLowerCase() !== "slett") return;
-    setDeleteBusy(true);
-    try {
-      const { error } = await supabase.from("recipes").delete().eq("id", deleting.id);
-      if (error) throw error;
-      qc.invalidateQueries({ queryKey: ["recipes-list"] });
-      toast.success("Oppskriften er slettet");
-      setDeleting(null);
-      setDeleteConfirm("");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Kunne ikke slette oppskriften");
-    } finally {
-      setDeleteBusy(false);
-    }
-  }
+  const rows = useMemo(() => filterAndSortRecipes(data.rows, state), [data.rows, state]);
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const page = Math.min(state.page, totalPages);
+  const pagedRows = useMemo(() => rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [rows, page]);
+  const hrefFor = (id: string) => detailHref("recipes", id, search);
+
+  useReturnFocus(!data.isLoading && !data.isError);
+
+  /** Klikk på kolonne: samme kolonne snur retning, ny kolonne starter stigende. */
+  const toggleSort = (key: RecipeSortKey) =>
+    update({ sort: key, dir: state.sort === key && state.dir === "asc" ? "desc" : "asc" });
+
+  const activeFilters: ActiveFilter[] = [
+    state.q.trim() && { key: "q", label: `Søk: «${state.q.trim()}»`, onRemove: () => update({ q: "" }) },
+    state.status !== "all" && { key: "status", label: `Status: ${RECIPE_STATUS_LABEL[state.status] ?? state.status}`, onRemove: () => update({ status: "all" }) },
+    state.labeling !== "all" && { key: "merking", label: `Merking: ${LABELING_STATUS_LABEL[state.labeling].toLowerCase()}`, onRemove: () => update({ labeling: "all" }) },
+    state.dept !== "all" && { key: "avdeling", label: DEPARTMENT_FILTERS.find((f) => f.value === state.dept)?.label ?? state.dept, onRemove: () => update({ dept: "all" }) },
+    state.category !== "all" && { key: "kategori", label: state.category === "none" ? "Uten kategori" : `Kategori: ${state.category}`, onRemove: () => update({ category: "all" }) },
+  ].filter((f): f is ActiveFilter => !!f);
+
+  const resetFilters = () =>
+    update({ q: "", status: "all", labeling: "all", dept: "all", category: RECIPE_LIST_DEFAULTS.category });
 
   /** Kopier oppskrift fra radmenyen og åpne kopien i navneredigering. */
   async function handleCopy(id: string) {
@@ -121,206 +80,12 @@ export default function Recipes() {
       const newId = await copyRecipe(id);
       qc.invalidateQueries({ queryKey: ["recipes-list"] });
       toast.success("Kopi opprettet");
-      navigate(`/varer/oppskrifter/${newId}?rename=1`);
+      navigate(`${hrefFor(newId)}${hrefFor(newId).includes("?") ? "&" : "?"}rename=1`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Kunne ikke kopiere oppskriften");
     } finally {
       setCopyingId(null);
     }
-  }
-
-
-  const rmQuery = useQuery({
-    queryKey: ["rm-bakers-map", legalEntityId],
-    enabled: !!legalEntityId,
-    queryFn: async () => {
-      const data = await fetchAllRows<BakersRawMaterial>((from, to) =>
-        supabase
-          .from("raw_materials")
-          .select("id, name, category, grain_classification, water_content_pct, unit_weight_grams, current_cost_price, density_g_per_ml, is_water")
-          .eq("legal_entity_id", legalEntityId!)
-          .eq("is_active", true)
-          .range(from, to) as unknown as PromiseLike<{ data: BakersRawMaterial[] | null; error: { message: string } | null }>,
-      );
-      const map: Record<string, BakersRawMaterial> = {};
-      for (const r of data) map[r.id] = r;
-      return map;
-    },
-  });
-
-  const recipesQuery = useQuery({
-    queryKey: ["recipes-list", legalEntityId],
-    queryFn: async () => {
-      const data = await fetchAllRows<RecipeListRow>((from, to) =>
-        supabase
-          .from("recipes")
-          .select("id, name, image_url, category, status, department, version, updated_at, unit_weight_grams, units_per_batch, dough_piece_grams, dough_waste_pct, product_id, is_template, recipe_lines(id, quantity, unit, raw_material_id, is_flour_override, water_content_pct_override, ingredient_name), product_recipe_links(product_id, products(display_name))")
-          .is("valid_to", null)
-          .order("created_at", { ascending: false })
-          .range(from, to) as unknown as PromiseLike<{ data: RecipeListRow[] | null; error: { message: string } | null }>,
-      );
-      return data;
-    },
-  });
-
-  /** Antall aktive delingslenker per oppskrift — viser hva som ligger ute. */
-  const shareCountsQuery = useQuery({
-    queryKey: ["recipe-share-counts", legalEntityId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("recipe_share_links")
-        .select("recipe_id, expires_at, revoked_at")
-        .is("revoked_at", null);
-      const counts: Record<string, number> = {};
-      const now = Date.now();
-      for (const r of (data ?? []) as { recipe_id: string; expires_at: string | null }[]) {
-        if (r.expires_at && new Date(r.expires_at).getTime() < now) continue;
-        counts[r.recipe_id] = (counts[r.recipe_id] ?? 0) + 1;
-      }
-      return counts;
-    },
-  });
-
-  /**
-   * Merkestatus pr oppskrift — samme grunnlag som Merking-fanen og varelisten:
-   * databasens `is_stale` på beregningen + godkjenningstidspunktet.
-   */
-  const labelingQuery = useQuery({
-    queryKey: ["recipes-labeling-status", legalEntityId],
-    queryFn: async () => {
-      // Godkjenning = nyeste deklarasjonsversjon. Lagringsdatoen på oppskriften
-      // flyttes også av «Lagre kladd» og kan derfor ikke brukes som bevis.
-      const [calcRows, recRows, verRows] = await Promise.all([
-        fetchAllRows<{ recipe_id: string; computed_at: string | null; is_stale: boolean | null }>((from, to) =>
-          supabase.from("recipe_label_calculated").select("recipe_id, computed_at, is_stale").range(from, to),
-        ),
-        fetchAllRows<{ id: string }>((from, to) =>
-          supabase.from("recipes").select("id").is("valid_to", null).range(from, to),
-        ),
-        fetchAllRows<{ recipe_id: string; approved_at: string | null }>((from, to) =>
-          supabase.from("recipe_declaration_versions").select("recipe_id, approved_at").range(from, to),
-        ),
-      ]);
-      const calcBy = new Map<string, { computed_at: string | null; is_stale: boolean | null }>();
-      for (const c of calcRows) calcBy.set(c.recipe_id, c);
-      const approvedBy = latestApprovalByRecipe(verRows);
-      const out: Record<string, LabelingStatus> = {};
-      for (const r of recRows) {
-        const c = calcBy.get(r.id);
-        out[r.id] = deriveLabelingStatusFromDb({
-          approvedAt: approvedBy.get(r.id) ?? null,
-          computedAt: c?.computed_at ?? null,
-          isStale: c?.is_stale ?? null,
-        });
-      }
-      return out;
-    },
-  });
-
-  const rmMap = rmQuery.data ?? {};
-  const shareCounts = shareCountsQuery.data ?? {};
-  const labelingMap = useMemo(() => labelingQuery.data ?? {}, [labelingQuery.data]);
-  const staleCount = useMemo(
-    () => Object.values(labelingMap).filter((s) => s === "stale").length,
-    [labelingMap],
-  );
-
-
-  const rows = useMemo<RecipeRow[]>(() => {
-    const q = search.trim().toLowerCase();
-    return (recipesQuery.data ?? [])
-      .map((r): RecipeRow => {
-        const lines = (r.recipe_lines ?? []).map((l) => ({
-          ...l,
-          _rm: l.raw_material_id ? rmMap[l.raw_material_id] ?? null : null,
-        }));
-        const totals = computeTotalsForRecipe(lines, r);
-        const products = (r.product_recipe_links ?? [])
-          .map((l) => l.products?.display_name)
-          .filter((n): n is string => !!n);
-        return { ...r, totals, products, labeling: labelingMap[r.id] ?? "missing" };
-      })
-      .filter((r) => !r.is_template)
-      .filter((r) => (statusFilter === "all" ? true : (r.status ?? "draft") === statusFilter))
-      .filter((r) => (labelingFilter === "all" ? true : r.labeling === labelingFilter))
-      .filter((r) => {
-        if (deptFilter === "all") return true;
-        const d = asDepartment(r.department);
-        return deptFilter === "none" ? d === null : d === deptFilter;
-      })
-      .filter((r) => {
-        if (categoryFilter === "all") return true;
-        if (categoryFilter === "none") return !r.category;
-        return r.category === categoryFilter;
-      })
-      .filter((r) =>
-        !q ? true : `${r.name ?? ""} ${r.category ?? ""} ${r.products.join(" ")}`.toLowerCase().includes(q),
-      )
-      .sort((a, b) => {
-        const dir = sort.dir === "asc" ? 1 : -1;
-        const txt = (v: string | null | undefined) => (v ?? "").toLowerCase();
-        const num = (v: number | null | undefined) => (v == null || Number.isNaN(v) ? null : v);
-        const cmpNum = (x: number | null, y: number | null) =>
-          x == null && y == null ? 0 : x == null ? 1 : y == null ? -1 : (x - y) * dir;
-        switch (sort.key) {
-          case "category":
-            return txt(a.category).localeCompare(txt(b.category), "nb") * dir;
-          case "department":
-            return txt(asDepartment(a.department) ?? "").localeCompare(txt(asDepartment(b.department) ?? ""), "nb") * dir;
-          case "hydration":
-            return cmpNum(num(a.totals.hydrationPct), num(b.totals.hydrationPct));
-          case "dough":
-            return cmpNum(num(a.totals.totalDoughG), num(b.totals.totalDoughG));
-          case "products":
-            return (a.products.length - b.products.length) * dir;
-          case "labeling":
-            return txt(a.labeling).localeCompare(txt(b.labeling), "nb") * dir;
-          case "status":
-            return txt(a.status ?? "draft").localeCompare(txt(b.status ?? "draft"), "nb") * dir;
-          case "updated":
-            return (
-              (a.updated_at ? new Date(a.updated_at).getTime() : 0) -
-              (b.updated_at ? new Date(b.updated_at).getTime() : 0)
-            ) * dir;
-          default:
-            return txt(a.name).localeCompare(txt(b.name), "nb") * dir;
-        }
-      });
-  }, [recipesQuery.data, rmMap, labelingMap, search, statusFilter, labelingFilter, deptFilter, categoryFilter, sort]);
-
-  /** Distinkte kategorier som faktisk finnes i dataene, sortert på norsk. */
-  const categories = useMemo(() => {
-    const set = new Set<string>();
-    for (const r of recipesQuery.data ?? []) {
-      if (r.category) set.add(r.category);
-    }
-    return Array.from(set).sort((a, b) => a.localeCompare(b, "nb"));
-  }, [recipesQuery.data]);
-
-  /** Oppskrifter markert som mal (is_template = true). */
-  const templates = useMemo(
-    () => (recipesQuery.data ?? []).filter((r) => r.is_template),
-    [recipesQuery.data],
-  );
-
-  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
-  const pagedRows = useMemo(
-    () => rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [rows, page],
-  );
-
-  /** Nullstill sidetall når søk/filtre/sortering endres. */
-  useEffect(() => {
-    setPage(1);
-  }, [search, statusFilter, labelingFilter, deptFilter, categoryFilter, sort]);
-
-  /** Tøm alle filtre. */
-  function resetFilters() {
-    setSearch("");
-    setStatusFilter("all");
-    setDeptFilter("all");
-    setCategoryFilter("all");
-    setLabelingFilter("all");
   }
 
   /** Opprett en ny oppskrift fra en mal via kopiering, og gi den et beskrivende navn. */
@@ -346,7 +111,7 @@ export default function Recipes() {
 
   async function createRecipe() {
     setCreating(true);
-    const { data, error } = await supabase
+    const { data: created, error } = await supabase
       .from("recipes")
       .insert({ name: "Ny oppskrift", status: "draft", legal_entity_id: legalEntityId, yield_quantity: 1, yield_unit: "stk" } as never)
       .select("id")
@@ -356,383 +121,214 @@ export default function Recipes() {
       toast.error(error.message);
       return;
     }
-    await supabase.from("recipe_parts").insert({ recipe_id: data.id, name: "Hoveddeig", sort_order: 0, part_type: "dough" } as never);
+    await supabase.from("recipe_parts").insert({ recipe_id: created.id, name: "Hoveddeig", sort_order: 0, part_type: "dough" } as never);
     setCreating(false);
     qc.invalidateQueries({ queryKey: ["recipes-list"] });
-    navigate(`/varer/oppskrifter/${data.id}`);
+    navigate(`/varer/oppskrifter/${created.id}`);
   }
+
+  const headerActions = canWrite && (
+    <div className="flex flex-wrap items-center gap-2">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" disabled={data.templates.length === 0 || creatingFromTemplate} title={data.templates.length === 0 ? "Ingen maler ennå" : undefined}>
+            {creatingFromTemplate ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileStack className="mr-1.5 h-4 w-4" />}
+            Ny fra mal
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {data.templates.map((t) => (
+            <DropdownMenuItem key={t.id} onSelect={() => void createFromTemplate(t.id, t.name?.trim() || "Uten navn")}>
+              {t.name?.trim() || "Uten navn"}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Button size="sm" className="rounded-full" onClick={createRecipe} disabled={creating}>
+        {creating ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Plus className="mr-1.5 h-4 w-4" />}
+        Ny oppskrift
+      </Button>
+    </div>
+  );
 
   return (
     <>
-      <AppHeaderBanner title="Oppskrifter" subtitle="Bakerfaglige oppskrifter med bakerprosent og prosess" />
-      <div className="px-6 py-6">
-        {staleCount > 0 && (
+      <AppHeaderBanner title="Oppskrifter" subtitle="Bakerfaglige oppskrifter med bakerprosent og prosess" actions={headerActions} />
+      <div className="space-y-4 px-4 py-6 sm:px-6">
+        {data.staleCount > 0 && state.labeling !== "stale" && (
           <button
             type="button"
-            onClick={() => setLabelingFilter("stale")}
-            className="mb-3 flex w-full items-center gap-3 rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-left transition-colors hover:bg-amber-500/15 sm:w-auto"
+            onClick={() => update({ labeling: "stale" })}
+            className="flex w-full items-center gap-3 rounded-lg border border-warning/50 bg-warning/10 px-4 py-3 text-left transition-colors hover:bg-warning/15 sm:w-auto"
           >
-            <span className="text-lg font-semibold tabular-nums">{staleCount}</span>
+            <span className="text-lg font-semibold tabular-nums">{data.staleCount}</span>
             <span className="text-sm">
-              {staleCount === 1 ? "deklarasjon er utdatert" : "deklarasjoner er utdaterte"} — vis dem
+              {data.staleCount === 1 ? "deklarasjon er utdatert" : "deklarasjoner er utdaterte"} — vis dem
             </span>
           </button>
         )}
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <div className="relative max-w-sm flex-1">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Søk i navn, kategori eller produkt…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8" />
+
+        <section aria-label="Søk og filtre" className="space-y-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="min-w-0 flex-1 sm:max-w-sm">
+              <Label htmlFor="recipe-search" className="text-caption text-muted-foreground">Søk</Label>
+              <div className="relative mt-1">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                <Input id="recipe-search" type="search" placeholder="Navn, kategori eller produkt" value={state.q} onChange={(e) => update({ q: e.target.value })} className="pl-8" />
+              </div>
+            </div>
+            <FilterSelect id="recipe-status" label="Status" value={state.status} onChange={(v) => update({ status: v as RecipeStatusFilter })}>
+              <option value="all">Alle statuser</option>
+              <option value="draft">Utkast</option>
+              <option value="active">Aktiv</option>
+              <option value="archived">Arkivert</option>
+            </FilterSelect>
+            <FilterSelect id="recipe-labeling" label="Merking" value={state.labeling} onChange={(v) => update({ labeling: v as "all" | LabelingStatus })}>
+              <option value="all">All merking</option>
+              <option value="approved">Godkjent</option>
+              <option value="stale">Utdatert</option>
+              <option value="missing">Mangler</option>
+            </FilterSelect>
+            <FilterSelect id="recipe-category" label="Kategori" value={state.category} onChange={(v) => update({ category: v })}>
+              <option value="all">Alle kategorier</option>
+              {data.categories.map((c) => <option key={c} value={c}>{c}</option>)}
+              {state.category !== "all" && state.category !== "none" && !data.categories.includes(state.category) && (
+                <option value={state.category}>{state.category}</option>
+              )}
+              <option value="none">Uten kategori</option>
+            </FilterSelect>
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-          >
-            <option value="all">Alle statuser</option>
-            <option value="draft">Utkast</option>
-            <option value="active">Aktiv</option>
-            <option value="archived">Arkivert</option>
-          </select>
-          <select
-            value={labelingFilter}
-            onChange={(e) => setLabelingFilter(e.target.value as "all" | LabelingStatus)}
-            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-            aria-label="Filtrer på merking"
-          >
-            <option value="all">All merking</option>
-            <option value="approved">Merking: godkjent</option>
-            <option value="stale">Merking: utdatert</option>
-            <option value="missing">Merking: mangler</option>
-          </select>
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-          >
-            <option value="all">Alle kategorier</option>
-            {categories.map((c) => (
-              <option key={c} value={c}>{c}</option>
+          <div role="group" aria-label="Avdeling" className="inline-flex max-w-full overflow-x-auto rounded-lg border border-border bg-muted/30 p-0.5">
+            {DEPARTMENT_FILTERS.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => update({ dept: f.value })}
+                aria-pressed={state.dept === f.value}
+                className={`whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition-colors ${
+                  state.dept === f.value ? "bg-background font-medium text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {f.label}
+              </button>
             ))}
-            <option value="none">Uten kategori</option>
-          </select>
-          <div className="flex-1" />
-          {canWrite && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  disabled={templates.length === 0 || creatingFromTemplate}
-                  title={templates.length === 0 ? "Ingen maler ennå" : undefined}
-                >
-                  {creatingFromTemplate ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileStack className="mr-2 h-4 w-4" />}
-                  Ny fra mal
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {templates.map((t) => (
-                  <DropdownMenuItem key={t.id} onSelect={() => void createFromTemplate(t.id, t.name?.trim() || "Uten navn")}>
-                    {t.name?.trim() || "Uten navn"}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          {canWrite && (
-            <Button onClick={createRecipe} disabled={creating}>
-              {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-              Ny oppskrift
-            </Button>
-          )}
-        </div>
-
-        <div className="mb-3 inline-flex rounded-lg border border-border bg-muted/30 p-0.5">
-          {DEPARTMENT_FILTERS.map((f) => (
-            <button
-              key={f.value}
-              type="button"
-              onClick={() => setDeptFilter(f.value)}
-              aria-pressed={deptFilter === f.value}
-              className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-                deptFilter === f.value
-                  ? "bg-background font-medium text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            {rows.length} {rows.length === 1 ? "oppskrift" : "oppskrifter"}
-          </p>
-        </div>
+          </div>
+          <ListResultSummary
+            count={rows.length}
+            noun={["oppskrift", "oppskrifter"]}
+            isLoading={data.isLoading}
+            isError={data.isError}
+            filters={activeFilters}
+            onReset={resetFilters}
+          />
+        </section>
 
         <Card className="overflow-hidden">
-          {recipesQuery.isLoading ? (
-            <div className="flex h-32 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-          ) : rows.length === 0 && (recipesQuery.data ?? []).length > 0 ? (
-            <div className="flex flex-col items-center gap-2 py-12 text-center">
-              <ChefHat className="h-8 w-8 text-muted-foreground/50" />
-              <p className="text-sm text-muted-foreground">Ingen oppskrifter passer filtrene.</p>
-              <Button variant="outline" size="sm" onClick={resetFilters}>Nullstill filtre</Button>
+          <QueryState
+            scope="varer:oppskriftsliste"
+            isLoading={data.isLoading}
+            isError={data.isError}
+            error={data.error}
+            onRetry={data.refetch}
+            isEmpty={rows.length === 0}
+            emptyIcon={ChefHat}
+            emptyTitle={data.rows.length > 0 ? "Ingen oppskrifter passer filtrene." : "Ingen oppskrifter ennå."}
+            emptyAction={activeFilters.length > 0 ? <Button variant="outline" size="sm" onClick={resetFilters}>Nullstill filtre</Button> : undefined}
+            skeletonRows={6}
+            className="m-4"
+          >
+            <div className="hidden lg:block">
+              <RecipeListTable
+                rows={pagedRows}
+                sort={{ key: state.sort, dir: state.dir }}
+                onSort={toggleSort}
+                hrefFor={hrefFor}
+                shareCounts={data.shareCounts}
+                canWrite={canWrite}
+                copyingId={copyingId}
+                onCopy={(id) => void handleCopy(id)}
+                onDelete={(id, name) => setDeleting({ id, name })}
+              />
             </div>
-          ) : rows.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-12 text-center">
-              <ChefHat className="h-8 w-8 text-muted-foreground/50" />
-              <p className="text-sm text-muted-foreground">Ingen oppskrifter ennå.</p>
-            </div>
-          ) : (
-            <>
-              <table className="hidden w-full text-sm sm:table">
-                <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
-                  <tr>
-                    <SortableTh label="Oppskrift" sortKey="name" sort={sort} onSort={toggleSort} />
-                    <SortableTh label="Kategori" sortKey="category" sort={sort} onSort={toggleSort} />
-                    <SortableTh label="Avdeling" sortKey="department" sort={sort} onSort={toggleSort} />
-                    <SortableTh label="Hydrering" sortKey="hydration" sort={sort} onSort={toggleSort} align="right" />
-                    <SortableTh label="Deigvekt" sortKey="dough" sort={sort} onSort={toggleSort} align="right" />
-                    <SortableTh label="Produkter" sortKey="products" sort={sort} onSort={toggleSort} />
-                    <SortableTh label="Status" sortKey="status" sort={sort} onSort={toggleSort} />
-                    <SortableTh label="Merking" sortKey="labeling" sort={sort} onSort={toggleSort} />
-                    <SortableTh label="Oppdatert" sortKey="updated" sort={sort} onSort={toggleSort} />
-                    <th className="w-10 px-2 py-2.5" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {pagedRows.map((r, i) => (
-                    <tr
-                      key={r.id}
-                      onClick={() => navigate(`/varer/oppskrifter/${r.id}`)}
-                      /* Zebra: annenhver rad får svak grå bakgrunn for lesbarhet */
-                      className={`cursor-pointer border-t border-border hover:bg-muted/40 ${i % 2 === 1 ? "bg-muted/20" : ""}`}
-                    >
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-2">
-                          {r.image_url && (
-                            <img
-                              src={r.image_url}
-                              alt={r.name || "Oppskrift"}
-                              className="h-8 w-8 shrink-0 rounded object-cover"
-                              loading="lazy"
-                            />
-                          )}
-                          <span className="font-medium">{r.name || "Uten navn"}</span>
-                          {shareCounts[r.id] > 0 && (
-                            <Badge variant="outline" className="gap-1 px-1.5 py-0 text-[11px] font-normal">
-                              <Link2 className="h-3 w-3" />
-                              {shareCounts[r.id]}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground">v{r.version}</div>
-                      </td>
-
-                      <td className="px-4 py-2.5">
-                        {r.category === BASE_RECIPE_CATEGORY ? (
-                          <Badge variant="outline" className="gap-1 border-app/50 text-app">
-                            <Wheat className="h-3.5 w-3.5" /> Grunnoppskrift
-                          </Badge>
-                        ) : (
-                          r.category ?? "—"
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        {(() => {
-                          const d = asDepartment(r.department);
-                          return d ? (
-                            <Badge variant="outline" className={`font-normal ${RECIPE_DEPARTMENT_BADGE[d]}`}>
-                              {RECIPE_DEPARTMENT_LABEL[d]}
-                            </Badge>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          );
-                        })()}
-                      </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{fmtPercent(r.totals.hydrationPct)}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{fmtG(r.totals.totalDoughG)} g</td>
-                      <td className="px-4 py-2.5">
-                        {r.products.length === 0 ? (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        ) : (
-                          <span className="text-xs">{r.products.slice(0, 2).join(", ")}{r.products.length > 2 ? ` +${r.products.length - 2}` : ""}</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <Badge variant="outline">{RECIPE_STATUS_LABEL[r.status ?? "draft"] ?? r.status}</Badge>
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <Badge
-                          variant="outline"
-                          className={
-                            r.labeling === "approved"
-                              ? "border-emerald-500/50 text-emerald-700"
-                              : r.labeling === "stale"
-                                ? "border-amber-500/60 text-amber-700"
-                                : "border-destructive/50 text-destructive"
-                          }
-                        >
-                          {LABELING_STATUS_LABEL[r.labeling]}
-                        </Badge>
-                      </td>
-
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                        {r.updated_at ? format(new Date(r.updated_at), "EEE d. MMM yyyy, HH:mm", { locale: nb }) : "—"}
-                      </td>
-                      <td className="px-2 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
-                        {canWrite && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Handlinger">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem disabled={copyingId === r.id} onSelect={() => void handleCopy(r.id)}>
-                                {copyingId === r.id ? (
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Copy className="mr-2 h-4 w-4" />
-                                )}
-                                Lag kopi
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive focus:text-destructive"
-                                onSelect={() => {
-                                  setDeleteConfirm("");
-                                  setDeleting({ id: r.id, name: r.name?.trim() || "Uten navn" });
-                                }}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Slett
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              <div className="divide-y divide-border sm:hidden">
+            <div className="lg:hidden">
+              <MobileSort sort={state.sort} dir={state.dir} onChange={(sort, dir) => update({ sort, dir })} />
+              <div className="divide-y divide-border">
                 {pagedRows.map((r) => (
                   <RecipeListCard
                     key={r.id}
                     recipe={r}
-                    shareCount={shareCounts[r.id] ?? 0}
+                    href={hrefFor(r.id)}
+                    shareCount={data.shareCounts[r.id] ?? 0}
                     canWrite={canWrite}
                     copyingId={copyingId}
-                    onOpen={() => navigate(`/varer/oppskrifter/${r.id}`)}
                     onCopy={() => void handleCopy(r.id)}
-                    onDelete={() => {
-                      setDeleteConfirm("");
-                      setDeleting({ id: r.id, name: r.name?.trim() || "Uten navn" });
-                    }}
+                    onDelete={() => setDeleting({ id: r.id, name: r.name?.trim() || "Uten navn" })}
                   />
                 ))}
               </div>
+            </div>
 
-              <div className="flex items-center justify-between gap-2 border-t border-border px-4 py-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                >
-                  <ChevronLeft className="mr-1 h-4 w-4" /> Forrige
-                </Button>
-                <span className="text-sm text-muted-foreground">Side {page} av {totalPages}</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
-                >
-                  Neste <ChevronRight className="ml-1 h-4 w-4" />
-                </Button>
-              </div>
-            </>
-          )}
+            <nav aria-label="Sidevalg" className="flex items-center justify-between gap-2 border-t border-border px-4 py-3">
+              <Button variant="outline" size="sm" onClick={() => update({ page: Math.max(1, page - 1) })} disabled={page <= 1}>
+                <ChevronLeft className="mr-1 h-4 w-4" /> Forrige
+              </Button>
+              <span className="text-sm text-muted-foreground">Side {page} av {totalPages}</span>
+              <Button variant="outline" size="sm" onClick={() => update({ page: Math.min(totalPages, page + 1) })} disabled={page >= totalPages}>
+                Neste <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+            </nav>
+          </QueryState>
         </Card>
       </div>
 
-      <AlertDialog
-        open={!!deleting}
-        onOpenChange={(o) => {
-          if (!o && !deleteBusy) {
-            setDeleting(null);
-            setDeleteConfirm("");
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Slett «{deleting?.name}»?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Oppskriften og linjene slettes permanent. Dette kan ikke angres. Skriv «slett» for å bekrefte.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="delete-confirm">Bekreftelse</Label>
-            <Input
-              id="delete-confirm"
-              value={deleteConfirm}
-              onChange={(e) => setDeleteConfirm(e.target.value)}
-              placeholder="slett"
-              autoComplete="off"
-            />
-          </div>
-          <AlertDialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setDeleting(null);
-                setDeleteConfirm("");
-              }}
-              disabled={deleteBusy}
-            >
-              Avbryt
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => void handleDelete()}
-              disabled={deleteBusy || deleteConfirm.trim().toLowerCase() !== "slett"}
-            >
-              {deleteBusy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Slett
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteRecipeDialog target={deleting} onClose={() => setDeleting(null)} />
     </>
   );
 }
 
-/** Klikkbar kolonneoverskrift med sorteringsindikator. */
-function SortableTh({
-  label, sortKey, sort, onSort, align = "left",
+function FilterSelect({
+  id, label, value, onChange, children,
 }: {
+  id: string;
   label: string;
-  sortKey: SortKey;
-  sort: { key: SortKey; dir: "asc" | "desc" };
-  onSort: (key: SortKey) => void;
-  align?: "left" | "right";
+  value: string;
+  onChange: (v: string) => void;
+  children: ReactNode;
 }) {
-  const active = sort.key === sortKey;
-  const Icon = !active ? ChevronsUpDown : sort.dir === "asc" ? ArrowUp : ArrowDown;
   return (
-    <th className={`px-4 py-2.5 ${align === "right" ? "text-right" : "text-left"}`} aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
-      <button
-        type="button"
-        onClick={() => onSort(sortKey)}
-        className={`inline-flex items-center gap-1 uppercase transition-colors hover:text-foreground ${active ? "text-foreground" : ""} ${align === "right" ? "flex-row-reverse" : ""}`}
-      >
-        {label}
-        <Icon className={`h-3 w-3 ${active ? "" : "opacity-40"}`} />
-      </button>
-    </th>
+    <div>
+      <Label htmlFor={id} className="text-caption text-muted-foreground">{label}</Label>
+      <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className={`mt-1 ${SELECT_CLS}`}>
+        {children}
+      </select>
+    </div>
+  );
+}
+
+const SORT_LABEL: Record<RecipeSortKey, string> = {
+  name: "Navn", category: "Kategori", department: "Avdeling", hydration: "Hydrering", dough: "Deigvekt",
+  products: "Antall produkter", status: "Status", labeling: "Merking", updated: "Oppdatert",
+};
+
+/** Sortering på smal skjerm, der tabelloverskriftene ikke vises. */
+function MobileSort({
+  sort, dir, onChange,
+}: {
+  sort: RecipeSortKey;
+  dir: "asc" | "desc";
+  onChange: (sort: RecipeSortKey, dir: "asc" | "desc") => void;
+}) {
+  return (
+    <div className="flex items-end gap-2 border-b border-border px-4 py-3">
+      <div className="flex-1">
+        <Label htmlFor="recipe-sort" className="text-caption text-muted-foreground">Sorter etter</Label>
+        <select id="recipe-sort" value={sort} onChange={(e) => onChange(e.target.value as RecipeSortKey, dir)} className={`mt-1 ${SELECT_CLS}`}>
+          {(Object.keys(SORT_LABEL) as RecipeSortKey[]).map((k) => <option key={k} value={k}>{SORT_LABEL[k]}</option>)}
+        </select>
+      </div>
+      <Button variant="outline" size="sm" className="h-10" onClick={() => onChange(sort, dir === "asc" ? "desc" : "asc")}>
+        {dir === "asc" ? "Stigende" : "Synkende"}
+      </Button>
+    </div>
   );
 }

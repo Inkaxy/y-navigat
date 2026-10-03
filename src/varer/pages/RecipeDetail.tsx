@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { listReturnHref, RETURN_PARAM } from "@/varer/lib/listReturn";
+import { focusRecipeLine } from "@/varer/lib/recipeWarningGroups";
+import { RecipeSection, RecipeSectionNav, StickySaveBar, useAnchorRef } from "@/varer/components/recipes/editor/RecipeSections";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -204,6 +207,16 @@ export default function RecipeDetail() {
   /** Grunnoppskrift: KATEGORIEN er sannheten. Råvare-koblingen er kun opplysning,
    *  ellers ville bryteren sprette på igjen så lenge en råvare finnes. */
   const isBaseRecipe = (header.category ?? "") === BASE_RECIPE_CATEGORY;
+  /** Tilbake til samme listevalg; kun oppskriftslisten er et gyldig mål. */
+  const backHref = listReturnHref("recipes", searchParams.get(RETURN_PARAM));
+  const [warningsOpen, setWarningsOpen] = useState(false);
+  const [scaleOpen, setScaleOpen] = useState(false);
+  const saveAnchorRef = useAnchorRef<HTMLDivElement>();
+  /** Åpner advarselsdetaljene og ruller dit. */
+  const showWarningDetails = useCallback(() => {
+    setWarningsOpen(true);
+    requestAnimationFrame(() => document.getElementById("oppskrift-advarsler")?.scrollIntoView({ block: "start", behavior: "smooth" }));
+  }, []);
 
 
 
@@ -848,7 +861,7 @@ export default function RecipeDetail() {
     return (
       <div className="px-6 py-10 text-center text-sm text-muted-foreground">
         Fant ikke oppskriften.{" "}
-        <button className="underline" onClick={() => navigate("/varer/oppskrifter")}>Tilbake til listen</button>
+        <Link className="underline" to={backHref}>Tilbake til alle oppskrifter</Link>
       </div>
     );
   }
@@ -858,13 +871,10 @@ export default function RecipeDetail() {
       <div className="space-y-4 px-6 py-5 pb-24">
         {/* Én kompakt oppskriftsheader: navn, versjon, oppskriftsstatus og handlinger. */}
         <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line-subtle pb-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Tilbake til alle oppskrifter"
-            onClick={() => navigate("/varer/oppskrifter")}
-          >
-            <ArrowLeft className="h-4 w-4" />
+          <Button variant="ghost" size="icon" aria-label="Tilbake til alle oppskrifter" asChild>
+            <Link to={backHref} state={{ focusId: recipe.id }}>
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
           </Button>
           {titleEditing && editable ? (
             <Input
@@ -946,10 +956,12 @@ export default function RecipeDetail() {
             </DropdownMenuContent>
           </DropdownMenu>
           {canWrite && (
+            <div ref={saveAnchorRef}>
             <Button onClick={save} disabled={saving || !dirty || isScaled}>
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Lagre oppskrift
             </Button>
+            </div>
           )}
         </header>
 
@@ -973,30 +985,6 @@ export default function RecipeDetail() {
           </TabsContent>
 
           <TabsContent value="oppskrift" className="space-y-4">
-        <ScalePanel
-          mode={scaleMode}
-          onModeChange={(m) => {
-            setScaleMode(m);
-            setScaleInput(m === "units" ? String(baseUnits) : m === "batches" ? "60" : String(Math.round(totals.totalDoughG)));
-          }}
-          target={scaleInput}
-          onTargetChange={setScaleInput}
-          rounding={rounding}
-          onRoundingChange={setRounding}
-          waste={scaleWaste}
-          onWasteChange={setScaleWaste}
-          result={scaleResult}
-          baseUnits={baseUnits}
-          isScaled={isScaled}
-          onReset={() => {
-            setScaleMode("units");
-            setScaleInput(String(baseUnits));
-            setScaleWaste("");
-          }}
-          onSaveAsNew={canWrite ? handleSaveScaledAsNew : undefined}
-          savingAsNew={copying}
-        />
-
         {isScaled && (
           <div className="flex items-center gap-2 rounded-md border border-app/40 bg-app/[0.06] px-3 py-2 text-sm">
             <Lock className="h-4 w-4 shrink-0 text-app" />
@@ -1038,9 +1026,8 @@ export default function RecipeDetail() {
           />
         )}
 
-        <RecipeWarningsBanner warnings={warnings.warnings} />
-
         <RecipeStatsBar
+          onShowDetails={warnings.warnings.length > 0 ? showWarningDetails : undefined}
           totals={displayTotals}
           cost={isScaled ? undefined : cost}
           margin={marginPct != null ? { marginPct, targetPct: marginTargetPct } : undefined}
@@ -1048,6 +1035,92 @@ export default function RecipeDetail() {
         />
 
 
+        <RecipeWarningsBanner
+          warnings={warnings.warnings}
+          open={warningsOpen}
+          onOpenChange={setWarningsOpen}
+          onFocusLine={(lineId) => { focusRecipeLine(lineId); }}
+        />
+
+        <RecipeSectionNav />
+
+        <details
+          className="rounded-md border border-border bg-card"
+          open={scaleOpen || isScaled}
+          onToggle={(e) => setScaleOpen(e.currentTarget.open)}
+        >
+          <summary className="cursor-pointer select-none px-4 py-2.5 text-sm font-medium">
+            Skalering {isScaled ? "— skalert utgave vises" : "— viser basisoppskriften"}
+          </summary>
+          <div className="border-t border-border p-2">
+        <ScalePanel
+          mode={scaleMode}
+          onModeChange={(m) => {
+            setScaleMode(m);
+            setScaleInput(m === "units" ? String(baseUnits) : m === "batches" ? "60" : String(Math.round(totals.totalDoughG)));
+          }}
+          target={scaleInput}
+          onTargetChange={setScaleInput}
+          rounding={rounding}
+          onRoundingChange={setRounding}
+          waste={scaleWaste}
+          onWasteChange={setScaleWaste}
+          result={scaleResult}
+          baseUnits={baseUnits}
+          isScaled={isScaled}
+          onReset={() => {
+            setScaleMode("units");
+            setScaleInput(String(baseUnits));
+            setScaleWaste("");
+          }}
+          onSaveAsNew={canWrite ? handleSaveScaledAsNew : undefined}
+          savingAsNew={copying}
+        />
+
+          </div>
+        </details>
+
+        <RecipeSection id="seksjon-ingredienser" title="Ingredienser">
+        <div className="space-y-3">
+          {parts.map((p, i) => (
+            <RecipePartCard
+              key={p.id}
+              part={p}
+              lines={displayLines.filter((l) => l.recipe_part_id === p.id)}
+              canWrite={editable}
+              totalFlourG={isScaled ? displayTotals.totalFlourG : totals.totalFlourG}
+              rmMap={rmMap}
+              currentRecipeId={recipe.id}
+              isFirst={i === 0}
+              isLast={i === parts.length - 1}
+              onUpdate={(patch) => updatePart(p.id, patch)}
+              onRemove={() => setPartToDelete(p)}
+              onDuplicate={() => duplicatePart(p.id)}
+              onMove={(dir) => movePart(p.id, dir)}
+              onAddLine={() => addLine(p.id)}
+              onUpdateLine={updateLine}
+              onRemoveLine={removeLine}
+              onReorderLines={reorderLines}
+              entryMode={entryModeFor(entryModes, p.id)}
+              onEntryModeChange={(mode) => editor.setEntryMode(p.id, mode)}
+              warningsByLine={warnings.byLine}
+            />
+          ))}
+          {editable && (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => addPart("dough")}>
+                <Plus className="mr-1 h-3.5 w-3.5" /> Legg til del
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => addPart("preferment")}>
+                <Plus className="mr-1 h-3.5 w-3.5" /> Legg til fordeig
+              </Button>
+            </div>
+          )}
+        </div>
+
+        </RecipeSection>
+
+        <RecipeSection id="seksjon-info" title="Oppskriftsinfo og vekt">
         <Card>
           <CardHeader className="pb-3"><CardTitle className="text-base">Oppskriftsinfo</CardTitle></CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -1234,6 +1307,9 @@ export default function RecipeDetail() {
           </CardContent>
         </Card>
 
+        </RecipeSection>
+
+        <RecipeSection id="seksjon-prosess" title="Prosess">
         <DoughTempPanel
           roomTemp={roomTemp}
           flourTemp={flourTemp}
@@ -1257,43 +1333,6 @@ export default function RecipeDetail() {
           onChange={patchHeader}
         />
 
-        <div className="space-y-3">
-          {parts.map((p, i) => (
-            <RecipePartCard
-              key={p.id}
-              part={p}
-              lines={displayLines.filter((l) => l.recipe_part_id === p.id)}
-              canWrite={editable}
-              totalFlourG={isScaled ? displayTotals.totalFlourG : totals.totalFlourG}
-              rmMap={rmMap}
-              currentRecipeId={recipe.id}
-              isFirst={i === 0}
-              isLast={i === parts.length - 1}
-              onUpdate={(patch) => updatePart(p.id, patch)}
-              onRemove={() => setPartToDelete(p)}
-              onDuplicate={() => duplicatePart(p.id)}
-              onMove={(dir) => movePart(p.id, dir)}
-              onAddLine={() => addLine(p.id)}
-              onUpdateLine={updateLine}
-              onRemoveLine={removeLine}
-              onReorderLines={reorderLines}
-              entryMode={entryModeFor(entryModes, p.id)}
-              onEntryModeChange={(mode) => editor.setEntryMode(p.id, mode)}
-              warningsByLine={warnings.byLine}
-            />
-          ))}
-          {editable && (
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => addPart("dough")}>
-                <Plus className="mr-1 h-3.5 w-3.5" /> Legg til del
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => addPart("preferment")}>
-                <Plus className="mr-1 h-3.5 w-3.5" /> Legg til fordeig
-              </Button>
-            </div>
-          )}
-        </div>
-
         <StepTimeline
           steps={steps}
           header={{
@@ -1310,8 +1349,9 @@ export default function RecipeDetail() {
         />
 
 
-        <RecipeProductLinks recipeId={recipe.id} currentProductId={recipe.product_id ?? undefined} canWrite={canWrite} />
+        </RecipeSection>
 
+        <RecipeSection id="seksjon-notater" title="Notater og ferdiggjøring">
         <Card>
           <CardHeader className="pb-3"><CardTitle className="text-base">Dekor / ferdiggjøring</CardTitle></CardHeader>
           <CardContent>
@@ -1333,6 +1373,15 @@ export default function RecipeDetail() {
           </CardContent>
         </Card>
 
+        </RecipeSection>
+
+        <RecipeSection id="seksjon-koblinger" title="Koblede varer og historikk">
+        <RecipeProductLinks recipeId={recipe.id} currentProductId={recipe.product_id ?? undefined} canWrite={canWrite} />
+
+        <details className="group rounded-md border border-border bg-card">
+          <summary className="cursor-pointer select-none px-4 py-2.5 text-sm font-medium">
+            Versjonshistorikk{versionsQuery.data ? ` (${versionsQuery.data.length})` : ""}
+          </summary>
         <Card>
           <CardHeader className="pb-3"><CardTitle className="text-base">Versjonshistorikk</CardTitle></CardHeader>
           <CardContent className="space-y-2">
@@ -1373,6 +1422,8 @@ export default function RecipeDetail() {
             ))}
           </CardContent>
         </Card>
+        </details>
+        </RecipeSection>
           </TabsContent>
         </Tabs>
       </div>
@@ -1496,6 +1547,14 @@ export default function RecipeDetail() {
         recipeId={recipe.id}
         recipeName={header.name || recipe.name || "Oppskrift"}
         canWrite={canWrite}
+      />
+
+      <StickySaveBar
+        anchorRef={saveAnchorRef}
+        visible={canWrite && dirty && activeTab === "oppskrift"}
+        saving={saving}
+        disabled={isScaled}
+        onSave={() => void save()}
       />
 
       <UnsavedChangesDialog
