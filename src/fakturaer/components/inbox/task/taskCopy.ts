@@ -21,7 +21,7 @@ const COPY: Record<LineStatus["key"], { missing: string; primary: string }> = {
   confirm_material: { missing: "Råvaren er bare foreslått. Bekreft eller velg en annen.", primary: "Bekreft råvare og fortsett" },
   confirm_package: { missing: "Råvaren er kjent, men pakningen må bekreftes før mengden kan regnes om.", primary: "Bekreft pakning og fortsett" },
   recalculate: { missing: "Linjen er endret, men prisen er ikke regnet om ennå.", primary: "Beregn prisen på nytt" },
-  review_price: { missing: "Prisen avviker fra sammenligningsprisen, eller sammenligningspris mangler.", primary: "Gå til neste linje" },
+  review_price: { missing: "Prisen avviker. Er den riktig, godta den.", primary: "Prisen er riktig" },
   start_price: { missing: "Første bekreftede kjøpspris kan lagres som startpris.", primary: "Bekreft startpris" },
   check_line: { missing: "Linjen står til kontroll uten en årsak vi kjenner igjen. Kontroller den mot originalfakturaen.", primary: "Gå til neste linje" },
   ready: { missing: "Linjen er avklart.", primary: "Gå til neste linje" },

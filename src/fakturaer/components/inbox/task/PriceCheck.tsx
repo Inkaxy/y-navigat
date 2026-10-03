@@ -54,7 +54,7 @@ export function PriceCheck({ line, link, tolerancePct }: { line: ReviewLineRow; 
           {fmtNum(variance, 1)} % · toleranse {fmtNum(tolerancePct, 1)} %
         </p>
       )}
-      {reasons.length > 0 && <p className="text-caption text-warning">Må avklares: {reasons.join(" · ")}</p>}
+      {reasons.length > 0 && variance == null && <p className="text-caption text-warning">Må avklares: {reasons.join(" · ")}</p>}
       <button type="button" className="text-caption text-ink-secondary underline underline-offset-2" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
         Prisdetaljer
       </button>

@@ -225,14 +225,20 @@ export function LineTask(p: LineTaskProps) {
         )}
         {(mode === "price" || mode === "done") && <PriceCheck line={line} link={link} tolerancePct={p.tolerancePct} />}
         {mode === "price" && p.canWrite && !agreedOpen && (
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={() => setEditMaterial(true)}>
+          <p className="flex flex-wrap gap-x-3 gap-y-1 text-caption text-ink-secondary">
+            <span>Stemmer ikke prisen?</span>
+            {priceAcceptable && (
+              <button type="button" className="text-primary underline underline-offset-2" disabled={!form.selectedRmId} onClick={() => setEditPackage(true)}>
+                Kontroller pakningen
+              </button>
+            )}
+            <button type="button" className="text-primary underline underline-offset-2" onClick={() => setEditMaterial(true)}>
               Endre råvare
-            </Button>
-            <Button size="sm" variant="outline" disabled={!form.selectedRmId} onClick={() => setAgreedOpen(true)}>
+            </button>
+            <button type="button" className="text-primary underline underline-offset-2" disabled={!form.selectedRmId} onClick={() => setAgreedOpen(true)}>
               Rett avtalepris
-            </Button>
-          </div>
+            </button>
+          </p>
         )}
         {agreedOpen && (
           <div className="space-y-1">
@@ -245,7 +251,7 @@ export function LineTask(p: LineTaskProps) {
               onChange={(e) => form.setAgreedPrice(e.target.value)}
             />
             <p className="text-caption text-ink-secondary">
-              Lagres som avtalepris for {rmName ?? "råvaren"} hos {supplier} og gjelder også senere fakturaer. Linjen regnes om mot den — avviket godkjennes ikke automatisk.
+              Gjelder også senere fakturaer fra {supplier}. Linjen regnes om etterpå.
             </p>
             <Button size="sm" variant="outline" disabled={form.busy || !form.selectedRmId} onClick={() => void save(false)}>
               Lagre avtalepris og beregn på nytt
@@ -324,8 +330,8 @@ export function LineTask(p: LineTaskProps) {
               Hopp over
             </Button>
           )}
-          <Button size="sm" disabled={!primary.run || form.busy} aria-describedby={`hint-${line.id}`} onClick={() => primary.run?.()}>
-            {form.busy && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+          <Button size="sm" disabled={!primary.run || form.busy || acceptBusy} aria-describedby={`hint-${line.id}`} onClick={() => primary.run?.()}>
+            {(form.busy || acceptBusy) && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
             {primary.label}
           </Button>
         </div>
