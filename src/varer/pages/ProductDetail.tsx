@@ -103,6 +103,13 @@ export default function ProductDetail() {
   const rawTab = params.get("tab") ?? "navn";
   // Gamle lenker til «Kalkyle» og «Priser» peker til den sammenslåtte fanen.
   const tab = rawTab === "kalkyle" || rawTab === "priser" ? "kalkyle_pris" : rawTab;
+  /** Bytter fane uten å miste returkonteksten til listen (`?fra=`). */
+  const setTab = (next: string) =>
+    setParams((prev) => {
+      const sp = new URLSearchParams(prev);
+      sp.set("tab", next);
+      return sp;
+    });
   const [saving, setSaving] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
   const [keywords, setKeywords] = useState<string[]>([]);
@@ -392,7 +399,7 @@ export default function ProductDetail() {
       (errors) => {
         const firstField = Object.keys(errors)[0];
         const firstTab = firstField ? FIELD_TO_TAB[firstField as keyof ProductFormValues] : null;
-        if (firstTab) setParams({ tab: firstTab });
+        if (firstTab) setTab(firstTab);
         toast.error("Det er valideringsfeil. Sjekk markerte tabs.");
       },
     )();
@@ -464,7 +471,7 @@ export default function ProductDetail() {
         }}
         tabs={visibleTabs}
         activeTab={tab}
-        onTabChange={(id) => setParams({ tab: id })}
+        onTabChange={setTab}
         dirtyTabs={dirtyTabs}
         errorTabs={errorTabs}
         isDirty={isDirty}

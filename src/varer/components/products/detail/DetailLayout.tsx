@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { listReturnHref, RETURN_PARAM } from "@/varer/lib/listReturn";
 import { ArrowLeft, Ban, Check, Loader2, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,17 +48,15 @@ export function DetailLayout({
   onActivate,
   children,
 }: DetailLayoutProps) {
-  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const backHref = listReturnHref("products", params.get(RETURN_PARAM));
 
   return (
     <div className="px-4 sm:px-6 py-6">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => navigate("/varer/vareliste")}
-        className="mb-3 -ml-2"
-      >
-        <ArrowLeft className="mr-1 h-4 w-4" /> Tilbake til vareliste
+      <Button variant="ghost" size="sm" className="mb-3 -ml-2" asChild>
+        <Link to={backHref} state={{ focusId: product.id }}>
+          <ArrowLeft className="mr-1 h-4 w-4" aria-hidden="true" /> Tilbake til alle varer
+        </Link>
       </Button>
 
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
