@@ -1,18 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Inbox, Search } from "lucide-react";
+import { Inbox } from "lucide-react";
 import { toast } from "sonner";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaging";
 import { useAuth } from "@/hooks/useAuth";
-import { cn } from "@/lib/utils";
 import { QueryErrorState, QueryState } from "@/components/common/QueryState";
 import { PageHeader } from "@/ordre/components/shell/PageHeader";
-import { normalizeAiSuggestion, REQUEST_TYPE_LABEL, type RequestType } from "@/ordre/lib/aiSuggestion";
-import { TEAMS, TEAM_LABEL, type TicketTeam } from "@/ordre/lib/teams";
+import { normalizeAiSuggestion } from "@/ordre/lib/aiSuggestion";
+import { TEAMS, type TicketTeam } from "@/ordre/lib/teams";
 import { useSlaBreachNotifications } from "@/ordre/hooks/useSlaBreachNotifications";
 import { useSlaSettings } from "@/ordre/hooks/useSlaSettings";
 import {
@@ -23,7 +21,6 @@ import {
 import { computeDeadline, formatCountdown } from "@/ordre/lib/sla";
 import { useUserNames } from "@/ordre/hooks/useUserNames";
 import { useUserAccess } from "@/ordre/hooks/useUserAccess";
-import { TICKET_PRIORITIES, TICKET_PRIORITY_LABEL } from "@/ordre/lib/ticketFormat";
 import type { TicketPriority } from "@/ordre/hooks/useTickets";
 import {
   countQueues,
@@ -40,6 +37,15 @@ import TicketPeekPanel, {
   type TicketPeekHandle,
 } from "@/ordre/components/tickets/TicketPeekPanel";
 import ShortcutHelp from "@/ordre/components/tickets/ShortcutHelp";
+import {
+  INTENT_QUEUES,
+  InboxQueueNav,
+  InboxQueueSelect,
+  queueLabel,
+} from "@/ordre/components/tickets/InboxQueueNav";
+import InboxFilterBar, { parsePriorityParam } from "@/ordre/components/tickets/InboxFilterBar";
+import { isTerminalTicket, pruneSelection } from "@/ordre/lib/ticketRowState";
+import { sanitizeInboxSearch, ticketHref } from "@/ordre/lib/ticketReturn";
 
 type TicketRow = {
   id: string;
@@ -58,19 +64,11 @@ type TicketRow = {
   related_order_id: string | null;
   ai_confidence_score: number | null;
   ai_suggestion: unknown;
-  orders?: { order_number: string | null } | null;
+  orders?: { order_number: string | null; status: string | null } | null;
 };
 
-const INTENT_QUEUES: { key: RequestType; label: string }[] = [
-  { key: "new_order", label: REQUEST_TYPE_LABEL.new_order },
-  { key: "change", label: REQUEST_TYPE_LABEL.change },
-  { key: "cancellation", label: REQUEST_TYPE_LABEL.cancellation },
-  { key: "complaint", label: REQUEST_TYPE_LABEL.complaint },
-  { key: "question", label: REQUEST_TYPE_LABEL.question },
-];
-
 const TICKET_SELECT =
-  "id, subject, body_preview, sender_name, sender_email, received_at, updated_at, status, priority, assigned_to, assigned_team, awaiting_internal, has_attachments, related_order_id, ai_confidence_score, ai_suggestion, orders:related_order_id(order_number)";
+  "id, subject, body_preview, sender_name, sender_email, received_at, updated_at, status, priority, assigned_to, assigned_team, awaiting_internal, has_attachments, related_order_id, ai_confidence_score, ai_suggestion, orders:related_order_id(order_number, status)";
 
 /** Antall lukkede/søppel-saker vi laster ned — resten telles med head-count. */
 const ARCHIVE_PAGE = 200;
@@ -144,57 +142,6 @@ function useIsDesktop() {
   return isDesktop;
 }
 
-function QueueButton({
-  active,
-  onClick,
-  label,
-  description,
-  count,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  description?: string;
-  count: number;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-current={active ? "true" : undefined}
-      className={cn(
-        "flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        active
-          ? "bg-primary/10 font-semibold text-foreground"
-          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-      )}
-    >
-      <span className="min-w-0">
-        <span className="block truncate text-sm">{label}</span>
-        {description && (
-          <span className="block truncate text-caption text-muted-foreground">{description}</span>
-        )}
-      </span>
-      <span
-        className={cn(
-          "shrink-0 rounded-full px-2 py-0.5 text-caption font-semibold tabular-nums",
-          active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
-        )}
-      >
-        {count}
-      </span>
-    </button>
-  );
-}
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mb-1 mt-4 px-3 text-caption font-semibold uppercase tracking-widest text-muted-foreground">
-      {children}
-    </div>
-  );
-}
-
 /** Over frist først, deretter tidligste frist, til slutt eldste e-post. */
 function sortByDeadline(a: InboxRow, b: InboxRow) {
   if (a.overdue && !b.overdue) return -1;
@@ -209,7 +156,6 @@ export default function TicketsInbox() {
   const { user } = useAuth();
   const { data: access } = useUserAccess(user);
   const canWrite = access?.hasOrdreWrite ?? false;
-  const navigate = useNavigate();
   const qc = useQueryClient();
   const isDesktop = useIsDesktop();
   const { data: tickets = [], isLoading, isError, error, refetch } = useInboxTickets();
@@ -223,7 +169,18 @@ export default function TicketsInbox() {
   });
   const selectedId = searchParams.get("t");
   const search = searchParams.get("q") ?? "";
-  const priority = (searchParams.get("prio") as TicketPriority | null) ?? "all";
+  const priority = parsePriorityParam(searchParams.get("prio"));
+  const location = useLocation();
+  /** Innboks-adresse med en bestemt sak valgt — brukes som returmål. */
+  const inboxHrefFor = useCallback(
+    (ticketId: string | null) => {
+      const params = new URLSearchParams(location.search);
+      if (ticketId) params.set("t", ticketId);
+      else params.delete("t");
+      return `/ordre/ticket${sanitizeInboxSearch(params)}`;
+    },
+    [location.search],
+  );
 
   const patchParams = useCallback(
     (patch: Record<string, string | null>) => {
@@ -275,7 +232,9 @@ export default function TicketsInbox() {
       return tickets.map((t) => {
         const ai = normalizeAiSuggestion(t.ai_suggestion);
         const intent = ai?.request_type ?? null;
-        const deadline = sla
+        // Avsluttede saker har ingen aktiv frist — historikken ligger i saken.
+        const terminal = isTerminalTicket(t.status);
+        const deadline = sla && !terminal
           ? computeDeadline(t.received_at, intent, sla.sla, sla.bh)
           : null;
         const cd = deadline ? formatCountdown(deadline, now) : null;
@@ -298,7 +257,7 @@ export default function TicketsInbox() {
   useSlaBreachNotifications(rows, user?.id ?? null, selectedId);
 
   // Lukket/søppel lastes bare delvis ned — hent eksakt antall fra serveren.
-  const { data: archiveCounts } = useQuery({
+  const { data: archiveCounts, isLoading: archiveLoading } = useQuery({
     queryKey: ["tickets", "archive-counts"],
     queryFn: async () => {
       const [closed, spam] = await Promise.all([
@@ -346,14 +305,33 @@ export default function TicketsInbox() {
       : [...out].sort(sortByDeadline);
   }, [rows, queue, user?.id, search, priority]);
 
+  const countsLoading = isLoading || isError;
+
+  // Valg gjelder bare synlige saker: bytte av kø/filter fjerner skjulte valg,
+  // så en massehandling aldri treffer saker brukeren ikke ser.
+  useEffect(() => {
+    setSelection((prev) => pruneSelection(prev, filtered.map((r) => r.id)));
+  }, [filtered]);
+
+  // Ved retur fra full sak: rull til og fokuser saken man kom fra.
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    if (restoredRef.current || isLoading || !selectedId) return;
+    restoredRef.current = true;
+    const link = listRef.current?.querySelector<HTMLElement>(`[data-ticket-link="${selectedId}"]`);
+    if (!link) return;
+    link.scrollIntoView({ block: "center" });
+    link.focus({ preventScroll: true });
+  }, [isLoading, selectedId, filtered]);
+
+  /** Desktop: peek i høyre panel. Smalere: lenken navigerer til full sak. */
   const openTicket = useCallback(
-    (id: string) => {
-      // Desktop: peek i høyre panel (kø, søk og scroll beholdes).
-      // Mindre skjermer: full rute, med innboks-URL-en i history for tilbake.
-      if (isDesktop) patchParams({ t: id });
-      else navigate(`/ordre/ticket/${id}`);
+    (id: string): boolean => {
+      if (!isDesktop) return false;
+      patchParams({ t: id });
+      return true;
     },
-    [isDesktop, navigate, patchParams],
+    [isDesktop, patchParams],
   );
 
   const invalidate = useCallback(() => {
@@ -398,7 +376,8 @@ export default function TicketsInbox() {
       onResolve: () => selectedId && void bulk("resolve", [selectedId]),
       onLinkOrder: () => {
         const el = document.querySelector<HTMLInputElement>("[data-order-link-search]");
-        el?.focus();
+        if (el) el.focus();
+        else document.querySelector<HTMLButtonElement>("[data-order-link-trigger]")?.click();
       },
       onHelp: () => setHelpOpen(true),
     },
@@ -438,116 +417,29 @@ export default function TicketsInbox() {
       )}
 
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[240px_minmax(340px,1fr)] xl:grid-cols-[240px_minmax(360px,0.9fr)_minmax(420px,1.1fr)]">
-        {/* Venstre: arbeidskøer */}
-        <nav
-          aria-label="Arbeidskøer"
-          className="min-h-0 overflow-y-auto rounded-[10px] border border-border bg-card p-2"
-        >
-          <SectionLabel>Arbeidskøer</SectionLabel>
-          {PRIMARY_QUEUES.map((q) => (
-            <QueueButton
-              key={q.key}
-              active={queue === q.key}
-              onClick={() => setQueue(q.key)}
-              label={q.label}
-              description={q.description}
-              count={counts[q.key] ?? 0}
-            />
-          ))}
-
-          <SectionLabel>Alle saker</SectionLabel>
-          <QueueButton
-            active={queue === "new"}
-            onClick={() => setQueue("new")}
-            label="Nye"
-            count={counts.new ?? 0}
-          />
-          <QueueButton
-            active={queue === "all_open"}
-            onClick={() => setQueue("all_open")}
-            label="Alle åpne"
-            count={counts.all_open ?? 0}
-          />
-          <QueueButton
-            active={queue === "resolved"}
-            onClick={() => setQueue("resolved")}
-            label="Løste"
-            count={counts.resolved ?? 0}
-          />
-          <QueueButton
-            active={queue === "closed"}
-            onClick={() => setQueue("closed")}
-            label="Lukket"
-            count={counts.closed ?? 0}
-          />
-          <QueueButton
-            active={queue === "spam"}
-            onClick={() => setQueue("spam")}
-            label="Søppel"
-            count={counts.spam ?? 0}
-          />
-
-          <SectionLabel>Type henvendelse</SectionLabel>
-          {INTENT_QUEUES.map((q) => (
-            <QueueButton
-              key={q.key}
-              active={queue === `intent:${q.key}`}
-              onClick={() => setQueue(`intent:${q.key}`)}
-              label={q.label}
-              count={counts[`intent:${q.key}`] ?? 0}
-            />
-          ))}
-
-          <SectionLabel>Team</SectionLabel>
-          {TEAMS.map((team) => (
-            <QueueButton
-              key={team}
-              active={queue === `team:${team}`}
-              onClick={() => setQueue(`team:${team}`)}
-              label={TEAM_LABEL[team]}
-              count={counts[`team:${team}`] ?? 0}
-            />
-          ))}
-        </nav>
+        <InboxQueueNav queue={queue} counts={counts} loading={countsLoading} onSelect={setQueue} />
 
         {/* Midten: arbeidslisten */}
         <section
           aria-label="Henvendelser"
           className="flex min-h-0 flex-col rounded-[10px] border border-border bg-card"
         >
-          <div className="flex flex-wrap items-center gap-2 border-b border-border p-2">
-            <div className="relative min-w-0 flex-1">
-              <Search
-                className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
-                aria-hidden="true"
-              />
-              <Input
-                value={search}
-                onChange={(e) => patchParams({ q: e.target.value })}
-                placeholder="Søk i kunde, emne eller ordrenummer …"
-                aria-label="Søk i henvendelser"
-                className="h-9 bg-background pl-8"
-              />
-            </div>
-            <select
-              value={priority}
-              onChange={(e) => patchParams({ prio: e.target.value === "all" ? null : e.target.value })}
-              aria-label="Filtrer på prioritet"
-              className="h-9 rounded-[10px] border border-border bg-background px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <option value="all">Alle prioriteter</option>
-              {TICKET_PRIORITIES.map((p) => (
-                <option key={p} value={p}>
-                  {TICKET_PRIORITY_LABEL[p]}
-                </option>
-              ))}
-            </select>
+          <div className="border-b border-border p-2 lg:hidden">
+            <InboxQueueSelect queue={queue} counts={counts} loading={countsLoading} onSelect={setQueue} />
           </div>
+          <InboxFilterBar
+            search={search}
+            priority={priority}
+            onSearch={(v) => patchParams({ q: v })}
+            onPriority={(v) => patchParams({ prio: v === "all" ? null : v })}
+            onReset={() => patchParams({ q: null, prio: null })}
+          />
 
           {selection.size > 0 && (
             <div className="flex flex-wrap items-center gap-2 border-b border-border bg-primary/5 px-2 py-1.5">
-              <span className="text-caption font-semibold text-foreground">
-                {selection.size} valgt
+              <span className="text-caption font-semibold text-foreground" role="status">
+                {selection.size} valgt i «{queueLabel(queue)}»
+                {priority !== "all" || search.trim() ? " (filtrert)" : ""}
               </span>
               {(["assign_me", "waiting", "resolve"] as BulkAction[]).map((a) => (
                 <Button
@@ -581,7 +473,7 @@ export default function TicketsInbox() {
               emptyDescription={
                 search.trim().length >= 2
                   ? "Prøv et annet søkeord, eller velg en annen kø."
-                  : "Velg en annen kø i menyen til venstre."
+                  : "Velg en annen kø."
               }
               emptyIcon={Inbox}
               skeletonRows={6}
@@ -598,8 +490,8 @@ export default function TicketsInbox() {
                     aria-label="Velg alle synlige henvendelser"
                     className="h-4 w-4 accent-[hsl(var(--primary))]"
                   />
-                  <span className="text-caption text-muted-foreground">
-                    {filtered.length} sak{filtered.length === 1 ? "" : "er"}
+                  <span className="text-caption text-muted-foreground" aria-live="polite">
+                    {filtered.length} sak{filtered.length === 1 ? "" : "er"} i «{queueLabel(queue)}»
                   </span>
                 </div>
                 <ul>
@@ -607,6 +499,8 @@ export default function TicketsInbox() {
                     <TicketListRow
                       key={row.id}
                       row={row}
+                      href={ticketHref(row.id, inboxHrefFor(row.id))}
+                      returnFrom={inboxHrefFor(row.id)}
                       active={row.id === selectedId}
                       selected={selection.has(row.id)}
                       canWrite={canWrite}
