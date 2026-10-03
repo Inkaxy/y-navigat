@@ -395,7 +395,6 @@ export default function TicketsInbox() {
       <PageHeader
         eyebrow="Ordre"
         title="Innboks"
-        stackActionsOnMobile
         description="Henvendelser til ordrekontoret — kø, kunde og ordre på samme flate"
         actions={
           <div className="flex flex-wrap items-center gap-2">

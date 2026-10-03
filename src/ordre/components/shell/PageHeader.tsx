@@ -66,7 +66,9 @@ export function PageHeader({
             )}
           </div>
         </div>
-        {actions && <div className="flex items-center gap-2">{actions}</div>}
+        {actions && (
+          <div className="flex basis-full flex-wrap items-center gap-2 sm:basis-auto">{actions}</div>
+        )}
       </div>
       {children && <div className="px-page pb-3">{children}</div>}
     </div>
