@@ -30,7 +30,7 @@ export function RecipeWarningsBanner({
   const headline =
     summary.affectedLineCount > 0
       ? `${summary.problemCount} ${summary.problemCount === 1 ? "problem" : "problemer"} på ${summary.affectedLineCount} ${summary.affectedLineCount === 1 ? "ingrediens" : "ingredienser"}`
-      : `${summary.problemCount} ${summary.problemCount === 1 ? "ting" : "ting"} bør ses på`;
+      : `${summary.problemCount} ting bør ses på`;
 
   return (
     <section id="oppskrift-advarsler" aria-label="Ting som bør ses på" className="scroll-mt-48 rounded-md border border-warning/40 bg-warning/10">

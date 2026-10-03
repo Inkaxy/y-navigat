@@ -218,6 +218,8 @@ const GridRow = memo(function GridRow({
     <div
       ref={setNodeRef}
       style={style}
+      data-line-id={line.id}
+      tabIndex={-1}
       onFocusCapture={(e) => {
         // Klikker brukeren rett i en celle, skal tastaturnavigasjonen fortsette derfra.
         const cell = (e.target as HTMLElement).closest?.("[data-grid-cell]");

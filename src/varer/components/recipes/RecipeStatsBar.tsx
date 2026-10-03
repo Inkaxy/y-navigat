@@ -22,7 +22,10 @@ export function RecipeStatsBar({
   margin,
   prefermentedFlourPct,
   className,
+  onShowDetails,
 }: {
+  /** Åpner advarselsoversikten med detaljer per ingrediens. */
+  onShowDetails?: () => void;
   totals: BakersTotals;
   /** Kost for oppskriften. Utelates når kost ikke skal vises. */
   cost?: RecipeCostTotals;
@@ -107,30 +110,26 @@ export function RecipeStatsBar({
           </div>
         ))}
         {cost?.incomplete && (
-          <Alert className="col-span-2 sm:col-span-3 lg:col-span-6">
+          <Alert className="col-span-2 py-2 sm:col-span-3 lg:col-span-6">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              <p className="font-medium">Kostnaden er ufullstendig.</p>
-              <ul className="mt-1 list-disc pl-5 text-sm">
-                {cost.missing.slice(0, 5).map((m, i) => (
-                  <li key={i}>
-                    {m.name}: {m.reason}
-                  </li>
-                ))}
-              </ul>
+              <IncompleteNotice
+                title={`Kostnaden er ufullstendig — ${cost.missing.length} linje${cost.missing.length === 1 ? "" : "r"} mangler grunnlag.`}
+                items={cost.missing.map((m) => `${m.name}: ${m.reason}`)}
+                onShowDetails={onShowDetails}
+              />
             </AlertDescription>
           </Alert>
         )}
         {totals.incomplete && (
-          <Alert variant="destructive" className="col-span-2 sm:col-span-3 lg:col-span-6">
+          <Alert variant="destructive" className="col-span-2 py-2 sm:col-span-3 lg:col-span-6">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              <p className="font-medium">Deigvekten er ufullstendig og kan ikke brukes som produksjonsvekt.</p>
-              <ul className="mt-1 list-disc pl-5 text-sm">
-                {totals.warnings.slice(0, 5).map((w, i) => (
-                  <li key={i}>{w}</li>
-                ))}
-              </ul>
+              <IncompleteNotice
+                title="Deigvekten er ufullstendig og kan ikke brukes som produksjonsvekt."
+                items={totals.warnings}
+                onShowDetails={onShowDetails}
+              />
             </AlertDescription>
           </Alert>
         )}
@@ -141,4 +140,26 @@ export function RecipeStatsBar({
 
 export function HydrationBadge({ pct }: { pct: number }) {
   return <Badge variant="outline" className="tabular-nums">{fmtPercent(pct)} hydrering</Badge>;
+}
+
+/** Kort, alltid synlig melding; linjene kan foldes ut uten å gi en lang liste i nøkkeltallene. */
+function IncompleteNotice({ title, items, onShowDetails }: { title: string; items: string[]; onShowDetails?: () => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+      <span className="font-medium">{title}</span>
+      {items.length > 0 && (
+        <details className="basis-full">
+          <summary className="cursor-pointer text-caption underline underline-offset-2">Vis linjene ({items.length})</summary>
+          <ul className="mt-1 list-disc pl-5">
+            {items.map((t, i) => <li key={i}>{t}</li>)}
+          </ul>
+        </details>
+      )}
+      {onShowDetails && (
+        <button type="button" onClick={onShowDetails} className="text-caption underline underline-offset-2">
+          Se alle problemer per ingrediens
+        </button>
+      )}
+    </div>
+  );
 }
