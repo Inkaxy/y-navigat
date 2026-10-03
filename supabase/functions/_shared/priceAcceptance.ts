@@ -1,4 +1,5 @@
 import { normalizeUnit } from "./units.ts";
+import { packageSignature } from "./packageSignature.ts";
 
 // deno-lint-ignore no-explicit-any
 type AnyRec = Record<string, any>;
@@ -13,7 +14,13 @@ const same = (a: unknown, b: unknown) => String(a ?? "") === String(b ?? "");
  * prisårsakene som faktisk ble godtatt — alle andre årsaker står. Ved endret
  * grunnlag slettes godkjenningen og avviket må avklares igjen.
  */
-export function reconcileAcceptance(line: AnyRec, target: AnyRec, rawMaterialId: string | null): void {
+export function reconcileAcceptance(
+  line: AnyRec,
+  target: AnyRec,
+  rawMaterialId: string | null,
+  /** Leverandørkoblingen motoren brukte som pakningskilde nå (null = ingen entydig). */
+  rmsRow: AnyRec | null = null,
+): void {
   const acc = line.price_acceptance as AnyRec | null;
   if (!acc) return;
   const unitNow = target.unit ?? line.unit;
@@ -23,6 +30,13 @@ export function reconcileAcceptance(line: AnyRec, target: AnyRec, rawMaterialId:
     same(normalizeUnit(acc.unit), normalizeUnit(unitNow)) &&
     round4(acc.unit_price) === round4(line.unit_price) &&
     round4(acc.total_amount) === round4(line.total_amount) &&
+    round4(acc.base_quantity) === round4(target.base_quantity) &&
+    round4(acc.package_size) === round4(line.package_size) &&
+    same(normalizeUnit(acc.package_unit), normalizeUnit(line.package_unit)) &&
+    round4(acc.count_per_package) === round4(line.count_per_package) &&
+    same(acc.rms_id, rmsRow?.id ?? null) &&
+    (acc.rms_package == null) === (rmsRow == null) &&
+    (rmsRow == null || packageSignature(acc.rms_package ?? {}) === packageSignature(rmsRow)) &&
     round4(acc.price_per_base_unit) === round4(target.price_per_base_unit) &&
     round4(acc.expected_price_per_base_unit) === round4(target.expected_price_per_base_unit) &&
     same(acc.price_reference_source, target.price_reference_source) &&

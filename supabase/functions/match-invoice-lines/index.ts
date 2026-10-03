@@ -309,6 +309,7 @@ Deno.serve(async (req) => {
         const rm = rmById.get(line.raw_material_id);
         const pickedM = pickRmsRow(line.raw_material_id, null, line.supplier_sku);
         const rmsRow = pickedM.row;
+        manualUpdate.package_source_rms_id = rmsRow?.id ?? null;
         const refM = withRegisteredLastPurchase(await priceReference(line.raw_material_id), rmsRow);
         const expected = applyReference(manualUpdate, refM);
 
@@ -400,6 +401,7 @@ Deno.serve(async (req) => {
         resolution_note: null,
         resolved_at: null,
         resolved_by: null,
+        package_source_rms_id: null,
       };
       const suggestionsToInsert: AnyRec[] = [];
 
@@ -685,6 +687,7 @@ Deno.serve(async (req) => {
         const rm = rmById.get(update.raw_material_id);
         const picked = pickRmsRow(update.raw_material_id, matchedRmsId, line.supplier_sku);
         const rmsRow = picked.row;
+        update.package_source_rms_id = rmsRow?.id ?? null;
         const ref = withRegisteredLastPurchase(await priceReference(update.raw_material_id), rmsRow);
         const expected = applyReference(update, ref);
 
