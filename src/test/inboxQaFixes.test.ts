@@ -75,3 +75,23 @@ describe("Fakturanivåavvik skilt fra linjene", () => {
     });
   }
 });
+
+import { lineIsOpen } from "@/fakturaer/lib/inbox";
+
+describe("Innboks og fokus teller likt", () => {
+  const base = { raw_material_id: "rm", match_confidence: "manual", requires_review: false, review_reason: null, price_per_base_unit: 10, price_variance_pct: null, variance_status: null, category: null, quantity: 1 };
+  const cases = [
+    { ...base, id: "a" },
+    { ...base, id: "smoremyk" },
+    { ...base, id: "b", requires_review: true, review_reason: "price_variance" },
+    { ...base, id: "c", match_confidence: "auto_low" },
+    { ...base, id: "d", price_per_base_unit: null },
+    { ...base, id: "e", invoice: { lines_sum_status: "mismatch", extraction_confidence: 0.4 } },
+  ];
+  it("samme åpne antall med startpriskandidater lastet", () => {
+    const inbox = cases.filter(lineIsOpen).length;
+    const focus = cases.filter((l) => lineStatus(l as unknown as LineStatusInput, new Set(["smoremyk"])).bucket === "needs").length;
+    expect(inbox).toBe(3);
+    expect(focus).toBe(inbox);
+  });
+});
