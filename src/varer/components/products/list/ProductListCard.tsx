@@ -1,3 +1,4 @@
+import { formatKr } from "@/varer/lib/pricing";
 import { Link } from "react-router-dom";
 import { Check, ImageIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -43,7 +44,7 @@ export function ProductListCard({ product: p, ctx, href }: { product: ProductRow
           </span>
         </div>
         <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-caption text-muted-foreground tabular-nums">
-          <span>{ctx.price !== undefined ? `kr ${ctx.price.toFixed(2)}` : "Ingen pris"} / {p.unit_of_sale}</span>
+          <span>{ctx.price !== undefined ? `${formatKr(ctx.price)} kr` : "Ingen pris"} / {p.unit_of_sale}</span>
           {p.in_web_shop && <span className="inline-flex items-center gap-1"><Check className="h-3 w-3" aria-hidden="true" />Nettbutikk</span>}
           {p.in_pos && <span className="inline-flex items-center gap-1"><Check className="h-3 w-3" aria-hidden="true" />Kasse</span>}
         </div>
