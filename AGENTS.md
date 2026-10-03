@@ -1,0 +1,1 @@
+- Fakturalinje-kobling og pakningsbekreftelse går gjennom `useLineMatchForm` (brukes av både kontrollflaten i køen og MatchDrawer) — én skjema- og lagringslogikk mot `acceptMatch`.
