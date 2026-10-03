@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { Check, ChevronsUpDown, Keyboard, Loader2, RotateCw, Undo2 } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, RotateCw, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
