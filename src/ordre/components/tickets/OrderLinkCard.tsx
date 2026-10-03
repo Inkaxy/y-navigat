@@ -91,6 +91,9 @@ export default function OrderLinkCard({
   const orders = collectLinkedOrders(primaryId, primary, linksQuery.data ?? []);
   const anyPending = primaryPending || linksPending;
   const anyError = primaryError || linksQuery.isError;
+  // Hovedordre er satt, oppslaget lyktes, men ordren finnes verken der eller blant lenkene.
+  const primaryMissing =
+    !!primaryId && !anyPending && !anyError && !primary && !orders.some((o) => o.id === primaryId);
   const knownNone = !anyPending && !anyError && orders.length === 0 && !primaryId;
 
   const onUnlink = async () => {
@@ -155,6 +158,19 @@ export default function OrderLinkCard({
             scope="ordre:sak:ordrekobling"
             title="Kunne ikke hente ordrekoblingen"
             description="Koblingen kan finnes selv om den ikke vises nå."
+            onRetry={() => {
+              void linkedState?.refetch();
+              void linksQuery.refetch();
+            }}
+            compact
+          />
+        )}
+
+        {primaryMissing && (
+          <QueryErrorState
+            scope="ordre:sak:hovedordre-mangler"
+            title="Den koblede ordren kan ikke vises"
+            description="Saken er koblet til en ordre som ikke kunne hentes. Den kan være slettet eller utenfor din tilgang."
             onRetry={() => {
               void linkedState?.refetch();
               void linksQuery.refetch();
