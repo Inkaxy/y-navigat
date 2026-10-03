@@ -36,6 +36,6 @@ describe("Frivillig startprisforslag gjør ikke linjen uavklart", () => {
   });
   it("ekte blokkere består", () => {
     const blocked = { ...line, requires_review: true, review_reasons: ["price_variance"] } as LineStatusInput;
-    expect(lineStatus(blocked, new Set(["smoremyk"])).key).toBe("review_price");
+    expect(lineStatus(blocked, new Set(["smoremyk"])).bucket).toBe("needs");
   });
 });
