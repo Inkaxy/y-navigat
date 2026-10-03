@@ -31,6 +31,8 @@ export interface RecipeWarning {
   /** Linjen advarselen hører til, når den gjelder en bestemt linje. */
   lineId: string | null;
   rawMaterialId: string | null;
+  /** Ingrediensnavnet linjen vises med — null for advarsler på hele oppskriften. */
+  name: string | null;
   /** Kort tekst som vises på raden og i banneret. */
   message: string;
   /** Hvor brukeren kan rette det. */
@@ -138,11 +140,12 @@ export function useRecipeWarnings({
     for (const line of lines) {
       const rmId = line.raw_material_id ?? null;
       const name = (rmId ? cov?.names.get(rmId) : null) ?? line.ingredient_name ?? "Ukjent ingrediens";
+      const push = (w: Omit<RecipeWarning, "name">) => push({ ...w, name });
 
       // Fritekstlinje: hverken råvare eller halvfabrikat er valgt.
       if (!rmId && !line.sub_product_id) {
         if (status === "active") {
-          out.push({
+          push({
             kind: "free_text_line",
             lineId: line.id,
             rawMaterialId: null,
@@ -155,7 +158,7 @@ export function useRecipeWarnings({
 
       const qty = Number(line.quantity);
       if (!Number.isFinite(qty) || qty === 0) {
-        out.push({
+        push({
           kind: "zero_quantity",
           lineId: line.id,
           rawMaterialId: rmId,
@@ -165,7 +168,7 @@ export function useRecipeWarnings({
       }
 
       if (!isLineConvertible(line) || !lineToGrams(line).exact) {
-        out.push({
+        push({
           kind: "unknown_conversion",
           lineId: line.id,
           rawMaterialId: rmId,
@@ -178,7 +181,7 @@ export function useRecipeWarnings({
       if (conv.exact) {
         const costRes = lineCost(line, conv.grams);
         if (costRes.cost == null) {
-          out.push({
+          push({
             kind: "missing_cost",
             lineId: line.id,
             rawMaterialId: rmId,
@@ -189,7 +192,7 @@ export function useRecipeWarnings({
       }
 
       if (line.unit === "stk" && rmId && cov && !cov.unitWeights.get(rmId)) {
-        out.push({
+        push({
           kind: "missing_unit_weight",
           lineId: line.id,
           rawMaterialId: rmId,
@@ -200,7 +203,7 @@ export function useRecipeWarnings({
 
       if (rmId && cov) {
         if (!cov.nutrition.has(rmId)) {
-          out.push({
+          push({
             kind: "missing_nutrition",
             lineId: line.id,
             rawMaterialId: rmId,
@@ -209,7 +212,7 @@ export function useRecipeWarnings({
           });
         }
         if (!cov.allergens.has(rmId)) {
-          out.push({
+          push({
             kind: "missing_allergens",
             lineId: line.id,
             rawMaterialId: rmId,
@@ -218,7 +221,7 @@ export function useRecipeWarnings({
           });
         }
         if (!cov.packages.has(rmId)) {
-          out.push({
+          push({
             kind: "missing_package",
             lineId: line.id,
             rawMaterialId: rmId,
@@ -234,6 +237,7 @@ export function useRecipeWarnings({
         kind: "low_margin",
         lineId: null,
         rawMaterialId: null,
+        name: null,
         message: `Dekningsgraden er ${marginPct.toFixed(1).replace(".", ",")} % — under målet på ${marginTargetPct.toFixed(1).replace(".", ",")} %`,
         action: null,
       });
