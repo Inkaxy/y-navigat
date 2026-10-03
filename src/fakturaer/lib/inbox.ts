@@ -8,6 +8,7 @@
  */
 
 import { CREDIT_NOTE_REF_PREFIX, creditNoteOriginalRef } from "@/fakturaer/lib/creditNote";
+import { lineStatus } from "@/fakturaer/lib/lineStatus";
 export { CREDIT_NOTE_REF_PREFIX, creditNoteOriginalRef };
 
 export type InboxIssue =
@@ -33,6 +34,14 @@ export interface InboxLine {
   category: string | null;
   match_confidence?: string | null;
   review_reason?: string | null;
+  id?: string;
+  quantity?: number | null;
+  price_per_base_unit?: number | null;
+  invoice?: {
+    currency?: string | null;
+    lines_sum_status?: string | null;
+    extraction_confidence?: number | null;
+  } | null;
 }
 
 export interface InboxInvoiceInput {
@@ -70,10 +79,26 @@ const reasonsOf = (l: InboxLine) =>
 
 const isNotApplicable = (l: InboxLine) => l.match_confidence === "not_applicable";
 
-/** Linjen står åpen når serveren sier den krever gjennomgang, eller den mangler kobling. */
+/**
+ * Samme linjevurdering som kontrollflaten (lineStatus): bare en bekreftet
+ * kobling med beregnet pris og uten årsaker er avklart. auto_low/medium,
+ * manglende pris eller usikkert uttrekk står åpne.
+ */
 export function lineIsOpen(l: InboxLine): boolean {
-  if (isNotApplicable(l)) return false;
-  return !l.raw_material_id || !!l.requires_review || reasonsOf(l).length > 0;
+  return (
+    lineStatus({
+      id: l.id ?? "",
+      review_reason: l.review_reason ?? null,
+      requires_review: l.requires_review,
+      variance_status: l.variance_status,
+      raw_material_id: l.raw_material_id,
+      match_confidence: l.match_confidence ?? null,
+      quantity: l.quantity ?? null,
+      price_per_base_unit: l.price_per_base_unit ?? null,
+      suggestions: null,
+      invoice: l.invoice ?? null,
+    }).bucket === "needs"
+  );
 }
 
 export function assessInboxInvoice(
