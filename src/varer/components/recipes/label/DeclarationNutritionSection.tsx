@@ -8,53 +8,19 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { ClipboardCopy, Copy, GitCompare, Loader2, Save } from "lucide-react";
 import { showError } from "@/lib/userError";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { UnsavedChangesDialog } from "@/varer/components/products/detail/UnsavedChangesDialog";
 import { useUserDisplayName, type RecipeLabelCalculated } from "@/varer/hooks/useRecipeLabel";
 import { NUTRITION_KEYS, parseAllergenSummary, pickNutrition, stripHtml, type DeclarationMode } from "@/varer/lib/effectiveDeclaration";
-import { NUTRIENT_LABEL } from "@/varer/lib/nutritionFormat";
 import { DeclarationAssistantPanel } from "@/varer/components/declaration/DeclarationAssistantPanel";
 import { SourceSegmented, formatDateTimeNb, type LabelSource } from "./labelShared";
 import { CalculatedDeclarationView } from "./CalculatedDeclarationView";
+import { ConfirmPendingDialog } from "./ConfirmPendingDialog";
+import { NUT_LABELS, formToDoc, type Form, type Pending } from "./declarationForm";
 import { DeclarationDiffView, type DeclarationDoc } from "./DeclarationDiffView";
 
-const NUT_UNIT: Record<string, string> = {
-  energy_kj: "kJ", energy_kcal: "kcal", fat_g: "g", saturated_fat_g: "g",
-  carbs_g: "g", sugars_g: "g", fiber_g: "g", protein_g: "g", salt_g: "g",
-};
-const NUT_LABELS: Record<string, string> = Object.fromEntries(
-  Object.entries(NUTRIENT_LABEL).map(([k, label]) => [k, `${label} (${NUT_UNIT[k] ?? "g"})`]),
-);
-
-interface Form {
-  ingredientText: string;
-  contains: string;
-  mayContain: string;
-  nutrition: Record<string, string>;
-}
-
-const splitList = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean);
-const parseNum = (v: string) => (v !== "" && Number.isFinite(Number(v.replace(",", "."))) ? Number(v.replace(",", ".")) : null);
-
-function formToDoc(f: Form): DeclarationDoc {
-  const nutrition: Record<string, number | null> = {};
-  for (const k of NUTRITION_KEYS) nutrition[k] = parseNum(f.nutrition[k] ?? "");
-  return { ingredientText: f.ingredientText.trim() || null, contains: splitList(f.contains), mayContain: splitList(f.mayContain), nutrition };
-}
-
-type Pending = { kind: "fill"; next: Form } | { kind: "assistant"; text: string } | { kind: "save" } | { kind: "source" };
 
 interface Props {
   recipeId: string;
@@ -409,22 +375,12 @@ export function DeclarationNutritionSection(p: Props) {
         </div>
       </CardContent>
 
-      <AlertDialog open={!!pending} onOpenChange={(v) => !v && setPending(null)}>
-        <AlertDialogContent>
-          {pending && (
-            <>
-              <AlertDialogHeader>
-                <AlertDialogTitle>{confirmText[pending.kind].title}</AlertDialogTitle>
-                <AlertDialogDescription>{confirmText[pending.kind].body}</AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Avbryt</AlertDialogCancel>
-                <AlertDialogAction onClick={confirmPending}>{confirmText[pending.kind].action}</AlertDialogAction>
-              </AlertDialogFooter>
-            </>
-          )}
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmPendingDialog
+        open={!!pending}
+        text={pending ? confirmText[pending.kind] : null}
+        onCancel={() => setPending(null)}
+        onConfirm={confirmPending}
+      />
       <UnsavedChangesDialog open={unsavedGuard.isBlocked} onConfirm={unsavedGuard.discard} onCancel={unsavedGuard.stay} />
     </Card>
   );
