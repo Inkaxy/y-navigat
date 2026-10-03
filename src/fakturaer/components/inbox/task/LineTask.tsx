@@ -83,17 +83,18 @@ export function LineTask(p: LineTaskProps) {
     }
   }
 
-  async function retryRecalc() {
-    if (!recalc) return;
+  async function retryRecalc(ids: string[] | undefined = recalc?.lineIds) {
+    if (!ids) return;
     setRecalcBusy(true);
     setError(null);
     try {
-      await recalculateLines(line.invoice_id, recalc.lineIds);
+      await recalculateLines(line.invoice_id, ids);
       setRecalc(null);
       await p.onSaved(line.id);
     } catch (e) {
       console.error("[fakturakontroll-reberegn]", e);
-      setError("Prisen kunne fortsatt ikke regnes om. Linjen står åpen.");
+      setRecalc({ lineIds: ids });
+      setError("Prisen kunne ikke regnes om. Linjen står åpen.");
     } finally {
       setRecalcBusy(false);
     }
@@ -120,7 +121,7 @@ export function LineTask(p: LineTaskProps) {
   } else if (status.key === "start_price") {
     primary = { label: "Bekreft startpris", run: () => p.onSecondary("start_price", line), hint: copy.missing };
   } else if (status.key === "recalculate") {
-    primary = { label: "Beregn prisen på nytt", run: () => setRecalc({ lineIds: [line.id] }), hint: copy.missing };
+    primary = { label: "Beregn prisen på nytt", run: () => void retryRecalc([line.id]), hint: copy.missing };
   } else if (mode === "done" && p.reconcileReady) {
     primary = { label: "Gå til bekreft prismatch", run: p.onReconcile, hint: "Alle linjer er avklart." };
   } else {
