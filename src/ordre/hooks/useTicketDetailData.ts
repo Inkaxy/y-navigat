@@ -99,18 +99,20 @@ export function useLinkedOrder(orderId: string | null) {
         .eq("id", orderId!)
         .maybeSingle();
       if (error) throw error;
-      const { data: lines } = await supabase
+      const { data: lines, error: linesError } = await supabase
         .from("order_lines")
         .select("quantity, product_snapshot, notes")
         .eq("order_id", orderId!)
         .limit(6);
+      if (linesError) throw linesError;
       let customerName: string | null = null;
       if (data?.customer_id) {
-        const { data: c } = await supabase
+        const { data: c, error: customerError } = await supabase
           .from("customers")
           .select("display_name")
           .eq("id", data.customer_id)
           .maybeSingle();
+        if (customerError) throw customerError;
         customerName = c?.display_name ?? null;
       }
       return {
@@ -124,4 +126,61 @@ export function useLinkedOrder(orderId: string | null) {
       };
     },
   });
+}
+
+export type LinkedOrderRef = {
+  id: string;
+  order_number: string;
+  status: string;
+  delivery_date: string | null;
+  customer_id: string | null;
+};
+
+/** Ordrer koblet via ticket_order_links. Feil kastes — aldri tom liste ved feil. */
+export function useTicketOrderLinks(ticketId: string | undefined) {
+  return useQuery({
+    enabled: !!ticketId,
+    queryKey: ["ticket-order-links", ticketId],
+    queryFn: async (): Promise<LinkedOrderRef[]> => {
+      const { data: links, error } = await supabase
+        .from("ticket_order_links")
+        .select("order_id")
+        .eq("ticket_id", ticketId!);
+      if (error) throw error;
+      const ids = (links ?? []).map((l) => l.order_id as string);
+      if (!ids.length) return [];
+      const { data: orders, error: ordersError } = await supabase
+        .from("orders")
+        .select("id, order_number, status, delivery_date, customer_id")
+        .in("id", ids)
+        .limit(50);
+      if (ordersError) throw ordersError;
+      return (orders ?? []) as LinkedOrderRef[];
+    },
+  });
+}
+
+export type CollectedOrder = LinkedOrderRef & { primary: boolean };
+
+/**
+ * Primær ordre (related_order_id) først, deretter øvrige koblinger.
+ * Dedupliseres kun på ordre-ID.
+ */
+export function collectLinkedOrders(
+  primaryId: string | null,
+  primary: LinkedOrderRef | null | undefined,
+  links: LinkedOrderRef[],
+): CollectedOrder[] {
+  const out: CollectedOrder[] = [];
+  const seen = new Set<string>();
+  if (primaryId && primary && primary.id === primaryId) {
+    out.push({ ...primary, primary: true });
+    seen.add(primary.id);
+  }
+  for (const o of links) {
+    if (seen.has(o.id)) continue;
+    seen.add(o.id);
+    out.push({ ...o, primary: o.id === primaryId });
+  }
+  return out;
 }
