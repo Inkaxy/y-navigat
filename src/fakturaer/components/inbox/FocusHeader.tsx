@@ -1,4 +1,5 @@
-import { ArrowLeft, CheckCircle2, FileText, Undo2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, FileText, Undo2 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { formatDate } from "@/fakturaer/lib/constants";
@@ -58,6 +59,17 @@ export function FocusHeader(p: Props) {
           )}
         </div>
       </div>
+      {(p.invoice?.assessment.invoiceLevelIssues?.length ?? 0) > 0 && p.invoice && (
+        <div role="status" className="flex flex-wrap items-center gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-warning" aria-hidden />
+          <span className="min-w-0 flex-1">
+            {p.invoice.assessment.invoiceLevelIssues?.join(" ")} Gjelder hele fakturaen, ikke enkeltlinjer. Fakturaen kan ikke fullføres før dette er rettet.
+          </span>
+          <Button asChild size="sm" variant="outline">
+            <Link to={`/ravarer/fakturaer/${p.invoice.id}`}>Rett registreringen</Link>
+          </Button>
+        </div>
+      )}
       {p.progress && <Progress className="h-1.5" value={p.progress.total ? (p.progress.handled / p.progress.total) * 100 : 0} aria-label="Fremdrift for fakturaen" />}
     </div>
   );

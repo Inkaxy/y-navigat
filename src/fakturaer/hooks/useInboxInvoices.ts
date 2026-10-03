@@ -99,6 +99,7 @@ export function toInboxInvoice(r: RawInvoice): InboxInvoice {
     line_extraction_status: r.line_extraction_status,
     currency: r.currency ?? null,
     extraction_confidence: r.extraction_confidence ?? null,
+    lines_sum_variance_pct: r.lines_sum_variance_pct,
     lines,
   });
   return {
