@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useLineMatchForm } from "@/fakturaer/hooks/useLineMatchForm";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,16 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, ExternalLink, Search, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { showError } from "@/lib/userError";
-import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
+import { invalidateInvoice } from "@/ravarer/lib/invalidate";
 import { formatNok, formatDate } from "@/fakturaer/lib/constants";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
-import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, deriveLinePackage, parseDecimal, resolveLineCost } from "@/fakturaer/lib/units";
+import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, parseDecimal } from "@/fakturaer/lib/units";
 import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
-import { acceptMatch, recalculateLines, startPriceOutcomeLabel } from "@/fakturaer/lib/acceptMatch";
-import { normalizeMatchKey } from "@/fakturaer/lib/matchNormalize";
-import { AI_REASON_LABELS, fetchAiLineSuggestion, type AiLineSuggestion } from "@/fakturaer/lib/aiLineSuggestion";
+import { recalculateLines, startPriceOutcomeLabel } from "@/fakturaer/lib/acceptMatch";
 import { Sparkles } from "lucide-react";
 
 interface Props {
@@ -34,302 +32,53 @@ interface Props {
   onAcceptedNext?: () => void;
 }
 
-/** Leverandørkoblingen bak et forslag — pris, pakning og SKU hos leverandøren. */
-interface LinkInfo {
-  raw_material_id: string;
-  supplier_sku: string | null;
-  supplier_product_name: string | null;
-  package_size: number | null;
-  package_unit: string | null;
-  agreed_price_per_base_unit: number | null;
-  last_invoice_price: number | null;
-  last_invoice_date: string | null;
-}
-
-interface RmRow {
-  id: string;
-  name: string;
-  sku: string | null;
-  category: string | null;
-  current_cost_price: number | null;
-  base_unit: string | null;
-  primary_supplier_id: string | null;
-  item_type?: string | null;
-}
-
 export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props) {
   const qc = useQueryClient();
-  const [selectedRmId, setSelectedRmId] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [rememberSku, setRememberSku] = useState(true);
-  const [rememberName, setRememberName] = useState(true);
-  const [setAsPrimary, setSetAsPrimary] = useState(false);
-  // Pakningen som tolkes fra linjen er et FORSLAG. Den lagres som bekreftet
-  // bare når brukeren aktivt sier at den stemmer.
-  const [confirmPackage, setConfirmPackage] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [agreedPrice, setAgreedPrice] = useState("");
-  const [packageSize, setPackageSize] = useState("");
-  const [packageUnit, setPackageUnit] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
-  // AI-forslag hentes bare når brukeren ber om det, og er aldri en bekreftelse.
-  const [aiBusy, setAiBusy] = useState(false);
-  const [aiSuggestion, setAiSuggestion] = useState<AiLineSuggestion | null>(null);
-  const [aiNotice, setAiNotice] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    setSelectedRmId(null);
-    setSearch("");
-    setRememberSku(!!line?.supplier_sku);
-    setRememberName(!!line?.description && line?.description !== line?.supplier_sku);
-    setSetAsPrimary(false);
-    setConfirmPackage(false);
-    setAgreedPrice("");
-    // Forhåndsutfyll pakning fra linjens lagrede felter, ellers fra beskrivelsen.
-    const pkg = line ? deriveLinePackage({
-      package_size: line.package_size,
-      package_unit: line.package_unit,
-      count_per_package: line.count_per_package,
-      description: line.description,
-    }) : null;
-    setPackageSize(pkg ? String(pkg.size) : "");
-    setPackageUnit(pkg?.unit ?? "");
-    setAiSuggestion(null);
-    setAiNotice(null);
-  }, [open, line?.id]);
-
-  const legalEntityId = line?.invoice.legal_entity_id;
-  const supplierId = line?.invoice.supplier_id;
-
-  /**
-   * Leverandørens alias hentes ÉN gang per leverandør og filtreres i minnet.
-   * Før lå dette inne i søket, som betød et nytt uttrekk av inntil 2000 rader
-   * for hvert tastetrykk.
-   */
-  const { data: supplierAliasRows = [], dataUpdatedAt: supplierAliasUpdatedAt } = useQuery({
-    queryKey: ["supplier-aliases-all", supplierId],
-    enabled: !!supplierId,
-    staleTime: 5 * 60 * 1000,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("raw_material_supplier_aliases")
-        .select("alias_value, raw_material_suppliers!inner(raw_material_id, supplier_id)")
-        .eq("raw_material_suppliers.supplier_id", supplierId!)
-        .limit(2000);
-      if (error) throw error;
-      return (data ?? []) as unknown as Array<{
-        alias_value: string | null;
-        raw_material_suppliers: { raw_material_id: string } | null;
-      }>;
-    },
-  });
-
-  /**
-   * Søk treffer navn og SKU på varen, men også leverandørens eget varenummer
-   * og registrerte alias — det er ofte det eneste som står på fakturaen.
-   */
-  const { data: rmResults = [], isLoading: searching } = useQuery({
-    // Cache-buster: siste vellykkede henting av aliasene, ikke antallet
-    // rader — to ulike alias-sett kan tilfeldigvis ha samme lengde og
-    // ville da IKKE trigget et nytt søk.
-    queryKey: ["rm-search", legalEntityId, supplierId, search, supplierAliasUpdatedAt],
-    enabled: !!legalEntityId && search.length > 1,
-    queryFn: async () => {
-      // Komma og parentes er skilletegn i PostgREST-filtre — fjernes fra søket.
-      const safe = search.trim().replace(/[,()]/g, " ");
-      const term = `%${safe}%`;
-      const needle = normalizeMatchKey(search);
-
-      // MERK: `alias_value_normalized` i databasen er bare lower(trim(...)),
-      // så et normalisert ilike-søk treffer aldri «crème» eller «hvetemel, 25 kg».
-      // Derfor filtreres leverandørens alias i minnet med samme normalisering
-      // som matchemotoren.
-      const bySupplier = await supabase
-        .from("raw_material_suppliers")
-        .select("raw_material_id")
-        .or(`supplier_sku.ilike.${term},supplier_product_name.ilike.${term}`)
-        .limit(50);
-      if (bySupplier.error) throw bySupplier.error;
-
-      const aliasRows = supplierAliasRows;
-      const extraIds = [
-        ...(bySupplier.data ?? []).map((r) => r.raw_material_id),
-        ...aliasRows
-          .filter((r) => normalizeMatchKey(r.alias_value).includes(needle))
-          .map((r) => r.raw_material_suppliers?.raw_material_id),
-      ].filter((id): id is string => !!id);
-
-      const filter = extraIds.length
-        ? `name.ilike.${term},sku.ilike.${term},id.in.(${[...new Set(extraIds)].join(",")})`
-        : `name.ilike.${term},sku.ilike.${term}`;
-
-      const { data, error } = await supabase
-        .from("raw_materials")
-        .select("id, name, sku, category, current_cost_price, base_unit, primary_supplier_id, item_type")
-        .eq("legal_entity_id", legalEntityId!)
-        .eq("is_active", true)
-        .or(filter)
-        .limit(20);
-      if (error) throw error;
-      return (data ?? []) as RmRow[];
-    },
-  });
-
-  /** Leverandørkoblingene for varene som foreslås — vises rett i forslagsraden. */
-  const suggestionIds = useMemo(
-    () => (line?.suggestions ?? []).map((s) => s.raw_material_id),
-    [line?.suggestions],
-  );
-  const { data: suggestionLinks } = useQuery({
-    queryKey: ["rm-suggestion-links", supplierId, suggestionIds],
-    enabled: !!supplierId && suggestionIds.length > 0,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("raw_material_suppliers")
-        .select(
-          `raw_material_id, supplier_sku, supplier_product_name, package_size, package_unit,
-           agreed_price_per_base_unit, last_invoice_price, last_invoice_date`,
-        )
-        .eq("supplier_id", supplierId!)
-        .in("raw_material_id", suggestionIds);
-      if (error) throw error;
-      const map = new Map<string, LinkInfo>();
-      ((data ?? []) as LinkInfo[]).forEach((r) => map.set(r.raw_material_id, r));
-      return map;
-    },
-  });
-
-  const { data: selectedRm } = useQuery({
-    queryKey: ["rm-detail", selectedRmId],
-    enabled: !!selectedRmId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("raw_materials")
-        .select("id, name, sku, category, current_cost_price, base_unit, primary_supplier_id, item_type")
-        .eq("id", selectedRmId!)
-        .single();
-      if (error) throw error;
-      return data as RmRow;
-    },
-  });
-
-  const { data: existingRms } = useQuery({
-    queryKey: ["rms-link", selectedRmId, supplierId],
-    enabled: !!selectedRmId && !!supplierId,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("raw_material_suppliers")
-        .select("id, supplier_id, agreed_price_per_base_unit, is_primary")
-        .eq("raw_material_id", selectedRmId!);
-      return data ?? [];
-    },
-  });
-
-  const linkExists = useMemo(() => existingRms?.find((r) => r.supplier_id === supplierId), [existingRms, supplierId]);
-  const anyPrimary = useMemo(() => existingRms?.some((r) => r.is_primary), [existingRms]);
-
-  // Når koblingen finnes fra før: forhåndsutfyll avtaleprisen slik at brukeren ser den.
-  useEffect(() => {
-    if (linkExists?.agreed_price_per_base_unit != null) {
-      setAgreedPrice(String(linkExists.agreed_price_per_base_unit));
-    }
-  }, [linkExists]);
-
-  const suggestions = line?.suggestions ?? [];
-
-  /** Kostpris per baseenhet fra kostprismotoren — samme beregning som overalt ellers. */
-  const cost = useMemo(() => {
-    const baseUnit = selectedRm?.base_unit;
-    if (!line || !baseUnit) return null;
-    const size = parseDecimal(packageSize);
-    return resolveLineCost({
-      quantity: line.quantity,
-      unit: line.unit,
-      unitPrice: line.unit_price,
-      totalAmount: line.total_amount,
-      packageSize: line.package_size,
-      packageUnit: line.package_unit,
-      countPerPackage: line.count_per_package,
-      description: line.description,
-      baseUnit,
-      supplierPackage: size && size > 0 ? { packageSize: size, packageUnit: packageUnit || baseUnit } : null,
-      knownPricePerBaseUnit: selectedRm?.current_cost_price ?? null,
-    });
-  }, [line, selectedRm?.base_unit, selectedRm?.current_cost_price, packageSize, packageUnit]);
-
-  const linePricePerBaseUnit = cost && !cost.needsInput ? cost.pricePerBaseUnit : null;
+  // Samme skjema og lagring som kontrollflaten i køen. Nullstilles når skuffen åpnes.
+  const form = useLineMatchForm(open ? line : null, open);
+  const {
+    selectedRmId, setSelectedRmId, search, setSearch, rmResults, searching, suggestions, suggestionLinks,
+    selectedRm, linkExists, anyPrimary, rememberSku, setRememberSku, rememberName, setRememberName,
+    setAsPrimary, setSetAsPrimary, confirmPackage, setConfirmPackage, agreedPrice, setAgreedPrice,
+    packageSize, setPackageSize, packageUnit, setPackageUnit, cost, linePricePerBaseUnit, busy,
+    aiBusy, aiSuggestion, aiNotice, runAiSuggestion,
+  } = form;
 
   async function performMatch(applyToAll: boolean, keepOpen = false) {
     if (!line || !selectedRmId) return;
-    setBusy(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Ikke innlogget");
-
-      const pkgSize = parseDecimal(packageSize);
-      const pkgUnit = packageUnit.trim() || null;
-      const agreed = parseDecimal(agreedPrice);
-
-      // Én felles implementasjon for både enkelt- og massegodkjenning.
-      const { lineIds, startPrice, recalculationPending, recalculationError } = await acceptMatch({
-        line,
-        rawMaterialId: selectedRmId,
-        userId: user.id,
-        packageSize: pkgSize,
-        packageUnit: pkgUnit,
-        baseUnitsPerPackage: cost?.baseUnitsPerPackage ?? null,
-        agreedPricePerBaseUnit: agreed,
-        rememberSku,
-        rememberName,
-        setAsPrimary,
-        confirmPackage,
-        rejectedRawMaterialIds: suggestions
-          .map((sg) => sg.raw_material_id)
-          .filter((id): id is string => !!id && id !== selectedRmId),
-        applyToAll,
-      });
-
-
+      const { lineIds, startPrice, recalculationPending, recalculationError } = await form.save({ applyToAll });
       const antall = lineIds.length;
       const startPriceNote = startPriceOutcomeLabel(startPrice) ?? undefined;
       const invoiceId = line.invoice_id;
       if (recalculationPending) {
-        // Matchen står, men prisavviket er ikke regnet om. Vi later ikke som
-        // om linjen er ferdig — brukeren får prøve reberegningen på nytt.
-        toast.warning(
-          `Koblingen er lagret, men prisen er ikke regnet om for ${antall} ${antall === 1 ? "linje" : "linjer"}`,
-          {
-            description: [recalculationError, startPriceNote].filter(Boolean).join(" ") || undefined,
-            duration: 15000,
-            action: {
-              label: "Prøv igjen",
-              onClick: () => {
-                void (async () => {
-                  try {
-                    await recalculateLines(invoiceId, lineIds);
-                    toast.success("Prisen er regnet om");
-                    invalidateInvoice(qc, invoiceId);
-                  } catch (err: unknown) {
-                    showError("faktura-match", err, "Reberegningen feilet fortsatt");
-                  }
-                })();
-              },
+        toast.warning(`Koblingen er lagret, men prisen er ikke regnet om for ${antall} ${antall === 1 ? "linje" : "linjer"}`, {
+          description: [recalculationError, startPriceNote].filter(Boolean).join(" ") || undefined,
+          duration: 15000,
+          action: {
+            label: "Prøv igjen",
+            onClick: () => {
+              void (async () => {
+                try {
+                  await recalculateLines(invoiceId, lineIds);
+                  toast.success("Prisen er regnet om");
+                  invalidateInvoice(qc, invoiceId);
+                } catch (err: unknown) {
+                  showError("faktura-match", err, "Reberegningen feilet fortsatt");
+                }
+              })();
             },
           },
-        );
+        });
       } else {
         toast.success(applyToAll ? `Matchet ${antall} ${antall === 1 ? "linje" : "linjer"}` : "Linje matchet", {
-          // Serveren avgjør om startprisen faktisk ble lagret — vi gjengir bare svaret.
           description: startPriceNote,
         });
       }
-      invalidateInvoice(qc, line.invoice_id);
-      invalidateRawMaterial(qc, selectedRmId);
       if (recalculationPending) {
         // Skuffen blir stående åpen så brukeren ser at noe gjenstår.
       } else if (keepOpen && onAcceptedNext) {
-        // Skuffen blir stående — neste linje lastes inn av kalleren.
         setSelectedRmId(null);
         setSearch("");
         onAcceptedNext();
@@ -338,38 +87,6 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
       }
     } catch (e: unknown) {
       showError("faktura-match", e, "Kunne ikke matche linjen");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  /**
-   * Henter et AI-forslag for linjen. Forslaget fyller bare ut skjemaet —
-   * bekreftelsen gjør brukeren selv, akkurat som før.
-   */
-  async function runAiSuggestion() {
-    if (!line) return;
-    setAiBusy(true);
-    setAiNotice(null);
-    try {
-      const { suggestion, reason } = await fetchAiLineSuggestion({
-        invoiceLineId: line.id,
-        candidateIds: suggestions.map((s) => s.raw_material_id).filter((id): id is string => !!id),
-      });
-      if (!suggestion) {
-        setAiSuggestion(null);
-        setAiNotice(reason ? AI_REASON_LABELS[reason] : AI_REASON_LABELS.ai_feilet);
-        return;
-      }
-      setAiSuggestion(suggestion);
-      if (suggestion.rawMaterialId) setSelectedRmId(suggestion.rawMaterialId);
-      if (suggestion.packageSize != null) setPackageSize(String(suggestion.packageSize));
-      if (suggestion.packageUnit) setPackageUnit(suggestion.packageUnit);
-      if (!suggestion.rawMaterialId) {
-        setAiNotice("AI-hjelpen fant ingen passende vare. Søk fram varen manuelt.");
-      }
-    } finally {
-      setAiBusy(false);
     }
   }
 
