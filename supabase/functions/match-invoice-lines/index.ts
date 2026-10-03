@@ -233,11 +233,19 @@ Deno.serve(async (req) => {
       .select("*").eq("legal_entity_id", inv.legal_entity_id)
       .or(`supplier_id.eq.${inv.supplier_id},supplier_id.is.null`));
 
+    // Raw materials in legal entity (active) — for fuzzy
+    const rmList = required("råvarer", await svc.from("raw_materials")
+      .select("id, name, sku, category, base_unit, current_cost_price, price_updated_at, primary_supplier_id, package_size, package_unit, base_units_per_package, package_confirmed_at")
+      .eq("legal_entity_id", inv.legal_entity_id).eq("is_active", true));
+    const rmById = new Map<string, AnyRec>((rmList ?? []).map((r: AnyRec) => [r.id, r]));
+
     // Supplier's raw_material_suppliers (with aliases)
     const rms = required("leverandørkoblinger", await svc.from("raw_material_suppliers")
       .select("id, raw_material_id, supplier_id, supplier_sku, supplier_product_name, agreed_price_per_base_unit, agreement_valid_from, agreement_valid_to, last_invoice_price, last_invoice_date, package_size, package_unit, base_units_per_package, package_confirmed_at, is_primary")
       .eq("supplier_id", inv.supplier_id));
-    const rmsList = rms ?? [];
+    // Bare koblinger til AKTIVE råvarer i fakturaens selskap kan brukes —
+    // en kobling til et annet selskaps eller en inaktiv vare er aldri et treff.
+    const rmsList = (rms ?? []).filter((r: AnyRec) => rmById.has(r.raw_material_id));
     const rmsIds = rmsList.map((r: AnyRec) => r.id);
 
     let aliases: AnyRec[] = [];
@@ -248,6 +256,32 @@ Deno.serve(async (req) => {
       aliases = aRows ?? [];
     }
     const rmsById = new Map<string, AnyRec>(rmsList.map((r: AnyRec) => [r.id, r]));
+
+    /**
+     * Leverandørkoblingen som er pakningskilden for linjen: den koblingen
+     * motoren faktisk traff, ellers samme varenummer, ellers den ENESTE
+     * koblingen. Flere koblinger med ulik pakning gir konflikt — aldri «første rad».
+     */
+    function pickRmsRow(
+      rawMaterialId: string,
+      preferredRmsId: string | null,
+      sku: string | null,
+    ): { row: AnyRec | undefined; conflict: boolean } {
+      if (preferredRmsId) {
+        const hit = rmsById.get(preferredRmsId);
+        if (hit && hit.raw_material_id === rawMaterialId) return { row: hit, conflict: false };
+      }
+      const rows = rmsList.filter((r: AnyRec) => r.raw_material_id === rawMaterialId);
+      if (rows.length <= 1) return { row: rows[0], conflict: false };
+      const skuN = norm(sku);
+      if (skuN) {
+        const bySku = rows.filter((r: AnyRec) => norm(r.supplier_sku) === skuN);
+        if (bySku.length === 1) return { row: bySku[0], conflict: false };
+      }
+      const sizes = new Set(rows.map((r: AnyRec) => (r.base_units_per_package == null ? "-" : String(Number(r.base_units_per_package)))));
+      if (sizes.size === 1) return { row: rows[0], conflict: false };
+      return { row: undefined, conflict: true };
+    }
 
     // Avviste og erstattede alias er lærdom om hva som IKKE stemmer — de skal aldri matche.
     const usableAliases = aliases.filter((a) => a.status !== "rejected" && a.status !== "superseded");
@@ -265,12 +299,6 @@ Deno.serve(async (req) => {
     }
     const isRejectedFor = (rmsId: string, ...keys: Array<string | null>) =>
       keys.some((k) => !!k && (rejectedKeysByRms.get(rmsId)?.has(k) ?? false));
-
-    // Raw materials in legal entity (active) — for fuzzy
-    const rmList = required("råvarer", await svc.from("raw_materials")
-      .select("id, name, sku, category, base_unit, current_cost_price, price_updated_at, primary_supplier_id, package_size, package_unit, base_units_per_package, package_confirmed_at")
-      .eq("legal_entity_id", inv.legal_entity_id).eq("is_active", true));
-    const rmById = new Map<string, AnyRec>((rmList ?? []).map((r: AnyRec) => [r.id, r]));
 
     // Lines
     let q = svc.from("invoice_lines").select("*").eq("invoice_id", invoiceId);
@@ -294,7 +322,8 @@ Deno.serve(async (req) => {
         if (normalizedUnitM && normalizedUnitM !== line.unit) manualUpdate.unit = normalizedUnitM;
 
         const rm = rmById.get(line.raw_material_id);
-        const rmsRow = rmsList.find((r: AnyRec) => r.raw_material_id === line.raw_material_id && r.supplier_id === inv.supplier_id);
+        const pickedM = pickRmsRow(line.raw_material_id, null, line.supplier_sku);
+        const rmsRow = pickedM.row;
         const refM = withRegisteredLastPurchase(await priceReference(line.raw_material_id), rmsRow);
         const expected = applyReference(manualUpdate, refM);
 
@@ -316,6 +345,10 @@ Deno.serve(async (req) => {
         if (actual == null && isPackageUnit(normalizedUnitM) && rm?.base_unit) {
           requiresReview = true;
           reviewReasons.add("unknown_package_size");
+        }
+        if (pickedM.conflict) {
+          requiresReview = true;
+          reviewReasons.add("package_conflict");
         }
         if (expected != null && actual != null && expected !== 0) {
           for (const reason of evaluateVariance(
@@ -354,6 +387,7 @@ Deno.serve(async (req) => {
         manualUpdate.requires_review = requiresReview;
         manualUpdate.review_reason = reviewReasons.size ? Array.from(reviewReasons).join(",") : null;
         await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, manualUpdate, catTolMap.get(rm?.category ?? "") ?? tolDefault, refM);
+        reconcileAcceptance(line, manualUpdate, line.raw_material_id);
 
         await applyUpdate(svc, line.id, manualUpdate);
         results.push({ id: line.id, status: "manual", recomputed: true });
@@ -654,7 +688,8 @@ Deno.serve(async (req) => {
       // STEG 6 — price variance (when raw_material_id is set)
       if (update.raw_material_id) {
         const rm = rmById.get(update.raw_material_id);
-        const rmsRow = rmsList.find((r: AnyRec) => r.raw_material_id === update.raw_material_id && r.supplier_id === inv.supplier_id);
+        const picked = pickRmsRow(update.raw_material_id, matchedRmsId ?? fuzzyMatchRmsRow?.id ?? null, line.supplier_sku);
+        const rmsRow = picked.row;
         const ref = withRegisteredLastPurchase(await priceReference(update.raw_material_id), rmsRow);
         const expected = applyReference(update, ref);
 
@@ -677,6 +712,7 @@ Deno.serve(async (req) => {
         // Aldri gjett: enhver ubrukelig kostpris skal ha en blokkerende årsak.
         for (const reason of costReviewReasons(cost, actual)) addReason(reason);
         if (actual == null && isPackageUnit(normalizedUnit) && rm?.base_unit) addReason("unknown_package_size");
+        if (picked.conflict) addReason("package_conflict");
 
         if (expected != null && actual != null && expected !== 0) {
           for (const reason of evaluateVariance(
@@ -699,6 +735,7 @@ Deno.serve(async (req) => {
         if (foreignCurrency) addReason("unsupported_currency");
 
         await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, update, catTolMap.get(rm?.category ?? "") ?? tolDefault, ref);
+        reconcileAcceptance(line, update, update.raw_material_id);
       }
 
       // Lær av vellykket fuzzy-match: skriv pending alias (aldri degrader bekreftede)
@@ -758,6 +795,48 @@ Deno.serve(async (req) => {
     return json({ error: "internal_error" }, 500);
   }
 });
+
+const ACCEPTABLE_PRICE_REASONS = new Set(["price_variance", "price_increase", "price_drop"]);
+const round4 = (v: unknown) => (v == null || !Number.isFinite(Number(v)) ? null : Math.round(Number(v) * 10000) / 10000);
+const same = (a: unknown, b: unknown) => String(a ?? "") === String(b ?? "");
+
+/**
+ * Et godtatt prisavvik gjelder bare for NØYAKTIG samme grunnlag: samme vare,
+ * mengde, enhet, beløp, beregnet pris og prisreferanse. Da fjernes kun de
+ * prisårsakene som faktisk ble godtatt — alle andre årsaker står. Ved endret
+ * grunnlag slettes godkjenningen og avviket må avklares igjen.
+ */
+export function reconcileAcceptance(line: AnyRec, target: AnyRec, rawMaterialId: string | null): void {
+  const acc = line.price_acceptance as AnyRec | null;
+  if (!acc) return;
+  const unitNow = target.unit ?? line.unit;
+  const identical =
+    same(acc.raw_material_id, rawMaterialId) &&
+    round4(acc.quantity) === round4(line.quantity) &&
+    same(normalizeUnit(acc.unit), normalizeUnit(unitNow)) &&
+    round4(acc.unit_price) === round4(line.unit_price) &&
+    round4(acc.total_amount) === round4(line.total_amount) &&
+    round4(acc.price_per_base_unit) === round4(target.price_per_base_unit) &&
+    round4(acc.expected_price_per_base_unit) === round4(target.expected_price_per_base_unit) &&
+    same(acc.price_reference_source, target.price_reference_source) &&
+    same(acc.price_reference_id, target.price_reference_id) &&
+    same(acc.price_reference_date, target.price_reference_date);
+  if (!identical) {
+    target.price_acceptance = null;
+    return;
+  }
+  const accepted = new Set<string>(
+    (Array.isArray(acc.accepted_reasons) ? acc.accepted_reasons : []).filter((r: string) => ACCEPTABLE_PRICE_REASONS.has(r)),
+  );
+  const reasons = String(target.review_reason ?? "").split(",").map((r) => r.trim()).filter(Boolean);
+  const rest = reasons.filter((r) => !accepted.has(r));
+  target.review_reason = rest.length ? rest.join(",") : null;
+  target.requires_review = rest.length > 0;
+  // Hvem og når står — motoren overskriver ikke et menneskes avgjørelse.
+  target.resolution_note = line.resolution_note;
+  target.resolved_by = line.resolved_by;
+  target.resolved_at = line.resolved_at;
+}
 
 async function applyUpdate(svc: any, lineId: string, update: AnyRec) {
   const { error } = await svc.from("invoice_lines").update(update).eq("id", lineId);
