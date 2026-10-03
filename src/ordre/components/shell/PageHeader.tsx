@@ -51,7 +51,7 @@ export function PageHeader({
         <div className="flex min-w-0 flex-1 flex-col">
           {eyebrow && <span className="eyebrow leading-none">{eyebrow}</span>}
           <div className="flex min-w-0 items-baseline gap-2">
-            <h1 className="font-display truncate text-[22px] font-semibold tracking-tight text-foreground">
+            <h1 className="font-display shrink-0 text-[22px] font-semibold tracking-tight text-foreground">
               {title}
             </h1>
             {count !== undefined && count !== null && (
@@ -67,7 +67,7 @@ export function PageHeader({
           </div>
         </div>
         {actions && (
-          <div className="flex basis-full flex-wrap items-center gap-2 sm:basis-auto">{actions}</div>
+          <div className="flex basis-full flex-wrap items-center gap-2 lg:basis-auto">{actions}</div>
         )}
       </div>
       {children && <div className="px-page pb-3">{children}</div>}
