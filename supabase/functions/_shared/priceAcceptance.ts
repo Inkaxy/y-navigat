@@ -52,7 +52,10 @@ export function reconcileAcceptance(
   const reasons = String(target.review_reason ?? "").split(",").map((r) => r.trim()).filter(Boolean);
   const rest = reasons.filter((r) => !accepted.has(r));
   target.review_reason = rest.length ? rest.join(",") : null;
-  target.requires_review = rest.length > 0;
+  // Bare når de godtatte prisårsakene var ALT som sto igjen. Et flagg uten
+  // kjent årsak ryddes aldri bort her.
+  if (reasons.length > 0 && rest.length === 0) target.requires_review = false;
+  else if (rest.length > 0) target.requires_review = true;
   // Hvem og når står — motoren overskriver ikke et menneskes avgjørelse.
   target.resolution_note = line.resolution_note;
   target.resolved_by = line.resolved_by;
