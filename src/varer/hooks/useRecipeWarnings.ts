@@ -140,7 +140,7 @@ export function useRecipeWarnings({
     for (const line of lines) {
       const rmId = line.raw_material_id ?? null;
       const name = (rmId ? cov?.names.get(rmId) : null) ?? line.ingredient_name ?? "Ukjent ingrediens";
-      const push = (w: Omit<RecipeWarning, "name">) => push({ ...w, name });
+      const push = (w: Omit<RecipeWarning, "name">) => out.push({ ...w, name });
 
       // Fritekstlinje: hverken råvare eller halvfabrikat er valgt.
       if (!rmId && !line.sub_product_id) {
