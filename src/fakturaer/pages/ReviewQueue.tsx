@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -246,7 +245,6 @@ export default function FakturaerInboxPage() {
   const [creditNoteId, setCreditNoteId] = useState<string | null>(null);
   const [startPriceOpen, setStartPriceOpen] = useState(false);
   const [busyInvoice, setBusyInvoice] = useState<{ id: string; action: string } | null>(null);
-  const [runAllProgress, setRunAllProgress] = useState<{ done: number; total: number } | null>(null);
   const anyDialogOpen =
     matchOpen || createOpen || notRmOpen || conflictOpen || !!reconcileId || bulkCreateOpen || !!creditNoteId || !!bulkLink ||
     startPriceOpen;
