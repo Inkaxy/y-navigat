@@ -773,7 +773,11 @@ export default function FakturaerInboxPage() {
       <BulkLinkDialog
         open={!!bulkLink}
         onOpenChange={(v) => {
-          if (!v) setBulkLink(null);
+          if (!v) {
+            setBulkLink(null);
+            setLastLinked(null);
+            void qc.invalidateQueries({ queryKey: ["similar-lines-count"] });
+          }
         }}
         rmsId={bulkLink?.rmsId ?? null}
         rawMaterialName={bulkLink?.name ?? ""}
