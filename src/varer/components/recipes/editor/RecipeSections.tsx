@@ -23,9 +23,9 @@ export function goToSection(id: string, root: ParentNode = document): boolean {
 /** Seksjon med fokuserbar overskrift — mål for «Gå til». */
 export function RecipeSection({ id, title, actions, children }: { id: RecipeSectionId; title: string; actions?: ReactNode; children: ReactNode }) {
   return (
-    <section id={id} aria-labelledby={`${id}-tittel`} className="scroll-mt-4 space-y-3 lg:scroll-mt-48">
+    <section id={id} aria-labelledby={`${id}-tittel`} className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-subtle pb-1.5">
-        <h2 id={`${id}-tittel`} data-section-heading tabIndex={-1} className="font-display text-title text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <h2 id={`${id}-tittel`} data-section-heading tabIndex={-1} className="scroll-mt-28 font-display text-title text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           {title}
         </h2>
         {actions}
