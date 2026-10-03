@@ -6,13 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { Check, ChevronsUpDown, Keyboard, Loader2, RotateCw, Undo2 } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, RotateCw, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { QueryState } from "@/components/common/QueryState";
-import { QueueWorkspace, type BucketTab } from "@/fakturaer/components/inbox/QueueWorkspace";
+import { QueueWorkspace } from "@/fakturaer/components/inbox/QueueWorkspace";
 import { isBulkAcceptable, lineStatus } from "@/fakturaer/lib/lineStatus";
 import { useReviewLines, useReviewLineCounts, type ReviewLineRow, type ReviewLineCountRow } from "@/fakturaer/hooks/useReviewLines";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
@@ -35,6 +35,7 @@ import { SkuConflictDialog } from "@/fakturaer/components/SkuConflictDialog";
 import { ConfirmReconcileDialog } from "@/fakturaer/components/ConfirmReconcileDialog";
 import { InvoiceDocumentPanel } from "@/fakturaer/components/InvoiceDocumentPanel";
 import { InboxInvoiceCard } from "@/fakturaer/components/inbox/InboxInvoiceCard";
+import { FocusHeader } from "@/fakturaer/components/inbox/FocusHeader";
 import {
   matchesGroup,
   repeatCounts as computeRepeatCounts,
@@ -127,7 +128,9 @@ export default function FakturaerInboxPage() {
   const { data: company } = useCompany();
   const [supplierId, setSupplierId] = useState<string>("all");
   const [supplierOpen, setSupplierOpen] = useState(false);
-  const [bucket, setBucket] = useState<BucketTab>("needs");
+  const [showAll, setShowAll] = useState(false);
+  const [multiSelect, setMultiSelect] = useState(false);
+  const [showGlobalLines, setShowGlobalLines] = useState(false);
   const [reason, setReason] = useState<TabValue>("all");
 
   // Ett firma: selskapet kommer fra useCompany, ikke fra en velger.
@@ -159,11 +162,18 @@ export default function FakturaerInboxPage() {
 
   // Ekspandert faktura — innboksen viser linjene for én faktura om gangen.
   const [lineLimit, setLineLimit] = useState(200);
-  const [expandedId, setExpandedId] = useState<string | null>(searchParams.get("faktura"));
-  useEffect(() => {
-    const wanted = searchParams.get("faktura");
-    if (wanted) setExpandedId(wanted);
-  }, [searchParams]);
+  // Valgt faktura ligger i adressen, så tilbakeknappen og delte lenker virker.
+  const expandedId = searchParams.get("faktura");
+  const openInvoice = useCallback(
+    (id: string | null) => {
+      const next = new URLSearchParams(searchParams);
+      if (id) next.set("faktura", id);
+      else next.delete("faktura");
+      setSearchParams(next);
+      window.scrollTo({ top: 0 });
+    },
+    [searchParams, setSearchParams],
+  );
 
   // Når et fakturakort er åpent henter vi bare den fakturaens linjer.
   // Listen over «alle linjer» har et tak slik at spørringen holder seg rask.
@@ -197,20 +207,10 @@ export default function FakturaerInboxPage() {
   const visibleLines = useMemo(() => {
     const scoped = expandedId ? lines.filter((l) => l.invoice_id === expandedId) : lines;
     const filtered = scoped.filter(
-      (l) => matchesTab(l, reason) && (bucket === "all" || statusOf(l).bucket === bucket),
+      (l) => matchesTab(l, reason) && (showAll || statusOf(l).bucket === "needs"),
     );
     return sortQueue(filtered, sort, repeats);
-  }, [lines, expandedId, reason, bucket, sort, repeats, statusOf]);
-
-  const counts = useMemo(() => {
-    const c: Record<BucketTab, number> = { all: 0, needs: 0, ready: 0, done: 0 };
-    for (const l of countRows) {
-      if (!matchesTab(l, reason)) continue;
-      c.all++;
-      c[statusOf(l).bucket]++;
-    }
-    return c;
-  }, [countRows, reason, statusOf]);
+  }, [lines, expandedId, reason, showAll, sort, repeats, statusOf]);
 
   const progress = useMemo(() => {
     if (!expandedId || countRows.length === 0) return null;
@@ -342,39 +342,6 @@ export default function FakturaerInboxPage() {
       busyRef.current = false;
     }
   }, [queue, refresh]);
-
-  /** Samlegodkjenning: bare linjer der det eneste som gjenstår er å bekrefte råvareforslaget. */
-  const acceptAllVisible = useCallback(
-    async () => {
-      if (!canWrite) return;
-      const candidates = visibleLines.filter(isBulkAcceptable);
-      if (candidates.length === 0) {
-        toast.info("Ingen synlige linjer har et forslag uten andre avvik");
-        return;
-      }
-      setBulkBusy(true);
-      let ok = 0;
-      const failures: string[] = [];
-      const accepted: Array<{ invoice_id: string; id: string }> = [];
-      for (const line of candidates) {
-        try {
-          await acceptTopSuggestion(line, { skipRematch: true });
-          accepted.push({ invoice_id: line.invoice_id, id: line.id });
-          ok++;
-        } catch (e) {
-          failures.push(e instanceof Error ? e.message : "ukjent feil");
-        }
-      }
-      // Én kjøring av matchemotoren for hele bunken, ikke én per linje.
-      const pending = accepted.length > 0 ? await rematchLines(accepted) : [];
-      setBulkBusy(false);
-      refresh();
-      if (failures.length === 0) toast.success(`${ok} linjer godtatt`);
-      else toast.warning(`${ok} godtatt, ${failures.length} feilet`);
-      notifyPendingRecalculation(pending);
-    },
-    [canWrite, visibleLines, refresh],
-  );
 
   // --- Masse-handlinger ----------------------------------------------------
   async function bulkAcceptSelected() {
@@ -567,28 +534,51 @@ export default function FakturaerInboxPage() {
   // --- Render --------------------------------------------------------------
   const expandedInvoice = invoices.find((i) => i.id === expandedId) ?? null;
 
+  const reconcileReady = !!expandedId && !!progress && progress.needs === 0 && canReconcile;
+
+  /**
+   * Etter lagring: hent serverens tilstand. Står linjen fortsatt til avklaring
+   * (pris, pakning, reberegning), blir den værende. Ellers går vi til neste
+   * linje som trenger hjelp — aldri ved å regne en uferdig linje som ferdig.
+   */
+  const handleSaved = useCallback(
+    async (lineId: string) => {
+      const ids = queue.ids;
+      const idx = ids.indexOf(lineId);
+      const r = await linesQuery.refetch();
+      void countsQuery.refetch();
+      const rows = r.data?.rows ?? [];
+      const needs = (id: string) => {
+        const row = rows.find((x) => x.id === id);
+        return !!row && statusOf(row).bucket === "needs";
+      };
+      if (needs(lineId)) return;
+      const nextId = [...ids.slice(idx + 1), ...ids.slice(0, Math.max(idx, 0))].find((id) => id !== lineId && needs(id));
+      if (nextId) dispatch({ type: "focus", id: nextId });
+    },
+    [queue.ids, linesQuery, countsQuery, statusOf],
+  );
+
   const queueEl = (
     <QueueWorkspace
       lines={visibleLines}
       statusOf={statusOf}
-      counts={counts}
-      bucket={bucket}
-      onBucket={setBucket}
+      showAll={showAll}
+      onShowAll={setShowAll}
+      needsCount={progress?.needs ?? countRows.length}
       reason={reason}
       onReason={setReason}
       sort={sort}
       onSort={setSort}
-      progress={progress}
+      multiSelect={multiSelect}
+      onMultiSelect={(v) => {
+        setMultiSelect(v);
+        if (!v) setSelected({});
+      }}
       loading={linesQuery.isLoading}
       error={linesQuery.isError ? linesQuery.error : null}
       onRetry={() => void linesQuery.refetch()}
-      emptyTitle={
-        bucket === "needs"
-          ? "Ingen linjer må avklares her — godt jobbet!"
-          : expandedInvoice
-            ? "Ingen linjer i dette utvalget på fakturaen"
-            : "Ingen linjer i dette utvalget"
-      }
+      emptyTitle={showAll ? "Ingen linjer i dette utvalget" : reconcileReady ? "Alle linjer er avklart" : "Ingen linjer må avklares her"}
       activeLine={activeLine}
       onSelect={(l) => dispatch({ type: "focus", id: l.id })}
       onPrev={() => dispatch({ type: "prev" })}
@@ -604,17 +594,17 @@ export default function FakturaerInboxPage() {
         onCreate: bulkCreate,
         onClear: () => setSelected({}),
       }}
-      readyToAccept={{ count: visibleLines.filter(isBulkAcceptable).length, onAccept: () => void acceptAllVisible() }}
       links={links}
       toleranceFor={toleranceForEntity}
       showInvoice={!expandedId}
       canWrite={canWrite}
-      busy={bulkBusy}
+      reconcileReady={reconcileReady}
       isMobile={isMobile}
       countsError={countsQuery.isError}
-      onAction={openDialog}
-      onAccept={(l) => void doAccept(l)}
+      onSaved={handleSaved}
+      onSecondary={(a, l) => openDialog(a, l)}
       onShowDocument={showDoc}
+      onReconcile={() => expandedId && setReconcileId(expandedId)}
     />
   );
 
@@ -657,6 +647,24 @@ export default function FakturaerInboxPage() {
 
   return (
     <div className="space-y-5">
+      {expandedId ? (
+        <FocusHeader
+          invoice={expandedInvoice}
+          fallback={lines.find((l) => l.invoice_id === expandedId)?.invoice ?? null}
+          progress={progress}
+          reconcileReady={reconcileReady}
+          undoLabel={undoEntry?.label ?? null}
+          onUndo={() => void doUndo()}
+          onBack={() => openInvoice(null)}
+          onReconcile={() => setReconcileId(expandedId)}
+          onShowDocument={() => {
+            const l = activeLine ?? lines.find((x) => x.invoice_id === expandedId);
+            if (l) showDoc(l);
+          }}
+        />
+      ) : null}
+      {expandedId ? queueEl : (
+      <>
       <FakturaerHeaderBanner
         title="Fakturainnboks"
         subtitle="Fakturaer som trenger handling — match, avstem og lukk uten å bytte side"
@@ -763,17 +771,6 @@ export default function FakturaerInboxPage() {
           </span>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line-subtle pt-3 text-xs text-ink-secondary">
-          <span className="inline-flex items-center gap-1.5 font-medium">
-            <Keyboard className="h-3.5 w-3.5" /> Hurtigtaster
-          </span>
-          <span>↑ / ↓ marker</span>
-          <span>Enter godta råvareforslag</span>
-          <span>m velg råvare</span>
-          <span>n ny råvare</span>
-          <span>x ikke råvare</span>
-          <span>u angre</span>
-        </div>
       </Card>
 
       <QueryState
@@ -794,7 +791,7 @@ export default function FakturaerInboxPage() {
                 canWrite={canWrite}
                 canReconcile={canReconcile}
                 busyAction={busyInvoice?.id === inv.id ? busyInvoice.action : null}
-                onToggle={() => setExpandedId((cur) => (cur === inv.id ? null : inv.id))}
+                onToggle={() => openInvoice(inv.id)}
                 onFetchLines={() => void invoiceAction(inv.id, "fetch")}
                 onRegisterLines={() => navigate(`/ravarer/fakturaer/${inv.id}/registrer-linjer`)}
                 onRunMatch={() => void invoiceAction(inv.id, "match")}
@@ -803,15 +800,18 @@ export default function FakturaerInboxPage() {
                 onReconcile={() => setReconcileId(inv.id)}
                 onOpen={() => navigate(`/ravarer/fakturaer/${inv.id}`)}
               />
-              {expandedId === inv.id && <div className="pl-4">{queueEl}</div>}
             </div>
           ))}
         </div>
       </QueryState>
 
-      {!expandedId && (
+      <div>
+        <Button variant="outline" size="sm" aria-expanded={showGlobalLines} onClick={() => setShowGlobalLines((v) => !v)}>
+          {showGlobalLines ? "Skjul linjer på tvers av fakturaer" : "Kontroller linjer på tvers av fakturaer"}
+        </Button>
+      </div>
+      {showGlobalLines && (
         <>
-          <h2 className="text-title">Alle linjer til behandling</h2>
           {hasMoreLines && sort === "impact" && (
             <p className="text-caption text-ink-secondary">
               Sorteringen etter kroner gjelder bare de {lines.length} linjene som er lastet inn — ikke hele køen.
@@ -826,6 +826,9 @@ export default function FakturaerInboxPage() {
             </div>
           )}
         </>
+      )}
+
+      </>
       )}
 
       {panelActive && (
