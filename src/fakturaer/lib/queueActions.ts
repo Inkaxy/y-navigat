@@ -195,23 +195,35 @@ export function canAcceptPriceVariance(line: ReviewLineRow): boolean {
   return reasons.length > 0 && reasons.every((r) => ACCEPTABLE_PRICE_REASONS.has(r));
 }
 
+const ACCEPT_ERRORS: Record<string, string> = {
+  stale_line: "Linjen er endret siden du åpnet den. Last inn på nytt og kontroller prisen igjen.",
+  not_only_price_variance: "Linjen har andre punkter som må avklares før prisen kan godtas.",
+  price_basis_missing: "Prisen kan ikke godtas uten beregnet pris og sammenligningspris.",
+  line_not_linked: "Linjen er ikke koblet til en råvare.",
+  invoice_locked: "Fakturaen er flagget eller allerede fullført.",
+  forbidden: "Du har ikke tilgang til å godta priser for dette selskapet.",
+  line_not_found: "Fant ikke linjen. Den kan være slettet.",
+  not_authenticated: "Du er ikke innlogget.",
+};
+
+/** Oversetter feilkoden fra serveren til en norsk forklaring — aldri rå backend-tekst. */
+export function acceptPriceErrorMessage(message: string | undefined): string {
+  const key = Object.keys(ACCEPT_ERRORS).find((k) => (message ?? "").includes(k));
+  return key ? ACCEPT_ERRORS[key] : "Kunne ikke godta prisen. Prøv igjen.";
+}
+
 /**
- * Godtar prisavviket på ÉN linje. Avtalepris og sammenligningsgrunnlag endres ikke;
- * hvem og når lagres på linjen på samme måte som «Ikke råvare».
+ * Godtar prisavviket på ÉN linje via serveren. Serveren låser linjen, sjekker
+ * tilgang, at tallene er de samme som brukeren så, og at prisavvik er det
+ * eneste som gjenstår. Grunnlaget lagres slik at en ny matching med samme
+ * grunnlag beholder godkjenningen, mens endret grunnlag åpner avviket igjen.
  */
 export async function acceptPriceVariance(line: ReviewLineRow): Promise<void> {
   if (!canAcceptPriceVariance(line)) throw new Error("Prisavviket kan ikke godtas på denne linjen");
-  const userId = await currentUserId();
-  const pct = line.price_variance_pct == null ? "" : ` (${Number(line.price_variance_pct) > 0 ? "+" : ""}${Number(line.price_variance_pct).toFixed(1).replace(".", ",")} %)`;
-  const { error } = await supabase
-    .from("invoice_lines")
-    .update({
-      requires_review: false,
-      review_reason: null,
-      resolution_note: `Prisavvik godtatt${pct}`,
-      resolved_by: userId,
-      resolved_at: new Date().toISOString(),
-    })
-    .eq("id", line.id);
-  if (error) throw new Error(`Kunne ikke godta prisen: ${error.message}`);
+  const { error } = await supabase.rpc("accept_invoice_line_price_variance", {
+    p_line_id: line.id,
+    p_expected_price_per_base_unit: Number(line.price_per_base_unit),
+    p_expected_reference_price: Number(line.expected_price_per_base_unit),
+  });
+  if (error) throw new Error(acceptPriceErrorMessage(error.message));
 }
