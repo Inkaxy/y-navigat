@@ -285,9 +285,13 @@ export default function TicketsInbox() {
     if (archiveCounts) {
       c.closed = archiveCounts.closed;
       c.spam = archiveCounts.spam;
+    } else if (archiveLoading) {
+      // Arkivet er bare delvis lastet ned — vis «–» til det eksakte tallet er klart.
+      delete c.closed;
+      delete c.spam;
     }
     return c;
-  }, [rows, user?.id, archiveCounts]);
+  }, [rows, user?.id, archiveCounts, archiveLoading]);
 
   const filtered = useMemo(() => {
     let out = rows.filter((r) => matchesQueue(r, queue, user?.id));
