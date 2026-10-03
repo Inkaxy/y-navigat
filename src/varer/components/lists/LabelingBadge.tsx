@@ -8,7 +8,10 @@ const CLS: Record<LabelingStatus, string> = {
 };
 
 /** Merkestatus i listene — én visning for vareliste og oppskrifter. */
-export function LabelingBadge({ status, withPrefix = false }: { status: LabelingStatus; withPrefix?: boolean }) {
+export function LabelingBadge({ status, withPrefix = false }: { status: LabelingStatus | null; withPrefix?: boolean }) {
+  if (status === null) {
+    return <Badge variant="outline" className="text-muted-foreground">Laster merking</Badge>;
+  }
   return (
     <Badge variant="outline" className={CLS[status]}>
       {withPrefix ? `Merking: ${LABELING_STATUS_LABEL[status].toLowerCase()}` : LABELING_STATUS_LABEL[status]}

@@ -52,9 +52,12 @@ export const BULK_EDITABLE: Record<string, BulkEditableField> = { in_web_shop: "
 export type RowCtx = {
   parent: ProductRow | null;
   price: number | undefined;
+  /** Valgt prisliste lastes fortsatt. */
+  priceLoading: boolean;
   costCache: CostCacheRow | undefined;
   readiness: (ProductCalcReadinessRow & { recipe_id: string | null }) | undefined;
-  labeling: LabelingStatus;
+  /** null = merkedata lastes fortsatt. */
+  labeling: LabelingStatus | null;
 };
 
 export type ColDef = ColumnOption & {
@@ -154,7 +157,7 @@ export function buildProductColumns({
     { key: "unit", label: "Salgsenhet", render: (p) => p.unit_of_sale },
     {
       key: "price", label: "Pris", headerClassName: "text-right", cellClassName: "text-right tabular-nums",
-      render: (_p, ctx) => (ctx.price !== undefined ? `${formatKr(ctx.price)} kr` : <span className="text-muted-foreground">—</span>),
+      render: (_p, ctx) => (ctx.price !== undefined ? `${formatKr(ctx.price)} kr` : <span className="text-muted-foreground">{ctx.priceLoading ? "Laster …" : "—"}</span>),
     },
     { key: "calc", label: "Kalkyle", render: (_p, ctx) => <CalcBadge readiness={ctx.readiness} costStale={!!ctx.costCache?.is_stale} /> },
     { key: "mva", label: "MVA", headerClassName: "text-right", cellClassName: "text-right tabular-nums text-muted-foreground", render: (p) => (p.mva_rate != null ? `${p.mva_rate}%` : "—") },
