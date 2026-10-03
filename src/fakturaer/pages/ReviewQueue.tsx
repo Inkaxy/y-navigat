@@ -28,6 +28,7 @@ import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { MatchDrawer } from "@/fakturaer/components/MatchDrawer";
 import { BulkLinkDialog } from "@/fakturaer/components/BulkLinkDialog";
 import { handleQueueShortcut } from "@/fakturaer/lib/queueShortcuts";
+import { notifyAccepted } from "@/fakturaer/lib/acceptNotice";
 import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
 import { BulkCreateRawMaterialsDialog } from "@/fakturaer/components/BulkCreateRawMaterialsDialog";
 import { LinkCreditNoteDialog } from "@/fakturaer/components/LinkCreditNoteDialog";
@@ -301,10 +302,7 @@ export default function FakturaerInboxPage() {
             action: { label: "Prøv igjen", onClick: () => retryRecalculation(line.invoice_id, lineIds) },
           });
         } else {
-          // «Bruk på flere» er et bevisst sekundærvalg — dialogen åpnes aldri av seg selv.
-          toast.success(`Koblet til ${name}`, rmsId
-            ? { action: { label: "Bruk på flere", onClick: () => setBulkLink({ rmsId, name }) } }
-            : undefined);
+          notifyAccepted(name, rmsId ?? null, (id, n) => setBulkLink({ rmsId: id, name: n }));
         }
         refresh(line.invoice_id);
       } catch (e) {
