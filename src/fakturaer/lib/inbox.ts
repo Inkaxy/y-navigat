@@ -51,6 +51,7 @@ export interface InboxInvoiceInput {
   /** Fritekst på fakturaen — koblingen til opprinnelig faktura lagres her. */
   notes?: string | null;
   line_extraction_status?: string | null;
+  currency?: string | null;
   lines: InboxLine[];
 }
 
@@ -131,6 +132,7 @@ export function assessInboxInvoice(
   if (inv.lines_sum_status == null && lines.length > 0) blockers.push("linjesummen er ikke kontrollert");
   if (inv.is_credit_note && !creditNoteOriginalRef(inv.notes))
     blockers.push("kreditnotaen er ikke knyttet til en opprinnelig faktura");
+  if (inv.currency && inv.currency.toUpperCase() !== "NOK") blockers.push(`fakturaen er i ${inv.currency.toUpperCase()}`);
 
   const locked = inv.status === "reconciled" || inv.status === "flagged" || inv.status === "cancelled";
   return {
@@ -165,7 +167,7 @@ export function inboxTabOf(inv: { status: string; assessment: InboxAssessment })
   return inv.assessment.canReconcile ? "ready" : "open";
 }
 
-export type InboxPrimaryAction = "fetch_lines" | "register_lines" | "link_credit_note" | "unflag" | "resolve" | "finish";
+export type InboxPrimaryAction = "fetch_lines" | "register_lines" | "link_credit_note" | "view_flag" | "resolve" | "finish";
 
 /** ÉN meningsfull handling per rad, og en kort forklaring. */
 export function inboxPrimaryAction(inv: {
@@ -176,7 +178,7 @@ export function inboxPrimaryAction(inv: {
   assessment: InboxAssessment;
 }): { action: InboxPrimaryAction; label: string; hint: string } {
   const a = inv.assessment;
-  if (inv.status === "flagged") return { action: "unflag", label: "Se flagget", hint: "Fakturaen er flagget" };
+  if (inv.status === "flagged") return { action: "view_flag", label: "Se flagget", hint: "Fakturaen er flagget" };
   const missing = inv.line_count === 0 || ["pending", "failed"].includes(inv.line_extraction_status ?? "");
   if (missing) {
     return inv.source === "tripletex"

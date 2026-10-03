@@ -451,7 +451,8 @@ export default function FakturaerInboxPage() {
     if (action === "fetch_lines") void invoiceAction(inv.id, "fetch");
     else if (action === "register_lines") navigate(`/ravarer/fakturaer/${inv.id}/registrer-linjer`);
     else if (action === "link_credit_note") setCreditNoteId(inv.id);
-    else if (action === "unflag") void invoiceAction(inv.id, "unflag");
+    // «Se flagget» viser flagget og detaljene — fjerner det ALDRI.
+    else if (action === "view_flag") navigate(`/ravarer/fakturaer/${inv.id}`);
     else if (action === "finish") setReconcileId(inv.id);
     else openInvoice(inv.id);
   }
@@ -701,6 +702,7 @@ export default function FakturaerInboxPage() {
         onRematch={(inv) => void invoiceAction(inv.id, "match")}
         onOpenDetail={(inv) => navigate(`/ravarer/fakturaer/${inv.id}`)}
         onFlag={(inv) => setFlagId(inv.id)}
+        onUnflag={(inv) => void invoiceAction(inv.id, "unflag")}
         onBatchMatch={batchMatch}
       />
 

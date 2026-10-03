@@ -156,7 +156,7 @@ describe("Oppdater matching med delvis feil", () => {
         <InvoiceInbox
           tab="open" onTabChange={() => {}} invoices={[mk("a", "1"), mk("b", "2")]} isLoading={false} isError={false}
           error={null} onRetry={() => {}} legalEntityId="le" supplierId={null} supplierFilter={null} canWrite canReconcile
-          busyId={null} onPrimary={() => {}} onRematch={() => {}} onOpenDetail={() => {}} onFlag={() => {}} onBatchMatch={batch}
+          busyId={null} onPrimary={() => {}} onRematch={() => {}} onOpenDetail={() => {}} onFlag={() => {}} onUnflag={() => {}} onBatchMatch={batch}
         />
       </QueryClientProvider>,
     );

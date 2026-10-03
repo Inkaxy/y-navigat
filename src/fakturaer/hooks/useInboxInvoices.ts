@@ -97,6 +97,7 @@ export function toInboxInvoice(r: RawInvoice): InboxInvoice {
     lines_sum_status: r.lines_sum_status,
     notes: r.notes,
     line_extraction_status: r.line_extraction_status,
+    currency: r.currency ?? null,
     lines,
   });
   return {
