@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
-import { Link2, Loader2, Plus } from "lucide-react";
+import { Link2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QueryErrorState } from "@/components/common/QueryState";
 import { StatusPill } from "@/ordre/components/ui/status-pill";
@@ -214,6 +214,7 @@ export default function OrderLinkCard({
                   variant="outline"
                   className="gap-1"
                   aria-expanded={mode === "search"}
+                  data-order-link-trigger
                   onClick={() => setMode((m) => (m === "search" ? "idle" : "search"))}
                 >
                   <Link2 className="h-3.5 w-3.5" aria-hidden="true" /> Koble eksisterende ordre
@@ -265,4 +266,3 @@ export default function OrderLinkCard({
   );
 }
 
-export { Plus as _unusedPlusIcon };
