@@ -63,7 +63,10 @@ export function LineTask(p: LineTaskProps) {
   const currency = line.invoice.currency ?? "NOK";
   const supplier = line.invoice.supplier?.name ?? "leverandøren";
   const dataCost = costOf(line, link);
-  const dataInconsistent = !!dataCost && !dataCost.checks.arithmeticPerInvoiceUnit && !dataCost.checks.arithmeticPerBaseUnit;
+  const dataInconsistent = invoiceArithmeticMismatch(
+    { quantity: line.quantity, unitPrice: line.unit_price, totalAmount: line.total_amount },
+    dataCost?.checks ?? null,
+  );
   const pkgValid = form.packageDraft.state === "valid" && !!form.cost && !form.cost.needsInput && !!form.selectedRm;
   const pkgHint =
     form.materialLoading

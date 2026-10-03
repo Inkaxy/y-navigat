@@ -972,3 +972,22 @@ export function packageBaseUnits(
   if (factor == null) return null;
   return size * factor;
 }
+
+/**
+ * Er det et VIRKELIG regneavvik på fakturalinjen? Bare når mengde, enhetspris og
+ * linjesum er endelige tall og mengde × enhetspris ikke gir linjesummen, og
+ * avviket heller ikke forklares av kjent pakning (pris per grunnenhet).
+ * «Kan ikke beregnes fordi pakningen er ukjent» er IKKE et regneavvik.
+ */
+export function invoiceArithmeticMismatch(
+  line: { quantity: unknown; unitPrice: unknown; totalAmount: unknown },
+  checks: Pick<CostChecks, "arithmeticPerBaseUnit"> | null,
+): boolean {
+  const q = toNum(line.quantity);
+  const p = toNum(line.unitPrice);
+  const a = toNum(line.totalAmount);
+  if (q == null || p == null || a == null || q <= 0) return false;
+  if (nearlyEqual(q * p, a)) return false;
+  if (checks?.arithmeticPerBaseUnit) return false;
+  return true;
+}
