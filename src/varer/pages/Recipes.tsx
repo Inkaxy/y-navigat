@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -293,7 +293,7 @@ function FilterSelect({
   label: string;
   value: string;
   onChange: (v: string) => void;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div>
