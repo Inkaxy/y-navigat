@@ -1,4 +1,3 @@
-import { cn } from "@/lib/utils";
 import { diffSegments, nutritionDiff } from "@/varer/lib/declarationDiff";
 import { stripHtml } from "@/varer/lib/effectiveDeclaration";
 
