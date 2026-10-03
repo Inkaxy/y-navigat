@@ -22,13 +22,13 @@ import { useAppContext } from "@/varer/context/AppContext";
 import { useUiPreference } from "@/hooks/useUiPreference";
 import { toast } from "sonner";
 import { osloTodayISO } from "@/lib/osloDate";
-import { QueryState } from "@/components/common/QueryState";
+import { QueryErrorState, QueryState } from "@/components/common/QueryState";
 import {
   parseProductListParams, writeProductListParams,
   type ProductStatusFilter, type ProductVariantFilter,
 } from "@/varer/lib/listUrlState";
 import { detailHref } from "@/varer/lib/listReturn";
-import { filterProducts } from "@/varer/lib/productListFilter";
+import { filterProducts, productListLoadState } from "@/varer/lib/productListFilter";
 import { useListUrlState, useReturnFocus } from "@/varer/hooks/useListUrlState";
 import { FilterDisclosure } from "@/varer/components/lists/FilterDisclosure";
 import { ListResultSummary, type ActiveFilter } from "@/varer/components/lists/ActiveFilterChips";

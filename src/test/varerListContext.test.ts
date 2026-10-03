@@ -5,7 +5,7 @@ import {
 } from "@/varer/lib/listUrlState";
 import { detailHref, listReturnHref, readFocusId, sanitizeListSearch } from "@/varer/lib/listReturn";
 import { groupRecipeWarnings, distinctActions, focusRecipeLine } from "@/varer/lib/recipeWarningGroups";
-import { filterProducts } from "@/varer/lib/productListFilter";
+import { filterProducts, productListLoadState } from "@/varer/lib/productListFilter";
 import { filterAndSortRecipes } from "@/varer/lib/recipeListFilter";
 import { goToSection } from "@/varer/components/recipes/editor/RecipeSections";
 import type { RecipeWarning } from "@/varer/hooks/useRecipeWarnings";
@@ -123,5 +123,25 @@ describe("filtrering bevart", () => {
   it("oppskrifter sorteres synkende", () => {
     const rows = ["b", "a", "c"].map((name) => ({ name, category: null, status: "draft", department: null, updated_at: null, products: [], labeling: "missing" as const, totals: { hydrationPct: 0, totalDoughG: 0 } }));
     expect(filterAndSortRecipes(rows, { ...RECIPE_LIST_DEFAULTS, dir: "desc" }).map((r) => r.name)).toEqual(["c", "b", "a"]);
+  });
+});
+
+describe("vareliste: lastetilstand for merking", () => {
+  const ok = { isLoading: false, isError: false };
+  const pending = { isLoading: true, isError: false };
+  it("varer + ventende merkedata gir ikke falsk tomtilstand med merkingfilter", () => {
+    const s = productListLoadState({ products: ok, readiness: pending, labelCalc: ok, labelingFilterActive: true });
+    expect(s.isLoading).toBe(true);
+    expect(productListLoadState({ products: ok, readiness: ok, labelCalc: pending, labelingFilterActive: true }).isLoading).toBe(true);
+  });
+  it("uten merkingfilter vises varene tidlig, men merking står som lastende", () => {
+    const s = productListLoadState({ products: ok, readiness: pending, labelCalc: ok, labelingFilterActive: false });
+    expect(s.isLoading).toBe(false);
+    expect(s.labelingPending).toBe(true);
+  });
+  it("deaktivert merkeberegning gir ikke evig lasting, og feil vinner", () => {
+    expect(productListLoadState({ products: ok, readiness: ok, labelCalc: ok, labelingFilterActive: true }).isLoading).toBe(false);
+    const e = productListLoadState({ products: ok, readiness: { isLoading: false, isError: true }, labelCalc: pending, labelingFilterActive: true });
+    expect(e.isError).toBe(true);
   });
 });
