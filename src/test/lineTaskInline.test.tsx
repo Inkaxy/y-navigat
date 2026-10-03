@@ -6,12 +6,15 @@ import type { ReactNode } from "react";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 
 /** Mockdata — ingen ekte forretningsdata lagres. */
-const RM = { id: "rm-kaffe", name: "Kaffe, malt", sku: "R-1042", category: null, current_cost_price: null, base_unit: "kg", primary_supplier_id: null, item_type: null };
+const RM_KG = { id: "rm-kaffe", name: "Kaffe, malt", sku: "R-1042", category: null, current_cost_price: null, base_unit: "kg", primary_supplier_id: null, item_type: null };
+let RM = RM_KG;
+/** Når satt, svarer råvareoppslaget aldri (lastetilstand). */
+let rmPending = false;
 
 function chain(table: string) {
   const c: Record<string, unknown> = {};
   for (const m of ["select", "eq", "in", "or", "limit", "order", "not", "range"]) c[m] = () => c;
-  c.single = async () => ({ data: table === "raw_materials" ? RM : null, error: null });
+  c.single = () => (rmPending ? new Promise(() => {}) : Promise.resolve({ data: table === "raw_materials" ? RM : null, error: null }));
   c.then = (resolve: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(resolve);
   return c;
 }
@@ -114,13 +117,15 @@ const okResult = { lineIds: ["line-a"], rmsId: "rms", startPrice: { attempted: f
 beforeEach(() => {
   cleanup();
   acceptMatch.mockReset();
+  RM = RM_KG;
+  rmPending = false;
   recalculateLines.mockReset();
 });
 
 describe("Kontrollflaten — pakning direkte i oppgaven", () => {
   it("allerede koblet råvare går rett til pakningsskjema uten nytt søk", async () => {
     setup(makeLine());
-    expect(screen.getByText(/Hvor mye inneholder én kartong/)).toBeTruthy();
+    expect(await screen.findByText(/Hvor mye inneholder én kartong/)).toBeTruthy();
     expect(screen.queryByLabelText("Søk i råvareregisteret")).toBeNull();
     expect(screen.getByText(/Råvare:/)).toBeTruthy();
     await waitFor(() => expect(screen.getAllByText(/6,48 kg/).length).toBeGreaterThan(0));
@@ -141,7 +146,7 @@ describe("Kontrollflaten — pakning direkte i oppgaven", () => {
   it("lagringsfeil vises i oppgaven, og inntastingen beholdes", async () => {
     acceptMatch.mockRejectedValue(new Error("db feil med constraint_navn"));
     const { onSaved } = setup(makeLine());
-    const input = screen.getByLabelText("Innhold") as HTMLInputElement;
+    const input = await screen.findByLabelText(/Innhold per/) as HTMLInputElement;
     fireEvent.change(input, { target: { value: "3 240" } });
     const btn = await screen.findByRole("button", { name: "Bekreft pakning og fortsett" });
     await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(false));
@@ -149,7 +154,7 @@ describe("Kontrollflaten — pakning direkte i oppgaven", () => {
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("Inntastingen er beholdt");
     expect(alert.textContent).not.toContain("constraint");
-    expect((screen.getByLabelText("Innhold") as HTMLInputElement).value).toBe("3 240");
+    expect((screen.getByLabelText(/Innhold per/) as HTMLInputElement).value).toBe("3 240");
     expect(onSaved).not.toHaveBeenCalled();
   });
 
@@ -165,11 +170,11 @@ describe("Kontrollflaten — pakning direkte i oppgaven", () => {
     expect(screen.getByRole("button", { name: "Prøv igjen" })).toBeTruthy();
   });
 
-  it("bytte av linje tar ikke med utkastet", () => {
+  it("bytte av linje tar ikke med utkastet", async () => {
     const { rerenderWith } = setup(makeLine());
-    fireEvent.change(screen.getByLabelText("Innhold"), { target: { value: "999" } });
+    fireEvent.change(await screen.findByLabelText(/Innhold per/), { target: { value: "999" } });
     rerenderWith(makeLine({ id: "line-b", description: "HVETEMEL SIKTET 25 KG", unit: "sekk" }));
-    expect((screen.getByLabelText("Innhold") as HTMLInputElement).value).toBe("25");
+    await waitFor(() => expect((screen.getByLabelText(/Innhold per/) as HTMLInputElement).value).toBe("25"));
   });
 
   it("umatchet linje viser råvarevalg, og knappen er sperret til en råvare er valgt", () => {
@@ -178,5 +183,69 @@ describe("Kontrollflaten — pakning direkte i oppgaven", () => {
     const btn = screen.getByRole("button", { name: "Bekreft råvare og fortsett" }) as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
     expect(screen.getByText("Velg en råvare først.")).toBeTruthy();
+  });
+});
+
+const ALI_STK = { ...RM_KG, base_unit: "stk" };
+const aliStkLine = () => makeLine({ matched_raw_material: { name: RM_KG.name, sku: RM_KG.sku, category: null, base_unit: "stk" } });
+type Payload = { packageSize: number | null; packageUnit: string | null; baseUnitsPerPackage: number | null; confirmPackage: boolean };
+
+describe("Pakning for stk-råvare (ALI 36×90 g)", () => {
+  it("foreslår 36 stk per kartong — 90 g er vekt per stk, ikke antall", async () => {
+    RM = ALI_STK;
+    setup(aliStkLine());
+    const input = (await screen.findByLabelText(/Antall stk per kartong/)) as HTMLInputElement;
+    await waitFor(() => expect(input.value).toBe("36"));
+    expect(screen.getByText(/90 g er vekt eller volum per stk/)).toBeTruthy();
+    expect(screen.getByText(/2 kartong × 36 stk =/)).toBeTruthy();
+    expect(screen.queryByLabelText("Enhet")).toBeNull();
+  });
+
+  it("endret antall er nøyaktig det som lagres", async () => {
+    RM = ALI_STK;
+    acceptMatch.mockResolvedValue(okResult);
+    setup(aliStkLine());
+    const input = await screen.findByLabelText(/Antall stk per kartong/);
+    await waitFor(() => expect((input as HTMLInputElement).value).toBe("36"));
+    fireEvent.change(input, { target: { value: "40" } });
+    expect(await screen.findByText(/2 kartong × 40 stk =/)).toBeTruthy();
+    const btn = screen.getByRole("button", { name: "Bekreft pakning og fortsett" }) as HTMLButtonElement;
+    await waitFor(() => expect(btn.disabled).toBe(false));
+    fireEvent.click(btn);
+    await waitFor(() => expect(acceptMatch).toHaveBeenCalled());
+    const opts = acceptMatch.mock.calls[0][0] as Payload;
+    expect(opts).toMatchObject({ packageSize: 40, packageUnit: "stk", baseUnitsPerPackage: 40, confirmPackage: true });
+  });
+
+  it.each(["", "0", "-1", "abc"])("ugyldig utkast «%s» sperrer bekreftelse", async (v) => {
+    RM = ALI_STK;
+    setup(aliStkLine());
+    const input = await screen.findByLabelText(/Antall stk per kartong/);
+    await waitFor(() => expect((input as HTMLInputElement).value).toBe("36"));
+    fireEvent.change(input, { target: { value: v } });
+    const btn = screen.getByRole("button", { name: "Bekreft pakning og fortsett" }) as HTMLButtonElement;
+    await waitFor(() => expect(btn.disabled).toBe(true));
+    expect(screen.queryByText(/2 kartong × /)).toBeNull();
+    expect(acceptMatch).not.toHaveBeenCalled();
+  });
+
+  it("pakningsutkast lekker ikke til neste linje", async () => {
+    RM = ALI_STK;
+    const { rerenderWith } = setup(aliStkLine());
+    const input = await screen.findByLabelText(/Antall stk per kartong/);
+    await waitFor(() => expect((input as HTMLInputElement).value).toBe("36"));
+    fireEvent.change(input, { target: { value: "99" } });
+    rerenderWith(makeLine({ id: "line-b", description: "TE 20X2G", matched_raw_material: { name: "Te", sku: null, category: null, base_unit: "stk" } }));
+    await waitFor(() => expect((screen.getByLabelText(/Antall stk per kartong/) as HTMLInputElement).value).toBe("20"));
+  });
+
+  it("mens råvaren lastes vises lastetilstand og bekreftelse er sperret — ikke nytt råvarevalg", () => {
+    rmPending = true;
+    setup(aliStkLine());
+    expect(screen.getAllByText(/Henter råvaren/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Velg råvare/)).toBeNull();
+    expect(screen.queryByLabelText("Søk i råvareregisteret")).toBeNull();
+    const btn = screen.getByRole("button", { name: "Bekreft pakning og fortsett" }) as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
   });
 });

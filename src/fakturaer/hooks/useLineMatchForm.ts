@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
-import { deriveLinePackage, parseDecimal, resolveLineCost } from "@/fakturaer/lib/units";
+import { deriveLinePackage, normalizeUnit, parseDecimal, parsePackageFromDescription, resolveLineCost, toBaseFactor } from "@/fakturaer/lib/units";
 import { acceptMatch, type AcceptMatchResult } from "@/fakturaer/lib/acceptMatch";
 import { normalizeMatchKey } from "@/fakturaer/lib/matchNormalize";
 import { fetchAiLineSuggestion, AI_REASON_LABELS, type AiLineSuggestion } from "@/fakturaer/lib/aiLineSuggestion";
@@ -49,6 +49,51 @@ interface ExistingLink {
  * aldri måtte søke den opp på nytt for å kontrollere pakning eller pris.
  * Skjemaet nullstilles når linjen byttes (`line.id`) eller `resetKey` endres.
  */
+/** Pakningsutkastet slik brukeren har skrevet det, tolket mot råvarens grunnenhet. */
+export type PackageDraft =
+  | { state: "empty" }
+  | { state: "invalid"; reason: string }
+  | { state: "valid"; size: number; unit: string; baseUnitsPerPackage: number };
+
+/** Tolk utkastet. Bare positive tall i en enhet som kan regnes om til grunnenheten godtas. */
+export function readPackageDraft(sizeText: string, unitText: string, baseUnit: string | null | undefined): PackageDraft {
+  if (!sizeText.trim()) return { state: "empty" };
+  const base = normalizeUnit(baseUnit);
+  if (!base) return { state: "invalid", reason: "Råvaren mangler grunnenhet, så pakningen kan ikke regnes om." };
+  const size = parseDecimal(sizeText);
+  if (size == null || !Number.isFinite(size) || size <= 0) return { state: "invalid", reason: "Skriv et positivt tall." };
+  const unit = normalizeUnit(unitText || base);
+  const factor = unit ? toBaseFactor(unit, base) : null;
+  if (!unit || factor == null) {
+    return { state: "invalid", reason: `${unitText || "Enheten"} kan ikke regnes om til ${base} uten et produktspesifikt grunnlag.` };
+  }
+  return { state: "valid", size, unit, baseUnitsPerPackage: size * factor };
+}
+
+/**
+ * Forslag til pakningsutkast i råvarens grunnenhet. For «stk» er forslaget
+ * ANTALLET (36 i «36X90G») — vekten per stk er aldri et antall.
+ */
+export function suggestPackage(
+  line: Pick<ReviewLineRow, "package_size" | "package_unit" | "count_per_package" | "description">,
+  baseUnit: string | null | undefined,
+  link?: { package_size: number | null; package_unit: string | null } | null,
+): { size: string; unit: string } {
+  const base = normalizeUnit(baseUnit);
+  if (!base) return { size: "", unit: "" };
+  if (base === "stk") {
+    const parsed = parsePackageFromDescription(line.description);
+    const cnt = Number(line.count_per_package) > 0 ? Number(line.count_per_package) : parsed?.unit === "stk" ? parsed.size * (parsed.count || 1) : parsed?.count ?? null;
+    return cnt && cnt > 0 ? { size: String(cnt), unit: "stk" } : { size: "", unit: "stk" };
+  }
+  const pkg = deriveLinePackage(line);
+  if (pkg && toBaseFactor(pkg.unit, base) != null) return { size: String(pkg.size), unit: pkg.unit };
+  if (link?.package_size != null && link.package_size > 0 && toBaseFactor(link.package_unit, base) != null) {
+    return { size: String(link.package_size), unit: normalizeUnit(link.package_unit) ?? base };
+  }
+  return { size: "", unit: base };
+}
+
 export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown = null) {
   const qc = useQueryClient();
   const [selectedRmId, setSelectedRmId] = useState<string | null>(line?.raw_material_id ?? null);
@@ -77,16 +122,8 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
     setSetAsPrimary(false);
     setConfirmPackage(false);
     setAgreedPrice("");
-    const pkg = line
-      ? deriveLinePackage({
-          package_size: line.package_size,
-          package_unit: line.package_unit,
-          count_per_package: line.count_per_package,
-          description: line.description,
-        })
-      : null;
-    setPackageSize(pkg ? String(pkg.size) : "");
-    setPackageUnit(pkg?.unit ?? "");
+    setPackageSize("");
+    setPackageUnit("");
     setPackageTouched(false);
     setAiSuggestion(null);
     setAiNotice(null);
@@ -167,7 +204,7 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
     },
   });
 
-  const { data: selectedRm } = useQuery({
+  const selectedRmQuery = useQuery({
     queryKey: ["rm-detail", selectedRmId],
     enabled: !!selectedRmId,
     queryFn: async () => {
@@ -180,6 +217,7 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
       return data as RmRow;
     },
   });
+  const selectedRm = selectedRmQuery.data;
 
   const { data: existingRms } = useQuery({
     queryKey: ["rms-link", selectedRmId, supplierId],
@@ -199,19 +237,29 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
 
   useEffect(() => {
     if (linkExists?.agreed_price_per_base_unit != null) setAgreedPrice(String(linkExists.agreed_price_per_base_unit));
-    // Kjent pakning hos leverandøren er et forslag når linjen selv ikke sier noe.
-    if (!packageTouched && !packageSize && linkExists?.package_size != null) {
-      setPackageSize(String(linkExists.package_size));
-      setPackageUnit(linkExists.package_unit ?? "");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- kun når koblingen lastes
   }, [linkExists]);
 
+  // Forslag i råvarens grunnenhet når råvaren/koblingen er kjent — overstyrer aldri inntasting.
+  useEffect(() => {
+    if (!line || packageTouched || !selectedRm?.base_unit) return;
+    const sug = suggestPackage(line, selectedRm.base_unit, linkExists ?? null);
+    setPackageSize(sug.size);
+    setPackageUnit(sug.unit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- bare når linje, råvare eller kobling endres
+  }, [line?.id, resetKey, selectedRm?.id, selectedRm?.base_unit, linkExists?.id]);
+
+  const packageDraft = useMemo(
+    () => readPackageDraft(packageSize, packageUnit, selectedRm?.base_unit),
+    [packageSize, packageUnit, selectedRm?.base_unit],
+  );
+
   /** Kostpris per baseenhet fra kostprismotoren — samme beregning som overalt ellers. */
+  // Et gyldig utkast er det brukeren bekrefter, og sendes derfor som bekreftet
+  // innhold — motoren bruker nøyaktig dette tallet. Ugyldig utkast gir ingen
+  // beregning (ingen stille tilbakefall til andre pakningsdata).
   const cost = useMemo(() => {
     const baseUnit = selectedRm?.base_unit;
-    if (!line || !baseUnit) return null;
-    const size = parseDecimal(packageSize);
+    if (!line || !baseUnit || packageDraft.state === "invalid") return null;
     return resolveLineCost({
       quantity: line.quantity,
       unit: line.unit,
@@ -222,10 +270,18 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
       countPerPackage: line.count_per_package,
       description: line.description,
       baseUnit,
-      supplierPackage: size && size > 0 ? { packageSize: size, packageUnit: packageUnit || baseUnit } : null,
+      supplierPackage:
+        packageDraft.state === "valid"
+          ? {
+              baseUnitsPerPackage: packageDraft.baseUnitsPerPackage,
+              packageSize: packageDraft.size,
+              packageUnit: packageDraft.unit,
+              packageConfirmedAt: "utkast",
+            }
+          : null,
       knownPricePerBaseUnit: selectedRm?.current_cost_price ?? null,
     });
-  }, [line, selectedRm?.base_unit, selectedRm?.current_cost_price, packageSize, packageUnit]);
+  }, [line, selectedRm?.base_unit, selectedRm?.current_cost_price, packageDraft]);
 
   /**
    * Lagrer gjennom eksisterende `acceptMatch`. Kaster ved feil — inntastingen
@@ -233,6 +289,10 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
    */
   async function save(opts: { applyToAll?: boolean; confirmPackage?: boolean } = {}): Promise<AcceptMatchResult & { stale: boolean }> {
     if (!line || !selectedRmId) throw new Error("Velg en råvare først");
+    if (!selectedRm) throw new Error("Råvaren er ikke lastet ennå");
+    const wantsConfirm = opts.confirmPackage ?? confirmPackage;
+    if (packageDraft.state === "invalid") throw new Error("Ugyldig pakning");
+    if (wantsConfirm && packageDraft.state !== "valid") throw new Error("Pakningen må fylles inn før den kan bekreftes");
     const lineId = line.id;
     setBusy(true);
     try {
@@ -244,14 +304,17 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
         line,
         rawMaterialId: selectedRmId,
         userId: user.id,
-        packageSize: parseDecimal(packageSize),
-        packageUnit: packageUnit.trim() || null,
-        baseUnitsPerPackage: cost?.baseUnitsPerPackage ?? null,
+        // Bare et bevisst utkast (bekreftet eller endret) sendes som pakning;
+        // ellers samme forslag som før, så en lagring av f.eks. avtalepris ikke
+        // overskriver kjent pakning med et ubekreftet standardforslag.
+        ...(packageDraft.state === "valid" && (wantsConfirm || packageTouched)
+          ? { packageSize: packageDraft.size, packageUnit: packageDraft.unit, baseUnitsPerPackage: packageDraft.baseUnitsPerPackage }
+          : { packageSize: parseDecimal(packageSize), packageUnit: packageUnit.trim() || null, baseUnitsPerPackage: cost?.baseUnitsPerPackage ?? null }),
         agreedPricePerBaseUnit: parseDecimal(agreedPrice),
         rememberSku,
         rememberName,
         setAsPrimary,
-        confirmPackage: opts.confirmPackage ?? confirmPackage,
+        confirmPackage: wantsConfirm,
         rejectedRawMaterialIds: suggestions
           .map((sg) => sg.raw_material_id)
           .filter((id): id is string => !!id && id !== selectedRmId),
@@ -283,6 +346,7 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
       }
       setAiSuggestion(suggestion);
       if (suggestion.rawMaterialId) setSelectedRmId(suggestion.rawMaterialId);
+      if (suggestion.packageSize != null || suggestion.packageUnit) setPackageTouched(true);
       if (suggestion.packageSize != null) setPackageSize(String(suggestion.packageSize));
       if (suggestion.packageUnit) setPackageUnit(suggestion.packageUnit);
       if (!suggestion.rawMaterialId) setAiNotice("AI-hjelpen fant ingen passende vare. Søk fram varen manuelt.");
@@ -301,6 +365,10 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
     suggestions,
     suggestionLinks,
     selectedRm,
+    materialLoading: !!selectedRmId && !selectedRm && !selectedRmQuery.isError,
+    materialError: !!selectedRmId && !selectedRm && selectedRmQuery.isError,
+    retryMaterial: () => void selectedRmQuery.refetch(),
+    packageDraft,
     linkExists,
     anyPrimary,
     rememberSku,

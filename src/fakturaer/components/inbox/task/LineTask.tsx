@@ -46,6 +46,7 @@ export function LineTask(p: LineTaskProps) {
   const { line, status, link } = p;
   const form = useLineMatchForm(line);
   const [editMaterial, setEditMaterial] = useState(false);
+  const [editPackage, setEditPackage] = useState(false);
   const [showScope, setShowScope] = useState(false);
   const [pkgOk, setPkgOk] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,13 +55,19 @@ export function LineTask(p: LineTaskProps) {
   const [recalcBusy, setRecalcBusy] = useState(false);
   const [agreedOpen, setAgreedOpen] = useState(false);
 
-  const mode: TaskMode = editMaterial ? "material" : taskCopy.modeFor(status.key);
+  const mode: TaskMode = editMaterial ? "material" : editPackage ? "package" : taskCopy.modeFor(status.key);
   const copy = taskCopy.forStatus(status.key);
   const currency = line.invoice.currency ?? "NOK";
   const supplier = line.invoice.supplier?.name ?? "leverandøren";
   const dataCost = costOf(line, link);
   const dataInconsistent = !!dataCost && !dataCost.checks.arithmeticPerInvoiceUnit && !dataCost.checks.arithmeticPerBaseUnit;
-  const pkgValid = !!form.cost && !form.cost.needsInput && !!form.packageSize;
+  const pkgValid = form.packageDraft.state === "valid" && !!form.cost && !form.cost.needsInput && !!form.selectedRm;
+  const pkgHint =
+    form.materialLoading
+      ? "Henter råvaren …"
+      : form.packageDraft.state === "invalid"
+        ? form.packageDraft.reason
+        : "Fyll inn innholdet slik at mengden kan regnes om.";
 
   async function save(confirmPackage: boolean, applyToAll = false) {
     setError(null);
@@ -75,6 +82,7 @@ export function LineTask(p: LineTaskProps) {
       }
       setNotice("Lagret. Henter oppdatert status …");
       setEditMaterial(false);
+      setEditPackage(false);
       await p.onSaved(line.id);
       setNotice("Lagret.");
     } catch (e) {
@@ -107,14 +115,20 @@ export function LineTask(p: LineTaskProps) {
   } else if (mode === "material") {
     primary = {
       label: pkgOk ? "Bekreft råvare og pakning og fortsett" : "Bekreft råvare og fortsett",
-      run: form.selectedRmId ? () => void save(pkgOk && pkgValid) : null,
-      hint: form.selectedRmId ? "Pakning og pris kontrolleres på nytt etter lagring." : "Velg en råvare først.",
+      run: form.selectedRmId && form.selectedRm && form.packageDraft.state !== "invalid" ? () => void save(pkgOk && pkgValid) : null,
+      hint: !form.selectedRmId
+        ? "Velg en råvare først."
+        : form.materialLoading
+          ? "Henter råvaren …"
+          : form.packageDraft.state === "invalid"
+            ? form.packageDraft.reason
+            : "Pakning og pris kontrolleres på nytt etter lagring.",
     };
   } else if (mode === "package") {
     primary = {
       label: "Bekreft pakning og fortsett",
       run: pkgValid && form.selectedRmId ? () => void save(true) : null,
-      hint: pkgValid ? "Bekreftet pakning godkjenner ikke et eventuelt prisavvik." : "Fyll inn innholdet slik at mengden kan regnes om.",
+      hint: pkgValid ? "Bekreftet pakning godkjenner ikke et eventuelt prisavvik." : pkgHint,
     };
   } else if (mode === "conflict") {
     primary = { label: "Løs konflikt", run: () => p.onSecondary("conflict", line), hint: copy.missing };
@@ -122,6 +136,12 @@ export function LineTask(p: LineTaskProps) {
     primary = { label: "Bekreft startpris", run: () => p.onSecondary("start_price", line), hint: copy.missing };
   } else if (status.key === "recalculate") {
     primary = { label: "Beregn prisen på nytt", run: () => void retryRecalc([line.id]), hint: copy.missing };
+  } else if (mode === "price" && p.canWrite) {
+    primary = {
+      label: "Kontroller pakningen",
+      run: form.selectedRmId ? () => setEditPackage(true) : null,
+      hint: "Prisavviket godkjennes ikke her. Stemmer pakning og råvare, må avviket avklares med leverandøren eller i avtalegrunnlaget — linjen står åpen.",
+    };
   } else if (mode === "done" && p.reconcileReady) {
     primary = { label: "Gå til bekreft prismatch", run: p.onReconcile, hint: "Alle linjer er avklart." };
   } else {
@@ -178,6 +198,16 @@ export function LineTask(p: LineTaskProps) {
           </label>
         )}
         {(mode === "price" || mode === "done") && <PriceCheck line={line} link={link} tolerancePct={p.tolerancePct} />}
+        {mode === "price" && p.canWrite && !agreedOpen && (
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => setEditMaterial(true)}>
+              Endre råvare
+            </Button>
+            <Button size="sm" variant="outline" disabled={!form.selectedRmId} onClick={() => setAgreedOpen(true)}>
+              Rett avtalepris
+            </Button>
+          </div>
+        )}
         {agreedOpen && (
           <div className="space-y-1">
             <label htmlFor={`agreed-${line.id}`} className="text-caption">Avtalepris per {baseUnit ?? "grunnenhet"} hos {supplier}</label>
@@ -188,6 +218,9 @@ export function LineTask(p: LineTaskProps) {
               value={form.agreedPrice}
               onChange={(e) => form.setAgreedPrice(e.target.value)}
             />
+            <p className="text-caption text-ink-secondary">
+              Lagres som avtalepris for {rmName ?? "råvaren"} hos {supplier} og gjelder også senere fakturaer. Linjen regnes om mot den — avviket godkjennes ikke automatisk.
+            </p>
             <Button size="sm" variant="outline" disabled={form.busy || !form.selectedRmId} onClick={() => void save(false)}>
               Lagre avtalepris og beregn på nytt
             </Button>
