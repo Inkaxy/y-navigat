@@ -132,7 +132,7 @@ export function QueueWorkspace(p: Props) {
           </Select>
           {p.readyToAccept.count > 0 && (
             <Button size="sm" disabled={!p.canWrite || p.bulk.busy} onClick={p.readyToAccept.onAccept}>
-              Godta {p.readyToAccept.count} {p.readyToAccept.count === 1 ? "forslag" : "forslag"} uten andre avvik
+              Godta {p.readyToAccept.count} forslag uten andre avvik
             </Button>
           )}
         </div>

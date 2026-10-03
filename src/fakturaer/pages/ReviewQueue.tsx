@@ -813,6 +813,11 @@ export default function FakturaerInboxPage() {
       {!expandedId && (
         <>
           <h2 className="text-title">Alle linjer til behandling</h2>
+          {hasMoreLines && sort === "impact" && (
+            <p className="text-caption text-ink-secondary">
+              Sorteringen etter kroner gjelder bare de {lines.length} linjene som er lastet inn — ikke hele køen.
+            </p>
+          )}
           {queueEl}
           {hasMoreLines && (
             <div className="flex justify-center">
