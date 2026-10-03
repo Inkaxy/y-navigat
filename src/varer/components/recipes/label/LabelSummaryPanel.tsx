@@ -70,7 +70,7 @@ export function LabelSummaryPanel(p: Props) {
           <>
             <Button variant="outline" size="sm" onClick={p.onRecompute} disabled={p.computing}>
               {p.computing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Calculator className="mr-2 h-4 w-4" />}
-              Beregn på nytt
+              {p.computedAt ? "Beregn på nytt" : "Beregn merkedata"}
             </Button>
             {p.nextAction !== "compute" && (
               <Button size="sm" onClick={p.onNextAction} disabled={busy}>
@@ -103,10 +103,13 @@ export function LabelSummaryPanel(p: Props) {
           </dd>
         </div>
         <div>
-          <dt className="inline">Kontroller: </dt>
+          <dt className="inline">Kontroller av beregningsgrunnlag: </dt>
           <dd className="inline text-foreground">
             {checkText("Allergener", p.allergenCheck)} · {checkText("Deklarasjonsnavn", p.nameCheck)}
             {p.coveragePct != null && ` · Næringsdekning (beregning) ${fmtPct(p.coveragePct, 0)}`}
+            {p.declarationManual && (
+              <span className="text-muted-foreground"> — gjelder beregnet kilde og sperrer ikke den manuelle</span>
+            )}
           </dd>
         </div>
         <div>
@@ -121,11 +124,7 @@ export function LabelSummaryPanel(p: Props) {
 
       {p.nextAction === "compute" && p.canWrite && (
         <div className="mt-3 flex flex-wrap items-center gap-3 rounded-md border border-dashed p-3 text-sm">
-          <span>Merkedata er ikke beregnet. Kontrollene over er derfor ikke vurdert.</span>
-          <Button size="sm" onClick={p.onNextAction} disabled={p.computing}>
-            {p.computing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Calculator className="mr-2 h-4 w-4" />}
-            Beregn merkedata
-          </Button>
+          <span>Merkedata er ikke beregnet. Bruk «Beregn merkedata» over; kontrollene er ikke vurdert før det.</span>
         </div>
       )}
 

@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
 import { stripHtml } from "@/varer/lib/effectiveDeclaration";
-import { nutritionDiff } from "@/varer/lib/declarationDiff";
+import { NUTRITION_TABLE_ROWS, formatEnergyRow, formatNutrient } from "@/varer/lib/nutritionFormat";
 import { DeclarationDiffView, declarationDocsDiffer, type DeclarationDoc } from "./DeclarationDiffView";
 import { formatDateTimeNb } from "./labelShared";
 
@@ -63,8 +63,17 @@ export function ApproveDeclarationDialog(p: Props) {
   const noCandidate = !candidate || !stripHtml(candidate.ingredientText ?? "").trim();
   const blocked = modeIssues.length > 0 || dirtyBlock || noCandidate;
   // Hele kandidatens næringstabell — vises alltid, også ved første godkjenning.
-  const nutRowsAll = candidate?.nutrition ? nutritionDiff(null, candidate.nutrition) : [];
-  const candidateNutrition = nutRowsAll.some((r) => r.to != null) ? nutRowsAll : [];
+  const nut = candidate?.nutrition ?? null;
+  const candidateNutrition =
+    nut && Object.values(nut).some((v) => v != null)
+      ? NUTRITION_TABLE_ROWS.map((r) => ({
+          key: r.key,
+          label: r.label,
+          indent: !!r.indent,
+          value:
+            r.key === "energy" ? formatEnergyRow(nut.energy_kj, nut.energy_kcal) : formatNutrient(r.key, nut[r.key]),
+        }))
+      : [];
   const unchanged = !!p.previous && !!candidate && !declarationDocsDiffer(p.previous.doc, candidate);
 
   return (
@@ -109,10 +118,8 @@ export function ApproveDeclarationDialog(p: Props) {
                 <tbody>
                   {candidateNutrition.map((r) => (
                     <tr key={r.key} className="border-b last:border-0">
-                      <td className="py-0.5 pr-2">{r.label}</td>
-                      <td className="py-0.5 text-right tabular-nums">
-                        {r.to == null ? "—" : r.to.toLocaleString("nb-NO", { maximumFractionDigits: 1 })}
-                      </td>
+                      <td className={r.indent ? "py-0.5 pl-4 pr-2" : "py-0.5 pr-2"}>{r.label}</td>
+                      <td className="py-0.5 text-right tabular-nums">{r.value}</td>
                     </tr>
                   ))}
                 </tbody>
