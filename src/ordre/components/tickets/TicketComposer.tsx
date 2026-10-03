@@ -8,6 +8,7 @@ import {
 import { AtSign, Loader2, Lock, Send, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { readTicketDraft, writeTicketDraft } from "@/ordre/lib/ticketDraftStore";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -68,12 +69,30 @@ const TicketComposer = forwardRef<
   const { data: activeUsers = [] } = useActiveUsers();
 
   const [tab, setTab] = useState<ComposerTab>("reply");
-  const [text, setText] = useState("");
+  // Kladden er knyttet til saken: den følger med ved bytte av sak og
+  // navigasjon i økten, og havner aldri på feil sak.
+  const ticketId = ticket.id;
+  const [draft, setDraft] = useState(() => ({ id: ticketId, text: readTicketDraft(ticketId) }));
+  const text = draft.id === ticketId ? draft.text : readTicketDraft(ticketId);
+  const setText = (value: string | ((prev: string) => string)) => {
+    setDraft((prev) => {
+      const base = prev.id === ticketId ? prev.text : readTicketDraft(ticketId);
+      const next = typeof value === "function" ? value(base) : value;
+      writeTicketDraft(ticketId, next);
+      return { id: ticketId, text: next };
+    });
+  };
   const [mention, setMention] = useState("");
   const [draftKey, setDraftKey] = useState<string | null>(null);
   const [aiDraft, setAiDraft] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Ny sak = ny idempotensnøkkel, så et svar aldri gjenbruker en annen saks nøkkel.
+  useEffect(() => {
+    setDraftKey(null);
+    setAiDraft(null);
+  }, [ticketId]);
 
   useEffect(() => {
     if (text.trim() && !draftKey) setDraftKey(safeUuid());
