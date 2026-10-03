@@ -21,7 +21,7 @@ import { useCompany } from "@/hooks/useCompany";
 import { resolveQueueEntityId } from "@/fakturaer/lib/queueEntity";
 import { StartPriceDialog } from "@/fakturaer/components/StartPriceDialog";
 import { START_PRICE_QUERY_KEYS, fetchStartPriceCandidates } from "@/fakturaer/lib/startPrice";
-import { useInboxInvoices } from "@/fakturaer/hooks/useInboxInvoices";
+import { useInboxInvoices, type InboxInvoice } from "@/fakturaer/hooks/useInboxInvoices";
 import { useSupplierLinkContext } from "@/fakturaer/hooks/useSupplierLinkContext";
 import { useMatchTolerancesByEntity } from "@/fakturaer/hooks/useMatchTolerances";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
@@ -36,7 +36,9 @@ import { NotARawMaterialDialog } from "@/fakturaer/components/NotARawMaterialDia
 import { SkuConflictDialog } from "@/fakturaer/components/SkuConflictDialog";
 import { ConfirmReconcileDialog } from "@/fakturaer/components/ConfirmReconcileDialog";
 import { InvoiceDocumentPanel } from "@/fakturaer/components/InvoiceDocumentPanel";
-import { InboxInvoiceCard } from "@/fakturaer/components/inbox/InboxInvoiceCard";
+import { InvoiceInbox, type BatchFailure } from "@/fakturaer/components/inbox/InvoiceInbox";
+import { FlagInvoiceDialog } from "@/fakturaer/components/FlagInvoiceDialog";
+import type { InboxPrimaryAction, InboxTab } from "@/fakturaer/lib/inbox";
 import { FocusHeader } from "@/fakturaer/components/inbox/FocusHeader";
 import {
   matchesGroup,
@@ -111,7 +113,18 @@ export default function FakturaerInboxPage() {
   const qc = useQueryClient();
   const { canWrite, canReconcile } = useFakturaer();
   const [searchParams, setSearchParams] = useSearchParams();
-  const onlyReady = searchParams.get("filter") === "klar";
+  // Fanene ligger i adressen. Linjekøen filtreres ikke lenger på «klar»-status.
+  const onlyReady = false;
+  const inboxTab: InboxTab =
+    searchParams.get("fane") === "klar" ? "ready" : searchParams.get("fane") === "fullfort" ? "done" : "open";
+  const setInboxTab = (t: InboxTab) => {
+    const next = new URLSearchParams(searchParams);
+    if (t === "open") next.delete("fane");
+    else next.set("fane", t === "ready" ? "klar" : "fullfort");
+    next.delete("filter");
+    setSearchParams(next, { replace: true });
+  };
+  const [flagId, setFlagId] = useState<string | null>(null);
 
   const { data: entities = [] } = useFakturaerLegalEntities();
   const { data: company } = useCompany();
@@ -146,7 +159,7 @@ export default function FakturaerInboxPage() {
     [legalEntityId, supplierId],
   );
 
-  const invoicesQuery = useInboxInvoices({ ...filters, onlyReady }, toleranceForEntity);
+  const invoicesQuery = useInboxInvoices(filters);
   const invoices = useMemo(() => invoicesQuery.data ?? [], [invoicesQuery.data]);
 
   // Ekspandert faktura — innboksen viser linjene for én faktura om gangen.
@@ -418,34 +431,33 @@ export default function FakturaerInboxPage() {
   }
 
   /**
-   * Kjører auto-match én faktura av gangen for alle fakturaene i lista.
-   * Ingen faktura godkjennes, attesteres eller betales — kun matching kjøres.
+   * Oppdaterer matchingen én faktura av gangen. Ingen faktura godkjennes,
+   * fullføres eller betales — kun matchemotoren kjøres. Feil rapporteres per faktura.
    */
-  async function runMatchOnAll() {
-    const targets = invoices.filter((i) => i.status !== "flagged" && i.line_count > 0);
-    if (targets.length === 0) {
-      toast.info("Ingen fakturaer med linjer å behandle");
-      return;
-    }
-    setRunAllProgress({ done: 0, total: targets.length });
-    let ok = 0;
-    const failed: string[] = [];
+  async function batchMatch(targets: InboxInvoice[], onProgress: (done: number) => void): Promise<BatchFailure[]> {
+    const failed: BatchFailure[] = [];
+    let done = 0;
     for (const inv of targets) {
       try {
         await runAutoMatch(inv.id);
-        ok++;
       } catch {
-        failed.push(inv.invoice_number);
+        failed.push({ id: inv.id, label: `${inv.supplier_name ?? "Ukjent"} ${inv.invoice_number}` });
       }
-      setRunAllProgress((p) => (p ? { ...p, done: p.done + 1 } : p));
+      done++;
+      onProgress(done);
     }
-    setRunAllProgress(null);
     refresh();
-    if (failed.length > 0) {
-      toast.warning(`${ok} fakturaer behandlet, ${failed.length} feilet (${failed.slice(0, 3).join(", ")}${failed.length > 3 ? " m.fl." : ""})`);
-    } else {
-      toast.success(`${ok} fakturaer behandlet`);
-    }
+    if (failed.length === 0) toast.success(`Matching oppdatert for ${targets.length} fakturaer`);
+    return failed;
+  }
+
+  function primaryAction(inv: InboxInvoice, action: InboxPrimaryAction) {
+    if (action === "fetch_lines") void invoiceAction(inv.id, "fetch");
+    else if (action === "register_lines") navigate(`/ravarer/fakturaer/${inv.id}/registrer-linjer`);
+    else if (action === "link_credit_note") setCreditNoteId(inv.id);
+    else if (action === "unflag") void invoiceAction(inv.id, "unflag");
+    else if (action === "finish") setReconcileId(inv.id);
+    else openInvoice(inv.id);
   }
 
   // --- Hurtigtaster --------------------------------------------------------
@@ -484,7 +496,10 @@ export default function FakturaerInboxPage() {
   // --- Render --------------------------------------------------------------
   const expandedInvoice = invoices.find((i) => i.id === expandedId) ?? null;
 
-  const reconcileReady = !!expandedId && !!progress && progress.needs === 0 && canReconcile;
+  // Fullfør krever at HELE fakturaen er klar — også sum, kreditnota og uttrekk —
+  // ikke bare at linjene i køen er avklart.
+  const reconcileReady =
+    !!expandedId && !!progress && progress.needs === 0 && canReconcile && !!expandedInvoice?.assessment.canReconcile;
 
   /**
    * Etter lagring: hent serverens tilstand. Står linjen fortsatt til avklaring
@@ -617,11 +632,21 @@ export default function FakturaerInboxPage() {
       <>
       <FakturaerHeaderBanner
         title="Fakturainnboks"
-        subtitle="Fakturaer som trenger handling — match, avstem og lukk uten å bytte side"
+        subtitle="Avklar linjene, fullfør kontrollen. Ingenting betales herfra."
       />
 
-      <Card className="p-4">
-        <div className="flex flex-wrap items-center gap-3">
+      <InvoiceInbox
+        tab={inboxTab}
+        onTabChange={setInboxTab}
+        invoices={invoices}
+        isLoading={invoicesQuery.isLoading}
+        isError={invoicesQuery.isError}
+        error={invoicesQuery.error}
+        onRetry={() => void invoicesQuery.refetch()}
+        legalEntityId={legalEntityId}
+        supplierId={supplierId === "all" ? null : supplierId}
+        supplierFilter={
+          <>
           <Popover open={supplierOpen} onOpenChange={setSupplierOpen}>
             <PopoverTrigger asChild>
               <Button
@@ -671,89 +696,17 @@ export default function FakturaerInboxPage() {
               </Command>
             </PopoverContent>
           </Popover>
-
-          <Button
-            size="sm"
-            variant={onlyReady ? "default" : "outline"}
-            onClick={() => {
-              const next = new URLSearchParams(searchParams);
-              if (onlyReady) next.delete("filter");
-              else next.set("filter", "klar");
-              setSearchParams(next, { replace: true });
-            }}
-          >
-            Klar for prismatch
-          </Button>
-
-          {onlyReady ? (
-            <span className="text-sm text-ink-secondary">
-              Disse er ferdig matchet — de forsvinner fra lista når du trykker «Avstem».
-            </span>
-          ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-1.5"
-              onClick={() => void runMatchOnAll()}
-              disabled={!!runAllProgress || invoices.length === 0}
-            >
-              {runAllProgress ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Behandler {runAllProgress.done}/{runAllProgress.total}
-                </>
-              ) : (
-                <>
-                  <RotateCw className="h-3.5 w-3.5" /> Behandle alle
-                </>
-              )}
-            </Button>
-          )}
-
-
-          {undoEntry && (
-            <Button size="sm" variant="ghost" onClick={() => void doUndo()} className="gap-1.5">
-              <Undo2 className="h-3.5 w-3.5" /> Angre «{undoEntry.label}»
-            </Button>
-          )}
-
-          <span className="ml-auto text-sm text-ink-secondary">
-            {invoices.length} fakturaer · {countRows.length} linjer til behandling
-          </span>
-        </div>
-
-      </Card>
-
-      <QueryState
-        scope="fakturaer:innboks"
-        isLoading={invoicesQuery.isLoading}
-        isError={invoicesQuery.isError}
-        error={invoicesQuery.error}
-        isEmpty={invoices.length === 0}
-        emptyTitle="Ingen fakturaer trenger handling akkurat nå"
-        onRetry={() => void invoicesQuery.refetch()}
-      >
-        <div className="space-y-2">
-          {invoices.map((inv) => (
-            <div key={inv.id} className="space-y-2">
-              <InboxInvoiceCard
-                invoice={inv}
-                expanded={expandedId === inv.id}
-                canWrite={canWrite}
-                canReconcile={canReconcile}
-                busyAction={busyInvoice?.id === inv.id ? busyInvoice.action : null}
-                onToggle={() => openInvoice(inv.id)}
-                onFetchLines={() => void invoiceAction(inv.id, "fetch")}
-                onRegisterLines={() => navigate(`/ravarer/fakturaer/${inv.id}/registrer-linjer`)}
-                onRunMatch={() => void invoiceAction(inv.id, "match")}
-                onUnflag={() => void invoiceAction(inv.id, "unflag")}
-                onLinkCreditNote={() => setCreditNoteId(inv.id)}
-                onReconcile={() => setReconcileId(inv.id)}
-                onOpen={() => navigate(`/ravarer/fakturaer/${inv.id}`)}
-              />
-            </div>
-          ))}
-        </div>
-      </QueryState>
+          </>
+        }
+        canWrite={canWrite}
+        canReconcile={canReconcile}
+        busyId={busyInvoice?.id ?? null}
+        onPrimary={primaryAction}
+        onRematch={(inv) => void invoiceAction(inv.id, "match")}
+        onOpenDetail={(inv) => navigate(`/ravarer/fakturaer/${inv.id}`)}
+        onFlag={(inv) => setFlagId(inv.id)}
+        onBatchMatch={batchMatch}
+      />
 
       <div>
         <Button variant="outline" size="sm" aria-expanded={showGlobalLines} onClick={() => setShowGlobalLines((v) => !v)}>
@@ -879,8 +832,17 @@ export default function FakturaerInboxPage() {
         />
       )}
 
-      {onlyReady && invoices.length === 0 && (
-        <Badge variant="outline">Ingen fakturaer står klare for prismatch</Badge>
+      {flagId && (
+        <FlagInvoiceDialog
+          open
+          onOpenChange={(v) => {
+            if (!v) {
+              setFlagId(null);
+              refresh();
+            }
+          }}
+          invoiceId={flagId}
+        />
       )}
     </div>
   );
