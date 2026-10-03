@@ -52,6 +52,8 @@ export interface InboxInvoiceInput {
   notes?: string | null;
   line_extraction_status?: string | null;
   currency?: string | null;
+  /** Fakturanivå: lav sikkerhet sperrer fullføring, men legges ikke på hver linje. */
+  extraction_confidence?: number | null;
   lines: InboxLine[];
 }
 
@@ -102,6 +104,9 @@ export function lineIsOpen(l: InboxLine): boolean {
   );
 }
 
+/** Samme grense som tidligere lå på linjenivå; nå bare fakturanivå. */
+export const LOW_EXTRACTION_CONFIDENCE = 0.6;
+
 export function assessInboxInvoice(
   inv: InboxInvoiceInput,
   /** Beholdt for bakoverkompatibilitet — avvik avgjøres av serverens årsaker. */
@@ -130,6 +135,8 @@ export function assessInboxInvoice(
   if (openCount > 0) blockers.push(`${openCount} linje(r) må avklares`);
   if (inv.lines_sum_status === "mismatch") blockers.push("linjene summerer seg ikke til fakturabeløpet");
   if (inv.lines_sum_status == null && lines.length > 0) blockers.push("linjesummen er ikke kontrollert");
+  if (inv.extraction_confidence != null && Number(inv.extraction_confidence) < LOW_EXTRACTION_CONFIDENCE)
+    blockers.push("fakturaen er lest med lav sikkerhet og må kontrolleres mot originalen");
   if (inv.is_credit_note && !creditNoteOriginalRef(inv.notes))
     blockers.push("kreditnotaen er ikke knyttet til en opprinnelig faktura");
   if (inv.currency && inv.currency.toUpperCase() !== "NOK") blockers.push(`fakturaen er i ${inv.currency.toUpperCase()}`);
