@@ -23,8 +23,6 @@ export interface PageHeaderProps {
   crumbs?: Crumb[];
   /** Knapper / actions til høyre. */
   actions?: ReactNode;
-  /** Legg handlingene på egen innpakket rad under tittelen på mobil (< sm). */
-  stackActionsOnMobile?: boolean;
   /** Subtil monogram-watermark i bakgrunnen. */
   watermark?: boolean;
   className?: string;
@@ -45,7 +43,6 @@ export function PageHeader({
   icon: Icon,
   crumbs,
   actions,
-  stackActionsOnMobile = false,
   watermark = true,
   className,
 }: PageHeaderProps) {
@@ -70,7 +67,7 @@ export function PageHeader({
         </div>
       )}
 
-      <div className={cn("relative flex items-start justify-between gap-4 px-5", stackActionsOnMobile && "flex-col sm:flex-row", "py-5 md:px-6 md:py-6")}>
+      <div className="relative flex items-start justify-between gap-4 px-5 py-5 md:px-6 md:py-6">
         <div className="flex min-w-0 items-start gap-3.5">
           {Icon && (
             <span
