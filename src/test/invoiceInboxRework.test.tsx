@@ -15,6 +15,7 @@ const L = (o: Partial<InboxLine> = {}): InboxLine => ({
   requires_review: false,
   review_reason: null,
   match_confidence: "manual",
+  price_per_base_unit: 10,
   price_variance_pct: null,
   variance_status: null,
   category: null,
