@@ -1,20 +1,19 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Check, ChevronsUpDown, Keyboard, Loader2, RotateCw, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { QueryState } from "@/components/common/QueryState";
+import { QueueWorkspace, type BucketTab } from "@/fakturaer/components/inbox/QueueWorkspace";
+import { isBulkAcceptable, lineStatus } from "@/fakturaer/lib/lineStatus";
 import { useReviewLines, useReviewLineCounts, type ReviewLineRow, type ReviewLineCountRow } from "@/fakturaer/hooks/useReviewLines";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
 import { useSuppliersFor } from "@/fakturaer/hooks/useSuppliersFor";
@@ -36,11 +35,7 @@ import { SkuConflictDialog } from "@/fakturaer/components/SkuConflictDialog";
 import { ConfirmReconcileDialog } from "@/fakturaer/components/ConfirmReconcileDialog";
 import { InvoiceDocumentPanel } from "@/fakturaer/components/InvoiceDocumentPanel";
 import { InboxInvoiceCard } from "@/fakturaer/components/inbox/InboxInvoiceCard";
-import { QueueTable } from "@/fakturaer/components/inbox/QueueTable";
 import {
-  GROUP_DESCRIPTIONS,
-  GROUP_LABELS,
-  REVIEW_GROUPS,
   matchesGroup,
   repeatCounts as computeRepeatCounts,
   sortQueue,
@@ -95,29 +90,16 @@ import { supabase } from "@/integrations/supabase/client";
 
 type TabValue = "all" | ReviewGroup;
 
-const TABS: { value: TabValue; label: string; hint: string }[] = [
-  { value: "all", label: "Alle", hint: "Alle linjer som venter på en avklaring." },
-  ...REVIEW_GROUPS.map((g) => ({ value: g as TabValue, label: GROUP_LABELS[g], hint: GROUP_DESCRIPTIONS[g] })),
-];
-
 const LS_OPEN = "nbhub.faktura.docpanel.open";
-const LS_SIZE = "nbhub.faktura.docpanel.size";
-
-const SORT_OPTIONS: { value: QueueSort; label: string }[] = [
-  { value: "invoice_date", label: "Nyeste faktura først" },
-  { value: "impact", label: "Størst kronepåvirkning først" },
-  { value: "repeats", label: "Går oftest igjen først" },
-];
 
 /**
- * Hører linjen hjemme under fanen? En linje kan ha flere årsaker samtidig og
+ * Hører linjen hjemme under årsaksfilteret? En linje kan ha flere årsaker samtidig og
  * dukker da opp i alle de tilhørende gruppene. Årsaker vi ikke kjenner igjen
  * havner i «Ukjent årsak» — aldri skjult under «Ukjent vare».
  */
 export function matchesTab(line: ReviewLineCountRow | ReviewLineRow, tab: TabValue): boolean {
   return matchesGroup(line, tab);
 }
-
 
 /** Samme vakter som i Vareliste: ingen hurtigtaster mens brukeren skriver eller i dialog. */
 function shouldIgnoreShortcut(e: KeyboardEvent): boolean {
@@ -145,7 +127,8 @@ export default function FakturaerInboxPage() {
   const { data: company } = useCompany();
   const [supplierId, setSupplierId] = useState<string>("all");
   const [supplierOpen, setSupplierOpen] = useState(false);
-  const [tab, setTab] = useState<TabValue>("all");
+  const [bucket, setBucket] = useState<BucketTab>("needs");
+  const [reason, setReason] = useState<TabValue>("all");
 
   // Ett firma: selskapet kommer fra useCompany, ikke fra en velger.
   const legalEntityId = useMemo(
@@ -188,6 +171,7 @@ export default function FakturaerInboxPage() {
     ...filters,
     invoiceId: expandedId,
     onlyReady,
+    includeResolved: true,
     limit: expandedId ? null : lineLimit,
   });
   const lines = useMemo(() => linesQuery.data?.rows ?? [], [linesQuery.data]);
@@ -196,26 +180,44 @@ export default function FakturaerInboxPage() {
   const links = useSupplierLinkContext(invoices.map((i) => i.supplier_id));
 
   // Tellerne skal gjelde HELE køen, ikke bare de linjene som er hentet inn.
-  const countsQuery = useReviewLineCounts({ ...filters, invoiceId: expandedId, onlyReady });
+  const countsQuery = useReviewLineCounts({ ...filters, invoiceId: expandedId, onlyReady, includeResolved: true });
   const countRows = useMemo(() => countsQuery.data ?? [], [countsQuery.data]);
 
   // Gjentakelser telles over HELE køen — det er poenget med tallet.
   const repeats = useMemo(() => computeRepeatCounts(countRows), [countRows]);
 
   const [sort, setSort] = useState<QueueSort>("invoice_date");
+  const startPriceLineIdsRef = useRef<ReadonlySet<string>>(new Set());
+
+  const statusOf = useCallback(
+    (l: ReviewLineRow | ReviewLineCountRow) => lineStatus(l, startPriceLineIdsRef.current),
+    [],
+  );
 
   const visibleLines = useMemo(() => {
     const scoped = expandedId ? lines.filter((l) => l.invoice_id === expandedId) : lines;
-    return sortQueue(scoped.filter((l) => matchesTab(l, tab)), sort, repeats);
-  }, [lines, expandedId, tab, sort, repeats]);
+    const filtered = scoped.filter(
+      (l) => matchesTab(l, reason) && (bucket === "all" || statusOf(l).bucket === bucket),
+    );
+    return sortQueue(filtered, sort, repeats);
+  }, [lines, expandedId, reason, bucket, sort, repeats, statusOf]);
 
   const counts = useMemo(() => {
-    const c = {} as Record<TabValue, number>;
-    TABS.forEach((t) => {
-      c[t.value] = countRows.filter((l) => matchesTab(l, t.value)).length;
-    });
+    const c: Record<BucketTab, number> = { all: 0, needs: 0, ready: 0, done: 0 };
+    for (const l of countRows) {
+      if (!matchesTab(l, reason)) continue;
+      c.all++;
+      c[statusOf(l).bucket]++;
+    }
     return c;
-  }, [countRows]);
+  }, [countRows, reason, statusOf]);
+
+  const progress = useMemo(() => {
+    if (!expandedId || countRows.length === 0) return null;
+    let needs = 0;
+    for (const l of countRows) if (statusOf(l).bucket === "needs") needs++;
+    return { handled: countRows.length - needs, total: countRows.length, needs };
+  }, [expandedId, countRows, statusOf]);
 
   // Kø-tilstand (aktiv linje + angre)
   const [queue, dispatch] = useReducer(queueReducer, emptyQueueState);
@@ -228,7 +230,6 @@ export default function FakturaerInboxPage() {
   // Valg for masse-handlinger
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const selectedLines = useMemo(() => lines.filter((l) => selected[l.id]), [lines, selected]);
-  const [bulkThreshold, setBulkThreshold] = useState("90");
   const [bulkBusy, setBulkBusy] = useState(false);
 
   // Dialoger
@@ -251,7 +252,6 @@ export default function FakturaerInboxPage() {
   // Dokumentpanel
   const [docOpen, setDocOpen] = useState<boolean>(() => localStorage.getItem(LS_OPEN) === "1");
   const [docLineId, setDocLineId] = useState<string | null>(null);
-  const [panelSize] = useState<number>(() => Number(localStorage.getItem(LS_SIZE)) || 42);
   useEffect(() => {
     localStorage.setItem(LS_OPEN, docOpen ? "1" : "0");
   }, [docOpen]);
@@ -283,6 +283,7 @@ export default function FakturaerInboxPage() {
     () => new Set((startPriceCandidatesQuery.data ?? []).map((c) => c.invoice_line_id)),
     [startPriceCandidatesQuery.data],
   );
+  startPriceLineIdsRef.current = startPriceLineIds;
 
   const refresh = useCallback(
     (invoiceId?: string) => {
@@ -326,25 +327,6 @@ export default function FakturaerInboxPage() {
     [canWrite, refresh],
   );
 
-  const doNotApplicable = useCallback(
-    async (line: ReviewLineRow) => {
-      if (!canWrite || busyRef.current) return;
-      busyRef.current = true;
-      const snapshot = snapshotOf(line);
-      try {
-        await markNotApplicable(line);
-        dispatch({ type: "resolved", id: line.id, snapshot, label: line.description ?? "linjen" });
-        toast.success("Markert som ikke aktuell");
-        refresh(line.invoice_id);
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Kunne ikke markere linjen");
-      } finally {
-        busyRef.current = false;
-      }
-    },
-    [canWrite, refresh],
-  );
-
   const doUndo = useCallback(async () => {
     const entry = peekUndo(queue);
     if (!entry || busyRef.current) return;
@@ -361,12 +343,13 @@ export default function FakturaerInboxPage() {
     }
   }, [queue, refresh]);
 
+  /** Samlegodkjenning: bare linjer der det eneste som gjenstår er å bekrefte råvareforslaget. */
   const acceptAllVisible = useCallback(
-    async (minPct: number) => {
+    async () => {
       if (!canWrite) return;
-      const candidates = visibleLines.filter((l) => (l.suggestions?.[0]?.confidence ?? 0) >= minPct / 100);
+      const candidates = visibleLines.filter(isBulkAcceptable);
       if (candidates.length === 0) {
-        toast.info(`Ingen synlige linjer har forslag over ${minPct} %`);
+        toast.info("Ingen synlige linjer har et forslag uten andre avvik");
         return;
       }
       setBulkBusy(true);
@@ -395,10 +378,9 @@ export default function FakturaerInboxPage() {
 
   // --- Masse-handlinger ----------------------------------------------------
   async function bulkAcceptSelected() {
-    const min = Number(bulkThreshold) / 100;
-    const candidates = selectedLines.filter((l) => (l.suggestions?.[0]?.confidence ?? 0) >= min);
+    const candidates = selectedLines.filter(isBulkAcceptable);
     if (candidates.length === 0) {
-      toast.info(`Ingen av de valgte linjene har forslag over ${bulkThreshold} %`);
+      toast.info("Ingen av de valgte linjene har et forslag uten andre avvik");
       return;
     }
     setBulkBusy(true);
@@ -422,7 +404,7 @@ export default function FakturaerInboxPage() {
     notifyPendingRecalculation(pending);
     const skipped = selectedLines.length - candidates.length;
     toast[failed ? "warning" : "success"](
-      `${ok} godtatt${failed ? `, ${failed} feilet` : ""}${skipped ? `, ${skipped} under terskelen` : ""}`,
+      `${ok} godtatt${failed ? `, ${failed} feilet` : ""}${skipped ? `, ${skipped} må avklares enkeltvis` : ""}`,
     );
   }
 
@@ -532,8 +514,10 @@ export default function FakturaerInboxPage() {
           break;
         case "Enter":
           e.preventDefault();
-          if (e.shiftKey) void acceptAllVisible(90);
-          else if (activeLine) void doAccept(activeLine);
+          // Enter godtar bare et råvareforslag — aldri en linje med pakning eller prisavvik.
+          if (!e.shiftKey && activeLine && !activeLine.raw_material_id && statusOf(activeLine).key === "confirm_material") {
+            void doAccept(activeLine);
+          }
           break;
         case "m":
         case "M":
@@ -551,9 +535,10 @@ export default function FakturaerInboxPage() {
           break;
         case "x":
         case "X":
+          // Utelatelse krever en grunn — åpne dialogen i stedet for å markere direkte.
           if (activeLine) {
             e.preventDefault();
-            void doNotApplicable(activeLine);
+            openDialog("not_rm", activeLine);
           }
           break;
         case "u":
@@ -567,7 +552,7 @@ export default function FakturaerInboxPage() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [activeLine, anyDialogOpen, docOpen, doAccept, doNotApplicable, doUndo, acceptAllVisible, openDialog]);
+  }, [activeLine, anyDialogOpen, docOpen, doAccept, doUndo, openDialog, statusOf]);
 
   // Aktiv linje følger dokumentpanelet.
   useEffect(() => {
@@ -583,122 +568,54 @@ export default function FakturaerInboxPage() {
   const expandedInvoice = invoices.find((i) => i.id === expandedId) ?? null;
 
   const queueEl = (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)}>
-          <TabsList className="flex-wrap">
-            {TABS.map((t) => (
-              <TabsTrigger key={t.value} value={t.value} title={t.hint}>
-                {t.label} ({counts[t.value] ?? 0})
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-        <Select value={sort} onValueChange={(v) => setSort(v as QueueSort)}>
-          <SelectTrigger className="w-[240px]" aria-label="Sorter køen">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SORT_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {countsQuery.isError && (
-        <p className="text-caption text-destructive">
-          Tellerne kunne ikke hentes — tallene i fanene kan være ufullstendige.
-        </p>
-      )}
-
-      {hasMoreLines && sort === "impact" && (
-        <p className="text-caption text-ink-secondary">
-          Sorteringen etter kroner gjelder bare de {lines.length} linjene som er lastet inn — ikke hele køen. Øk antall
-          linjer for å sortere over alt.
-        </p>
-      )}
-
-
-      {selectedLines.length > 0 && (
-        <Card className="flex flex-wrap items-center gap-3 border-primary/30 bg-primary/5 p-3">
-          <span className="text-sm font-medium">{selectedLines.length} valgt</span>
-          <Select value={bulkThreshold} onValueChange={setBulkThreshold}>
-            <SelectTrigger className="w-[120px]" aria-label="Terskel">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {["70", "80", "90"].map((v) => (
-                <SelectItem key={v} value={v}>
-                  ≥ {v} %
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button size="sm" disabled={!canWrite || bulkBusy} onClick={() => void bulkAcceptSelected()}>
-            {bulkBusy && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
-            Godta valgte
-          </Button>
-          <Button size="sm" variant="outline" disabled={!canWrite || bulkBusy} onClick={() => void bulkNotApplicable()}>
-            Marker ikke aktuell
-          </Button>
-          <Button size="sm" variant="outline" disabled={!canWrite || bulkBusy} onClick={bulkCreate}>
-            Opprett råvarer for valgte
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setSelected({})}>
-            Nullstill valg
-          </Button>
-        </Card>
-      )}
-
-      <Card className="overflow-hidden">
-        <QueryState
-          scope="fakturaer:innboks-linjer"
-          isLoading={linesQuery.isLoading}
-          isError={linesQuery.isError}
-          error={linesQuery.error}
-          isEmpty={visibleLines.length === 0}
-          emptyTitle={expandedInvoice ? "Ingen linjer å behandle på denne fakturaen" : "Ingenting her — godt jobbet!"}
-          onRetry={() => void linesQuery.refetch()}
-        >
-          <QueueTable
-            lines={visibleLines}
-            links={links}
-            toleranceFor={toleranceForEntity}
-            activeLineId={queue.activeId}
-            selected={selected}
-            onToggleSelect={(id, v) => setSelected((s) => ({ ...s, [id]: v }))}
-            onToggleSelectAll={(v) =>
-              setSelected((s) => {
-                const next = { ...s };
-                visibleLines.forEach((l) => {
-                  next[l.id] = v;
-                });
-                return next;
-              })
-            }
-            onFocusLine={(l) => dispatch({ type: "focus", id: l.id })}
-            onShowDocument={showDoc}
-            onAction={openDialog}
-            onAccept={(l) => void doAccept(l)}
-            repeatCounts={repeats}
-            startPriceLineIds={startPriceLineIds}
-            showInvoiceColumn={!expandedId}
-            canWrite={canWrite}
-          />
-        </QueryState>
-      </Card>
-
-      {hasMoreLines && (
-        <div className="flex justify-center">
-          <Button variant="outline" size="sm" onClick={() => setLineLimit((n) => n + 200)}>
-            Vis flere linjer
-          </Button>
-        </div>
-      )}
-    </div>
+    <QueueWorkspace
+      lines={visibleLines}
+      statusOf={statusOf}
+      counts={counts}
+      bucket={bucket}
+      onBucket={setBucket}
+      reason={reason}
+      onReason={setReason}
+      sort={sort}
+      onSort={setSort}
+      progress={progress}
+      loading={linesQuery.isLoading}
+      error={linesQuery.isError ? linesQuery.error : null}
+      onRetry={() => void linesQuery.refetch()}
+      emptyTitle={
+        bucket === "needs"
+          ? "Ingen linjer må avklares her — godt jobbet!"
+          : expandedInvoice
+            ? "Ingen linjer i dette utvalget på fakturaen"
+            : "Ingen linjer i dette utvalget"
+      }
+      activeLine={activeLine}
+      onSelect={(l) => dispatch({ type: "focus", id: l.id })}
+      onPrev={() => dispatch({ type: "prev" })}
+      onNext={() => dispatch({ type: "next" })}
+      selected={selected}
+      onToggleSelect={(id, v) => setSelected((s) => ({ ...s, [id]: v }))}
+      bulk={{
+        count: selectedLines.length,
+        acceptable: selectedLines.filter(isBulkAcceptable).length,
+        busy: bulkBusy,
+        onAccept: () => void bulkAcceptSelected(),
+        onNotApplicable: () => void bulkNotApplicable(),
+        onCreate: bulkCreate,
+        onClear: () => setSelected({}),
+      }}
+      readyToAccept={{ count: visibleLines.filter(isBulkAcceptable).length, onAccept: () => void acceptAllVisible() }}
+      links={links}
+      toleranceFor={toleranceForEntity}
+      showInvoice={!expandedId}
+      canWrite={canWrite}
+      busy={bulkBusy}
+      isMobile={isMobile}
+      countsError={countsQuery.isError}
+      onAction={openDialog}
+      onAccept={(l) => void doAccept(l)}
+      onShowDocument={showDoc}
+    />
   );
 
   const docPanel = docLine ? (
@@ -851,11 +768,10 @@ export default function FakturaerInboxPage() {
             <Keyboard className="h-3.5 w-3.5" /> Hurtigtaster
           </span>
           <span>↑ / ↓ marker</span>
-          <span>Enter godta og neste</span>
-          <span>Shift+Enter godta alle ≥ 90 %</span>
-          <span>m match</span>
+          <span>Enter godta råvareforslag</span>
+          <span>m velg råvare</span>
           <span>n ny råvare</span>
-          <span>x ikke aktuell</span>
+          <span>x ikke råvare</span>
           <span>u angre</span>
         </div>
       </Card>
@@ -896,36 +812,30 @@ export default function FakturaerInboxPage() {
       {!expandedId && (
         <>
           <h2 className="text-title">Alle linjer til behandling</h2>
-          {panelActive && !isMobile ? (
-            <ResizablePanelGroup
-              direction="horizontal"
-              className="items-stretch"
-              onLayout={(sizes) => {
-                if (sizes[1]) localStorage.setItem(LS_SIZE, String(Math.round(sizes[1])));
-              }}
-            >
-              <ResizablePanel defaultSize={100 - panelSize} minSize={35}>
-                <div className="pr-3">{queueEl}</div>
-              </ResizablePanel>
-              <ResizableHandle withHandle />
-              <ResizablePanel defaultSize={panelSize} minSize={30} maxSize={65}>
-                <div className="sticky top-4 h-[calc(100vh-8rem)] pl-3">{docPanel}</div>
-              </ResizablePanel>
-            </ResizablePanelGroup>
-          ) : (
-            queueEl
+          {hasMoreLines && sort === "impact" && (
+            <p className="text-caption text-ink-secondary">
+              Sorteringen etter kroner gjelder bare de {lines.length} linjene som er lastet inn — ikke hele køen.
+            </p>
+          )}
+          {queueEl}
+          {hasMoreLines && (
+            <div className="flex justify-center">
+              <Button variant="outline" size="sm" onClick={() => setLineLimit((n) => n + 200)}>
+                Vis flere linjer
+              </Button>
+            </div>
           )}
         </>
       )}
 
-      {panelActive && isMobile && (
+      {panelActive && (
         <Sheet
           open
           onOpenChange={(v) => {
             if (!v) setDocOpen(false);
           }}
         >
-          <SheetContent side="bottom" className="h-[95vh] p-0">
+          <SheetContent side={isMobile ? "bottom" : "right"} className={isMobile ? "h-[95vh] p-0" : "w-full p-0 sm:max-w-xl"}>
             {docPanel}
           </SheetContent>
         </Sheet>
