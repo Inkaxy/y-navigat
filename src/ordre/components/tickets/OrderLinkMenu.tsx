@@ -49,7 +49,7 @@ export default function OrderLinkMenu({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={() => setConfirm("switch")}>
-            <Replace className="mr-2 h-4 w-4" aria-hidden="true" /> Bytt ordre …
+            <Replace className="mr-2 h-4 w-4" aria-hidden="true" /> Bytt hovedordre …
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setConfirm("unlink")}>
             <Link2Off className="mr-2 h-4 w-4" aria-hidden="true" /> Fjern kobling …
@@ -62,14 +62,12 @@ export default function OrderLinkMenu({
           <AlertDialogHeader>
             <AlertDialogTitle>
               {confirm === "switch"
-                ? `Bytte fra ordre #${orderNumber}?`
+                ? `Bytte hovedordre fra #${orderNumber}?`
                 : `Fjerne koblingen til ordre #${orderNumber}?`}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirm === "switch"
-                ? "Du velger en annen ordre i neste steg. Ordre #" +
-                  orderNumber +
-                  " beholdes uendret; bare saken kobles om."
+                ? `Du velger en annen ordre i neste steg, og den blir sakens hovedordre. Ordre #${orderNumber} er fortsatt koblet til saken og endres ikke.`
                 : "Saken kobles fra ordren. Selve ordren beholdes uendret, og koblingen kan legges til igjen senere."}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -93,7 +91,7 @@ export default function OrderLinkMenu({
                 }
               }}
             >
-              {confirm === "switch" ? "Velg annen ordre" : "Fjern kobling"}
+              {confirm === "switch" ? "Velg ny hovedordre" : "Fjern kobling"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
