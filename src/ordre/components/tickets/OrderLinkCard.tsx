@@ -1,28 +1,30 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
-import { ArrowUpRight, Link2Off, Package, Replace } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { Link2, Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { getStatusMeta } from "@/ordre/lib/orderStatus";
+import { QueryErrorState } from "@/components/common/QueryState";
 import { StatusPill } from "@/ordre/components/ui/status-pill";
-import { formatNOK, formatDateLong } from "@/ordre/lib/format";
-import { linkTicketToOrder, unlinkTicketFromOrder } from "@/ordre/hooks/useTicketOrderLink";
+import { TICKET_STATUS_LABEL } from "@/ordre/lib/ticketFormat";
+import { TEAM_LABEL } from "@/ordre/lib/teams";
+import { isTerminalTicket } from "@/ordre/lib/ticketRowState";
+import { currentLocationHref } from "@/ordre/lib/ticketReturn";
+import {
+  linkTicketToOrder,
+  unlinkTicketFromOrder,
+  useInvalidateTicketLinks,
+} from "@/ordre/hooks/useTicketOrderLink";
+import { collectLinkedOrders, useTicketOrderLinks } from "@/ordre/hooks/useTicketDetailData";
+import { useUserNames } from "@/ordre/hooks/useUserNames";
+import { userErrorMessage } from "@/lib/userError";
 import LinkOrderSearch from "@/ordre/components/tickets/LinkOrderSearch";
 import CreateOrderFromTicketButton from "@/ordre/components/tickets/CreateOrderFromTicketButton";
 import EditLinkedOrderButton from "@/ordre/components/tickets/EditLinkedOrderButton";
+import LinkedOrderRow from "@/ordre/components/tickets/LinkedOrderRow";
+import OrderLinkMenu from "@/ordre/components/tickets/OrderLinkMenu";
+import OrderLinkCandidates from "@/ordre/components/tickets/OrderLinkCandidates";
 import type { Ticket, TicketAttachment } from "@/ordre/hooks/useTickets";
 import type { AiSuggestion } from "@/ordre/lib/aiSuggestion";
-import {
-  CONFIDENCE_LABEL,
-  CONFIDENCE_SHORT,
-  CONFIDENCE_TOKEN,
-  confidenceLevel,
-  DEFAULT_CONFIDENCE_THRESHOLDS,
-} from "@/ordre/lib/aiConfidence";
-import { useOrdreDeskSettings } from "@/ordre/hooks/useOrdreDeskSettings";
 
 export interface LinkedOrderData {
   order: {
@@ -43,35 +45,21 @@ export interface LinkedOrderData {
   customerName?: string | null;
 }
 
-/** Alle ordrer koblet via ticket_order_links (i tillegg til related_order_id). */
-function useTicketOrderLinks(ticketId: string | undefined) {
-  return useQuery({
-    enabled: !!ticketId,
-    queryKey: ["ticket-order-links", ticketId],
-    queryFn: async () => {
-      const { data: links, error } = await supabase
-        .from("ticket_order_links")
-        .select("order_id")
-        .eq("ticket_id", ticketId!);
-      if (error) throw error;
-      const ids = (links ?? []).map((l) => l.order_id as string);
-      if (!ids.length) return [] as Array<{ id: string; order_number: string; status: string }>;
-      const { data: orders } = await supabase
-        .from("orders")
-        .select("id, order_number, status")
-        .in("id", ids);
-      return (orders ?? []) as Array<{ id: string; order_number: string; status: string }>;
-    },
-  });
+export interface LinkedOrderState {
+  isLoading: boolean;
+  isError: boolean;
+  error: unknown;
+  refetch: () => unknown;
 }
 
 /**
- * «Ordre»-kortet i høyre kolonne. Alltid øverst: hvilken ordre henvendelsen
- * gjelder er det viktigste på siden.
+ * «Henvendelse og ordre» — samme kompakte oversikt i full sak og peek.
+ * Sakens behandling og ordrens oppfyllelse vises hver for seg.
  */
 export default function OrderLinkCard({
   ticket,
   linked,
+  linkedState,
   ai,
   attachments = [],
   canWrite,
@@ -79,36 +67,39 @@ export default function OrderLinkCard({
 }: {
   ticket: Ticket;
   linked: LinkedOrderData | undefined;
+  linkedState?: LinkedOrderState;
   ai: AiSuggestion | null;
   attachments?: TicketAttachment[];
   canWrite: boolean;
   /** Ekstra innhold (f.eks. ChangeIntentCard) under ordredetaljene. */
   children?: React.ReactNode;
 }) {
-  const qc = useQueryClient();
-  const { data: desk } = useOrdreDeskSettings();
-  const thresholds = desk
-    ? { high: desk.confidenceHigh, medium: desk.confidenceMedium }
-    : DEFAULT_CONFIDENCE_THRESHOLDS;
-  const [switching, setSwitching] = useState(false);
-  const { data: extraLinks = [] } = useTicketOrderLinks(ticket.id);
-  const order = linked?.order ?? null;
+  const location = useLocation();
+  const returnFrom = currentLocationHref(location);
+  const invalidateLinks = useInvalidateTicketLinks();
+  const invalidate = () => invalidateLinks(ticket.id);
+  const [mode, setMode] = useState<"idle" | "search">("idle");
+  const linksQuery = useTicketOrderLinks(ticket.id);
+  const { data: names = {} } = useUserNames([ticket.assigned_to]);
 
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ["ticket", ticket.id] });
-    qc.invalidateQueries({ queryKey: ["ticket-events", ticket.id] });
-    qc.invalidateQueries({ queryKey: ["ticket-order-links", ticket.id] });
-    qc.invalidateQueries({ queryKey: ["cake-images-for", ticket.id] });
-  };
+  const primaryId = ticket.related_order_id;
+  const primary = linked?.order ?? null;
+  const primaryPending = !!primaryId && (linkedState?.isLoading ?? !linked);
+  const primaryError = !!primaryId && !!linkedState?.isError;
+  const linksPending = linksQuery.isLoading;
+  const orders = collectLinkedOrders(primaryId, primary, linksQuery.data ?? []);
+  const anyPending = primaryPending || linksPending;
+  const anyError = primaryError || linksQuery.isError;
+  const knownNone = !anyPending && !anyError && orders.length === 0 && !primaryId;
 
   const onUnlink = async () => {
-    if (!order) return;
+    if (!primary) return;
     try {
-      await unlinkTicketFromOrder(ticket.id, order.id, order.order_number);
+      await unlinkTicketFromOrder(ticket.id, primary.id, primary.order_number);
       invalidate();
-      toast.success("Ordrekoblingen er fjernet");
+      toast.success("Koblingen er fjernet. Ordren er beholdt.");
     } catch (e) {
-      toast.error(`Kunne ikke fjerne kobling: ${e instanceof Error ? e.message : String(e)}`);
+      toast.error(userErrorMessage(e, "Kunne ikke fjerne koblingen"));
     }
   };
 
@@ -116,232 +107,162 @@ export default function OrderLinkCard({
     try {
       await linkTicketToOrder(ticket.id, orderId, orderNumber);
       invalidate();
-      toast.success("Ordren er koblet til samtalen");
+      toast.success("Ordren er koblet til saken");
     } catch (e) {
-      toast.error(`Kunne ikke koble: ${e instanceof Error ? e.message : String(e)}`);
+      toast.error(userErrorMessage(e, "Kunne ikke koble ordren"));
     }
   };
 
-
-  const candidates = [...(ai?.candidate_orders ?? [])]
-    .filter((c) => c.order_id && c.order_id !== ticket.related_order_id)
-    .sort((a, b) => (b.match_confidence ?? 0) - (a.match_confidence ?? 0));
-  const best = candidates[0] ?? null;
-  const otherCandidates = candidates.slice(1);
+  const assignee = ticket.assigned_to ? (names[ticket.assigned_to] ?? "Ukjent bruker") : null;
+  const waiting = ticket.awaiting_internal
+    ? `Venter på ${ticket.assigned_team ? TEAM_LABEL[ticket.assigned_team] : "intern avklaring"}`
+    : ticket.awaiting_external
+      ? "Venter på ekstern part"
+      : null;
 
   return (
-    <div className="rounded-[10px] border border-border bg-card p-4 shadow-xs">
-      <div className="mb-2 flex items-center gap-2">
-        <Package className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-        <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-          Ordre
-        </div>
+    <section
+      aria-label="Henvendelse og ordre"
+      className="space-y-3 rounded-[10px] border border-border bg-card p-3 shadow-xs"
+    >
+      <div className="flex items-center gap-2">
+        <Link2 className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+        <h3 className="text-caption font-semibold uppercase tracking-widest text-muted-foreground">
+          Henvendelse og ordre
+        </h3>
       </div>
 
-      {order ? (
-        <div className="space-y-2 text-sm">
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              to={`/ordre/ordrer/${order.id}`}
-              className="font-semibold text-foreground underline-offset-2 hover:underline"
-            >
-              #{order.order_number}
-            </Link>
-            <StatusPill
-              label={getStatusMeta(order.status).label}
-              tokenVar={getStatusMeta(order.status).tokenVar}
-              size="sm"
-            />
-          </div>
-          {linked?.customerName && (
-            <div className="text-xs text-muted-foreground">{linked.customerName}</div>
-          )}
-          {order.delivery_date && (
-            <div className="text-xs text-muted-foreground">
-              Levering {formatDateLong(order.delivery_date)}
-              {order.delivery_time ? ` kl. ${order.delivery_time.slice(0, 5)}` : ""}
-            </div>
-          )}
-          <div className="text-xs text-muted-foreground">
-            Sum {formatNOK(order.total_incl_vat ?? order.subtotal_excl_vat)}
-          </div>
-          {(linked?.lines.length ?? 0) > 0 && (
-            <ul className="space-y-0.5 border-t pt-2 text-xs text-muted-foreground">
-              {linked!.lines.slice(0, 6).map((l, i) => (
-                <li key={i} className="truncate">
-                  {l.quantity} × {l.product_snapshot?.name ?? l.notes ?? "linje"}
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {extraLinks.length > 1 && (
-            <div className="border-t pt-2">
-              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Koblede ordrer
-              </div>
-              <ul className="space-y-0.5 text-xs">
-                {extraLinks.map((o) => (
-                  <li key={o.id} className="flex items-center gap-1.5">
-                    <Link
-                      to={`/ordre/ordrer/${o.id}`}
-                      className="text-foreground underline-offset-2 hover:underline"
-                    >
-                      #{o.order_number}
-                    </Link>
-                    {o.id === order.id && (
-                      <span className="rounded border border-border bg-background px-1 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        Primær
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-2 pt-1">
-            <Button asChild variant="outline" size="sm" className="gap-1">
-              <Link to={`/ordre/ordrer/${order.id}`}>
-                Åpne ordre <ArrowUpRight className="h-3.5 w-3.5" />
-              </Link>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1"
-              onClick={() => setSwitching((v) => !v)}
-              disabled={!canWrite}
-            >
-              <Replace className="h-3.5 w-3.5" /> Bytt ordre
-            </Button>
-          </div>
-          {canWrite && (
-            <EditLinkedOrderButton
-              orderId={order.id}
-              customerId={order.customer_id ?? null}
-              onSaved={invalidate}
-            />
-          )}
-          <Button
-            variant="ghost"
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+        <dt className="text-muted-foreground">Sak</dt>
+        <dd className="flex flex-wrap items-center gap-1.5">
+          <StatusPill
+            label={TICKET_STATUS_LABEL[ticket.status]}
+            tokenVar={isTerminalTicket(ticket.status) ? "--state-neutral" : "--state-info"}
             size="sm"
-            className="w-full gap-1 text-muted-foreground"
-            onClick={onUnlink}
-            disabled={!canWrite}
-          >
-            <Link2Off className="h-3.5 w-3.5" /> Fjern kobling
-          </Button>
+          />
+          {waiting && <span className="text-caption text-muted-foreground">{waiting}</span>}
+        </dd>
+        <dt className="text-muted-foreground">Ansvarlig</dt>
+        <dd className="text-foreground">{assignee ?? "Ingen ansvarlig"}</dd>
+      </dl>
 
-          {switching && canWrite && (
-            <div className="border-t pt-2">
-              <LinkOrderSearch ticketId={ticket.id} onLinked={() => { setSwitching(false); invalidate(); }} />
+      <div className="space-y-3 border-t border-border pt-3">
+        {anyError && (
+          <QueryErrorState
+            error={linkedState?.error ?? linksQuery.error}
+            scope="ordre:sak:ordrekobling"
+            title="Kunne ikke hente ordrekoblingen"
+            description="Koblingen kan finnes selv om den ikke vises nå."
+            onRetry={() => {
+              void linkedState?.refetch();
+              void linksQuery.refetch();
+            }}
+            compact
+          />
+        )}
+
+        {anyPending && orders.length === 0 && (
+          <p className="flex items-center gap-2 text-caption text-muted-foreground" role="status">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> Henter ordrekobling …
+          </p>
+        )}
+
+        {orders.map((o) => (
+          <div key={o.id} className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <LinkedOrderRow
+                order={o}
+                primary={o.primary}
+                customerName={o.primary ? linked?.customerName : null}
+                deliveryTime={o.primary ? primary?.delivery_time : null}
+                returnFrom={returnFrom}
+              />
             </div>
-          )}
+            {o.primary && primary && (
+              <OrderLinkMenu
+                orderNumber={primary.order_number}
+                canWrite={canWrite}
+                onSwitch={() => setMode("search")}
+                onUnlink={onUnlink}
+              />
+            )}
+          </div>
+        ))}
 
-          {children}
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {/* Beslutningsflyt: er dette en eksisterende ordre, en annen ordre, eller en ny? */}
-          {best ? (
-            <div className="space-y-2 rounded-[10px] border border-primary/30 bg-primary/5 p-2.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-caption font-semibold uppercase tracking-wide text-primary">
-                  Foreslått ordre
-                </span>
-                <StatusPill
-                  label={CONFIDENCE_LABEL[(confidenceLevel(best.match_confidence, thresholds) ?? "low")]}
-                  tokenVar={CONFIDENCE_TOKEN[(confidenceLevel(best.match_confidence, thresholds) ?? "low")]}
-                  size="sm"
-                />
-              </div>
-              <div className="text-sm font-semibold text-foreground">
-                #{best.order_number ?? best.order_id.slice(0, 8)}
-                {best.snapshot?.customer_name ? ` · ${best.snapshot.customer_name}` : ""}
-              </div>
-              {best.snapshot?.delivery_date && (
-                <div className="text-caption text-muted-foreground">
-                  Levering {formatDateLong(best.snapshot.delivery_date)}
-                </div>
-              )}
-              {best.why_match && (
-                <p className="text-caption text-muted-foreground">
-                  <span className="font-semibold text-foreground">Belegg:</span> {best.why_match}
-                </p>
-              )}
-              <div className="flex flex-wrap gap-2 pt-0.5">
-                <Button
-                  size="sm"
-                  disabled={!canWrite}
-                  onClick={() => void linkCandidate(best.order_id, best.order_number)}
-                >
-                  Dette er riktig
-                </Button>
+        {orders.length > 0 && (
+          <p className="text-caption text-muted-foreground">
+            Sakens status og ordrens status følges hver for seg. En løst sak betyr ikke at
+            ordren er levert.
+          </p>
+        )}
+
+        {primary && canWrite && (
+          <EditLinkedOrderButton
+            orderId={primary.id}
+            customerId={primary.customer_id ?? null}
+            onSaved={invalidate}
+          />
+        )}
+
+        {knownNone && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-foreground">Ingen ordre koblet</p>
+            {canWrite && (
+              <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setSwitching((v) => !v)}
-                  disabled={!canWrite}
+                  className="gap-1"
+                  aria-expanded={mode === "search"}
+                  onClick={() => setMode((m) => (m === "search" ? "idle" : "search"))}
                 >
-                  Finn en annen ordre
+                  <Link2 className="h-3.5 w-3.5" aria-hidden="true" /> Koble eksisterende ordre
                 </Button>
+                <CreateOrderFromTicketButton
+                  ticket={ticket}
+                  ai={ai}
+                  attachments={attachments}
+                  onCreated={invalidate}
+                  label="Opprett ny ordre"
+                />
               </div>
-            </div>
-          ) : (
-            <p className="text-caption text-muted-foreground">
-              Ingen ordre er koblet til denne henvendelsen ennå.
-            </p>
-          )}
+            )}
+          </div>
+        )}
 
-          {(switching || !best) && canWrite && (
-            <LinkOrderSearch ticketId={ticket.id} onLinked={invalidate} />
-          )}
-
-          {otherCandidates.length > 0 && (
-            <div className="space-y-1.5">
-              <div className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">
-                Andre mulige ordrer
-              </div>
-              {otherCandidates.slice(0, 4).map((c) => (
-                <button
-                  key={c.order_id}
-                  type="button"
-                  disabled={!canWrite}
-                  onClick={() => void linkCandidate(c.order_id, c.order_number)}
-                  className={cn(
-                    "w-full rounded-[8px] border border-border bg-background px-2 py-1.5 text-left text-caption transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60",
-                  )}
-                >
-                  <div className="flex items-center gap-1.5 font-medium text-foreground">
-                    #{c.order_number ?? c.order_id.slice(0, 8)}
-                    {c.snapshot?.customer_name ? ` · ${c.snapshot.customer_name}` : ""}
-                    <StatusPill
-                      label={CONFIDENCE_SHORT[(confidenceLevel(c.match_confidence, thresholds) ?? "low")]}
-                      tokenVar={CONFIDENCE_TOKEN[(confidenceLevel(c.match_confidence, thresholds) ?? "low")]}
-                      size="sm"
-                      hideDot
-                    />
-                  </div>
-                  <div className="text-muted-foreground">{c.why_match}</div>
-                </button>
-              ))}
+        {mode === "search" && canWrite && (
+          <div className="space-y-1 border-t border-border pt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-caption font-semibold text-muted-foreground">
+                {primary ? "Velg ordren saken skal kobles til" : "Søk etter ordre"}
+              </span>
+              <Button variant="ghost" size="sm" className="h-7" onClick={() => setMode("idle")}>
+                Avbryt
+              </Button>
             </div>
-          )}
+            <LinkOrderSearch
+              ticketId={ticket.id}
+              onLinked={() => {
+                setMode("idle");
+                invalidate();
+              }}
+            />
+          </div>
+        )}
 
-          {canWrite && (
-            <div className="border-t border-border pt-2">
-              <CreateOrderFromTicketButton
-                ticket={ticket}
-                ai={ai}
-                attachments={attachments}
-                onCreated={invalidate}
-                label="Dette er en ny ordre"
-              />
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+        {knownNone && (
+          <OrderLinkCandidates
+            ai={ai}
+            excludeIds={orders.map((o) => o.id)}
+            canWrite={canWrite}
+            onLink={(id, num) => void linkCandidate(id, num)}
+          />
+        )}
+
+        {primary && children}
+      </div>
+    </section>
   );
 }
+
+export { Plus as _unusedPlusIcon };
