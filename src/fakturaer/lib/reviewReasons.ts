@@ -27,6 +27,7 @@ export const LINE_REASON_CODES = [
   "missing_base_unit",
   "start_price_manual_check",
   "no_automatic_basis",
+  "package_conflict",
 ] as const;
 export type LineReasonCode = (typeof LINE_REASON_CODES)[number];
 
@@ -44,6 +45,7 @@ export const REASON_LABELS: Record<ReasonCode, string> = {
   price_drop: "Prisfall",
   uncertain_cost: "Usikker kostpris",
   unknown_package_size: "Ukjent pakningsstørrelse",
+  package_conflict: "Flere pakninger hos leverandøren",
   sku_collision: "Konflikt",
   unsupported_currency: "Valuta ikke støttet",
   agreement_conflict: "To likestilte avtaler",
@@ -114,6 +116,7 @@ const REASON_GROUP: Record<ReasonCode, ReviewGroup> = {
   unmatched: "unknown_item",
   low_confidence: "uncertain_match",
   unknown_package_size: "package_unit",
+  package_conflict: "package_unit",
   uncertain_cost: "package_unit",
   zero_quantity: "package_unit",
   no_baseline: "no_baseline",

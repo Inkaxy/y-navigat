@@ -5,6 +5,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2.95.0/cors";
 import { normalizeUnit, isPackageUnit, packageNeedsConfirmation, resolveLineCost, stripPackageTokens } from "../_shared/units.ts";
 import { normalizeMatchKey } from "../_shared/matchNormalize.ts";
 import { syncRegisteredPrices, learnPendingAliases } from "../_shared/priceSync.ts";
+import { reconcileAcceptance } from "../_shared/priceAcceptance.ts";
 import { CREDIT_NOTE_REF_PREFIX, creditNoteOriginalRef } from "../_shared/creditNote.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -233,11 +234,19 @@ Deno.serve(async (req) => {
       .select("*").eq("legal_entity_id", inv.legal_entity_id)
       .or(`supplier_id.eq.${inv.supplier_id},supplier_id.is.null`));
 
+    // Raw materials in legal entity (active) — for fuzzy
+    const rmList = required("råvarer", await svc.from("raw_materials")
+      .select("id, name, sku, category, base_unit, current_cost_price, price_updated_at, primary_supplier_id, package_size, package_unit, base_units_per_package, package_confirmed_at")
+      .eq("legal_entity_id", inv.legal_entity_id).eq("is_active", true));
+    const rmById = new Map<string, AnyRec>((rmList ?? []).map((r: AnyRec) => [r.id, r]));
+
     // Supplier's raw_material_suppliers (with aliases)
     const rms = required("leverandørkoblinger", await svc.from("raw_material_suppliers")
       .select("id, raw_material_id, supplier_id, supplier_sku, supplier_product_name, agreed_price_per_base_unit, agreement_valid_from, agreement_valid_to, last_invoice_price, last_invoice_date, package_size, package_unit, base_units_per_package, package_confirmed_at, is_primary")
       .eq("supplier_id", inv.supplier_id));
-    const rmsList = rms ?? [];
+    // Bare koblinger til AKTIVE råvarer i fakturaens selskap kan brukes —
+    // en kobling til et annet selskaps eller en inaktiv vare er aldri et treff.
+    const rmsList = (rms ?? []).filter((r: AnyRec) => rmById.has(r.raw_material_id));
     const rmsIds = rmsList.map((r: AnyRec) => r.id);
 
     let aliases: AnyRec[] = [];
@@ -248,6 +257,32 @@ Deno.serve(async (req) => {
       aliases = aRows ?? [];
     }
     const rmsById = new Map<string, AnyRec>(rmsList.map((r: AnyRec) => [r.id, r]));
+
+    /**
+     * Leverandørkoblingen som er pakningskilden for linjen: den koblingen
+     * motoren faktisk traff, ellers samme varenummer, ellers den ENESTE
+     * koblingen. Flere koblinger med ulik pakning gir konflikt — aldri «første rad».
+     */
+    function pickRmsRow(
+      rawMaterialId: string,
+      preferredRmsId: string | null,
+      sku: string | null,
+    ): { row: AnyRec | undefined; conflict: boolean } {
+      if (preferredRmsId) {
+        const hit = rmsById.get(preferredRmsId);
+        if (hit && hit.raw_material_id === rawMaterialId) return { row: hit, conflict: false };
+      }
+      const rows = rmsList.filter((r: AnyRec) => r.raw_material_id === rawMaterialId);
+      if (rows.length <= 1) return { row: rows[0], conflict: false };
+      const skuN = norm(sku);
+      if (skuN) {
+        const bySku = rows.filter((r: AnyRec) => norm(r.supplier_sku) === skuN);
+        if (bySku.length === 1) return { row: bySku[0], conflict: false };
+      }
+      const sizes = new Set(rows.map((r: AnyRec) => (r.base_units_per_package == null ? "-" : String(Number(r.base_units_per_package)))));
+      if (sizes.size === 1) return { row: rows[0], conflict: false };
+      return { row: undefined, conflict: true };
+    }
 
     // Avviste og erstattede alias er lærdom om hva som IKKE stemmer — de skal aldri matche.
     const usableAliases = aliases.filter((a) => a.status !== "rejected" && a.status !== "superseded");
@@ -265,12 +300,6 @@ Deno.serve(async (req) => {
     }
     const isRejectedFor = (rmsId: string, ...keys: Array<string | null>) =>
       keys.some((k) => !!k && (rejectedKeysByRms.get(rmsId)?.has(k) ?? false));
-
-    // Raw materials in legal entity (active) — for fuzzy
-    const rmList = required("råvarer", await svc.from("raw_materials")
-      .select("id, name, sku, category, base_unit, current_cost_price, price_updated_at, primary_supplier_id, package_size, package_unit, base_units_per_package, package_confirmed_at")
-      .eq("legal_entity_id", inv.legal_entity_id).eq("is_active", true));
-    const rmById = new Map<string, AnyRec>((rmList ?? []).map((r: AnyRec) => [r.id, r]));
 
     // Lines
     let q = svc.from("invoice_lines").select("*").eq("invoice_id", invoiceId);
@@ -294,7 +323,8 @@ Deno.serve(async (req) => {
         if (normalizedUnitM && normalizedUnitM !== line.unit) manualUpdate.unit = normalizedUnitM;
 
         const rm = rmById.get(line.raw_material_id);
-        const rmsRow = rmsList.find((r: AnyRec) => r.raw_material_id === line.raw_material_id && r.supplier_id === inv.supplier_id);
+        const pickedM = pickRmsRow(line.raw_material_id, null, line.supplier_sku);
+        const rmsRow = pickedM.row;
         const refM = withRegisteredLastPurchase(await priceReference(line.raw_material_id), rmsRow);
         const expected = applyReference(manualUpdate, refM);
 
@@ -316,6 +346,10 @@ Deno.serve(async (req) => {
         if (actual == null && isPackageUnit(normalizedUnitM) && rm?.base_unit) {
           requiresReview = true;
           reviewReasons.add("unknown_package_size");
+        }
+        if (pickedM.conflict) {
+          requiresReview = true;
+          reviewReasons.add("package_conflict");
         }
         if (expected != null && actual != null && expected !== 0) {
           for (const reason of evaluateVariance(
@@ -354,6 +388,7 @@ Deno.serve(async (req) => {
         manualUpdate.requires_review = requiresReview;
         manualUpdate.review_reason = reviewReasons.size ? Array.from(reviewReasons).join(",") : null;
         await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, manualUpdate, catTolMap.get(rm?.category ?? "") ?? tolDefault, refM);
+        reconcileAcceptance(line, manualUpdate, line.raw_material_id);
 
         await applyUpdate(svc, line.id, manualUpdate);
         results.push({ id: line.id, status: "manual", recomputed: true });
@@ -654,7 +689,8 @@ Deno.serve(async (req) => {
       // STEG 6 — price variance (when raw_material_id is set)
       if (update.raw_material_id) {
         const rm = rmById.get(update.raw_material_id);
-        const rmsRow = rmsList.find((r: AnyRec) => r.raw_material_id === update.raw_material_id && r.supplier_id === inv.supplier_id);
+        const picked = pickRmsRow(update.raw_material_id, matchedRmsId, line.supplier_sku);
+        const rmsRow = picked.row;
         const ref = withRegisteredLastPurchase(await priceReference(update.raw_material_id), rmsRow);
         const expected = applyReference(update, ref);
 
@@ -677,6 +713,7 @@ Deno.serve(async (req) => {
         // Aldri gjett: enhver ubrukelig kostpris skal ha en blokkerende årsak.
         for (const reason of costReviewReasons(cost, actual)) addReason(reason);
         if (actual == null && isPackageUnit(normalizedUnit) && rm?.base_unit) addReason("unknown_package_size");
+        if (picked.conflict) addReason("package_conflict");
 
         if (expected != null && actual != null && expected !== 0) {
           for (const reason of evaluateVariance(
@@ -699,6 +736,7 @@ Deno.serve(async (req) => {
         if (foreignCurrency) addReason("unsupported_currency");
 
         await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, update, catTolMap.get(rm?.category ?? "") ?? tolDefault, ref);
+        reconcileAcceptance(line, update, update.raw_material_id);
       }
 
       // Lær av vellykket fuzzy-match: skriv pending alias (aldri degrader bekreftede)

@@ -3,7 +3,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
-import { deriveLinePackage, normalizeUnit, parseDecimal, parsePackageFromDescription, resolveLineCost, toBaseFactor } from "@/fakturaer/lib/units";
+import { parseDecimal, resolveLineCost } from "@/fakturaer/lib/units";
+import { packageDisagreement, pickSupplierLink, readPackageDraft, suggestPackage } from "@/fakturaer/lib/packageDraft";
+export { readPackageDraft, suggestPackage, type PackageDraft } from "@/fakturaer/lib/packageDraft";
 import { acceptMatch, type AcceptMatchResult } from "@/fakturaer/lib/acceptMatch";
 import { normalizeMatchKey } from "@/fakturaer/lib/matchNormalize";
 import { fetchAiLineSuggestion, AI_REASON_LABELS, type AiLineSuggestion } from "@/fakturaer/lib/aiLineSuggestion";
@@ -38,6 +40,9 @@ interface ExistingLink {
   is_primary: boolean | null;
   package_size: number | null;
   package_unit: string | null;
+  base_units_per_package: number | null;
+  package_confirmed_at: string | null;
+  supplier_sku: string | null;
 }
 
 /**
@@ -49,60 +54,17 @@ interface ExistingLink {
  * aldri måtte søke den opp på nytt for å kontrollere pakning eller pris.
  * Skjemaet nullstilles når linjen byttes (`line.id`) eller `resetKey` endres.
  */
-/** Pakningsutkastet slik brukeren har skrevet det, tolket mot råvarens grunnenhet. */
-export type PackageDraft =
-  | { state: "empty" }
-  | { state: "invalid"; reason: string }
-  | { state: "valid"; size: number; unit: string; baseUnitsPerPackage: number };
-
-/** Tolk utkastet. Bare positive tall i en enhet som kan regnes om til grunnenheten godtas. */
-export function readPackageDraft(sizeText: string, unitText: string, baseUnit: string | null | undefined): PackageDraft {
-  if (!sizeText.trim()) return { state: "empty" };
-  const base = normalizeUnit(baseUnit);
-  if (!base) return { state: "invalid", reason: "Råvaren mangler grunnenhet, så pakningen kan ikke regnes om." };
-  const size = parseDecimal(sizeText);
-  if (size == null || !Number.isFinite(size) || size <= 0) return { state: "invalid", reason: "Skriv et positivt tall." };
-  const unit = normalizeUnit(unitText || base);
-  const factor = unit ? toBaseFactor(unit, base) : null;
-  if (!unit || factor == null) {
-    return { state: "invalid", reason: `${unitText || "Enheten"} kan ikke regnes om til ${base} uten et produktspesifikt grunnlag.` };
-  }
-  return { state: "valid", size, unit, baseUnitsPerPackage: size * factor };
-}
-
-/**
- * Forslag til pakningsutkast i råvarens grunnenhet. For «stk» er forslaget
- * ANTALLET (36 i «36X90G») — vekten per stk er aldri et antall.
- */
-export function suggestPackage(
-  line: Pick<ReviewLineRow, "package_size" | "package_unit" | "count_per_package" | "description">,
-  baseUnit: string | null | undefined,
-  link?: { package_size: number | null; package_unit: string | null } | null,
-): { size: string; unit: string } {
-  const base = normalizeUnit(baseUnit);
-  if (!base) return { size: "", unit: "" };
-  if (base === "stk") {
-    const parsed = parsePackageFromDescription(line.description);
-    const cnt = Number(line.count_per_package) > 0 ? Number(line.count_per_package) : parsed?.unit === "stk" ? parsed.size * (parsed.count || 1) : parsed?.count ?? null;
-    return cnt && cnt > 0 ? { size: String(cnt), unit: "stk" } : { size: "", unit: "stk" };
-  }
-  const pkg = deriveLinePackage(line);
-  if (pkg && toBaseFactor(pkg.unit, base) != null) return { size: String(pkg.size), unit: pkg.unit };
-  if (link?.package_size != null && link.package_size > 0 && toBaseFactor(link.package_unit, base) != null) {
-    return { size: String(link.package_size), unit: normalizeUnit(link.package_unit) ?? base };
-  }
-  return { size: "", unit: base };
-}
-
 export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown = null) {
   const qc = useQueryClient();
-  const [selectedRmId, setSelectedRmId] = useState<string | null>(line?.raw_material_id ?? null);
+  const [selectedRmId, setSelectedRmIdRaw] = useState<string | null>(line?.raw_material_id ?? null);
   const [search, setSearch] = useState("");
   const [rememberSku, setRememberSku] = useState(!!line?.supplier_sku);
   const [rememberName, setRememberName] = useState(!!line?.description && line?.description !== line?.supplier_sku);
   const [setAsPrimary, setSetAsPrimary] = useState(false);
   const [confirmPackage, setConfirmPackage] = useState(false);
-  const [agreedPrice, setAgreedPrice] = useState("");
+  const [agreedPrice, setAgreedPriceRaw] = useState("");
+  /** Avtalepris sendes bare når brukeren bevisst har endret den. */
+  const [agreedTouched, setAgreedTouched] = useState(false);
   const [packageSize, setPackageSize] = useState("");
   const [packageUnit, setPackageUnit] = useState("");
   const [packageTouched, setPackageTouched] = useState(false);
@@ -115,13 +77,14 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
 
   useEffect(() => {
     currentLineId.current = line?.id ?? null;
-    setSelectedRmId(line?.raw_material_id ?? null);
+    setSelectedRmIdRaw(line?.raw_material_id ?? null);
     setSearch("");
     setRememberSku(!!line?.supplier_sku);
     setRememberName(!!line?.description && line?.description !== line?.supplier_sku);
     setSetAsPrimary(false);
     setConfirmPackage(false);
-    setAgreedPrice("");
+    setAgreedPriceRaw("");
+    setAgreedTouched(false);
     setPackageSize("");
     setPackageUnit("");
     setPackageTouched(false);
@@ -129,6 +92,18 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
     setAiNotice(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- nullstilles bevisst bare ved ny linje
   }, [line?.id, resetKey]);
+
+  /** Ny råvare: avhengige utkast (pakning, avtalepris) gjelder ikke lenger. */
+  const setSelectedRmId = (id: string | null) => {
+    setSelectedRmIdRaw((prev) => {
+      if (prev !== id) {
+        setPackageTouched(false);
+        setConfirmPackage(false);
+        setAgreedTouched(false);
+      }
+      return id;
+    });
+  };
 
   const legalEntityId = line?.invoice.legal_entity_id;
   const supplierId = line?.invoice.supplier_id;
@@ -142,6 +117,8 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
         .from("raw_material_supplier_aliases")
         .select("alias_value, raw_material_suppliers!inner(raw_material_id, supplier_id)")
         .eq("raw_material_suppliers.supplier_id", supplierId!)
+        // Avviste og erstattede alias er lærdom om hva som IKKE stemmer.
+        .not("status", "in", "(rejected,superseded)")
         .limit(2000);
       if (error) throw error;
       return (data ?? []) as unknown as Array<{ alias_value: string | null; raw_material_suppliers: { raw_material_id: string } | null }>;
@@ -156,11 +133,13 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
       const safe = search.trim().replace(/[,()]/g, " ");
       const term = `%${safe}%`;
       const needle = normalizeMatchKey(search);
-      const bySupplier = await supabase
+      let supplierQ = supabase
         .from("raw_material_suppliers")
         .select("raw_material_id")
-        .or(`supplier_sku.ilike.${term},supplier_product_name.ilike.${term}`)
-        .limit(50);
+        .or(`supplier_sku.ilike.${term},supplier_product_name.ilike.${term}`);
+      // Bare DENNE leverandørens varenummer og navn — ikke andres.
+      if (supplierId) supplierQ = supplierQ.eq("supplier_id", supplierId);
+      const bySupplier = await supplierQ.limit(50);
       if (bySupplier.error) throw bySupplier.error;
       const extraIds = [
         ...(bySupplier.data ?? []).map((r) => r.raw_material_id),
@@ -225,19 +204,25 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
     queryFn: async () => {
       const { data, error } = await supabase
         .from("raw_material_suppliers")
-        .select("id, supplier_id, agreed_price_per_base_unit, is_primary, package_size, package_unit")
+        .select("id, supplier_id, agreed_price_per_base_unit, is_primary, package_size, package_unit, base_units_per_package, package_confirmed_at, supplier_sku")
         .eq("raw_material_id", selectedRmId!);
       if (error) throw error;
       return (data ?? []) as ExistingLink[];
     },
   });
 
-  const linkExists = useMemo(() => existingRms?.find((r) => r.supplier_id === supplierId), [existingRms, supplierId]);
+  const linkExists = useMemo(
+    () => pickSupplierLink((existingRms ?? []).filter((r) => r.supplier_id === supplierId), line?.supplier_sku ?? null),
+    [existingRms, supplierId, line?.supplier_sku],
+  );
   const anyPrimary = useMemo(() => existingRms?.some((r) => r.is_primary), [existingRms]);
 
+  // Bytte av råvare tømmer alltid en gammel avtalepris; ny kobling fyller sin egen.
   useEffect(() => {
-    if (linkExists?.agreed_price_per_base_unit != null) setAgreedPrice(String(linkExists.agreed_price_per_base_unit));
-  }, [linkExists]);
+    if (agreedTouched) return;
+    setAgreedPriceRaw(linkExists?.agreed_price_per_base_unit != null ? String(linkExists.agreed_price_per_base_unit) : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- bare når råvare eller kobling endres
+  }, [selectedRmId, linkExists?.id, linkExists?.agreed_price_per_base_unit]);
 
   // Forslag i råvarens grunnenhet når råvaren/koblingen er kjent — overstyrer aldri inntasting.
   useEffect(() => {
@@ -310,7 +295,7 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
         ...(packageDraft.state === "valid" && (wantsConfirm || packageTouched)
           ? { packageSize: packageDraft.size, packageUnit: packageDraft.unit, baseUnitsPerPackage: packageDraft.baseUnitsPerPackage }
           : { packageSize: parseDecimal(packageSize), packageUnit: packageUnit.trim() || null, baseUnitsPerPackage: cost?.baseUnitsPerPackage ?? null }),
-        agreedPricePerBaseUnit: parseDecimal(agreedPrice),
+        agreedPricePerBaseUnit: agreedTouched ? parseDecimal(agreedPrice) : null,
         rememberSku,
         rememberName,
         setAsPrimary,
@@ -380,7 +365,11 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
     confirmPackage,
     setConfirmPackage,
     agreedPrice,
-    setAgreedPrice,
+    setAgreedPrice: (v: string) => {
+      setAgreedTouched(true);
+      setAgreedPriceRaw(v);
+    },
+    packageNote: line && selectedRm?.base_unit ? packageDisagreement(line, selectedRm.base_unit, linkExists ?? null) : null,
     packageSize,
     setPackageSize: (v: string) => {
       setPackageTouched(true);

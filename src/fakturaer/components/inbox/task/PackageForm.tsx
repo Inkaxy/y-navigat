@@ -46,6 +46,12 @@ export function PackageForm({ line, form }: { line: ReviewLineRow; form: LineMat
   return (
     <div className="space-y-2">
       <p className="text-sm font-medium">{isPieces ? `Hvor mange stk inneholder én ${unit}?` : `Hvor mye inneholder én ${unit}?`}</p>
+      {form.linkExists?.package_confirmed_at && !form.packageNote && (
+        <p className="text-caption text-ink-secondary">Bekreftet pakning hos leverandøren er fylt inn og huskes til senere fakturaer.</p>
+      )}
+      {form.packageNote && (
+        <p className="rounded-md bg-warning/10 px-3 py-2 text-caption text-warning">{form.packageNote}</p>
+      )}
       {parsed && (
         <p className="text-caption text-ink-secondary">
           Varenavnet antyder {parsed.count && parsed.count > 1 ? `${parsed.count} × ` : ""}

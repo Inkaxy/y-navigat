@@ -59,6 +59,7 @@ const PACKAGE_REASONS: ReadonlySet<string> = new Set([
   "zero_quantity",
   "extraction_unresolved",
   "extraction_issue",
+  "package_conflict",
 ]);
 
 const PRICE_REASONS: ReadonlySet<string> = new Set([

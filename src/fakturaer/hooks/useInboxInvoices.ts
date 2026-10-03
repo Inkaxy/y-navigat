@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { assessInboxInvoice, type InboxAssessment, type InboxLine } from "@/fakturaer/lib/inbox";
+import { fetchAllRows } from "@/lib/supabasePaging";
+import { assessInboxInvoice, inboxTabOf, type InboxAssessment, type InboxLine, type InboxTab } from "@/fakturaer/lib/inbox";
 
 export interface InboxInvoice {
   id: string;
@@ -24,14 +25,21 @@ export interface InboxInvoice {
   line_extraction_attempts: number;
   line_count: number;
   assessment: InboxAssessment;
+  tab: InboxTab;
 }
 
 interface Filters {
   legalEntityId?: string | null;
   supplierId?: string | null;
-  /** «klar» viser bare fakturaer som står klare for prismatch. */
-  onlyReady?: boolean;
 }
+
+/** Alle statuser som fortsatt er i arbeid — «ready» hører med. */
+export const OPEN_INVOICE_STATUSES = ["imported", "needs_review", "flagged", "ready"] as const;
+
+const SELECT = `id, invoice_number, invoice_date, status, legal_entity_id, supplier_id, is_credit_note,
+  total_amount, total_vat, lines_sum_status, lines_sum_variance_pct, source_document_url,
+  line_extraction_status, line_extraction_attempts, source, notes, paid_at, tripletex_is_paid, suppliers(name),
+  invoice_lines(raw_material_id, requires_review, review_reason, match_confidence, price_variance_pct, variance_status, raw_materials(category))`;
 
 interface RawInvoice {
   id: string;
@@ -53,85 +61,134 @@ interface RawInvoice {
   tripletex_is_paid: boolean | null;
   line_extraction_attempts: number;
   suppliers: { name: string } | null;
-  invoice_lines:
-    | Array<{
-        raw_material_id: string | null;
-        requires_review: boolean | null;
-        price_variance_pct: number | null;
-        variance_status: string | null;
-        raw_materials: { category: string | null } | null;
-      }>
-    | null;
+  invoice_lines: Array<{
+    raw_material_id: string | null;
+    requires_review: boolean | null;
+    review_reason: string | null;
+    match_confidence: string | null;
+    price_variance_pct: number | null;
+    variance_status: string | null;
+    raw_materials: { category: string | null } | null;
+  }> | null;
 }
 
-/** Fakturaer som fortsatt er i arbeid — kortene øverst i innboksen. */
-export function useInboxInvoices(
-  filters: Filters,
-  toleranceFor: (legalEntityId: string | null, category?: string | null) => number,
-) {
+export function toInboxInvoice(r: RawInvoice): InboxInvoice {
+  const lines: InboxLine[] = (r.invoice_lines ?? []).map((l) => ({
+    raw_material_id: l.raw_material_id,
+    requires_review: l.requires_review,
+    review_reason: l.review_reason,
+    match_confidence: l.match_confidence,
+    price_variance_pct: l.price_variance_pct == null ? null : Number(l.price_variance_pct),
+    variance_status: l.variance_status,
+    category: l.raw_materials?.category ?? null,
+  }));
+  const assessment = assessInboxInvoice({
+    status: r.status,
+    is_credit_note: r.is_credit_note,
+    lines_sum_status: r.lines_sum_status,
+    notes: r.notes,
+    line_extraction_status: r.line_extraction_status,
+    lines,
+  });
+  return {
+    id: r.id,
+    invoice_number: r.invoice_number,
+    invoice_date: r.invoice_date,
+    status: r.status,
+    legal_entity_id: r.legal_entity_id,
+    supplier_id: r.supplier_id,
+    supplier_name: r.suppliers?.name ?? null,
+    is_credit_note: r.is_credit_note,
+    total_amount: r.total_amount,
+    total_vat: r.total_vat,
+    lines_sum_status: r.lines_sum_status,
+    lines_sum_variance_pct: r.lines_sum_variance_pct,
+    source_document_url: r.source_document_url,
+    line_extraction_status: r.line_extraction_status,
+    source: r.source,
+    notes: r.notes,
+    paid_at: r.paid_at,
+    tripletex_is_paid: r.tripletex_is_paid,
+    line_extraction_attempts: r.line_extraction_attempts ?? 0,
+    line_count: lines.length,
+    assessment,
+    tab: inboxTabOf({ status: r.status, assessment }),
+  };
+}
+
+/**
+ * ALLE fakturaer som fortsatt er i arbeid, side for side — ingen stille tak.
+ * Fanene «Må avklares» og «Klar til å fullføre» deles på klienten etter
+ * linjenes faktiske tilstand, så tallene i fanene er de ekte totalene.
+ */
+export function useInboxInvoices(filters: Filters) {
   return useQuery({
     queryKey: ["fakturaer-inbox", filters],
     refetchInterval: 30000,
     queryFn: async (): Promise<InboxInvoice[]> => {
-      let q = supabase
-        .from("invoices")
-        .select(
-          `id, invoice_number, invoice_date, status, legal_entity_id, supplier_id, is_credit_note,
-           total_amount, total_vat, lines_sum_status, lines_sum_variance_pct, source_document_url,
-           line_extraction_status, line_extraction_attempts, source, notes, paid_at, tripletex_is_paid, suppliers(name),
-           invoice_lines(raw_material_id, requires_review, price_variance_pct, variance_status, raw_materials(category))`,
-        )
-        .in("status", filters.onlyReady ? ["ready"] : ["imported", "needs_review", "flagged"])
-        .order("invoice_date", { ascending: false })
-        .limit(100);
-
-      if (filters.legalEntityId) q = q.eq("legal_entity_id", filters.legalEntityId);
-      if (filters.supplierId) q = q.eq("supplier_id", filters.supplierId);
-
-      const { data, error } = await q;
-      if (error) throw error;
-
-      return ((data ?? []) as unknown as RawInvoice[]).map((r) => {
-        const lines: InboxLine[] = (r.invoice_lines ?? []).map((l) => ({
-          raw_material_id: l.raw_material_id,
-          requires_review: l.requires_review,
-          price_variance_pct: l.price_variance_pct == null ? null : Number(l.price_variance_pct),
-          variance_status: l.variance_status,
-          category: l.raw_materials?.category ?? null,
-        }));
-        return {
-          id: r.id,
-          invoice_number: r.invoice_number,
-          invoice_date: r.invoice_date,
-          status: r.status,
-          legal_entity_id: r.legal_entity_id,
-          supplier_id: r.supplier_id,
-          supplier_name: r.suppliers?.name ?? null,
-          is_credit_note: r.is_credit_note,
-          total_amount: r.total_amount,
-          total_vat: r.total_vat,
-          lines_sum_status: r.lines_sum_status,
-          lines_sum_variance_pct: r.lines_sum_variance_pct,
-          source_document_url: r.source_document_url,
-          line_extraction_status: r.line_extraction_status,
-          source: r.source,
-          notes: r.notes,
-          paid_at: r.paid_at,
-          tripletex_is_paid: r.tripletex_is_paid,
-          line_extraction_attempts: r.line_extraction_attempts ?? 0,
-          line_count: lines.length,
-          assessment: assessInboxInvoice(
-            {
-              status: r.status,
-              is_credit_note: r.is_credit_note,
-              lines_sum_status: r.lines_sum_status,
-              notes: r.notes,
-              lines,
-            },
-            (category) => toleranceFor(r.legal_entity_id, category),
-          ),
-        };
-      });
+      const rows = await fetchAllRows<RawInvoice>((from, to) => {
+        let q = supabase
+          .from("invoices")
+          .select(SELECT)
+          .in("status", [...OPEN_INVOICE_STATUSES])
+          .order("invoice_date", { ascending: false })
+          .order("id")
+          .range(from, to);
+        if (filters.legalEntityId) q = q.eq("legal_entity_id", filters.legalEntityId);
+        if (filters.supplierId) q = q.eq("supplier_id", filters.supplierId);
+        return q as unknown as PromiseLike<{ data: RawInvoice[] | null; error: { message: string } | null }>;
+      }, 200);
+      return rows.map(toInboxInvoice);
     },
   });
+}
+
+export const COMPLETED_PAGE_SIZE = 25;
+
+/** Fullførte (avstemte) fakturaer — sideinndelt på serveren med eksakt total. */
+export function useCompletedInvoices(filters: Filters & { search: string; page: number; enabled: boolean }) {
+  return useQuery({
+    queryKey: ["fakturaer-inbox-done", filters],
+    enabled: filters.enabled,
+    placeholderData: keepPreviousData,
+    queryFn: async (): Promise<{ rows: InboxInvoice[]; total: number }> => {
+      const term = filters.search.trim();
+      let supplierIds: string[] | null = null;
+      if (term) {
+        const { data: sup, error: supErr } = await supabase
+          .from("suppliers")
+          .select("id")
+          .ilike("name", `%${term}%`)
+          .limit(50);
+        if (supErr) throw supErr;
+        supplierIds = (sup ?? []).map((s) => s.id);
+      }
+      const from = filters.page * COMPLETED_PAGE_SIZE;
+      let q = supabase
+        .from("invoices")
+        .select(SELECT, { count: "exact" })
+        .eq("status", "reconciled")
+        .order("invoice_date", { ascending: false })
+        .order("id")
+        .range(from, from + COMPLETED_PAGE_SIZE - 1);
+      if (filters.legalEntityId) q = q.eq("legal_entity_id", filters.legalEntityId);
+      if (filters.supplierId) q = q.eq("supplier_id", filters.supplierId);
+      if (term) {
+        const safe = term.replace(/[,()%]/g, " ");
+        const ors = [`invoice_number.ilike.%${safe}%`];
+        if (supplierIds && supplierIds.length) ors.push(`supplier_id.in.(${supplierIds.join(",")})`);
+        q = q.or(ors.join(","));
+      }
+      const { data, error, count } = await q;
+      if (error) throw error;
+      return { rows: ((data ?? []) as unknown as RawInvoice[]).map(toInboxInvoice), total: count ?? 0 };
+    },
+  });
+}
+
+/** Klientfilter for åpne fakturaer: leverandørnavn eller fakturanummer. */
+export function matchesInboxSearch(inv: Pick<InboxInvoice, "invoice_number" | "supplier_name">, term: string): boolean {
+  const t = term.trim().toLowerCase();
+  if (!t) return true;
+  return inv.invoice_number.toLowerCase().includes(t) || (inv.supplier_name ?? "").toLowerCase().includes(t);
 }
