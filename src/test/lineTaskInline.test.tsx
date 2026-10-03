@@ -142,14 +142,14 @@ describe("Kontrollflaten — pakning direkte i oppgaven", () => {
     acceptMatch.mockRejectedValue(new Error("db feil med constraint_navn"));
     const { onSaved } = setup(makeLine());
     const input = screen.getByLabelText("Innhold") as HTMLInputElement;
-    fireEvent.change(input, { target: { value: "3,3" } });
+    fireEvent.change(input, { target: { value: "3 240" } });
     const btn = await screen.findByRole("button", { name: "Bekreft pakning og fortsett" });
     await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(btn);
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("Inntastingen er beholdt");
     expect(alert.textContent).not.toContain("constraint");
-    expect((screen.getByLabelText("Innhold") as HTMLInputElement).value).toBe("3,3");
+    expect((screen.getByLabelText("Innhold") as HTMLInputElement).value).toBe("3 240");
     expect(onSaved).not.toHaveBeenCalled();
   });
 
