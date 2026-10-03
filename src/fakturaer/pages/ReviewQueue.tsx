@@ -34,6 +34,7 @@ import { SkuConflictDialog } from "@/fakturaer/components/SkuConflictDialog";
 import { ConfirmReconcileDialog } from "@/fakturaer/components/ConfirmReconcileDialog";
 import { InvoiceDocumentPanel } from "@/fakturaer/components/InvoiceDocumentPanel";
 import { InvoiceInbox, type BatchFailure } from "@/fakturaer/components/inbox/InvoiceInbox";
+import { SimilarLinesHint } from "@/fakturaer/components/inbox/SimilarLinesHint";
 import { FlagInvoiceDialog } from "@/fakturaer/components/FlagInvoiceDialog";
 import type { InboxPrimaryAction, InboxTab } from "@/fakturaer/lib/inbox";
 import { FocusHeader } from "@/fakturaer/components/inbox/FocusHeader";
@@ -122,6 +123,7 @@ export default function FakturaerInboxPage() {
     setSearchParams(next, { replace: true });
   };
   const [flagId, setFlagId] = useState<string | null>(null);
+  const [lastLinked, setLastLinked] = useState<{ rmsId: string; name: string } | null>(null);
 
   const { data: entities = [] } = useFakturaerLegalEntities();
   const { data: company } = useCompany();
@@ -564,6 +566,7 @@ export default function FakturaerInboxPage() {
       isMobile={isMobile}
       countsError={countsQuery.isError}
       onSaved={handleSaved}
+      onLinked={(rmsId, name) => setLastLinked({ rmsId, name })}
       onSecondary={(a, l) => openDialog(a, l)}
       onShowDocument={showDoc}
       onReconcile={() => expandedId && setReconcileId(expandedId)}
@@ -625,6 +628,14 @@ export default function FakturaerInboxPage() {
           }}
         />
       ) : null}
+      {expandedId && lastLinked && (
+        <SimilarLinesHint
+          rmsId={lastLinked.rmsId}
+          name={lastLinked.name}
+          onOpen={() => setBulkLink(lastLinked)}
+          onDismiss={() => setLastLinked(null)}
+        />
+      )}
       {expandedId ? queueEl : (
       <>
       <FakturaerHeaderBanner
