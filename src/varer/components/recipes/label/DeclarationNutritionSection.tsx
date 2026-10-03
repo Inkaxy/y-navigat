@@ -281,13 +281,9 @@ export function DeclarationNutritionSection(p: Props) {
         <div className={candidate === "auto" ? "space-y-3" : "hidden"}>
           {!calculated ? (
             <div className="space-y-3 py-6 text-center">
-              <p className="text-sm text-muted-foreground">Ikke beregnet ennå.</p>
-              {canWrite && (
-                <Button onClick={p.onRecompute} disabled={p.computing}>
-                  {p.computing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Beregn merkedata
-                </Button>
-              )}
+              <p className="text-sm text-muted-foreground">
+                Ikke beregnet ennå. Bruk «Beregn merkedata» øverst i Merking.
+              </p>
             </div>
           ) : (
             <>
