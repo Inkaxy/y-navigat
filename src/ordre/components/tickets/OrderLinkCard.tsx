@@ -16,7 +16,7 @@ import {
 } from "@/ordre/hooks/useTicketOrderLink";
 import { collectLinkedOrders, useTicketOrderLinks } from "@/ordre/hooks/useTicketDetailData";
 import { useUserNames } from "@/ordre/hooks/useUserNames";
-import { userErrorMessage } from "@/lib/userError";
+import { showError } from "@/lib/userError";
 import LinkOrderSearch from "@/ordre/components/tickets/LinkOrderSearch";
 import CreateOrderFromTicketButton from "@/ordre/components/tickets/CreateOrderFromTicketButton";
 import EditLinkedOrderButton from "@/ordre/components/tickets/EditLinkedOrderButton";
@@ -99,7 +99,7 @@ export default function OrderLinkCard({
       invalidate();
       toast.success("Koblingen er fjernet. Ordren er beholdt.");
     } catch (e) {
-      toast.error(userErrorMessage(e, "Kunne ikke fjerne koblingen"));
+      showError("ordre:sak:fjern-kobling", e, "Kunne ikke fjerne koblingen. Prøv igjen.");
     }
   };
 
@@ -109,7 +109,7 @@ export default function OrderLinkCard({
       invalidate();
       toast.success("Ordren er koblet til saken");
     } catch (e) {
-      toast.error(userErrorMessage(e, "Kunne ikke koble ordren"));
+      showError("ordre:sak:koble-ordre", e, "Kunne ikke koble ordren. Prøv igjen.");
     }
   };
 
