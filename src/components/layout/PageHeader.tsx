@@ -70,7 +70,7 @@ export function PageHeader({
         </div>
       )}
 
-      <div className={cn("relative flex items-start justify-between gap-4 px-5", stackActionsOnMobile && "flex-col sm:flex-row", " py-5 md:px-6 md:py-6">
+      <div className={cn("relative flex items-start justify-between gap-4 px-5", stackActionsOnMobile && "flex-col sm:flex-row", "py-5 md:px-6 md:py-6")}>
         <div className="flex min-w-0 items-start gap-3.5">
           {Icon && (
             <span
