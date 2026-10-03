@@ -1,20 +1,20 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Check, ChevronsUpDown, Keyboard, Loader2, RotateCw, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { QueryState } from "@/components/common/QueryState";
+import { QueueWorkspace, type BucketTab } from "@/fakturaer/components/inbox/QueueWorkspace";
+import { isBulkAcceptable, lineStatus } from "@/fakturaer/lib/lineStatus";
 import { useReviewLines, useReviewLineCounts, type ReviewLineRow, type ReviewLineCountRow } from "@/fakturaer/hooks/useReviewLines";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
 import { useSuppliersFor } from "@/fakturaer/hooks/useSuppliersFor";
@@ -36,11 +36,7 @@ import { SkuConflictDialog } from "@/fakturaer/components/SkuConflictDialog";
 import { ConfirmReconcileDialog } from "@/fakturaer/components/ConfirmReconcileDialog";
 import { InvoiceDocumentPanel } from "@/fakturaer/components/InvoiceDocumentPanel";
 import { InboxInvoiceCard } from "@/fakturaer/components/inbox/InboxInvoiceCard";
-import { QueueTable } from "@/fakturaer/components/inbox/QueueTable";
 import {
-  GROUP_DESCRIPTIONS,
-  GROUP_LABELS,
-  REVIEW_GROUPS,
   matchesGroup,
   repeatCounts as computeRepeatCounts,
   sortQueue,
@@ -95,29 +91,16 @@ import { supabase } from "@/integrations/supabase/client";
 
 type TabValue = "all" | ReviewGroup;
 
-const TABS: { value: TabValue; label: string; hint: string }[] = [
-  { value: "all", label: "Alle", hint: "Alle linjer som venter på en avklaring." },
-  ...REVIEW_GROUPS.map((g) => ({ value: g as TabValue, label: GROUP_LABELS[g], hint: GROUP_DESCRIPTIONS[g] })),
-];
-
 const LS_OPEN = "nbhub.faktura.docpanel.open";
-const LS_SIZE = "nbhub.faktura.docpanel.size";
-
-const SORT_OPTIONS: { value: QueueSort; label: string }[] = [
-  { value: "invoice_date", label: "Nyeste faktura først" },
-  { value: "impact", label: "Størst kronepåvirkning først" },
-  { value: "repeats", label: "Går oftest igjen først" },
-];
 
 /**
- * Hører linjen hjemme under fanen? En linje kan ha flere årsaker samtidig og
+ * Hører linjen hjemme under årsaksfilteret? En linje kan ha flere årsaker samtidig og
  * dukker da opp i alle de tilhørende gruppene. Årsaker vi ikke kjenner igjen
  * havner i «Ukjent årsak» — aldri skjult under «Ukjent vare».
  */
 export function matchesTab(line: ReviewLineCountRow | ReviewLineRow, tab: TabValue): boolean {
   return matchesGroup(line, tab);
 }
-
 
 /** Samme vakter som i Vareliste: ingen hurtigtaster mens brukeren skriver eller i dialog. */
 function shouldIgnoreShortcut(e: KeyboardEvent): boolean {
@@ -145,7 +128,8 @@ export default function FakturaerInboxPage() {
   const { data: company } = useCompany();
   const [supplierId, setSupplierId] = useState<string>("all");
   const [supplierOpen, setSupplierOpen] = useState(false);
-  const [tab, setTab] = useState<TabValue>("all");
+  const [bucket, setBucket] = useState<BucketTab>("needs");
+  const [reason, setReason] = useState<TabValue>("all");
 
   // Ett firma: selskapet kommer fra useCompany, ikke fra en velger.
   const legalEntityId = useMemo(
@@ -188,6 +172,7 @@ export default function FakturaerInboxPage() {
     ...filters,
     invoiceId: expandedId,
     onlyReady,
+    includeResolved: true,
     limit: expandedId ? null : lineLimit,
   });
   const lines = useMemo(() => linesQuery.data?.rows ?? [], [linesQuery.data]);
@@ -196,26 +181,44 @@ export default function FakturaerInboxPage() {
   const links = useSupplierLinkContext(invoices.map((i) => i.supplier_id));
 
   // Tellerne skal gjelde HELE køen, ikke bare de linjene som er hentet inn.
-  const countsQuery = useReviewLineCounts({ ...filters, invoiceId: expandedId, onlyReady });
+  const countsQuery = useReviewLineCounts({ ...filters, invoiceId: expandedId, onlyReady, includeResolved: true });
   const countRows = useMemo(() => countsQuery.data ?? [], [countsQuery.data]);
 
   // Gjentakelser telles over HELE køen — det er poenget med tallet.
   const repeats = useMemo(() => computeRepeatCounts(countRows), [countRows]);
 
   const [sort, setSort] = useState<QueueSort>("invoice_date");
+  const startPriceLineIdsRef = useRef<ReadonlySet<string>>(new Set());
+
+  const statusOf = useCallback(
+    (l: ReviewLineRow | ReviewLineCountRow) => lineStatus(l, startPriceLineIdsRef.current),
+    [],
+  );
 
   const visibleLines = useMemo(() => {
     const scoped = expandedId ? lines.filter((l) => l.invoice_id === expandedId) : lines;
-    return sortQueue(scoped.filter((l) => matchesTab(l, tab)), sort, repeats);
-  }, [lines, expandedId, tab, sort, repeats]);
+    const filtered = scoped.filter(
+      (l) => matchesTab(l, reason) && (bucket === "all" || statusOf(l).bucket === bucket),
+    );
+    return sortQueue(filtered, sort, repeats);
+  }, [lines, expandedId, reason, bucket, sort, repeats, statusOf]);
 
   const counts = useMemo(() => {
-    const c = {} as Record<TabValue, number>;
-    TABS.forEach((t) => {
-      c[t.value] = countRows.filter((l) => matchesTab(l, t.value)).length;
-    });
+    const c: Record<BucketTab, number> = { all: 0, needs: 0, ready: 0, done: 0 };
+    for (const l of countRows) {
+      if (!matchesTab(l, reason)) continue;
+      c.all++;
+      c[statusOf(l).bucket]++;
+    }
     return c;
-  }, [countRows]);
+  }, [countRows, reason, statusOf]);
+
+  const progress = useMemo(() => {
+    if (!expandedId || countRows.length === 0) return null;
+    let needs = 0;
+    for (const l of countRows) if (statusOf(l).bucket === "needs") needs++;
+    return { handled: countRows.length - needs, total: countRows.length, needs };
+  }, [expandedId, countRows, statusOf]);
 
   // Kø-tilstand (aktiv linje + angre)
   const [queue, dispatch] = useReducer(queueReducer, emptyQueueState);
@@ -228,7 +231,6 @@ export default function FakturaerInboxPage() {
   // Valg for masse-handlinger
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const selectedLines = useMemo(() => lines.filter((l) => selected[l.id]), [lines, selected]);
-  const [bulkThreshold, setBulkThreshold] = useState("90");
   const [bulkBusy, setBulkBusy] = useState(false);
 
   // Dialoger
@@ -283,6 +285,7 @@ export default function FakturaerInboxPage() {
     () => new Set((startPriceCandidatesQuery.data ?? []).map((c) => c.invoice_line_id)),
     [startPriceCandidatesQuery.data],
   );
+  startPriceLineIdsRef.current = startPriceLineIds;
 
   const refresh = useCallback(
     (invoiceId?: string) => {
@@ -361,12 +364,13 @@ export default function FakturaerInboxPage() {
     }
   }, [queue, refresh]);
 
+  /** Samlegodkjenning: bare linjer der det eneste som gjenstår er å bekrefte råvareforslaget. */
   const acceptAllVisible = useCallback(
-    async (minPct: number) => {
+    async () => {
       if (!canWrite) return;
-      const candidates = visibleLines.filter((l) => (l.suggestions?.[0]?.confidence ?? 0) >= minPct / 100);
+      const candidates = visibleLines.filter(isBulkAcceptable);
       if (candidates.length === 0) {
-        toast.info(`Ingen synlige linjer har forslag over ${minPct} %`);
+        toast.info("Ingen synlige linjer har et forslag uten andre avvik");
         return;
       }
       setBulkBusy(true);
@@ -395,10 +399,9 @@ export default function FakturaerInboxPage() {
 
   // --- Masse-handlinger ----------------------------------------------------
   async function bulkAcceptSelected() {
-    const min = Number(bulkThreshold) / 100;
-    const candidates = selectedLines.filter((l) => (l.suggestions?.[0]?.confidence ?? 0) >= min);
+    const candidates = selectedLines.filter(isBulkAcceptable);
     if (candidates.length === 0) {
-      toast.info(`Ingen av de valgte linjene har forslag over ${bulkThreshold} %`);
+      toast.info("Ingen av de valgte linjene har et forslag uten andre avvik");
       return;
     }
     setBulkBusy(true);
@@ -422,7 +425,7 @@ export default function FakturaerInboxPage() {
     notifyPendingRecalculation(pending);
     const skipped = selectedLines.length - candidates.length;
     toast[failed ? "warning" : "success"](
-      `${ok} godtatt${failed ? `, ${failed} feilet` : ""}${skipped ? `, ${skipped} under terskelen` : ""}`,
+      `${ok} godtatt${failed ? `, ${failed} feilet` : ""}${skipped ? `, ${skipped} må avklares enkeltvis` : ""}`,
     );
   }
 
@@ -532,8 +535,10 @@ export default function FakturaerInboxPage() {
           break;
         case "Enter":
           e.preventDefault();
-          if (e.shiftKey) void acceptAllVisible(90);
-          else if (activeLine) void doAccept(activeLine);
+          // Enter godtar bare et råvareforslag — aldri en linje med pakning eller prisavvik.
+          if (!e.shiftKey && activeLine && !activeLine.raw_material_id && statusOf(activeLine).key === "confirm_material") {
+            void doAccept(activeLine);
+          }
           break;
         case "m":
         case "M":
@@ -551,9 +556,10 @@ export default function FakturaerInboxPage() {
           break;
         case "x":
         case "X":
+          // Utelatelse krever en grunn — åpne dialogen i stedet for å markere direkte.
           if (activeLine) {
             e.preventDefault();
-            void doNotApplicable(activeLine);
+            openDialog("not_rm", activeLine);
           }
           break;
         case "u":
@@ -567,7 +573,7 @@ export default function FakturaerInboxPage() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [activeLine, anyDialogOpen, docOpen, doAccept, doNotApplicable, doUndo, acceptAllVisible, openDialog]);
+  }, [activeLine, anyDialogOpen, docOpen, doAccept, doNotApplicable, doUndo, openDialog, statusOf]);
 
   // Aktiv linje følger dokumentpanelet.
   useEffect(() => {
@@ -851,11 +857,10 @@ export default function FakturaerInboxPage() {
             <Keyboard className="h-3.5 w-3.5" /> Hurtigtaster
           </span>
           <span>↑ / ↓ marker</span>
-          <span>Enter godta og neste</span>
-          <span>Shift+Enter godta alle ≥ 90 %</span>
-          <span>m match</span>
+          <span>Enter godta råvareforslag</span>
+          <span>m velg råvare</span>
           <span>n ny råvare</span>
-          <span>x ikke aktuell</span>
+          <span>x ikke råvare</span>
           <span>u angre</span>
         </div>
       </Card>
