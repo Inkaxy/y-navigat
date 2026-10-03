@@ -180,3 +180,37 @@ export async function runAutoMatchAfterImport(invoiceId: string): Promise<boolea
     return false;
   }
 }
+
+/** Årsaker en medarbeider kan godta direkte: rene prisavvik mot en kjent sammenligningspris. */
+const ACCEPTABLE_PRICE_REASONS: ReadonlySet<string> = new Set(["price_variance", "price_increase", "price_drop"]);
+
+/**
+ * Kan prisavviket godtas på linjen? Bare når både fakturapris og sammenligningspris
+ * er beregnet, og det ENESTE som gjenstår er selve avviket.
+ */
+export function canAcceptPriceVariance(line: ReviewLineRow): boolean {
+  if (line.price_per_base_unit == null || line.expected_price_per_base_unit == null) return false;
+  const reasons = allReasons(line);
+  return reasons.length > 0 && reasons.every((r) => ACCEPTABLE_PRICE_REASONS.has(r));
+}
+
+/**
+ * Godtar prisavviket på ÉN linje. Avtalepris og sammenligningsgrunnlag endres ikke;
+ * hvem og når lagres på linjen på samme måte som «Ikke råvare».
+ */
+export async function acceptPriceVariance(line: ReviewLineRow): Promise<void> {
+  if (!canAcceptPriceVariance(line)) throw new Error("Prisavviket kan ikke godtas på denne linjen");
+  const userId = await currentUserId();
+  const pct = line.price_variance_pct == null ? "" : ` (${Number(line.price_variance_pct) > 0 ? "+" : ""}${Number(line.price_variance_pct).toFixed(1).replace(".", ",")} %)`;
+  const { error } = await supabase
+    .from("invoice_lines")
+    .update({
+      requires_review: false,
+      review_reason: null,
+      resolution_note: `Prisavvik godtatt${pct}`,
+      resolved_by: userId,
+      resolved_at: new Date().toISOString(),
+    })
+    .eq("id", line.id);
+  if (error) throw new Error(`Kunne ikke godta prisen: ${error.message}`);
+}
