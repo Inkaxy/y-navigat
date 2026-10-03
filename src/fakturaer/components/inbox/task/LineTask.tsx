@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { formatMoney } from "@/fakturaer/lib/constants";
-import { fmtNum } from "@/fakturaer/lib/units";
+import { fmtNum, invoiceArithmeticMismatch } from "@/fakturaer/lib/units";
 import { GENERIC_ERROR_MESSAGE } from "@/lib/userError";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import type { SupplierLinkRow } from "@/fakturaer/hooks/useSupplierLinkContext";
@@ -63,7 +63,10 @@ export function LineTask(p: LineTaskProps) {
   const currency = line.invoice.currency ?? "NOK";
   const supplier = line.invoice.supplier?.name ?? "leverandøren";
   const dataCost = costOf(line, link);
-  const dataInconsistent = !!dataCost && !dataCost.checks.arithmeticPerInvoiceUnit && !dataCost.checks.arithmeticPerBaseUnit;
+  const dataInconsistent = invoiceArithmeticMismatch(
+    { quantity: line.quantity, unitPrice: line.unit_price, totalAmount: line.total_amount },
+    dataCost?.checks ?? null,
+  );
   const pkgValid = form.packageDraft.state === "valid" && !!form.cost && !form.cost.needsInput && !!form.selectedRm;
   const pkgHint =
     form.materialLoading
