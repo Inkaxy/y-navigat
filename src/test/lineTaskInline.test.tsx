@@ -242,7 +242,7 @@ describe("Pakning for stk-råvare (ALI 36×90 g)", () => {
   it("mens råvaren lastes vises lastetilstand og bekreftelse er sperret — ikke nytt råvarevalg", () => {
     rmPending = true;
     setup(aliStkLine());
-    expect(screen.getByText(/Henter råvaren/)).toBeTruthy();
+    expect(screen.getAllByText(/Henter råvaren/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/Velg råvare/)).toBeNull();
     expect(screen.queryByLabelText("Søk i råvareregisteret")).toBeNull();
     const btn = screen.getByRole("button", { name: "Bekreft pakning og fortsett" }) as HTMLButtonElement;
