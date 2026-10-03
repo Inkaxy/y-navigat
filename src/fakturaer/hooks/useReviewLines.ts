@@ -68,7 +68,7 @@ export interface ReviewLineRow {
     rank: number;
     raw_material: { name: string; sku: string | null; category: string | null; current_cost_price: number | null; base_unit?: string | null; item_type?: string | null } | null;
   }>;
-  matched_raw_material?: { name: string; sku: string | null; category: string | null; item_type?: string | null } | null;
+  matched_raw_material?: { name: string; sku: string | null; category: string | null; item_type?: string | null; base_unit?: string | null } | null;
 }
 
 /** Fakturastatuser som ikke skal kunne behandles fra køen. */
@@ -86,7 +86,7 @@ const SELECT = `id, invoice_id, line_number, supplier_sku, description, quantity
      legal_entity:legal_entities(legal_name, short_code)),
    suggestions:invoice_line_match_suggestions(raw_material_id, confidence, match_reason, rank,
      raw_material:raw_materials(name, sku, category, current_cost_price, base_unit, item_type)),
-   matched_raw_material:raw_materials!invoice_lines_raw_material_id_fkey(name, sku, category, item_type)`;
+   matched_raw_material:raw_materials!invoice_lines_raw_material_id_fkey(name, sku, category, item_type, base_unit)`;
 
 const REVIEW_FILTER = "requires_review.eq.true,variance_status.eq.no_baseline";
 
