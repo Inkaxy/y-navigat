@@ -33,7 +33,7 @@ export function RecipeWarningsBanner({
       : `${summary.problemCount} ting bør ses på`;
 
   return (
-    <section id="oppskrift-advarsler" aria-label="Ting som bør ses på" className="scroll-mt-48 rounded-md border border-warning/40 bg-warning/10">
+    <section id="oppskrift-advarsler" aria-label="Ting som bør ses på" className="scroll-mt-28 rounded-md border border-warning/40 bg-warning/10">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2">
         <AlertTriangle className="h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
         <p className="text-sm font-medium">{headline}</p>
