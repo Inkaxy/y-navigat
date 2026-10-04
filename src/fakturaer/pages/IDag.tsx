@@ -1,13 +1,14 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
+import { DecisionNav } from "@/fakturaer/components/decisions/DecisionNav";
 import { ArrowUpRight, CheckCircle2, CircleAlert, GitBranch, Package } from "lucide-react";
-import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { QueryState } from "@/components/common/QueryState";
 import { useReviewLines } from "@/fakturaer/hooks/useReviewLines";
 import { useCompany } from "@/hooks/useCompany";
 import { buildDecisionGroups, DECISION_KIND_LABEL, encodeGroupKey, type DecisionGroup } from "@/fakturaer/lib/decisionGroups";
 import { formatMoney } from "@/fakturaer/lib/constants";
-import { formatOsloLongDate } from "@/fakturaer/lib/dayLabel";
+import { format } from "date-fns";
+import { nb } from "date-fns/locale";
 
 function headline(g: DecisionGroup): { title: string; body: string; foot: string } {
   const n = g.invoiceIds.length;
@@ -41,14 +42,14 @@ export default function IDag() {
 
   return (
     <div className="px-page py-6 space-y-6">
-      <FakturaerHeaderBanner />
-      <QueryState isLoading={q.isLoading} error={q.error} onRetry={() => q.refetch()} isEmpty={false}>
+      <DecisionNav />
+      <QueryState isLoading={q.isLoading} isError={q.isError} error={q.error} scope="fakturaer:i-dag" onRetry={() => q.refetch()} isEmpty={false}>
         <header className="space-y-2">
-          <p className="text-caption uppercase tracking-wide text-ink-secondary">{formatOsloLongDate()} · din arbeidsøkt</p>
+          <p className="text-caption uppercase tracking-wide text-ink-secondary">{format(new Date(), "EEEE d. MMMM", { locale: nb })} · din arbeidsøkt</p>
           <h1 className="font-display text-3xl font-semibold leading-tight sm:text-4xl">
             {invoiceCount} {invoiceCount === 1 ? "faktura" : "fakturaer"} med åpne linjer.
             <br />
-            {groups.length} {groups.length === 1 ? "ting" : "ting"} å ta stilling til.
+            {groups.length} ting å ta stilling til.
           </h1>
           <p className="text-body text-ink-secondary">Like spørsmål er samlet. Ett svar gjelder alle berørte fakturaer.</p>
         </header>
