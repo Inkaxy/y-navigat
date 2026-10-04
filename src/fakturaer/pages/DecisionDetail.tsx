@@ -8,6 +8,7 @@ import { QueryState } from "@/components/common/QueryState";
 import { DecisionNav } from "@/fakturaer/components/decisions/DecisionNav";
 import { useReviewLines } from "@/fakturaer/hooks/useReviewLines";
 import { useCompany } from "@/hooks/useCompany";
+import { useInvoiceRights } from "@/fakturaer/hooks/useInvoiceRights";
 import { buildDecisionGroups, materialOptions } from "@/fakturaer/lib/decisionGroups";
 import { formatMoney } from "@/fakturaer/lib/constants";
 import { applyMaterialToLines, filterUnchanged, outcomeNotes, runPerLine, type GroupOutcome } from "@/fakturaer/lib/groupActions";
@@ -37,6 +38,7 @@ export default function DecisionDetail() {
   const group = frozen ?? live;
   const [choice, setChoice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const { canWrite } = useInvoiceRights();
   const [search, setSearch] = useState("");
   const debounced = useDebouncedValue(search.trim(), 250);
   const found = useQuery({
@@ -158,7 +160,7 @@ export default function DecisionDetail() {
                       <p>{group.shared ? `${group.supplierName} + varenummer ${group.sku} → valgt råvare.` : "Linjen mangler varenummer, så valget gjelder bare denne linjen."}</p>
                       <p className="mt-1 text-ink-secondary">Pakningen bekreftes separat. Valget godkjenner ikke fakturaen.</p>
                     </div>
-                    <Button className="w-full" disabled={!choice || busy} onClick={applyMaterial}>
+                    <Button className="w-full" disabled={!choice || busy || !canWrite} onClick={applyMaterial}>
                       {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       {group.shared ? `Bruk på ${group.lines.length} linje(r) og husk valget` : "Lagre valget"}
                     </Button>
@@ -204,10 +206,10 @@ export default function DecisionDetail() {
                       <p className="text-2xl font-semibold tabular-nums">{group.differenceExclVat != null ? kr(group.differenceExclVat) : "Ukjent"}</p>
                       <p className="text-sm text-ink-secondary">Ekskl. mva. Beregnet fra dokumentert grunnmengde.</p>
                     </div>
-                    <Button className="w-full" disabled={busy || group.differenceExclVat == null} onClick={createCase}>
+                    <Button className="w-full" disabled={busy || !canWrite || group.differenceExclVat == null} onClick={createCase}>
                       Opprett én sak for {group.invoiceIds.length === 1 ? "fakturaen" : `${group.invoiceIds.length} fakturaer`}
                     </Button>
-                    <Button variant="outline" className="w-full" disabled={busy || !allPriceOk} onClick={acceptPrices}>
+                    <Button variant="outline" className="w-full" disabled={busy || !canWrite || !allPriceOk} onClick={acceptPrices}>
                       {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Godta prisavviket denne gangen
                     </Button>
                     {!allPriceOk && <p className="text-sm text-ink-secondary">Noen linjer har flere åpne punkter og må avklares i køen først.</p>}

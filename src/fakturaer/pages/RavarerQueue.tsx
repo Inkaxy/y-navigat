@@ -10,6 +10,7 @@ import { QueryState } from "@/components/common/QueryState";
 import { DecisionNav } from "@/fakturaer/components/decisions/DecisionNav";
 import { useReviewLines } from "@/fakturaer/hooks/useReviewLines";
 import { useCompany } from "@/hooks/useCompany";
+import { useInvoiceRights } from "@/fakturaer/hooks/useInvoiceRights";
 import { buildDecisionGroups, DECISION_KIND_LABEL, encodeGroupKey, RAVARE_KINDS, type DecisionGroup } from "@/fakturaer/lib/decisionGroups";
 import { applyPackageToLines, outcomeNotes, packagePreview } from "@/fakturaer/lib/groupActions";
 import { postSafeCosts } from "@/fakturaer/lib/costPosting";
@@ -67,10 +68,10 @@ export default function RavarerQueue() {
   const { data: company } = useCompany();
   const q = useReviewLines({ legalEntityId: company?.id ?? null, limit: null });
   const groups = useMemo(() => buildDecisionGroups(q.data?.rows ?? []).filter((g) => RAVARE_KINDS.has(g.kind)), [q.data]);
+  const { canWrite } = useInvoiceRights();
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const refresh = async () => {
-    await qc.invalidateQueries({ queryKey: ["fakturaer-review-lines"] });
-    await qc.invalidateQueries({ queryKey: ["invoice-approval-overview"] });
+    await Promise.all(["fakturaer-review-lines", "invoice-approval-overview", "fakturaer-inbox", "vareminne-links"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
   };
 
   async function firstCost(g: DecisionGroup) {
@@ -107,8 +108,9 @@ export default function RavarerQueue() {
                   <Link to={`/ravarer/fakturaer/i-dag/${encodeGroupKey(g.key)}`} className="inline-flex items-center gap-1 text-sm text-primary hover:underline">Velg råvare <ArrowUpRight className="h-4 w-4" aria-hidden /></Link>
                 )}
               </div>
-              {g.kind === "package" && <PackageCard g={g} onDone={refresh} />}
-              {g.kind === "first_cost" && (
+              {g.kind === "package" && canWrite && <PackageCard g={g} onDone={refresh} />}
+              {!canWrite && g.kind !== "material" && <p className="text-sm text-ink-secondary">Du har lesetilgang og kan ikke lagre valg her.</p>}
+              {g.kind === "first_cost" && canWrite && (
                 <div className="space-y-2">
                   <p className="text-sm">
                     Ingen avtale- eller startpris finnes. Dokumentert pris: <strong>{g.observedPerBase != null ? formatMoney(g.observedPerBase, "NOK") : "–"}</strong> per {g.lines[0].matched_raw_material?.base_unit ?? "grunnenhet"} ({g.lines[0].invoice.invoice_date}).
