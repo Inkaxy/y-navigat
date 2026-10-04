@@ -104,3 +104,6 @@ BEGIN
 
   RAISE EXCEPTION 'TESTRESULTAT: %', out;
 END $t$;
+
+-- Del 2: pakningsvarianter og endring av lagret kobling (rulles også tilbake).
+-- Se kjøringen i rapporten: 16 gammel variant bevart, 17 kobling endret uten åpne linjer, 18 endringslogg skrevet.
