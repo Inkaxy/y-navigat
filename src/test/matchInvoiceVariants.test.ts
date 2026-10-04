@@ -87,7 +87,7 @@ describe("2: flere bekreftede pakninger for samme varenummer", () => {
       { raw_material_supplier_id: "rms-v", supplier_sku_norm: "60241", package_size: 12, package_unit: "l", base_units_per_package: 6, confirmed_at: "2026-09-01T00:00:00Z" },
     ] }));
     expect(r.line.raw_material_id).toBe(RM);
-    expect(Number(r.line.base_quantity)).not.toBe(6);
+    expect([6, 8]).not.toContain(Number(r.line.base_quantity));
   });
 });
 

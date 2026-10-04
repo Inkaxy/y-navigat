@@ -277,7 +277,13 @@ Deno.serve(async (req) => {
         && v.package_size != null && Number(v.package_size) === Number(line.package_size)
         && String(v.package_unit ?? "").trim().toLowerCase() === unit);
       const bupps = new Set(hits.map((h) => Number(h.base_units_per_package)));
-      if (bupps.size !== 1) return row; // ingen eller motstridende varianter: ingen gjenbruk
+      if (bupps.size !== 1) {
+        // Ny, ukjent eller motstridende pakning: arv aldri koblingsradens siste
+        // variant. Finnes det varianter for koblingen, fjernes pakningsfeltene
+        // slik at bare linjens egen dokumentasjon (eller en pakningsoppgave) gjelder.
+        const known = variants.some((v) => v.raw_material_supplier_id === row.id);
+        return known ? { ...row, base_units_per_package: null, package_size: null, package_unit: null, package_confirmed_at: null } : row;
+      }
       const v = hits[0];
       return { ...row, base_units_per_package: v.base_units_per_package, package_size: v.package_size, package_unit: v.package_unit, package_confirmed_at: v.confirmed_at };
     }
