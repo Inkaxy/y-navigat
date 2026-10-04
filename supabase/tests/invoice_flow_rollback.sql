@@ -107,3 +107,8 @@ END $t$;
 
 -- Del 2: pakningsvarianter og endring av lagret kobling (rulles også tilbake).
 -- Se kjøringen i rapporten: 16 gammel variant bevart, 17 kobling endret uten åpne linjer, 18 endringslogg skrevet.
+
+-- Test 3 (kjørt 2026-10-04, rullet tilbake): kreditnota med lines_sum_status
+-- not_checked/no_total/no_lines/mismatch avvises (kreditnota_sumavvik), lav
+-- extraction_confidence (0.4) avvises (kreditnota_lavt_uttrekk), kontrollert
+-- kreditnota tillates; rm_post_safe_line_costs avviser faktura uten valuta ('valuta').

@@ -19,7 +19,8 @@ const ERR: Record<string, string> = {
   kreditnota_mva_ukjent: "Kreditnotaens mva er ukjent, så nettobeløpet kan ikke fastslås",
   kreditnota_kansellert: "Kreditnotaen er kansellert",
   kreditnota_flagget: "Kreditnotaen er flagget",
-  kreditnota_sumavvik: "Kreditnotaens linjesum stemmer ikke",
+  kreditnota_sumavvik: "Kreditnotaens linjesum er ikke kontrollert eller stemmer ikke",
+  kreditnota_lavt_uttrekk: "Kreditnotaen er lest inn med lav sikkerhet og må kontrolleres",
   kreditnota_duplikat: "Kreditnotanummeret finnes flere ganger hos leverandøren",
 };
 
