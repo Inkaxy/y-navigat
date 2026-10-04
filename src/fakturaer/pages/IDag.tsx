@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { DecisionNav } from "@/fakturaer/components/decisions/DecisionNav";
 import { ArrowUpRight, CheckCircle2, CircleAlert, GitBranch, Package } from "lucide-react";
@@ -42,8 +42,8 @@ export default function IDag() {
   const groups = useMemo(() => buildDecisionGroups(q.data?.rows ?? []), [q.data]);
   const invoiceCount = useMemo(() => new Set((q.data?.rows ?? []).map((r) => r.invoice_id)).size, [q.data]);
   const merged = groups.reduce((s, g) => s + Math.max(0, g.lines.length - 1), 0);
-  const [shown, setShown] = useState(12);
-  const top = groups.slice(0, shown);
+  // Kort prioritert liste; hele køen ligger i Råvarer med søk og filter.
+  const top = groups.slice(0, 5);
   const overview = useQuery({ queryKey: ["invoice-approval-overview", company?.id], enabled: !!company?.id, queryFn: () => fetchApprovalOverview(company!.id) });
   const readyCount = (overview.data ?? []).filter((r) => approvalBucket(r) === "ready").length;
 
@@ -72,7 +72,7 @@ export default function IDag() {
               return (
                 <li key={g.key}>
                   <Link
-                    to={g.kind === "first_cost" || g.kind === "package" ? "/ravarer/fakturaer/ravarer" : `/ravarer/fakturaer/i-dag/${encodeGroupKey(g.key)}`}
+                    to={`/ravarer/fakturaer/i-dag/${encodeGroupKey(g.key)}`}
                     className="group block rounded-xl border border-line-subtle bg-card p-5 transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <div className="flex items-start justify-between gap-4">
@@ -94,10 +94,10 @@ export default function IDag() {
               );
             })}
             {groups.length > top.length && (
-              <li className="text-sm text-ink-secondary">
-                <button type="button" className="rounded-lg border border-line-subtle px-3 py-2 text-primary hover:bg-muted/50" onClick={() => setShown((n) => n + 12)}>
-                  Vis {Math.min(12, groups.length - top.length)} flere ({groups.length - top.length} gjenstår)
-                </button>
+              <li>
+                <Link to="/ravarer/fakturaer/ravarer" className="inline-flex items-center gap-1 rounded-lg border border-line-subtle px-3 py-2 text-sm text-primary hover:bg-muted/50">
+                  Se alle råvarespørsmål <ArrowUpRight className="h-4 w-4" aria-hidden />
+                </Link>
               </li>
             )}
           </ol>

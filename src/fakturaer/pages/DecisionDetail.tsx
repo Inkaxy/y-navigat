@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { PackageDecision } from "@/fakturaer/components/decisions/PackageDecision";
+import { FirstCostDecision } from "@/fakturaer/components/decisions/FirstCostDecision";
+import { filterRavarerGroups, nextGroupKey, parseRavarerFilter } from "@/fakturaer/lib/ravarerQueueFilter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Brain, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -9,7 +12,7 @@ import { DecisionNav } from "@/fakturaer/components/decisions/DecisionNav";
 import { useReviewLines } from "@/fakturaer/hooks/useReviewLines";
 import { useCompany } from "@/hooks/useCompany";
 import { useInvoiceRights } from "@/fakturaer/hooks/useInvoiceRights";
-import { buildDecisionGroups, materialOptions } from "@/fakturaer/lib/decisionGroups";
+import { buildDecisionGroups, encodeGroupKey, materialOptions } from "@/fakturaer/lib/decisionGroups";
 import { formatMoney } from "@/fakturaer/lib/constants";
 import { applyMaterialToLines, filterUnchanged, outcomeNotes, runPerLine, type GroupOutcome } from "@/fakturaer/lib/groupActions";
 import { Input } from "@/components/ui/input";
@@ -28,6 +31,10 @@ export default function DecisionDetail() {
   // useParams er allerede dekodet; ny dekoding krasjer på %-tegn i varenummer.
   const groupKey = key;
   const navigate = useNavigate();
+  const [sp] = useSearchParams();
+  const fromRavarer = sp.get("fra") === "ravarer";
+  const backParams = new URLSearchParams(sp); backParams.delete("fra");
+  const backHref = fromRavarer ? `/ravarer/fakturaer/ravarer${backParams.toString() ? `?${backParams}` : ""}` : "/ravarer/fakturaer/i-dag";
   const qc = useQueryClient();
   const { data: company } = useCompany();
   const q = useReviewLines({ legalEntityId: company?.id ?? null, limit: null });
@@ -61,7 +68,12 @@ export default function DecisionDetail() {
   const done = async (msg?: string) => {
     await Promise.all(["fakturaer-review-lines", "fakturaer-inbox", "invoice-approval-overview", "vareminne-links", "supplier-cases"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
     if (msg) toast.success(msg);
-    navigate("/ravarer/fakturaer/i-dag");
+    // Neste spørsmål i samme filtrerte rekkefølge som brukeren kom fra.
+    const all = buildDecisionGroups(q.data?.rows ?? []);
+    const ordered = fromRavarer ? filterRavarerGroups(all, parseRavarerFilter(sp)) : all;
+    const next = nextGroupKey(ordered, groupKey);
+    if (next) navigate(`/ravarer/fakturaer/i-dag/${encodeGroupKey(next)}${sp.toString() ? `?${sp}` : ""}`);
+    else navigate(backHref);
   };
 
   async function applyMaterial() {
@@ -118,7 +130,7 @@ export default function DecisionDetail() {
   return (
     <div className="px-page py-6 space-y-6">
       <DecisionNav />
-      <Link to="/ravarer/fakturaer/i-dag" className="text-sm text-primary hover:underline">← I dag</Link>
+      <Link to={backHref} className="text-sm text-primary hover:underline">← {fromRavarer ? "Alle råvarespørsmål" : "I dag"}</Link>
       <QueryState isLoading={q.isLoading} isError={q.isError} error={q.error} scope="fakturaer:beslutning" onRetry={() => q.refetch()}
         isEmpty={!group} emptyTitle="Spørsmålet er allerede avklart" emptyDescription="Gå tilbake til I dag for neste beslutning.">
         {group && first && (
@@ -128,7 +140,7 @@ export default function DecisionDetail() {
                 {group.supplierName} · {group.invoiceIds.length === 1 ? "1 faktura" : `${group.invoiceIds.length} fakturaer`}
               </p>
               <h1 className="font-display text-3xl font-semibold">
-                {group.kind === "material" ? `Hvilken råvare er dette?` : group.kind === "price" ? "Ett prisavvik. Én beslutning." : "Avklar linjen"}
+                {group.kind === "material" ? `Hvilken råvare er dette?` : group.kind === "price" ? "Ett prisavvik. Én beslutning." : group.kind === "package" ? "Bekreft pakningen" : group.kind === "first_cost" ? "Første kostpris" : "Avklar linjen"}
               </h1>
             </header>
 
@@ -177,9 +189,9 @@ export default function DecisionDetail() {
                   </>
                 )}
 
-                {(group.kind === "package" || group.kind === "other") && (
-                  <p className="text-body">{group.kind === "package" ? "Pakningen bekreftes i Råvarer-køen, der innholdet per pakning fylles inn og gjelder like linjer." : "Denne linjen åpnes på fakturaen for kontroll."}</p>
-                )}
+                {group.kind === "package" && <PackageDecision g={group} canWrite={canWrite} onSaved={() => done()} />}
+                {group.kind === "first_cost" && <FirstCostDecision g={group} canWrite={canWrite} onSaved={() => done()} />}
+                {group.kind === "other" && <p className="text-body">Denne linjen åpnes på fakturaen for kontroll.</p>}
 
                 <ul className="divide-y divide-line-subtle border-t border-line-subtle text-sm">
                   {group.lines.map((l) => (
@@ -216,8 +228,8 @@ export default function DecisionDetail() {
                     <p className="text-sm text-ink-secondary">Avtaleprisen endres ikke. Fakturaen godkjennes eller betales ikke automatisk.</p>
                   </>
                 )}
-                {(group.kind === "package" || group.kind === "other") && (
-                  <Button asChild className="w-full"><Link to={group.kind === "package" ? "/ravarer/fakturaer/ravarer" : `/ravarer/fakturaer/til-behandling?faktura=${first.invoice_id}`}>{group.kind === "package" ? "Bekreft pakning i Råvarer" : "Åpne fakturaen"}</Link></Button>
+                {group.kind === "other" && (
+                  <Button asChild className="w-full"><Link to={`/ravarer/fakturaer/til-behandling?faktura=${first.invoice_id}`}>Åpne fakturaen</Link></Button>
                 )}
               </aside>
             </div>
