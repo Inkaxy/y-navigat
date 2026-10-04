@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Brain, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,12 @@ import { useReviewLines } from "@/fakturaer/hooks/useReviewLines";
 import { useCompany } from "@/hooks/useCompany";
 import { buildDecisionGroups, materialOptions } from "@/fakturaer/lib/decisionGroups";
 import { formatMoney } from "@/fakturaer/lib/constants";
-import { applyMaterialToLines, runPerLine } from "@/fakturaer/lib/groupActions";
+import { applyMaterialToLines, filterUnchanged, outcomeNotes, runPerLine, type GroupOutcome } from "@/fakturaer/lib/groupActions";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
+import { useDebouncedValue } from "@/kunder/hooks/useDebouncedValue";
+import type { DecisionGroup } from "@/fakturaer/lib/decisionGroups";
 import { createSupplierCase } from "@/fakturaer/lib/supplierCases";
 import { acceptPriceVariance, canAcceptPriceVariance } from "@/fakturaer/lib/queueActions";
 import { cn } from "@/lib/utils";
@@ -19,19 +24,41 @@ const kr = (v: number | null) => (v == null ? "–" : formatMoney(v, "NOK"));
 
 export default function DecisionDetail() {
   const { key = "" } = useParams();
-  const groupKey = decodeURIComponent(key);
+  // useParams er allerede dekodet; ny dekoding krasjer på %-tegn i varenummer.
+  const groupKey = key;
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { data: company } = useCompany();
   const q = useReviewLines({ legalEntityId: company?.id ?? null, limit: null });
-  const group = useMemo(() => buildDecisionGroups(q.data?.rows ?? []).find((g) => g.key === groupKey), [q.data, groupKey]);
+  const live = useMemo(() => buildDecisionGroups(q.data?.rows ?? []).find((g) => g.key === groupKey), [q.data, groupKey]);
+  // Listen brukeren ser fryses: lagring gjelder nøyaktig disse linjene, ikke en ny refetch.
+  const [frozen, setFrozen] = useState<DecisionGroup | null>(null);
+  useEffect(() => { if (live && (!frozen || frozen.key !== live.key)) setFrozen(live); }, [live, frozen]);
+  const group = frozen ?? live;
   const [choice, setChoice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [search, setSearch] = useState("");
+  const debounced = useDebouncedValue(search.trim(), 250);
+  const found = useQuery({
+    queryKey: ["decision-material-search", company?.id, debounced],
+    enabled: !!company?.id && debounced.length >= 2,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("raw_materials").select("id, name, base_unit, category")
+        .eq("legal_entity_id", company!.id).eq("is_active", true).ilike("name", `%${debounced}%`).order("name").limit(20);
+      if (error) throw new Error("Kunne ikke søke i råvarene");
+      return data ?? [];
+    },
+  });
+  const report = (label: string, r: GroupOutcome) => {
+    const notes = outcomeNotes(r);
+    const fails = r.outcomes.filter((o) => !o.ok).map((o) => `${o.invoiceNumber}: ${o.message}`);
+    const description = [...notes, ...fails].join("\n") || undefined;
+    (r.failed || notes.length ? toast.warning : toast.success)(`${label}: ${r.text}`, { description });
+  };
 
-  const done = async (msg: string) => {
-    await qc.invalidateQueries({ queryKey: ["fakturaer-review-lines"] });
-    await qc.invalidateQueries({ queryKey: ["fakturaer-inbox"] });
-    toast.success(msg);
+  const done = async (msg?: string) => {
+    await Promise.all(["fakturaer-review-lines", "fakturaer-inbox", "invoice-approval-overview", "vareminne-links", "supplier-cases"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
+    if (msg) toast.success(msg);
     navigate("/ravarer/fakturaer/i-dag");
   };
 
@@ -41,8 +68,8 @@ export default function DecisionDetail() {
     try {
       const targets = group.shared ? group.lines : group.lines.slice(0, 1);
       const r = await applyMaterialToLines(targets, choice);
-      if (r.failed) toast.error(`Råvarevalg: ${r.text}`, { description: r.outcomes.filter((o) => !o.ok).map((o) => `${o.invoiceNumber}: ${o.message}`).join("\n") });
-      await done(r.failed ? `Råvarevalg: ${r.text}` : `Råvarevalg: ${r.text}. Huskes for neste import.`);
+      report(r.failed || r.learningFailed ? "Råvarevalg" : "Råvarevalg lagret og huskes", r);
+      await done();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Kunne ikke lagre valget");
     } finally {
@@ -68,14 +95,22 @@ export default function DecisionDetail() {
   async function acceptPrices() {
     if (!group) return;
     setBusy(true);
-    const r = await runPerLine(group.lines, acceptPriceVariance);
-    setBusy(false);
-    if (r.failed) toast.error(`Prisavvik: ${r.text}`, { description: r.outcomes.filter((o) => !o.ok).map((o) => `${o.invoiceNumber}: ${o.message}`).join("\n") });
-    await done(`Prisavvik godtatt denne gangen: ${r.text}. Avtalen er ikke endret.`);
+    try {
+      const { keep, changed } = await filterUnchanged(group.lines);
+      const r = await runPerLine(keep, acceptPriceVariance);
+      report("Prisavvik godtatt denne gangen (avtalen er ikke endret)", { ...r, changedSinceViewed: changed });
+      await done();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Kunne ikke lagre");
+    } finally {
+      setBusy(false);
+    }
   }
 
   const first = group?.lines[0];
-  const options = group ? materialOptions(group) : [];
+  const suggested = group ? materialOptions(group) : [];
+  const options = [...suggested, ...(found.data ?? []).filter((m) => !suggested.some((o) => o.id === m.id))
+    .map((m) => ({ id: m.id, name: m.name, detail: [m.category, m.base_unit ? `grunnenhet ${m.base_unit}` : null].filter(Boolean).join(" · "), confidence: 0 }))];
   const allPriceOk = !!group && group.lines.every(canAcceptPriceVariance);
 
   return (
@@ -101,7 +136,7 @@ export default function DecisionDetail() {
                   <>
                     <h2 className="font-semibold">Velg råvare</h2>
                     <div role="radiogroup" aria-label="Råvare" className="space-y-2">
-                      {options.length === 0 && <p className="text-sm text-ink-secondary">Ingen forslag. Velg råvare i køen.</p>}
+                      {options.length === 0 && <p className="text-sm text-ink-secondary">Ingen forslag. Søk i hele råvarelisten under.</p>}
                       {options.map((o) => (
                         <button key={o.id} type="button" role="radio" aria-checked={choice === o.id} onClick={() => setChoice(o.id)}
                           className={cn("flex w-full items-center gap-3 rounded-lg border p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -110,6 +145,13 @@ export default function DecisionDetail() {
                           <span><span className="block font-medium">{o.name}</span><span className="text-sm text-ink-secondary">{o.detail}</span></span>
                         </button>
                       ))}
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="decision-material-search">Finner du ikke riktig råvare? Søk i hele listen</Label>
+                      <Input id="decision-material-search" placeholder="Minst to bokstaver" value={search} onChange={(e) => setSearch(e.target.value)} />
+                      {found.isError && <p className="text-sm text-destructive">Søket feilet. Prøv igjen.</p>}
+                      {debounced.length >= 2 && found.data?.length === 0 && <p className="text-sm text-ink-secondary">Ingen treff.</p>}
+                      <p className="text-sm text-ink-secondary">Er det ikke en råvare (frakt, gebyr, pant)? <Link className="text-primary hover:underline" to={`/ravarer/fakturaer/til-behandling?faktura=${first.invoice_id}`}>Marker som ikke råvare på fakturaen</Link>.</p>
                     </div>
                     <div className="border-t border-line-subtle pt-3 text-sm">
                       <p className="flex items-center gap-2 font-medium text-primary"><Brain className="h-4 w-4" aria-hidden />Dette huskes</p>
@@ -134,7 +176,7 @@ export default function DecisionDetail() {
                 )}
 
                 {(group.kind === "package" || group.kind === "other") && (
-                  <p className="text-body">Denne linjen krever pakningsdetaljer som avklares i fakturakøen.</p>
+                  <p className="text-body">{group.kind === "package" ? "Pakningen bekreftes i Råvarer-køen, der innholdet per pakning fylles inn og gjelder like linjer." : "Denne linjen åpnes på fakturaen for kontroll."}</p>
                 )}
 
                 <ul className="divide-y divide-line-subtle border-t border-line-subtle text-sm">
@@ -173,7 +215,7 @@ export default function DecisionDetail() {
                   </>
                 )}
                 {(group.kind === "package" || group.kind === "other") && (
-                  <Button asChild className="w-full"><Link to={`/ravarer/fakturaer/til-behandling?faktura=${first.invoice_id}`}>Åpne i fakturakøen</Link></Button>
+                  <Button asChild className="w-full"><Link to={group.kind === "package" ? "/ravarer/fakturaer/ravarer" : `/ravarer/fakturaer/til-behandling?faktura=${first.invoice_id}`}>{group.kind === "package" ? "Bekreft pakning i Råvarer" : "Åpne fakturaen"}</Link></Button>
                 )}
               </aside>
             </div>
