@@ -34,6 +34,12 @@ export const BLOCKER_LABEL: Record<string, string> = {
   prisavvik: "Prisavvik er ikke avklart",
   leverandorsak: "Holdes igjen av en åpen leverandørsak",
   finnes_ikke: "Fakturaen finnes ikke",
+  leverandor_mangler: "Leverandør mangler",
+  belop_mangler: "Fakturabeløpet mangler",
+  mva_ukjent: "Mva-beløpet er ukjent",
+  valuta_mangler: "Valuta mangler",
+  sum_ukontrollert: "Linjesummen er ikke kontrollert mot fakturabeløpet",
+  lavt_uttrekk: "Fakturaen er tolket med lav sikkerhet — kontroller registreringen",
 };
 
 export function blockerLabel(code: string): string {
@@ -61,7 +67,7 @@ export type ApproveResult = { invoiceId: string; ok: boolean; already: boolean; 
 
 export async function approveInvoiceInternal(invoiceId: string, note: string | null): Promise<ApproveResult> {
   const { data, error } = await supabase.rpc("approve_invoice_internal", { p_invoice_id: invoiceId, p_note: note ?? undefined });
-  if (error) return { invoiceId, ok: false, already: false, message: /forbidden/.test(error.message) ? "Mangler skrivetilgang" : "Kunne ikke godkjenne" };
+  if (error) return { invoiceId, ok: false, already: false, message: /forbidden/.test(error.message) ? "Mangler godkjennerrolle (godkjenne eller admin)" : "Kunne ikke godkjenne" };
   const res = (data ?? {}) as { ok?: boolean; already_approved?: boolean; blockers?: string[] };
   if (res.ok !== true) return { invoiceId, ok: false, already: false, message: (res.blockers ?? []).map(blockerLabel).join(", ") || "Kunne ikke godkjenne" };
   return { invoiceId, ok: true, already: res.already_approved === true, message: null };
@@ -69,7 +75,7 @@ export async function approveInvoiceInternal(invoiceId: string, note: string | n
 
 export async function revokeInvoiceApproval(invoiceId: string, reason: string): Promise<void> {
   const { error } = await supabase.rpc("revoke_invoice_internal_approval", { p_invoice_id: invoiceId, p_reason: reason });
-  if (error) throw new Error("Kunne ikke trekke tilbake godkjenningen");
+  if (error) throw new Error(/forbidden/.test(error.message) ? "Mangler godkjennerrolle" : /begrunnelse/.test(error.message) ? "Skriv en begrunnelse" : "Kunne ikke trekke tilbake godkjenningen");
 }
 
 /** Godkjenner valgte fakturaer én og én og rapporterer nøyaktig resultat per faktura. */
