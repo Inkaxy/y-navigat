@@ -1,7 +1,8 @@
 import { normalizeSearch } from "@/ravarer/lib/rawMaterialViews";
 import { RAVARE_KINDS, type DecisionGroup, type DecisionKind } from "@/fakturaer/lib/decisionGroups";
 
-export type RavarerFilterKind = "alle" | "material" | "package" | "first_cost";
+export type RavarerFilterKind = "alle" | "material" | "package" | "first_cost" | "price" | "other";
+export type QueueScope = "ravarer" | "alle";
 
 export const RAVARER_FILTERS: ReadonlyArray<{ key: RavarerFilterKind; label: string }> = [
   { key: "alle", label: "Alle" },
@@ -9,6 +10,15 @@ export const RAVARER_FILTERS: ReadonlyArray<{ key: RavarerFilterKind; label: str
   { key: "package", label: "Pakning" },
   { key: "first_cost", label: "Første kostpris" },
 ];
+
+/** Filtre for «Alle beslutninger» — inkluderer prisavvik og øvrige typer. */
+export const ALL_DECISION_FILTERS: ReadonlyArray<{ key: RavarerFilterKind; label: string }> = [
+  ...RAVARER_FILTERS,
+  { key: "price", label: "Prisavvik" },
+  { key: "other", label: "Annet" },
+];
+
+export const filtersFor = (scope: QueueScope) => (scope === "alle" ? ALL_DECISION_FILTERS : RAVARER_FILTERS);
 
 export const RAVARER_PAGE_SIZE = 12;
 
@@ -19,18 +29,18 @@ export interface RavarerFilter {
 }
 
 /** Leser filteret fra URL-en; ukjente verdier faller tilbake til «Alle». */
-export function parseRavarerFilter(sp: URLSearchParams): RavarerFilter & { page: number } {
+export function parseRavarerFilter(sp: URLSearchParams, scope: QueueScope = "ravarer"): RavarerFilter & { page: number } {
   const k = sp.get("type");
-  const kind = (RAVARER_FILTERS.some((f) => f.key === k) ? k : "alle") as RavarerFilterKind;
+  const kind = (filtersFor(scope).some((f) => f.key === k) ? k : "alle") as RavarerFilterKind;
   const p = Number(sp.get("side"));
   return { kind, search: sp.get("q") ?? "", supplierId: sp.get("leverandor") ?? "", page: Number.isInteger(p) && p > 0 ? p : 1 };
 }
 
 /** Filtrerer HELE køen (alle grupper), aldri en avkortet side. */
-export function filterRavarerGroups(groups: readonly DecisionGroup[], f: RavarerFilter): DecisionGroup[] {
+export function filterRavarerGroups(groups: readonly DecisionGroup[], f: RavarerFilter, scope: QueueScope = "ravarer"): DecisionGroup[] {
   const s = normalizeSearch(f.search.trim());
   return groups.filter((g) => {
-    if (!RAVARE_KINDS.has(g.kind)) return false;
+    if (scope === "ravarer" && !RAVARE_KINDS.has(g.kind)) return false;
     if (f.kind !== "alle" && g.kind !== (f.kind as DecisionKind)) return false;
     if (f.supplierId && g.supplierId !== f.supplierId) return false;
     if (!s) return true;
