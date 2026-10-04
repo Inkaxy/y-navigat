@@ -230,7 +230,7 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<AcceptMatch
       .select("id, raw_material_id")
       .eq("supplier_id", supplierId);
     if (rmsErr) {
-      learnErrors.push("kunne ikke hente leverandørens varekoblinger"), console.warn(`acceptMatch: kunne ikke hente leverandørens varekoblinger for alias-opprydning: ${rmsErr.message}`);
+      learnErrors.push("kunne ikke hente leverandørens varekoblinger"); console.warn(`acceptMatch: kunne ikke hente leverandørens varekoblinger for alias-opprydning: ${rmsErr.message}`);
     }
     supplierRmsRows = rmsRows ?? [];
     const allRmsIds = supplierRmsRows.map((r) => r.id);
@@ -240,7 +240,7 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<AcceptMatch
         .select("id, raw_material_supplier_id, alias_type, alias_value, alias_value_normalized, status")
         .in("raw_material_supplier_id", allRmsIds);
       if (aliasReadErr) {
-        learnErrors.push("kunne ikke hente leverandørens alias"), console.warn(`acceptMatch: kunne ikke hente leverandørens alias: ${aliasReadErr.message}`);
+        learnErrors.push("kunne ikke hente leverandørens alias"); console.warn(`acceptMatch: kunne ikke hente leverandørens alias: ${aliasReadErr.message}`);
       }
       supplierAliases = aliasRows ?? [];
     }
@@ -276,7 +276,7 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<AcceptMatch
         onConflict: "alias_type,alias_value_normalized,raw_material_supplier_id",
       });
       if (aliasErr) {
-        learnErrors.push("matchen er lagret, men alias kunne ikke lagres"), console.warn(`acceptMatch: matchen er lagret, men alias kunne ikke lagres: ${aliasErr.message}`);
+        learnErrors.push("matchen er lagret, men alias kunne ikke lagres"); console.warn(`acceptMatch: matchen er lagret, men alias kunne ikke lagres: ${aliasErr.message}`);
       }
     }
 
@@ -286,7 +286,7 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<AcceptMatch
         .update({ status: "superseded" })
         .in("id", plan.supersedeIds);
       if (supErr) {
-        learnErrors.push("kunne ikke pensjonere"), console.warn(
+        learnErrors.push("kunne ikke pensjonere"); console.warn(
           `acceptMatch: kunne ikke pensjonere ${plan.supersedeIds.length} motstridende alias: ${supErr.message}`,
         );
       }
@@ -302,7 +302,7 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<AcceptMatch
           rejected_reason: "valgt annen råvare",
         })
         .in("id", plan.rejectExistingIds);
-      if (rejUpdErr) learnErrors.push("kunne ikke avvise eksisterende alias"), console.warn(`acceptMatch: kunne ikke avvise eksisterende alias: ${rejUpdErr.message}`);
+      if (rejUpdErr) { learnErrors.push("kunne ikke avvise eksisterende alias"); console.warn(`acceptMatch: kunne ikke avvise eksisterende alias: ${rejUpdErr.message}`); }
     }
 
     if (plan.rejectNewRows.length > 0) {
@@ -317,7 +317,7 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<AcceptMatch
         })),
         { onConflict: "alias_type,alias_value_normalized,raw_material_supplier_id" },
       );
-      if (rejInsErr) learnErrors.push("kunne ikke lagre avviste alias"), console.warn(`acceptMatch: kunne ikke lagre avviste alias: ${rejInsErr.message}`);
+      if (rejInsErr) { learnErrors.push("kunne ikke lagre avviste alias"); console.warn(`acceptMatch: kunne ikke lagre avviste alias: ${rejInsErr.message}`); }
     }
   }
 
