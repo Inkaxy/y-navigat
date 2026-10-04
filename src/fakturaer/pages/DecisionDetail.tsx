@@ -4,7 +4,7 @@ import { PackageDecision } from "@/fakturaer/components/decisions/PackageDecisio
 import { FirstCostDecision } from "@/fakturaer/components/decisions/FirstCostDecision";
 import { filterRavarerGroups, nextGroupKey, parseRavarerFilter } from "@/fakturaer/lib/ravarerQueueFilter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Brain, Loader2 } from "lucide-react";
+import { Brain, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { QueryState } from "@/components/common/QueryState";
@@ -23,6 +23,7 @@ import type { DecisionGroup } from "@/fakturaer/lib/decisionGroups";
 import { createSupplierCase } from "@/fakturaer/lib/supplierCases";
 import { acceptPriceVariance, canAcceptPriceVariance } from "@/fakturaer/lib/queueActions";
 import { cn } from "@/lib/utils";
+import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
 
 const kr = (v: number | null) => (v == null ? "–" : formatMoney(v, "NOK"));
 
@@ -47,6 +48,7 @@ export default function DecisionDetail() {
   const group = frozen ?? live;
   const [choice, setChoice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const { canWrite } = useInvoiceRights();
   const [search, setSearch] = useState("");
   const debounced = useDebouncedValue(search.trim(), 250);
@@ -88,6 +90,28 @@ export default function DecisionDetail() {
       await done();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Kunne ikke lagre valget");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Ny råvare opprettes fra første linje; de øvrige like linjene kobles til den samme råvaren. */
+  async function onRawMaterialCreated(rawMaterialId: string) {
+    if (!group) return;
+    const rest = group.shared ? group.lines.slice(1) : [];
+    if (rest.length === 0) {
+      toast.success("Råvaren er opprettet og koblet");
+      await done();
+      return;
+    }
+    setBusy(true);
+    try {
+      const r = await applyMaterialToLines(rest, rawMaterialId);
+      report(r.failed || r.learningFailed ? "Ny råvare opprettet, kobling av øvrige linjer" : "Ny råvare opprettet og brukt på alle linjene", r);
+      await done();
+    } catch (e) {
+      toast.error(e instanceof Error ? `Råvaren er opprettet, men de øvrige linjene ble ikke koblet: ${e.message}` : "Råvaren er opprettet, men de øvrige linjene ble ikke koblet");
+      await done();
     } finally {
       setBusy(false);
     }
@@ -152,7 +176,7 @@ export default function DecisionDetail() {
                   <>
                     <h2 className="font-semibold">Velg råvare</h2>
                     <div role="radiogroup" aria-label="Råvare" className="space-y-2">
-                      {options.length === 0 && <p className="text-sm text-ink-secondary">Ingen forslag. Søk i hele råvarelisten under.</p>}
+                      {options.length === 0 && <p className="text-sm text-ink-secondary">Ingen forslag. Søk i hele råvarelisten under, eller opprett en ny råvare.</p>}
                       {options.map((o) => (
                         <button key={o.id} type="button" role="radio" aria-checked={choice === o.id} onClick={() => setChoice(o.id)}
                           className={cn("flex w-full items-center gap-3 rounded-lg border p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -167,6 +191,12 @@ export default function DecisionDetail() {
                       <Input id="decision-material-search" placeholder="Minst to bokstaver" value={search} onChange={(e) => setSearch(e.target.value)} />
                       {found.isError && <p className="text-sm text-destructive">Søket feilet. Prøv igjen.</p>}
                       {debounced.length >= 2 && found.data?.length === 0 && <p className="text-sm text-ink-secondary">Ingen treff.</p>}
+                      {canWrite && (
+                        <Button type="button" variant="outline" size="sm" className="mt-1" onClick={() => setCreateOpen(true)} disabled={busy}>
+                          <Plus className="mr-1 h-4 w-4" aria-hidden />Opprett ny råvare
+                        </Button>
+                      )}
+                      <CreateRawMaterialDialog open={createOpen} onOpenChange={setCreateOpen} line={first} onCreated={(id) => void onRawMaterialCreated(id)} />
                       <p className="text-sm text-ink-secondary">Er det ikke en råvare (frakt, gebyr, pant)? <Link className="text-primary hover:underline" to={`/ravarer/fakturaer/til-behandling?faktura=${first.invoice_id}`}>Marker som ikke råvare på fakturaen</Link>.</p>
                     </div>
                     <div className="border-t border-line-subtle pt-3 text-sm">
