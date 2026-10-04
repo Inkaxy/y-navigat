@@ -2906,6 +2906,121 @@ export type Database = {
           },
         ]
       }
+      invoice_internal_approvals: {
+        Row: {
+          approved_at: string
+          approved_by: string
+          basis: Json
+          created_at: string
+          id: string
+          invoice_id: string
+          legal_entity_id: string
+          note: string | null
+          revoke_reason: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string
+          approved_by: string
+          basis?: Json
+          created_at?: string
+          id?: string
+          invoice_id: string
+          legal_entity_id: string
+          note?: string | null
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string
+          approved_by?: string
+          basis?: Json
+          created_at?: string
+          id?: string
+          invoice_id?: string
+          legal_entity_id?: string
+          note?: string | null
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_internal_approvals_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_internal_approvals_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_line_cost_postings: {
+        Row: {
+          first_cost: boolean
+          invoice_id: string
+          invoice_line_id: string
+          legal_entity_id: string
+          posted_at: string
+          posted_by: string
+          revoked_at: string | null
+        }
+        Insert: {
+          first_cost?: boolean
+          invoice_id: string
+          invoice_line_id: string
+          legal_entity_id: string
+          posted_at?: string
+          posted_by: string
+          revoked_at?: string | null
+        }
+        Update: {
+          first_cost?: boolean
+          invoice_id?: string
+          invoice_line_id?: string
+          legal_entity_id?: string
+          posted_at?: string
+          posted_by?: string
+          revoked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_line_cost_postings_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_line_cost_postings_invoice_line_id_fkey"
+            columns: ["invoice_line_id"]
+            isOneToOne: true
+            referencedRelation: "invoice_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_line_cost_postings_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_line_exclusion_patterns: {
         Row: {
           created_at: string | null
@@ -13196,6 +13311,185 @@ export type Database = {
           },
         ]
       }
+      supplier_deviation_case_lines: {
+        Row: {
+          amount_excl_vat: number
+          basis: Json
+          case_id: string
+          created_at: string
+          id: string
+          invoice_id: string
+          invoice_line_id: string
+        }
+        Insert: {
+          amount_excl_vat: number
+          basis?: Json
+          case_id: string
+          created_at?: string
+          id?: string
+          invoice_id: string
+          invoice_line_id: string
+        }
+        Update: {
+          amount_excl_vat?: number
+          basis?: Json
+          case_id?: string
+          created_at?: string
+          id?: string
+          invoice_id?: string
+          invoice_line_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_deviation_case_lines_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_deviation_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_deviation_case_lines_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_deviation_case_lines_invoice_line_id_fkey"
+            columns: ["invoice_line_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_deviation_cases: {
+        Row: {
+          created_at: string
+          created_by: string
+          follow_up_on: string | null
+          id: string
+          kind: string
+          legal_entity_id: string
+          reason: string | null
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          responsible_user_id: string | null
+          status: string
+          supplier_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          follow_up_on?: string | null
+          id?: string
+          kind?: string
+          legal_entity_id: string
+          reason?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          responsible_user_id?: string | null
+          status?: string
+          supplier_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          follow_up_on?: string | null
+          id?: string
+          kind?: string
+          legal_entity_id?: string
+          reason?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          responsible_user_id?: string | null
+          status?: string
+          supplier_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_deviation_cases_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_deviation_cases_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_deviation_credits: {
+        Row: {
+          amount_excl_vat: number
+          case_id: string
+          client_ref: string
+          created_at: string
+          created_by: string
+          credit_invoice_id: string
+          id: string
+          invoice_id: string
+          note: string | null
+        }
+        Insert: {
+          amount_excl_vat: number
+          case_id: string
+          client_ref: string
+          created_at?: string
+          created_by: string
+          credit_invoice_id: string
+          id?: string
+          invoice_id: string
+          note?: string | null
+        }
+        Update: {
+          amount_excl_vat?: number
+          case_id?: string
+          client_ref?: string
+          created_at?: string
+          created_by?: string
+          credit_invoice_id?: string
+          id?: string
+          invoice_id?: string
+          note?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_deviation_credits_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_deviation_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_deviation_credits_credit_invoice_id_fkey"
+            columns: ["credit_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_deviation_credits_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppliers: {
         Row: {
           contact_email: string | null
@@ -15161,9 +15455,24 @@ export type Database = {
         Args: { p_detail?: string }
         Returns: undefined
       }
+      allocate_supplier_deviation_credit: {
+        Args: {
+          p_amount_excl_vat: number
+          p_case_id: string
+          p_client_ref: string
+          p_credit_invoice_id: string
+          p_invoice_id: string
+          p_note?: string
+        }
+        Returns: Json
+      }
       app_access_level: {
         Args: { p_app_code: string }
         Returns: Database["public"]["Enums"]["access_level"]
+      }
+      approve_invoice_internal: {
+        Args: { p_invoice_id: string; p_note?: string }
+        Returns: Json
       }
       approve_recipe_declaration: {
         Args: { p_overrides: Json; p_recipe_id: string; p_source: string }
@@ -15322,6 +15631,16 @@ export type Database = {
           p_groups: string[]
           p_legal_entity_id: string
           p_run_date: string
+        }
+        Returns: Json
+      }
+      create_supplier_deviation_case: {
+        Args: {
+          p_follow_up_on?: string
+          p_line_ids: string[]
+          p_reason?: string
+          p_responsible_user_id?: string
+          p_title: string
         }
         Returns: Json
       }
@@ -15905,6 +16224,30 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      invoice_approval_blockers: {
+        Args: { p_invoice_id: string }
+        Returns: string[]
+      }
+      invoice_approval_overview: {
+        Args: { p_legal_entity_id: string }
+        Returns: {
+          approved_at: string
+          approved_by: string
+          blockers: string[]
+          cost_posted_lines: number
+          currency: string
+          invoice_date: string
+          invoice_id: string
+          invoice_number: string
+          is_credit_note: boolean
+          open_material_lines: number
+          status: string
+          supplier_id: string
+          supplier_name: string
+          total_amount: number
+          total_vat: number
+        }[]
       }
       invoice_line_price_basis: {
         Args: { p_line: Database["public"]["Tables"]["invoice_lines"]["Row"] }
@@ -16850,6 +17193,10 @@ export type Database = {
           rule_value: number
         }[]
       }
+      revoke_invoice_internal_approval: {
+        Args: { p_invoice_id: string; p_reason: string }
+        Returns: Json
+      }
       rm_apply_agreement: { Args: { p_payload: Json }; Returns: Json }
       rm_apply_derived_cost_price: {
         Args: { p_raw_material_id: string }
@@ -16978,6 +17325,10 @@ export type Database = {
         }[]
       }
       rm_parse_package_text: { Args: { p_text: string }; Returns: Json }
+      rm_post_safe_line_costs: {
+        Args: { p_invoice_id: string; p_line_ids?: string[] }
+        Returns: Json
+      }
       rm_price_reference: {
         Args: {
           p_invoice_date: string
@@ -17164,6 +17515,10 @@ export type Database = {
         Returns: Json
       }
       set_rfq_password: { Args: { p_recipient_id: string }; Returns: string }
+      set_supplier_deviation_case_status: {
+        Args: { p_case_id: string; p_note: string; p_status: string }
+        Returns: Json
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       snapshot_recipe_prices: { Args: { p_product_id: string }; Returns: Json }
@@ -17213,6 +17568,10 @@ export type Database = {
           p_trays?: number
         }
         Returns: Json
+      }
+      supplier_case_invoice_remaining: {
+        Args: { p_case_id: string; p_invoice_id: string }
+        Returns: number
       }
       sync_label_numbers: {
         Args: { p_date: string; p_legal_entity_id: string }
