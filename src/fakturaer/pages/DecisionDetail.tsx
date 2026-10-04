@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { PackageDecision } from "@/fakturaer/components/decisions/PackageDecision";
 import { FirstCostDecision } from "@/fakturaer/components/decisions/FirstCostDecision";
 import { filterRavarerGroups, nextGroupKey, parseRavarerFilter } from "@/fakturaer/lib/ravarerQueueFilter";
-import { encodeGroupKey } from "@/fakturaer/lib/decisionGroups";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Brain, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -13,7 +12,7 @@ import { DecisionNav } from "@/fakturaer/components/decisions/DecisionNav";
 import { useReviewLines } from "@/fakturaer/hooks/useReviewLines";
 import { useCompany } from "@/hooks/useCompany";
 import { useInvoiceRights } from "@/fakturaer/hooks/useInvoiceRights";
-import { buildDecisionGroups, materialOptions } from "@/fakturaer/lib/decisionGroups";
+import { buildDecisionGroups, encodeGroupKey, materialOptions } from "@/fakturaer/lib/decisionGroups";
 import { formatMoney } from "@/fakturaer/lib/constants";
 import { applyMaterialToLines, filterUnchanged, outcomeNotes, runPerLine, type GroupOutcome } from "@/fakturaer/lib/groupActions";
 import { Input } from "@/components/ui/input";
@@ -230,7 +229,7 @@ export default function DecisionDetail() {
                   </>
                 )}
                 {group.kind === "other" && (
-                  <Button asChild className="w-full"><Link to={group.kind === "package" ? "/ravarer/fakturaer/ravarer" : `/ravarer/fakturaer/til-behandling?faktura=${first.invoice_id}`}>{group.kind === "package" ? "Bekreft pakning i Råvarer" : "Åpne fakturaen"}</Link></Button>
+                  <Button asChild className="w-full"><Link to={`/ravarer/fakturaer/til-behandling?faktura=${first.invoice_id}`}>Åpne fakturaen</Link></Button>
                 )}
               </aside>
             </div>
