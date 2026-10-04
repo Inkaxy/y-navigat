@@ -96,7 +96,7 @@ export default function IDag() {
             {groups.length > top.length && (
               <li>
                 <Link to="/ravarer/fakturaer/ravarer" className="inline-flex items-center gap-1 rounded-lg border border-line-subtle px-3 py-2 text-sm text-primary hover:bg-muted/50">
-                  Se alle {groups.length} spørsmål <ArrowUpRight className="h-4 w-4" aria-hidden />
+                  Se alle råvarespørsmål <ArrowUpRight className="h-4 w-4" aria-hidden />
                 </Link>
               </li>
             )}
