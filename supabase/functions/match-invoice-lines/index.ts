@@ -733,7 +733,9 @@ Deno.serve(async (req) => {
         update.expected_price_per_base_unit = expected;
 
         // Samme vare (eksakt leverandørvarenummer) og bekreftet pakning er en
-        // kjent identitet. Mangel på avtale/startpris alene skal ikke åpne den igjen.
+        // kjent identitet. Uten noe prisgrunnlag i det hele tatt (første kjøp)
+        // skal den ikke sendes til kontroll bare for manglende avtale/startpris.
+        // Finnes et grunnlag, gjelder selskapets innstilling som før.
         const knownIdentity = confidenceLabel === "auto_high" && !!skuN && !!rmsRow
           && normalizeMatchKey(rmsRow.supplier_sku) === skuN && !!rmsRow.package_confirmed_at
           && usable && !picked.conflict;
@@ -752,7 +754,7 @@ Deno.serve(async (req) => {
 
         if (expected != null && actual != null && expected !== 0) {
           for (const reason of evaluateVariance(
-            ref, expected, actual, rm?.category ?? null, update.base_quantity ?? null, update, !knownIdentity,
+            ref, expected, actual, rm?.category ?? null, update.base_quantity ?? null, update, true,
           )) {
             addReason(reason);
           }
