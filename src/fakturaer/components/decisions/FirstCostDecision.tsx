@@ -21,7 +21,14 @@ export function FirstCostDecision({ g, canWrite, onSaved }: { g: DecisionGroup; 
       const res = await postSafeCosts(g.invoiceIds, g.lines.map((l) => l.id));
       const posted = res.reduce((s, r) => s + r.posted, 0);
       const failed = res.filter((r) => r.error);
-      (posted === g.lines.length ? toast.success : toast.error)(`Første kostpris: ${posted} av ${g.lines.length} linjer ført`, failed.length ? { description: failed.map((f) => f.error).join("\n") } : undefined);
+      const skipped = res.reduce((s, r) => s + r.skipped, 0);
+      // Ingen feil, ingen hoppet over og ingenting ført: linjene var allerede ført (f.eks. i et tidligere klikk).
+      if (posted === 0 && skipped === 0 && failed.length === 0) {
+        toast.success("Disse linjene er allerede ført som første kostpris");
+        await onSaved();
+        return;
+      }
+      (posted === g.lines.length ? toast.success : toast.error)(`Første kostpris: ${posted} av ${g.lines.length} linjer ført`, failed.length ? { description: failed.map((f) => f.error).join("\n") } : skipped ? { description: `${skipped} linjer trenger fortsatt avklaring` } : undefined);
       if (posted > 0) await onSaved();
     } finally {
       setBusy(false);
