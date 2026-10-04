@@ -11,7 +11,6 @@ import { QueryState } from "@/components/common/QueryState";
 import { DecisionNav } from "@/fakturaer/components/decisions/DecisionNav";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMoney } from "@/fakturaer/lib/constants";
-import { amountExclVat } from "@/fakturaer/lib/approval";
 import { allocateCredit, maxAllocatable, remainingByInvoice, setCaseStatus, creditNetExclVat } from "@/fakturaer/lib/supplierCases";
 import { parseDecimal } from "@/fakturaer/lib/units";
 
