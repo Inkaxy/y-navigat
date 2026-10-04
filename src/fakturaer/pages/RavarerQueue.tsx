@@ -8,18 +8,18 @@ import { DecisionNav } from "@/fakturaer/components/decisions/DecisionNav";
 import { useReviewLines } from "@/fakturaer/hooks/useReviewLines";
 import { useCompany } from "@/hooks/useCompany";
 import { buildDecisionGroups, DECISION_KIND_LABEL, encodeGroupKey, RAVARE_KINDS } from "@/fakturaer/lib/decisionGroups";
-import { filterRavarerGroups, paginate, parseRavarerFilter, RAVARER_FILTERS, RAVARER_PAGE_SIZE } from "@/fakturaer/lib/ravarerQueueFilter";
+import { filterRavarerGroups, filtersFor, paginate, parseRavarerFilter, RAVARER_PAGE_SIZE, type QueueScope } from "@/fakturaer/lib/ravarerQueueFilter";
 import { cn } from "@/lib/utils";
 
-export default function RavarerQueue() {
+export default function RavarerQueue({ scope = "ravarer" }: { scope?: QueueScope }) {
   const { data: company } = useCompany();
   // limit: null henter hele køen side for side — ingen skjult grense.
   const q = useReviewLines({ legalEntityId: company?.id ?? null, limit: null });
   const [sp, setSp] = useSearchParams();
-  const f = parseRavarerFilter(sp);
-  const all = useMemo(() => buildDecisionGroups(q.data?.rows ?? []).filter((g) => RAVARE_KINDS.has(g.kind)), [q.data]);
+  const f = parseRavarerFilter(sp, scope);
+  const all = useMemo(() => buildDecisionGroups(q.data?.rows ?? []).filter((g) => scope === "alle" || RAVARE_KINDS.has(g.kind)), [q.data, scope]);
   const suppliers = useMemo(() => [...new Map(all.map((g) => [g.supplierId, g.supplierName])).entries()].sort((a, b) => a[1].localeCompare(b[1], "nb")), [all]);
-  const filtered = useMemo(() => filterRavarerGroups(all, f), [all, f.kind, f.search, f.supplierId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const filtered = useMemo(() => filterRavarerGroups(all, f, scope), [scope, all, f.kind, f.search, f.supplierId]); // eslint-disable-line react-hooks/exhaustive-deps
   const pg = paginate(filtered, f.page, RAVARER_PAGE_SIZE);
 
   const set = (k: string, v: string) => {
@@ -28,14 +28,14 @@ export default function RavarerQueue() {
     if (k !== "side") n.delete("side");
     setSp(n, { replace: true });
   };
-  const detailHref = (key: string) => `/ravarer/fakturaer/i-dag/${encodeGroupKey(key)}?fra=ravarer${sp.toString() ? `&${sp.toString()}` : ""}`;
+  const detailHref = (key: string) => `/ravarer/fakturaer/i-dag/${encodeGroupKey(key)}?fra=${scope}${sp.toString() ? `&${sp.toString()}` : ""}`;
 
   return (
     <div className="px-page py-6 space-y-5">
       <DecisionNav />
       <header className="space-y-1">
-        <h1 className="font-display text-3xl font-semibold">Råvarer og kostpris</h1>
-        <p className="text-ink-secondary">Like linjer med samme leverandør, varenummer og pakning er samlet til ett spørsmål. Valgene godkjenner ikke fakturaer.</p>
+        <h1 className="font-display text-3xl font-semibold">{scope === "alle" ? "Alle beslutninger" : "Råvarer og kostpris"}</h1>
+        <p className="text-ink-secondary">{scope === "alle" ? "Alle åpne spørsmål, også prisavvik. Like linjer er samlet til ett spørsmål." : "Like linjer med samme leverandør, varenummer og pakning er samlet til ett spørsmål."} Valgene godkjenner ikke fakturaer.</p>
       </header>
 
       <div className="space-y-3">
@@ -50,7 +50,7 @@ export default function RavarerQueue() {
           </select>
         </div>
         <div role="tablist" aria-label="Type spørsmål" className="flex gap-1 overflow-x-auto">
-          {RAVARER_FILTERS.map((t) => (
+          {filtersFor(scope).map((t) => (
             <button key={t.key} role="tab" type="button" aria-selected={f.kind === t.key} onClick={() => set("type", t.key === "alle" ? "" : t.key)}
               className={cn("rounded-md px-3 py-1.5 text-sm whitespace-nowrap", f.kind === t.key ? "bg-primary/10 font-medium text-primary" : "text-ink-secondary hover:bg-muted")}>
               {t.label}
@@ -60,7 +60,7 @@ export default function RavarerQueue() {
       </div>
 
       <QueryState isLoading={q.isLoading} isError={q.isError} error={q.error} scope="fakturaer:ravarer" onRetry={() => q.refetch()}
-        isEmpty={filtered.length === 0} emptyTitle={all.length ? "Ingen spørsmål passer filteret" : "Ingen råvarespørsmål nå"}>
+        isEmpty={filtered.length === 0} emptyTitle={all.length ? "Ingen spørsmål passer filteret" : (scope === "alle" ? "Ingen beslutninger nå" : "Ingen råvarespørsmål nå")}>
         <p className="text-sm text-ink-secondary" aria-live="polite">
           {filtered.length} {filtered.length === 1 ? "spørsmål" : "spørsmål"}{filtered.length !== all.length && ` av ${all.length}`} · viser {(pg.page - 1) * RAVARER_PAGE_SIZE + 1}–{(pg.page - 1) * RAVARER_PAGE_SIZE + pg.items.length}
         </p>

@@ -54,11 +54,11 @@ export default function IDag() {
         <header className="space-y-2">
           <p className="text-caption uppercase tracking-wide text-ink-secondary">{format(new Date(), "EEEE d. MMMM", { locale: nb })} · din arbeidsøkt</p>
           <h1 className="font-display text-3xl font-semibold leading-tight sm:text-4xl">
-            {invoiceCount} {invoiceCount === 1 ? "faktura" : "fakturaer"} med åpne linjer.
-            <br />
-            {groups.length} ting å ta stilling til.
+            {groups.length ? "Start med de viktigste spørsmålene" : "Ingenting å avklare nå"}
           </h1>
-          <p className="text-body text-ink-secondary">Like spørsmål er samlet. Ett svar gjelder alle berørte fakturaer.</p>
+          <p className="text-body text-ink-secondary">
+            {groups.length} åpne beslutninger på {invoiceCount} {invoiceCount === 1 ? "faktura" : "fakturaer"}. Like spørsmål er samlet; ett svar gjelder alle berørte fakturaer.
+          </p>
         </header>
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
@@ -95,8 +95,8 @@ export default function IDag() {
             })}
             {groups.length > top.length && (
               <li>
-                <Link to="/ravarer/fakturaer/ravarer" className="inline-flex items-center gap-1 rounded-lg border border-line-subtle px-3 py-2 text-sm text-primary hover:bg-muted/50">
-                  Se alle råvarespørsmål <ArrowUpRight className="h-4 w-4" aria-hidden />
+                <Link to="/ravarer/fakturaer/beslutninger" className="inline-flex items-center gap-1 rounded-lg border border-line-subtle px-3 py-2 text-sm text-primary hover:bg-muted/50">
+                  Se alle {groups.length} beslutninger, også prisavvik <ArrowUpRight className="h-4 w-4" aria-hidden />
                 </Link>
               </li>
             )}

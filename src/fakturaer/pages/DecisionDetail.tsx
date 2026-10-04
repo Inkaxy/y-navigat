@@ -32,9 +32,11 @@ export default function DecisionDetail() {
   const groupKey = key;
   const navigate = useNavigate();
   const [sp] = useSearchParams();
-  const fromRavarer = sp.get("fra") === "ravarer";
+  const fra = sp.get("fra");
+  const fromRavarer = fra === "ravarer" || fra === "alle";
+  const fromScope = fra === "alle" ? "alle" : "ravarer";
   const backParams = new URLSearchParams(sp); backParams.delete("fra");
-  const backHref = fromRavarer ? `/ravarer/fakturaer/ravarer${backParams.toString() ? `?${backParams}` : ""}` : "/ravarer/fakturaer/i-dag";
+  const backHref = fromRavarer ? `/ravarer/fakturaer/${fromScope === "alle" ? "beslutninger" : "ravarer"}${backParams.toString() ? `?${backParams}` : ""}` : "/ravarer/fakturaer/i-dag";
   const qc = useQueryClient();
   const { data: company } = useCompany();
   const q = useReviewLines({ legalEntityId: company?.id ?? null, limit: null });
@@ -70,7 +72,7 @@ export default function DecisionDetail() {
     if (msg) toast.success(msg);
     // Neste spørsmål i samme filtrerte rekkefølge som brukeren kom fra.
     const all = buildDecisionGroups(q.data?.rows ?? []);
-    const ordered = fromRavarer ? filterRavarerGroups(all, parseRavarerFilter(sp)) : all;
+    const ordered = fromRavarer ? filterRavarerGroups(all, parseRavarerFilter(sp, fromScope), fromScope) : all;
     const next = nextGroupKey(ordered, groupKey);
     if (next) navigate(`/ravarer/fakturaer/i-dag/${encodeGroupKey(next)}${sp.toString() ? `?${sp}` : ""}`);
     else navigate(backHref);
@@ -130,7 +132,7 @@ export default function DecisionDetail() {
   return (
     <div className="px-page py-6 space-y-6">
       <DecisionNav />
-      <Link to={backHref} className="text-sm text-primary hover:underline">← {fromRavarer ? "Alle råvarespørsmål" : "I dag"}</Link>
+      <Link to={backHref} className="text-sm text-primary hover:underline">← {fromRavarer ? (fromScope === "alle" ? "Alle beslutninger" : "Alle råvarespørsmål") : "I dag"}</Link>
       <QueryState isLoading={q.isLoading} isError={q.isError} error={q.error} scope="fakturaer:beslutning" onRetry={() => q.refetch()}
         isEmpty={!group} emptyTitle="Spørsmålet er allerede avklart" emptyDescription="Gå tilbake til I dag for neste beslutning.">
         {group && first && (
