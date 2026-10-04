@@ -1,0 +1,121 @@
+import { useMemo } from "react";
+import { Link } from "react-router-dom";
+import { ArrowUpRight, CheckCircle2, CircleAlert, GitBranch, Package } from "lucide-react";
+import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
+import { QueryState } from "@/components/common/QueryState";
+import { useReviewLines } from "@/fakturaer/hooks/useReviewLines";
+import { useCompany } from "@/hooks/useCompany";
+import { buildDecisionGroups, DECISION_KIND_LABEL, encodeGroupKey, type DecisionGroup } from "@/fakturaer/lib/decisionGroups";
+import { formatMoney } from "@/fakturaer/lib/constants";
+import { formatOsloLongDate } from "@/fakturaer/lib/dayLabel";
+
+function headline(g: DecisionGroup): { title: string; body: string; foot: string } {
+  const n = g.invoiceIds.length;
+  const fakt = n === 1 ? "1 faktura" : `${n} fakturaer`;
+  if (g.kind === "material")
+    return {
+      title: `Hvilken råvare er «${g.description}»?`,
+      body: g.shared ? `${g.supplierName}, varenummer ${g.sku}. Samme vare og pakning.` : `${g.supplierName}. Mangler varenummer — avklares for denne linjen.`,
+      foot: g.shared && n > 1 ? `Ett svar løser ${fakt}` : `Gjelder ${fakt}`,
+    };
+  if (g.kind === "package")
+    return { title: `Bekreft pakningen for «${g.description}»`, body: `${g.supplierName}. Råvaren er kjent, pakningen er ny eller usikker.`, foot: `Gjelder ${fakt}` };
+  if (g.kind === "price")
+    return {
+      title: n > 1 ? `Samme prisavvik. ${fakt}.` : `Prisavvik på «${g.description}»`,
+      body: `${g.supplierName} har fakturert en annen pris enn referansen for ${g.description}.`,
+      foot: g.differenceExclVat != null ? `${formatMoney(g.differenceExclVat, "NOK")} ekskl. mva. å avklare` : `Gjelder ${fakt}`,
+    };
+  return { title: `Kontroller «${g.description}»`, body: `${g.supplierName}. Linjen står til kontroll.`, foot: `Gjelder ${fakt}` };
+}
+
+const ICON = { material: GitBranch, package: Package, price: CircleAlert, other: CircleAlert } as const;
+
+export default function IDag() {
+  const { data: company } = useCompany();
+  const q = useReviewLines({ legalEntityId: company?.id ?? null, limit: null });
+  const groups = useMemo(() => buildDecisionGroups(q.data?.rows ?? []), [q.data]);
+  const invoiceCount = useMemo(() => new Set((q.data?.rows ?? []).map((r) => r.invoice_id)).size, [q.data]);
+  const merged = groups.reduce((s, g) => s + Math.max(0, g.lines.length - 1), 0);
+  const top = groups.slice(0, 12);
+
+  return (
+    <div className="px-page py-6 space-y-6">
+      <FakturaerHeaderBanner />
+      <QueryState isLoading={q.isLoading} error={q.error} onRetry={() => q.refetch()} isEmpty={false}>
+        <header className="space-y-2">
+          <p className="text-caption uppercase tracking-wide text-ink-secondary">{formatOsloLongDate()} · din arbeidsøkt</p>
+          <h1 className="font-display text-3xl font-semibold leading-tight sm:text-4xl">
+            {invoiceCount} {invoiceCount === 1 ? "faktura" : "fakturaer"} med åpne linjer.
+            <br />
+            {groups.length} {groups.length === 1 ? "ting" : "ting"} å ta stilling til.
+          </h1>
+          <p className="text-body text-ink-secondary">Like spørsmål er samlet. Ett svar gjelder alle berørte fakturaer.</p>
+        </header>
+
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <ol className="space-y-3" aria-label="Beslutninger">
+            {top.length === 0 && (
+              <li className="rounded-xl border border-line-subtle bg-card p-6 text-body text-ink-secondary">Ingenting å avklare nå.</li>
+            )}
+            {top.map((g) => {
+              const h = headline(g);
+              const Icon = ICON[g.kind];
+              return (
+                <li key={g.key}>
+                  <Link
+                    to={`/ravarer/fakturaer/i-dag/${encodeGroupKey(g.key)}`}
+                    className="group block rounded-xl border border-line-subtle bg-card p-5 transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 space-y-1">
+                        <p className="text-caption uppercase tracking-wide text-ink-secondary">{DECISION_KIND_LABEL[g.kind]}</p>
+                        <h2 className="text-lg font-semibold">{h.title}</h2>
+                        <p className="text-body text-ink-secondary">{h.body}</p>
+                      </div>
+                      <span className="rounded-lg bg-muted p-2" aria-hidden>
+                        <Icon className="h-4 w-4 text-accent-foreground" />
+                      </span>
+                    </div>
+                    <div className="mt-4 flex items-center justify-between border-t border-line-subtle pt-3 text-sm text-primary">
+                      <span>{h.foot}</span>
+                      <ArrowUpRight className="h-4 w-4" aria-hidden />
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
+            {groups.length > top.length && (
+              <li className="text-sm text-ink-secondary">
+                {groups.length - top.length} flere beslutninger.{" "}
+                <Link className="text-primary underline-offset-2 hover:underline" to="/ravarer/fakturaer/til-behandling">Se alle i køen</Link>
+              </li>
+            )}
+          </ol>
+
+          <aside className="space-y-4" aria-label="Oppsummering">
+            <p className="text-caption uppercase tracking-wide text-ink-secondary">Dette er samlet for deg</p>
+            <div className="flex gap-3 border-b border-line-subtle pb-4">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 text-success" aria-hidden />
+              <div>
+                <p className="font-medium">{merged} gjentatte linjer slått sammen</p>
+                <p className="text-sm text-ink-secondary">Bare samme leverandør, varenummer og pakning samles.</p>
+              </div>
+            </div>
+            <div className="flex gap-3 border-b border-line-subtle pb-4">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 text-success" aria-hidden />
+              <div>
+                <p className="font-medium">Bekreftede koblinger huskes</p>
+                <p className="text-sm text-ink-secondary">Leverandørvare og bekreftet pakning brukes på nytt ved neste import.</p>
+              </div>
+            </div>
+            <Link to="/ravarer/fakturaer/til-behandling" className="block rounded-xl border border-success/30 bg-success/10 p-4 hover:bg-success/15">
+              <p className="font-semibold text-success">Fakturaoversikt</p>
+              <p className="text-sm text-ink-secondary">Klare, avventende og fullførte fakturaer.</p>
+            </Link>
+          </aside>
+        </div>
+      </QueryState>
+    </div>
+  );
+}
