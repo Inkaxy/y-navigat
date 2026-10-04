@@ -37,3 +37,27 @@ describe("Fakturaer: sum per valuta", () => {
       .toEqual([{ currency: "EUR", total: 10, missing: 0 }, { currency: "NOK", total: 150.5, missing: 1 }]);
   });
 });
+
+describe("Alle beslutninger: prisavvik og øvrige typer er tilgjengelige", () => {
+  const groups = [
+    ...Array.from({ length: 20 }, (_, i) => G(`m${i}`, "material")),
+    G("p1", "price", { description: "Hvetemel", sku: "M-1" }), G("p2", "price", { supplierId: "s2", supplierName: "Mølle" }), G("o1", "other"),
+  ];
+  it("tar med prisavvik og annet, med typefilter, søk og 12 per side", () => {
+    const all = filterRavarerGroups(groups, { kind: "alle", search: "", supplierId: "" }, "alle");
+    expect(all).toHaveLength(23);
+    expect(paginate(all, 2, 12).items.map((g) => g.key)).toEqual(["m12", "m13", "m14", "m15", "m16", "m17", "m18", "m19", "p1", "p2", "o1"]);
+    expect(filterRavarerGroups(groups, { kind: "price", search: "", supplierId: "" }, "alle").map((g) => g.key)).toEqual(["p1", "p2"]);
+    expect(filterRavarerGroups(groups, { kind: "other", search: "", supplierId: "" }, "alle").map((g) => g.key)).toEqual(["o1"]);
+    expect(filterRavarerGroups(groups, { kind: "alle", search: "hvetemel", supplierId: "" }, "alle").map((g) => g.key)).toEqual(["p1"]);
+  });
+  it("URL-typen price godtas bare i alle-visningen; Råvarer holder seg uendret", () => {
+    expect(parseRavarerFilter(new URLSearchParams("type=price"), "alle").kind).toBe("price");
+    expect(parseRavarerFilter(new URLSearchParams("type=price")).kind).toBe("alle");
+    expect(filterRavarerGroups(groups, { kind: "alle", search: "", supplierId: "" })).toHaveLength(20);
+  });
+  it("neste spørsmål etter et prisavvik følger samme filtrerte rekkefølge", () => {
+    const prices = filterRavarerGroups(groups, { kind: "price", search: "", supplierId: "" }, "alle");
+    expect(nextGroupKey(prices, "p1")).toBe("p2");
+  });
+});
