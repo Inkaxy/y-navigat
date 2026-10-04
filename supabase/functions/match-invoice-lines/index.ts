@@ -259,6 +259,34 @@ Deno.serve(async (req) => {
     }
     const rmsById = new Map<string, AnyRec>(rmsList.map((r: AnyRec) => [r.id, r]));
 
+    // Bekreftede pakningsvarianter: flere gyldige pakninger per kobling bevares og gjenbrukes.
+    let variants: AnyRec[] = [];
+    if (rmsIds.length) {
+      variants = required("pakningsvarianter", await svc.from("raw_material_supplier_packages")
+        .select("raw_material_supplier_id, supplier_sku_norm, package_size, package_unit, base_units_per_package, confirmed_at")
+        .in("raw_material_supplier_id", rmsIds)) ?? [];
+    }
+    const skuNormSql = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    /** Linjens egen dokumenterte pakning mot en bekreftet variant. Ukjent pakning gir aldri treff. */
+    function withVariant(row: AnyRec | undefined, line: AnyRec): AnyRec | undefined {
+      if (!row || line.package_size == null || !line.package_unit) return row;
+      const sku = skuNormSql(line.supplier_sku);
+      const unit = String(line.package_unit).trim().toLowerCase();
+      const hits = variants.filter((v) => v.raw_material_supplier_id === row.id
+        && (v.supplier_sku_norm === "" || v.supplier_sku_norm === sku)
+        && v.package_size != null && Number(v.package_size) === Number(line.package_size)
+        && String(v.package_unit ?? "").trim().toLowerCase() === unit);
+      const bupps = new Set(hits.map((h) => Number(h.base_units_per_package)));
+      if (bupps.size !== 1) return row; // ingen eller motstridende varianter: ingen gjenbruk
+      const v = hits[0];
+      return { ...row, base_units_per_package: v.base_units_per_package, package_size: v.package_size, package_unit: v.package_unit, package_confirmed_at: v.confirmed_at };
+    }
+
+    // Linjer med ført kostpris er låst: ny matching skal ikke endre dem eller åpne dem igjen.
+    const posted = required("førte kostprislinjer", await svc.from("invoice_line_cost_postings")
+      .select("invoice_line_id").eq("invoice_id", invoiceId).is("revoked_at", null));
+    const postedIds = new Set<string>((posted ?? []).map((p: AnyRec) => p.invoice_line_id));
+
     /** Pakningskilden for linjen — felles regel med skjermen (packageSignature.ts). */
     function pickRmsRow(
       rawMaterialId: string,
@@ -299,6 +327,10 @@ Deno.serve(async (req) => {
         results.push({ id: line.id, skipped: true });
         continue;
       }
+      if (postedIds.has(line.id)) {
+        results.push({ id: line.id, skipped: true, reason: "cost_posted" });
+        continue;
+      }
 
       // For manually matched lines: keep the match, but recompute price/variance + normalized unit only
       if (line.match_confidence === "manual" && line.raw_material_id) {
@@ -308,7 +340,7 @@ Deno.serve(async (req) => {
 
         const rm = rmById.get(line.raw_material_id);
         const pickedM = pickRmsRow(line.raw_material_id, null, line.supplier_sku);
-        const rmsRow = pickedM.row;
+        const rmsRow = withVariant(pickedM.row, line);
         manualUpdate.package_source_rms_id = rmsRow?.id ?? null;
         const refM = withRegisteredLastPurchase(await priceReference(line.raw_material_id), rmsRow);
         const expected = applyReference(manualUpdate, refM);
@@ -686,7 +718,7 @@ Deno.serve(async (req) => {
       if (update.raw_material_id) {
         const rm = rmById.get(update.raw_material_id);
         const picked = pickRmsRow(update.raw_material_id, matchedRmsId, line.supplier_sku);
-        const rmsRow = picked.row;
+        const rmsRow = withVariant(picked.row, line);
         update.package_source_rms_id = rmsRow?.id ?? null;
         const ref = withRegisteredLastPurchase(await priceReference(update.raw_material_id), rmsRow);
         const expected = applyReference(update, ref);
@@ -699,6 +731,14 @@ Deno.serve(async (req) => {
         // tall her forplanter seg til lager og kalkyler.
         update.base_quantity = usable && cost!.confidence >= 0.85 ? cost!.baseQuantity : null;
         update.expected_price_per_base_unit = expected;
+
+        // Samme vare (eksakt leverandørvarenummer) og bekreftet pakning er en
+        // kjent identitet. Uten noe prisgrunnlag i det hele tatt (første kjøp)
+        // skal den ikke sendes til kontroll bare for manglende avtale/startpris.
+        // Finnes et grunnlag, gjelder selskapets innstilling som før.
+        const knownIdentity = confidenceLabel === "auto_high" && !!skuN && !!rmsRow
+          && normalizeMatchKey(rmsRow.supplier_sku) === skuN && !!rmsRow.package_confirmed_at
+          && usable && !picked.conflict;
 
         const addReason = (reason: string) => {
           update.requires_review = true;
@@ -723,8 +763,8 @@ Deno.serve(async (req) => {
           // Et gammelt avvik skal aldri bli stående når det ikke er regnet ut nå.
           update.price_variance_pct = null;
           // Uten gyldig avtale eller bekreftet startpris finnes det ikke noe
-          // grunnlag en maskin kan godkjenne mot.
-          addReason("no_automatic_basis");
+          // grunnlag en maskin kan godkjenne mot — unntatt kjent identitet.
+          if (!knownIdentity) addReason("no_automatic_basis");
 
           if (ref.source === "conflict") addReason("agreement_conflict");
         }

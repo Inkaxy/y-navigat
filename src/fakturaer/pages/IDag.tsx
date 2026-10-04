@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { DecisionNav } from "@/fakturaer/components/decisions/DecisionNav";
 import { ArrowUpRight, CheckCircle2, CircleAlert, GitBranch, Package } from "lucide-react";
@@ -42,7 +42,8 @@ export default function IDag() {
   const groups = useMemo(() => buildDecisionGroups(q.data?.rows ?? []), [q.data]);
   const invoiceCount = useMemo(() => new Set((q.data?.rows ?? []).map((r) => r.invoice_id)).size, [q.data]);
   const merged = groups.reduce((s, g) => s + Math.max(0, g.lines.length - 1), 0);
-  const top = groups.slice(0, 12);
+  const [shown, setShown] = useState(12);
+  const top = groups.slice(0, shown);
   const overview = useQuery({ queryKey: ["invoice-approval-overview", company?.id], enabled: !!company?.id, queryFn: () => fetchApprovalOverview(company!.id) });
   const readyCount = (overview.data ?? []).filter((r) => approvalBucket(r) === "ready").length;
 
@@ -94,8 +95,9 @@ export default function IDag() {
             })}
             {groups.length > top.length && (
               <li className="text-sm text-ink-secondary">
-                {groups.length - top.length} flere beslutninger.{" "}
-                <Link className="text-primary underline-offset-2 hover:underline" to="/ravarer/fakturaer/til-behandling">Se alle i køen</Link>
+                <button type="button" className="rounded-lg border border-line-subtle px-3 py-2 text-primary hover:bg-muted/50" onClick={() => setShown((n) => n + 12)}>
+                  Vis {Math.min(12, groups.length - top.length)} flere ({groups.length - top.length} gjenstår)
+                </button>
               </li>
             )}
           </ol>

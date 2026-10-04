@@ -77,6 +77,8 @@ export interface AcceptMatchResult {
   recalculationPending: boolean;
   /** Feilmeldingen fra reberegningen, når den feilet. */
   recalculationError: string | null;
+  /** Feil i læringen (varenummer/alias). Koblingen er lagret, men huskes kanskje ikke. */
+  learningError: string | null;
 }
 
 function num(v: unknown): number | null {
@@ -203,6 +205,7 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<AcceptMatch
 
   // 3) Alias — hvilke som skal bekreftes bestemmes av planen (aliasLearning.ts),
   // slik at det er samme kode som avgjør hva som skal skrives og hva som skal læres.
+  const learnErrors: string[] = [];
   const confirmedAliasValues: Array<{ alias_type: "supplier_sku" | "product_name"; alias_value: string }> = [];
   if (rememberSku && line.supplier_sku) {
     confirmedAliasValues.push({ alias_type: "supplier_sku", alias_value: line.supplier_sku });
@@ -227,7 +230,7 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<AcceptMatch
       .select("id, raw_material_id")
       .eq("supplier_id", supplierId);
     if (rmsErr) {
-      console.warn(`acceptMatch: kunne ikke hente leverandørens varekoblinger for alias-opprydning: ${rmsErr.message}`);
+      learnErrors.push("kunne ikke hente leverandørens varekoblinger"); console.warn(`acceptMatch: kunne ikke hente leverandørens varekoblinger for alias-opprydning: ${rmsErr.message}`);
     }
     supplierRmsRows = rmsRows ?? [];
     const allRmsIds = supplierRmsRows.map((r) => r.id);
@@ -237,7 +240,7 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<AcceptMatch
         .select("id, raw_material_supplier_id, alias_type, alias_value, alias_value_normalized, status")
         .in("raw_material_supplier_id", allRmsIds);
       if (aliasReadErr) {
-        console.warn(`acceptMatch: kunne ikke hente leverandørens alias: ${aliasReadErr.message}`);
+        learnErrors.push("kunne ikke hente leverandørens alias"); console.warn(`acceptMatch: kunne ikke hente leverandørens alias: ${aliasReadErr.message}`);
       }
       supplierAliases = aliasRows ?? [];
     }
@@ -273,7 +276,7 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<AcceptMatch
         onConflict: "alias_type,alias_value_normalized,raw_material_supplier_id",
       });
       if (aliasErr) {
-        console.warn(`acceptMatch: matchen er lagret, men alias kunne ikke lagres: ${aliasErr.message}`);
+        learnErrors.push("matchen er lagret, men alias kunne ikke lagres"); console.warn(`acceptMatch: matchen er lagret, men alias kunne ikke lagres: ${aliasErr.message}`);
       }
     }
 
@@ -283,7 +286,7 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<AcceptMatch
         .update({ status: "superseded" })
         .in("id", plan.supersedeIds);
       if (supErr) {
-        console.warn(
+        learnErrors.push("kunne ikke pensjonere"); console.warn(
           `acceptMatch: kunne ikke pensjonere ${plan.supersedeIds.length} motstridende alias: ${supErr.message}`,
         );
       }
@@ -299,7 +302,7 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<AcceptMatch
           rejected_reason: "valgt annen råvare",
         })
         .in("id", plan.rejectExistingIds);
-      if (rejUpdErr) console.warn(`acceptMatch: kunne ikke avvise eksisterende alias: ${rejUpdErr.message}`);
+      if (rejUpdErr) { learnErrors.push("kunne ikke avvise eksisterende alias"); console.warn(`acceptMatch: kunne ikke avvise eksisterende alias: ${rejUpdErr.message}`); }
     }
 
     if (plan.rejectNewRows.length > 0) {
@@ -314,7 +317,7 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<AcceptMatch
         })),
         { onConflict: "alias_type,alias_value_normalized,raw_material_supplier_id" },
       );
-      if (rejInsErr) console.warn(`acceptMatch: kunne ikke lagre avviste alias: ${rejInsErr.message}`);
+      if (rejInsErr) { learnErrors.push("kunne ikke lagre avviste alias"); console.warn(`acceptMatch: kunne ikke lagre avviste alias: ${rejInsErr.message}`); }
     }
   }
 
@@ -324,7 +327,7 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<AcceptMatch
   // Masse-godkjenning kjører reberegningen samlet til slutt; linjene står
   // fortsatt til ny beregning når denne funksjonen returnerer.
   if (skipRematch) {
-    return { lineIds, rmsId, startPrice, recalculationPending: true, recalculationError: null };
+    return { lineIds, rmsId, startPrice, recalculationPending: true, recalculationError: null, learningError: learnErrors.length ? learnErrors.join("; ") : null };
   }
 
   const { error: fnErr } = await supabase.functions.invoke("match-invoice-lines", {
@@ -337,10 +340,11 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<AcceptMatch
       startPrice,
       recalculationPending: true,
       recalculationError: fnErr.message,
+      learningError: learnErrors.length ? learnErrors.join("; ") : null,
     };
   }
 
-  return { lineIds, rmsId, startPrice, recalculationPending: false, recalculationError: null };
+  return { lineIds, rmsId, startPrice, recalculationPending: false, recalculationError: null, learningError: learnErrors.length ? learnErrors.join("; ") : null };
 }
 
 /**

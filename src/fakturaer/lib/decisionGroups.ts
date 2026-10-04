@@ -59,16 +59,39 @@ function packageKey(l: ReviewLineRow): string {
   return [r4(l.package_size), (l.package_unit ?? "").trim().toLowerCase() || "-", r4(l.count_per_package)].join("|");
 }
 
+/** Dokumentert pakning: størrelse og enhet må være kjent. Null beviser ikke «samme pakning». */
+export function hasKnownPackage(l: Pick<ReviewLineRow, "package_size" | "package_unit">): boolean {
+  return l.package_size != null && Number.isFinite(Number(l.package_size)) && !!(l.package_unit ?? "").trim();
+}
+
+function scopeKey(l: ReviewLineRow): string {
+  return [l.invoice.legal_entity_id ?? "-", (l.invoice.currency ?? "NOK").toUpperCase(), l.invoice.is_credit_note ? "kredit" : "debet", l.invoice.supplier_id].join(":");
+}
+
+function priceRefKey(l: ReviewLineRow): string {
+  return [l.price_reference_source ?? "-", l.price_reference_id ?? "-", l.price_reference_date ?? "-"].join("|");
+}
+
 export function groupKeyFor(line: ReviewLineRow, kind: DecisionKind): { key: string; shared: boolean } {
+  // Varenøkkelen er leverandørens varenummer — aldri produktnavnet.
   const sku = line.supplier_sku ? normalizeSearch(line.supplier_sku) : "";
   const conflict = lineStatus(line).key === "conflict";
   if (!sku || conflict || kind === "other") return { key: `line:${line.id}`, shared: false };
-  const supplier = line.invoice.supplier_id;
-  if (kind === "material") return { key: `m:${supplier}:${sku}:${packageKey(line)}`, shared: true };
-  if (kind === "first_cost") return { key: `f:${supplier}:${sku}:${line.raw_material_id ?? "-"}`, shared: true };
-  if (kind === "package") return { key: `p:${supplier}:${sku}:${packageKey(line)}:${line.raw_material_id ?? "-"}`, shared: true };
+  const scope = scopeKey(line);
+  const pkg = hasKnownPackage(line) ? packageKey(line) : null;
+  if (kind === "material") return { key: `m:${scope}:${sku}:${pkg ?? `ukjent:${line.id}`}`, shared: pkg != null };
+  // Pakning: bare linjer med samme dokumenterte pakning deler bekreftelse.
+  if (kind === "package") {
+    if (!pkg) return { key: `line:${line.id}`, shared: false };
+    return { key: `p:${scope}:${sku}:${pkg}:${line.raw_material_id ?? "-"}`, shared: true };
+  }
+  if (kind === "first_cost") {
+    if (!pkg) return { key: `line:${line.id}`, shared: false };
+    return { key: `f:${scope}:${sku}:${pkg}:${line.raw_material_id ?? "-"}`, shared: true };
+  }
+  if (!pkg) return { key: `line:${line.id}`, shared: false };
   return {
-    key: `pr:${supplier}:${sku}:${line.raw_material_id ?? "-"}:${r4(line.price_per_base_unit)}:${r4(line.expected_price_per_base_unit)}`,
+    key: `pr:${scope}:${sku}:${pkg}:${line.raw_material_id ?? "-"}:${r4(line.price_per_base_unit)}:${r4(line.expected_price_per_base_unit)}:${priceRefKey(line)}`,
     shared: true,
   };
 }

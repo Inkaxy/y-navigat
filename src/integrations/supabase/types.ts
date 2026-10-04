@@ -10766,6 +10766,53 @@ export type Database = {
           },
         ]
       }
+      raw_material_supplier_packages: {
+        Row: {
+          base_units_per_package: number
+          confirmed_at: string
+          confirmed_by: string | null
+          created_at: string
+          id: string
+          package_size: number | null
+          package_unit: string | null
+          raw_material_supplier_id: string
+          supplier_sku_norm: string
+          updated_at: string
+        }
+        Insert: {
+          base_units_per_package: number
+          confirmed_at: string
+          confirmed_by?: string | null
+          created_at?: string
+          id?: string
+          package_size?: number | null
+          package_unit?: string | null
+          raw_material_supplier_id: string
+          supplier_sku_norm?: string
+          updated_at?: string
+        }
+        Update: {
+          base_units_per_package?: number
+          confirmed_at?: string
+          confirmed_by?: string | null
+          created_at?: string
+          id?: string
+          package_size?: number | null
+          package_unit?: string | null
+          raw_material_supplier_id?: string
+          supplier_sku_norm?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "raw_material_supplier_packages_raw_material_supplier_id_fkey"
+            columns: ["raw_material_supplier_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       raw_material_suppliers: {
         Row: {
           agreed_price: number | null
@@ -16153,6 +16200,10 @@ export type Database = {
         Args: { _legal_entity_id: string; _required_level?: string }
         Returns: boolean
       }
+      has_ravarer_invoice_approve: {
+        Args: { _legal_entity_id: string }
+        Returns: boolean
+      }
       has_ravarer_invoice_read_or_owner: {
         Args: { _legal_entity_id: string }
         Returns: boolean
@@ -16249,9 +16300,17 @@ export type Database = {
           total_vat: number
         }[]
       }
+      invoice_line_credit_covered: {
+        Args: { p_line_id: string }
+        Returns: boolean
+      }
       invoice_line_price_basis: {
         Args: { p_line: Database["public"]["Tables"]["invoice_lines"]["Row"] }
         Returns: Json
+      }
+      invoice_net_excl_vat: {
+        Args: { p_total: number; p_vat: number }
+        Returns: number
       }
       is_internal_user: { Args: never; Returns: boolean }
       is_kiosk_user: { Args: never; Returns: boolean }
@@ -17235,6 +17294,15 @@ export type Database = {
       }
       rm_can_read: { Args: { _rm_id: string }; Returns: boolean }
       rm_can_write: { Args: { _rm_id: string }; Returns: boolean }
+      rm_change_supplier_link: {
+        Args: {
+          p_line_ids?: string[]
+          p_new_raw_material_id: string
+          p_reason: string
+          p_rms_id: string
+        }
+        Returns: Json
+      }
       rm_claim_invoice_line_extraction: {
         Args: {
           p_invoice_id?: string
@@ -17356,6 +17424,7 @@ export type Database = {
         Returns: Json
       }
       rm_reconcile_invoice: { Args: { p_invoice_id: string }; Returns: Json }
+      rm_sku_norm: { Args: { p: string }; Returns: string }
       rm_start_price_candidates: {
         Args: {
           p_legal_entity_id: string

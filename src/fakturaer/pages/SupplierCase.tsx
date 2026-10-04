@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
@@ -11,8 +11,7 @@ import { QueryState } from "@/components/common/QueryState";
 import { DecisionNav } from "@/fakturaer/components/decisions/DecisionNav";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMoney } from "@/fakturaer/lib/constants";
-import { amountExclVat } from "@/fakturaer/lib/approval";
-import { allocateCredit, maxAllocatable, remainingByInvoice, setCaseStatus } from "@/fakturaer/lib/supplierCases";
+import { allocateCredit, maxAllocatable, remainingByInvoice, setCaseStatus, creditNetExclVat } from "@/fakturaer/lib/supplierCases";
 import { parseDecimal } from "@/fakturaer/lib/units";
 
 const kr = (v: number | null | undefined) => (v == null ? "–" : formatMoney(v, "NOK"));
@@ -50,7 +49,8 @@ export default function SupplierCase() {
   const unallocated = (noteId: string) => {
     const n = q.data?.notes.find((x) => x.id === noteId);
     if (!n) return 0;
-    const total = Math.abs(amountExclVat(n.total_amount, n.total_vat) ?? 0);
+    // Ukjent mva gir ingen kapasitet — samme regel som serveren.
+    const total = creditNetExclVat(n.total_amount, n.total_vat) ?? 0;
     const used = (q.data?.used ?? []).filter((u) => u.credit_invoice_id === noteId).reduce((s, u) => s + Number(u.amount_excl_vat), 0);
     return Math.round((total - used) * 100) / 100;
   };
@@ -59,6 +59,8 @@ export default function SupplierCase() {
   const [invoiceId, setInvoiceId] = useState("");
   const [amount, setAmount] = useState("");
   const [ref, setRef] = useState(() => crypto.randomUUID());
+  // Ny nøkkel når innholdet endres; samme innhold beholder nøkkelen slik at et nytt forsøk er trygt.
+  useEffect(() => { setRef(crypto.randomUUID()); }, [noteId, invoiceId, amount]);
   const [statusNote, setStatusNote] = useState("");
   const parsed = parseDecimal(amount);
   const max = noteId && invoiceId ? maxAllocatable(unallocated(noteId), remaining.get(invoiceId) ?? 0) : 0;

@@ -14,6 +14,13 @@ const ERR: Record<string, string> = {
   sak_ikke_aapen: "Saken er ikke åpen",
   begrunnelse_mangler: "Skriv en begrunnelse",
   ugyldig_belop: "Ugyldig beløp",
+  client_ref_gjenbrukt: "Denne fordelingen er allerede lagret med et annet innhold. Last siden på nytt.",
+  valuta_ulik: "Kreditnotaen har en annen valuta enn fakturaen",
+  kreditnota_mva_ukjent: "Kreditnotaens mva er ukjent, så nettobeløpet kan ikke fastslås",
+  kreditnota_kansellert: "Kreditnotaen er kansellert",
+  kreditnota_flagget: "Kreditnotaen er flagget",
+  kreditnota_sumavvik: "Kreditnotaens linjesum stemmer ikke",
+  kreditnota_duplikat: "Kreditnotanummeret finnes flere ganger hos leverandøren",
 };
 
 export function caseErrorMessage(raw: string): string {
@@ -63,6 +70,12 @@ export function remainingByInvoice(
   for (const c of credits) m.set(c.invoice_id, (m.get(c.invoice_id) ?? 0) - Number(c.amount_excl_vat));
   for (const [k, v] of m) m.set(k, Math.round(v * 100) / 100);
   return m;
+}
+
+/** Nettobeløp på kreditnota, regnet likt som serveren (invoice_net_excl_vat). Ukjent mva gir null. */
+export function creditNetExclVat(total: number | null | undefined, vat: number | null | undefined): number | null {
+  if (total == null || vat == null || !Number.isFinite(Number(total)) || !Number.isFinite(Number(vat))) return null;
+  return Math.round((Math.abs(Number(total)) - Math.abs(Number(vat))) * 100) / 100;
 }
 
 /** Klientkontroll (serveren kontrollerer det samme): største lovlige kredit. */

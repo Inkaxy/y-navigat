@@ -10,7 +10,9 @@ import { QueryState } from "@/components/common/QueryState";
 import { DecisionNav } from "@/fakturaer/components/decisions/DecisionNav";
 import { useCompany } from "@/hooks/useCompany";
 import { formatMoney } from "@/fakturaer/lib/constants";
-import { amountExclVat, approvalBucket, approveMany, blockerLabel, fetchApprovalOverview, summarizeResults, type ApprovalBucket } from "@/fakturaer/lib/approval";
+import { amountExclVat, approvalBucket, approveMany, blockerLabel, fetchApprovalOverview, revokeInvoiceApproval, summarizeResults, type ApprovalBucket } from "@/fakturaer/lib/approval";
+import { useInvoiceRights } from "@/fakturaer/hooks/useInvoiceRights";
+import { AuditHistory } from "@/fakturaer/components/decisions/AuditHistory";
 import { postSafeCosts } from "@/fakturaer/lib/costPosting";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +30,10 @@ export default function InvoiceOverview() {
   const [search, setSearch] = useState(sp.get("q") ?? "");
   const [supplier, setSupplier] = useState(sp.get("leverandor") ?? "");
   const [selected, setSelected] = useState<Record<string, boolean>>({});
-  const [busy, setBusy] = useState<"approve" | "costs" | null>(null);
+  const [busy, setBusy] = useState<"approve" | "costs" | "revoke" | null>(null);
+  const { canWrite, canApprove } = useInvoiceRights();
+  const [openRow, setOpenRow] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
 
   const q = useQuery({
     queryKey: ["invoice-approval-overview", company?.id],
@@ -65,6 +70,21 @@ export default function InvoiceOverview() {
     await refresh();
   }
 
+  async function revoke(id: string) {
+    setBusy("revoke");
+    try {
+      await revokeInvoiceApproval(id, reason.trim());
+      toast.success("Godkjenningen er trukket tilbake.");
+      setReason("");
+      await refresh();
+      await qc.invalidateQueries({ queryKey: ["audit-history"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Kunne ikke trekke tilbake");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function postCosts() {
     setBusy("costs");
     const res = await postSafeCosts(chosen);
@@ -82,7 +102,7 @@ export default function InvoiceOverview() {
       <DecisionNav />
       <header className="space-y-1">
         <h1 className="font-display text-3xl font-semibold">Fakturaer</h1>
-        <p className="text-sm text-ink-secondary">Intern godkjenning i NBhub. Den betaler ikke og sendes ikke til Tripletex. Råvarevalg sperrer ikke godkjenning; sumavvik, duplikat, mengde og prisavvik gjør det.</p>
+        <p className="text-sm text-ink-secondary">Intern godkjenning i NBhub. Den betaler ikke og sendes ikke til Tripletex. Råvarevalg sperrer ikke godkjenning; manglende beløp, mva, valuta eller leverandør, ukontrollert eller avvikende linjesum, duplikat, mengdefeil og uavklart prisavvik gjør det.</p>
       </header>
       <div role="tablist" aria-label="Status" className="flex gap-1 border-b border-line-subtle">
         {TABS.map((t) => (
@@ -105,8 +125,9 @@ export default function InvoiceOverview() {
       {tab !== "done" && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="text-ink-secondary">{chosen.length} valgt av {visible.length}</span>
-          {tab === "ready" && <Button size="sm" disabled={!chosen.length || !!busy} onClick={approve}>{busy === "approve" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Godkjenn valgte internt</Button>}
-          <Button size="sm" variant="outline" disabled={!chosen.length || !!busy} onClick={postCosts}>{busy === "costs" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Før kostpris for trygge linjer</Button>
+          {tab === "ready" && canApprove && <Button size="sm" disabled={!chosen.length || !!busy} onClick={approve}>{busy === "approve" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Godkjenn valgte internt</Button>}
+          {tab === "ready" && !canApprove && <span className="text-ink-secondary">Intern godkjenning krever godkjenner- eller admin-rolle.</span>}
+          {canWrite && <Button size="sm" variant="outline" disabled={!chosen.length || !!busy} onClick={postCosts}>{busy === "costs" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Før kostpris for trygge linjer</Button>}
         </div>
       )}
       <QueryState isLoading={q.isLoading || !company} isError={q.isError} error={q.error} scope="fakturaer:oversikt" onRetry={() => q.refetch()} isEmpty={visible.length === 0} emptyTitle="Ingen fakturaer her">
@@ -135,6 +156,25 @@ export default function InvoiceOverview() {
                     {r.approved_at && ` · internt godkjent ${new Date(r.approved_at).toLocaleString("nb-NO", { dateStyle: "medium", timeStyle: "short" })}`}
                   </p>
                   {r.blockers.length > 0 && <p className="text-sm text-warning">{r.blockers.map(blockerLabel).join(" · ")}</p>}
+                  <button type="button" className="mt-1 text-sm text-primary hover:underline" aria-expanded={openRow === r.invoice_id} onClick={() => { setOpenRow(openRow === r.invoice_id ? null : r.invoice_id); setReason(""); }}>
+                    {openRow === r.invoice_id ? "Skjul historikk" : r.approved_at && canApprove ? "Historikk og tilbaketrekking" : "Historikk"}
+                  </button>
+                  {openRow === r.invoice_id && (
+                    <div className="mt-2 space-y-3 rounded-lg bg-muted/30 p-3">
+                      <AuditHistory entityId={r.invoice_id} kind="invoice" />
+                      {r.approved_at && canApprove && (
+                        <div className="flex flex-wrap items-end gap-2">
+                          <div className="min-w-[14rem] flex-1 space-y-1">
+                            <label htmlFor={`revoke-${r.invoice_id}`} className="text-sm font-medium">Begrunnelse for tilbaketrekking</label>
+                            <Input id={`revoke-${r.invoice_id}`} value={reason} onChange={(e) => setReason(e.target.value)} />
+                          </div>
+                          <Button size="sm" variant="outline" disabled={!reason.trim() || !!busy} onClick={() => revoke(r.invoice_id)}>
+                            {busy === "revoke" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Trekk tilbake godkjenning
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </li>
             );
