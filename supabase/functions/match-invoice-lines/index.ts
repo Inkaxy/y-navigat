@@ -718,7 +718,7 @@ Deno.serve(async (req) => {
       if (update.raw_material_id) {
         const rm = rmById.get(update.raw_material_id);
         const picked = pickRmsRow(update.raw_material_id, matchedRmsId, line.supplier_sku);
-        const rmsRow = picked.row;
+        const rmsRow = withVariant(picked.row, line);
         update.package_source_rms_id = rmsRow?.id ?? null;
         const ref = withRegisteredLastPurchase(await priceReference(update.raw_material_id), rmsRow);
         const expected = applyReference(update, ref);
@@ -731,6 +731,12 @@ Deno.serve(async (req) => {
         // tall her forplanter seg til lager og kalkyler.
         update.base_quantity = usable && cost!.confidence >= 0.85 ? cost!.baseQuantity : null;
         update.expected_price_per_base_unit = expected;
+
+        // Samme vare (eksakt leverandørvarenummer) og bekreftet pakning er en
+        // kjent identitet. Mangel på avtale/startpris alene skal ikke åpne den igjen.
+        const knownIdentity = confidenceLabel === "auto_high" && !!skuN && !!rmsRow
+          && normalizeMatchKey(rmsRow.supplier_sku) === skuN && !!rmsRow.package_confirmed_at
+          && usable && !picked.conflict;
 
         const addReason = (reason: string) => {
           update.requires_review = true;
@@ -746,7 +752,7 @@ Deno.serve(async (req) => {
 
         if (expected != null && actual != null && expected !== 0) {
           for (const reason of evaluateVariance(
-            ref, expected, actual, rm?.category ?? null, update.base_quantity ?? null, update, true,
+            ref, expected, actual, rm?.category ?? null, update.base_quantity ?? null, update, !knownIdentity,
           )) {
             addReason(reason);
           }
@@ -755,8 +761,8 @@ Deno.serve(async (req) => {
           // Et gammelt avvik skal aldri bli stående når det ikke er regnet ut nå.
           update.price_variance_pct = null;
           // Uten gyldig avtale eller bekreftet startpris finnes det ikke noe
-          // grunnlag en maskin kan godkjenne mot.
-          addReason("no_automatic_basis");
+          // grunnlag en maskin kan godkjenne mot — unntatt kjent identitet.
+          if (!knownIdentity) addReason("no_automatic_basis");
 
           if (ref.source === "conflict") addReason("agreement_conflict");
         }
