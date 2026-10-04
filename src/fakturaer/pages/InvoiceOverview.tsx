@@ -15,6 +15,10 @@ import { useInvoiceRights } from "@/fakturaer/hooks/useInvoiceRights";
 import { AuditHistory } from "@/fakturaer/components/decisions/AuditHistory";
 import { postSafeCosts } from "@/fakturaer/lib/costPosting";
 import { cn } from "@/lib/utils";
+import { paginate, sumByCurrency } from "@/fakturaer/lib/ravarerQueueFilter";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+
+const PAGE_SIZE = 25;
 
 const TABS: Array<{ key: ApprovalBucket; label: string }> = [
   { key: "ready", label: "Klare" },
@@ -34,6 +38,8 @@ export default function InvoiceOverview() {
   const { canWrite, canApprove } = useInvoiceRights();
   const [openRow, setOpenRow] = useState<string | null>(null);
   const [reason, setReason] = useState("");
+  const [page, setPage] = useState(1);
+  const [confirm, setConfirm] = useState<"approve" | "costs" | null>(null);
 
   const q = useQuery({
     queryKey: ["invoice-approval-overview", company?.id],
@@ -50,9 +56,14 @@ export default function InvoiceOverview() {
   const s = search.trim().toLowerCase();
   const visible = rows.filter((r) => approvalBucket(r) === tab && (!supplier || r.supplier_id === supplier)
     && (!s || r.invoice_number.toLowerCase().includes(s) || (r.supplier_name ?? "").toLowerCase().includes(s)));
-  const chosen = visible.filter((r) => selected[r.invoice_id]).map((r) => r.invoice_id);
+  const pg = paginate(visible, page, PAGE_SIZE);
+  // Valg gjelder bare synlig side; filter- og sidebytte nullstiller valget.
+  const chosenRows = pg.items.filter((r) => selected[r.invoice_id]);
+  const chosen = chosenRows.map((r) => r.invoice_id);
+  const chosenSums = sumByCurrency(chosenRows);
+  const resetScope = () => { setSelected({}); setPage(1); };
 
-  const setTab = (k: ApprovalBucket) => { const n = new URLSearchParams(sp); n.set("fane", k); setSp(n, { replace: true }); setSelected({}); };
+  const setTab = (k: ApprovalBucket) => { const n = new URLSearchParams(sp); n.set("fane", k); setSp(n, { replace: true }); resetScope(); };
   const refresh = () => Promise.all([
     qc.invalidateQueries({ queryKey: ["invoice-approval-overview"] }),
     qc.invalidateQueries({ queryKey: ["fakturaer-review-lines"] }),
@@ -115,31 +126,57 @@ export default function InvoiceOverview() {
       <div className="flex flex-wrap gap-2">
         <div className="relative min-w-[12rem] flex-1">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-ink-secondary" aria-hidden />
-          <Input aria-label="Søk på fakturanummer eller leverandør" className="pl-8" placeholder="Søk" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input aria-label="Søk på fakturanummer eller leverandør" className="pl-8" placeholder="Søk" value={search} onChange={(e) => { setSearch(e.target.value); resetScope(); }} />
         </div>
-        <select aria-label="Leverandør" className="h-10 rounded-md border border-input bg-background px-2 text-sm" value={supplier} onChange={(e) => setSupplier(e.target.value)}>
+        <select aria-label="Leverandør" className="h-10 rounded-md border border-input bg-background px-2 text-sm" value={supplier} onChange={(e) => { setSupplier(e.target.value); resetScope(); }}>
           <option value="">Alle leverandører</option>
           {suppliers.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
         </select>
       </div>
       {tab !== "done" && (
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-ink-secondary">{chosen.length} valgt av {visible.length}</span>
-          {tab === "ready" && canApprove && <Button size="sm" disabled={!chosen.length || !!busy} onClick={approve}>{busy === "approve" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Godkjenn valgte internt</Button>}
+        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 text-sm">
+          <span aria-live="polite">
+            <strong>{chosen.length}</strong> valgt på denne siden
+            {chosenSums.length > 0 && ` · ${chosenSums.map((c) => `${formatMoney(c.total, c.currency)} inkl. mva.${c.missing ? ` (${c.missing} uten beløp)` : ""}`).join(" · ")}`}
+          </span>
+          <span className="flex-1" />
+          {tab === "ready" && canApprove && <Button size="sm" disabled={!chosen.length || !!busy} onClick={() => setConfirm("approve")}>{busy === "approve" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Godkjenn valgte internt</Button>}
           {tab === "ready" && !canApprove && <span className="text-ink-secondary">Intern godkjenning krever godkjenner- eller admin-rolle.</span>}
-          {canWrite && <Button size="sm" variant="outline" disabled={!chosen.length || !!busy} onClick={postCosts}>{busy === "costs" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Før kostpris for trygge linjer</Button>}
+          {canWrite && <Button size="sm" variant="outline" disabled={!chosen.length || !!busy} onClick={() => setConfirm("costs")}>{busy === "costs" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Før kostpris for trygge linjer</Button>}
         </div>
       )}
+      <AlertDialog open={confirm != null} onOpenChange={(o) => !o && setConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirm === "approve" ? `Godkjenne ${chosen.length} fakturaer internt?` : `Føre kostpris for ${chosen.length} fakturaer?`}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirm === "approve" ? "Dette er intern attestasjon i NBhub. Det utløser ikke betaling og sendes ikke til Tripletex. Serveren kontrollerer hver faktura på nytt." : "Bare trygge linjer føres. Usikre linjer hoppes over og venter på avklaring."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <ul className="max-h-48 divide-y divide-line-subtle overflow-y-auto text-sm">
+            {chosenRows.map((r) => (
+              <li key={r.invoice_id} className="flex justify-between gap-3 py-1.5"><span className="truncate">{r.supplier_name ?? "Ukjent"} · {r.invoice_number}</span><span className="tabular-nums">{formatMoney(r.total_amount, r.currency)}</span></li>
+            ))}
+          </ul>
+          <p className="text-sm font-medium tabular-nums">Sum: {chosenSums.map((c) => `${formatMoney(c.total, c.currency)} inkl. mva.`).join(" · ")}</p>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { const c = confirm; setConfirm(null); if (c === "approve") void approve(); else void postCosts(); }}>
+              {confirm === "approve" ? "Godkjenn internt" : "Før kostpris"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <QueryState isLoading={q.isLoading || !company} isError={q.isError} error={q.error} scope="fakturaer:oversikt" onRetry={() => q.refetch()} isEmpty={visible.length === 0} emptyTitle="Ingen fakturaer her">
         <ul className="divide-y divide-line-subtle rounded-xl border border-line-subtle bg-card">
           {tab !== "done" && (
             <li className="flex items-center gap-3 px-4 py-2 text-sm text-ink-secondary">
-              <Checkbox aria-label="Velg alle synlige" checked={chosen.length > 0 && chosen.length === visible.length}
-                onCheckedChange={(v) => setSelected(v ? Object.fromEntries(visible.map((r) => [r.invoice_id, true])) : {})} />
-              Velg alle synlige
+              <Checkbox aria-label="Velg denne siden" checked={chosen.length > 0 && chosen.length === pg.items.length}
+                onCheckedChange={(v) => setSelected(v ? Object.fromEntries(pg.items.map((r) => [r.invoice_id, true])) : {})} />
+              Velg denne siden ({pg.items.length})
             </li>
           )}
-          {visible.map((r) => {
+          {pg.items.map((r) => {
             const excl = amountExclVat(r.total_amount, r.total_vat);
             return (
               <li key={r.invoice_id} className="flex items-start gap-3 px-4 py-3">
@@ -180,6 +217,11 @@ export default function InvoiceOverview() {
             );
           })}
         </ul>
+        <nav aria-label="Sider" className="flex items-center justify-between text-sm">
+          <Button variant="outline" size="sm" disabled={pg.page <= 1} onClick={() => { setSelected({}); setPage(pg.page - 1); }}>Forrige</Button>
+          <span className="tabular-nums text-ink-secondary">{visible.length} fakturaer · side {pg.page} av {pg.pages}</span>
+          <Button variant="outline" size="sm" disabled={pg.page >= pg.pages} onClick={() => { setSelected({}); setPage(pg.page + 1); }}>Neste</Button>
+        </nav>
       </QueryState>
     </div>
   );
