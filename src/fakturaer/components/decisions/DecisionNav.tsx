@@ -3,8 +3,10 @@ import { cn } from "@/lib/utils";
 
 const ITEMS = [
   { to: "/ravarer/fakturaer/i-dag", label: "I dag" },
-  { to: "/ravarer/fakturaer/til-behandling", label: "Fakturaer" },
-  { to: "/ravarer/fakturaer/i-dag?vis=ravarer", label: "Råvarer" },
+  { to: "/ravarer/fakturaer/oversikt", label: "Fakturaer" },
+  { to: "/ravarer/fakturaer/ravarer", label: "Råvarer" },
+  { to: "/ravarer/fakturaer/vareminne", label: "Lagrede koblinger" },
+  { to: "/ravarer/fakturaer/saker", label: "Leverandørsaker" },
 ];
 
 /** Inngangen til fakturabehandlingen: I dag · Fakturaer · Råvarer. */

@@ -10,9 +10,9 @@ import { useReviewLines } from "@/fakturaer/hooks/useReviewLines";
 import { useCompany } from "@/hooks/useCompany";
 import { buildDecisionGroups, materialOptions } from "@/fakturaer/lib/decisionGroups";
 import { formatMoney } from "@/fakturaer/lib/constants";
-import { acceptMatch } from "@/fakturaer/lib/acceptMatch";
-import { acceptPriceVariance, canAcceptPriceVariance, rematchLines } from "@/fakturaer/lib/queueActions";
-import { supabase } from "@/integrations/supabase/client";
+import { applyMaterialToLines, runPerLine } from "@/fakturaer/lib/groupActions";
+import { createSupplierCase } from "@/fakturaer/lib/supplierCases";
+import { acceptPriceVariance, canAcceptPriceVariance } from "@/fakturaer/lib/queueActions";
 import { cn } from "@/lib/utils";
 
 const kr = (v: number | null) => (v == null ? "–" : formatMoney(v, "NOK"));
@@ -38,24 +38,28 @@ export default function DecisionDetail() {
   async function applyMaterial() {
     if (!group || !choice) return;
     setBusy(true);
-    const failed: string[] = [];
     try {
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) throw new Error("Ikke innlogget");
       const targets = group.shared ? group.lines : group.lines.slice(0, 1);
-      for (const line of targets) {
-        try {
-          // Pakningen bekreftes ikke her: det er bare råvarevalget som huskes.
-          await acceptMatch({ line, rawMaterialId: choice, userId: data.user.id, rememberSku: !!line.supplier_sku, skipRematch: true });
-        } catch (e) {
-          failed.push(`${line.invoice.invoice_number}: ${e instanceof Error ? e.message : "ukjent feil"}`);
-        }
-      }
-      await rematchLines(targets);
-      if (failed.length) toast.error(`${failed.length} linje(r) ble ikke lagret`, { description: failed.join("\n") });
-      await done(`Råvaren er lagret på ${targets.length - failed.length} linje(r) og huskes for neste import.`);
+      const r = await applyMaterialToLines(targets, choice);
+      if (r.failed) toast.error(`Råvarevalg: ${r.text}`, { description: r.outcomes.filter((o) => !o.ok).map((o) => `${o.invoiceNumber}: ${o.message}`).join("\n") });
+      await done(r.failed ? `Råvarevalg: ${r.text}` : `Råvarevalg: ${r.text}. Huskes for neste import.`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Kunne ikke lagre valget");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createCase() {
+    if (!group) return;
+    setBusy(true);
+    try {
+      const id = await createSupplierCase({ lineIds: group.lines.map((l) => l.id), title: `Prisavvik ${group.description}`, reason: `Fakturert ${group.observedPerBase ?? "–"} mot ${group.expectedPerBase ?? "–"} per grunnenhet` });
+      await qc.invalidateQueries({ queryKey: ["supplier-cases"] });
+      toast.success("Leverandørsak opprettet. Fakturaene holdes igjen til saken er avklart.");
+      navigate(`/ravarer/fakturaer/saker/${id}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Kunne ikke opprette sak");
     } finally {
       setBusy(false);
     }
@@ -64,19 +68,10 @@ export default function DecisionDetail() {
   async function acceptPrices() {
     if (!group) return;
     setBusy(true);
-    let ok = 0;
-    const failed: string[] = [];
-    for (const line of group.lines) {
-      try {
-        await acceptPriceVariance(line);
-        ok += 1;
-      } catch (e) {
-        failed.push(`${line.invoice.invoice_number}: ${e instanceof Error ? e.message : "ukjent feil"}`);
-      }
-    }
+    const r = await runPerLine(group.lines, acceptPriceVariance);
     setBusy(false);
-    if (failed.length) toast.error(`${failed.length} linje(r) ble ikke godtatt`, { description: failed.join("\n") });
-    await done(`Prisavviket er godtatt denne gangen på ${ok} linje(r). Avtalen er ikke endret.`);
+    if (r.failed) toast.error(`Prisavvik: ${r.text}`, { description: r.outcomes.filter((o) => !o.ok).map((o) => `${o.invoiceNumber}: ${o.message}`).join("\n") });
+    await done(`Prisavvik godtatt denne gangen: ${r.text}. Avtalen er ikke endret.`);
   }
 
   const first = group?.lines[0];
@@ -167,6 +162,9 @@ export default function DecisionDetail() {
                       <p className="text-2xl font-semibold tabular-nums">{group.differenceExclVat != null ? kr(group.differenceExclVat) : "Ukjent"}</p>
                       <p className="text-sm text-ink-secondary">Ekskl. mva. Beregnet fra dokumentert grunnmengde.</p>
                     </div>
+                    <Button className="w-full" disabled={busy || group.differenceExclVat == null} onClick={createCase}>
+                      Opprett én sak for {group.invoiceIds.length === 1 ? "fakturaen" : `${group.invoiceIds.length} fakturaer`}
+                    </Button>
                     <Button variant="outline" className="w-full" disabled={busy || !allPriceOk} onClick={acceptPrices}>
                       {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Godta prisavviket denne gangen
                     </Button>

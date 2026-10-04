@@ -1,3 +1,4 @@
+import { blockerLabel } from "@/fakturaer/lib/approval";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface CostPostingResult {
@@ -35,7 +36,7 @@ export async function postSafeCosts(invoiceIds: readonly string[], lineIds?: rea
     }
     const r = (data ?? {}) as { ok?: boolean; posted?: number; skipped?: unknown[]; blockers?: string[] };
     if (r.ok !== true) {
-      out.push({ invoiceId, posted: 0, skipped: 0, error: `Fakturaen er sperret (${(r.blockers ?? []).join(", ")})` });
+      out.push({ invoiceId, posted: 0, skipped: 0, error: `Fakturaen er sperret (${(r.blockers ?? []).map(blockerLabel).join(", ")})` });
       continue;
     }
     out.push({ invoiceId, posted: Number(r.posted ?? 0), skipped: Array.isArray(r.skipped) ? r.skipped.length : 0, error: null });
