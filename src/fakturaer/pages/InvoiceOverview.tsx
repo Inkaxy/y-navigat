@@ -35,7 +35,7 @@ export default function InvoiceOverview() {
     enabled: !!company?.id,
     queryFn: () => fetchApprovalOverview(company!.id),
   });
-  const rows = q.data ?? [];
+  const rows = useMemo(() => q.data ?? [], [q.data]);
   const suppliers = useMemo(() => [...new Map(rows.filter((r) => r.supplier_id).map((r) => [r.supplier_id!, r.supplier_name ?? "Ukjent"])).entries()].sort((a, b) => a[1].localeCompare(b[1], "nb")), [rows]);
   const counts = useMemo(() => {
     const c = { ready: 0, waiting: 0, done: 0 };
