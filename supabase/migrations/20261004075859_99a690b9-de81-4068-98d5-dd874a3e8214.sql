@@ -1,0 +1,1 @@
+REVOKE ALL ON FUNCTION public._rms_record_package_variant() FROM PUBLIC, anon, authenticated;
