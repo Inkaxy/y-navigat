@@ -70,5 +70,3 @@ export function maxAllocatable(creditUnallocated: number, invoiceRemaining: numb
   return Math.max(0, Math.min(creditUnallocated, invoiceRemaining));
 }
 
-export const VAT_FOOD = 0.15;
-export const inclVat = (exclVat: number, rate = VAT_FOOD) => Math.round(exclVat * (1 + rate) * 100) / 100;
