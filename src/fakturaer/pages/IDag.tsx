@@ -6,6 +6,8 @@ import { QueryState } from "@/components/common/QueryState";
 import { useReviewLines } from "@/fakturaer/hooks/useReviewLines";
 import { useCompany } from "@/hooks/useCompany";
 import { buildDecisionGroups, DECISION_KIND_LABEL, encodeGroupKey, type DecisionGroup } from "@/fakturaer/lib/decisionGroups";
+import { useQuery } from "@tanstack/react-query";
+import { approvalBucket, fetchApprovalOverview } from "@/fakturaer/lib/approval";
 import { formatMoney } from "@/fakturaer/lib/constants";
 import { format } from "date-fns";
 import { nb } from "date-fns/locale";
@@ -27,10 +29,12 @@ function headline(g: DecisionGroup): { title: string; body: string; foot: string
       body: `${g.supplierName} har fakturert en annen pris enn referansen for ${g.description}.`,
       foot: g.differenceExclVat != null ? `${formatMoney(g.differenceExclVat, "NOK")} ekskl. mva. å avklare` : `Gjelder ${fakt}`,
     };
+  if (g.kind === "first_cost")
+    return { title: `Første kostpris for «${g.description}»`, body: `${g.supplierName}. Ingen avtale- eller startpris finnes; prisen er dokumentert på fakturaen.`, foot: `Gjelder ${fakt}` };
   return { title: `Kontroller «${g.description}»`, body: `${g.supplierName}. Linjen står til kontroll.`, foot: `Gjelder ${fakt}` };
 }
 
-const ICON = { material: GitBranch, package: Package, price: CircleAlert, other: CircleAlert } as const;
+const ICON = { material: GitBranch, package: Package, price: CircleAlert, first_cost: Package, other: CircleAlert } as const;
 
 export default function IDag() {
   const { data: company } = useCompany();
@@ -39,6 +43,8 @@ export default function IDag() {
   const invoiceCount = useMemo(() => new Set((q.data?.rows ?? []).map((r) => r.invoice_id)).size, [q.data]);
   const merged = groups.reduce((s, g) => s + Math.max(0, g.lines.length - 1), 0);
   const top = groups.slice(0, 12);
+  const overview = useQuery({ queryKey: ["invoice-approval-overview", company?.id], enabled: !!company?.id, queryFn: () => fetchApprovalOverview(company!.id) });
+  const readyCount = (overview.data ?? []).filter((r) => approvalBucket(r) === "ready").length;
 
   return (
     <div className="px-page py-6 space-y-6">
@@ -65,7 +71,7 @@ export default function IDag() {
               return (
                 <li key={g.key}>
                   <Link
-                    to={`/ravarer/fakturaer/i-dag/${encodeGroupKey(g.key)}`}
+                    to={g.kind === "first_cost" || g.kind === "package" ? "/ravarer/fakturaer/ravarer" : `/ravarer/fakturaer/i-dag/${encodeGroupKey(g.key)}`}
                     className="group block rounded-xl border border-line-subtle bg-card p-5 transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <div className="flex items-start justify-between gap-4">
@@ -110,9 +116,9 @@ export default function IDag() {
                 <p className="text-sm text-ink-secondary">Leverandørvare og bekreftet pakning brukes på nytt ved neste import.</p>
               </div>
             </div>
-            <Link to="/ravarer/fakturaer/til-behandling" className="block rounded-xl border border-success/30 bg-success/10 p-4 hover:bg-success/15">
-              <p className="font-semibold text-success">Fakturaoversikt</p>
-              <p className="text-sm text-ink-secondary">Klare, avventende og fullførte fakturaer.</p>
+            <Link to="/ravarer/fakturaer/oversikt" className="block rounded-xl border border-success/30 bg-success/10 p-4 hover:bg-success/15">
+              <p className="font-semibold text-success">{overview.data ? `${readyCount} fakturaer klare til intern godkjenning` : "Fakturaoversikt"}</p>
+              <p className="text-sm text-ink-secondary">Se og godkjenn. Godkjenning utløser ikke betaling.</p>
             </Link>
           </aside>
         </div>

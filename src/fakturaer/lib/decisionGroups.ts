@@ -1,5 +1,6 @@
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { lineStatus } from "@/fakturaer/lib/lineStatus";
+import { allReasons } from "@/fakturaer/lib/reviewReasons";
 import { normalizeSearch } from "@/ravarer/lib/rawMaterialViews";
 
 /**
@@ -9,7 +10,7 @@ import { normalizeSearch } from "@/ravarer/lib/rawMaterialViews";
  * sammen. Linjer uten varenummer, og konflikter, står alltid alene —
  * navnelikhet alene gir aldri en felles beslutning.
  */
-export type DecisionKind = "material" | "package" | "price" | "other";
+export type DecisionKind = "material" | "package" | "price" | "first_cost" | "other";
 
 export interface DecisionGroup {
   key: string;
@@ -29,6 +30,8 @@ export interface DecisionGroup {
   differenceExclVat: number | null;
 }
 
+export const FIRST_COST_REASONS: ReadonlySet<string> = new Set(["no_automatic_basis", "no_baseline"]);
+
 const r4 = (v: number | null | undefined): string =>
   v == null || !Number.isFinite(Number(v)) ? "-" : Number(v).toFixed(4);
 
@@ -41,8 +44,12 @@ function kindOf(line: ReviewLineRow): DecisionKind | null {
       return "material";
     case "confirm_package":
       return "package";
-    case "review_price":
+    case "review_price": {
+      // Mangler bare avtale/startpris: første dokumenterte kostpris, ikke et prisavvik.
+      const reasons = allReasons(line);
+      if (reasons.length > 0 && reasons.every((r) => FIRST_COST_REASONS.has(r))) return "first_cost";
       return "price";
+    }
     default:
       return "other";
   }
@@ -58,6 +65,7 @@ export function groupKeyFor(line: ReviewLineRow, kind: DecisionKind): { key: str
   if (!sku || conflict || kind === "other") return { key: `line:${line.id}`, shared: false };
   const supplier = line.invoice.supplier_id;
   if (kind === "material") return { key: `m:${supplier}:${sku}:${packageKey(line)}`, shared: true };
+  if (kind === "first_cost") return { key: `f:${supplier}:${sku}:${line.raw_material_id ?? "-"}`, shared: true };
   if (kind === "package") return { key: `p:${supplier}:${sku}:${packageKey(line)}:${line.raw_material_id ?? "-"}`, shared: true };
   return {
     key: `pr:${supplier}:${sku}:${line.raw_material_id ?? "-"}:${r4(line.price_per_base_unit)}:${r4(line.expected_price_per_base_unit)}`,
@@ -145,8 +153,12 @@ export const DECISION_KIND_LABEL: Record<DecisionKind, string> = {
   material: "Råvarer og kostpris",
   package: "Pakning",
   price: "Fakturakontroll",
+  first_cost: "Første kostpris",
   other: "Kontroll",
 };
+
+/** Råvare-løpet: bare råvare-, paknings- og førstegangsspørsmål. */
+export const RAVARE_KINDS: ReadonlySet<DecisionKind> = new Set(["material", "package", "first_cost"]);
 
 export function encodeGroupKey(k: string): string {
   return encodeURIComponent(k);

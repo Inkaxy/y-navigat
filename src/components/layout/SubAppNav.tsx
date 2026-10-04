@@ -257,6 +257,10 @@ function RavarerNav() {
       badge: reviewCount,
       links: [
         { to: "/ravarer/fakturaer/i-dag", label: "I dag" },
+        { to: "/ravarer/fakturaer/oversikt", label: "Fakturaoversikt" },
+        { to: "/ravarer/fakturaer/ravarer", label: "Råvarespørsmål" },
+        { to: "/ravarer/fakturaer/vareminne", label: "Lagrede koblinger" },
+        { to: "/ravarer/fakturaer/saker", label: "Leverandørsaker" },
         { to: "/ravarer/fakturaer/til-behandling", label: "Til behandling", badge: reviewCount },
         { to: "/ravarer/fakturaer", label: "Alle fakturaer" },
         { to: "/ravarer/fakturaer/til-behandling?filter=klar", label: "Klar for prismatch" },
