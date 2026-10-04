@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.invoice_approval_blockers(uuid), public.supplier_case_invoice_remaining(uuid, uuid) FROM authenticated;
