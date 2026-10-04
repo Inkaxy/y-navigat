@@ -11,7 +11,7 @@ import { DecisionNav } from "@/fakturaer/components/decisions/DecisionNav";
 import { useReviewLines } from "@/fakturaer/hooks/useReviewLines";
 import { useCompany } from "@/hooks/useCompany";
 import { buildDecisionGroups, DECISION_KIND_LABEL, encodeGroupKey, RAVARE_KINDS, type DecisionGroup } from "@/fakturaer/lib/decisionGroups";
-import { applyPackageToLines, packagePreview } from "@/fakturaer/lib/groupActions";
+import { applyPackageToLines, outcomeNotes, packagePreview } from "@/fakturaer/lib/groupActions";
 import { postSafeCosts } from "@/fakturaer/lib/costPosting";
 import { formatMoney } from "@/fakturaer/lib/constants";
 import { fmtNum, parseDecimal } from "@/fakturaer/lib/units";
@@ -29,7 +29,9 @@ function PackageCard({ g, onDone }: { g: DecisionGroup; onDone: () => Promise<vo
     setBusy(true);
     try {
       const r = await applyPackageToLines(g.lines, content);
-      (r.failed ? toast.error : toast.success)(`Pakning: ${r.text}`, r.failed ? { description: r.outcomes.filter((o) => !o.ok).map((o) => `${o.invoiceNumber}: ${o.message}`).join("\n") } : undefined);
+      const notes = outcomeNotes(r);
+      const desc = [...notes, ...r.outcomes.filter((o) => !o.ok).map((o) => `${o.invoiceNumber}: ${o.message}`)].join("\n") || undefined;
+      (r.failed ? toast.error : notes.length ? toast.warning : toast.success)(`Pakning: ${r.text}`, { description: desc });
       await onDone();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Kunne ikke lagre pakningen");
