@@ -259,6 +259,34 @@ Deno.serve(async (req) => {
     }
     const rmsById = new Map<string, AnyRec>(rmsList.map((r: AnyRec) => [r.id, r]));
 
+    // Bekreftede pakningsvarianter: flere gyldige pakninger per kobling bevares og gjenbrukes.
+    let variants: AnyRec[] = [];
+    if (rmsIds.length) {
+      variants = required("pakningsvarianter", await svc.from("raw_material_supplier_packages")
+        .select("raw_material_supplier_id, supplier_sku_norm, package_size, package_unit, base_units_per_package, confirmed_at")
+        .in("raw_material_supplier_id", rmsIds)) ?? [];
+    }
+    const skuNormSql = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    /** Linjens egen dokumenterte pakning mot en bekreftet variant. Ukjent pakning gir aldri treff. */
+    function withVariant(row: AnyRec | undefined, line: AnyRec): AnyRec | undefined {
+      if (!row || line.package_size == null || !line.package_unit) return row;
+      const sku = skuNormSql(line.supplier_sku);
+      const unit = String(line.package_unit).trim().toLowerCase();
+      const hits = variants.filter((v) => v.raw_material_supplier_id === row.id
+        && (v.supplier_sku_norm === "" || v.supplier_sku_norm === sku)
+        && v.package_size != null && Number(v.package_size) === Number(line.package_size)
+        && String(v.package_unit ?? "").trim().toLowerCase() === unit);
+      const bupps = new Set(hits.map((h) => Number(h.base_units_per_package)));
+      if (bupps.size !== 1) return row; // ingen eller motstridende varianter: ingen gjenbruk
+      const v = hits[0];
+      return { ...row, base_units_per_package: v.base_units_per_package, package_size: v.package_size, package_unit: v.package_unit, package_confirmed_at: v.confirmed_at };
+    }
+
+    // Linjer med ført kostpris er låst: ny matching skal ikke endre dem eller åpne dem igjen.
+    const posted = required("førte kostprislinjer", await svc.from("invoice_line_cost_postings")
+      .select("invoice_line_id").eq("invoice_id", invoiceId).is("revoked_at", null));
+    const postedIds = new Set<string>((posted ?? []).map((p: AnyRec) => p.invoice_line_id));
+
     /** Pakningskilden for linjen — felles regel med skjermen (packageSignature.ts). */
     function pickRmsRow(
       rawMaterialId: string,
@@ -299,6 +327,10 @@ Deno.serve(async (req) => {
         results.push({ id: line.id, skipped: true });
         continue;
       }
+      if (postedIds.has(line.id)) {
+        results.push({ id: line.id, skipped: true, reason: "cost_posted" });
+        continue;
+      }
 
       // For manually matched lines: keep the match, but recompute price/variance + normalized unit only
       if (line.match_confidence === "manual" && line.raw_material_id) {
@@ -308,7 +340,7 @@ Deno.serve(async (req) => {
 
         const rm = rmById.get(line.raw_material_id);
         const pickedM = pickRmsRow(line.raw_material_id, null, line.supplier_sku);
-        const rmsRow = pickedM.row;
+        const rmsRow = withVariant(pickedM.row, line);
         manualUpdate.package_source_rms_id = rmsRow?.id ?? null;
         const refM = withRegisteredLastPurchase(await priceReference(line.raw_material_id), rmsRow);
         const expected = applyReference(manualUpdate, refM);
