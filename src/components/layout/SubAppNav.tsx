@@ -256,6 +256,7 @@ function RavarerNav() {
       matches: ["/ravarer/fakturaer"],
       badge: reviewCount,
       links: [
+        { to: "/ravarer/fakturaer/i-dag", label: "I dag" },
         { to: "/ravarer/fakturaer/til-behandling", label: "Til behandling", badge: reviewCount },
         { to: "/ravarer/fakturaer", label: "Alle fakturaer" },
         { to: "/ravarer/fakturaer/til-behandling?filter=klar", label: "Klar for prismatch" },

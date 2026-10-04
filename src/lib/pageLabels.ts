@@ -60,6 +60,7 @@ const RULES: PageRule[] = [
   { test: (p) => p.startsWith("/ravarer/avtaler"), label: "Avtaler" },
   { test: (p) => p.startsWith("/ravarer/datablad-endringer"), label: "Datablad-endringer" },
   { test: (p) => p.startsWith("/ravarer/datablad-bulk"), label: "Bulk-opplasting datablad" },
+  { test: (p) => p.startsWith("/ravarer/fakturaer/i-dag"), label: "I dag" },
   { test: (p) => p === "/ravarer/fakturaer/til-behandling", label: "Til behandling" },
   { test: (p) => p.startsWith("/ravarer/fakturaer/import"), label: "Importer faktura" },
   { test: (p) => p.startsWith("/ravarer/fakturaer"), label: "Fakturaer" },
