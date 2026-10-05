@@ -15,6 +15,8 @@ import { UnsavedChangesDialog } from "@/varer/components/products/detail/Unsaved
 import { useUserDisplayName, type RecipeLabelCalculated } from "@/varer/hooks/useRecipeLabel";
 import { NUTRITION_KEYS, parseAllergenSummary, pickNutrition, stripHtml, type DeclarationMode } from "@/varer/lib/effectiveDeclaration";
 import { DeclarationAssistantPanel } from "@/varer/components/declaration/DeclarationAssistantPanel";
+import { DeclarationAllergenExtractor } from "@/varer/components/declaration/DeclarationAllergenExtractor";
+import { ALLERGEN_FIELD_LABEL, type AllergenApplyPlan } from "@/varer/lib/declarationAllergenSuggestion";
 import { SourceSegmented, formatDateTimeNb, type LabelSource } from "./labelShared";
 import { CalculatedDeclarationView } from "./CalculatedDeclarationView";
 import { ConfirmPendingDialog } from "./ConfirmPendingDialog";
@@ -171,6 +173,17 @@ export function DeclarationNutritionSection(p: Props) {
     if (form.ingredientText.trim() && form.ingredientText.trim() !== text.trim()) setPending({ kind: "assistant", text });
     else setForm((f) => ({ ...f, ingredientText: text }));
   }
+  function onAllergenSuggestion(plan: AllergenApplyPlan) {
+    const summary = plan.changes
+      .map((c) => `${ALLERGEN_FIELD_LABEL[c.field]}: ${c.before.trim() ? `«${c.before}»` : "tomt"} → «${c.after}»`)
+      .join(". ");
+    if (plan.needsConfirm) setPending({ kind: "allergens", next: plan.next, summary });
+    else applyAllergens(plan.next);
+  }
+  function applyAllergens(next: { contains: string; mayContain: string }) {
+    setForm((f) => ({ ...f, contains: next.contains, mayContain: next.mayContain }));
+    toast.success("Allergenforslaget er lagt inn i kladden — husk «Lagre kladd»");
+  }
   function requestSave() {
     const overwrites = !!saved.ingredientText.trim() && saved.ingredientText !== form.ingredientText;
     if (p.approvedManualActive || overwrites) setPending({ kind: "save" });
@@ -178,6 +191,11 @@ export function DeclarationNutritionSection(p: Props) {
   }
 
   const confirmText: Record<Pending["kind"], { title: string; body: string; action: string }> = {
+    allergens: {
+      title: "Erstatte allergenfeltene med forslaget?",
+      body: `${pending?.kind === "allergens" ? pending.summary + ". " : ""}Ingenting lagres før du trykker «Lagre kladd».`,
+      action: "Bruk allergenforslag",
+    },
     fill: {
       title: "Erstatte kladden med beregningen?",
       body: "Teksten, allergenene og næringstallene i kladden byttes ut med det beregnede. Ingenting lagres før du trykker «Lagre kladd».",
@@ -206,6 +224,7 @@ export function DeclarationNutritionSection(p: Props) {
     if (!pending) return;
     if (pending.kind === "fill") applyFill(pending.next);
     else if (pending.kind === "assistant") setForm((f) => ({ ...f, ingredientText: pending.text }));
+    else if (pending.kind === "allergens") applyAllergens(pending.next);
     else if (pending.kind === "save") saveDraft.mutate();
     else saveSource.mutate(candidate === "manual" ? "manual" : "auto");
     setPending(null);
@@ -319,6 +338,14 @@ export function DeclarationNutritionSection(p: Props) {
             value={form.ingredientText}
             canWrite={canWrite}
             onApply={onAssistant}
+          />
+          <DeclarationAllergenExtractor
+            target="recipe"
+            targetId={recipeId}
+            value={form.ingredientText}
+            canWrite={canWrite}
+            current={{ contains: form.contains, mayContain: form.mayContain }}
+            onApply={onAllergenSuggestion}
           />
           {canWrite && (
             <div className="flex flex-wrap items-center justify-between gap-2">

@@ -26,4 +26,5 @@ export function formToDoc(f: Form): DeclarationDoc {
   return { ingredientText: f.ingredientText.trim() || null, contains: splitList(f.contains), mayContain: splitList(f.mayContain), nutrition };
 }
 
-export type Pending = { kind: "fill"; next: Form } | { kind: "assistant"; text: string } | { kind: "save" } | { kind: "source" };
+export type Pending = { kind: "fill"; next: Form } | { kind: "assistant"; text: string } | { kind: "save" } | { kind: "source" }
+  | { kind: "allergens"; next: { contains: string; mayContain: string }; summary: string };
