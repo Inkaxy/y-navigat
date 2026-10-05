@@ -6,8 +6,8 @@
 // feilkilder avvises, spor krever en uttrykkelig sporsetning. Ingenting lagres.
 // Ren TypeScript uten Deno-avhengigheter, så vitest kan teste den direkte.
 
-import { ALLERGEN_CODES, normalizeAllergenCode, type AllergenCode } from "./allergen-diff.ts";
-import { ALLERGEN_LABEL } from "./allergen-labels.ts";
+import { ALLERGEN_CODES, normalizeAllergenCode, type AllergenCode } from "../_shared/allergen-diff.ts";
+import { ALLERGEN_LABEL } from "../_shared/allergen-labels.ts";
 
 export const ALLERGEN_EXTRACT_VERSION = "decl-allergens-2026-10-05.1";
 

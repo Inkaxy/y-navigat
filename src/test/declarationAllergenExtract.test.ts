@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateAllergenExtraction } from "../../supabase/functions/_shared/declaration-allergen-extract";
+import { validateAllergenExtraction } from "../../supabase/functions/declaration-assistant/allergen-extract";
 import { sourceFingerprint } from "../../supabase/functions/_shared/declaration-proposal";
 import { parseAllergenSuggestion, planAllergenApply } from "@/varer/lib/declarationAllergenSuggestion";
 

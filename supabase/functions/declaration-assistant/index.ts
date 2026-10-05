@@ -29,7 +29,7 @@ import {
   ALLERGEN_EXTRACT_SCHEMA,
   ALLERGEN_EXTRACT_VERSION,
   validateAllergenExtraction,
-} from "../_shared/declaration-allergen-extract.ts";
+} from "./allergen-extract.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
