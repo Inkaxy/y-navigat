@@ -76,6 +76,18 @@ const JSON_SCHEMA = {
           storage_instructions: { type: ["string", "null"] },
           country_of_origin: { type: ["string", "null"] },
           recipe_name: { type: ["string", "null"] },
+          grain: {
+            type: ["object", "null"],
+            description: "Brødskala'n. Null når varen ikke har grovhetsgrunnlag.",
+            properties: {
+              level: { enum: ["fint", "halvgrovt", "grovt", "ekstra_grovt"] },
+              label: { type: "string" },
+              pct: { type: ["number", "null"] },
+              pieces: { type: "integer", minimum: 1, maximum: 4 },
+              pieces_total: { const: 4 },
+              source: { enum: ["manual", "auto"] },
+            },
+          },
           approved_at: { type: ["string", "null"], format: "date-time" },
           content_hash: { type: "string" },
         },
@@ -193,13 +205,13 @@ Deno.serve(async (req) => {
   const { data: recipeRows } = recipeIds.length
     ? await admin
         .from("recipes")
-        .select("id, name, unit_weight_grams, shelf_life_days, storage_instructions, country_of_origin")
+        .select("id, name, unit_weight_grams, shelf_life_days, storage_instructions, country_of_origin, breadscale_mode, manual_breadscale_pct")
         .in("id", recipeIds)
     : { data: [] as Record<string, unknown>[] };
   const recipeById = new Map((recipeRows ?? []).map((r) => [r.id as string, r]));
 
   const { data: calcRows } = recipeIds.length
-    ? await admin.from("recipe_label_calculated").select("recipe_id, computed_at, is_stale").in("recipe_id", recipeIds)
+    ? await admin.from("recipe_label_calculated").select("recipe_id, computed_at, is_stale, grain_category, grain_score_pct").in("recipe_id", recipeIds)
     : { data: [] as { recipe_id: string; computed_at: string | null; is_stale: boolean | null }[] };
   const calcByRecipe = new Map((calcRows ?? []).map((c) => [c.recipe_id as string, c]));
 
@@ -250,6 +262,14 @@ Deno.serve(async (req) => {
       storage_instructions: (recipe?.storage_instructions as string | null) ?? null,
       country_of_origin: (recipe?.country_of_origin as string | null) ?? null,
       recipe_name: (recipe?.name as string | null) ?? null,
+      grain: recipe
+        ? exportGrain({
+            mode: recipe.breadscale_mode as string | null,
+            manualPct: recipe.manual_breadscale_pct as number | null,
+            calcCategory: (calc?.grain_category as string | null) ?? null,
+            calcPct: (calc?.grain_score_pct as number | null) ?? null,
+          })
+        : null,
       approved_at: (p.manual_declaration_updated_at as string | null) ?? (calc?.computed_at as string | null) ?? null,
     };
     products.push({ ...item, content_hash: await contentHash(item) });
