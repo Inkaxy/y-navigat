@@ -81,3 +81,60 @@ function flatten(value: unknown): Record<string, true> {
   walk(value);
   return out;
 }
+
+export type GrainLevel = "fint" | "halvgrovt" | "grovt" | "ekstra_grovt";
+
+const GRAIN_LABEL: Record<GrainLevel, string> = {
+  fint: "Fint",
+  halvgrovt: "Halvgrovt",
+  grovt: "Grovt",
+  ekstra_grovt: "Ekstra grovt",
+};
+const GRAIN_PIECES: Record<GrainLevel, number> = { fint: 1, halvgrovt: 2, grovt: 3, ekstra_grovt: 4 };
+
+function levelFromPct(pct: number): GrainLevel {
+  if (pct < 26) return "fint";
+  if (pct < 51) return "halvgrovt";
+  if (pct < 76) return "grovt";
+  return "ekstra_grovt";
+}
+
+export interface ExportGrain {
+  level: GrainLevel;
+  label: string;
+  pct: number | null;
+  /** Antall fylte kakestykker i Brødskala'n-merket (1–4). */
+  pieces: number;
+  pieces_total: 4;
+  source: "manual" | "auto";
+}
+
+/**
+ * Grovhet slik oppskriften viser den: manuell prosent når manuelt er valgt,
+ * ellers beregnet kategori/prosent. Null når grunnlag mangler — aldri gjetning.
+ */
+export function exportGrain(input: {
+  mode: string | null | undefined;
+  manualPct: number | null | undefined;
+  calcCategory: string | null | undefined;
+  calcPct: number | null | undefined;
+}): ExportGrain | null {
+  const build = (level: GrainLevel, pct: number | null, source: "manual" | "auto"): ExportGrain => ({
+    level,
+    label: GRAIN_LABEL[level],
+    pct: pct == null ? null : Math.round(pct * 10) / 10,
+    pieces: GRAIN_PIECES[level],
+    pieces_total: 4,
+    source,
+  });
+  if (input.mode === "manual") {
+    const m = Number(input.manualPct);
+    if (input.manualPct == null || !Number.isFinite(m)) return null;
+    return build(levelFromPct(m), m, "manual");
+  }
+  const cat = input.calcCategory as GrainLevel | null | undefined;
+  const p = input.calcPct == null ? null : Number(input.calcPct);
+  if (cat && cat in GRAIN_LABEL) return build(cat, p != null && Number.isFinite(p) ? p : null, "auto");
+  if (p != null && Number.isFinite(p)) return build(levelFromPct(p), p, "auto");
+  return null;
+}
