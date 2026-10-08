@@ -4,7 +4,7 @@
 // GET /declarations-export?updated_since=<ISO>&product_ids=a,b&page=1&page_size=200
 // GET /declarations-export?schema=1   -> JSON Schema for responsen
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { checkApiKey, contentHash, exportRejection } from "../_shared/declaration-export.ts";
+import { checkApiKey, contentHash, exportGrain, exportRejection } from "../_shared/declaration-export.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
