@@ -1,7 +1,7 @@
 import { formatKr } from "@/varer/lib/pricing";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Cake, ImageIcon, Tag } from "lucide-react";
+import { Cake, ImageOff, Tag } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ColumnOption } from "@/varer/components/products/ColumnPicker";
@@ -116,8 +116,8 @@ export function buildProductColumns({
         p.image_url ? (
           <img src={thumbUrl(p.image_url, 32)} onError={onThumbError(p.image_url)} alt="" width={32} height={32} loading="lazy" decoding="async" className="h-8 w-8 rounded object-cover" />
         ) : (
-          <div className="flex h-8 w-8 items-center justify-center rounded bg-muted text-muted-foreground">
-            <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />
+          <div role="img" aria-label="Mangler bilde" title="Mangler bilde" className="flex h-8 w-8 items-center justify-center rounded border border-dashed border-warning/60 bg-warning/10 text-warning">
+            <ImageOff className="h-4 w-4" aria-hidden="true" />
           </div>
         ),
     },
