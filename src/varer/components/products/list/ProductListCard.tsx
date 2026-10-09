@@ -4,6 +4,7 @@ import { Check, ImageIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { PRODUCT_STATUS_LABEL } from "@/varer/lib/constants";
 import { LabelingBadge } from "@/varer/components/lists/LabelingBadge";
+import { thumbUrl, onThumbError } from "@/varer/lib/thumbUrl";
 import { CalcBadge, STATUS_BADGE, type ProductRow, type RowCtx } from "./productListColumns";
 
 /**
@@ -14,7 +15,7 @@ export function ProductListCard({ product: p, ctx, href }: { product: ProductRow
   return (
     <div className="relative flex gap-3 p-4 transition-colors focus-within:bg-muted/40 hover:bg-muted/30">
       {p.image_url ? (
-        <img src={p.image_url} alt="" className="h-12 w-12 shrink-0 rounded object-cover" loading="lazy" />
+        <img src={thumbUrl(p.image_url, 48)} onError={onThumbError(p.image_url)} alt="" width={48} height={48} className="h-12 w-12 shrink-0 rounded object-cover" loading="lazy" decoding="async" />
       ) : (
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-muted text-muted-foreground">
           <ImageIcon className="h-4 w-4" aria-hidden="true" />
