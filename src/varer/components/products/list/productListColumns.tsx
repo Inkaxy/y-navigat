@@ -9,6 +9,7 @@ import { readinessChips, readinessStatusLabel, type ProductCalcReadinessRow } fr
 import { CAKE_ROLE_LABEL, LABEL_MODE_OPTIONS, PRODUCT_STATUS_LABEL, type CakeRole, type ProductStatus } from "@/varer/lib/constants";
 import type { LabelingStatus } from "@/varer/lib/labelStaleness";
 import { LabelingBadge } from "@/varer/components/lists/LabelingBadge";
+import { thumbUrl, onThumbError } from "@/varer/lib/thumbUrl";
 
 export type ProductRow = {
   id: string;
@@ -113,7 +114,7 @@ export function buildProductColumns({
       key: "image", label: "Bilde", cellClassName: "w-12", headerClassName: "w-12",
       render: (p) =>
         p.image_url ? (
-          <img src={p.image_url} alt="" className="h-8 w-8 rounded object-cover" />
+          <img src={thumbUrl(p.image_url, 32)} onError={onThumbError(p.image_url)} alt="" width={32} height={32} loading="lazy" decoding="async" className="h-8 w-8 rounded object-cover" />
         ) : (
           <div className="flex h-8 w-8 items-center justify-center rounded bg-muted text-muted-foreground">
             <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />
