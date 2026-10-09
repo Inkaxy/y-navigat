@@ -1,6 +1,6 @@
 import { formatKr } from "@/varer/lib/pricing";
 import { Link } from "react-router-dom";
-import { Check, ImageIcon } from "lucide-react";
+import { Check, ImageOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { PRODUCT_STATUS_LABEL } from "@/varer/lib/constants";
 import { LabelingBadge } from "@/varer/components/lists/LabelingBadge";
@@ -17,8 +17,8 @@ export function ProductListCard({ product: p, ctx, href }: { product: ProductRow
       {p.image_url ? (
         <img src={thumbUrl(p.image_url, 48)} onError={onThumbError(p.image_url)} alt="" width={48} height={48} className="h-12 w-12 shrink-0 rounded object-cover" loading="lazy" decoding="async" />
       ) : (
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-muted text-muted-foreground">
-          <ImageIcon className="h-4 w-4" aria-hidden="true" />
+        <div role="img" aria-label="Mangler bilde" title="Mangler bilde" className="flex h-12 w-12 shrink-0 items-center justify-center rounded border border-dashed border-warning/60 bg-warning/10 text-warning">
+          <ImageOff className="h-5 w-5" aria-hidden="true" />
         </div>
       )}
       <div className="min-w-0 flex-1">
