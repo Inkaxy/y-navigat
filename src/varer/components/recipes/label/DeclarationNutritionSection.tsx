@@ -21,6 +21,11 @@ import { SourceSegmented, formatDateTimeNb, type LabelSource } from "./labelShar
 import { CalculatedDeclarationView } from "./CalculatedDeclarationView";
 import { ConfirmPendingDialog } from "./ConfirmPendingDialog";
 import { NUT_LABELS, formToDoc, type Form, type Pending } from "./declarationForm";
+
+/** Samme rekkefølge som på etiketten, slik at manuell innføring kan følge et datablad linje for linje. */
+const NUTRITION_ENTRY_ORDER = [
+  "energy_kj", "energy_kcal", "fat_g", "saturated_fat_g", "carbs_g", "sugars_g", "fiber_g", "protein_g", "salt_g",
+] as const;
 import { DeclarationDiffView, type DeclarationDoc } from "./DeclarationDiffView";
 
 
@@ -390,20 +395,28 @@ export function DeclarationNutritionSection(p: Props) {
               />
             </div>
           </div>
-          <div id="merking-editor-naering" tabIndex={-1} className="grid scroll-mt-4 gap-2 outline-none sm:grid-cols-3">
-            {NUTRITION_KEYS.map((k) => (
-              <div key={k}>
-                <Label className="text-xs">{NUT_LABELS[k]}</Label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={form.nutrition[k] ?? ""}
-                  disabled={!canWrite}
-                  onChange={(e) => setForm((f) => ({ ...f, nutrition: { ...f.nutrition, [k]: e.target.value } }))}
-                  className="h-9 text-right tabular-nums"
-                />
-              </div>
-            ))}
+          <div id="merking-editor-naering" tabIndex={-1} className="max-w-md scroll-mt-4 divide-y rounded-md border outline-none">
+            {NUTRITION_ENTRY_ORDER.map((k) => {
+              const indent = k === "saturated_fat_g" || k === "sugars_g";
+              const id = `naering-${k}`;
+              return (
+                <div key={k} className="flex items-center gap-3 px-3 py-1.5">
+                  <Label htmlFor={id} className={`flex-1 text-sm font-normal ${indent ? "pl-4 text-muted-foreground" : ""}`}>
+                    {indent ? "– " : ""}{NUT_LABELS[k]}
+                  </Label>
+                  <Input
+                    id={id}
+                    type="number"
+                    step="0.1"
+                    inputMode="decimal"
+                    value={form.nutrition[k] ?? ""}
+                    disabled={!canWrite}
+                    onChange={(e) => setForm((f) => ({ ...f, nutrition: { ...f.nutrition, [k]: e.target.value } }))}
+                    className="h-8 w-28 text-right tabular-nums"
+                  />
+                </div>
+              );
+            })}
           </div>
           {canWrite && (
             <div className="flex flex-wrap items-center justify-end gap-2">
