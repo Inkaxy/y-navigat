@@ -3,6 +3,8 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export const FALLBACK_TOLERANCE_PCT = 5;
+export const DEFAULT_MIN_IMPACT_NOK = 50;
+export const DEFAULT_HARD_CAP_PCT = 15;
 
 export interface MatchSettings {
   default_price_tolerance_pct: number;
@@ -19,6 +21,11 @@ export interface MatchSettings {
   auto_check_against_last_purchase: boolean;
   start_price_tolerance_pct: number | null;
   start_price_max_impact_nok: number | null;
+  price_min_impact_nok: number;
+  price_hard_cap_pct: number;
+  auto_accept_first_price: boolean;
+  auto_confirm_inferred_package: boolean;
+  auto_exclude_line_kinds: string[];
 }
 
 export interface MatchTolerances {
@@ -42,7 +49,7 @@ async function fetchTolerances(legalEntityId: string): Promise<ToleranceData> {
     supabase
       .from("invoice_match_settings")
       .select(
-        "default_price_tolerance_pct, fuzzy_match_threshold, fuzzy_auto_match_threshold, fuzzy_auto_match_dominance_threshold, auto_approve_within_tolerance, auto_reconcile_clean_imports, use_first_confirmed_price_as_start, auto_check_against_start_price, auto_check_against_last_purchase, start_price_tolerance_pct, start_price_max_impact_nok",
+        "default_price_tolerance_pct, fuzzy_match_threshold, fuzzy_auto_match_threshold, fuzzy_auto_match_dominance_threshold, auto_approve_within_tolerance, auto_reconcile_clean_imports, use_first_confirmed_price_as_start, auto_check_against_start_price, auto_check_against_last_purchase, start_price_tolerance_pct, start_price_max_impact_nok, price_min_impact_nok, price_hard_cap_pct, auto_accept_first_price, auto_confirm_inferred_package, auto_exclude_line_kinds",
       )
       .eq("legal_entity_id", legalEntityId)
       .maybeSingle(),
@@ -80,6 +87,11 @@ async function fetchTolerances(legalEntityId: string): Promise<ToleranceData> {
             s.start_price_tolerance_pct == null ? null : Number(s.start_price_tolerance_pct),
           start_price_max_impact_nok:
             s.start_price_max_impact_nok == null ? null : Number(s.start_price_max_impact_nok),
+          price_min_impact_nok: Number(s.price_min_impact_nok ?? DEFAULT_MIN_IMPACT_NOK),
+          price_hard_cap_pct: Number(s.price_hard_cap_pct ?? DEFAULT_HARD_CAP_PCT),
+          auto_accept_first_price: !!s.auto_accept_first_price,
+          auto_confirm_inferred_package: !!s.auto_confirm_inferred_package,
+          auto_exclude_line_kinds: s.auto_exclude_line_kinds ?? [],
         } satisfies MatchSettings)
       : null,
   };

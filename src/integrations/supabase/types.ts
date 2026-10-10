@@ -3162,6 +3162,7 @@ export type Database = {
           id: string
           invoice_id: string
           ledger_account: string | null
+          line_kind: string | null
           line_number: number | null
           match_confidence: string | null
           package_size: number | null
@@ -3197,6 +3198,7 @@ export type Database = {
           id?: string
           invoice_id: string
           ledger_account?: string | null
+          line_kind?: string | null
           line_number?: number | null
           match_confidence?: string | null
           package_size?: number | null
@@ -3232,6 +3234,7 @@ export type Database = {
           id?: string
           invoice_id?: string
           ledger_account?: string | null
+          line_kind?: string | null
           line_number?: number | null
           match_confidence?: string | null
           package_size?: number | null
@@ -3341,15 +3344,20 @@ export type Database = {
       }
       invoice_match_settings: {
         Row: {
+          auto_accept_first_price: boolean
           auto_approve_within_tolerance: boolean | null
           auto_check_against_last_purchase: boolean
           auto_check_against_start_price: boolean
+          auto_confirm_inferred_package: boolean
+          auto_exclude_line_kinds: string[]
           auto_reconcile_clean_imports: boolean
           default_price_tolerance_pct: number | null
           fuzzy_auto_match_dominance_threshold: number | null
           fuzzy_auto_match_threshold: number | null
           fuzzy_match_threshold: number | null
           legal_entity_id: string
+          price_hard_cap_pct: number
+          price_min_impact_nok: number
           start_price_max_impact_nok: number | null
           start_price_tolerance_pct: number
           updated_at: string | null
@@ -3357,15 +3365,20 @@ export type Database = {
           use_first_confirmed_price_as_start: boolean
         }
         Insert: {
+          auto_accept_first_price?: boolean
           auto_approve_within_tolerance?: boolean | null
           auto_check_against_last_purchase?: boolean
           auto_check_against_start_price?: boolean
+          auto_confirm_inferred_package?: boolean
+          auto_exclude_line_kinds?: string[]
           auto_reconcile_clean_imports?: boolean
           default_price_tolerance_pct?: number | null
           fuzzy_auto_match_dominance_threshold?: number | null
           fuzzy_auto_match_threshold?: number | null
           fuzzy_match_threshold?: number | null
           legal_entity_id: string
+          price_hard_cap_pct?: number
+          price_min_impact_nok?: number
           start_price_max_impact_nok?: number | null
           start_price_tolerance_pct?: number
           updated_at?: string | null
@@ -3373,15 +3386,20 @@ export type Database = {
           use_first_confirmed_price_as_start?: boolean
         }
         Update: {
+          auto_accept_first_price?: boolean
           auto_approve_within_tolerance?: boolean | null
           auto_check_against_last_purchase?: boolean
           auto_check_against_start_price?: boolean
+          auto_confirm_inferred_package?: boolean
+          auto_exclude_line_kinds?: string[]
           auto_reconcile_clean_imports?: boolean
           default_price_tolerance_pct?: number | null
           fuzzy_auto_match_dominance_threshold?: number | null
           fuzzy_auto_match_threshold?: number | null
           fuzzy_match_threshold?: number | null
           legal_entity_id?: string
+          price_hard_cap_pct?: number
+          price_min_impact_nok?: number
           start_price_max_impact_nok?: number | null
           start_price_tolerance_pct?: number
           updated_at?: string | null
@@ -3522,6 +3540,7 @@ export type Database = {
           pdf_status: string
           reconciled_at: string | null
           reconciled_by: string | null
+          reconciled_mode: string | null
           source: string | null
           source_document_url: string | null
           status: string
@@ -3534,6 +3553,7 @@ export type Database = {
           tripletex_voucher_id: string | null
           tripletex_voucher_number: string | null
           updated_at: string | null
+          vat_inferred: boolean
         }
         Insert: {
           created_at?: string | null
@@ -3565,6 +3585,7 @@ export type Database = {
           pdf_status?: string
           reconciled_at?: string | null
           reconciled_by?: string | null
+          reconciled_mode?: string | null
           source?: string | null
           source_document_url?: string | null
           status?: string
@@ -3577,6 +3598,7 @@ export type Database = {
           tripletex_voucher_id?: string | null
           tripletex_voucher_number?: string | null
           updated_at?: string | null
+          vat_inferred?: boolean
         }
         Update: {
           created_at?: string | null
@@ -3608,6 +3630,7 @@ export type Database = {
           pdf_status?: string
           reconciled_at?: string | null
           reconciled_by?: string | null
+          reconciled_mode?: string | null
           source?: string | null
           source_document_url?: string | null
           status?: string
@@ -3620,6 +3643,7 @@ export type Database = {
           tripletex_voucher_id?: string | null
           tripletex_voucher_number?: string | null
           updated_at?: string | null
+          vat_inferred?: boolean
         }
         Relationships: [
           {
@@ -15456,6 +15480,10 @@ export type Database = {
         }
         Returns: Json
       }
+      _rm_reconcile_core: {
+        Args: { p_invoice_id: string; p_mode: string; p_uid: string }
+        Returns: Json
+      }
       _validate_and_resolve_cake_line: {
         Args: { p_legal_entity_id: string; p_merknad: Json }
         Returns: {
@@ -17282,6 +17310,10 @@ export type Database = {
         }
         Returns: Json
       }
+      rm_auto_reconcile_invoice: {
+        Args: { p_invoice_id: string }
+        Returns: Json
+      }
       rm_base_quantity_matches: {
         Args: {
           p_base_quantity: number
@@ -17369,6 +17401,14 @@ export type Database = {
         }
         Returns: Json
       }
+      rm_infer_package: {
+        Args: { p_base_unit?: string; p_line_id: string }
+        Returns: Json
+      }
+      rm_invoice_lines_trusted: {
+        Args: { p_invoice: Database["public"]["Tables"]["invoices"]["Row"] }
+        Returns: boolean
+      }
       rm_is_finite: { Args: { p: number }; Returns: boolean }
       rm_line_base: {
         Args: {
@@ -17384,6 +17424,21 @@ export type Database = {
           price_per_base_unit: number
         }[]
       }
+      rm_link_supplier_item: {
+        Args: {
+          p_item_key: string
+          p_legal_entity_id: string
+          p_line_ids?: string[]
+          p_new_raw_material?: Json
+          p_not_raw_material?: boolean
+          p_package?: Json
+          p_raw_material_id?: string
+          p_reason?: string
+          p_set_primary?: boolean
+          p_supplier_id: string
+        }
+        Returns: Json
+      }
       rm_match_key: { Args: { p: string }; Returns: string }
       rm_package_factor: {
         Args: { p_raw_material_id: string; p_supplier_id: string }
@@ -17392,9 +17447,21 @@ export type Database = {
           source: string
         }[]
       }
+      rm_parse_package_any: { Args: { p_text: string }; Returns: Json }
       rm_parse_package_text: { Args: { p_text: string }; Returns: Json }
       rm_post_safe_line_costs: {
         Args: { p_invoice_id: string; p_line_ids?: string[] }
+        Returns: Json
+      }
+      rm_price_deviation_eval: {
+        Args: {
+          p_actual: number
+          p_base_quantity: number
+          p_expected: number
+          p_hard_cap_pct: number
+          p_min_impact_nok: number
+          p_tol_pct: number
+        }
         Returns: Json
       }
       rm_price_reference: {
@@ -17414,6 +17481,10 @@ export type Database = {
         }
         Returns: Json
       }
+      rm_quarantine_implausible_prices: {
+        Args: { p_apply?: boolean; p_legal_entity_id: string }
+        Returns: Json
+      }
       rm_receive_invoice_line: {
         Args: {
           p_best_before?: string
@@ -17424,6 +17495,31 @@ export type Database = {
         Returns: Json
       }
       rm_reconcile_invoice: { Args: { p_invoice_id: string }; Returns: Json }
+      rm_rematch_invoices: {
+        Args: {
+          p_invoice_ids?: string[]
+          p_legal_entity_id: string
+          p_limit?: number
+          p_only_open?: boolean
+        }
+        Returns: Json
+      }
+      rm_repair_invoice_vat: { Args: { p_invoice_id: string }; Returns: Json }
+      rm_repair_invoice_vat_batch: {
+        Args: { p_legal_entity_id: string; p_limit?: number }
+        Returns: Json
+      }
+      rm_repair_invoice_vat_candidates: {
+        Args: { p_legal_entity_id: string }
+        Returns: {
+          invoice_id: string
+          invoice_number: string
+          mode: string
+          ratio: number
+          status: string
+          supplier_name: string
+        }[]
+      }
       rm_sku_norm: { Args: { p: string }; Returns: string }
       rm_start_price_candidates: {
         Args: {
@@ -17462,6 +17558,26 @@ export type Database = {
       rm_suggest_package_from_name: {
         Args: { p_base_unit: string; p_name: string }
         Returns: number
+      }
+      rm_supplier_item_lines: {
+        Args: {
+          p_item_key: string
+          p_legal_entity_id: string
+          p_limit?: number
+          p_supplier_id: string
+        }
+        Returns: Json
+      }
+      rm_supplier_items: {
+        Args: {
+          p_legal_entity_id: string
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+          p_status?: string
+          p_supplier_id?: string
+        }
+        Returns: Json
       }
       rm_supplier_link_candidates: {
         Args: { p_rms_id: string }

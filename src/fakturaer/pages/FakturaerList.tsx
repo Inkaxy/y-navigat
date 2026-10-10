@@ -383,7 +383,7 @@ export default function FakturaerListPage() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <InvoiceStatusBadge status={r.status} />
+                            <InvoiceStatusBadge status={r.status} reconciledMode={r.reconciled_mode} />
                             {r.extraction_confidence != null && Number(r.extraction_confidence) < 0.7 && (
                               <Badge
                                 variant="outline"

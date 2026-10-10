@@ -190,7 +190,7 @@ const FakturaerImportPdf = lazy(() => import("@/fakturaer/pages/ImportPdf"));
 const FakturaerDetail = lazy(() => import("@/fakturaer/pages/InvoiceDetail"));
 const FaktInvoiceOverview = lazy(() => import("@/fakturaer/pages/InvoiceOverview"));
 const FaktRavarerQueue = lazy(() => import("@/fakturaer/pages/RavarerQueue"));
-const FaktVareminne = lazy(() => import("@/fakturaer/pages/Vareminne"));
+const FaktVarekoblinger = lazy(() => import("@/fakturaer/pages/Varekoblinger"));
 const FaktSupplierCases = lazy(() => import("@/fakturaer/pages/SupplierCases"));
 const FaktSupplierCase = lazy(() => import("@/fakturaer/pages/SupplierCase"));
 const FakturaerIDag = lazy(() => import("@/fakturaer/pages/IDag"));
@@ -425,7 +425,8 @@ const App = () => (
               <Route path="/ravarer/fakturaer/oversikt" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FaktInvoiceOverview /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/fakturaer/ravarer" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FaktRavarerQueue /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/fakturaer/beslutninger" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FaktRavarerQueue scope="alle" /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/fakturaer/vareminne" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FaktVareminne /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
+              <Route path="/ravarer/fakturaer/varekoblinger" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FaktVarekoblinger /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
+              <Route path="/ravarer/fakturaer/vareminne" element={<Navigate to="/ravarer/fakturaer/varekoblinger" replace />} />
               <Route path="/ravarer/fakturaer/saker" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FaktSupplierCases /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/fakturaer/saker/:id" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FaktSupplierCase /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
               <Route path="/ravarer/fakturaer/i-dag" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerIDag /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />

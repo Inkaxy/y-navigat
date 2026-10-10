@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/sheet";
 import { useAccessibleApps } from "@/hooks/useAccessibleApps";
 import { useReviewCount } from "@/fakturaer/hooks/useReviewCount";
+import { useSupplierItems } from "@/fakturaer/hooks/useSupplierItems";
 import { useExpiringAgreementsCount } from "@/ravarer/hooks/useAgreements";
 import { useInvoiceAccess } from "@/ravarer/hooks/useInvoiceAccess";
 import { useRavarerAccessLevel } from "@/ravarer/hooks/useRavarerAccessLevel";
@@ -223,6 +224,8 @@ export function SubAppNav() {
 function RavarerNav() {
   const { data: reviewCount = 0 } = useReviewCount();
   const { data: hasInvoiceAccess = false } = useInvoiceAccess();
+  const itemCounts = useSupplierItems({ supplierId: null, search: "", status: null, page: 1, pageSize: 1, enabled: hasInvoiceAccess }).data?.counts;
+  const supplierItemBadge = itemCounts ? itemCounts.ukoblet + itemCounts.mangler_pakning : 0;
   const { data: accessLevel = "none" } = useRavarerAccessLevel();
   const { data: changelogCount = 0 } = useQuery({
     queryKey: ["raw-material-changelog-count"],
@@ -259,7 +262,7 @@ function RavarerNav() {
         { to: "/ravarer/fakturaer/i-dag", label: "I dag" },
         { to: "/ravarer/fakturaer/oversikt", label: "Fakturaoversikt" },
         { to: "/ravarer/fakturaer/ravarer", label: "Råvarespørsmål" },
-        { to: "/ravarer/fakturaer/vareminne", label: "Lagrede koblinger" },
+        { to: "/ravarer/fakturaer/varekoblinger", label: "Varekoblinger", badge: supplierItemBadge },
         { to: "/ravarer/fakturaer/saker", label: "Leverandørsaker" },
         { to: "/ravarer/fakturaer/til-behandling", label: "Til behandling", badge: reviewCount },
         { to: "/ravarer/fakturaer", label: "Alle fakturaer" },

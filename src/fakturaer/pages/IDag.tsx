@@ -1,3 +1,4 @@
+import { useSupplierItems } from "@/fakturaer/hooks/useSupplierItems";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { DecisionNav } from "@/fakturaer/components/decisions/DecisionNav";
@@ -118,6 +119,7 @@ export default function IDag() {
                 <p className="text-sm text-ink-secondary">Leverandørvare og bekreftet pakning brukes på nytt ved neste import.</p>
               </div>
             </div>
+            <SupplierItemsCard />
             <Link to="/ravarer/fakturaer/oversikt" className="block rounded-xl border border-success/30 bg-success/10 p-4 hover:bg-success/15">
               <p className="font-semibold text-success">{overview.data ? `${readyCount} fakturaer klare til intern godkjenning` : "Fakturaoversikt"}</p>
               <p className="text-sm text-ink-secondary">Se og godkjenn. Godkjenning utløser ikke betaling.</p>
@@ -126,5 +128,16 @@ export default function IDag() {
         </div>
       </QueryState>
     </div>
+  );
+}
+
+function SupplierItemsCard() {
+  const c = useSupplierItems({ supplierId: null, search: "", status: null, page: 1, pageSize: 1 }).data?.counts;
+  if (!c || c.ukoblet + c.mangler_pakning === 0) return null;
+  return (
+    <Link to="/ravarer/fakturaer/varekoblinger?status=ukoblet" className="block rounded-xl border border-warning/30 bg-warning/10 p-4 hover:bg-warning/15">
+      <p className="font-semibold">Varekort som trenger deg: {c.ukoblet} ukoblet · {c.mangler_pakning} mangler pakning</p>
+      <p className="text-sm text-ink-secondary">Én beslutning per leverandørvare gjelder alle fakturaer.</p>
+    </Link>
   );
 }
