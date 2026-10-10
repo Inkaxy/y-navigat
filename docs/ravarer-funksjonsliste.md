@@ -7,14 +7,14 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| R1 | Råvarer-meny med grupper, nedtrekk og aktiv-markering | RavarerNav: Oversikt · Varer · Priskontroll · Leverandører · Lager + tannhjul | 1 | Gammel plass |
-| R2, F2, F3 | Meny-badger: linjer til behandling, varekort som venter (ukoblet + mangler pakning), avtaler som utløper, ukvitterte datablad-endringer | RavarerNav-badge per inngang fra `rm_work_summary` (samme tall som Oversikt og faner) | 1 | Gammel plass |
-| R3, F4 | Tilgang: fakturadel og forhandlinger krever fakturatilgang (`user_has_invoice_access`, roller read/write/approve/admin); Innstillinger krever approve/admin; AI-tjenester krever plattformadmin | Rutevakter på /priskontroll/*, /leverandorer/forhandlinger/* og /innstillinger (vakt på ruten, ikke bare i menyen) | 1 | Gammel plass |
-| R4 | Mobilmeny som bunnark | RavarerNav mobil-bunnark (5 innganger + Innstillinger) | 1 | Gammel plass |
-| R5 | Sidetitler i nettleserfanen | `pageLabels.ts` komplett for alle nye ruter | 1 | Gammel plass |
-| R6, F1 | Omdirigeringer: /ravarer, /pakninger, /innstillinger, fakturaer /ny, /import-ehf, /import-pdf, /vareminne, /fakturaer/* | Omdirigeringskart i App.tsx: alle gamle stier peker til nye, og query videreføres. /ravarer blir Oversikt | 1 | Gammel plass |
+| R1 | Råvarer-meny med grupper, nedtrekk og aktiv-markering | RavarerNav: Oversikt · Varer · Priskontroll · Leverandører · Lager + tannhjul | 1 | Flyttet |
+| R2, F2, F3 | Meny-badger: linjer til behandling, varekort som venter (ukoblet + mangler pakning), avtaler som utløper, ukvitterte datablad-endringer | RavarerNav-badge per inngang fra `rm_work_summary` (samme tall som Oversikt og faner) | 1 | Flyttet |
+| R3, F4 | Tilgang: fakturadel og forhandlinger krever fakturatilgang (`user_has_invoice_access`, roller read/write/approve/admin); Innstillinger krever approve/admin; AI-tjenester krever plattformadmin | Rutevakter på /priskontroll/*, /leverandorer/forhandlinger/* og /innstillinger (vakt på ruten, ikke bare i menyen) | 1 | Flyttet |
+| R4 | Mobilmeny som bunnark | RavarerNav mobil-bunnark (5 innganger + Innstillinger) | 1 | Flyttet |
+| R5 | Sidetitler i nettleserfanen | `pageLabels.ts` komplett for alle nye ruter | 1 | Flyttet |
+| R6, F1 | Omdirigeringer: /ravarer, /pakninger, /innstillinger, fakturaer /ny, /import-ehf, /import-pdf, /vareminne, /fakturaer/* | Omdirigeringskart i App.tsx: alle gamle stier peker til nye, og query videreføres. /ravarer blir Oversikt | 1 | Flyttet |
 | F108 | Nivådelt forklaring av prisavvik (speiler `rm_price_deviation_eval`) i alle prisvisninger | Felles PriceDeviationNote: varekort-panel › Prisblokk, linjeinspektør, råvarekort ?seksjon=pris | 3 | Gammel plass |
-| F109 | Oversatte etiketter for årsakskoder, matchtype og linjetype | `src/ravarer/lib/labels.ts` (én kilde) + StatusPill | 1 | Gammel plass |
+| F109 | Oversatte etiketter for årsakskoder, matchtype og linjetype | `src/ravarer/lib/labels.ts` (én kilde) + StatusPill | 1 | Flyttet |
 
 ## Vareliste
 
