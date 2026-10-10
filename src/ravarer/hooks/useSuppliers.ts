@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
+import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
 
 export interface SupplierRow {
   id: string;
@@ -49,7 +50,7 @@ export function useCreateSupplier() {
       if (error) throw error;
       return data as unknown as SupplierRow;
     },
-    onSuccess: () => {
+    onSuccess: () => { invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["suppliers"] });
       toast.success("Leverandør opprettet");
     },
@@ -74,7 +75,7 @@ export function useSetTrackInvoiceLines() {
       if (error) throw error;
       return value;
     },
-    onSuccess: () => {
+    onSuccess: () => { invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["suppliers"] });
     },
     onError: (e: any) => toast.error(`Kunne ikke lagre: ${e.message ?? e}`),
@@ -94,7 +95,7 @@ export function useBackfillSupplierInvoices() {
       if ((data as any)?.error) throw new Error((data as any).error);
       return data as { imported?: number; skipped?: number; fetched?: number; reason?: string };
     },
-    onSuccess: (r) => {
+    onSuccess: (r) => { invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["suppliers"] });
       qc.invalidateQueries({ queryKey: ["fakturaer"] });
       if (r?.reason) toast.info(r.reason);
@@ -124,7 +125,7 @@ export function useSyncSuppliersFromTripletex() {
         hoppet_navn?: { navn: string; grunn: string }[];
       };
     },
-    onSuccess: (r) => {
+    onSuccess: (r) => { invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["suppliers"] });
       const skipped = r.hoppet ?? 0;
       toast.success(
