@@ -1,5 +1,5 @@
 import { lazy, type ComponentType, type ReactNode } from "react";
-import { Route } from "react-router-dom";
+import { Route, useSearchParams } from "react-router-dom";
 import { AppAccessGuard } from "@/components/auth/AppAccessGuard";
 import { RavarerProvider } from "@/ravarer/context/RavarerContext";
 import { FakturaerProvider } from "@/fakturaer/context/FakturaerContext";
@@ -91,7 +91,6 @@ export function ravarerRoutes(Shell: ShellType) {
   ];
 }
 
-import { useSearchParams } from "react-router-dom";
 function QueueByScope() {
   const [sp] = useSearchParams();
   return <RavarerQueue scope={sp.get("omfang") === "ravarer" ? "ravarer" : "alle"} />;

@@ -40,6 +40,7 @@ import { RavarerProvider } from "@/ravarer/context/RavarerContext";
 
 import { FakturaerProvider } from "@/fakturaer/context/FakturaerContext";
 import { InvoiceAccessGuard } from "@/ravarer/components/InvoiceAccessGuard";
+import { ravarerRoutes } from "@/ravarer/routes";
 
 // Fakturering (utgående kundefakturaer → Tripletex)
 import { FaktureringProvider } from "@/fakturering/context/FaktureringContext";
@@ -241,11 +242,6 @@ const queryClient = new QueryClient({
   },
 });
 
-const RedirectFakturaer = () => {
-  const { id } = useParams();
-  return <Navigate to={`/ravarer/fakturaer/${id}`} replace />;
-};
-
 /**
  * `/tilbakestill-passord` deles av to flyter:
  * - Kundeportalen (kundeportal.nbhub.no) → eksisterende SetPortalPassword.
@@ -400,64 +396,12 @@ const App = () => (
               <Route path="/kunder/portaltilgang" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderPortalUsers /></KunderEntityProvider></AppAccessGuard></Shell>} />
               <Route path="/kunder/innstillinger" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderInnstillinger /></KunderEntityProvider></AppAccessGuard></Shell>} />
               <Route path="/kunder/innstillinger/hentesteder" element={<Shell><AppAccessGuard appCode="kunder" appName="Kunder"><KunderEntityProvider><KunderPickupLocations /></KunderEntityProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><Navigate to="/ravarer/vareliste" replace /></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/vareliste" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerVareliste /></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/vareliste/:id" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerDetail /></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/lager" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerLager /></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/varemottak" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerVaremottak /></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/varetelling" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerVaretelling /></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/pakninger" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerPakninger /></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/deklarasjonsnavn" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerDeklarasjonsnavn /></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/matvaretabellen" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerMatvaretabellen /></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/koble-matvaretabellen" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerKobleMatvaretabellen /></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/pakningsstorrelser" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerPakningsstorrelser /></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/fakturaer/reberegn-kostpriser" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><RavarerReberegnKostpriser /></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
+              {ravarerRoutes(Shell)}
 
 
-              {/* Fakturaer flyttet inn under Råvarer-appen (granulær invoice_access) */}
-              <Route path="/ravarer/fakturaer" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerList /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
               {/* Samlet manuell import (EHF/PDF/manuelt) under én rute med tabs */}
-              <Route path="/ravarer/fakturaer/import" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerImport /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
               {/* Bakoverkompat — peker mot tab-versjonen */}
-              <Route path="/ravarer/fakturaer/ny" element={<Navigate to="/ravarer/fakturaer/import?tab=manuelt" replace />} />
-              <Route path="/ravarer/fakturaer/import-ehf" element={<Navigate to="/ravarer/fakturaer/import?tab=ehf" replace />} />
-              <Route path="/ravarer/fakturaer/import-pdf" element={<Navigate to="/ravarer/fakturaer/import?tab=pdf" replace />} />
-              <Route path="/ravarer/fakturaer/oversikt" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FaktInvoiceOverview /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/fakturaer/ravarer" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FaktRavarerQueue /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/fakturaer/beslutninger" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FaktRavarerQueue scope="alle" /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/fakturaer/varekoblinger" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FaktVarekoblinger /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/fakturaer/vareminne" element={<Navigate to="/ravarer/fakturaer/varekoblinger" replace />} />
-              <Route path="/ravarer/fakturaer/saker" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FaktSupplierCases /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/fakturaer/saker/:id" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FaktSupplierCase /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/fakturaer/i-dag" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerIDag /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/fakturaer/i-dag/:key" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerDecision /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/fakturaer/til-behandling" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerReviewQueue /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/fakturaer/:id/registrer-linjer" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerRegistrerLinjer /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/fakturaer/:id" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><FakturaerProvider><FakturaerDetail /></FakturaerProvider></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/innstillinger" element={<Navigate to="/ravarer/innstillinger/tripletex" replace />} />
-              <Route path="/ravarer/leverandorer" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerLeverandorer /></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/leverandorer/:id" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerLeverandorDetail /></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/avtaler" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerAvtaler /></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/datablad-endringer" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerDatabladEndringer /></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/datablad-bulk" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><RavarerDatabladBulk /></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/forhandlinger" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><RavarerForhandlingerList /></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/forhandlinger/ny" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><RavarerForhandlingWizard /></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/forhandlinger/live/ny" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><RavarerLiveForhandlingSetup /></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/forhandlinger/live/:id" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><RavarerLiveForhandlingWorkspace /></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/forhandlinger/:id/rediger" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><RavarerForhandlingWizard /></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/forhandlinger/:id" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><InvoiceAccessGuard><RavarerForhandlingDetail /></InvoiceAccessGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/innstillinger/tripletex" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><TripletexSettings /></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/innstillinger/ai-tjenester" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><PlatformAdminGuard title="AI-tjenester"><AiServicesSettings /></PlatformAdminGuard></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/innstillinger/match-toleranser" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><MatchToleranserSettings /></RavarerProvider></AppAccessGuard></Shell>} />
-              <Route path="/ravarer/innstillinger/kategorier" element={<Shell><AppAccessGuard appCode="ravarer" appName="Råvarer"><RavarerProvider><KategorierSettings /></RavarerProvider></AppAccessGuard></Shell>} />
 
-              {/* Backward-compat redirects fra gamle /fakturaer/* */}
-              <Route path="/fakturaer" element={<Navigate to="/ravarer/fakturaer" replace />} />
-              <Route path="/fakturaer/ny" element={<Navigate to="/ravarer/fakturaer/import?tab=manuelt" replace />} />
-              <Route path="/fakturaer/import-ehf" element={<Navigate to="/ravarer/fakturaer/import?tab=ehf" replace />} />
-              <Route path="/fakturaer/import-pdf" element={<Navigate to="/ravarer/fakturaer/import?tab=pdf" replace />} />
-              <Route path="/fakturaer/til-behandling" element={<Navigate to="/ravarer/fakturaer/til-behandling" replace />} />
-              <Route path="/fakturaer/:id" element={<RedirectFakturaer />} />
 
               <Route path="/ordre" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><Navigate to="/ordre/dashbord" replace /></AppAccessGuard></Shell>} />
               <Route path="/ordre/dashbord" element={<Shell><AppAccessGuard appCode="ordre" appName="Ordre"><OrdreDashboard /></AppAccessGuard></Shell>} />
