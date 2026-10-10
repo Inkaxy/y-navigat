@@ -32,6 +32,7 @@ import {
 import { toast } from "sonner";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
+import { paths } from "@/ravarer/lib/paths";
 
 /** Felt som redigeres i denne fanen. Lager styres i lagerkortet. */
 const CEREAL_TYPES = [
@@ -329,7 +330,7 @@ export function OverviewTab({ rm, registerSave }: Props) {
             <p className="mt-2 text-xs text-ink-secondary">
               Pakningen endres i dialogen, som viser forhåndsvisning av
               omregnede priser og kan angres.{" "}
-              <Link to="/ravarer/pakningsstorrelser" className="underline">
+              <Link to={paths.pakninger()} className="underline">
                 Se alle pakninger
               </Link>
               .

@@ -213,7 +213,7 @@ function RowInner({
   const show = (id: string) => isColumnVisible(id, hiddenColumns);
   const cell = "px-3 py-2 align-middle";
   const navigate = useNavigate();
-  const detailUrl = `/ravarer/vareliste/${item.id}${listSearch ? `?${listSearch}` : ""}`;
+  const detailUrl = `/ravarer/varer/${item.id}${listSearch ? `?${listSearch}` : ""}`;
 
   /** Hele raden er klikkbar, men ikke når klikket traff en kontroll i raden. */
   const onRowClick = (e: React.MouseEvent<HTMLTableRowElement>) => {

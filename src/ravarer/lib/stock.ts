@@ -1,3 +1,4 @@
+import { paths } from "@/ravarer/lib/paths";
 /** Felles hjelpere for handelsvarer og lagerbevegelser. */
 
 export const MOVEMENT_TYPES = [
@@ -41,10 +42,10 @@ export function movementSourceLink(
   switch (sourceTable) {
     case "invoice_lines": {
       const invoiceId = invoiceIdByLineId?.get(sourceId);
-      return invoiceId ? { to: `/ravarer/fakturaer/${invoiceId}`, label: "Faktura" } : null;
+      return invoiceId ? { to: paths.faktura(invoiceId), label: "Faktura" } : null;
     }
     case "invoices":
-      return { to: `/ravarer/fakturaer/${sourceId}`, label: "Faktura" };
+      return { to: paths.faktura(sourceId), label: "Faktura" };
     case "delivery_note_lines": {
       const noteId = deliveryNoteIdByLineId?.get(sourceId);
       return noteId ? { to: `/ordre/pakksedler/${noteId}`, label: "Pakkseddel" } : null;

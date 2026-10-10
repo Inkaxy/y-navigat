@@ -7,6 +7,7 @@ import { QueryState } from "@/components/common/QueryState";
 import { formatDate } from "@/ravarer/lib/constants";
 import { formatMoney } from "@/fakturaer/lib/constants";
 import type { PriceObservation, PriceSummary } from "@/ravarer/hooks/usePriceComparison";
+import { paths } from "@/ravarer/lib/paths";
 
 const ALL = "__alle__";
 
@@ -221,7 +222,7 @@ export function PriceComparisonView({
                           ))}
                           {o.invoice_id && (
                             <Link
-                              to={`/ravarer/fakturaer/${o.invoice_id}`}
+                              to={paths.faktura(o.invoice_id)}
                               className="text-app underline-offset-2 hover:underline"
                             >
                               Åpne faktura

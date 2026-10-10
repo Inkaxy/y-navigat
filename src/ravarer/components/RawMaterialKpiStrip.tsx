@@ -6,6 +6,7 @@ import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { chooseAgreedPrice, kpiDeviation, pricePerPackage } from "@/ravarer/lib/rawMaterialKpi";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 import type { RmSupplierRow } from "@/ravarer/hooks/useRmSuppliers";
+import { paths } from "@/ravarer/lib/paths";
 
 interface Props {
   rm: RawMaterialRow;
@@ -106,7 +107,7 @@ export function RawMaterialKpiStrip({ rm, links, recipeCount, spend12m }: Props)
         value={
           primarySupplierId ? (
             <Link
-              to={`/ravarer/leverandorer/${primarySupplierId}`}
+              to={paths.leverandor(primarySupplierId)}
               className="text-app underline-offset-2 hover:underline"
             >
               <span className="text-lg">{supplierName(primarySupplierId)}</span>

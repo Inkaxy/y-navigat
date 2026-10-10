@@ -39,6 +39,7 @@ import {
   type ItemType,
 } from "@/ravarer/lib/itemTypes";
 import { useNavigate } from "react-router-dom";
+import { paths } from "@/ravarer/lib/paths";
 
 const schema = z.object({
   sku: z.string().trim().min(1, "Påkrevd"),
@@ -127,7 +128,7 @@ export function NewRawMaterialDialog({
     onOpenChange(false);
     form.reset();
     if (onCreated) onCreated(created.id);
-    else navigate(`/ravarer/vareliste/${created.id}`);
+    else navigate(paths.raavare(created.id));
   });
 
   return (

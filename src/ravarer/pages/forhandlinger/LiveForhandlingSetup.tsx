@@ -16,6 +16,7 @@ import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
 import { useCreateNegotiation } from "@/ravarer/hooks/useNegotiations";
 import { useLogLiveEvent } from "@/ravarer/hooks/useLiveNegotiation";
+import { paths } from "@/ravarer/lib/paths";
 
 export default function LiveForhandlingSetup() {
   const navigate = useNavigate();
@@ -106,7 +107,7 @@ export default function LiveForhandlingSetup() {
         event_data: { format, supplier_id: supplierId, preloaded_count: rmIds.length },
       });
 
-      navigate(`/ravarer/forhandlinger/live/${neg.id}`);
+      navigate(paths.liveForhandling(neg.id));
     } catch (e: any) {
       toast.error(`Kunne ikke starte: ${e.message ?? e}`);
     } finally {
@@ -116,7 +117,7 @@ export default function LiveForhandlingSetup() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
-      <Button variant="ghost" size="sm" onClick={() => navigate("/ravarer/forhandlinger")}>
+      <Button variant="ghost" size="sm" onClick={() => navigate(paths.forhandlinger())}>
         <ArrowLeft className="mr-1 h-4 w-4" /> Forhandlinger
       </Button>
 
@@ -161,7 +162,7 @@ fakturahistorikk, og uten den finnes verken volum eller prisgrunnlag. */}
           {hiddenSupplierCount > 0 && (
             <p className="text-xs text-ink-secondary">
               {hiddenSupplierCount} leverandører uten «Følg fakturalinjer» vises ikke – slå på under{" "}
-              <Link to="/ravarer/leverandorer" className="underline">
+              <Link to={paths.leverandorer()} className="underline">
                 Leverandører
               </Link>
               .
@@ -209,7 +210,7 @@ fakturahistorikk, og uten den finnes verken volum eller prisgrunnlag. */}
         </label>
 
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={() => navigate("/ravarer/forhandlinger")}>
+          <Button variant="outline" onClick={() => navigate(paths.forhandlinger())}>
             Avbryt
           </Button>
           <Button onClick={handleStart} disabled={submitting || !supplierId || !title.trim()}>
