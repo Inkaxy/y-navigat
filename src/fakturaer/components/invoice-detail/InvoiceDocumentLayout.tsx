@@ -52,6 +52,7 @@ export function InvoiceDocumentLayout({ data, docOpen, isMobile, tolerancePct, o
 }) {
   if (!docOpen) return <>{children}</>;
   const docPanel = (
+        <InvoiceDocumentPanel
           invoice={{
             invoice_number: data.invoice_number,
             invoice_date: data.invoice_date,
