@@ -18,7 +18,7 @@ export function ShortcutHelp({ open, onOpenChange, bindings }: { open: boolean; 
               <dd className="flex gap-1">
                 {b.keys.map((k) => (
                   <kbd key={k} className="rounded-[6px] border border-border bg-muted px-1.5 py-0.5 text-caption font-semibold text-foreground">
-                    {keyLabel(k)}
+                    {keyLabel(k, b.mod)}
                   </kbd>
                 ))}
               </dd>
