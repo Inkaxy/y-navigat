@@ -1,3 +1,4 @@
+import { setPrimarySupplier } from "@/ravarer/lib/supplierLinkRpc";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
@@ -99,17 +100,23 @@ export function useCreateRawMaterial() {
           base_unit: input.base_unit,
           package_size: input.package_size ?? null,
           package_unit: input.package_unit ?? null,
+          base_units_per_package: input.base_units_per_package ?? null,
+          declaration_name: input.declaration_name ?? null,
           current_cost_price: input.current_cost_price ?? null,
-          agreed_price: input.agreed_price ?? null,
           current_stock: input.current_stock ?? 0,
           min_stock: input.min_stock ?? null,
           is_active: input.is_active ?? true,
-          primary_supplier_id: input.primary_supplier_id ?? null,
         })
         .select()
         .single();
       if (error) throw error;
-      return data as RawMaterialRow;
+      const row = data as RawMaterialRow;
+      // Primærleverandør settes bare via RPC-en (oppretter koblingen).
+      if (input.primary_supplier_id) {
+        await setPrimarySupplier(row.id, input.primary_supplier_id);
+        row.primary_supplier_id = input.primary_supplier_id;
+      }
+      return row;
     },
     onSuccess: (data) => {
       invalidateRawMaterial(qc, data.id);
