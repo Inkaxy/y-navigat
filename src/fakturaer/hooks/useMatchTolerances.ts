@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export const FALLBACK_TOLERANCE_PCT = 5;
+export const FALLBACK_TOLERANCE_PCT = 3;
 export const DEFAULT_MIN_IMPACT_NOK = 50;
 export const DEFAULT_HARD_CAP_PCT = 15;
 

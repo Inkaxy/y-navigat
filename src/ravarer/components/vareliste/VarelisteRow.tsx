@@ -1,4 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react";
+import { DeviationCell, PriceSourceCell } from "./PriceCells";
 import { Link, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,6 +21,7 @@ export interface VarelisteRowProps {
   focused: boolean;
   canWrite: boolean;
   tolerance: number;
+  hardCap: number;
   editing: InlineField | null;
   onToggleSelect: (id: string) => void;
   onStartEdit: (id: string, field: InlineField) => void;
@@ -190,22 +192,6 @@ function CategoryEditor({
   );
 }
 
-function DeviationCell({ item, tolerance }: { item: RawMaterialListItem; tolerance: number }) {
-  if (item.deviation == null) return <span className="text-muted-foreground">—</span>;
-  const over = Math.abs(item.deviation) > tolerance;
-  return (
-    <span
-      className={cn(
-        "rounded px-1.5 py-0.5 text-xs tabular-nums",
-        over ? "bg-destructive/10 text-destructive" : "text-muted-foreground",
-      )}
-    >
-      {item.deviation > 0 ? "+" : ""}
-      {formatNumber(item.deviation, 1)} %
-    </span>
-  );
-}
-
 function RowInner({
   item,
   hiddenColumns,
@@ -213,6 +199,7 @@ function RowInner({
   focused,
   canWrite,
   tolerance,
+  hardCap,
   editing,
   categoryOptions,
   onToggleSelect,
@@ -370,7 +357,7 @@ function RowInner({
 
       {show("deviation") && (
         <td className={cn(cell, "text-right")}>
-          <DeviationCell item={item} tolerance={tolerance} />
+          <DeviationCell deviation={item.deviation} tolerance={tolerance} hardCap={hardCap} />
         </td>
       )}
 
@@ -410,6 +397,14 @@ function RowInner({
             </span>
           )}
         </td>
+      )}
+
+      {show("price_source") && (
+        <td className={cell}><PriceSourceCell source={item.costSource} updatedAt={item.costUpdatedAt} /></td>
+      )}
+
+      {show("price_updated") && (
+        <td className={cn(cell, "text-muted-foreground")}>{formatDate(item.costUpdatedAt)}</td>
       )}
 
       {show("status") && (

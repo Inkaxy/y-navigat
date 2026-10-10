@@ -1,6 +1,7 @@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { QueryState } from "@/components/common/QueryState";
 import { useSupplierItemLines, useSupplierItems } from "@/fakturaer/hooks/useSupplierItems";
+import { useInvoiceRights } from "@/fakturaer/hooks/useInvoiceRights";
 import { whatIsMissing, type LinkSupplierItemResult, type SupplierItem, type SupplierItemLine } from "@/fakturaer/lib/supplierItems";
 import { SupplierItemStatusBadge } from "./SupplierItemStatusBadge";
 import { SupplierItemLinkForm } from "./SupplierItemLinkForm";
@@ -13,15 +14,8 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   onDone?: (r: LinkSupplierItemResult) => void;
   onNext?: () => void;
-  /** Kjent rad fra listen — sparer et oppslag. */
+  /** Kjent rad fra listen — vises mens ferskt varekort hentes. */
   item?: SupplierItem | null;
-}
-
-function useItem(supplierId: string | null, itemKey: string | null, known: SupplierItem | null | undefined) {
-  const term = itemKey ? itemKey.replace(/^(sku|name):/, "") : "";
-  const q = useSupplierItems({ supplierId, search: term, status: null, page: 1, pageSize: 50, enabled: !known && !!supplierId && !!itemKey });
-  if (known) return { item: known, isLoading: false, isError: false, error: null, refetch: () => undefined };
-  return { item: q.data?.items.find((i) => i.item_key === itemKey) ?? null, isLoading: q.isLoading, isError: q.isError, error: q.error, refetch: () => void q.refetch() };
 }
 
 export function SupplierItemSheet({ supplierId, itemKey, open, onOpenChange, onDone, onNext, item: known }: Props) {
@@ -36,18 +30,21 @@ export function SupplierItemSheet({ supplierId, itemKey, open, onOpenChange, onD
 }
 
 function SheetBody({ supplierId, itemKey, known, onClose, onDone, onNext }: { supplierId: string | null; itemKey: string | null; known?: SupplierItem | null; onClose: () => void; onDone?: (r: LinkSupplierItemResult) => void; onNext?: () => void }) {
-  const it = useItem(supplierId, itemKey, known);
+  const q = useSupplierItems({ supplierId, itemKey, pageSize: 1, enabled: !!supplierId && !!itemKey });
+  const item = q.data?.items[0] ?? known ?? null;
   const lines = useSupplierItemLines(supplierId, itemKey);
+  const { canWrite } = useInvoiceRights();
   return (
-    <QueryState isLoading={it.isLoading} isError={it.isError} error={it.error} scope="fakturaer:varekort" onRetry={it.refetch} isEmpty={!it.item} emptyTitle="Fant ikke varekortet">
-      {it.item && <SupplierItemView item={it.item} linesQuery={lines} onClose={onClose} onDone={onDone} onNext={onNext} />}
+    <QueryState isLoading={q.isLoading && !known} isError={q.isError} error={q.error} scope="fakturaer:varekort" onRetry={() => void q.refetch()} isEmpty={!item} emptyTitle="Fant ikke varekortet">
+      {item && <SupplierItemView item={item} linesQuery={lines} canWrite={canWrite} onClose={onClose} onDone={onDone} onNext={onNext} />}
     </QueryState>
   );
 }
 
-export function SupplierItemView({ item, linesQuery, onClose, onDone, onNext }: {
+export function SupplierItemView({ item, linesQuery, canWrite = true, onClose, onDone, onNext }: {
   item: SupplierItem;
   linesQuery: { data?: SupplierItemLine[]; isLoading: boolean; isError: boolean; error: unknown; refetch: () => unknown };
+  canWrite?: boolean;
   onClose: () => void;
   onDone?: (r: LinkSupplierItemResult) => void;
   onNext?: () => void;
@@ -63,12 +60,13 @@ export function SupplierItemView({ item, linesQuery, onClose, onDone, onNext }: 
       <section className="rounded-md bg-muted/40 p-3">
         <h3 className="text-caption font-semibold text-ink-secondary">Hva mangler</h3>
         <p className="mt-1 text-sm">{whatIsMissing(item)}</p>
+        {item.rms_notes && <p className="mt-2 text-caption text-ink-secondary">{item.rms_notes}</p>}
       </section>
       <QueryState isLoading={linesQuery.isLoading} isError={linesQuery.isError} error={linesQuery.error} scope="fakturaer:varekort-linjer" onRetry={() => void linesQuery.refetch()}>
-        <SupplierItemLinkForm key={item.item_key} item={item} lines={lines} onClose={onClose} onDone={onDone} onNext={onNext} />
+        <SupplierItemLinkForm key={`${item.supplier_id}|${item.item_key}`} item={item} lines={lines} canWrite={canWrite} onClose={onClose} onDone={onDone} onNext={onNext} />
         <section>
           <h3 className="mb-1 text-sm font-semibold">Historikk</h3>
-          {lines.length === 0 ? <p className="text-sm text-ink-secondary">Ingen linjer funnet.</p> : <SupplierItemHistory lines={lines} />}
+          {lines.length === 0 ? <p className="text-sm text-ink-secondary">Ingen linjer funnet.</p> : <SupplierItemHistory lines={lines} baseUnit={item.rm_base_unit} />}
         </section>
       </QueryState>
     </div>

@@ -20,13 +20,15 @@ export const LIST_COLUMNS: ListColumn[] = [
   { id: "package", label: "Pakning", sortKey: "package" },
   { id: "volume_12m", label: "Volum 12 mnd", sortKey: "volume_12m", numeric: true },
   { id: "last_invoice", label: "Siste faktura", sortKey: "last_invoice" },
+  { id: "price_source", label: "Priskilde", sortKey: null },
+  { id: "price_updated", label: "Pris oppdatert", sortKey: null },
   { id: "stock", label: "Beholdning", sortKey: null, numeric: true },
   { id: "status", label: "Status", sortKey: null },
   { id: "active", label: "Aktiv", sortKey: "active" },
 ];
 
 /** Kolonner som er skjult inntil brukeren slår dem på. */
-export const DEFAULT_HIDDEN_COLUMNS: string[] = ["stock"];
+export const DEFAULT_HIDDEN_COLUMNS: string[] = ["stock", "price_source", "price_updated"];
 
 
 export function isColumnVisible(id: string, hidden: readonly string[]): boolean {

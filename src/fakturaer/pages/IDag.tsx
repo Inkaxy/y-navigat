@@ -1,10 +1,10 @@
-import { useSupplierItems } from "@/fakturaer/hooks/useSupplierItems";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { DecisionNav } from "@/fakturaer/components/decisions/DecisionNav";
 import { ArrowUpRight, CheckCircle2, CircleAlert, GitBranch, Package } from "lucide-react";
 import { QueryState } from "@/components/common/QueryState";
 import { useReviewLines } from "@/fakturaer/hooks/useReviewLines";
+import { useSupplierItems } from "@/fakturaer/hooks/useSupplierItems";
 import { useCompany } from "@/hooks/useCompany";
 import { buildDecisionGroups, DECISION_KIND_LABEL, encodeGroupKey, type DecisionGroup } from "@/fakturaer/lib/decisionGroups";
 import { useQuery } from "@tanstack/react-query";

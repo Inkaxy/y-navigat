@@ -3,6 +3,7 @@ import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEn
 import { useTripletexCredentials, useTripletexSyncLog } from "@/ravarer/hooks/useTripletex";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { isObj } from "@/fakturaer/lib/parseRpcJson";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -206,7 +207,7 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
         },
       });
       if (error) throw new Error(await edgeErrorMessage(error, "Lagring feilet"));
-      if ((data as any)?.error) throw new Error((data as any).error);
+      if (isObj(data) && typeof data.error === "string" && data.error) throw new Error(data.error);
       toast.success("Tripletex-konfigurasjon lagret");
       setJwtToken(""); setConsumerToken(""); setEmployeeToken("");
       qc.invalidateQueries({ queryKey: ["tripletex-credentials", legalEntityId] });
@@ -465,8 +466,8 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
             <p className="text-sm text-muted-foreground">Ingen sync-kjøringer ennå.</p>
           ) : (
             <ul className="divide-y">
-              {log.map((row: any) => {
-                const note = typeof row.details?.note === "string" ? row.details.note : null;
+              {log.map((row) => {
+                const note = isObj(row.details) && typeof row.details.note === "string" ? row.details.note : null;
                 return (
                   <li key={row.id} className="flex items-start justify-between gap-4 py-2 text-sm">
                     <div>

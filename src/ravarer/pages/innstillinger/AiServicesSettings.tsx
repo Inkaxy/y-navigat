@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { FunctionsHttpError } from "@supabase/supabase-js";
+import { isObj } from "@/fakturaer/lib/parseRpcJson";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -160,15 +162,15 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
       });
       if (error) {
         // Forsøk å hente serverfeil-detaljer
-        const ctxErr = (error as any)?.context;
-        let detail = (error as any)?.message ?? String(error);
-        try {
-          const txt = await ctxErr?.text?.();
-          if (txt) {
-            const parsed = JSON.parse(txt);
-            detail = parsed?.error ?? detail;
+        let detail = error instanceof Error ? error.message : String(error);
+        if (error instanceof FunctionsHttpError) {
+          try {
+            const parsed: unknown = await error.context.json();
+            if (isObj(parsed) && typeof parsed.error === "string") detail = parsed.error;
+          } catch (parseErr) {
+            console.error("[ai-config-test] uleselig feilsvar", parseErr);
           }
-        } catch { /* ignore */ }
+        }
         setTestResult({ ok: false, message: detail });
         return;
       }
@@ -178,8 +180,8 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
       } else {
         setTestResult({ ok: false, message: r.error ?? "Ukjent feil" });
       }
-    } catch (e: any) {
-      setTestResult({ ok: false, message: e?.message ?? String(e) });
+    } catch (e) {
+      setTestResult({ ok: false, message: e instanceof Error ? e.message : String(e) });
     } finally {
       setTesting(false);
     }
@@ -204,7 +206,7 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
       setApiKey("");
       onSaved();
     },
-    onError: (e: any) => toast.error(`Lagring feilet: ${e.message ?? e}`),
+    onError: (e: Error) => toast.error(`Lagring feilet: ${e.message}`),
   });
 
   const remove = useMutation({
@@ -219,7 +221,7 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
       toast.success("Konfigurasjon slettet");
       qc.invalidateQueries({ queryKey: ["ai-configs"] });
     },
-    onError: (e: any) => toast.error(`Sletting feilet: ${e.message ?? e}`),
+    onError: (e: Error) => toast.error(`Sletting feilet: ${e.message}`),
   });
 
   return (

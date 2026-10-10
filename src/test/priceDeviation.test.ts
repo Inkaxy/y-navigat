@@ -33,6 +33,16 @@ describe("nivådelt prisavvik", () => {
     expect(r.rule).toBe("over_toleranse");
     expect(r.impactNok).toBeNull();
   });
+  it("mengde 0 gir kjent kronevirkning 0", () => {
+    const r = evaluatePriceDeviation({ ...base, actual: 105, expected: 100, baseQuantity: 0 });
+    expect(r.impactNok).toBe(0);
+    expect(r.rule).toBe("liten_kronevirkning");
+  });
+  it("avrunder som databasen", () => {
+    const r = evaluatePriceDeviation({ ...base, actual: 10.4237, expected: 10, baseQuantity: 3.333 });
+    expect(r.pct).toBe(4.237);
+    expect(r.impactNok).toBe(1.41);
+  });
   it("mangler grunnlag", () => {
     expect(evaluatePriceDeviation({ ...base, actual: 5, expected: null, baseQuantity: 1 }).rule).toBe("mangler_grunnlag");
     expect(evaluatePriceDeviation({ ...base, actual: 5, expected: 0, baseQuantity: 1 }).rule).toBe("mangler_grunnlag");

@@ -50,7 +50,10 @@ import {
   type RawMaterialListItem,
 } from "@/ravarer/lib/rawMaterialViews";
 import { LIST_COLUMNS, DEFAULT_HIDDEN_COLUMNS, isColumnVisible } from "@/ravarer/lib/varelisteColumns";
-import { useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
+import { DEFAULT_HARD_CAP_PCT, useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
+import { csvValue } from "@/ravarer/lib/varelisteCsv";
+import { isLargeDeviation } from "@/ravarer/components/vareliste/PriceCells";
+import { SupplierItemsBanner } from "@/ravarer/components/vareliste/SupplierItemsBanner";
 import { SaveViewDialog } from "@/ravarer/components/vareliste/SaveViewDialog";
 
 interface SavedView {
@@ -169,6 +172,7 @@ export default function VarelistePage() {
   );
 
   const tolerance = tolerances.defaultPct ?? DEFAULT_DEVIATION_TOLERANCE;
+  const hardCap = tolerances.settings?.price_hard_cap_pct ?? DEFAULT_HARD_CAP_PCT;
 
   const filtered = useMemo(
     () => filterAndSortItems(items, listQuery, tolerance),
@@ -259,65 +263,7 @@ export default function VarelistePage() {
   const exportCsv = useCallback(() => {
     const rows = filtered.filter((i) => selected.has(i.id));
     const header = visibleColumns.map((c) => c.label);
-    const lines = [header.join(";")];
-    for (const i of rows) {
-      const cells: string[] = [];
-      for (const c of visibleColumns) {
-        switch (c.id) {
-          case "sku":
-            cells.push(i.sku);
-            break;
-          case "name":
-            cells.push(i.name);
-            break;
-          case "category":
-            cells.push(i.categories.join(", "));
-            break;
-          case "supplier":
-            cells.push(i.supplierName ?? "");
-            break;
-          case "cost":
-            cells.push(formatNok(i.costPrice));
-            break;
-          case "agreed":
-            cells.push(i.agreedPrice != null ? formatNok(i.agreedPrice) : "");
-            break;
-          case "deviation":
-            cells.push(i.deviation != null ? formatNumber(i.deviation, 1) : "");
-            break;
-          case "package":
-            cells.push(i.packageState);
-            break;
-          case "volume_12m":
-            cells.push(formatNumber(i.volume12m, 0));
-            break;
-          case "last_invoice":
-            cells.push(formatDate(i.lastInvoiceDate));
-            break;
-          case "stock":
-            cells.push(i.stockTracking ? formatNumber(i.currentStock, 0) : "");
-            break;
-          case "status":
-            cells.push(
-              [
-                i.declarationName ? "dekl" : "",
-                i.hasDatasheet ? "datablad" : "",
-                i.hasAllergens ? "allergen" : "",
-                i.hasNutrition ? "næring" : "",
-              ]
-                .filter(Boolean)
-                .join(" "),
-            );
-            break;
-          case "active":
-            cells.push(i.isActive ? "Aktiv" : "Inaktiv");
-            break;
-          default:
-            cells.push("");
-        }
-      }
-      lines.push(cells.map(csvCell).join(";"));
-    }
+    const lines = [header.join(";"), ...rows.map((i) => visibleColumns.map((c) => csvCell(csvValue(c.id, i))).join(";"))];
     const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -523,6 +469,7 @@ export default function VarelistePage() {
   return (
     <TooltipProvider delayDuration={200}>
       <div className="space-y-5">
+        <SupplierItemsBanner />
         <RavarerHeaderBanner
           actions={canWrite && <NewRawMaterialButton onClick={() => setNewOpen(true)} />}
         />
@@ -707,7 +654,8 @@ export default function VarelistePage() {
                       selected={selected.has(item.id)}
                       focused={focusedId === item.id}
                       canWrite={canWrite}
-                      tolerance={tolerance}
+                      tolerance={tolerances.toleranceFor(item.categories[0])}
+                      hardCap={hardCap}
                       editing={editing?.id === item.id ? editing.field : null}
                       onToggleSelect={toggleSelect}
                       onStartEdit={startEdit}
@@ -736,8 +684,7 @@ export default function VarelistePage() {
                       {item.baseUnit}
                     </p>
                     <div className="mt-1 flex flex-wrap gap-1">
-                      {item.deviation != null &&
-                        Math.abs(item.deviation) > tolerance && (
+                      {isLargeDeviation(item.deviation, tolerances.toleranceFor(item.categories[0]), hardCap) && item.deviation != null && (
                           <Badge variant="outline" className="border-destructive/40 text-destructive">
                             Avvik {formatNumber(item.deviation, 1)} %
                           </Badge>

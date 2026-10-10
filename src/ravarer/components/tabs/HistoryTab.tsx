@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { supersededReasonText } from "@/ravarer/lib/priceReference";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
@@ -105,7 +106,12 @@ export function HistoryTab({ rm }: Props) {
         kind: "pris",
         at: p.effective_date,
         title: `${formatNok(p.price)} per ${rm.base_unit}`,
-        detail: `${sourceLabel(p.source)}${p.notes ? ` · ${p.notes}` : ""}`,
+        detail: [
+          sourceLabel(p.source),
+          p.is_legacy ? "Gammel pakningslogikk" : null,
+          supersededReasonText(p.superseded_reason),
+          p.notes,
+        ].filter(Boolean).join(" · "),
         invoiceId: p.invoice_id,
       });
     }
