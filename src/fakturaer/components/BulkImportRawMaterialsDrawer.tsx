@@ -105,7 +105,7 @@ function derivePricePerBaseUnit(l: BulkLine, baseUnit: string, pkgSize: number |
   return Number(c.pricePerBaseUnit.toFixed(4));
 }
 
-export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, legalEntityId, lines, onComplete }: Props) {
+export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, legalEntityId, supplierId, lines, onComplete }: Props) {
   const qc = useQueryClient();
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [rows, setRows] = useState<Record<string, RowState>>({});
