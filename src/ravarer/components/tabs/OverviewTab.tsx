@@ -24,7 +24,7 @@ import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
 import { categoryOptions } from "@/ravarer/lib/categories";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { RecalcHistory } from "@/ravarer/components/packages/RecalcHistory";
-import { SetPackageDialog } from "@/ravarer/components/packages/SetPackageDialog";
+import { PackageEditor as SetPackageDialog } from "@/ravarer/editors/PackageEditor";
 import {
   usePackageWorklistRow,
   type PackageWorklistRow,

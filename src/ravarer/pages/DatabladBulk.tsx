@@ -9,7 +9,7 @@ import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { CreateRawMaterialFromDatasheetDialog, type DatasheetExtract } from "@/ravarer/components/CreateRawMaterialFromDatasheetDialog";
 import { useDeleteDatasheets, useOrphanDatasheets } from "@/ravarer/hooks/useDatasheets";
 import { formatDate } from "@/ravarer/lib/constants";
-import { SetPackageDialog } from "@/ravarer/components/packages/SetPackageDialog";
+import { PackageEditor as SetPackageDialog } from "@/ravarer/editors/PackageEditor";
 import type { PackageWorklistRow } from "@/ravarer/hooks/usePackageSizes";
 import type { PackageFillSuggestion } from "@/ravarer/lib/packageMath";
 

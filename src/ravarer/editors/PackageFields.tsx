@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { formatNumber, PACKAGE_UNITS } from "@/ravarer/lib/constants";
 
 // Én kilde til emballasjetypene: den kanoniske lista motoren selv kjenner.
-export const PACKAGE_UNIT_OPTIONS: readonly string[] = PACKAGE_UNITS;
+const PACKAGE_UNIT_OPTIONS: readonly string[] = PACKAGE_UNITS;
 
 export interface PackageFieldsProps {
   baseUnit: string;

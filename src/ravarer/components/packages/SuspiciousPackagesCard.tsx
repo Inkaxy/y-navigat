@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AlertTriangle, PackageCheck } from "lucide-react";
 import { formatNumber } from "@/ravarer/lib/constants";
 import { useSuspiciousPackages, type SuspiciousPackageRow } from "@/ravarer/hooks/useSuspiciousPackages";
-import { SetPackageDialog } from "@/ravarer/components/packages/SetPackageDialog";
+import { PackageEditor as SetPackageDialog } from "@/ravarer/editors/PackageEditor";
 import type { PackageWorklistRow } from "@/ravarer/hooks/usePackageSizes";
 
 /** Pakningsdialogen forventer en arbeidslisterad; her har vi bare den mistenkelige koblingen. */

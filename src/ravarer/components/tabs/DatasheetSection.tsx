@@ -18,7 +18,7 @@ import { useRawMaterial } from "@/ravarer/hooks/useRawMaterials";
 import { ALLERGENS, formatNumber } from "@/ravarer/lib/constants";
 import { diffAllergens, normalizeAllergenCode } from "@/ravarer/lib/allergenDiff";
 import { NUTRITION_NUMBER_FIELDS } from "@/ravarer/lib/nutritionSource";
-import { SetPackageDialog } from "@/ravarer/components/packages/SetPackageDialog";
+import { PackageEditor as SetPackageDialog } from "@/ravarer/editors/PackageEditor";
 import type { PackageWorklistRow } from "@/ravarer/hooks/usePackageSizes";
 import type { PackageFillSuggestion } from "@/ravarer/lib/packageMath";
 import { NUTRITION_LABELS, changePct } from "@/ravarer/lib/nutritionLabels";

@@ -31,7 +31,7 @@ import { NewRawMaterialDialog } from "@/ravarer/components/NewRawMaterialDialog"
 import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
 import { VarelisteRow, type InlineField } from "@/ravarer/components/vareliste/VarelisteRow";
 import { VarelisteBulkBar } from "@/ravarer/components/vareliste/VarelisteBulkBar";
-import { SetPackageDialog } from "@/ravarer/components/packages/SetPackageDialog";
+import { PackageEditor as SetPackageDialog } from "@/ravarer/editors/PackageEditor";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useVarelisteItems } from "@/ravarer/hooks/useVarelisteItems";
 import { useUpdateRawMaterial } from "@/ravarer/hooks/useRawMaterials";

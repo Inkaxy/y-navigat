@@ -6,10 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { AlertTriangle, ArrowRight, ChevronDown, Loader2 } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { formatNumber } from "@/ravarer/lib/constants";
-import { PackageFields, PACKAGE_UNIT_OPTIONS } from "@/ravarer/editors/PackageFields";
+import { PackageFields } from "@/ravarer/editors/PackageFields";
+import { PACKAGE_UNITS } from "@/ravarer/lib/constants";
+
+const PACKAGE_UNIT_OPTIONS: readonly string[] = PACKAGE_UNITS;
 import { PackagePreview } from "@/ravarer/editors/PackagePreview";
 import { useRawMaterialSuppliers } from "@/ravarer/hooks/useRmSuppliers";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
@@ -18,7 +21,6 @@ import {
   usePreviewPackage,
   useApplyPackage,
   useUndoRecalc,
-  normalizePackageUnit,
   type PackageWorklistRow,
   type PackageRpcResult,
 } from "@/ravarer/hooks/usePackageSizes";
