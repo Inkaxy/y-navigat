@@ -17512,7 +17512,7 @@ export type Database = {
       rm_price_reference: {
         Args: {
           p_invoice_date: string
-          p_invoice_id: string | null
+          p_invoice_id: string
           p_raw_material_id: string
           p_supplier_id: string
         }
@@ -17560,6 +17560,7 @@ export type Database = {
         }
         Returns: Json
       }
+      rm_rematch_queue_cleanup: { Args: never; Returns: number }
       rm_rematch_status: { Args: { p_legal_entity_id: string }; Returns: Json }
       rm_rematch_tick: { Args: { p_slots?: number }; Returns: Json }
       rm_repair_invoice_vat: { Args: { p_invoice_id: string }; Returns: Json }
