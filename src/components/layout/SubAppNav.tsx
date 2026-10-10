@@ -629,7 +629,7 @@ function CountBadge({ value, tone }: { value: number; tone?: "warning" }) {
     <span
       className={cn(
         "rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
-        tone === "warning" || value <= 10 ? "bg-warning/20 text-warning" : "bg-destructive text-destructive-foreground",
+        tone === "warning" || value <= 10 ? "bg-brand-bronze text-brand-cream" : "bg-destructive text-destructive-foreground",
       )}
     >
       {value}
