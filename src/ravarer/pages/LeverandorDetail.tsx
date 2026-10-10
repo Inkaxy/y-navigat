@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { OrderDeskKpi } from "@/ordre/components/dashboard/OrderDeskKpi";
-import { Boxes, CalendarClock, CalendarDays, FileText, PieChart, TrendingUp, Wallet } from "lucide-react";
+import { Boxes, CalendarClock, CalendarDays, PieChart, TrendingUp, Wallet } from "lucide-react";
 import { PriceTimeline } from "@/ravarer/components/PriceTimeline";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
