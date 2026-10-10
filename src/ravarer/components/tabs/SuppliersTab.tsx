@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import { TrendingUp } from "lucide-react";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { NewSupplierDialog } from "@/ravarer/components/NewSupplierDialog";
-import { useRawMaterialSuppliers, usePriceHistory } from "@/ravarer/hooks/useRmSuppliers";
+import { useRawMaterialSuppliers, usePriceHistory, type RmSupplierRow } from "@/ravarer/hooks/useRmSuppliers";
+import { PackageEditor } from "@/ravarer/editors/PackageEditor";
+import { fallbackPackageRow } from "@/ravarer/lib/packageRow";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 import { PriceTimeline } from "@/ravarer/components/PriceTimeline";
@@ -34,6 +36,8 @@ export function SuppliersTab({ rm }: Props) {
   }>({ open: false });
   const [supplierOpen, setSupplierOpen] = useState(false);
   const [priceOpen, setPriceOpen] = useState(false);
+  const [packageLink, setPackageLink] = useState<RmSupplierRow | null>(null);
+  const packageRow = useMemo(() => fallbackPackageRow(rm), [rm]);
   const [priceUnitId, setPriceUnitId] = useState<string>(BASE_UNIT_KEY);
 
   const { data: units = [] } = useRawMaterialUnits(rm.id);
@@ -130,6 +134,18 @@ export function SuppliersTab({ rm }: Props) {
         rawMaterialId={rm.id}
         baseUnit={rm.base_unit}
         existing={links.find((l) => l.id === linkOpen.existingId) ?? null}
+        onEditPackage={(l) => {
+          setLinkOpen((prev) => ({ ...prev, open: false }));
+          setPackageLink(l);
+        }}
+      />
+      <PackageEditor
+        key={packageLink?.id ?? "none"}
+        row={packageRow}
+        open={!!packageLink}
+        onOpenChange={(v) => { if (!v) setPackageLink(null); }}
+        forceSupplierSection
+        initialSupplier={packageLink ? { supplierId: packageLink.supplier_id, supplierUnits: packageLink.base_units_per_package ?? rm.base_units_per_package ?? 0 } : null}
       />
       <CostPriceEditor
         open={priceOpen}
