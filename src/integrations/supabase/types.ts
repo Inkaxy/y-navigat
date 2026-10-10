@@ -17329,6 +17329,10 @@ export type Database = {
         Args: { p_invoice_id: string; p_reason: string }
         Returns: Json
       }
+      rm_activity_feed: {
+        Args: { p_legal_entity_id: string; p_limit?: number; p_since?: string }
+        Returns: Json
+      }
       rm_apply_agreement: { Args: { p_payload: Json }; Returns: Json }
       rm_apply_derived_cost_price: {
         Args: { p_raw_material_id: string }
@@ -17509,10 +17513,14 @@ export type Database = {
         }
         Returns: Json
       }
+      rm_price_movers: {
+        Args: { p_days?: number; p_legal_entity_id: string; p_limit?: number }
+        Returns: Json
+      }
       rm_price_reference: {
         Args: {
           p_invoice_date: string
-          p_invoice_id: string | null
+          p_invoice_id: string
           p_raw_material_id: string
           p_supplier_id: string
         }
@@ -17618,6 +17626,16 @@ export type Database = {
         Args: { p_base_unit: string; p_name: string }
         Returns: number
       }
+      rm_supplier_item_accept_price: {
+        Args: {
+          p_item_key: string
+          p_legal_entity_id: string
+          p_lines?: Json
+          p_reason?: string
+          p_supplier_id: string
+        }
+        Returns: Json
+      }
       rm_supplier_item_lines: {
         Args: {
           p_item_key: string
@@ -17689,6 +17707,22 @@ export type Database = {
       rm_unlink_matvaretabellen: {
         Args: { p_raw_material_id: string }
         Returns: undefined
+      }
+      rm_work_items: {
+        Args: {
+          p_group?: string
+          p_legal_entity_id: string
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+          p_sort?: string
+          p_supplier_id?: string
+        }
+        Returns: Json
+      }
+      rm_work_summary: {
+        Args: { p_include_approval?: boolean; p_legal_entity_id: string }
+        Returns: Json
       }
       sales_aggregate: {
         Args: {
