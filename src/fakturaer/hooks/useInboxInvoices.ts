@@ -7,6 +7,8 @@ export interface InboxInvoice {
   id: string;
   invoice_number: string;
   invoice_date: string;
+  received_at: string | null;
+  due_date: string | null;
   status: string;
   legal_entity_id: string;
   supplier_id: string;
@@ -36,7 +38,7 @@ interface Filters {
 /** Alle statuser som fortsatt er i arbeid — «ready» hører med. */
 export const OPEN_INVOICE_STATUSES = ["imported", "needs_review", "flagged", "ready"] as const;
 
-const SELECT = `id, invoice_number, invoice_date, status, legal_entity_id, supplier_id, is_credit_note,
+const SELECT = `id, invoice_number, invoice_date, imported_at, created_at, due_date, status, legal_entity_id, supplier_id, is_credit_note,
   total_amount, total_vat, lines_sum_status, lines_sum_variance_pct, source_document_url,
   line_extraction_status, line_extraction_attempts, source, notes, paid_at, tripletex_is_paid, currency, extraction_confidence, suppliers(name),
   invoice_lines(id, quantity, price_per_base_unit, raw_material_id, requires_review, review_reason, match_confidence, price_variance_pct, variance_status, raw_materials(category))`;
@@ -45,6 +47,9 @@ interface RawInvoice {
   id: string;
   invoice_number: string;
   invoice_date: string;
+  imported_at: string | null;
+  created_at: string | null;
+  due_date: string | null;
   status: string;
   legal_entity_id: string;
   supplier_id: string;
@@ -106,6 +111,8 @@ export function toInboxInvoice(r: RawInvoice): InboxInvoice {
     id: r.id,
     invoice_number: r.invoice_number,
     invoice_date: r.invoice_date,
+    received_at: r.imported_at ?? r.created_at,
+    due_date: r.due_date,
     status: r.status,
     legal_entity_id: r.legal_entity_id,
     supplier_id: r.supplier_id,

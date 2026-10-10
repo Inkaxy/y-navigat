@@ -6,7 +6,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Loader2, MoreHorizontal } from "lucide-react";
-import { formatDate, formatNok } from "@/fakturaer/lib/constants";
+import { formatDate, formatNok, todayIso } from "@/fakturaer/lib/constants";
 import { inboxPrimaryAction, type InboxPrimaryAction } from "@/fakturaer/lib/inbox";
 import type { InboxInvoice } from "@/fakturaer/hooks/useInboxInvoices";
 
@@ -45,6 +45,12 @@ export function InboxRow({ invoice, canWrite, canReconcile, busy, onPrimary, onR
         <div className="truncate text-caption text-ink-secondary">
           {invoice.invoice_number} · {formatDate(invoice.invoice_date)}
           {!done && <> · {primary.hint}</>}
+        </div>
+        <div className="truncate text-caption text-ink-secondary">
+          Mottatt {formatDate(invoice.received_at)} · Forfall{" "}
+          <span className={!done && invoice.due_date && invoice.due_date.slice(0, 10) < todayIso() ? "font-medium text-destructive" : undefined}>
+            {formatDate(invoice.due_date)}
+          </span>
         </div>
         {!done && total > 0 && (
           <div

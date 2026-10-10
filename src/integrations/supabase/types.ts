@@ -17560,6 +17560,7 @@ export type Database = {
         }
         Returns: Json
       }
+      rm_rematch_queue_cleanup: { Args: never; Returns: number }
       rm_rematch_status: { Args: { p_legal_entity_id: string }; Returns: Json }
       rm_rematch_tick: { Args: { p_slots?: number }; Returns: Json }
       rm_repair_invoice_vat: { Args: { p_invoice_id: string }; Returns: Json }

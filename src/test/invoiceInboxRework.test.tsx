@@ -143,7 +143,7 @@ describe("Oppdater matching med delvis feil", () => {
     const mk = (id: string, num: string): InboxInvoice => {
       const assessment = assessInboxInvoice({ ...base, lines: [L({ requires_review: true, review_reason: "unmatched", raw_material_id: null })] });
       return {
-        id, invoice_number: num, invoice_date: "2026-09-01", status: "needs_review", legal_entity_id: "le", supplier_id: "s",
+        id, invoice_number: num, invoice_date: "2026-09-01", received_at: null, due_date: null, status: "needs_review", legal_entity_id: "le", supplier_id: "s",
         supplier_name: "ASKO", is_credit_note: false, total_amount: 100, total_vat: 0, lines_sum_status: "ok",
         lines_sum_variance_pct: null, source_document_url: null, line_extraction_status: "done", source: "ehf", notes: null,
         paid_at: null, tripletex_is_paid: null, line_extraction_attempts: 0, line_count: 1, assessment, tab: inboxTabOf({ status: "needs_review", assessment }),
