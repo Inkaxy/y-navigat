@@ -25,7 +25,8 @@ export type OrderDeskKpiProps = {
   label: string;
   value: number | string;
   sub?: string;
-  to: string;
+  /** Uten `to` vises feltet som et rolig, ikke-klikkbart tall. */
+  to?: string;
   icon: ComponentType<{ className?: string }>;
   tone?: KpiTone;
   loading?: boolean;
@@ -45,13 +46,8 @@ export function OrderDeskKpi({
   failed,
 }: OrderDeskKpiProps) {
   const display = failed ? "–" : value;
-
-  return (
-    <Link
-      to={to}
-      aria-label={`${label}: ${failed ? "ikke tilgjengelig" : display}${sub ? `. ${sub}` : ""}`}
-      className="group rounded-lg border border-border bg-card p-3 transition-all hover:border-primary/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-    >
+  const ariaLabel = `${label}: ${failed ? "ikke tilgjengelig" : display}${sub ? `. ${sub}` : ""}`;
+  const body = (
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="truncate text-caption uppercase tracking-wide text-muted-foreground">
@@ -77,6 +73,21 @@ export function OrderDeskKpi({
           <Icon className="h-4 w-4" />
         </span>
       </div>
+  );
+  if (!to) {
+    return (
+      <div role="group" aria-label={ariaLabel} className="rounded-lg border border-border bg-card p-3">
+        {body}
+      </div>
+    );
+  }
+  return (
+    <Link
+      to={to}
+      aria-label={ariaLabel}
+      className="group rounded-lg border border-border bg-card p-3 transition-all hover:border-primary/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    >
+      {body}
     </Link>
   );
 }

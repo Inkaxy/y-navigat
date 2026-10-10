@@ -19,7 +19,8 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
-import { Kpi } from "@/ravarer/components/Kpi";
+import { OrderDeskKpi } from "@/ordre/components/dashboard/OrderDeskKpi";
+import { Boxes, CalendarClock, CalendarDays, FileText, PieChart, TrendingUp, Wallet } from "lucide-react";
 import { PriceTimeline } from "@/ravarer/components/PriceTimeline";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
@@ -259,29 +260,29 @@ export default function LeverandorDetailPage() {
         </div>
       </Card>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Fakturaer" value={String(supplier.invoice_count ?? invoiceTotal ?? 0)} />
-        <Kpi label="Siste faktura" value={formatDate(supplier.last_invoice_date)} />
-        <Kpi label="Varer koblet" value={String(items.length)} />
-        <Kpi label="Kjøpt siste 12 mnd (eks. mva)" value={formatNok(spend ?? 0)} hint="Fakturabeløp eks. mva, kreditnotaer trukket fra" />
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <OrderDeskKpi icon={FileText} label="Fakturaer" value={String(supplier.invoice_count ?? invoiceTotal ?? 0)} />
+        <OrderDeskKpi icon={CalendarDays} label="Siste faktura" value={formatDate(supplier.last_invoice_date)} />
+        <OrderDeskKpi icon={Boxes} label="Varer koblet" value={String(items.length)} sub="Råvarer koblet til leverandøren" />
+        <OrderDeskKpi icon={Wallet} label="Kjøpt siste 12 mnd (eks. mva)" value={formatNok(spend ?? 0)} sub="Kreditnotaer trukket fra" />
+        <OrderDeskKpi
+          icon={PieChart}
           label="Andel av totalt innkjøp"
           value={sharePct == null ? "—" : `${sharePct.toFixed(1)} %`}
-          hint="Leverandørens andel av alt innkjøp siste 12 måneder"
+          sub="Andel av alt innkjøp siste 12 mnd"
         />
-        <Kpi label="Antall råvarer" value={String(items.length)} hint="Råvarer koblet til leverandøren" />
-        <Kpi
+        <OrderDeskKpi
+          icon={CalendarClock}
+          tone={expiring90 > 0 ? "warning" : "default"}
           label="Avtaler som utløper ≤ 90 d"
           value={String(expiring90)}
-          hint="Avtaler med sluttdato innen 90 dager"
+          sub="Sluttdato innen 90 dager"
         />
-        <Kpi
+        <OrderDeskKpi
+          icon={TrendingUp}
           label="Prisindeks"
           value={priceIndex?.indexPct == null ? "—" : `${priceIndex.indexPct.toFixed(0)}`}
-          hint="Siste fakturapris mot 12-måneders snitt, snittet over råvarene. 100 = uendret"
+          sub="Siste pris mot 12 mnd snitt (100 = uendret)"
         />
       </div>
 
