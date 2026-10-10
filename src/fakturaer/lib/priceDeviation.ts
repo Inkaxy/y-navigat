@@ -31,15 +31,17 @@ export interface PriceDeviationResult {
 const nbNum = (n: number, d = 1) => n.toLocaleString("nb-NO", { minimumFractionDigits: 0, maximumFractionDigits: d });
 const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${nbNum(Math.abs(n))} %`;
 const kr = (n: number) => `${nbNum(Math.round(Math.abs(n)), 0)} kr`;
+const round = (n: number, d: number) => Math.round(n * 10 ** d) / 10 ** d;
 const fin = (n: number | null | undefined): n is number => n != null && Number.isFinite(n);
 
 export function evaluatePriceDeviation(i: PriceDeviationInput): PriceDeviationResult {
   if (!fin(i.actual) || !fin(i.expected) || i.expected <= 0) {
     return { pct: null, impactNok: null, large: false, rule: "mangler_grunnlag", explanation: "Mangler prisgrunnlag — avviket kan ikke regnes ut." };
   }
-  const pct = ((i.actual - i.expected) / i.expected) * 100;
-  const qty = fin(i.baseQuantity) && i.baseQuantity > 0 ? i.baseQuantity : null;
-  const impactNok = qty == null ? null : (i.actual - i.expected) * qty;
+  const pct = round(((i.actual - i.expected) / i.expected) * 100, 3);
+  // 0 er en kjent mengde (ingen kronevirkning); bare null/ikke-finitt er ukjent.
+  const qty = fin(i.baseQuantity) ? i.baseQuantity : null;
+  const impactNok = qty == null ? null : round((i.actual - i.expected) * qty, 2);
   const abs = Math.abs(pct);
   const impactTxt = impactNok == null ? "" : ` (${kr(impactNok)} på denne linjen)`;
 

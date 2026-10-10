@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Loader2, LineChart as LineChartIcon, CheckCircle2, Flag, Sparkles, Link2, Pencil, RefreshCw, FileText } from "lucide-react";
+import { ArrowLeft, Loader2, CheckCircle2, Flag, Sparkles, RefreshCw, FileText } from "lucide-react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -15,8 +14,9 @@ import { showError } from "@/lib/userError";
 import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
-import { ConfidenceBadge, InvoiceLineNotes } from "@/fakturaer/components/InvoiceLineBadges";
-import { OpenSupplierItemButton } from "@/fakturaer/components/supplier-item/OpenSupplierItemButton";
+import { InvoiceLinesTable } from "@/fakturaer/components/invoice-detail/InvoiceLinesTable";
+import { InvoiceFactsCard } from "@/fakturaer/components/invoice-detail/InvoiceFactsCard";
+import { fetchInvoiceDetail } from "@/fakturaer/components/invoice-detail/fetchInvoiceDetail";
 import { ConfirmReconcileDialog } from "@/fakturaer/components/ConfirmReconcileDialog";
 import { FlagInvoiceDialog } from "@/fakturaer/components/FlagInvoiceDialog";
 import { BulkImportRawMaterialsDrawer } from "@/fakturaer/components/BulkImportRawMaterialsDrawer";
@@ -50,15 +50,7 @@ export default function InvoiceDetailPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["invoice", id],
     enabled: !!id,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("invoices")
-        .select("*, suppliers(name, org_number, contact_email), legal_entities(legal_name), invoice_lines(*, raw_materials(id, name, sku))")
-        .eq("id", id!)
-        .single();
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => fetchInvoiceDetail(id!),
   });
 
   const tolerances = useMatchTolerances(data?.legal_entity_id ?? null);
@@ -366,9 +358,12 @@ export default function InvoiceDetailPage() {
         />
       )}
 
-      {data.vat_inferred && (
-        <p className="rounded-md bg-muted/40 px-3 py-2 text-sm text-ink-secondary">Mva-beløp utledet fra linjesummen (Tripletex ga ikke mva)</p>
-      )}
+      <InvoiceFactsCard
+        invoice={data}
+        canWrite={canWrite && hasInvoiceAccess}
+        fetchingLines={fetchingLines}
+        onFetchLines={fetchLinesFromPdf}
+      />
 
 
       {(() => {
@@ -405,113 +400,20 @@ export default function InvoiceDetailPage() {
           </dl>
         </Card>
 
-        <Card className="overflow-hidden lg:col-span-2">
-          <div className="flex items-center justify-between border-b border-line-subtle p-4">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-secondary">Linjer ({lines.length})</h3>
-            <label className="flex cursor-pointer items-center gap-2 text-xs text-ink-secondary">
-              <Checkbox checked={showLedgerAccount} onCheckedChange={(v) => setShowLedgerAccount(!!v)} />
-              Vis konto
-            </label>
-          </div>
-          {lines.length === 0 ? (
-            <div className="p-8 text-center text-sm text-ink-secondary">
-              Ingen linjer registrert ennå.
-              <div className="mt-3">
-                <Button size="sm" variant="outline" onClick={() => navigate(`/ravarer/fakturaer/${id}/registrer-linjer`)}>Registrer linjer</Button>
-              </div>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/30 text-left text-xs uppercase tracking-wider text-ink-secondary">
-                  <tr>
-                    {canBulkImport && <th className="w-8 px-2 py-3"></th>}
-                    <th className="px-4 py-3">SKU</th>
-                    <th className="px-4 py-3">Beskrivelse / råvare</th>
-                    <th className="px-4 py-3 text-right">Antall</th>
-                    <th className="px-4 py-3">Enhet</th>
-                    <th className="px-4 py-3 text-right">Pris</th>
-                    <th className="px-4 py-3 text-right">Sum</th>
-                    {showLedgerAccount && <th className="px-4 py-3">Konto</th>}
-                    <th className="px-4 py-3"><span className="sr-only">Handlinger</span></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lines.sort((a, b) => (a.line_number ?? 0) - (b.line_number ?? 0)).map((l) => {
-                    const rm = l.raw_materials as { id: string; name: string; sku: string | null } | null;
-                    return (
-                      <tr key={l.id} className="border-t border-line-subtle align-top">
-                        {canBulkImport && (
-                          <td className="px-2 py-3">
-                            {!rm && (
-                              <Checkbox
-                                checked={!!selected[l.id]}
-                                onCheckedChange={(c) => setSelected((s) => ({ ...s, [l.id]: !!c }))}
-                              />
-                            )}
-                          </td>
-                        )}
-                        <td className="px-4 py-3 font-mono text-xs">{l.supplier_sku ?? "—"}</td>
-                        <td className="px-4 py-3">
-                          {rm ? (
-                            <div className="space-y-0.5">
-                              <div className="flex items-center gap-2">
-                                <Link
-                                  to={`/ravarer/vareliste/${rm.id}`}
-                                  className="font-medium text-app underline-offset-2 hover:underline"
-                                >
-                                  {rm.name}
-                                </Link>
-                                <ConfidenceBadge value={l.match_confidence} />
-
-                              </div>
-                              <div className="text-xs text-ink-secondary">{l.description}</div>
-                              <InvoiceLineNotes reviewReason={l.review_reason} lineKind={l.line_kind} resolutionNote={l.resolution_note} />
-                            </div>
-                          ) : (
-                            <div className="space-y-1">
-                              <span>{l.description}</span>
-                              <InvoiceLineNotes reviewReason={l.review_reason} lineKind={l.line_kind} resolutionNote={l.resolution_note} />
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums">{l.quantity}</td>
-                        <td className="px-4 py-3 text-ink-secondary">{l.unit}</td>
-                        <td className="px-4 py-3 text-right tabular-nums">{formatNok(l.unit_price)}</td>
-                        <td className="px-4 py-3 text-right tabular-nums">{formatNok(l.total_amount)}</td>
-                        {showLedgerAccount && (
-                          <td className="px-4 py-3 font-mono text-xs text-ink-secondary">{l.ledger_account ?? "—"}</td>
-                        )}
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <OpenSupplierItemButton supplierId={data.supplier_id} line={l} variant="ghost" iconOnly />
-                            {canMatch && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                title={rm ? "Endre match" : "Match mot råvare"}
-                                onClick={() => setMatchLineId(l.id)}
-                              >
-                                {rm ? <Pencil className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
-                              </Button>
-                            )}
-                            {rm && (
-                              <Button variant="ghost" size="icon" asChild title="Se prishistorikk">
-                                <Link to={`/ravarer/vareliste/${rm.id}?tab=suppliers`}>
-                                  <LineChartIcon className="h-4 w-4" />
-                                </Link>
-                              </Button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
+        <InvoiceLinesTable
+          lines={lines}
+          supplierId={data.supplier_id}
+          canBulkImport={canBulkImport}
+          canMatch={canMatch}
+          selected={selected}
+          onSelect={(lineId, v) => setSelected((x) => ({ ...x, [lineId]: v }))}
+          showLedgerAccount={showLedgerAccount}
+          onShowLedgerAccount={setShowLedgerAccount}
+          onMatch={setMatchLineId}
+          onRegister={() => navigate(`/ravarer/fakturaer/${id}/registrer-linjer`)}
+          tolerancePct={defaultTolerancePct}
+          settings={tolerances.settings}
+        />
       </div>
       );
       if (!docOpen) return mainContent;

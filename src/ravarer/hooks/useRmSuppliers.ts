@@ -60,6 +60,8 @@ export interface PriceHistoryRow {
   invoice_id: string | null;
   notes: string | null;
   created_at: string;
+  superseded_reason?: string | null;
+  is_legacy?: boolean | null;
   invoices?: { invoice_number: string | null; is_credit_note: boolean | null } | null;
 }
 

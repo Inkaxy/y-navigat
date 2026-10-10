@@ -73,15 +73,20 @@ export default function DecisionDetail() {
     (r.failed || notes.length ? toast.warning : toast.success)(`${label}: ${r.text}`, { description });
   };
 
-  const done = async (msg?: string) => {
-    await Promise.all(["fakturaer-review-lines", "fakturaer-inbox", "invoice-approval-overview", "vareminne-links", "supplier-cases"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
-    if (msg) toast.success(msg);
+  const invalidateAll = () =>
+    Promise.all(["fakturaer-review-lines", "fakturaer-inbox", "invoice-approval-overview", "vareminne-links", "supplier-cases"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
+  const goNext = () => {
     // Neste spørsmål i samme filtrerte rekkefølge som brukeren kom fra.
     const all = buildDecisionGroups(q.data?.rows ?? []);
     const ordered = fromRavarer ? filterRavarerGroups(all, parseRavarerFilter(sp, fromScope), fromScope) : all;
     const next = nextGroupKey(ordered, groupKey);
     if (next) navigate(`/ravarer/fakturaer/i-dag/${encodeGroupKey(next)}${sp.toString() ? `?${sp}` : ""}`);
     else navigate(backHref);
+  };
+  const done = async (msg?: string) => {
+    await invalidateAll();
+    if (msg) toast.success(msg);
+    goNext();
   };
 
   async function applyMaterial() {
@@ -247,7 +252,7 @@ export default function DecisionDetail() {
                   <p className="font-medium">{first.description}</p>
                   <p className="text-sm">{kr(first.unit_price)} per {first.unit ?? "enhet"}{first.price_per_base_unit != null ? ` · ${kr(first.price_per_base_unit)} per ${first.matched_raw_material?.base_unit ?? "grunnenhet"}` : ""}</p>
                 </div>
-                {(group.kind === "material" || group.kind === "package") && <OpenSupplierItemButton supplierId={first.invoice.supplier_id} line={first} className="w-full" onDone={() => void done()} />}
+                {(group.kind === "material" || group.kind === "package") && <OpenSupplierItemButton supplierId={first.invoice.supplier_id} line={first} className="w-full" onDone={() => void invalidateAll()} onClosedAfterDone={goNext} />}
                 <p className="text-sm text-ink-secondary">Kilde: {first.invoice.source === "tripletex" ? "Tripletex (tolket fra PDF)" : first.invoice.source ?? "ukjent"}.</p>
                 {group.kind === "price" && (
                   <>

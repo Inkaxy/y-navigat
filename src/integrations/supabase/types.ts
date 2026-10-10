@@ -12701,6 +12701,51 @@ export type Database = {
           },
         ]
       }
+      rm_rematch_queue: {
+        Row: {
+          attempts: number
+          dispatched_at: string | null
+          finished_at: string | null
+          http_status: number | null
+          id: number
+          invoice_id: string
+          last_error: string | null
+          legal_entity_id: string
+          queued_at: string
+          request_id: number | null
+          requested_by: string | null
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          dispatched_at?: string | null
+          finished_at?: string | null
+          http_status?: number | null
+          id?: number
+          invoice_id: string
+          last_error?: string | null
+          legal_entity_id: string
+          queued_at?: string
+          request_id?: number | null
+          requested_by?: string | null
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          dispatched_at?: string | null
+          finished_at?: string | null
+          http_status?: number | null
+          id?: number
+          invoice_id?: string
+          last_error?: string | null
+          legal_entity_id?: string
+          queued_at?: string
+          request_id?: number | null
+          requested_by?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       rm_stock_count_sheets: {
         Row: {
           applied_at: string | null
@@ -17467,7 +17512,7 @@ export type Database = {
       rm_price_reference: {
         Args: {
           p_invoice_date: string
-          p_invoice_id: string
+          p_invoice_id: string | null
           p_raw_material_id: string
           p_supplier_id: string
         }
@@ -17504,6 +17549,8 @@ export type Database = {
         }
         Returns: Json
       }
+      rm_rematch_status: { Args: { p_legal_entity_id: string }; Returns: Json }
+      rm_rematch_tick: { Args: { p_slots?: number }; Returns: Json }
       rm_repair_invoice_vat: { Args: { p_invoice_id: string }; Returns: Json }
       rm_repair_invoice_vat_batch: {
         Args: { p_legal_entity_id: string; p_limit?: number }
@@ -17569,6 +17616,19 @@ export type Database = {
         Returns: Json
       }
       rm_supplier_items: {
+        Args: {
+          p_item_key?: string
+          p_legal_entity_id: string
+          p_limit?: number
+          p_offset?: number
+          p_raw_material_id?: string
+          p_search?: string
+          p_status?: string
+          p_supplier_id?: string
+        }
+        Returns: Json
+      }
+      rm_supplier_items_v1: {
         Args: {
           p_legal_entity_id: string
           p_limit?: number

@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
+import { SupplierItemStatusChips } from "@/fakturaer/components/supplier-item/SupplierItemStatusChips";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -293,6 +294,7 @@ export default function LeverandorDetailPage() {
         </TabsList>
 
         <TabsContent value="varer" className="space-y-4">
+          {id && <SupplierItemStatusChips supplierId={id} />}
           {items.length > 0 && (
             <SupplierPriceTimeline supplierId={supplier.id} supplierName={supplier.name} items={items} />
           )}

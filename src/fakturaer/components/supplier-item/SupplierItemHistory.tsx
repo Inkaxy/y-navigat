@@ -15,7 +15,8 @@ function lineStatus(l: SupplierItemLine): { label: string; tone: StatusTone } {
 
 const n = (v: number | null) => (v == null ? "—" : v.toLocaleString("nb-NO", { maximumFractionDigits: 3 }));
 
-export function SupplierItemHistory({ lines }: { lines: SupplierItemLine[] }) {
+export function SupplierItemHistory({ lines, baseUnit }: { lines: SupplierItemLine[]; baseUnit?: string | null }) {
+  const per = baseUnit ? `kr/${baseUnit}` : "kr per grunnenhet";
   return (
     <ul className="divide-y divide-line-subtle text-sm">
       {lines.map((l) => (
@@ -28,7 +29,7 @@ export function SupplierItemHistory({ lines }: { lines: SupplierItemLine[] }) {
             <span className="tabular-nums">{n(l.quantity)} {l.unit ?? ""}</span>
             <span className="tabular-nums">{formatMoney(l.total_amount, "NOK")}</span>
             <span className="tabular-nums text-ink-secondary">
-              {l.price_per_base_unit == null ? "—" : `${formatMoney(l.price_per_base_unit, "NOK")} / grunnenhet`}
+              {l.price_per_base_unit == null ? "—" : `${n(Math.round(l.price_per_base_unit * 100) / 100)} ${per}`}
             </span>
             <LineStatusBadge status={lineStatus(l)} />
             {lineKindLabel(l.line_kind) && l.line_kind !== "vare" && (

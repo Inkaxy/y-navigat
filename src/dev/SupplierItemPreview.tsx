@@ -6,6 +6,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SupplierItemsTable } from "@/fakturaer/components/supplier-item/SupplierItemsTable";
 import { SupplierItemView } from "@/fakturaer/components/supplier-item/SupplierItemSheet";
 import type { SupplierItem, SupplierItemLine } from "@/fakturaer/lib/supplierItems";
+import { PriceBasisNowView } from "@/ravarer/components/tabs/suppliers/PriceBasisNowCard";
+import { InvoiceFactsView } from "@/fakturaer/components/invoice-detail/InvoiceFactsCard";
+import { Button } from "@/components/ui/button";
 import "@/index.css";
 
 /** Utviklingsforhåndsvisning av Varekoblinger med FASTE data. Ikke en del av produksjonsbygget. */
@@ -13,9 +16,9 @@ const qc = new QueryClient({ defaultOptions: { queries: { retry: false, staleTim
 
 const base: SupplierItem = {
   supplier_id: "s1", supplier_name: "Regal Mølle", item_key: "sku:10042", supplier_sku: "10042", description: "HVETEMEL SIKTET 25KG",
-  line_count: 41, invoice_count: 22, first_seen: "2025-11-02", last_seen: "2026-10-06", open_lines: 8, last_line_id: "l1", last_invoice_id: "i1",
+  line_count: 41, invoice_count: 22, first_seen: "2025-11-02", last_seen: "2026-10-06", open_lines: 8, last_line_id: "l1", last_open_line_id: "l1", last_invoice_id: "i1",
   last_invoice_date: "2026-10-06", linked_rm_id: "rm1", rm_id: "rm1", rm_name: "Hvetemel siktet", rm_sku: "R-3", rm_base_unit: "kg", rm_category: "Mel",
-  rm_cost: 11.2, rms_id: "rms1", package_size: 25, package_unit: "sekk", base_units_per_package: null, package_confirmed_at: null,
+  rm_cost: 11.2, rms_id: "rms1", rms_notes: null, package_size: 25, package_unit: "sekk", base_units_per_package: null, package_confirmed_at: null,
   agreed_price_per_base_unit: null, is_primary: true, variants: 1, last_ppbu: 11.6, prev_ppbu: 11.2, last_conf: "auto_high",
   reasons_raw: "unknown_package_size", status: "mangler_pakning",
 };
@@ -37,7 +40,7 @@ const lines: SupplierItemLine[] = [1, 2, 3].map((n) => ({
 }));
 qc.setQueryData(["supplier-item-rm", "rm1"], { id: "rm1", name: "Hvetemel siktet", base_unit: "kg", sku: "R-3", category: "Mel", why: null });
 qc.setQueryData(["package-inference", "l1", "kg"], {
-  ok: true, base_unit: "kg", line_unit: "sekk", arithmetic: { bupp: 25, raw: 25, ok: true }, description: { count: 1, size: 25, unit: "kg", total: 25, bupp: 25 },
+  ok: true, direct: false, direct_factor: null, base_unit: "kg", line_unit: "sekk", arithmetic: { bupp: 25, raw: 25, ok: true }, description: { count: 1, size: 25, unit: "kg", total: 25, bupp: 25 },
   agrees: true, suggested_bupp: 25, source: "regnestykke_og_varenavn", auto_confirmable: true,
   explanation: "1 160 kr ÷ (4 sekk × 290 kr) gir 1 sekk, og varenavnet sier 25 kg — altså 25 kg per sekk.",
 });
@@ -47,6 +50,15 @@ function App() {
   return (
     <div className="space-y-6 px-page py-6">
       <h1 className="font-display text-3xl font-semibold">Varekoblinger</h1>
+      <PriceBasisNowView baseUnit="kg" tolerancePct={3} tolIsCategory={false} rows={[
+        { link: { id: "a", supplier_id: "s1", is_primary: true, notes: null }, name: "Regal Mølle", loading: false, error: false, ref: { source: "agreement", price: 11.2, reference_date: "2026-01-01", valid_to: null, reason: null } },
+        { link: { id: "b", supplier_id: "s2", is_primary: false, notes: "Avtalepris 1,12 kr/kg satt i karantene 4. okt. 2026 — usannsynlig pris." }, name: "ASKO ØST AS", loading: false, error: false, ref: { source: "last_purchase", price: 11.85, reference_date: "2026-10-03", valid_to: null, reason: null } },
+        { link: { id: "c", supplier_id: "s3", is_primary: false, notes: null }, name: "Tine", loading: false, error: false, ref: { source: "none", price: null, reference_date: null, valid_to: null, reason: null } },
+      ]} />
+      <InvoiceFactsView
+        invoice={{ id: "i1", legal_entity_id: "le", status: "needs_review", total_amount: 14500, total_vat: 2900, vat_inferred: true, tripletex_voucher_number: "2026-4412", tripletex_is_paid: true, paid_at: "2026-10-08", lines_sum_excl_vat: 11600, lines_sum_variance_pct: 0.4, lines_sum_status: "ok", extraction_confidence: 0.91, line_extraction_attempts: 1, lines_source: "pdf_extracted" }}
+        actions={<><Button size="sm" variant="outline">Hent linjer på nytt</Button><Button size="sm" variant="outline">Beregn på nytt</Button></>}
+      />
       <SupplierItemsTable items={items} onOpen={setOpen} />
       <div className="max-w-[720px] rounded-lg border border-line-subtle bg-card p-5">
         <SupplierItemView item={open} linesQuery={{ data: lines, isLoading: false, isError: false, error: null, refetch: () => undefined }} onClose={() => undefined} />

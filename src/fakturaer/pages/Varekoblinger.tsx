@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,15 +27,19 @@ export default function Varekoblinger() {
   const [qInput, setQInput] = useState(sp.get("q") ?? "");
   const q = useDebouncedValue(qInput, 300);
 
-  const set = (k: string, v: string | null) => {
-    const n = new URLSearchParams(sp);
-    if (v) n.set(k, v); else n.delete(k);
-    if (k !== "side") n.delete("side");
-    setSp(n, { replace: true });
-  };
+  const set = useCallback((k: string, v: string | null) => {
+    setSp((prev) => {
+      const n = new URLSearchParams(prev);
+      if (v) n.set(k, v); else n.delete(k);
+      if (k !== "side") n.delete("side");
+      return n;
+    }, { replace: true });
+  }, [setSp]);
+  const urlQ = sp.get("q") ?? "";
   useEffect(() => {
-    if ((sp.get("q") ?? "") !== q) set("q", q || null);
-  }, [q]); // eslint-disable-line react-hooks/exhaustive-deps -- synk bare når søket faktisk endres
+    if (urlQ !== q) set("q", q || null);
+    // urlQ med i avhengighetene; effekten skriver bare når søket faktisk avviker.
+  }, [q, urlQ, set]);
 
   const data = useSupplierItems({ supplierId, search: q, status, page });
   const suppliers = useSuppliersFor(company?.id ?? null);

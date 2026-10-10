@@ -52,7 +52,12 @@ describe("koblingsskjema", () => {
     expect(nameFromDescription("HVETEMEL SIKTET 25KG")).toBe("Hvetemel siktet");
   });
   it("åpen linje krever gjennomgang og åpen faktura", () => {
-    expect(isOpenLine({ requires_review: true, invoice_status: "pending" })).toBe(true);
-    expect(isOpenLine({ requires_review: true, invoice_status: "reconciled" })).toBe(false);
+    expect(isOpenLine({ requires_review: true, invoice_status: "needs_review", flagged_at: null })).toBe(true);
+    expect(isOpenLine({ requires_review: true, invoice_status: "imported", flagged_at: null })).toBe(true);
+    expect(isOpenLine({ requires_review: true, invoice_status: "ready", flagged_at: null })).toBe(true);
+    expect(isOpenLine({ requires_review: true, invoice_status: "pending", flagged_at: null })).toBe(false);
+    expect(isOpenLine({ requires_review: true, invoice_status: "reconciled", flagged_at: null })).toBe(false);
+    expect(isOpenLine({ requires_review: true, invoice_status: "needs_review", flagged_at: "2026-10-01" })).toBe(false);
+    expect(isOpenLine({ requires_review: false, invoice_status: "needs_review", flagged_at: null })).toBe(false);
   });
 });

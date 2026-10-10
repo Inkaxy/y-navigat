@@ -29,6 +29,8 @@ export interface SupplierItem {
   last_seen: string | null;
   open_lines: number;
   last_line_id: string | null;
+  /** Siste ÅPNE linje — brukes til pakningsutledning. */
+  last_open_line_id: string | null;
   last_invoice_id: string | null;
   last_invoice_date: string | null;
   linked_rm_id: string | null;
@@ -39,6 +41,8 @@ export interface SupplierItem {
   rm_category: string | null;
   rm_cost: number | null;
   rms_id: string | null;
+  /** Merknader på leverandørkoblingen (f.eks. karantene). */
+  rms_notes: string | null;
   package_size: number | null;
   package_unit: string | null;
   base_units_per_package: number | null;
@@ -108,6 +112,9 @@ export interface PackageInference {
   suggested_bupp: number | null;
   source: "regnestykke_og_varenavn" | "regnestykke" | "varenavn" | null;
   auto_confirmable: boolean;
+  /** Fakturaenheten kan regnes rett om til grunnenheten — pakning trengs ikke. */
+  direct: boolean;
+  direct_factor: number | null;
   explanation: string;
 }
 
@@ -140,6 +147,7 @@ export interface LinkSupplierItemResult {
     requires_review_count: number;
     review_reasons: string[];
     auto_reconcile: boolean;
+    error?: string | null;
   }[];
   still_open_lines: number;
   failures: { invoice_id: string; reason: string }[];

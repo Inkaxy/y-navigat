@@ -13,11 +13,18 @@ interface Props {
   /** Bare ikon (med aria-label) — for tette tabeller. */
   iconOnly?: boolean;
   onDone?: () => void;
+  /** Kalles når panelet lukkes etter en vellykket kobling. */
+  onClosedAfterDone?: () => void;
 }
 
 /** «Åpne varekort» for en fakturalinje. Skjules når linjen mangler leverandør eller identitet. */
-export function OpenSupplierItemButton({ supplierId, line, variant = "outline", size = "sm", className, iconOnly, onDone }: Props) {
+export function OpenSupplierItemButton({ supplierId, line, variant = "outline", size = "sm", className, iconOnly, onDone, onClosedAfterDone }: Props) {
   const [open, setOpen] = useState(false);
+  const [didLink, setDidLink] = useState(false);
+  const onOpenChange = (v: boolean) => {
+    setOpen(v);
+    if (!v && didLink) { setDidLink(false); onClosedAfterDone?.(); }
+  };
   const key = supplierItemKey(line);
   if (!supplierId || !key) return null;
   return (
@@ -26,7 +33,7 @@ export function OpenSupplierItemButton({ supplierId, line, variant = "outline", 
         <Tags className={iconOnly ? "h-4 w-4" : "mr-1 h-4 w-4"} aria-hidden />
         {!iconOnly && "Åpne varekort"}
       </Button>
-      <SupplierItemSheet supplierId={supplierId} itemKey={key} open={open} onOpenChange={setOpen} onDone={onDone ? () => onDone() : undefined} />
+      <SupplierItemSheet supplierId={supplierId} itemKey={key} open={open} onOpenChange={onOpenChange} onDone={() => { setDidLink(true); onDone?.(); }} />
     </>
   );
 }

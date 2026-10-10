@@ -10,8 +10,10 @@ import { Button } from "@/components/ui/button";
 import { showError } from "@/lib/userError";
 import { evaluatePriceDeviation } from "@/fakturaer/lib/priceDeviation";
 import { parseDecimal } from "@/fakturaer/lib/units";
-import { DEFAULT_HARD_CAP_PCT, DEFAULT_MIN_IMPACT_NOK, type MatchSettings } from "@/fakturaer/hooks/useMatchTolerances";
+import { FALLBACK_TOLERANCE_PCT, DEFAULT_HARD_CAP_PCT, DEFAULT_MIN_IMPACT_NOK, type MatchSettings } from "@/fakturaer/hooks/useMatchTolerances";
 import { cn } from "@/lib/utils";
+import { parseRematchQueued } from "@/fakturaer/lib/parseRpcJson";
+import { useRematchStatus } from "@/fakturaer/hooks/useRematchStatus";
 
 const LINE_KINDS = [
   ["frakt", "Frakt"], ["gebyr", "Gebyr"], ["avrunding", "Avrunding"], ["rabatt", "Rabatt"], ["pant", "Pant"], ["mva", "Mva"], ["annet", "Annet"],
@@ -23,7 +25,7 @@ interface Draft {
 }
 
 const fromSettings = (s: MatchSettings | null): Draft => ({
-  tol: String(s?.default_price_tolerance_pct ?? 3).replace(".", ","),
+  tol: String(s?.default_price_tolerance_pct ?? FALLBACK_TOLERANCE_PCT).replace(".", ","),
   minImpact: String(s?.price_min_impact_nok ?? DEFAULT_MIN_IMPACT_NOK).replace(".", ","),
   hardCap: String(s?.price_hard_cap_pct ?? DEFAULT_HARD_CAP_PCT).replace(".", ","),
   firstPrice: s?.auto_accept_first_price ?? true,
@@ -36,8 +38,12 @@ export function TieredPriceSettings({ legalEntityId, settings, canWrite, loading
   const qc = useQueryClient();
   const [d, setD] = useState<Draft>(() => fromSettings(settings));
   const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [queued, setQueued] = useState<number | null>(null);
-  useEffect(() => setD(fromSettings(settings)), [settings]);
+  // Bakgrunnsrefetch skal aldri overskrive et påbegynt utkast.
+  useEffect(() => { if (!dirty) setD(fromSettings(settings)); }, [settings, dirty]);
+  const status = useRematchStatus(legalEntityId);
+  const busy = (status.data?.queued ?? 0) + (status.data?.in_flight ?? 0) > 0;
 
   const tol = parseDecimal(d.tol), minImpact = parseDecimal(d.minImpact), hardCap = parseDecimal(d.hardCap);
   const valid = tol != null && tol >= 0 && minImpact != null && minImpact >= 0 && hardCap != null && tol != null && hardCap >= tol;
@@ -54,7 +60,7 @@ export function TieredPriceSettings({ legalEntityId, settings, canWrite, loading
       }, { onConflict: "legal_entity_id" });
       if (error) throw error;
     },
-    onSuccess: () => { setSaved(true); void qc.invalidateQueries({ queryKey: ["invoice-match-tolerances"] }); },
+    onSuccess: () => { setSaved(true); setDirty(false); void qc.invalidateQueries({ queryKey: ["invoice-match-tolerances"] }); },
     onError: (e) => showError("nivadelt-prisavvik", e, "Kunne ikke lagre innstillingene"),
   });
 
@@ -62,14 +68,13 @@ export function TieredPriceSettings({ legalEntityId, settings, canWrite, loading
     mutationFn: async () => {
       const { data, error } = await supabase.rpc("rm_rematch_invoices", { p_legal_entity_id: legalEntityId!, p_limit: 500, p_only_open: true });
       if (error) throw error;
-      const r = (data ?? {}) as { queued?: number };
-      return Number(r.queued ?? 0);
+      return parseRematchQueued(data).queued;
     },
-    onSuccess: setQueued,
+    onSuccess: (n) => { setQueued(n); void qc.invalidateQueries({ queryKey: ["rematch-status"] }); },
     onError: (e) => showError("rematch-alle", e, "Kunne ikke starte ny beregning"),
   });
 
-  const change = (p: Partial<Draft>) => { setSaved(false); setD((x) => ({ ...x, ...p })); };
+  const change = (p: Partial<Draft>) => { setSaved(false); setDirty(true); setD((x) => ({ ...x, ...p })); };
   const example = valid ? evaluatePriceDeviation({ actual: 10.42, expected: 10, baseQuantity: 50, tolPct: tol, minImpactNok: minImpact, hardCapPct: hardCap }) : null;
   const dis = !canWrite || loading;
 
@@ -124,12 +129,17 @@ export function TieredPriceSettings({ legalEntityId, settings, canWrite, loading
           {save.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />}Lagre
         </Button>
         {saved && <span role="status" className="inline-flex items-center gap-1 text-sm text-success"><Check className="h-4 w-4" aria-hidden />Lagret</span>}
-        <Button type="button" variant="outline" disabled={dis || !legalEntityId || rematch.isPending} onClick={() => rematch.mutate()}>
-          {rematch.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden /> : <RefreshCw className="mr-1.5 h-4 w-4" aria-hidden />}
-          Beregn alle åpne fakturaer på nytt
+        <Button type="button" variant="outline" disabled={dis || !legalEntityId || rematch.isPending || busy} onClick={() => rematch.mutate()}>
+          {rematch.isPending || busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden /> : <RefreshCw className="mr-1.5 h-4 w-4" aria-hidden />}
+          {busy ? "Omberegning pågår…" : "Beregn alle åpne fakturaer på nytt"}
         </Button>
         {queued != null && <span role="status" className="text-sm text-ink-secondary">{queued} fakturaer satt i kø — resultatet vises om noen minutter</span>}
       </div>
+      {status.data && (
+        <p className="text-caption text-ink-secondary tabular-nums">
+          {status.data.queued} i kø · {status.data.in_flight} under arbeid · {status.data.done_last_hour} ferdige siste time · {status.data.failed_last_day} feilet siste døgn
+        </p>
+      )}
     </Card>
   );
 }

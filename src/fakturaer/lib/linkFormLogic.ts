@@ -1,10 +1,11 @@
 import { stripPackageTokens, toBaseFactor } from "@/fakturaer/lib/units";
 import type { PackageInference, SupplierItemLine } from "@/fakturaer/lib/supplierItems";
 
-const CLOSED = new Set(["reconciled", "approved", "paid", "cancelled", "rejected"]);
+const OPEN_INVOICE = new Set(["imported", "needs_review", "ready"]);
 
-export function isOpenLine(l: Pick<SupplierItemLine, "requires_review" | "invoice_status">): boolean {
-  return !!l.requires_review && !CLOSED.has(l.invoice_status ?? "");
+/** Samme definisjon som databasen: til kontroll, faktura åpen og ikke flagget. */
+export function isOpenLine(l: Pick<SupplierItemLine, "requires_review" | "invoice_status" | "flagged_at">): boolean {
+  return !!l.requires_review && OPEN_INVOICE.has(l.invoice_status ?? "") && !l.flagged_at;
 }
 
 export function openScope(lines: SupplierItemLine[]): { lines: number; invoices: number; lastOpen: SupplierItemLine | null } {

@@ -34,7 +34,7 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
   const link = useLinkSupplierItem();
   const scope = openScope(lines);
   const refLine = scope.lastOpen ?? lines[0] ?? null;
-  const refLineId = refLine?.id ?? item.last_line_id;
+  const refLineId = refLine?.id ?? item.last_open_line_id ?? item.last_line_id;
 
   const [mode, setMode] = useState<"existing" | "new">("existing");
   const [selectedId, setSelectedId] = useState<string | null>(item.rm_id);
@@ -45,6 +45,7 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
   const [editPkg, setEditPkg] = useState(false);
   const [primary, setPrimary] = useState(false);
   const [notItem, setNotItem] = useState<string | null>(null);
+  const [touched, setTouched] = useState({ baseUnit: false, bupp: false, confirm: false });
   const [result, setResult] = useState<LinkSupplierItemResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,19 +57,19 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
 
   // Grunnenhet for ny råvare forhåndsvelges fra varenavnet.
   useEffect(() => {
-    if (baseGuess.data) setDraft((d) => ({ ...d, baseUnit: suggestedBaseUnit(baseGuess.data) }));
-  }, [baseGuess.data]);
+    if (baseGuess.data && !touched.baseUnit) setDraft((d) => ({ ...d, baseUnit: suggestedBaseUnit(baseGuess.data) }));
+  }, [baseGuess.data, touched.baseUnit]);
   useEffect(() => {
     if (mode === "new") setPrimary(true);
   }, [mode]);
   useEffect(() => {
     const inf = inference.data;
-    if (!inf) return;
-    setBupp(inf.suggested_bupp != null ? String(inf.suggested_bupp).replace(".", ",") : "");
-    setConfirm(inf.source === "regnestykke_og_varenavn");
-  }, [inference.data]);
+    if (!inf || inf.direct) return;
+    if (!touched.bupp) setBupp(inf.suggested_bupp != null ? String(inf.suggested_bupp).replace(".", ",") : "");
+    if (!touched.confirm) setConfirm(inf.source === "regnestykke_og_varenavn");
+  }, [inference.data, touched.bupp, touched.confirm]);
 
-  const pkgNeeded = needsPackage(refLine?.unit, baseUnit);
+  const pkgNeeded = !inference.data?.direct && needsPackage(refLine?.unit, baseUnit);
   const sameRm = mode === "existing" && selectedId === item.rm_id;
   const existingPkg = sameRm && item.package_confirmed_at && item.base_units_per_package != null ? { bupp: item.base_units_per_package, confirmedAt: item.package_confirmed_at } : null;
   const buppNum = parseDecimal(bupp);
@@ -108,6 +109,11 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
   };
 
   const disabled = !canWrite || link.isPending || !company;
+  const materialLoading = mode === "existing" && !!selectedId && selected.isLoading;
+  const onDraft = (d: NewMaterialDraft) => {
+    if (d.baseUnit !== draft.baseUnit) setTouched((t) => ({ ...t, baseUnit: true }));
+    setDraft(d);
+  };
 
   return (
     <div className="space-y-5">
@@ -125,7 +131,7 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
           search={search}
           onSearch={setSearch}
           draft={draft}
-          onDraft={setDraft}
+          onDraft={onDraft}
         />
       </Block>
       {pkgNeeded && baseUnit && (
@@ -135,9 +141,9 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
             baseUnit={baseUnit}
             packageUnit={refLine?.unit ?? "pakning"}
             value={bupp}
-            onChange={setBupp}
+            onChange={(v) => { setTouched((t) => ({ ...t, bupp: true })); setBupp(v); }}
             confirm={confirm}
-            onConfirm={setConfirm}
+            onConfirm={(v) => { setTouched((t) => ({ ...t, confirm: true })); setConfirm(v); }}
             inference={inference.data}
             loading={inference.isFetching}
             existing={existingPkg}
@@ -154,10 +160,11 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
         </label>
       </Block>
 
+      {!canWrite && <p className="text-caption text-ink-secondary">Du har bare lesetilgang.</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
       <div className="flex flex-wrap items-center gap-3 border-t border-line-subtle pt-4">
-        <Button type="button" onClick={onLink} disabled={disabled || !hasMaterial || !pkgValid}>
+        <Button type="button" onClick={onLink} disabled={disabled || materialLoading || !hasMaterial || !pkgValid}>
           {link.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />}
           {mode === "new" ? `Opprett råvare og koble ${n} ${n === 1 ? "linje" : "linjer"}` : `Koble og regn om ${n} ${n === 1 ? "linje" : "linjer"}`}
         </Button>
