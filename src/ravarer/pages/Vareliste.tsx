@@ -40,7 +40,7 @@ import { usePackageWorklist } from "@/ravarer/hooks/usePackageSizes";
 import { useBulkUpdateRawMaterials, type BulkPatch } from "@/ravarer/hooks/useBulkUpdateRawMaterials";
 import { useUiPreference } from "@/hooks/useUiPreference";
 import { osloTodayISO } from "@/lib/osloDate";
-import { formatNok, formatNumber, formatDate } from "@/ravarer/lib/constants";
+import { formatNok, formatNumber } from "@/ravarer/lib/constants";
 import { categoryOptions } from "@/ravarer/lib/categories";
 import {
   BUILTIN_VIEWS,
