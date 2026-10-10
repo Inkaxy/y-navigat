@@ -356,6 +356,7 @@ export default function RawMaterialDetail() {
           <HistoryTab rm={rm} />
         </TabsContent>
       </Tabs>
+      <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} bindings={hotkeys} />
     </div>
   );
 }
