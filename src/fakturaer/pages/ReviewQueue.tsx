@@ -114,11 +114,11 @@ export default function FakturaerInboxPage() {
   // Fanene ligger i adressen. Linjekøen filtreres ikke lenger på «klar»-status.
   const onlyReady = false;
   const inboxTab: InboxTab =
-    searchParams.get("fane") === "klar" ? "ready" : searchParams.get("fane") === "fullfort" ? "done" : "open";
+    searchParams.get("innboks") === "klar" ? "ready" : searchParams.get("innboks") === "fullfort" ? "done" : "open";
   const setInboxTab = (t: InboxTab) => {
     const next = new URLSearchParams(searchParams);
-    if (t === "open") next.delete("fane");
-    else next.set("fane", t === "ready" ? "klar" : "fullfort");
+    if (t === "open") next.delete("innboks");
+    else next.set("innboks", t === "ready" ? "klar" : "fullfort");
     next.delete("filter");
     setSearchParams(next, { replace: true });
   };

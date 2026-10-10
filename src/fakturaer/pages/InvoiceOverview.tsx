@@ -30,7 +30,7 @@ export default function InvoiceOverview() {
   const { data: company } = useCompany();
   const qc = useQueryClient();
   const [sp, setSp] = useSearchParams();
-  const tab = (TABS.find((t) => t.key === sp.get("fane"))?.key ?? "ready") as ApprovalBucket;
+  const tab = (TABS.find((t) => t.key === sp.get("status"))?.key ?? "ready") as ApprovalBucket;
   const [search, setSearch] = useState(sp.get("q") ?? "");
   const [supplier, setSupplier] = useState(sp.get("leverandor") ?? "");
   const [selected, setSelected] = useState<Record<string, boolean>>({});
@@ -63,7 +63,7 @@ export default function InvoiceOverview() {
   const chosenSums = sumByCurrency(chosenRows);
   const resetScope = () => { setSelected({}); setPage(1); };
 
-  const setTab = (k: ApprovalBucket) => { const n = new URLSearchParams(sp); n.set("fane", k); setSp(n, { replace: true }); resetScope(); };
+  const setTab = (k: ApprovalBucket) => { const n = new URLSearchParams(sp); n.set("status", k); setSp(n, { replace: true }); resetScope(); };
   const refresh = () => Promise.all([
     qc.invalidateQueries({ queryKey: ["invoice-approval-overview"] }),
     qc.invalidateQueries({ queryKey: ["fakturaer-review-lines"] }),
