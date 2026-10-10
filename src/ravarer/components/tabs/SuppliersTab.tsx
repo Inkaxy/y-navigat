@@ -131,10 +131,13 @@ export function SuppliersTab({ rm }: Props) {
         baseUnit={rm.base_unit}
         existing={links.find((l) => l.id === linkOpen.existingId) ?? null}
       />
-      <AddPriceDialog
+      <CostPriceEditor
         open={priceOpen}
         onOpenChange={setPriceOpen}
-        rm={rm}
+        rawMaterialId={rm.id}
+        rawMaterialName={rm.name}
+        baseUnit={rm.base_unit}
+        initialSupplierId={rm.primary_supplier_id}
         suppliers={links.map((l) => ({
           id: l.supplier_id,
           name: supplierMap.get(l.supplier_id)?.name ?? "—",
