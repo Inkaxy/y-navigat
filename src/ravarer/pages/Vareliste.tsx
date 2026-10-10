@@ -40,11 +40,10 @@ import { usePackageWorklist } from "@/ravarer/hooks/usePackageSizes";
 import { useBulkUpdateRawMaterials, type BulkPatch } from "@/ravarer/hooks/useBulkUpdateRawMaterials";
 import { useUiPreference } from "@/hooks/useUiPreference";
 import { osloTodayISO } from "@/lib/osloDate";
-import { formatNok, formatNumber, formatDate } from "@/ravarer/lib/constants";
+import { formatNok, formatNumber } from "@/ravarer/lib/constants";
 import { categoryOptions } from "@/ravarer/lib/categories";
 import {
   BUILTIN_VIEWS,
-  DEFAULT_DEVIATION_TOLERANCE,
   filterAndSortItems,
   type ListSortKey,
   type RawMaterialListItem,
@@ -171,12 +170,11 @@ export default function VarelistePage() {
     [q, kat, type, status, view, sort.key, sort.dir],
   );
 
-  const tolerance = tolerances.defaultPct ?? DEFAULT_DEVIATION_TOLERANCE;
   const hardCap = tolerances.settings?.price_hard_cap_pct ?? DEFAULT_HARD_CAP_PCT;
 
   const filtered = useMemo(
-    () => filterAndSortItems(items, listQuery, tolerance),
-    [items, listQuery, tolerance],
+    () => filterAndSortItems(items, listQuery, (i) => isLargeDeviation(i.deviation, tolerances.toleranceFor(i.categories[0]), hardCap)),
+    [items, listQuery, tolerances, hardCap],
   );
 
   /** Filtrene følger med til detaljen, slik at «Tilbake» og «forrige/neste» beholder dem. */
@@ -469,10 +467,10 @@ export default function VarelistePage() {
   return (
     <TooltipProvider delayDuration={200}>
       <div className="space-y-5">
-        <SupplierItemsBanner />
         <RavarerHeaderBanner
           actions={canWrite && <NewRawMaterialButton onClick={() => setNewOpen(true)} />}
         />
+        <SupplierItemsBanner />
 
         <Card className="p-4">
           <div className="flex flex-wrap items-center gap-3">

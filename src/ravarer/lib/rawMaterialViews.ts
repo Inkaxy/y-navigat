@@ -101,10 +101,17 @@ export interface RawMaterialListItem {
 
 export const DEFAULT_DEVIATION_TOLERANCE = 5;
 
+/** Avgjør om en rads avvik er «stort» — samme regel som Avvik-kolonnen. */
+export type DeviationRule = (item: RawMaterialListItem) => boolean;
+/** Tall = enkel prosentgrense (bakoverkompatibelt); funksjon = full regel. */
+export type DeviationInput = number | DeviationRule;
+const toRule = (t: DeviationInput): DeviationRule =>
+  typeof t === "function" ? t : (i) => i.deviation != null && Math.abs(i.deviation) > t;
+
 export interface ViewDefinition {
   id: string;
   label: string;
-  predicate: (item: RawMaterialListItem, tolerance: number) => boolean;
+  predicate: (item: RawMaterialListItem, isLarge: DeviationRule) => boolean;
 }
 
 /** Innebygde visninger. Rekkefølgen styrer chip-rekkefølgen i UI. */
@@ -124,7 +131,7 @@ export const BUILTIN_VIEWS: ViewDefinition[] = [
   {
     id: "deviation",
     label: "Avvik > toleranse",
-    predicate: (i, tolerance) => i.deviation != null && Math.abs(i.deviation) > tolerance,
+    predicate: (i, isLarge) => isLarge(i),
   },
   { id: "not_purchased", label: "Ikke kjøpt 12 mnd", predicate: (i) => i.volume12m <= 0 },
   { id: "no_supplier", label: "Uten leverandør", predicate: (i) => !i.supplierId },
@@ -139,11 +146,12 @@ export function viewById(id: string): ViewDefinition | undefined {
 export function applyView(
   items: readonly RawMaterialListItem[],
   viewId: string,
-  tolerance = DEFAULT_DEVIATION_TOLERANCE,
+  tolerance: DeviationInput = DEFAULT_DEVIATION_TOLERANCE,
 ): RawMaterialListItem[] {
   const view = viewById(viewId);
   if (!view) return [...items];
-  return items.filter((i) => view.predicate(i, tolerance));
+  const rule = toRule(tolerance);
+  return items.filter((i) => view.predicate(i, rule));
 }
 
 export type ListSortKey =
@@ -259,7 +267,7 @@ export function parseListQuery(params: URLSearchParams): ListQuery {
 export function filterAndSortItems(
   items: readonly RawMaterialListItem[],
   query: ListQuery,
-  tolerance = DEFAULT_DEVIATION_TOLERANCE,
+  tolerance: DeviationInput = DEFAULT_DEVIATION_TOLERANCE,
 ): RawMaterialListItem[] {
   const needle = normalizeSearch(query.q);
   // Visningen «Inaktive» overstyrer statusfilteret — ellers ville standard

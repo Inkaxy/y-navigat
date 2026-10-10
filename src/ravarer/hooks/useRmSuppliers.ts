@@ -194,11 +194,12 @@ export function usePriceHistory(rawMaterialId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("raw_material_price_history")
-        .select("*, invoices(invoice_number, is_credit_note)")
+        .select("id, raw_material_id, supplier_id, price, effective_date, source, source_reference, invoice_id, notes, created_at, superseded_reason, is_legacy, invoices(invoice_number, is_credit_note)")
         .eq("raw_material_id", rawMaterialId!)
-        .order("effective_date", { ascending: false });
+        .order("effective_date", { ascending: false })
+        .returns<PriceHistoryRow[]>();
       if (error) throw error;
-      return (data ?? []) as unknown as PriceHistoryRow[];
+      return data ?? [];
     },
   });
 }

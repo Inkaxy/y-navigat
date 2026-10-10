@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/userError";
 import { formatDate, formatNok } from "@/fakturaer/lib/constants";
-import { parseRepairVat } from "@/fakturaer/lib/parseRpcJson";
+import { parseRematchQueued, parseRepairVat } from "@/fakturaer/lib/parseRpcJson";
 import { confidenceLabel, linesSourceLabel, repairVatMessage, sumCheck } from "@/fakturaer/lib/invoiceFacts";
 import { invalidateInvoice } from "@/ravarer/lib/invalidate";
 import { cn } from "@/lib/utils";
@@ -90,10 +90,15 @@ export function InvoiceFactsCard({ invoice, canWrite, fetchingLines, onFetchLine
   });
   const rematch = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("rm_rematch_invoices", { p_legal_entity_id: invoice.legal_entity_id, p_invoice_ids: [invoice.id], p_limit: 1, p_only_open: true });
+      const { data, error } = await supabase.rpc("rm_rematch_invoices", { p_legal_entity_id: invoice.legal_entity_id, p_invoice_ids: [invoice.id], p_limit: 1, p_only_open: true });
       if (error) throw error;
+      return parseRematchQueued(data);
     },
-    onSuccess: () => {
+    onSuccess: (r) => {
+      if (r.queued === 0) {
+        toast.info(r.already_queued > 0 ? "Fakturaen ligger allerede i kø" : "Fakturaen kan ikke beregnes på nytt (ikke åpen, eller uten linjer)");
+        return;
+      }
       toast.success("Fakturaen er lagt i kø — oppdateres om litt");
       [10_000, 30_000].forEach((ms) => timers.current.push(window.setTimeout(() => invalidateInvoice(qc, invoice.id), ms)));
     },

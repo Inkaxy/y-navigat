@@ -7,7 +7,7 @@ import { osloTodayISO } from "@/lib/osloDate";
 import { useCompany } from "@/hooks/useCompany";
 import { useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
 import { parsePriceReference, type PriceReference } from "@/fakturaer/lib/parseRpcJson";
-import { priceReferenceLabel, priceReferenceDateText } from "@/ravarer/lib/priceReference";
+import { priceReferenceLabel, priceReferenceDateText, priceReferenceReasonText } from "@/ravarer/lib/priceReference";
 import { formatNok } from "@/ravarer/lib/constants";
 
 export interface PriceBasisLink {
@@ -41,6 +41,7 @@ export function PriceBasisNowView({ rows, baseUnit, tolerancePct, tolIsCategory 
                 {ref && priceReferenceDateText(ref) && <span className="text-caption text-ink-secondary">{priceReferenceDateText(ref)}</span>}
                 <span className="ml-auto text-caption text-ink-secondary">Toleranse {tol}</span>
               </div>
+              {ref && priceReferenceReasonText(ref) && <p className="text-caption text-ink-secondary">{priceReferenceReasonText(ref)}</p>}
               {link.notes && <p className="text-caption text-ink-secondary">{link.notes}</p>}
             </li>
           ))}
