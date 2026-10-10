@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { useUpsertRmSupplier, useDeleteRmSupplier } from "@/ravarer/hooks/useRmSuppliers";
-import { PACKAGE_UNITS, formatNok } from "@/ravarer/lib/constants";
+import { formatNok } from "@/ravarer/lib/constants";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import type { RmSupplierRow } from "@/ravarer/hooks/useRmSuppliers";
 import { perBaseUnitFromPackage } from "@/ravarer/lib/rawMaterialKpi";
@@ -19,6 +19,8 @@ interface RmSupplierDialogProps {
   rawMaterialId: string;
   baseUnit: string;
   existing: RmSupplierRow | null;
+  /** Åpner PackageEditor i modus «Egen pakning for denne leverandøren». */
+  onEditPackage?: (link: RmSupplierRow) => void;
 }
 
 export function RmSupplierDialog({
@@ -27,6 +29,7 @@ export function RmSupplierDialog({
   rawMaterialId,
   baseUnit,
   existing,
+  onEditPackage,
 }: RmSupplierDialogProps) {
   const { data: suppliers = [] } = useSuppliers();
   const { user } = useRavarer();
@@ -39,13 +42,6 @@ export function RmSupplierDialog({
   const [productName, setProductName] = useState(
     existing?.supplier_product_name ?? "",
   );
-  const [packageSize, setPackageSize] = useState(
-    existing?.package_size?.toString() ?? "",
-  );
-  const [baseUnitsPerPackage, setBaseUnitsPerPackage] = useState(
-    existing?.base_units_per_package?.toString() ?? "",
-  );
-  const [packageUnit, setPackageUnit] = useState(existing?.package_unit ?? "");
   const [agreedPrice, setAgreedPrice] = useState(
     existing?.agreed_price?.toString() ?? "",
   );
@@ -62,8 +58,8 @@ export function RmSupplierDialog({
   /** Avtaleprisen skrives inn per pakning og lagres også om til per grunnenhet. */
   // «2,5» skal bli 2,5 — Number("2,5") gir NaN og droppet pakningen stille.
   const agreedPriceNum = parseDecimal(agreedPrice);
-  const baseUnitsNum = parseDecimal(baseUnitsPerPackage);
-  const packageSizeNum = parseDecimal(packageSize);
+  // Pakningen er skrivebeskyttet her — den endres i PackageEditor.
+  const baseUnitsNum = existing?.base_units_per_package ?? null;
   // Begge prisfeltene skrives konsistent, uansett hvilken av dem brukeren fyller inn.
   const perBaseUnit =
     priceBasis === "base" ? agreedPriceNum : perBaseUnitFromPackage(agreedPriceNum, baseUnitsNum);
@@ -82,9 +78,6 @@ export function RmSupplierDialog({
       supplier_id: supplierId,
       supplier_sku: sku || null,
       supplier_product_name: productName || null,
-      package_size: packageSizeNum,
-      base_units_per_package: baseUnitsNum,
-      package_unit: packageUnit || null,
       agreed_price: perPackage,
       agreed_price_per_base_unit: perBaseUnit,
       agreed_price_set_at: agreedPriceNum == null ? null : new Date().toISOString(),
@@ -135,43 +128,19 @@ export function RmSupplierDialog({
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Pakn. størrelse</Label>
-              <Input
-                type="text"
-                inputMode="decimal"
-                value={packageSize}
-                onChange={(e) => setPackageSize(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label>Pakn. enhet</Label>
-              <Select value={packageUnit} onValueChange={setPackageUnit}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Velg" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PACKAGE_UNITS.map((u) => (
-                    <SelectItem key={u} value={u}>
-                      {u}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div>
-            <Label>Antall baseenheter per pakning</Label>
-            <Input
-              type="text"
-              inputMode="decimal"
-              value={baseUnitsPerPackage}
-              onChange={(e) => setBaseUnitsPerPackage(e.target.value)}
-            />
-            <p className="mt-1 text-xs text-ink-secondary">
-              Brukes til å regne om fakturapriser til pris per baseenhet for
-              denne leverandøren.
+          <div className="rounded-lg border p-3">
+            <Label className="text-sm">Pakning hos leverandøren</Label>
+            <p className="mt-1 text-sm tabular-nums">
+              {existing?.package_size ? `${existing.package_size} ${existing.package_unit ?? ""}` : "Ingen egen pakning"}
+              {baseUnitsNum != null && <span className="text-muted-foreground"> · {baseUnitsNum} {baseUnit} per pakning</span>}
+            </p>
+            {existing && onEditPackage && (
+              <Button variant="outline" size="sm" className="mt-2" onClick={() => onEditPackage(existing)}>
+                Endre pakning
+              </Button>
+            )}
+            <p className="mt-1 text-caption text-muted-foreground">
+              Pakningen endres med forhåndsvisning og omregning av fakturapriser.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -198,7 +167,7 @@ export function RmSupplierDialog({
             </div>
             <p className="col-span-2 text-xs text-ink-secondary">
               {perBaseUnit == null
-                ? `Fyll inn antall baseenheter per pakning for å se prisen per ${baseUnit}.`
+                ? `Sett pakningen først for å se prisen per ${baseUnit}.`
                 : `Tilsvarer ${formatNok(perBaseUnit)} per ${baseUnit}${perPackage == null ? "" : ` og ${formatNok(perPackage)} per pakning`}.`}
             </p>
           </div>
