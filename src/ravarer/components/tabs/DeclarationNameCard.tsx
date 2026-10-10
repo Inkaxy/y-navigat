@@ -1,13 +1,9 @@
-import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Loader2, Save, Sparkles, Table2 } from "lucide-react";
-import { toast } from "sonner";
+import { AlertTriangle } from "lucide-react";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useRawMaterial, type RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 import { DeclarationNameField } from "@/ravarer/editors/DeclarationNameField";
