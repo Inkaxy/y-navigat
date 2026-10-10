@@ -1,43 +1,32 @@
-# Allergener fra deklarasjonsteksten – funn og forslag
+# Råvarer 2.0 — fase 1: gjennomføring i fire leveranser
 
-## Funn (kun lest, ingenting endret)
+Fase 1 er stor: rundt 60 filer får nye ruter, og nesten hele `src/` endres. For at hver del skal kunne kontrolleres og angres hver for seg, leveres den i fire trinn. Hvert trinn avsluttes med grønn typekontroll, bygg og tester, og med en kort rapport. Ingen migrasjoner, ingen endringer i Edge-funksjoner, `units.ts` røres ikke, og ingenting publiseres.
 
-Alle elementene i skjermbildet finnes:
+## Trinn 1 — Fundament uten synlige endringer (A1, A2, A4, RPC-lag)
+- Tokens i `index.css` (lys og mørk): `--alert-*` og `--rm-*`, avledet fra `--state-*`/`--brand-*`.
+- `src/ravarer/lib/labels.ts` som eneste kilde for etiketter. Dagens kart blir tynne re-eksporter. Test: alle kjente koder har etikett, og ukjente koder får «Annen årsak».
+- `src/ravarer/lib/paths.ts` med stibygger for alle Råvarer-sider (nye stier).
+- Fem RPC-er legges i `types.ts`, med parse-funksjoner i `src/ravarer/lib/workRpc.ts` og hooks (`useWorkSummary`, `useWorkItems`, `useActivityFeed`, `usePriceMovers`, `useAcceptSupplierItemPrice`). I tillegg `invalidateRavarerCounts`, som kobles inn i alle relevante `useMutation` i `src/fakturaer` og `src/ravarer`.
 
-| Element | Fil |
-|---|---|
-| «Deklarasjonshjelp», «Bruk standardformat», «Kontroller med AI», «Bruk forslag» | `src/varer/components/declaration/DeclarationAssistantPanel.tsx` (178, 287–295, 369) |
-| «Hent allergener fra råvarene», «Inneholder (kommaseparert)», «Kan inneholde spor av (kommaseparert)», «Lagre kladd» | `src/varer/components/recipes/label/DeclarationNutritionSection.tsx` (323–388) |
-| Skjematype `Form { ingredientText, contains, mayContain, nutrition }` | `src/varer/components/recipes/label/declarationForm.ts` |
-| AI-endepunkt | `supabase/functions/declaration-assistant/index.ts` (589 linjer) |
+## Trinn 2 — Primitiver (A3) og forhåndsvisning
+- `src/ravarer/ui/`: `ModulePage`, `SectionTabs`, `DataTable`, `SplitView`/`PeekPanel`, `useHotkeys` + `ShortcutHelp`, `ResultBox`.
+- `queueShortcuts` og de innebygde tastaturhåndtererne i Vareliste og RawMaterialDetail flyttes over på `useHotkeys`, med de samme tastene som før.
+- `Kpi.tsx` byttes ut med `OrderDeskKpi`, med de samme tallene.
+- Forhåndsvisning `ravarer-shell-preview.html` (1440 og 390 px). Tester for URL-tilstand, hotkey-vakt, sortering og fanebytte i `SectionTabs`.
 
-**AI-endepunktet:** henter Henriks egen OpenAI-nøkkel (kryptert i oppsettet), bare modeller på godkjent liste, kaller `https://api.openai.com/v1/responses` med strengt JSON-skjema `DECLARATION_OUTPUT_SCHEMA` (`_shared/declaration-instructions.ts`): `proposals` (bare `case | spelling | alias | spacing`), `allergen_findings`, `questions`. Tilgang: innlogging, så `has_app_write_access('varer')` eller skriverett på oppskriften (linje 160–182), dagskvote og bruklogg.
+## Trinn 3 — Ny informasjonsstruktur (B1–B4)
+- Nye ruter i `App.tsx`. Eksisterende sider monteres med `embedded`-prop. Innboksens fane-parameter blir `innboks`.
+- `resolveLegacyRavarerUrl` + `LegacyRavarerRedirect`, med én test per rad i tabellen.
+- Alle hardkodede `"/ravarer/..."` i `src/` byttes til `paths.*`.
+- Ny `RavarerNav` med fem innganger og tannhjul, mobilark, enkel Oversikt-side og Innstillinger-side med vakt for approve/admin.
+- `pageLabels` for alle nye stier, og full bredde for `/ravarer/priskontroll`.
 
-**Svaret til klienten:** `suggestion: { markerText, issues, allergenCodes, blocked }`, `before`, `accepted`, `rejected`, `metadata_conflicts`. `allergenCodes` regnes ut deterministisk fra *stjernemerkede* ord i teksten (`_shared/declaration-format.ts:578`), ikke av modellen.
+## Trinn 4 — ⌘K og dokumentasjon (B5, C1)
+- Søketyper `raw_material` og `supplier` i entitetssøket, med hurtighandlinger. Vareliste åpner ny-råvare-dialogen ved `?ny=1`.
+- `docs/ravarer-2-designprinsipper.md`.
+- Gjennomgang av alle gamle stier i forhåndsvisningen og sluttrapport.
 
-**Skjema og lagring:** lokal `useState<Form>`. «Lagre kladd» oppdaterer `recipes.manual_ingredient_declaration` og `manual_allergen_summary: { contains, may_contain }` direkte (linje 106–120). Feltene er låst når `canWrite` er false.
-
-## Hvorfor allergenfeltene ikke fylles
-
-1. Panelet sender bare teksten videre: `onApply: (markerText: string) => void`. I `onAssistant(text)` settes bare `ingredientText`. `allergenCodes` blir aldri brukt.
-2. Modellen er bygd for å rette tekst, ikke for å hente ut allergener. `allergen_findings` brukes bare internt mot registrerte data (`substantiateFindings`, linje 492). Det går ikke ut som noe forslag til feltene.
-3. «Kan inneholde spor av» finnes ikke i svaret i det hele tatt. Ingen kode leser setningen «Kan inneholde spor av …» i teksten.
-4. «Hent allergener fra råvarene» bruker råvareberegningen, ikke den registrerte teksten.
-
-## Minste nødvendige endring (forslag, ikke godkjent)
-
-Det trengs ikke et nytt AI-kall. Tallene finnes allerede deterministisk:
-
-1. **Ny knapp «Hent allergener fra teksten»** ved siden av «Hent allergener fra råvarene». Den leser `form.ingredientText` lokalt:
-   - *stjernemerkede* ord gjøres om til koder med den eksisterende tolkningen som gir `allergenCodes`, og deretter til norske navn med `ALLERGEN_LABEL` → **Inneholder**.
-   - Setningen «Kan inneholde spor av …» tolkes med `normalizeAllergenCode` → **Kan inneholde spor av**.
-   - Uleselige ord vises som «ikke tolket». De legges aldri stille inn.
-2. **Etter «Bruk forslag»/«Bruk standardformat»:** tilby samme utfylling, ikke automatisk. Utvid `onApply` til `(markerText, allergenCodes)`.
-3. Bekreftelsesdialog hvis feltene allerede har innhold (eksisterende `Pending`-mønster). Ingenting lagres før «Lagre kladd». Godkjente deklarasjoner berøres ikke.
-4. Tester: stjernemerking → Inneholder, sporsetning → Kan inneholde, ukjente ord avvist, ingen overskriving uten bekreftelse.
-
-Valgfritt senere: la AI foreslå umerkede allergenord (f.eks. «hvetemel» uten stjerner). Det krever endring i skjema/edge og betalte OpenAI-kall. Da trengs Henriks eksplisitte godkjenning og en nøkkel.
-
-## Tekniske detaljer
-- Bare kode i nettleseren. Ingen database-, edge- eller deployendring i trinn 1–4.
-- Tolkningen må speile `_shared/declaration-format.ts`. Gjenbruk speilet i `src/` hvis det finnes, ellers en liten delt hjelper med speilingstest, som `allergenMirror.test.ts`.
+## Kjente begrensninger
+- Commit-SHA kan jeg ikke lese i dette miljøet. Den må hentes fra GitHub.
+- Innloggede sider kan ikke kjøres i forhåndsvisningen. Visuell sjekk gjøres med faste data.
+- `npm run lint` er bare rent på berørte filer. Resten av prosjektet har kjente feil fra før.
