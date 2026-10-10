@@ -36,7 +36,7 @@ export function RawMaterialCreateSheet({ open, onOpenChange, context, onDone }: 
   const [draft, setDraft] = useState<CreateDraft>(() => initialDraft(context));
   const [error, setError] = useState<string | null>(null);
   const [linked, setLinked] = useState<LinkSupplierItemResult | null>(null);
-  const { submit, useExisting, isPending } = useCreateSheetSubmit(context);
+  const { submit, linkExisting, isPending } = useCreateSheetSubmit(context);
   const firstLine = context.kind === "supplier_item" ? (context.lineIds?.[0] ?? null) : null;
   const inference = usePackageInference(open ? firstLine : null, null);
 
@@ -66,7 +66,7 @@ export function RawMaterialCreateSheet({ open, onOpenChange, context, onDone }: 
   };
 
   const pickExisting = async (id: string) => {
-    try { finish(await useExisting(id)); } catch (e) { toast.error(e instanceof Error ? e.message : "Kunne ikke koble"); }
+    try { finish(await linkExisting(id)); } catch (e) { toast.error(e instanceof Error ? e.message : "Kunne ikke koble"); }
   };
 
   const ai = context.kind === "datasheet"

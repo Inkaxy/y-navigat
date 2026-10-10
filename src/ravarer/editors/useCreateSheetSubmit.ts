@@ -74,12 +74,12 @@ export function useCreateSheetSubmit(ctx: CreateContext) {
   };
 
   /** «Bruk denne»: i fakturakontekst kobles varekortet til en eksisterende råvare. */
-  const useExisting = async (rawMaterialId: string): Promise<CreateOutcome> => {
+  const linkExisting = async (rawMaterialId: string): Promise<CreateOutcome> => {
     if (ctx.kind !== "supplier_item") return { kind: "created", rawMaterialId };
     if (!company?.id) throw new Error("Fant ikke selskapet");
     const result = await link.mutateAsync(linkExistingBody(ctx, rawMaterialId, company.id));
     return { kind: "linked", result };
   };
 
-  return { submit, useExisting, isPending: create.isPending || link.isPending || datasheetPending };
+  return { submit, linkExisting, isPending: create.isPending || link.isPending || datasheetPending };
 }
