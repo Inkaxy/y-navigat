@@ -120,6 +120,14 @@ export default function VarelistePage() {
 
 
   const [newOpen, setNewOpen] = useState(false);
+  // «Ny råvare» fra ⌘K: `?ny=1` åpner dialogen og fjernes fra adressen.
+  useEffect(() => {
+    if (params.get("ny") !== "1") return;
+    if (canWrite) setNewOpen(true);
+    const next = new URLSearchParams(params);
+    next.delete("ny");
+    setParams(next, { replace: true });
+  }, [params, setParams, canWrite]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [focusedId, setFocusedId] = useState<string | null>(null);
