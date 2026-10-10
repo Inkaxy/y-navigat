@@ -1,3 +1,5 @@
+import { setPrimarySupplier } from "@/ravarer/lib/supplierLinkRpc";
+import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -243,6 +245,7 @@ export default function ForhandlingDetail() {
             });
             if (error) throw error;
             if (!data?.success) throw new Error(data?.error ?? "Feil");
+            invalidateRawMaterial(qc);
             // Mark unconfirmed tentative items as unconfirmed_active
             if (!onlyConfirmed) {
               await supabase
@@ -396,6 +399,7 @@ export default function ForhandlingDetail() {
         onSuccess={() => {
           qc.invalidateQueries({ queryKey: ["negotiation", id] });
           qc.invalidateQueries({ queryKey: ["negotiations"] });
+          invalidateRawMaterial(qc);
           toast.success("Forhandling avsluttet");
         }}
       />
@@ -567,6 +571,13 @@ function ConcludeDialog({
       });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error ?? "Feil");
+      // Primær settes atomisk (råvare + alle koblinger) etter hovedskrivingen.
+      for (const it of items) {
+        const p = picks[it.id];
+        if (!p?.set_as_primary || !p.winner_recipient_id) continue;
+        const rec = recipients.find((r: { id: string; supplier_id: string }) => r.id === p.winner_recipient_id);
+        if (rec?.supplier_id && it.raw_material_id) await setPrimarySupplier(it.raw_material_id, rec.supplier_id);
+      }
     },
     onSuccess: () => { onOpenChange(false); onSuccess(); },
     onError: (e: any) => toast.error(e?.message ?? "Avslutning feilet"),
