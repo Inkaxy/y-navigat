@@ -60,7 +60,7 @@ export function TieredPriceSettings({ legalEntityId, settings, canWrite, loading
       }, { onConflict: "legal_entity_id" });
       if (error) throw error;
     },
-    onSuccess: () => { setSaved(true); setDirty(false); void qc.invalidateQueries({ queryKey: ["invoice-match-tolerances"] }); },
+    onSuccess: async () => { setSaved(true); await qc.invalidateQueries({ queryKey: ["invoice-match-tolerances"] }); setDirty(false); },
     onError: (e) => showError("nivadelt-prisavvik", e, "Kunne ikke lagre innstillingene"),
   });
 

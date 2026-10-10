@@ -44,7 +44,6 @@ import { formatNok, formatNumber, formatDate } from "@/ravarer/lib/constants";
 import { categoryOptions } from "@/ravarer/lib/categories";
 import {
   BUILTIN_VIEWS,
-  DEFAULT_DEVIATION_TOLERANCE,
   filterAndSortItems,
   type ListSortKey,
   type RawMaterialListItem,

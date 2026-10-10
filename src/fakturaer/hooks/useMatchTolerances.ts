@@ -33,7 +33,11 @@ export interface MatchTolerances {
   byCategory: Record<string, number>;
   settings: MatchSettings | null;
   isLoading: boolean;
-  /** Toleranse i prosent for en kategori: kategori-override → default → 5. */
+  /**
+   * Toleranse i prosent for en kategori: kategori-override → selskapets default → 3 (FALLBACK_TOLERANCE_PCT).
+   * Merk: databasens kolonnestandard for `default_price_tolerance_pct` er 2 %, men selskapet har 3 % lagret;
+   * fallbacken brukes bare når ingen innstillinger er lagret.
+   */
   toleranceFor: (category?: string | null) => number;
 }
 

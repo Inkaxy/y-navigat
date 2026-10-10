@@ -95,7 +95,7 @@ export function SuppliersTab({ rm }: Props) {
         unitLabel={unitLabel}
         canWrite={canWrite}
         isLoading={isLoading}
-        hasHistory={(sid) => history.some((h) => h.supplier_id === sid)}
+        hasHistory={(sid) => history.some((h) => h.supplier_id === sid && h.source === "invoice" && !h.is_legacy)}
         onNewSupplier={() => setSupplierOpen(true)}
         onLink={(existingId) => setLinkOpen({ open: true, existingId })}
       />

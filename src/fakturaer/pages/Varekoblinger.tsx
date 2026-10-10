@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,10 +36,19 @@ export default function Varekoblinger() {
     }, { replace: true });
   }, [setSp]);
   const urlQ = sp.get("q") ?? "";
+  // Énveis: brukerens debouncede søk skrives til URL kun når det endres.
+  const lastWritten = useRef(q);
   useEffect(() => {
-    if (urlQ !== q) set("q", q || null);
-    // urlQ med i avhengighetene; effekten skriver bare når søket faktisk avviker.
-  }, [q, urlQ, set]);
+    if (q === lastWritten.current) return;
+    lastWritten.current = q;
+    set("q", q || null);
+  }, [q, set]);
+  // Endringer utenfra (tilbake-knapp, lenker med ?q=) speiles inn i feltet.
+  useEffect(() => {
+    if (urlQ === lastWritten.current) return;
+    lastWritten.current = urlQ;
+    setQInput(urlQ);
+  }, [urlQ]);
 
   const data = useSupplierItems({ supplierId, search: q, status, page });
   const suppliers = useSuppliersFor(company?.id ?? null);
