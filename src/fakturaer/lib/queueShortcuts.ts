@@ -1,18 +1,9 @@
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 
-/** Samme vakter som i Vareliste: ingen hurtigtaster mens brukeren skriver eller i dialog. */
-export function shouldIgnoreShortcut(e: KeyboardEvent): boolean {
-  if (e.ctrlKey || e.metaKey || e.altKey) return true;
-  const el = e.target instanceof HTMLElement ? e.target : null;
-  if (!el) return false;
-  if (el.isContentEditable) return true;
-  if (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName)) return true;
-  // En knapp med fokus skal bare svelge Enter og mellomrom — den er knappens
-  // egen aktivering. Alle andre hurtigtaster skal fortsatt virke.
-  if (el.closest("button") && (e.key === "Enter" || e.key === " ")) return true;
-  if (el.closest('[role="combobox"], [role="dialog"], [role="menu"], [role="listbox"]')) return true;
-  return false;
-}
+import { shouldIgnoreShortcut } from "@/ravarer/ui/hotkeys";
+
+/** Felles vakt fra Råvarer-hurtigtastene (samme regler som før). */
+export { shouldIgnoreShortcut };
 
 export type ShortcutDialog = "match" | "create" | "not_rm";
 
