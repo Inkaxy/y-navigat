@@ -54,6 +54,7 @@ import { csvValue } from "@/ravarer/lib/varelisteCsv";
 import { isLargeDeviation } from "@/ravarer/components/vareliste/PriceCells";
 import { SupplierItemsBanner } from "@/ravarer/components/vareliste/SupplierItemsBanner";
 import { SaveViewDialog } from "@/ravarer/components/vareliste/SaveViewDialog";
+import { paths } from "@/ravarer/lib/paths";
 
 interface SavedView {
   id: string;
@@ -368,7 +369,7 @@ export default function VarelistePage() {
         setFocusedId(filtered[Math.max(idx - 1, 0)]?.id ?? filtered[0].id);
       } else if (e.key === "Enter" && focusedId) {
         e.preventDefault();
-        navigate(`/ravarer/varer/${focusedId}${listSearch ? `?${listSearch}` : ""}`);
+        navigate(`${paths.raavare(focusedId)}${listSearch ? `?${listSearch}` : ""}`);
       } else if (e.key === "e" && focusedId && canWrite) {
         e.preventDefault();
         setEditing({ id: focusedId, field: "cost" });
@@ -673,7 +674,7 @@ export default function VarelistePage() {
               {filtered.map((item) => (
                 <li key={item.id} className="p-3">
                   <Link
-                    to={`/ravarer/varer/${item.id}${listSearch ? `?${listSearch}` : ""}`}
+                    to={`${paths.raavare(item.id)}${listSearch ? `?${listSearch}` : ""}`}
                     className="block"
                   >
                     <p className="font-medium">{item.name}</p>

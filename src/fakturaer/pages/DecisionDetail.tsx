@@ -41,7 +41,7 @@ export default function DecisionDetail() {
   const fromRavarer = fra === "ravarer" || fra === "alle";
   const fromScope = fra === "alle" ? "alle" : "ravarer";
   const backParams = new URLSearchParams(sp); backParams.delete("fra");
-  const backHref = fromRavarer ? `/ravarer/fakturaer/${fromScope === "alle" ? "beslutninger" : "ravarer"}${backParams.toString() ? `?${backParams}` : ""}` : paths.priskontroll();
+  const backHref = fromRavarer ? paths.beslutninger({ omfang: fromScope === "alle" ? undefined : "ravarer", ...Object.fromEntries(backParams) }) : paths.priskontroll();
   const qc = useQueryClient();
   const { data: company } = useCompany();
   const q = useReviewLines({ legalEntityId: company?.id ?? null, limit: null });
@@ -81,7 +81,7 @@ export default function DecisionDetail() {
     const all = buildDecisionGroups(q.data?.rows ?? []);
     const ordered = fromRavarer ? filterRavarerGroups(all, parseRavarerFilter(sp, fromScope), fromScope) : all;
     const next = nextGroupKey(ordered, groupKey);
-    if (next) navigate(`/ravarer/priskontroll/beslutninger/${encodeGroupKey(next)}${sp.toString() ? `?${sp}` : ""}`);
+    if (next) navigate(`${paths.beslutning(encodeGroupKey(next))}${sp.toString() ? `?${sp}` : ""}`);
     else navigate(backHref);
   };
   const done = async (msg?: string) => {

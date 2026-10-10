@@ -10,6 +10,7 @@ import { useCompany } from "@/hooks/useCompany";
 import { buildDecisionGroups, DECISION_KIND_LABEL, encodeGroupKey, RAVARE_KINDS } from "@/fakturaer/lib/decisionGroups";
 import { filterRavarerGroups, filtersFor, paginate, parseRavarerFilter, RAVARER_PAGE_SIZE, type QueueScope } from "@/fakturaer/lib/ravarerQueueFilter";
 import { cn } from "@/lib/utils";
+import { paths } from "@/ravarer/lib/paths";
 
 export default function RavarerQueue({ scope = "ravarer" }: { scope?: QueueScope }) {
   const { data: company } = useCompany();
@@ -28,7 +29,7 @@ export default function RavarerQueue({ scope = "ravarer" }: { scope?: QueueScope
     if (k !== "side") n.delete("side");
     setSp(n, { replace: true });
   };
-  const detailHref = (key: string) => `/ravarer/priskontroll/beslutninger/${encodeGroupKey(key)}?fra=${scope}${sp.toString() ? `&${sp.toString()}` : ""}`;
+  const detailHref = (key: string) => `${paths.beslutning(encodeGroupKey(key), { fra: scope })}${sp.toString() ? `&${sp.toString()}` : ""}`;
 
   return (
     <div className="px-page py-6 space-y-5">

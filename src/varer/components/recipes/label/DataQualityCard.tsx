@@ -30,6 +30,7 @@ import {
   GrainClassInline,
   WaterContentInline,
 } from "./InlineRawMaterialFix";
+import { paths } from "@/ravarer/lib/paths";
 
 export interface MissingData {
   nutrition?: MissingNutritionRow[];
@@ -71,7 +72,7 @@ interface Props {
 }
 
 function rmLink(id: string, tab?: string): string {
-  return `/ravarer/varer/${id}${tab ? `?tab=${tab}` : ""}`;
+  return paths.raavare(id, { tab });
 }
 
 /** Datakvalitet — ÉN oppgaveliste, én rad per ingrediens, samme rettehandlinger overalt. */

@@ -103,7 +103,7 @@ export default function RawMaterialDetail() {
   const goTo = useCallback(
     (targetId: string) =>
       navigate(
-        `/ravarer/varer/${targetId}${listSearch ? `?${listSearch}` : ""}`,
+        `${paths.raavare(targetId)}${listSearch ? `?${listSearch}` : ""}`,
       ),
     [navigate, listSearch],
   );
@@ -207,7 +207,7 @@ export default function RawMaterialDetail() {
           { label: "Råvarer", to: paths.varer() },
           {
             label: "Vareliste",
-            to: `/ravarer/varer${listSearch ? `?${listSearch}` : ""}`,
+            to: `${paths.varer()}${listSearch ? `?${listSearch}` : ""}`,
           },
           { label: rm.name },
         ]}
@@ -218,7 +218,7 @@ export default function RawMaterialDetail() {
               size="sm"
               onClick={() =>
                 navigate(
-                  `/ravarer/varer${listSearch ? `?${listSearch}` : ""}`,
+                  `${paths.varer()}${listSearch ? `?${listSearch}` : ""}`,
                 )
               }
             >

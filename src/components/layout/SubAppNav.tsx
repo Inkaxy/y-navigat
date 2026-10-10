@@ -389,9 +389,6 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
 
   const isLinkActive = (to: string) => {
     const [path, query] = to.split("?");
-    if (path === "/ravarer/fakturaer" && !query) {
-      return pathname === path && !new URLSearchParams(search).get("status");
-    }
     if ((path === "/pos-styring" || path === "/fakturering") && !query) {
       return pathname === path;
     }
