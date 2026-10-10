@@ -51,7 +51,7 @@ export function DataTable<T>(p: Props<T>) {
   const [sort, setSort] = useState<{ id: string; dir: SortDir } | null>(null);
   const anchor = useRef<string | null>(null);
   const defaultHidden = useMemo(() => p.columns.filter((c) => c.defaultHidden).map((c) => c.id), [p.columns]);
-  const [hiddenPref, setHiddenPref] = useUiPreference<string[]>(p.preferenceScope ?? "ravarer:datatable:ephemeral", defaultHidden);
+  const { value: hiddenPref, setValue: setHiddenPref } = useUiPreference<string[]>(p.preferenceScope ?? "ravarer:datatable:ephemeral", defaultHidden);
   const hidden = new Set(p.preferenceScope ? hiddenPref : defaultHidden);
   const cols = p.columns.filter((c) => !hidden.has(c.id));
 
@@ -93,7 +93,9 @@ export function DataTable<T>(p: Props<T>) {
   return (
     <QueryState
       isLoading={!!p.isLoading && !p.rows}
-      error={p.error ?? null}
+      isError={!!p.error}
+      error={p.error}
+      scope={`ravarer:${p.ariaLabel}`}
       onRetry={p.onRetry}
       isEmpty={!p.isLoading && sorted.length === 0}
       emptyTitle={p.emptyText ?? "Ingen treff"}
