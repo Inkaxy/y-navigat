@@ -17528,8 +17528,8 @@ export type Database = {
       }
       rm_price_reference: {
         Args: {
-          p_invoice_date: string
-          p_invoice_id: string | null
+          p_invoice_date?: string
+          p_invoice_id?: string
           p_raw_material_id: string
           p_supplier_id: string
         }
