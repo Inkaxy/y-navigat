@@ -93,7 +93,6 @@ export default function InvoiceDetailPage() {
   const canMatch = canWrite && hasInvoiceAccess && !isFinal;
 
   const matchLineRaw = matchLineId ? lines.find((l) => l.id === matchLineId) : null;
-  const matchLineRaw = matchLineId ? lines.find((l) => l.id === matchLineId) : null;
   const matchLineRow: ReviewLineRow | null = matchLineRaw ? toReviewLineRow(data, matchLineRaw, (matchLineSuggestions ?? []) as ReviewLineRow["suggestions"]) : null;
 
   async function rerunAutoMatch() {
