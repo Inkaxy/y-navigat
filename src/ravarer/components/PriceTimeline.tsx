@@ -34,6 +34,7 @@ import {
   type TimelineLink,
   type TimelinePoint,
 } from "@/ravarer/lib/priceTimeline";
+import { paths } from "@/ravarer/lib/paths";
 
 function sourceLabel(value: string): string {
   return PRICE_SOURCES.find((s) => s.value === value)?.label ?? value;
@@ -217,7 +218,7 @@ export function PriceTimeline({
                     r: 5,
                     onClick: (_: unknown, payload: unknown) => {
                       const p = (payload as { payload?: TimelinePoint })?.payload;
-                      if (p?.invoiceId) navigate(`/ravarer/fakturaer/${p.invoiceId}`);
+                      if (p?.invoiceId) navigate(paths.faktura(p.invoiceId));
                     },
                   }}
                 />
@@ -277,7 +278,7 @@ export function PriceTimeline({
                       <button
                         type="button"
                         className="font-mono text-xs text-app underline-offset-2 hover:underline"
-                        onClick={() => navigate(`/ravarer/fakturaer/${r.invoiceId}`)}
+                        onClick={() => navigate(paths.faktura(r.invoiceId))}
                       >
                         {r.invoiceNumber ?? "Åpne"}
                       </button>

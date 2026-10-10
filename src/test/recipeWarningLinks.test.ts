@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { paths } from "@/ravarer/lib/paths";
 
 /**
  * Sjekker at lenkene useRecipeWarnings genererer mot /ravarer/vareliste/:id
@@ -9,18 +10,18 @@ import path from "node:path";
 describe("useRecipeWarnings — lenker matcher registrerte ruter", () => {
   const rmId = "11111111-1111-1111-1111-111111111111";
   const hrefs = [
-    `/ravarer/vareliste/${rmId}?tab=suppliers`,
-    `/ravarer/vareliste/${rmId}?tab=nutrition`,
+    paths.raavare(rmId, { tab: "suppliers" }),
+    paths.raavare(rmId, { tab: "nutrition" }),
   ];
 
-  const appTsx = fs.readFileSync(path.resolve(__dirname, "../App.tsx"), "utf-8");
+  const routesTsx = fs.readFileSync(path.resolve(__dirname, "../ravarer/routes.tsx"), "utf-8");
 
-  it("finner /ravarer/vareliste/:id som registrert rute i App.tsx", () => {
-    expect(appTsx).toMatch(/path="\/ravarer\/vareliste\/:id"/);
+  it("finner /ravarer/varer/:id som registrert rute", () => {
+    expect(routesTsx).toMatch(/path="\/ravarer\/varer\/:id"/);
   });
 
   it("hver lenke fra useRecipeWarnings matcher denne ruten", () => {
-    const routePattern = /^\/ravarer\/vareliste\/[^/?]+(\?.*)?$/;
+    const routePattern = /^\/ravarer\/varer\/[^/?]+(\?.*)?$/;
     for (const href of hrefs) {
       expect(href).toMatch(routePattern);
     }

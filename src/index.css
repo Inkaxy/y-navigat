@@ -58,6 +58,24 @@
     --state-neutral:         28 14% 44%;
     --state-info:            210 50% 42%;
 
+    /* ---- Varsel-aliaser (brukt av Ordre-kort) ---- */
+    --alert-info:            var(--state-info);
+    --alert-warning:         var(--state-warning);
+    --alert-success:         var(--state-success);
+
+    /* ---- Råvarer-status (StatusPill: 10 % fyll, 45 % ring) ---- */
+    --rm-koblet:             var(--state-success);
+    --rm-ukoblet:            var(--state-warning);
+    --rm-pakning:            var(--brand-gold);
+    --rm-pris:               var(--state-danger);
+    --rm-kontroll:           var(--state-info);
+    --rm-ikke-vare:          var(--state-neutral);
+    --rm-avstemt:            var(--state-success);
+    --rm-auto:               var(--state-info);
+    --rm-godkjent:           var(--state-success);
+    --rm-flagget:            var(--state-danger);
+    --rm-kreditnota:         var(--brand-bronze);
+
     /* ---- Radii — moderate, etikett-aktig ---- */
     --radius-sm: 6px;
     --radius-md: 10px;
@@ -144,6 +162,9 @@
   }
 
   .dark {
+    /* Råvarer-status: lysere varianter for kontrast på navy */
+    --rm-pakning:            38 70% 60%;
+    --rm-kreditnota:         var(--brand-bronze-soft);
     /* Emballasje-navy basert mørk modus */
     --surface-canvas:        214 38% 10%;
     --surface-raised:        214 36% 13%;

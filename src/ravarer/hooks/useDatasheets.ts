@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
 
 export interface ChangelogRow {
   id: string;
@@ -63,7 +64,7 @@ export function useAcknowledgeChange() {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: () => { invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["raw-material-changelog"] });
       qc.invalidateQueries({ queryKey: ["raw-material-changelog-count"] });
       toast.success("Endring bekreftet");
@@ -100,7 +101,7 @@ export function useDeleteDatasheets() {
       if (error) throw error;
       return ids.length;
     },
-    onSuccess: (n) => {
+    onSuccess: (n) => { invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["orphan-datasheets"] });
       qc.invalidateQueries({ queryKey: ["raw-material-datasheets"] });
       toast.success(`${n} datablad slettet`);

@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { QueryState } from "@/components/common/QueryState";
 import { formatNok, formatDate } from "@/ravarer/lib/constants";
+import { paths } from "@/ravarer/lib/paths";
 
 interface Props {
   rawMaterialId: string;
@@ -87,7 +88,7 @@ export function RecentInvoiceLinesCard({ rawMaterialId, baseUnit }: Props) {
                   </td>
                   <td className="py-2">
                     <Link
-                      to={`/ravarer/fakturaer/${r.invoice_id}`}
+                      to={paths.faktura(r.invoice_id)}
                       className="underline"
                     >
                       {r.invoices?.invoice_number ?? "Uten nummer"}

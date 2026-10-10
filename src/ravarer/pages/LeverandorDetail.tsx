@@ -47,6 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { paths } from "@/ravarer/lib/paths";
 
 type ItemSort = { key: "name" | "price"; dir: "asc" | "desc" };
 
@@ -144,7 +145,7 @@ export default function LeverandorDetailPage() {
       <Card className="p-12 text-center">
         <Truck className="mx-auto mb-3 h-10 w-10 text-ink-secondary" />
         <p className="text-ink-secondary">Fant ikke leverandøren.</p>
-        <Button variant="outline" className="mt-4" onClick={() => navigate("/ravarer/leverandorer")}>
+        <Button variant="outline" className="mt-4" onClick={() => navigate(paths.leverandorer())}>
           Tilbake til leverandører
         </Button>
       </Card>
@@ -166,7 +167,7 @@ export default function LeverandorDetailPage() {
                 Rediger leverandør
               </Button>
             )}
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => navigate("/ravarer/leverandorer")}>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => navigate(paths.leverandorer())}>
               <ArrowLeft className="h-4 w-4" /> Tilbake
             </Button>
           </div>
@@ -332,13 +333,13 @@ export default function LeverandorDetailPage() {
                       return (
                         <tr
                           key={r.id}
-                          onClick={() => navigate(`/ravarer/vareliste/${r.raw_material_id}`)}
+                          onClick={() => navigate(paths.raavare(r.raw_material_id))}
                           className="cursor-pointer border-t border-line-subtle transition-colors hover:bg-muted/40"
                         >
                           <td className="px-4 py-3 font-medium">
                             <div className="flex items-center gap-2">
                               <Link
-                                to={`/ravarer/vareliste/${r.raw_material_id}`}
+                                to={paths.raavare(r.raw_material_id)}
                                 onClick={(e) => e.stopPropagation()}
                                 className="hover:underline"
                               >
@@ -421,12 +422,12 @@ export default function LeverandorDetailPage() {
                       {invoices.map((inv) => (
                         <tr
                           key={inv.id}
-                          onClick={() => navigate(`/ravarer/fakturaer/${inv.id}`)}
+                          onClick={() => navigate(paths.faktura(inv.id))}
                           className="cursor-pointer border-t border-line-subtle transition-colors hover:bg-muted/40"
                         >
                           <td className="px-4 py-3 font-mono text-xs">
                             <Link
-                              to={`/ravarer/fakturaer/${inv.id}`}
+                              to={paths.faktura(inv.id)}
                               onClick={(e) => e.stopPropagation()}
                               className="text-primary hover:underline"
                             >
@@ -517,7 +518,7 @@ export default function LeverandorDetailPage() {
                           <td className="px-4 py-3">
                             {item ? (
                               <Link
-                                to={`/ravarer/vareliste/${item.raw_material_id}`}
+                                to={paths.raavare(item.raw_material_id)}
                                 className="text-primary hover:underline"
                               >
                                 {item.raw_material?.name ?? "—"}

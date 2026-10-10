@@ -6,6 +6,7 @@ import { QueryState } from "@/components/common/QueryState";
 import { DecisionNav } from "@/fakturaer/components/decisions/DecisionNav";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
+import { paths } from "@/ravarer/lib/paths";
 
 const STATUS: Record<string, string> = { open: "Åpen", resolved: "Løst", cancelled: "Avbrutt" };
 
@@ -37,7 +38,7 @@ export default function SupplierCases() {
             const sum = c.lines.reduce((s, l) => s + Number(l.amount_excl_vat), 0);
             return (
               <li key={c.id}>
-                <Link to={`/ravarer/fakturaer/saker/${c.id}`} className="flex flex-wrap items-center justify-between gap-2 p-4 hover:bg-muted/40">
+                <Link to={paths.sak(c.id)} className="flex flex-wrap items-center justify-between gap-2 p-4 hover:bg-muted/40">
                   <span><span className="block font-medium">{c.title}</span><span className="text-sm text-ink-secondary">{c.supplier?.name} · {inv} fakturaer · {STATUS[c.status] ?? c.status}</span></span>
                   <span className="text-sm text-ink-secondary">
                     {sum.toLocaleString("nb-NO", { style: "currency", currency: "NOK" })} ekskl. mva.

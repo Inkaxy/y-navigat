@@ -11,6 +11,7 @@ import { formatDate, formatNok, PRICE_SOURCES } from "@/ravarer/lib/constants";
 import { usePriceHistory } from "@/ravarer/hooks/useRmSuppliers";
 import { PriceComparisonCard } from "@/ravarer/components/PriceComparisonCard";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
+import { paths } from "@/ravarer/lib/paths";
 
 type EventKind = "endring" | "omregning" | "pris";
 
@@ -172,7 +173,7 @@ export function HistoryTab({ rm }: Props) {
                     <>
                       {" · "}
                       <Link
-                        to={`/ravarer/fakturaer/${e.invoiceId}`}
+                        to={paths.faktura(e.invoiceId)}
                         className="text-app underline-offset-2 hover:underline"
                       >
                         Åpne faktura

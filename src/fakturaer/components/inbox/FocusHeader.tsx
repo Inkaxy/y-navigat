@@ -5,6 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { formatDate } from "@/fakturaer/lib/constants";
 import type { InboxInvoice } from "@/fakturaer/hooks/useInboxInvoices";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
+import { paths } from "@/ravarer/lib/paths";
 
 interface Props {
   invoice: InboxInvoice | null;
@@ -66,7 +67,7 @@ export function FocusHeader(p: Props) {
             {p.invoice.assessment.invoiceLevelIssues?.join(" ")} Gjelder hele fakturaen, ikke enkeltlinjer. Fakturaen kan ikke fullføres før dette er rettet.
           </span>
           <Button asChild size="sm" variant="outline">
-            <Link to={`/ravarer/fakturaer/${p.invoice.id}`}>Rett registreringen</Link>
+            <Link to={paths.faktura(p.invoice.id)}>Rett registreringen</Link>
           </Button>
         </div>
       )}

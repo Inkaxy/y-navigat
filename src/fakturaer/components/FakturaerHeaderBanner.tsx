@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { FileText } from "lucide-react";
+import { EmbeddedActions, useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
 
 interface Props {
   title?: string;
@@ -8,6 +9,8 @@ interface Props {
 }
 
 export function FakturaerHeaderBanner({ title = "Fakturaer", subtitle = "Prismatch mot Tripletex — validerer pris og oppdaterer prishistorikk", actions }: Props) {
+  const embedded = useIsEmbedded();
+  if (embedded) return <EmbeddedActions>{actions}</EmbeddedActions>;
   return (
     <div className="rounded-2xl border border-line-subtle bg-surface-raised p-6 shadow-xs">
       <div className="flex items-start justify-between gap-4">

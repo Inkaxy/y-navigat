@@ -28,6 +28,7 @@ import {
 } from "@/ravarer/hooks/useSuppliers";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { NewSupplierDialog, SupplierDialog } from "@/ravarer/components/NewSupplierDialog";
+import { paths } from "@/ravarer/lib/paths";
 
 const TRACK_HELP =
   "Er denne på, hentes leverandørens fakturaer inn i NBhub: PDF-en lastes ned og varelinjene leses ut automatisk, slik at priser per råvare oppdateres. Er den av, hentes ingen fakturaer fra leverandøren i det hele tatt — leverandøren blir stående i listen, men uten fakturaer. Slå den på for råvareleverandører, og la den være av for strøm, forsikring og lignende.";
@@ -203,7 +204,7 @@ export default function LeverandorerPage() {
                   {filtered.map((r) => (
                     <tr
                       key={r.id}
-                      onClick={() => navigate(`/ravarer/leverandorer/${r.id}`)}
+                      onClick={() => navigate(paths.leverandor(r.id))}
                       className="cursor-pointer border-t border-line-subtle hover:bg-muted/40"
                     >
                       <td className="px-4 py-3 font-medium">{r.name}</td>

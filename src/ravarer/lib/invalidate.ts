@@ -158,11 +158,26 @@ export function invalidateRawMaterial(qc: QueryClient, id?: string): void {
   for (const queryKey of rawMaterialQueryKeys(id)) {
     void qc.invalidateQueries({ queryKey });
   }
+  invalidateRavarerCounts(qc);
 }
 
 /** Invalider alt som avhenger av en faktura. */
 export function invalidateInvoice(qc: QueryClient, invoiceId?: string): void {
   for (const queryKey of invoiceQueryKeys(invoiceId)) {
     void qc.invalidateQueries({ queryKey });
+  }
+  invalidateRavarerCounts(qc);
+}
+
+/** Nøkler for de felles tellerne i Råvarer (meny, Oversikt, faner). */
+export const RAVARER_COUNT_KEYS: readonly (readonly string[])[] = [
+  ["ravarer", "work-summary"],
+  ["ravarer", "work-items"],
+];
+
+/** Invalider tellerne slik at meny, Oversikt og faner alltid viser samme tall. */
+export function invalidateRavarerCounts(qc: QueryClient): void {
+  for (const queryKey of RAVARER_COUNT_KEYS) {
+    void qc.invalidateQueries({ queryKey: [...queryKey] });
   }
 }

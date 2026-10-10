@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Settings2, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
+import { paths } from "@/ravarer/lib/paths";
 
 export function TripletexStatusCard() {
   const { data: entities = [] } = useFakturaerLegalEntities();
@@ -64,7 +65,7 @@ export function TripletexStatusCard() {
           </div>
         </div>
         <Button asChild variant="outline" size="sm" className="gap-2">
-          <Link to="/ravarer/innstillinger/tripletex">
+          <Link to={paths.innstillinger({ seksjon: "tripletex" })}>
             <RefreshCw className="h-4 w-4" />
             {configured === 0 ? "Konfigurer Tripletex" : "Administrer"}
           </Link>

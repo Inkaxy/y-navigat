@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Mail, Handshake } from "lucide-react";
+import { paths } from "@/ravarer/lib/paths";
 
 interface Props {
   open: boolean;
@@ -18,7 +19,7 @@ export default function NewNegotiationTypeDialog({ open, onOpenChange }: Props) 
       best: "Best for: standard reforhandlinger, konkurrere flere leverandører.",
       onClick: () => {
         onOpenChange(false);
-        navigate("/ravarer/forhandlinger/ny");
+        navigate(paths.nyForhandling());
       },
     },
     {
@@ -28,7 +29,7 @@ export default function NewNegotiationTypeDialog({ open, onOpenChange }: Props) 
       best: "Best for: fysiske møter, telefonmøter, bredere diskusjon med én leverandør.",
       onClick: () => {
         onOpenChange(false);
-        navigate("/ravarer/forhandlinger/live/ny");
+        navigate(paths.nyLiveForhandling());
       },
     },
   ];

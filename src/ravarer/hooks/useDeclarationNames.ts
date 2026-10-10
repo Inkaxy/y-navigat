@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { recomputeRecipesForRawMaterial } from "@/varer/lib/recomputeFanout";
+import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
 
 export interface DeclarationWorklistRow {
   raw_material_id: string;
@@ -62,7 +63,7 @@ export function useSaveDeclarationName() {
       if (error) throw error;
       return { ...input, value };
     },
-    onSuccess: (res) => {
+    onSuccess: (res) => { invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["declaration-worklist"] });
       qc.invalidateQueries({ queryKey: ["raw_materials"] });
       qc.invalidateQueries({ queryKey: ["raw_material", res.rawMaterialId] });

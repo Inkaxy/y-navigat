@@ -14,6 +14,7 @@ import { FALLBACK_TOLERANCE_PCT, DEFAULT_HARD_CAP_PCT, DEFAULT_MIN_IMPACT_NOK, t
 import { cn } from "@/lib/utils";
 import { parseRematchQueued } from "@/fakturaer/lib/parseRpcJson";
 import { useRematchStatus } from "@/fakturaer/hooks/useRematchStatus";
+import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
 
 const LINE_KINDS = [
   ["frakt", "Frakt"], ["gebyr", "Gebyr"], ["avrunding", "Avrunding"], ["rabatt", "Rabatt"], ["pant", "Pant"], ["mva", "Mva"], ["annet", "Annet"],
@@ -60,7 +61,7 @@ export function TieredPriceSettings({ legalEntityId, settings, canWrite, loading
       }, { onConflict: "legal_entity_id" });
       if (error) throw error;
     },
-    onSuccess: async () => { setSaved(true); await qc.invalidateQueries({ queryKey: ["invoice-match-tolerances"] }); setDirty(false); },
+    onSuccess: async () => { invalidateRavarerCounts(qc); setSaved(true); await qc.invalidateQueries({ queryKey: ["invoice-match-tolerances"] }); setDirty(false); },
     onError: (e) => showError("nivadelt-prisavvik", e, "Kunne ikke lagre innstillingene"),
   });
 
@@ -70,7 +71,7 @@ export function TieredPriceSettings({ legalEntityId, settings, canWrite, loading
       if (error) throw error;
       return parseRematchQueued(data).queued;
     },
-    onSuccess: (n) => { setQueued(n); void qc.invalidateQueries({ queryKey: ["rematch-status"] }); },
+    onSuccess: (n) => { invalidateRavarerCounts(qc); setQueued(n); void qc.invalidateQueries({ queryKey: ["rematch-status"] }); },
     onError: (e) => showError("rematch-alle", e, "Kunne ikke starte ny beregning"),
   });
 

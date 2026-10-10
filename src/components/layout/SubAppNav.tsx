@@ -8,16 +8,15 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useAccessibleApps } from "@/hooks/useAccessibleApps";
-import { useReviewCount } from "@/fakturaer/hooks/useReviewCount";
-import { useSupplierItems } from "@/fakturaer/hooks/useSupplierItems";
-import { useExpiringAgreementsCount } from "@/ravarer/hooks/useAgreements";
+import { useWorkSummary } from "@/ravarer/hooks/useWorkData";
+import type { WorkSummary } from "@/ravarer/lib/workRpc";
+import { paths } from "@/ravarer/lib/paths";
 import { useInvoiceAccess } from "@/ravarer/hooks/useInvoiceAccess";
 import { useRavarerAccessLevel } from "@/ravarer/hooks/useRavarerAccessLevel";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMarginAlerts } from "@/varer/hooks/useMarginAlerts";
 import { useCompany } from "@/hooks/useCompany";
-import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,7 +40,6 @@ import {
   Settings,
   Users,
   UserCog,
-  Building2,
   Briefcase,
   LayoutGrid,
   Plug,
@@ -60,6 +58,8 @@ import {
   Printer,
   Globe,
   Warehouse,
+  Wheat,
+  ScanSearch,
   TrendingUp,
   GitCompareArrows,
   FileDown,
@@ -76,6 +76,14 @@ interface SimpleItem {
   label: string;
   icon: LucideIcon;
   badge?: number;
+  /** Aktiv bare på eksakt sti. */
+  exact?: boolean;
+  /** Prefikser som gjør lenken aktiv (i tillegg til `to`). */
+  matches?: string[];
+  /** Varseltone i stedet for standard tellerfarge. */
+  badgeTone?: "warning";
+  /** Bare ikon (med aria-label), høyrestilt. */
+  iconOnly?: boolean;
 }
 interface DropdownLink { to: string; label: string; badge?: number }
 interface DropdownItem {
@@ -222,132 +230,40 @@ export function SubAppNav() {
 }
 
 function RavarerNav() {
-  const { data: reviewCount = 0 } = useReviewCount();
   const { data: hasInvoiceAccess = false } = useInvoiceAccess();
-  const itemCounts = useSupplierItems({ supplierId: null, search: "", status: null, page: 1, pageSize: 1, enabled: hasInvoiceAccess }).data?.counts;
-  const supplierItemBadge = itemCounts ? itemCounts.ukoblet + itemCounts.mangler_pakning : 0;
   const { data: accessLevel = "none" } = useRavarerAccessLevel();
-  const { data: changelogCount = 0 } = useQuery({
-    queryKey: ["raw-material-changelog-count"],
-    queryFn: async () => {
-      const { count } = await supabase
-        .from("raw_material_changelog")
-        .select("*", { count: "exact", head: true })
-        .eq("acknowledged", false)
-        .in("severity", ["high", "medium"]);
-      return count ?? 0;
-    },
-    refetchInterval: 60_000,
-  });
-  const { data: expiringAgreementsCount = 0 } = useExpiringAgreementsCount();
-  const canManage = accessLevel === "admin" || accessLevel === "approve";
-  const { data: isPlatformAdmin = false } = usePlatformAdmin();
+  const { data: summary } = useWorkSummary({ includeApproval: false });
+  return (
+    <RavarerNavView
+      summary={summary}
+      hasInvoiceAccess={hasInvoiceAccess}
+      canManage={accessLevel === "admin" || accessLevel === "approve"}
+    />
+  );
+}
 
-  // Sju toppnivåpunkter. Alle ruter fra den gamle menyen finnes fortsatt —
-  // de er bare gruppert. Aktiv-markering skjer på eksplisitte `matches`,
-  // fordi flere ruter ikke deler prefiks med nedtrekket sitt.
+/**
+ * Råvarer 2.0: fem faste innganger + tannhjul. Alle tellere kommer fra ÉN
+ * `rm_work_summary`, slik at meny, Oversikt og faner alltid viser samme tall.
+ */
+export function RavarerNavView({ summary, hasInvoiceAccess, canManage }: { summary: WorkSummary | undefined; hasInvoiceAccess: boolean; canManage: boolean }) {
   const items: NavItem[] = [
-    { kind: "link", to: "/ravarer/vareliste", label: "Vareliste", icon: Boxes },
+    { kind: "link", to: paths.oversikt(), label: "Oversikt", icon: LayoutDashboard, exact: true },
+    {
+      kind: "link", to: paths.varer(), label: "Varer", icon: Wheat, matches: [paths.varer()],
+      badge: summary?.data_quality.datasheet_changes, badgeTone: "warning",
+    },
   ];
-
   if (hasInvoiceAccess) {
-    items.push({
-      kind: "dropdown",
-      label: "Fakturaer",
-      icon: Receipt,
-      basePath: "/ravarer/fakturaer",
-      matches: ["/ravarer/fakturaer"],
-      badge: reviewCount,
-      links: [
-        { to: "/ravarer/fakturaer/i-dag", label: "I dag" },
-        { to: "/ravarer/fakturaer/oversikt", label: "Fakturaoversikt" },
-        { to: "/ravarer/fakturaer/ravarer", label: "Råvarespørsmål" },
-        { to: "/ravarer/fakturaer/varekoblinger", label: "Varekoblinger", badge: supplierItemBadge },
-        { to: "/ravarer/fakturaer/saker", label: "Leverandørsaker" },
-        { to: "/ravarer/fakturaer/til-behandling", label: "Til behandling", badge: reviewCount },
-        { to: "/ravarer/fakturaer", label: "Alle fakturaer" },
-        { to: "/ravarer/fakturaer/til-behandling?filter=klar", label: "Klar for prismatch" },
-        { to: "/ravarer/fakturaer/import", label: "Importer manuelt" },
-        { to: "/ravarer/fakturaer/reberegn-kostpriser", label: "Reberegn kostpriser" },
-      ],
-    });
+    items.push({ kind: "link", to: paths.priskontroll(), label: "Priskontroll", icon: ScanSearch, matches: [paths.priskontroll()], badge: summary?.todo_total ?? undefined });
   }
-
-  items.push({
-    kind: "dropdown",
-    label: "Leverandører",
-    icon: Building2,
-    basePath: "/ravarer/leverandorer",
-    matches: ["/ravarer/leverandorer", "/ravarer/avtaler", "/ravarer/forhandlinger"],
-    badge: expiringAgreementsCount,
-    links: [
-      { to: "/ravarer/leverandorer", label: "Leverandører" },
-      { to: "/ravarer/avtaler", label: "Avtaler", badge: expiringAgreementsCount },
-      ...(hasInvoiceAccess
-        ? [
-            { to: "/ravarer/forhandlinger", label: "Aktive forhandlinger" },
-            { to: "/ravarer/forhandlinger/ny", label: "Ny forhandling" },
-          ]
-        : []),
-    ],
-  });
-
-  items.push({
-    kind: "dropdown",
-    label: "Datakvalitet",
-    icon: FileText,
-    basePath: "/ravarer/pakningsstorrelser",
-    matches: [
-      "/ravarer/pakninger",
-      "/ravarer/pakningsstorrelser",
-      "/ravarer/matvaretabellen",
-      "/ravarer/koble-matvaretabellen",
-      "/ravarer/deklarasjonsnavn",
-      "/ravarer/datablad-endringer",
-      "/ravarer/datablad-bulk",
-    ],
-    badge: changelogCount,
-    links: [
-      { to: "/ravarer/pakningsstorrelser", label: "Pakninger" },
-      { to: "/ravarer/matvaretabellen", label: "Matvaretabellen" },
-      { to: "/ravarer/koble-matvaretabellen", label: "Koble Matvaretabellen" },
-      { to: "/ravarer/deklarasjonsnavn", label: "Deklarasjonsnavn" },
-      { to: "/ravarer/datablad-endringer", label: "Datablad-endringer", badge: changelogCount },
-      { to: "/ravarer/datablad-bulk", label: "Bulk-opplasting" },
-    ],
-  });
-
-  items.push({
-    kind: "dropdown",
-    label: "Lager",
-    icon: Warehouse,
-    basePath: "/ravarer/lager",
-    matches: ["/ravarer/lager", "/ravarer/varemottak", "/ravarer/varetelling"],
-    links: [
-      { to: "/ravarer/lager", label: "Lager" },
-      { to: "/ravarer/varemottak", label: "Varemottak" },
-      { to: "/ravarer/varetelling", label: "Varetelling" },
-    ],
-  });
-
+  items.push(
+    { kind: "link", to: paths.leverandorer(), label: "Leverandører", icon: Truck, matches: [paths.leverandorer()], badge: summary?.other.agreements_expiring_30d, badgeTone: "warning" },
+    { kind: "link", to: paths.lager(), label: "Lager", icon: Warehouse, matches: [paths.lager()], badge: summary?.other.stock_below_min, badgeTone: "warning" },
+  );
   if (canManage) {
-    items.push({
-      kind: "dropdown",
-      label: "Innstillinger",
-      icon: Settings,
-      basePath: "/ravarer/innstillinger",
-      matches: ["/ravarer/innstillinger"],
-      links: [
-        { to: "/ravarer/innstillinger/match-toleranser", label: "Match-toleranser" },
-        { to: "/ravarer/innstillinger/tripletex", label: "Tripletex-tilkobling" },
-        { to: "/ravarer/innstillinger/kategorier", label: "Kategorier" },
-        // AI-tjenester krever plattform-admin i backend; lenken skjules ellers.
-        ...(isPlatformAdmin ? [{ to: "/ravarer/innstillinger/ai-tjenester", label: "AI-tjenester" }] : []),
-      ],
-    });
+    items.push({ kind: "link", to: paths.innstillinger(), label: "Innstillinger", icon: Settings, matches: [paths.innstillinger()], iconOnly: true });
   }
-
-
   return <NavBar appSlug="ravarer" items={items} />;
 }
 
@@ -473,9 +389,6 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
 
   const isLinkActive = (to: string) => {
     const [path, query] = to.split("?");
-    if (path === "/ravarer/fakturaer" && !query) {
-      return pathname === path && !new URLSearchParams(search).get("status");
-    }
     if ((path === "/pos-styring" || path === "/fakturering") && !query) {
       return pathname === path;
     }
@@ -487,6 +400,11 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
       return true;
     }
     return pathname === path || pathname.startsWith(path + "/");
+  };
+  const isItemActive = (item: SimpleItem) => {
+    if (item.exact) return pathname === item.to;
+    if (item.matches) return item.matches.some((p) => pathname === p || pathname.startsWith(p + "/"));
+    return isLinkActive(item.to);
   };
   const isDropdownActive = (item: DropdownItem) => {
     const paths = item.matches ?? [item.basePath];
@@ -526,6 +444,7 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
         items={items}
         color={color}
         isLinkActive={isLinkActive}
+        isItemActive={isItemActive}
         isDropdownActive={isDropdownActive}
       />
 
@@ -533,18 +452,24 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
         {items.map((item) => {
           const Icon = item.icon;
           if (item.kind === "link") {
-            const active = isLinkActive(item.to);
+            const active = isItemActive(item);
             return (
-              <li key={item.to} className="shrink-0">
-                <NavLink to={item.to} className={itemClass(active)} style={itemStyle(active)}>
+              <li key={item.to} className={cn("shrink-0", item.iconOnly && "md:ml-4")}>
+                <NavLink
+                  to={item.to}
+                  className={cn(itemClass(active), item.iconOnly && "min-w-[44px]")}
+                  style={itemStyle(active)}
+                  aria-label={item.iconOnly ? item.label : undefined}
+                  title={item.iconOnly ? item.label : undefined}
+                >
                   <span className="relative">
                   <Icon className="h-5 w-5" strokeWidth={active ? 2.25 : 1.75} />
 
                     {item.badge != null && item.badge > 0 && (
-                      <span className="absolute -right-2 -top-1.5"><CountBadge value={item.badge} /></span>
+                      <span className="absolute -right-2 -top-1.5"><CountBadge value={item.badge} tone={item.badgeTone} /></span>
                     )}
                   </span>
-                  <span className="whitespace-nowrap">{item.label}</span>
+                  {!item.iconOnly && <span className="whitespace-nowrap">{item.label}</span>}
                 </NavLink>
               </li>
             );
@@ -589,11 +514,13 @@ function MobileSubNav({
   items,
   color,
   isLinkActive,
+  isItemActive,
   isDropdownActive,
 }: {
   items: NavItem[];
   color: string;
   isLinkActive: (to: string) => boolean;
+  isItemActive: (item: SimpleItem) => boolean;
   isDropdownActive: (item: DropdownItem) => boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -601,7 +528,7 @@ function MobileSubNav({
 
   let current: { label: string; icon: LucideIcon } | null = null;
   for (const item of items) {
-    if (item.kind === "link" ? isLinkActive(item.to) : isDropdownActive(item)) {
+    if (item.kind === "link" ? isItemActive(item) : isDropdownActive(item)) {
       current = { label: item.label, icon: item.icon };
       break;
     }
@@ -636,7 +563,7 @@ function MobileSubNav({
                 .filter((i): i is SimpleItem => i.kind === "link")
                 .map((item) => {
                   const Icon = item.icon;
-                  const active = isLinkActive(item.to);
+                  const active = isItemActive(item);
                   return (
                     <li key={item.to}>
                       <button
@@ -651,7 +578,7 @@ function MobileSubNav({
                       >
                         <Icon className="h-4 w-4 shrink-0" />
                         <span className="flex-1 truncate">{item.label}</span>
-                        {item.badge != null && item.badge > 0 && <CountBadge value={item.badge} />}
+                        {item.badge != null && item.badge > 0 && <CountBadge value={item.badge} tone={item.badgeTone} />}
                       </button>
                     </li>
                   );
@@ -697,12 +624,12 @@ function MobileSubNav({
   );
 }
 
-function CountBadge({ value }: { value: number }) {
+function CountBadge({ value, tone }: { value: number; tone?: "warning" }) {
   return (
     <span
       className={cn(
-        "rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
-        value > 10 ? "bg-destructive text-destructive-foreground" : "bg-warning/20 text-warning",
+        "rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
+        tone === "warning" || value <= 10 ? "bg-warning/20 text-warning" : "bg-destructive text-destructive-foreground",
       )}
     >
       {value}

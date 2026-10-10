@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 import { recomputeRecipesForRawMaterial } from "@/varer/lib/recomputeFanout";
+import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
 
 type AllergenCode = Database["public"]["Enums"]["allergen_type"];
 
@@ -87,7 +88,7 @@ export function useUpsertNutrition() {
       if (error) throw error;
       return data as NutritionRow;
     },
-    onSuccess: (data: NutritionRow) => {
+    onSuccess: (data: NutritionRow) => { invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["raw_material_nutrition", data.raw_material_id] });
       void recomputeRecipesForRawMaterial(data.raw_material_id, qc);
       toast.success("Næringsinnhold lagret");
@@ -148,7 +149,7 @@ export function useSetAllergen() {
       if (error) throw error;
       return data;
     },
-    onSuccess: (_d, vars) => {
+    onSuccess: (_d, vars) => { invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["raw_material_allergens", vars.raw_material_id] });
       void recomputeRecipesForRawMaterial(vars.raw_material_id, qc, { silent: true });
     },

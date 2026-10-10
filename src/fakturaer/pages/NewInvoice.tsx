@@ -16,6 +16,7 @@ import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
 import { useSuppliersFor } from "@/fakturaer/hooks/useSuppliersFor";
 import { LINE_UNITS, todayIso } from "@/fakturaer/lib/constants";
+import { paths } from "@/ravarer/lib/paths";
 
 const lineSchema = z.object({
   supplier_sku: z.string().optional(),
@@ -150,7 +151,7 @@ export default function NewInvoicePage({ embedded = false }: { embedded?: boolea
         /* matching kommer i Steg 3 */
       }
 
-      navigate(`/ravarer/fakturaer/${invoice.id}`);
+      navigate(paths.faktura(invoice.id));
     } catch (e: any) {
       toast.error(`Kunne ikke lagre: ${e.message ?? e}`);
     } finally {
@@ -163,7 +164,7 @@ export default function NewInvoicePage({ embedded = false }: { embedded?: boolea
       {!embedded && (
         <div>
           <button
-            onClick={() => navigate("/ravarer/fakturaer")}
+            onClick={() => navigate(paths.alleFakturaer())}
             className="mb-3 flex items-center gap-1 text-sm text-ink-secondary transition-colors hover:text-ink-primary"
           >
             <ArrowLeft className="h-4 w-4" /> Tilbake
@@ -345,7 +346,7 @@ export default function NewInvoicePage({ embedded = false }: { embedded?: boolea
         </Card>
 
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => navigate("/ravarer/fakturaer")} disabled={submitting}>
+          <Button type="button" variant="outline" onClick={() => navigate(paths.alleFakturaer())} disabled={submitting}>
             Avbryt
           </Button>
           <Button type="submit" disabled={submitting} className="gap-2">

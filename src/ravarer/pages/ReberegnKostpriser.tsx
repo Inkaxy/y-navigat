@@ -20,6 +20,7 @@ import {
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { useCostRecalc, type RecalcBucket, type RecalcRow } from "@/fakturaer/hooks/useCostRecalc";
 import { fmtNum } from "@/fakturaer/lib/units";
+import { paths } from "@/ravarer/lib/paths";
 
 const BUCKETS: { key: RecalcBucket; title: string; hint: string; tone: string }[] = [
   {
@@ -200,7 +201,7 @@ export default function ReberegnKostpriser() {
               </p>
               {receipt.stillBlocked > 0 && (
                 <Link
-                  to="/ravarer/pakningsstorrelser"
+                  to={paths.pakninger()}
                   className="inline-flex items-center gap-1 font-medium text-app hover:underline"
                 >
                   {receipt.stillBlocked} varer kan fortsatt ikke beregnes — fyll inn pakningsstørrelse
@@ -313,7 +314,7 @@ export default function ReberegnKostpriser() {
                     </Button>
                   ) : b.key === "umulig" ? (
                     <Button asChild variant="outline" size="sm">
-                      <Link to="/ravarer/pakningsstorrelser">
+                      <Link to={paths.pakninger()}>
                         <Package className="mr-1.5 h-3.5 w-3.5" /> Fyll inn pakningsstørrelser
                       </Link>
                     </Button>
@@ -369,7 +370,7 @@ export default function ReberegnKostpriser() {
                           </td>
                           <td className="px-3 py-2 text-xs text-ink-secondary">
                             {r.invoiceId ? (
-                              <Link className="text-app hover:underline" to={`/ravarer/fakturaer/${r.invoiceId}`}>
+                              <Link className="text-app hover:underline" to={paths.faktura(r.invoiceId)}>
                                 {r.invoiceNumber ?? "faktura"}
                               </Link>
                             ) : (

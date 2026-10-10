@@ -10,6 +10,7 @@ import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBan
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { useSelection } from "@/providers/SelectionProvider";
 import { runAutoMatchAfterImport } from "@/fakturaer/lib/queueActions";
+import { paths } from "@/ravarer/lib/paths";
 
 export default function ImportEhfPage({ embedded = false }: { embedded?: boolean } = {}) {
   const navigate = useNavigate();
@@ -45,10 +46,10 @@ export default function ImportEhfPage({ embedded = false }: { embedded?: boolean
         // Auto-match kjøres med én gang, slik at brukeren lander på ferdige forslag.
         const matched = await runAutoMatchAfterImport(invoiceId);
         toast.success(matched ? "EHF-faktura importert og matchet" : "EHF-faktura importert — kjør match fra innboksen");
-        navigate(`/ravarer/fakturaer/til-behandling?faktura=${invoiceId}`);
+        navigate(paths.fakturaInnboks({ faktura: invoiceId }));
       } else {
         toast.success("EHF-faktura importert");
-        navigate("/ravarer/fakturaer");
+        navigate(paths.alleFakturaer());
       }
     } catch (e: unknown) {
       showError("ehf-import", e, "Importen feilet");
@@ -68,7 +69,7 @@ export default function ImportEhfPage({ embedded = false }: { embedded?: boolean
       {!embedded && (
         <>
           <button
-            onClick={() => navigate("/ravarer/fakturaer")}
+            onClick={() => navigate(paths.alleFakturaer())}
             className="flex items-center gap-1 text-sm text-ink-secondary transition-colors hover:text-ink-primary"
           >
             <ArrowLeft className="h-4 w-4" /> Tilbake

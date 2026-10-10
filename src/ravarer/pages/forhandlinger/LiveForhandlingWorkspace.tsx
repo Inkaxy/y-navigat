@@ -33,6 +33,7 @@ import { LiveItemCard } from "./components/LiveItemCard";
 import { LiveTidslinjeDrawer } from "./components/LiveTidslinjeDrawer";
 import { formatNok } from "@/ravarer/lib/constants";
 import { UnitPriceHint } from "@/ravarer/components/forhandlinger/UnitPriceHint";
+import { paths } from "@/ravarer/lib/paths";
 
 export default function LiveForhandlingWorkspace() {
   const { id = "" } = useParams<{ id: string }>();
@@ -316,7 +317,7 @@ export default function LiveForhandlingWorkspace() {
   }
 
   if (neg.negotiation_mode !== "live") {
-    navigate(`/ravarer/forhandlinger/${id}`);
+    navigate(paths.forhandling(id));
     return null;
   }
 
@@ -324,7 +325,7 @@ export default function LiveForhandlingWorkspace() {
 
   return (
     <div className="mx-auto max-w-[1100px] space-y-5 p-6">
-      <Button variant="ghost" size="sm" onClick={() => navigate("/ravarer/forhandlinger")}>
+      <Button variant="ghost" size="sm" onClick={() => navigate(paths.forhandlinger())}>
         <ArrowLeft className="mr-1 h-4 w-4" /> Forhandlinger
       </Button>
 
@@ -532,7 +533,7 @@ export default function LiveForhandlingWorkspace() {
       </Card>
 
       {/* End dialog */}
-      <Dialog open={endOpen} onOpenChange={(o) => { setEndOpen(o); if (!o && credentials) { setCredentials(null); navigate(`/ravarer/forhandlinger/${id}`); } }}>
+      <Dialog open={endOpen} onOpenChange={(o) => { setEndOpen(o); if (!o && credentials) { setCredentials(null); navigate(paths.forhandling(id)); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{credentials ? "Send bekreftelse til leverandør" : "Avslutt forhandling"}</DialogTitle>

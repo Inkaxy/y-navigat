@@ -27,6 +27,7 @@ import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMateria
 import { PriceDeviationNote } from "@/fakturaer/components/PriceDeviationNote";
 import { OpenSupplierItemButton } from "@/fakturaer/components/supplier-item/OpenSupplierItemButton";
 import { useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
+import { paths } from "@/ravarer/lib/paths";
 
 const kr = (v: number | null) => (v == null ? "–" : formatMoney(v, "NOK"));
 
@@ -40,7 +41,7 @@ export default function DecisionDetail() {
   const fromRavarer = fra === "ravarer" || fra === "alle";
   const fromScope = fra === "alle" ? "alle" : "ravarer";
   const backParams = new URLSearchParams(sp); backParams.delete("fra");
-  const backHref = fromRavarer ? `/ravarer/fakturaer/${fromScope === "alle" ? "beslutninger" : "ravarer"}${backParams.toString() ? `?${backParams}` : ""}` : "/ravarer/fakturaer/i-dag";
+  const backHref = fromRavarer ? paths.beslutninger({ omfang: fromScope === "alle" ? undefined : "ravarer", ...Object.fromEntries(backParams) }) : paths.priskontroll();
   const qc = useQueryClient();
   const { data: company } = useCompany();
   const q = useReviewLines({ legalEntityId: company?.id ?? null, limit: null });
@@ -80,7 +81,7 @@ export default function DecisionDetail() {
     const all = buildDecisionGroups(q.data?.rows ?? []);
     const ordered = fromRavarer ? filterRavarerGroups(all, parseRavarerFilter(sp, fromScope), fromScope) : all;
     const next = nextGroupKey(ordered, groupKey);
-    if (next) navigate(`/ravarer/fakturaer/i-dag/${encodeGroupKey(next)}${sp.toString() ? `?${sp}` : ""}`);
+    if (next) navigate(`${paths.beslutning(encodeGroupKey(next))}${sp.toString() ? `?${sp}` : ""}`);
     else navigate(backHref);
   };
   const done = async (msg?: string) => {
@@ -133,7 +134,7 @@ export default function DecisionDetail() {
       const id = await createSupplierCase({ lineIds: group.lines.map((l) => l.id), title: `Prisavvik ${group.description}`, reason: `Fakturert ${group.observedPerBase ?? "–"} mot ${group.expectedPerBase ?? "–"} per grunnenhet` });
       await qc.invalidateQueries({ queryKey: ["supplier-cases"] });
       toast.success("Leverandørsak opprettet. Fakturaene holdes igjen til saken er avklart.");
-      navigate(`/ravarer/fakturaer/saker/${id}`);
+      navigate(paths.sak(id));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Kunne ikke opprette sak");
     } finally {
@@ -206,7 +207,7 @@ export default function DecisionDetail() {
                         </Button>
                       )}
                       <CreateRawMaterialDialog open={createOpen} onOpenChange={setCreateOpen} line={first} onCreated={(id) => void onRawMaterialCreated(id)} />
-                      <p className="text-sm text-ink-secondary">Er det ikke en råvare (frakt, gebyr, pant)? <Link className="text-primary hover:underline" to={`/ravarer/fakturaer/til-behandling?faktura=${first.invoice_id}`}>Marker som ikke råvare på fakturaen</Link>.</p>
+                      <p className="text-sm text-ink-secondary">Er det ikke en råvare (frakt, gebyr, pant)? <Link className="text-primary hover:underline" to={paths.fakturaInnboks({ faktura: first.invoice_id })}>Marker som ikke råvare på fakturaen</Link>.</p>
                     </div>
                     <div className="border-t border-line-subtle pt-3 text-sm">
                       <p className="flex items-center gap-2 font-medium text-primary"><Brain className="h-4 w-4" aria-hidden />Dette huskes</p>
@@ -238,7 +239,7 @@ export default function DecisionDetail() {
                 <ul className="divide-y divide-line-subtle border-t border-line-subtle text-sm">
                   {group.lines.map((l) => (
                     <li key={l.id} className="flex items-center justify-between gap-3 py-2">
-                      <Link className="text-primary hover:underline" to={`/ravarer/fakturaer/til-behandling?faktura=${l.invoice_id}`}>{l.invoice.invoice_number}</Link>
+                      <Link className="text-primary hover:underline" to={paths.fakturaInnboks({ faktura: l.invoice_id })}>{l.invoice.invoice_number}</Link>
                       <span className="text-ink-secondary">{l.quantity ?? "–"} {l.unit ?? ""} × {kr(l.unit_price)} = {kr(l.total_amount)} ekskl. mva.</span>
                     </li>
                   ))}
@@ -272,7 +273,7 @@ export default function DecisionDetail() {
                   </>
                 )}
                 {group.kind === "other" && (
-                  <Button asChild className="w-full"><Link to={`/ravarer/fakturaer/til-behandling?faktura=${first.invoice_id}`}>Åpne fakturaen</Link></Button>
+                  <Button asChild className="w-full"><Link to={paths.fakturaInnboks({ faktura: first.invoice_id })}>Åpne fakturaen</Link></Button>
                 )}
               </aside>
             </div>

@@ -17489,6 +17489,15 @@ export type Database = {
         Returns: Json
       }
       rm_match_key: { Args: { p: string }; Returns: string }
+      rm_move_legacy_agreed_price: {
+        Args: {
+          p_raw_material_id: string
+          p_supplier_id: string
+          p_valid_from?: string
+          p_valid_to?: string
+        }
+        Returns: Json
+      }
       rm_package_factor: {
         Args: { p_raw_material_id: string; p_supplier_id: string }
         Returns: {
@@ -17520,7 +17529,7 @@ export type Database = {
       rm_price_reference: {
         Args: {
           p_invoice_date: string
-          p_invoice_id: string
+          p_invoice_id: string | null
           p_raw_material_id: string
           p_supplier_id: string
         }
@@ -17586,6 +17595,10 @@ export type Database = {
           status: string
           supplier_name: string
         }[]
+      }
+      rm_set_primary_supplier: {
+        Args: { p_raw_material_id: string; p_supplier_id: string }
+        Returns: Json
       }
       rm_sku_norm: { Args: { p: string }; Returns: string }
       rm_start_price_candidates: {

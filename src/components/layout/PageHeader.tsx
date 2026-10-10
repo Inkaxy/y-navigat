@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/brand/Logo";
+import { EmbeddedActions, useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
 
 export interface Crumb {
   label: string;
@@ -46,6 +47,8 @@ export function PageHeader({
   watermark = true,
   className,
 }: PageHeaderProps) {
+  const embedded = useIsEmbedded();
+  if (embedded) return <EmbeddedActions>{actions}</EmbeddedActions>;
   return (
     <header
       className={cn(

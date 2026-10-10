@@ -34,6 +34,7 @@ import { QueryState } from "@/components/common/QueryState";
 import { UnitAmountRows, emptyRow, rowsToBase, type UnitAmountRow } from "@/ravarer/components/stock/UnitAmountRows";
 import { formatDate, formatNok, formatNumber } from "@/ravarer/lib/constants";
 import { osloDateISOPlusDays, osloTodayISO } from "@/lib/osloDate";
+import { paths } from "@/ravarer/lib/paths";
 
 const isoDaysAgo = (days: number) => osloDateISOPlusDays(-days);
 const today = () => osloTodayISO();
@@ -149,7 +150,7 @@ export default function Varemottak() {
                 {invoices.map(inv => (
                   <tr key={inv.id} className="border-t border-line-subtle">
                     <td className="px-4 py-3">
-                      <Link to={`/ravarer/fakturaer/${inv.id}`} className="font-mono text-xs text-primary hover:underline">
+                      <Link to={paths.faktura(inv.id)} className="font-mono text-xs text-primary hover:underline">
                         {inv.invoice_number}
                       </Link>
                     </td>

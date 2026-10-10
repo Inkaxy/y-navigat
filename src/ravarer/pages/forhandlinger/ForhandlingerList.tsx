@@ -8,6 +8,7 @@ import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { useNegotiations, type NegotiationStatus } from "@/ravarer/hooks/useNegotiations";
 import { formatDate } from "@/ravarer/lib/constants";
 import NewNegotiationTypeDialog from "./NewNegotiationTypeDialog";
+import { paths } from "@/ravarer/lib/paths";
 
 const STATUS_META: Record<NegotiationStatus, { label: string; cls: string }> = {
   draft: { label: "Kladd", cls: "border-line-strong bg-surface-muted text-ink-secondary" },
@@ -25,9 +26,9 @@ export default function ForhandlingerList() {
 
   function openNegotiation(n: any) {
     if (n.negotiation_mode === "live" && n.status !== "concluded" && n.status !== "cancelled") {
-      navigate(`/ravarer/forhandlinger/live/${n.id}`);
+      navigate(paths.liveForhandling(n.id));
     } else {
-      navigate(`/ravarer/forhandlinger/${n.id}`);
+      navigate(paths.forhandling(n.id));
     }
   }
 

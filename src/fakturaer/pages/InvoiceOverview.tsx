@@ -17,6 +17,7 @@ import { postSafeCosts } from "@/fakturaer/lib/costPosting";
 import { cn } from "@/lib/utils";
 import { paginate, sumByCurrency } from "@/fakturaer/lib/ravarerQueueFilter";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { paths } from "@/ravarer/lib/paths";
 
 const PAGE_SIZE = 25;
 
@@ -30,7 +31,7 @@ export default function InvoiceOverview() {
   const { data: company } = useCompany();
   const qc = useQueryClient();
   const [sp, setSp] = useSearchParams();
-  const tab = (TABS.find((t) => t.key === sp.get("fane"))?.key ?? "ready") as ApprovalBucket;
+  const tab = (TABS.find((t) => t.key === sp.get("status"))?.key ?? "ready") as ApprovalBucket;
   const [search, setSearch] = useState(sp.get("q") ?? "");
   const [supplier, setSupplier] = useState(sp.get("leverandor") ?? "");
   const [selected, setSelected] = useState<Record<string, boolean>>({});
@@ -63,7 +64,7 @@ export default function InvoiceOverview() {
   const chosenSums = sumByCurrency(chosenRows);
   const resetScope = () => { setSelected({}); setPage(1); };
 
-  const setTab = (k: ApprovalBucket) => { const n = new URLSearchParams(sp); n.set("fane", k); setSp(n, { replace: true }); resetScope(); };
+  const setTab = (k: ApprovalBucket) => { const n = new URLSearchParams(sp); n.set("status", k); setSp(n, { replace: true }); resetScope(); };
   const refresh = () => Promise.all([
     qc.invalidateQueries({ queryKey: ["invoice-approval-overview"] }),
     qc.invalidateQueries({ queryKey: ["fakturaer-review-lines"] }),
@@ -183,7 +184,7 @@ export default function InvoiceOverview() {
                 {tab !== "done" && <Checkbox className="mt-1" aria-label={`Velg faktura ${r.invoice_number}`} checked={!!selected[r.invoice_id]} onCheckedChange={(v) => setSelected((p) => ({ ...p, [r.invoice_id]: !!v }))} />}
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span><span className="font-semibold">{r.supplier_name ?? "Ukjent leverandør"}</span> · <Link className="text-primary hover:underline" to={`/ravarer/fakturaer/${r.invoice_id}`}>{r.invoice_number}</Link>{r.is_credit_note && " · kreditnota"}</span>
+                    <span><span className="font-semibold">{r.supplier_name ?? "Ukjent leverandør"}</span> · <Link className="text-primary hover:underline" to={paths.faktura(r.invoice_id)}>{r.invoice_number}</Link>{r.is_credit_note && " · kreditnota"}</span>
                     <span className="text-sm tabular-nums">{formatMoney(r.total_amount, r.currency)} inkl. mva. · {formatMoney(excl, r.currency)} ekskl. mva.</span>
                   </div>
                   <p className="text-sm text-ink-secondary">

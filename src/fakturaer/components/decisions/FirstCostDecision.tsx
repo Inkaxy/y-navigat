@@ -9,6 +9,7 @@ import type { DecisionGroup } from "@/fakturaer/lib/decisionGroups";
 import { postSafeCosts } from "@/fakturaer/lib/costPosting";
 import { applyPackageToLines, outcomeNotes } from "@/fakturaer/lib/groupActions";
 import { formatMoney } from "@/fakturaer/lib/constants";
+import { paths } from "@/ravarer/lib/paths";
 
 const sourceLabel = (s: string | null) => (s === "tripletex" ? "Tripletex (tolket fra PDF)" : s === "ehf" ? "EHF" : s === "pdf" ? "PDF-import" : s ?? "ukjent kilde");
 
@@ -114,7 +115,7 @@ export function FirstCostDecision({ g, canWrite, onSaved }: { g: DecisionGroup; 
                 : l.price_per_base_unit;
               return (
                 <tr key={l.id}>
-                  <td className="py-2 pr-3"><Link className="text-primary hover:underline" to={`/ravarer/fakturaer/til-behandling?faktura=${l.invoice_id}`}>{l.invoice.invoice_number}</Link></td>
+                  <td className="py-2 pr-3"><Link className="text-primary hover:underline" to={paths.fakturaInnboks({ faktura: l.invoice_id })}>{l.invoice.invoice_number}</Link></td>
                   <td className="py-2 pr-3 tabular-nums">{l.invoice.invoice_date ?? "Uten dato"}</td>
                   <td className="py-2 pr-3">{sourceLabel(l.invoice.source)}</td>
                   <td className="py-2 text-right tabular-nums">{price != null ? formatMoney(price, l.invoice.currency ?? "NOK") : "Mangler pakning"}</td>

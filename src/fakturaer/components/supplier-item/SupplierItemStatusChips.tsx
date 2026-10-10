@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useSupplierItems } from "@/fakturaer/hooks/useSupplierItems";
 import { SUPPLIER_ITEM_STATUS_META, type SupplierItemStatus } from "@/fakturaer/lib/supplierItems";
+import { paths } from "@/ravarer/lib/paths";
 
 const SHOWN: SupplierItemStatus[] = ["ukoblet", "mangler_pakning", "prisavvik", "kontroll", "koblet"];
 
@@ -12,7 +13,7 @@ export function SupplierItemStatusChips({ supplierId }: { supplierId: string }) 
     <div className="flex flex-wrap items-center gap-1.5" aria-label="Varekort hos leverandøren">
       <span className="text-caption text-ink-secondary">Varekort:</span>
       {SHOWN.map((s) => (
-        <Link key={s} to={`/ravarer/fakturaer/varekoblinger?leverandor=${encodeURIComponent(supplierId)}&status=${s}`}
+        <Link key={s} to={paths.varekoblinger({ leverandor: supplierId, status: s })}
           className="rounded-full border border-line-subtle px-3 py-1 text-sm hover:bg-muted">
           {SUPPLIER_ITEM_STATUS_META[s].label} <span className="tabular-nums">{counts[s]}</span>
         </Link>

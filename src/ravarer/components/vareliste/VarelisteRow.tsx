@@ -11,6 +11,7 @@ import { formatDate, formatNok, formatNumber } from "@/ravarer/lib/constants";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import type { RawMaterialListItem } from "@/ravarer/lib/rawMaterialViews";
 import { isColumnVisible } from "@/ravarer/lib/varelisteColumns";
+import { paths } from "@/ravarer/lib/paths";
 
 export type InlineField = "cost" | "agreed" | "category";
 
@@ -213,7 +214,7 @@ function RowInner({
   const show = (id: string) => isColumnVisible(id, hiddenColumns);
   const cell = "px-3 py-2 align-middle";
   const navigate = useNavigate();
-  const detailUrl = `/ravarer/vareliste/${item.id}${listSearch ? `?${listSearch}` : ""}`;
+  const detailUrl = `${paths.raavare(item.id)}${listSearch ? `?${listSearch}` : ""}`;
 
   /** Hele raden er klikkbar, men ikke når klikket traff en kontroll i raden. */
   const onRowClick = (e: React.MouseEvent<HTMLTableRowElement>) => {

@@ -29,6 +29,7 @@ import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 import { rankBySearch } from "@/lib/textSimilarity";
 import { useNutritionCoverage } from "@/ravarer/hooks/useNutritionCoverage";
 import { Link } from "react-router-dom";
+import { paths } from "@/ravarer/lib/paths";
 
 const PAGE_SIZE = 50;
 
@@ -149,7 +150,7 @@ export default function Matvaretabellen() {
           </div>
         </div>
         <Button asChild variant="outline">
-          <Link to="/ravarer/koble-matvaretabellen">Koble råvarer</Link>
+          <Link to={paths.naering()}>Koble råvarer</Link>
         </Button>
       </Card>
 

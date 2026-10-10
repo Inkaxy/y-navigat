@@ -35,6 +35,7 @@ import { SuppliersTab } from "@/ravarer/components/tabs/SuppliersTab";
 import { RecipesTab } from "@/ravarer/components/tabs/RecipesTab";
 import { StockTab } from "@/ravarer/components/tabs/StockTab";
 import { HistoryTab } from "@/ravarer/components/tabs/HistoryTab";
+import { paths } from "@/ravarer/lib/paths";
 
 const ITEM_TYPE_LABEL: Record<string, string> = {
   ravare: "Råvare",
@@ -102,7 +103,7 @@ export default function RawMaterialDetail() {
   const goTo = useCallback(
     (targetId: string) =>
       navigate(
-        `/ravarer/vareliste/${targetId}${listSearch ? `?${listSearch}` : ""}`,
+        `${paths.raavare(targetId)}${listSearch ? `?${listSearch}` : ""}`,
       ),
     [navigate, listSearch],
   );
@@ -203,10 +204,10 @@ export default function RawMaterialDetail() {
         title={rm.name}
         subtitle={`SKU ${rm.sku} · ${rm.base_unit}`}
         crumbs={[
-          { label: "Råvarer", to: "/ravarer/vareliste" },
+          { label: "Råvarer", to: paths.varer() },
           {
             label: "Vareliste",
-            to: `/ravarer/vareliste${listSearch ? `?${listSearch}` : ""}`,
+            to: `${paths.varer()}${listSearch ? `?${listSearch}` : ""}`,
           },
           { label: rm.name },
         ]}
@@ -217,7 +218,7 @@ export default function RawMaterialDetail() {
               size="sm"
               onClick={() =>
                 navigate(
-                  `/ravarer/vareliste${listSearch ? `?${listSearch}` : ""}`,
+                  `${paths.varer()}${listSearch ? `?${listSearch}` : ""}`,
                 )
               }
             >

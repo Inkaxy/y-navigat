@@ -19,6 +19,7 @@ import { todayIso } from "@/fakturaer/lib/constants";
 import { computeLinesSum } from "@/fakturaer/lib/linesSum";
 import { cn } from "@/lib/utils";
 import { runAutoMatchAfterImport } from "@/fakturaer/lib/queueActions";
+import { paths } from "@/ravarer/lib/paths";
 
 interface ExtractedLine {
   description: string | null;
@@ -338,13 +339,13 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
         setQueueIndex(queueIndex + 1);
       } else if (queue.length > 1) {
         toast.success(`Alle ${queue.length} fakturaer lagret og matchet`);
-        navigate("/ravarer/fakturaer/til-behandling");
+        navigate(paths.fakturaInnboks());
       } else if (lines.length === 0) {
         toast.success("Faktura opprettet — registrer linjer");
-        navigate(`/ravarer/fakturaer/${invoice.id}/registrer-linjer`);
+        navigate(paths.registrerLinjer(invoice.id));
       } else {
         toast.success("Faktura opprettet og matchet");
-        navigate(`/ravarer/fakturaer/til-behandling?faktura=${invoice.id}`);
+        navigate(paths.fakturaInnboks({ faktura: invoice.id }));
       }
     } catch (e: unknown) {
       showError("pdf-import", e, "Opplastingen feilet");
@@ -365,7 +366,7 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
       <div className="space-y-5">
         {!embedded && (
           <>
-            <button onClick={() => navigate("/ravarer/fakturaer")} className="flex items-center gap-1 text-sm text-ink-secondary hover:text-ink-primary">
+            <button onClick={() => navigate(paths.alleFakturaer())} className="flex items-center gap-1 text-sm text-ink-secondary hover:text-ink-primary">
               <ArrowLeft className="h-4 w-4" /> Tilbake
             </button>
             <FakturaerHeaderBanner title="Last opp PDF" subtitle="AI leser fakturaen og gir deg et forslag du kan bekrefte" />
@@ -405,7 +406,7 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
           </div>
 
           <div className="mt-5 flex justify-end gap-2">
-            <Button variant="outline" onClick={() => navigate("/ravarer/fakturaer")}>Avbryt</Button>
+            <Button variant="outline" onClick={() => navigate(paths.alleFakturaer())}>Avbryt</Button>
             <Button onClick={runParse} disabled={!file || !legalEntityId || parsing} className="gap-2">
               {parsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
               {queue.length > 1 ? `Les første (1 av ${queue.length})` : "Les og fortsett"}
@@ -629,7 +630,7 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
       </Card>
 
       <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={() => navigate("/ravarer/fakturaer")} disabled={busy}>Avbryt</Button>
+        <Button variant="outline" onClick={() => navigate(paths.alleFakturaer())} disabled={busy}>Avbryt</Button>
         <Button onClick={submit} disabled={busy} className="gap-2">
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
           Lagre faktura

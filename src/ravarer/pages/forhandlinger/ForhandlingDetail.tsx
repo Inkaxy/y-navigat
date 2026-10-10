@@ -28,6 +28,7 @@ import {
   recipientStatusLabel,
   isNegotiationClosed,
 } from "@/ravarer/lib/negotiationMatrix";
+import { paths } from "@/ravarer/lib/paths";
 
 export default function ForhandlingDetail() {
   const navigate = useNavigate();
@@ -159,14 +160,14 @@ export default function ForhandlingDetail() {
       neg.status !== "cancelled" &&
       neg.status !== "awaiting_confirmation"
     ) {
-      navigate(`/ravarer/forhandlinger/live/${id}`, { replace: true });
+      navigate(paths.liveForhandling(id), { replace: true });
     }
   }, [neg, id, navigate, isLive]);
 
   if (!neg) {
     return (
       <div className="p-6">
-        <Button variant="ghost" onClick={() => navigate("/ravarer/forhandlinger")}>
+        <Button variant="ghost" onClick={() => navigate(paths.forhandlinger())}>
           <ArrowLeft className="mr-1 h-4 w-4" /> Tilbake
         </Button>
       </div>
@@ -175,7 +176,7 @@ export default function ForhandlingDetail() {
 
   return (
     <div className="mx-auto max-w-[1280px] space-y-6 p-6">
-      <Button variant="ghost" size="sm" onClick={() => navigate("/ravarer/forhandlinger")}>
+      <Button variant="ghost" size="sm" onClick={() => navigate(paths.forhandlinger())}>
         <ArrowLeft className="mr-1 h-4 w-4" /> Forhandlinger
       </Button>
 
@@ -192,7 +193,7 @@ export default function ForhandlingDetail() {
             )}
             {!isLive && !isNegotiationClosed(neg.status) && (
               <Button size="sm" variant="outline" className="rounded-full"
-                onClick={() => navigate(`/ravarer/forhandlinger/${id}/rediger`)}>
+                onClick={() => navigate(paths.forhandlingRediger(id))}>
                 Rediger
               </Button>
             )}

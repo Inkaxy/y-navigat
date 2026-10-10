@@ -30,6 +30,7 @@ import { formatNok, formatNumber } from "@/ravarer/lib/constants";
 import { UnitPriceHint } from "@/ravarer/components/forhandlinger/UnitPriceHint";
 import { osloDateISO } from "@/lib/osloDate";
 import { Link } from "react-router-dom";
+import { paths } from "@/ravarer/lib/paths";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -350,7 +351,7 @@ export default function ForhandlingWizard() {
             {hiddenSupplierCount > 0 && (
               <p className="mt-1">
                 {hiddenSupplierCount} leverandører uten «Følg fakturalinjer» vises ikke – slå på under{" "}
-                <Link to="/ravarer/leverandorer" className="underline">
+                <Link to={paths.leverandorer()} className="underline">
                   Leverandører
                 </Link>
                 .
@@ -457,7 +458,7 @@ fakturahistorikk, og uten den finnes verken volum eller prisgrunnlag. */}
               <Separator />
               <Button
                 variant="outline"
-                onClick={() => navigate(`/ravarer/forhandlinger/${negotiationId}`)}
+                onClick={() => navigate(paths.forhandling(negotiationId))}
                 className="rounded-full"
               >
                 Til forhandlingsdetaljer

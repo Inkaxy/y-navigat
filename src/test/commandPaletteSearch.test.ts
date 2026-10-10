@@ -112,3 +112,15 @@ describe("entityRoute", () => {
     expect(entityRoute({ kind: "ticket", id: "4", title: "" })).toBe("/ordre/ticket/4");
   });
 });
+
+import { mergeRawMaterialHits } from "@/lib/entitySearch";
+describe("råvaresøk i ⌘K", () => {
+  it("slår sammen navne- og aliastreff uten duplikater og går til nye stier", () => {
+    const a: EntityHit = { kind: "raw_material", id: "r1", title: "Hvetemel" };
+    const b: EntityHit = { kind: "raw_material", id: "r1", title: "Hvetemel", subtitle: "Leverandørnavn: HVETEMEL SIKT" };
+    const c: EntityHit = { kind: "raw_material", id: "r2", title: "Rug" };
+    expect(mergeRawMaterialHits([a], [b, c]).map((h) => h.id)).toEqual(["r1", "r2"]);
+    expect(entityRoute(a)).toBe("/ravarer/varer/r1");
+    expect(entityRoute({ kind: "supplier", id: "s1", title: "Bama" })).toBe("/ravarer/leverandorer/s1");
+  });
+});

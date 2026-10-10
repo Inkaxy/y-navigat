@@ -1,16 +1,19 @@
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
+import { paths } from "@/ravarer/lib/paths";
 
 const ITEMS = [
-  { to: "/ravarer/fakturaer/i-dag", label: "I dag" },
-  { to: "/ravarer/fakturaer/oversikt", label: "Fakturaer" },
-  { to: "/ravarer/fakturaer/ravarer", label: "Råvarer" },
-  { to: "/ravarer/fakturaer/varekoblinger", label: "Varekoblinger" },
-  { to: "/ravarer/fakturaer/saker", label: "Leverandørsaker" },
+  { to: paths.priskontroll(), label: "I dag" },
+  { to: paths.godkjenning(), label: "Fakturaer" },
+  { to: paths.beslutninger({ omfang: "ravarer" }), label: "Råvarer" },
+  { to: paths.varekoblinger(), label: "Varekoblinger" },
+  { to: paths.saker(), label: "Leverandørsaker" },
 ];
 
 /** Inngangen til fakturabehandlingen: I dag · Fakturaer · Råvarer. */
 export function DecisionNav() {
+  if (useIsEmbedded()) return null;
   return (
     <nav aria-label="Fakturabehandling" className="flex gap-1 overflow-x-auto">
       {ITEMS.map((i) => (

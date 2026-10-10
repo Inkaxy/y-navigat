@@ -54,6 +54,7 @@ import { csvValue } from "@/ravarer/lib/varelisteCsv";
 import { isLargeDeviation } from "@/ravarer/components/vareliste/PriceCells";
 import { SupplierItemsBanner } from "@/ravarer/components/vareliste/SupplierItemsBanner";
 import { SaveViewDialog } from "@/ravarer/components/vareliste/SaveViewDialog";
+import { paths } from "@/ravarer/lib/paths";
 
 interface SavedView {
   id: string;
@@ -119,6 +120,14 @@ export default function VarelistePage() {
 
 
   const [newOpen, setNewOpen] = useState(false);
+  // «Ny råvare» fra ⌘K: `?ny=1` åpner dialogen og fjernes fra adressen.
+  useEffect(() => {
+    if (params.get("ny") !== "1") return;
+    if (canWrite) setNewOpen(true);
+    const next = new URLSearchParams(params);
+    next.delete("ny");
+    setParams(next, { replace: true });
+  }, [params, setParams, canWrite]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [focusedId, setFocusedId] = useState<string | null>(null);
@@ -368,7 +377,7 @@ export default function VarelistePage() {
         setFocusedId(filtered[Math.max(idx - 1, 0)]?.id ?? filtered[0].id);
       } else if (e.key === "Enter" && focusedId) {
         e.preventDefault();
-        navigate(`/ravarer/vareliste/${focusedId}${listSearch ? `?${listSearch}` : ""}`);
+        navigate(`${paths.raavare(focusedId)}${listSearch ? `?${listSearch}` : ""}`);
       } else if (e.key === "e" && focusedId && canWrite) {
         e.preventDefault();
         setEditing({ id: focusedId, field: "cost" });
@@ -673,7 +682,7 @@ export default function VarelistePage() {
               {filtered.map((item) => (
                 <li key={item.id} className="p-3">
                   <Link
-                    to={`/ravarer/vareliste/${item.id}${listSearch ? `?${listSearch}` : ""}`}
+                    to={`${paths.raavare(item.id)}${listSearch ? `?${listSearch}` : ""}`}
                     className="block"
                   >
                     <p className="font-medium">{item.name}</p>

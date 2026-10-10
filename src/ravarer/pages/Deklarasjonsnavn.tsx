@@ -13,6 +13,7 @@ import {
   useSaveDeclarationName,
   type DeclarationWorklistRow,
 } from "@/ravarer/hooks/useDeclarationNames";
+import { paths } from "@/ravarer/lib/paths";
 
 function initialFor(r: DeclarationWorklistRow) {
   return (r.matvaretabellen_name ?? r.suggested_name ?? "").trim().toLowerCase();
@@ -96,7 +97,7 @@ export default function Deklarasjonsnavn() {
           {simple.map((r) => (
             <div key={r.raw_material_id} className="flex flex-wrap items-center gap-3 py-3">
               <div className="min-w-0 flex-1">
-                <Link to={`/ravarer/vareliste/${r.raw_material_id}`} className="truncate text-sm font-medium hover:underline">
+                <Link to={paths.raavare(r.raw_material_id)} className="truncate text-sm font-medium hover:underline">
                   {r.name}
                 </Link>
                 <div className="text-xs tabular-nums text-ink-secondary">
@@ -137,7 +138,7 @@ export default function Deklarasjonsnavn() {
                 <div className="min-w-0 flex-1 truncate text-sm font-medium">{r.name}</div>
                 <Badge variant="outline">Sammensatt — deklareres via komponentene</Badge>
                 <Button asChild size="sm" variant="outline">
-                  <Link to={`/ravarer/vareliste/${r.raw_material_id}`}>Åpne råvaren</Link>
+                  <Link to={paths.raavare(r.raw_material_id)}>Åpne råvaren</Link>
                 </Button>
               </div>
             ))}
