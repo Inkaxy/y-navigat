@@ -487,7 +487,7 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
           </Button>
           <Button onClick={() => importMutation.mutate(false)} disabled={importMutation.isPending || loadingSuggestions}>
             {importMutation.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-            Importer alle ({lines.length})
+            {progress ? `Oppretter ${Math.min(progress.done + 1, progress.total)} av ${progress.total}` : `Importer alle (${lines.length})`}
           </Button>
         </SheetFooter>
       </SheetContent>
