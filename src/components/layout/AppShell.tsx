@@ -13,7 +13,7 @@ import { MobileBottomNav } from "@/ordre/components/shell/MobileBottomNav";
  * Ruter som skal bruke hele skjermbredden (full-bleed) fordi innholdet er en
  * bred matrise/tabell der hver ekstra piksel er nyttig kolonneplass.
  */
-const FULL_BLEED_PREFIXES = ["/ordre/leveringskalender"];
+const FULL_BLEED_PREFIXES = ["/ordre/leveringskalender", "/ravarer/priskontroll"];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
