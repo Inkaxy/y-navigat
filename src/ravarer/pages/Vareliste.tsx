@@ -31,7 +31,7 @@ import { NewRawMaterialDialog } from "@/ravarer/components/NewRawMaterialDialog"
 import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
 import { VarelisteRow, type InlineField } from "@/ravarer/components/vareliste/VarelisteRow";
 import { VarelisteBulkBar } from "@/ravarer/components/vareliste/VarelisteBulkBar";
-import { PackageEditor as SetPackageDialog } from "@/ravarer/editors/PackageEditor";
+import { PackageEditor } from "@/ravarer/editors/PackageEditor";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useVarelisteItems } from "@/ravarer/hooks/useVarelisteItems";
 import { useUpdateRawMaterial } from "@/ravarer/hooks/useRawMaterials";
@@ -706,7 +706,7 @@ export default function VarelistePage() {
         <NewRawMaterialDialog open={newOpen} onOpenChange={setNewOpen} />
         <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} bindings={hotkeys} />
 
-        <SetPackageDialog
+        <PackageEditor
           key={packageQueue[0] ?? "none"}
           row={packageRow}
           open={packageQueue.length > 0 && !!packageRow}

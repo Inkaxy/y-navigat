@@ -9,7 +9,7 @@ import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { CreateRawMaterialFromDatasheetDialog, type DatasheetExtract } from "@/ravarer/components/CreateRawMaterialFromDatasheetDialog";
 import { useDeleteDatasheets, useOrphanDatasheets } from "@/ravarer/hooks/useDatasheets";
 import { formatDate } from "@/ravarer/lib/constants";
-import { PackageEditor as SetPackageDialog } from "@/ravarer/editors/PackageEditor";
+import { PackageEditor } from "@/ravarer/editors/PackageEditor";
 import type { PackageWorklistRow } from "@/ravarer/hooks/usePackageSizes";
 import type { PackageFillSuggestion } from "@/ravarer/lib/packageMath";
 
@@ -382,7 +382,7 @@ export default function DatabladBulk() {
         </Card>
       )}
 
-      <SetPackageDialog
+      <PackageEditor
         row={packageTarget?.row ?? null}
         open={packageTarget !== null}
         onOpenChange={(v) => { if (!v) setPackageTarget(null); }}

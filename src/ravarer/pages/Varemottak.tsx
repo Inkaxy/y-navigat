@@ -15,7 +15,7 @@ import { AlertTriangle, Check, PackageCheck, PackagePlus, Truck } from "lucide-r
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { PackageEditor as SetPackageDialog } from "@/ravarer/editors/PackageEditor";
+import { PackageEditor } from "@/ravarer/editors/PackageEditor";
 import type { PackageWorklistRow } from "@/ravarer/hooks/usePackageSizes";
 import { useRawMaterialSearchIndex } from "@/ravarer/hooks/useRawMaterialSearchIndex";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
@@ -373,7 +373,7 @@ function InvoiceReceiptDialog({
 
       <DeviationDialog line={deviationLine} invoiceNumber={invoiceNumber} onClose={() => setDeviationLine(null)} />
 
-      <SetPackageDialog
+      <PackageEditor
         open={!!packageLine}
         row={packageLine ? receiptLineAsWorklistRow(packageLine) : null}
         onOpenChange={v => {

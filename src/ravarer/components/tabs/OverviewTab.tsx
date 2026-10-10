@@ -24,7 +24,7 @@ import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
 import { categoryOptions } from "@/ravarer/lib/categories";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { RecalcHistory } from "@/ravarer/components/packages/RecalcHistory";
-import { PackageEditor as SetPackageDialog } from "@/ravarer/editors/PackageEditor";
+import { PackageEditor } from "@/ravarer/editors/PackageEditor";
 import {
   usePackageWorklistRow,
   type PackageWorklistRow,
@@ -562,7 +562,7 @@ export function OverviewTab({ rm, registerSave }: Props) {
         </div>
       )}
 
-      <SetPackageDialog
+      <PackageEditor
         row={packageRow}
         open={packageOpen}
         onOpenChange={setPackageOpen}
