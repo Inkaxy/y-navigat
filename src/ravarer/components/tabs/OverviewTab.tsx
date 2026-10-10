@@ -4,7 +4,7 @@ import {
   useUpdateRawMaterial,
   type RawMaterialRow,
 } from "@/ravarer/hooks/useRawMaterials";
-import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
+import { PriceSupplierCard } from "@/ravarer/editors/PriceSupplierCard";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,11 +55,8 @@ const EDITABLE_FIELDS = [
   "category",
   "categories",
   "base_unit",
-  "current_cost_price",
-  "agreed_price",
   "is_active",
   "is_packaging",
-  "primary_supplier_id",
   "grain_classification",
   "cereal_type",
   "water_content_pct",
@@ -85,12 +82,13 @@ interface Props {
   rm: RawMaterialRow;
   /** Lar siden lagre fanen med ⌘S. */
   registerSave?: (save: () => void) => void;
+  /** Åpner leverandørkoblingene (prisfanen). */
+  onEditLink?: () => void;
 }
 
-export function OverviewTab({ rm, registerSave }: Props) {
+export function OverviewTab({ rm, registerSave, onEditLink }: Props) {
   const { canWrite } = useRavarer();
   const update = useUpdateRawMaterial();
-  const { data: suppliers = [] } = useSuppliers();
   const [draft, setDraft] = useState<RawMaterialRow>(rm);
   const patch = useMemo(() => changedFields(draft, rm), [draft, rm]);
   const dirty = Object.keys(patch).length > 0;
@@ -475,73 +473,7 @@ export function OverviewTab({ rm, registerSave }: Props) {
         </div>
       </Card>
 
-      <Card className="p-5 space-y-4">
-        <h3 className="text-base font-semibold">Pris og leverandør</h3>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <Label>Gjeldende kostpris (kr/{draft.base_unit})</Label>
-            <Input
-              type="number"
-              step="0.01"
-              value={draft.current_cost_price ?? ""}
-              onChange={(e) =>
-                setDraft((d) => ({
-                  ...d,
-                  current_cost_price:
-                    e.target.value === "" ? null : Number(e.target.value),
-                }))
-              }
-              disabled={!canWrite}
-            />
-            <p className="mt-1 text-xs text-ink-secondary">
-              Sist oppdatert: {formatDate(rm.price_updated_at)}{" "}
-              {rm.price_source && `(${rm.price_source})`}
-            </p>
-          </div>
-          <div>
-            <Label>Avtalt pris (kr/{draft.base_unit})</Label>
-            <Input
-              type="number"
-              step="0.01"
-              value={draft.agreed_price ?? ""}
-              onChange={(e) =>
-                setDraft((d) => ({
-                  ...d,
-                  agreed_price:
-                    e.target.value === "" ? null : Number(e.target.value),
-                }))
-              }
-              disabled={!canWrite}
-            />
-          </div>
-        </div>
-        <div>
-          <Label>Primær leverandør</Label>
-          <Select
-            value={draft.primary_supplier_id ?? "_none"}
-            onValueChange={(v) =>
-              setDraft((d) => ({
-                ...d,
-                primary_supplier_id: v === "_none" ? null : v,
-              }))
-            }
-            disabled={!canWrite}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Ingen" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="_none">Ingen</SelectItem>
-              {suppliers.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </Card>
-
+      <PriceSupplierCard rm={rm} canWrite={canWrite} onEditLink={onEditLink} />
       <Card className="p-5 space-y-3">
         <h3 className="text-base font-semibold">Omregninger av kostpris</h3>
         <RecalcHistory rawMaterialId={rm.id} baseUnit={rm.base_unit} />
