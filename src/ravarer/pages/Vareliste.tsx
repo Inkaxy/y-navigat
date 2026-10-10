@@ -55,6 +55,8 @@ import { isLargeDeviation } from "@/ravarer/components/vareliste/PriceCells";
 import { SupplierItemsBanner } from "@/ravarer/components/vareliste/SupplierItemsBanner";
 import { SaveViewDialog } from "@/ravarer/components/vareliste/SaveViewDialog";
 import { paths } from "@/ravarer/lib/paths";
+import { useHotkeys, type HotkeyBinding } from "@/ravarer/ui/hotkeys";
+import { ShortcutHelp } from "@/ravarer/ui/ShortcutHelp";
 
 interface SavedView {
   id: string;
@@ -324,68 +326,43 @@ export default function VarelistePage() {
     [setParam],
   );
 
-  // Hurtigtaster: «/» søk, ↑/↓ markering, Enter åpner, «e» kostpris, «n» ny, Esc.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      // Snarveier skal aldri kapre nettleserens egne kombinasjoner.
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      // Ingen snarveier mens en dialog, ark eller meny er åpen.
-      if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="listbox"]')) return;
-
-      const target = e.target as HTMLElement | null;
-      const tag = target?.tagName ?? "";
-      const inControl =
-        !!target &&
-        (tag === "INPUT" ||
-          tag === "TEXTAREA" ||
-          tag === "SELECT" ||
-          tag === "BUTTON" ||
-          target.isContentEditable ||
-          !!target.closest('[role="combobox"], [role="menu"], [contenteditable="true"]'));
-      const typing =
-        !!target && (tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable);
-
-      if (e.key === "/" && !inControl) {
-        e.preventDefault();
-        searchRef.current?.focus();
-        return;
-      }
-      if (e.key === "Escape") {
-        if (typing && document.activeElement === searchRef.current) {
-          setParam({ q: null });
-          return;
-        }
-        setEditing(null);
-        return;
-      }
-      if (inControl) return;
-
-      if (e.key === "n") {
-        if (canWrite) {
-          e.preventDefault();
-          setNewOpen(true);
-        }
-        return;
-      }
+  // Hurtigtaster: «/» søk, ↑/↓ markering, Enter åpner, «e» kostpris, «n» ny, Esc, «?» oversikt.
+  const [helpOpen, setHelpOpen] = useState(false);
+  const moveFocus = useCallback(
+    (delta: number) => {
       if (filtered.length === 0) return;
       const idx = filtered.findIndex((i) => i.id === focusedId);
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setFocusedId(filtered[Math.min(idx + 1, filtered.length - 1)]?.id ?? filtered[0].id);
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setFocusedId(filtered[Math.max(idx - 1, 0)]?.id ?? filtered[0].id);
-      } else if (e.key === "Enter" && focusedId) {
-        e.preventDefault();
-        navigate(`${paths.raavare(focusedId)}${listSearch ? `?${listSearch}` : ""}`);
-      } else if (e.key === "e" && focusedId && canWrite) {
-        e.preventDefault();
-        setEditing({ id: focusedId, field: "cost" });
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [filtered, focusedId, canWrite, setParam, navigate, listSearch]);
+      const nextIdx = idx < 0 ? 0 : Math.min(Math.max(idx + delta, 0), filtered.length - 1);
+      setFocusedId(filtered[nextIdx]?.id ?? filtered[0].id);
+    },
+    [filtered, focusedId],
+  );
+  const hotkeys = useMemo<HotkeyBinding[]>(
+    () => [
+      { keys: ["/"], description: "Søk", handler: () => searchRef.current?.focus() },
+      { keys: ["ArrowDown"], description: "Neste rad", handler: () => moveFocus(1) },
+      { keys: ["ArrowUp"], description: "Forrige rad", handler: () => moveFocus(-1) },
+      {
+        keys: ["Enter"],
+        description: "Åpne råvaren",
+        handler: () => {
+          if (focusedId) navigate(`${paths.raavare(focusedId)}${listSearch ? `?${listSearch}` : ""}`);
+        },
+      },
+      {
+        keys: ["e"],
+        description: "Endre kostpris",
+        handler: () => {
+          if (focusedId && canWrite) setEditing({ id: focusedId, field: "cost" });
+        },
+      },
+      { keys: ["n"], description: "Ny råvare", handler: () => { if (canWrite) setNewOpen(true); } },
+      { keys: ["Escape"], description: "Avbryt redigering", handler: () => setEditing(null) },
+      { keys: ["?"], description: "Vis hurtigtaster", handler: () => setHelpOpen(true) },
+    ],
+    [moveFocus, focusedId, canWrite, navigate, listSearch],
+  );
+  useHotkeys(hotkeys);
 
   const startEdit = useCallback((id: string, field: InlineField) => setEditing({ id, field }), []);
   const cancelEdit = useCallback(() => setEditing(null), []);
@@ -492,6 +469,9 @@ export default function VarelistePage() {
                 placeholder="Søk navn, SKU, leverandørnummer eller alias…"
                 className="pl-9"
                 aria-label="Søk i varelisten"
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setParam({ q: null });
+                }}
               />
             </div>
 
@@ -724,6 +704,7 @@ export default function VarelistePage() {
         />
 
         <NewRawMaterialDialog open={newOpen} onOpenChange={setNewOpen} />
+        <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} bindings={hotkeys} />
 
         <SetPackageDialog
           key={packageQueue[0] ?? "none"}
