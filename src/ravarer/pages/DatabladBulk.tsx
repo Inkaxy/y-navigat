@@ -6,7 +6,8 @@ import { Upload, Loader2, FileText, Check, RefreshCw, AlertCircle, Plus } from "
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
-import { CreateRawMaterialFromDatasheetDialog, type DatasheetExtract } from "@/ravarer/components/CreateRawMaterialFromDatasheetDialog";
+import { RawMaterialCreateSheet } from "@/ravarer/editors/RawMaterialCreateSheet";
+import type { DatasheetAiFields as DatasheetExtract } from "@/ravarer/editors/createSheetLogic";
 import { useDeleteDatasheets, useOrphanDatasheets } from "@/ravarer/hooks/useDatasheets";
 import { formatDate } from "@/ravarer/lib/constants";
 import { PackageEditor } from "@/ravarer/editors/PackageEditor";
