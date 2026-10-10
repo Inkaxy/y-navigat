@@ -8,11 +8,11 @@ import { cn } from "@/lib/utils";
  * Liste + panel. Fra 1280 px vises listen og panelet side om side; under det
  * skjules panelet og listen navigerer til full side (`fullHref` på radene).
  */
-export function SplitView({ list, panel, hasSelection, className }: { list: ReactNode; panel: ReactNode; hasSelection: boolean; className?: string }) {
+export function SplitView({ list, panel, className }: { list: ReactNode; panel: ReactNode; className?: string }) {
   return (
     <div className={cn("grid gap-4 xl:h-[calc(100dvh-var(--shell-offset,7rem))] xl:grid-cols-[minmax(380px,0.9fr)_minmax(460px,1.1fr)]", className)}>
       <div className="min-h-0 overflow-auto">{list}</div>
-      <div className={cn("hidden min-h-0 xl:block", !hasSelection && "xl:block")}>{panel}</div>
+      <div className="hidden min-h-0 xl:block">{panel}</div>
     </div>
   );
 }

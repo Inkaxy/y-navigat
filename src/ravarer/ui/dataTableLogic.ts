@@ -28,10 +28,14 @@ export function toggleSelection(ids: string[], selected: Set<string>, id: string
   if (shift && anchor && ids.includes(anchor)) {
     const [a, b] = [ids.indexOf(anchor), ids.indexOf(id)].sort((x, y) => x - y);
     const on = !selected.has(id);
-    for (const rid of ids.slice(a, b + 1)) on ? next.add(rid) : next.delete(rid);
+    for (const rid of ids.slice(a, b + 1)) {
+      if (on) next.add(rid);
+      else next.delete(rid);
+    }
     return next;
   }
-  next.has(id) ? next.delete(id) : next.add(id);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
   return next;
 }
 
