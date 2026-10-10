@@ -171,7 +171,6 @@ export default function VarelistePage() {
     [q, kat, type, status, view, sort.key, sort.dir],
   );
 
-  const tolerance = tolerances.defaultPct ?? DEFAULT_DEVIATION_TOLERANCE;
   const hardCap = tolerances.settings?.price_hard_cap_pct ?? DEFAULT_HARD_CAP_PCT;
 
   const filtered = useMemo(
