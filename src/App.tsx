@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { lazyWithReload as lazy } from "@/lib/lazyWithReload";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, useParams } from "react-router-dom";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -36,10 +36,7 @@ import { LegalEntityProvider as PosStyringEntityProvider } from "@/pos_styring/c
 
 // Ordre-app
 
-import { RavarerProvider } from "@/ravarer/context/RavarerContext";
 
-import { FakturaerProvider } from "@/fakturaer/context/FakturaerContext";
-import { InvoiceAccessGuard } from "@/ravarer/components/InvoiceAccessGuard";
 import { ravarerRoutes } from "@/ravarer/routes";
 
 // Fakturering (utgående kundefakturaer → Tripletex)
@@ -173,10 +170,6 @@ const OrdreRefundsQueue = lazy(() => import("@/ordre/pages/RefundsQueue"));
 const OrdrePakkesystem = lazy(() => import("@/ordre/pages/Pakkesystem"));
 const OrdreWebsiteOrders = lazy(() => import("@/ordre/pages/WebsiteOrders"));
 
-const FakturaerList = lazy(() => import("@/fakturaer/pages/FakturaerList"));
-const TripletexSettings = lazy(() => import("@/ravarer/pages/innstillinger/TripletexSettings"));
-const AiServicesSettings = lazy(() => import("@/ravarer/pages/innstillinger/AiServicesSettings"));
-const KategorierSettings = lazy(() => import("@/ravarer/pages/innstillinger/KategorierSettings"));
 const RavarerSupplierPortal = lazy(() => import("@/ravarer/pages/forhandlinger/SupplierPortal"));
 const VarerPublicRecipe = lazy(() => import("@/varer/pages/PublicRecipe"));
 const RavarerLiveConfirmationPortal = lazy(() => import("@/ravarer/pages/forhandlinger/LiveConfirmationPortal"));
