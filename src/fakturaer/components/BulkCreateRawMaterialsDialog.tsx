@@ -334,7 +334,8 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
             Avbryt
           </Button>
           <Button onClick={() => void submit()} disabled={busy || included.length === 0 || missing.length > 0}>
-            {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Opprett {included.length} varer
+            {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {progress ? `Oppretter ${Math.min(progress.done + 1, progress.total)} av ${progress.total}` : `Opprett ${included.length} varer`}
           </Button>
         </DialogFooter>
       </DialogContent>
