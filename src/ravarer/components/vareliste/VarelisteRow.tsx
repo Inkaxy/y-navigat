@@ -350,7 +350,9 @@ function RowInner({
               onClick={() => onStartEdit(item.id, "agreed")}
               className="tabular-nums hover:underline disabled:cursor-default disabled:no-underline"
             >
-              {item.agreedPrice != null ? formatNok(item.agreedPrice) : "—"}
+              {!item.primaryLinkId ? (
+                <span className="text-caption text-muted-foreground">Velg primærleverandør først</span>
+              ) : item.agreedPrice != null ? formatNok(item.agreedPrice) : "—"}
             </button>
           )}
         </td>
