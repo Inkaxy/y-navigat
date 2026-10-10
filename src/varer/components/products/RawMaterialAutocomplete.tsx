@@ -1,3 +1,4 @@
+import { RawMaterialCreateSheet } from "@/ravarer/editors/RawMaterialCreateSheet";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppContext } from "@/varer/context/AppContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -286,132 +287,22 @@ export function RawMaterialAutocomplete({
         )}
       </div>
 
-      <QuickCreateRawMaterialDialog
+      <RawMaterialCreateSheet
         open={createOpen}
         onOpenChange={setCreateOpen}
-        prefilledName={prefilledName}
-        onCreated={(opt) => {
-          onChange(opt.id, opt);
-          setCreateOpen(false);
+        context={{ kind: "standalone", prefill: { name: prefilledName, openAfterSave: false } }}
+        onDone={async (id) => {
+          if (!id) return;
+          const { data, error } = await supabase
+            .from("raw_materials")
+            .select("id, sku, name, category, base_unit, current_cost_price")
+            .eq("id", id)
+            .single();
+          if (error || !data) return;
+          onChange(data.id, data);
         }}
       />
     </>
   );
 }
 
-function QuickCreateRawMaterialDialog({
-  open,
-  onOpenChange,
-  prefilledName,
-  onCreated,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  prefilledName: string;
-  onCreated: (opt: RawMaterialOption) => void;
-}) {
-  const { legalEntityId } = useAppContext();
-  const qc = useQueryClient();
-  const [name, setName] = useState("");
-  const [sku, setSku] = useState("");
-  const [category, setCategory] = useState<string>("Annet");
-  const [baseUnit, setBaseUnit] = useState("kg");
-  const [saving, setSaving] = useState(false);
-  const initRef = useRef(false);
-
-  useEffect(() => {
-    if (open) {
-      setName(prefilledName);
-      setSku("");
-      setCategory("Annet");
-      setBaseUnit("kg");
-      initRef.current = true;
-    }
-  }, [open, prefilledName]);
-
-  async function save() {
-    if (!name.trim()) {
-      toast.error("Navn er påkrevd");
-      return;
-    }
-    if (!sku.trim()) {
-      toast.error("SKU er påkrevd");
-      return;
-    }
-    setSaving(true);
-    const { data: userData } = await supabase.auth.getUser();
-    const { data, error } = await supabase
-      .from("raw_materials")
-      .insert({
-        legal_entity_id: legalEntityId,
-        created_by: userData.user?.id ?? null,
-        sku: sku.trim(),
-        name: name.trim(),
-        category: category || null,
-        base_unit: baseUnit,
-        is_active: true,
-        is_packaging: false,
-      } as never)
-      .select("id, sku, name, category, base_unit, current_cost_price")
-      .single();
-    setSaving(false);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    qc.invalidateQueries({ queryKey: ["raw_materials_autocomplete"] });
-    qc.invalidateQueries({ queryKey: ["raw_materials"] });
-    toast.success("Råvare opprettet");
-    onCreated(data as RawMaterialOption);
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Opprett ny råvare</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div>
-            <Label>Navn *</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="f.eks. Hvetemel Sigdal" />
-          </div>
-          <div>
-            <Label>SKU *</Label>
-            <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="f.eks. MEL-001" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Kategori</Label>
-              <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <CategorySelectItems existing={[category]} />
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Basisenhet *</Label>
-              <Select value={baseUnit} onValueChange={setBaseUnit}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {BASE_UNITS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Du kan fylle inn flere detaljer (pris, leverandør, næring) på råvare-siden senere.
-          </p>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Avbryt</Button>
-          <Button onClick={save} disabled={saving}>
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Opprett
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
