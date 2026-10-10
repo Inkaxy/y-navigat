@@ -100,6 +100,8 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [sharedCategory, setSharedCategory] = useState("");
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const link = useLinkSupplierItem();
 
   const lineIds = useMemo(() => lines.map((l) => l.id).join(","), [lines]);
 
