@@ -58,7 +58,7 @@ describe("invalidateRawMaterial", () => {
     expect(flat).not.toContain("total-supplier-spend");
 
     expect(flat).toContain("raw_material_search_index");
-    expect(calls).toHaveLength(rawMaterialQueryKeys("rm-1").length);
+    expect(calls).toHaveLength(rawMaterialQueryKeys("rm-1").length + RAVARER_COUNT_KEYS.length);
   });
 
   it("uten id blir de scopede nøklene prefiks-nøkler", () => {
@@ -87,7 +87,7 @@ describe("invalidateInvoice", () => {
     // faktura-id, så den ble aldri truffet uansett.
     expect(flat).not.toContain("invoice-doc-url|inv-1");
 
-    expect(calls).toHaveLength(invoiceQueryKeys("inv-1").length);
+    expect(calls).toHaveLength(invoiceQueryKeys("inv-1").length + RAVARER_COUNT_KEYS.length);
   });
 });
 
