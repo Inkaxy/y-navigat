@@ -17,7 +17,6 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMarginAlerts } from "@/varer/hooks/useMarginAlerts";
 import { useCompany } from "@/hooks/useCompany";
-import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,7 +40,6 @@ import {
   Settings,
   Users,
   UserCog,
-  Building2,
   Briefcase,
   LayoutGrid,
   Plug,
