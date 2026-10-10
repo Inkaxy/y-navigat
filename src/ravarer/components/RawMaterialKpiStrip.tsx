@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
 import { OrderDeskKpi } from "@/ordre/components/dashboard/OrderDeskKpi";
 import { BookOpen, Coins, FileText, Handshake, Package, Percent, Truck, Wallet } from "lucide-react";
 import { formatDate, formatNok } from "@/ravarer/lib/constants";
