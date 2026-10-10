@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Boxes } from "lucide-react";
 import { useProductStockLinks } from "@/ravarer/hooks/useStock";
+import { paths } from "@/ravarer/lib/paths";
 
 /** Liten opplysning på varekortet: hvilke handelsvarer salget trekker fra. */
 export function StockLinkNote({ productId }: { productId?: string }) {
@@ -16,7 +17,7 @@ export function StockLinkNote({ productId }: { productId?: string }) {
         {links.map(l => (
           <li key={l.id} className="text-muted-foreground">
             {l.raw_material ? (
-              <Link to={`/ravarer/vareliste/${l.raw_material.id}`} className="hover:underline">
+              <Link to={paths.raavare(l.raw_material.id)} className="hover:underline">
                 {l.raw_material.name}
               </Link>
             ) : (

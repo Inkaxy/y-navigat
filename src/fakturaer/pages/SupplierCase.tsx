@@ -14,6 +14,7 @@ import { formatMoney } from "@/fakturaer/lib/constants";
 import { allocateCredit, maxAllocatable, remainingByInvoice, setCaseStatus, creditNetExclVat } from "@/fakturaer/lib/supplierCases";
 import { parseDecimal } from "@/fakturaer/lib/units";
 import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
+import { paths } from "@/ravarer/lib/paths";
 
 const kr = (v: number | null | undefined) => (v == null ? "–" : formatMoney(v, "NOK"));
 const STATUS: Record<string, string> = { open: "Åpen", resolved: "Løst", cancelled: "Avbrutt" };
@@ -90,7 +91,7 @@ export default function SupplierCase() {
   return (
     <div className="px-page py-6 space-y-6">
       <DecisionNav />
-      <Link to="/ravarer/fakturaer/saker" className="text-sm text-primary hover:underline">← Leverandørsaker</Link>
+      <Link to={paths.saker()} className="text-sm text-primary hover:underline">← Leverandørsaker</Link>
       <QueryState isLoading={q.isLoading} isError={q.isError} error={q.error} scope="fakturaer:leverandorsak" onRetry={() => q.refetch()} isEmpty={!d} emptyTitle="Saken finnes ikke">
         {d && (
           <>
@@ -106,7 +107,7 @@ export default function SupplierCase() {
                 <ul className="divide-y divide-line-subtle text-sm">
                   {invoices.map(([invId, no]) => (
                     <li key={invId} className="flex justify-between gap-3 py-2">
-                      <Link className="text-primary hover:underline" to={`/ravarer/fakturaer/${invId}`}>{no}</Link>
+                      <Link className="text-primary hover:underline" to={paths.faktura(invId)}>{no}</Link>
                       <span>Restavvik {kr(remaining.get(invId) ?? 0)} ekskl. mva.</span>
                     </li>
                   ))}

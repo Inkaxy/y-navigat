@@ -27,6 +27,7 @@ import { LinesSumMismatchAlert } from "@/fakturaer/components/LinesSumMismatchAl
 import { useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
 import { unflagInvoice } from "@/fakturaer/lib/queueActions";
 import { invalidateInvoice } from "@/ravarer/lib/invalidate";
+import { paths } from "@/ravarer/lib/paths";
 
 export default function InvoiceDetailPage() {
   const { id } = useParams();
@@ -140,7 +141,7 @@ export default function InvoiceDetailPage() {
 
   return (
     <div className="space-y-5">
-      <button onClick={() => navigate("/ravarer/fakturaer")} className="flex items-center gap-1 text-sm text-ink-secondary transition-colors hover:text-ink-primary">
+      <button onClick={() => navigate(paths.alleFakturaer())} className="flex items-center gap-1 text-sm text-ink-secondary transition-colors hover:text-ink-primary">
         <ArrowLeft className="h-4 w-4" /> Tilbake
       </button>
 
@@ -327,7 +328,7 @@ export default function InvoiceDetailPage() {
             showLedgerAccount={showLedgerAccount}
             onShowLedgerAccount={setShowLedgerAccount}
             onMatch={setMatchLineId}
-            onRegister={() => navigate(`/ravarer/fakturaer/${id}/registrer-linjer`)}
+            onRegister={() => navigate(paths.registrerLinjer(id))}
             tolerancePct={defaultTolerancePct}
             settings={tolerances.settings}
           />

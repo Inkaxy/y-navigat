@@ -12,6 +12,7 @@ import { approvalBucket, fetchApprovalOverview } from "@/fakturaer/lib/approval"
 import { formatMoney } from "@/fakturaer/lib/constants";
 import { format } from "date-fns";
 import { nb } from "date-fns/locale";
+import { paths } from "@/ravarer/lib/paths";
 
 function headline(g: DecisionGroup): { title: string; body: string; foot: string } {
   const n = g.invoiceIds.length;
@@ -73,7 +74,7 @@ export default function IDag() {
               return (
                 <li key={g.key}>
                   <Link
-                    to={`/ravarer/fakturaer/i-dag/${encodeGroupKey(g.key)}`}
+                    to={paths.beslutning(encodeGroupKey(g.key))}
                     className="group block rounded-xl border border-line-subtle bg-card p-5 transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <div className="flex items-start justify-between gap-4">
@@ -96,7 +97,7 @@ export default function IDag() {
             })}
             {groups.length > top.length && (
               <li>
-                <Link to="/ravarer/fakturaer/beslutninger" className="inline-flex items-center gap-1 rounded-lg border border-line-subtle px-3 py-2 text-sm text-primary hover:bg-muted/50">
+                <Link to={paths.beslutninger()} className="inline-flex items-center gap-1 rounded-lg border border-line-subtle px-3 py-2 text-sm text-primary hover:bg-muted/50">
                   Se alle {groups.length} beslutninger, også prisavvik <ArrowUpRight className="h-4 w-4" aria-hidden />
                 </Link>
               </li>
@@ -120,7 +121,7 @@ export default function IDag() {
               </div>
             </div>
             <SupplierItemsCard />
-            <Link to="/ravarer/fakturaer/oversikt" className="block rounded-xl border border-success/30 bg-success/10 p-4 hover:bg-success/15">
+            <Link to={paths.godkjenning()} className="block rounded-xl border border-success/30 bg-success/10 p-4 hover:bg-success/15">
               <p className="font-semibold text-success">{overview.data ? `${readyCount} fakturaer klare til intern godkjenning` : "Fakturaoversikt"}</p>
               <p className="text-sm text-ink-secondary">Se og godkjenn. Godkjenning utløser ikke betaling.</p>
             </Link>
@@ -135,7 +136,7 @@ function SupplierItemsCard() {
   const c = useSupplierItems({ supplierId: null, search: "", status: null, page: 1, pageSize: 1 }).data?.counts;
   if (!c || c.ukoblet + c.mangler_pakning === 0) return null;
   return (
-    <Link to="/ravarer/fakturaer/varekoblinger?status=ukoblet" className="block rounded-xl border border-warning/30 bg-warning/10 p-4 hover:bg-warning/15">
+    <Link to={paths.varekoblinger({ status: "ukoblet" })} className="block rounded-xl border border-warning/30 bg-warning/10 p-4 hover:bg-warning/15">
       <p className="font-semibold">Varekort som trenger deg: {c.ukoblet} ukoblet · {c.mangler_pakning} mangler pakning</p>
       <p className="text-sm text-ink-secondary">Én beslutning per leverandørvare gjelder alle fakturaer.</p>
     </Link>

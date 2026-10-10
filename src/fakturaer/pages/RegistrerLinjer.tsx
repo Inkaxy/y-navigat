@@ -24,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { paths } from "@/ravarer/lib/paths";
 
 interface Line {
   id?: string;
@@ -184,7 +185,7 @@ export default function RegistrerLinjerPage() {
 
       toast.success("Linjer lagret");
       invalidateInvoice(qc, id);
-      navigate(`/ravarer/fakturaer/til-behandling?faktura=${id}`);
+      navigate(paths.fakturaInnboks({ faktura: id }));
     } catch (e: unknown) {
       showError("registrer-linjer", e, "Kunne ikke lagre linjene");
     } finally {
@@ -207,7 +208,7 @@ export default function RegistrerLinjerPage() {
   return (
     <div className="space-y-5">
       <button
-        onClick={() => navigate(`/ravarer/fakturaer/${id}`)}
+        onClick={() => navigate(paths.faktura(id))}
         className="flex items-center gap-1 text-sm text-ink-secondary transition-colors hover:text-ink-primary"
       >
         <ArrowLeft className="h-4 w-4" /> Tilbake til faktura
@@ -288,7 +289,7 @@ export default function RegistrerLinjerPage() {
           )}
 
           <div className="flex justify-end gap-2 border-t border-border pt-3">
-            <Button variant="outline" onClick={() => navigate(`/ravarer/fakturaer/${id}`)} disabled={busy}>Avbryt</Button>
+            <Button variant="outline" onClick={() => navigate(paths.faktura(id))} disabled={busy}>Avbryt</Button>
             <Button onClick={requestSave} disabled={busy || !replaceCheck.allowed} className="gap-2">
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Lagre linjer

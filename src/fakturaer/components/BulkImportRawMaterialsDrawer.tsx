@@ -51,6 +51,7 @@ interface RowState {
 }
 
 import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
+import { paths } from "@/ravarer/lib/paths";
 
 const FALLBACK_CATEGORY = "Importert – ikke kategorisert";
 
@@ -263,7 +264,7 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
       const skippedRows = res.skipped ?? [];
       if (created > 0) {
         toast.success(`${created} nye råvarer opprettet og koblet til fakturaen. Husk å fylle inn næringsinnhold senere.`, {
-          action: { label: "Vis", onClick: () => window.location.assign("/ravarer/vareliste") },
+          action: { label: "Vis", onClick: () => window.location.assign(paths.varer()) },
         });
       }
       // Samme invalidering som enkeltopprettelse (CreateRawMaterialDialog/MatchDrawer),

@@ -20,6 +20,7 @@ import { nutritionValueDiff, nutritionObjectDiff, NUTRITION_LABELS } from "@/rav
 import { useNavigate } from "react-router-dom";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
+import { paths } from "@/ravarer/lib/paths";
 
 /** Verdier som ikke er næringsobjekter vises som lesbar tekst, ikke rå JSON. */
 function formatPlainValue(value: unknown): string {
@@ -181,7 +182,7 @@ export default function DatabladEndringer() {
                 </Card>
                 <Card className="p-4">
                   <div className="text-sm font-medium mb-2">Berørt: {selected.affected_recipes_count} oppskrifter</div>
-                  <Button variant="outline" size="sm" onClick={() => navigate(`/ravarer/vareliste/${selected.raw_material_id}?tab=nutrition`)}>
+                  <Button variant="outline" size="sm" onClick={() => navigate(paths.raavare(selected.raw_material_id, { tab: "nutrition" }))}>
                     Åpne råvare
                   </Button>
                 </Card>

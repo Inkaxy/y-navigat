@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ExternalLink, Loader2, Save } from "lucide-react";
 import { useSaveDeclarationName } from "@/ravarer/hooks/useDeclarationNames";
+import { paths } from "@/ravarer/lib/paths";
 
 export interface MissingDeclarationNameRow {
   raw_material_id: string;
@@ -64,7 +65,7 @@ export function MissingDeclarationNames({ rows, canWrite, onSaved }: Props) {
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-medium">{r.name}</div>
             <Link
-              to={`/ravarer/vareliste/${r.raw_material_id}`}
+              to={paths.raavare(r.raw_material_id)}
               className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
             >
               Åpne råvarekortet <ExternalLink className="h-3 w-3" />

@@ -20,6 +20,7 @@ import { MarginTable } from "@/ravarer/components/stock/MarginTable";
 import { formatDate, formatNumber } from "@/ravarer/lib/constants";
 import { AllStockTable } from "@/ravarer/components/stock/AllStockTable";
 import { StockLedger } from "@/ravarer/components/stock/StockLedger";
+import { paths } from "@/ravarer/lib/paths";
 
 const kr = (n: number | null) =>
   n == null ? "—" : new Intl.NumberFormat("nb-NO", { style: "currency", currency: "NOK", maximumFractionDigits: 0 }).format(n);
@@ -267,7 +268,7 @@ export default function LagerPage() {
                       {missingLines.map(l => (
                         <tr key={l.id} className="border-t border-line-subtle">
                           <td className="px-4 py-3">
-                            <Link to={`/ravarer/fakturaer/${l.invoice_id}`} className="text-primary hover:underline">
+                            <Link to={paths.faktura(l.invoice_id)} className="text-primary hover:underline">
                               {l.invoice_number}
                             </Link>
                           </td>

@@ -12,7 +12,7 @@ export function SupplierItemStatusChips({ supplierId }: { supplierId: string }) 
     <div className="flex flex-wrap items-center gap-1.5" aria-label="Varekort hos leverandøren">
       <span className="text-caption text-ink-secondary">Varekort:</span>
       {SHOWN.map((s) => (
-        <Link key={s} to={`/ravarer/fakturaer/varekoblinger?leverandor=${encodeURIComponent(supplierId)}&status=${s}`}
+        <Link key={s} to={`/ravarer/priskontroll?fane=gjore&leverandor=${encodeURIComponent(supplierId)}&status=${s}`}
           className="rounded-full border border-line-subtle px-3 py-1 text-sm hover:bg-muted">
           {SUPPLIER_ITEM_STATUS_META[s].label} <span className="tabular-nums">{counts[s]}</span>
         </Link>

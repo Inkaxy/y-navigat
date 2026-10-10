@@ -19,6 +19,7 @@ import {
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { NewAgreementDialog } from "@/ravarer/components/NewAgreementDialog";
 import { formatNok, formatDate } from "@/ravarer/lib/constants";
+import { paths } from "@/ravarer/lib/paths";
 
 export default function AvtalerPage() {
   const navigate = useNavigate();
@@ -155,7 +156,7 @@ export default function AvtalerPage() {
                   return (
                     <tr
                       key={row.id}
-                      onClick={() => row.raw_material && navigate(`/ravarer/vareliste/${row.raw_material.id}?tab=suppliers`)}
+                      onClick={() => row.raw_material && navigate(paths.raavare(row.raw_material.id, { tab: "suppliers" }))}
                       className="cursor-pointer border-t border-line-subtle hover:bg-muted/40"
                     >
                       <td className="px-4 py-3 font-medium">{row.supplier?.name ?? "—"}</td>

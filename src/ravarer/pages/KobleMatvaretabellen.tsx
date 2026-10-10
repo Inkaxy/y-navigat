@@ -41,6 +41,7 @@ import {
 } from "@/ravarer/lib/foodSuggestions";
 import { FoodPickerDialog } from "@/ravarer/components/matvaretabellen/FoodPickerDialog";
 import { formatNumber } from "@/ravarer/lib/constants";
+import { paths } from "@/ravarer/lib/paths";
 
 const PAGE_SIZE = 25;
 
@@ -283,7 +284,7 @@ export default function KobleMatvaretabellen() {
           <ul className="mt-2 space-y-1 text-xs">
             {review.slice(0, 8).map((r) => (
               <li key={r.raw_material_id}>
-                <Link className="underline underline-offset-2" to={`/ravarer/vareliste/${r.raw_material_id}`}>
+                <Link className="underline underline-offset-2" to={paths.raavare(r.raw_material_id)}>
                   {r.name}
                 </Link>{" "}
                 <span className="text-ink-secondary">

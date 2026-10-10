@@ -7,6 +7,7 @@ import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBan
 import ImportEhfPage from "./ImportEhf";
 import ImportPdfPage from "./ImportPdf";
 import NewInvoicePage from "./NewInvoice";
+import { paths } from "@/ravarer/lib/paths";
 
 const TABS = ["ehf", "pdf", "manuelt"] as const;
 type TabKey = typeof TABS[number];
@@ -34,7 +35,7 @@ export default function ImportInvoicePage() {
   return (
     <div className="space-y-5">
       <button
-        onClick={() => navigate("/ravarer/fakturaer")}
+        onClick={() => navigate(paths.alleFakturaer())}
         className="flex items-center gap-1 text-sm text-ink-secondary transition-colors hover:text-ink-primary"
       >
         <ArrowLeft className="h-4 w-4" /> Tilbake til fakturaer

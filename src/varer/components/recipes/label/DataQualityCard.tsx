@@ -71,7 +71,7 @@ interface Props {
 }
 
 function rmLink(id: string, tab?: string): string {
-  return `/ravarer/vareliste/${id}${tab ? `?tab=${tab}` : ""}`;
+  return `/ravarer/varer/${id}${tab ? `?tab=${tab}` : ""}`;
 }
 
 /** Datakvalitet — ÉN oppgaveliste, én rad per ingrediens, samme rettehandlinger overalt. */

@@ -90,6 +90,7 @@ import {
 } from "@/fakturaer/lib/queueActions";
 import { emptyQueueState, peekUndo, queueReducer } from "@/fakturaer/lib/queueReducer";
 import { supabase } from "@/integrations/supabase/client";
+import { paths } from "@/ravarer/lib/paths";
 
 type TabValue = "all" | ReviewGroup;
 
@@ -451,10 +452,10 @@ export default function FakturaerInboxPage() {
 
   function primaryAction(inv: InboxInvoice, action: InboxPrimaryAction) {
     if (action === "fetch_lines") void invoiceAction(inv.id, "fetch");
-    else if (action === "register_lines") navigate(`/ravarer/fakturaer/${inv.id}/registrer-linjer`);
+    else if (action === "register_lines") navigate(paths.registrerLinjer(inv.id));
     else if (action === "link_credit_note") setCreditNoteId(inv.id);
     // «Se flagget» viser flagget og detaljene — fjerner det ALDRI.
-    else if (action === "view_flag") navigate(`/ravarer/fakturaer/${inv.id}`);
+    else if (action === "view_flag") navigate(paths.faktura(inv.id));
     else if (action === "finish") setReconcileId(inv.id);
     else openInvoice(inv.id);
   }
@@ -711,7 +712,7 @@ export default function FakturaerInboxPage() {
         busyId={busyInvoice?.id ?? null}
         onPrimary={primaryAction}
         onRematch={(inv) => void invoiceAction(inv.id, "match")}
-        onOpenDetail={(inv) => navigate(`/ravarer/fakturaer/${inv.id}`)}
+        onOpenDetail={(inv) => navigate(paths.faktura(inv.id))}
         onFlag={(inv) => setFlagId(inv.id)}
         onUnflag={(inv) => void invoiceAction(inv.id, "unflag")}
         onBatchMatch={batchMatch}

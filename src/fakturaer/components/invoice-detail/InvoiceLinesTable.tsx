@@ -10,6 +10,7 @@ import { formatNok } from "@/fakturaer/lib/constants";
 import { lineReferenceLabel } from "@/ravarer/lib/priceReference";
 import type { MatchSettings } from "@/fakturaer/hooks/useMatchTolerances";
 import type { InvoiceDetailLine } from "./fetchInvoiceDetail";
+import { paths } from "@/ravarer/lib/paths";
 
 interface Props {
   lines: InvoiceDetailLine[];
@@ -82,7 +83,7 @@ export function InvoiceLinesTable({ lines, supplierId, canBulkImport, canMatch, 
                             <div className="space-y-0.5">
                               <div className="flex items-center gap-2">
                                 <Link
-                                  to={`/ravarer/vareliste/${rm.id}`}
+                                  to={paths.raavare(rm.id)}
                                   className="font-medium text-app underline-offset-2 hover:underline"
                                 >
                                   {rm.name}
@@ -129,7 +130,7 @@ export function InvoiceLinesTable({ lines, supplierId, canBulkImport, canMatch, 
                             )}
                             {rm && (
                               <Button variant="ghost" size="icon" asChild title="Se prishistorikk">
-                                <Link to={`/ravarer/vareliste/${rm.id}?tab=suppliers`}>
+                                <Link to={paths.raavare(rm.id, { tab: "suppliers" })}>
                                   <LineChartIcon className="h-4 w-4" />
                                 </Link>
                               </Button>

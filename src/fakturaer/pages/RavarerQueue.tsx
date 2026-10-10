@@ -28,7 +28,7 @@ export default function RavarerQueue({ scope = "ravarer" }: { scope?: QueueScope
     if (k !== "side") n.delete("side");
     setSp(n, { replace: true });
   };
-  const detailHref = (key: string) => `/ravarer/fakturaer/i-dag/${encodeGroupKey(key)}?fra=${scope}${sp.toString() ? `&${sp.toString()}` : ""}`;
+  const detailHref = (key: string) => `/ravarer/priskontroll/beslutninger/${encodeGroupKey(key)}?fra=${scope}${sp.toString() ? `&${sp.toString()}` : ""}`;
 
   return (
     <div className="px-page py-6 space-y-5">

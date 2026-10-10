@@ -5,6 +5,7 @@ import { LineStatusBadge } from "@/fakturaer/components/inbox/LineStatusBadge";
 import { lineKindLabel, reasonLabelsOf, type SupplierItemLine } from "@/fakturaer/lib/supplierItems";
 import { isOpenLine } from "@/fakturaer/lib/linkFormLogic";
 import type { StatusTone } from "@/fakturaer/lib/lineStatus";
+import { paths } from "@/ravarer/lib/paths";
 
 function lineStatus(l: SupplierItemLine): { label: string; tone: StatusTone } {
   if (l.line_kind && l.line_kind !== "vare" && !l.raw_material_id) return { label: "Utelatt", tone: "muted" };
@@ -23,7 +24,7 @@ export function SupplierItemHistory({ lines, baseUnit }: { lines: SupplierItemLi
         <li key={l.id} className="space-y-1 py-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="tabular-nums text-ink-secondary">{formatDate(l.invoice_date)}</span>
-            <Link to={`/ravarer/fakturaer/${l.invoice_id}`} className="font-medium underline-offset-2 hover:underline">
+            <Link to={paths.faktura(l.invoice_id)} className="font-medium underline-offset-2 hover:underline">
               {l.invoice_number ?? "Faktura"}
             </Link>
             <span className="tabular-nums">{n(l.quantity)} {l.unit ?? ""}</span>
