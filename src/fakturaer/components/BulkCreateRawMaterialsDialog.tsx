@@ -13,7 +13,8 @@ import { showError } from "@/lib/userError";
 import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
-import { createRawMaterialFromLine } from "@/fakturaer/lib/createRawMaterial";
+import { supplierItemKey } from "@/fakturaer/lib/supplierItemKey";
+import { useLinkSupplierItem } from "@/fakturaer/hooks/useSupplierItems";
 import {
   CANONICAL_BASE_UNITS,
   CANONICAL_PACKAGE_UNITS,
@@ -138,46 +139,37 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
 
   async function submit() {
     setBusy(true);
+    setProgress({ done: 0, total: included.length });
     let ok = 0;
     const failed: string[] = [];
     const createdIds = new Set<string>();
     const invoiceIds = new Set<string>();
     try {
-      const { data: auth } = await supabase.auth.getUser();
-      const userId = auth.user?.id ?? null;
+      let done = 0;
       for (const d of included) {
         const line = lines.find((l) => l.id === d.lineId);
-        if (!line) continue;
+        const itemKey = line ? supplierItemKey(line) : null;
+        if (!line || !itemKey) continue;
+        setProgress({ done, total: included.length });
         const size = parseDecimal(d.packageSize);
         const perPackage = packageBaseUnits(size, d.packageUnit, d.baseUnit);
-        const cost = resolveLineCost({
-          quantity: line.quantity,
-          unit: line.unit,
-          unitPrice: line.unit_price,
-          totalAmount: line.total_amount,
-          packageSize: line.package_size,
-          packageUnit: line.package_unit,
-          countPerPackage: line.count_per_package,
-          description: line.description,
-          baseUnit: d.baseUnit,
-          supplierPackage:
-            size != null && size > 0 ? { packageSize: size, packageUnit: d.packageUnit } : null,
-        });
         try {
-          await createRawMaterialFromLine({
-            line,
-            userId,
-            name: d.name,
-            sku: d.sku,
-            category: d.category.trim() || sharedCategory.trim(),
-            baseUnit: d.baseUnit,
-            itemType: "ravare",
-            supplierSku: line.supplier_sku?.trim() || null,
-            packageSize: size,
-            packageUnit: size != null ? d.packageUnit : null,
-            baseUnitsPerPackage: cost.needsInput ? perPackage : cost.baseUnitsPerPackage ?? perPackage,
-            pricePerBaseUnit: cost.needsInput ? null : Number(cost.pricePerBaseUnit.toFixed(4)),
-            baseQuantity: cost.needsInput ? null : cost.baseQuantity,
+          // Samme skrivevei som enkeltopprettelse: alle åpne linjer på
+          // varekortet kobles og regnes om av matchemotoren.
+          await link.mutateAsync({
+            legal_entity_id: line.invoice.legal_entity_id,
+            supplier_id: line.invoice.supplier_id,
+            item_key: itemKey,
+            new_raw_material: {
+              name: d.name.trim(),
+              base_unit: d.baseUnit,
+              category: d.category.trim() || sharedCategory.trim(),
+              item_type: "ravare",
+              sku: d.sku.trim(),
+            },
+            package: size != null && size > 0
+              ? { package_size: size, package_unit: d.packageUnit, base_units_per_package: perPackage ?? undefined, confirm: true }
+              : undefined,
           });
           createdIds.add(d.lineId);
           invoiceIds.add(line.invoice_id);
@@ -186,6 +178,8 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
           const why = e instanceof Error ? e.message : "ukjent feil";
           failed.push(`${d.name || d.sku || "uten navn"} (${why})`);
         }
+        done++;
+        setProgress({ done, total: included.length });
       }
       invoiceIds.forEach((id) => invalidateInvoice(qc, id));
       invalidateRawMaterial(qc);
@@ -207,6 +201,7 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
       showError("masse-opprett-raavarer", e, "Kunne ikke opprette varene");
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   }
 
