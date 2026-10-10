@@ -175,8 +175,8 @@ export default function VarelistePage() {
   const hardCap = tolerances.settings?.price_hard_cap_pct ?? DEFAULT_HARD_CAP_PCT;
 
   const filtered = useMemo(
-    () => filterAndSortItems(items, listQuery, tolerance),
-    [items, listQuery, tolerance],
+    () => filterAndSortItems(items, listQuery, (i) => isLargeDeviation(i.deviation, tolerances.toleranceFor(i.categories[0]), hardCap)),
+    [items, listQuery, tolerances, hardCap],
   );
 
   /** Filtrene følger med til detaljen, slik at «Tilbake» og «forrige/neste» beholder dem. */
@@ -469,10 +469,10 @@ export default function VarelistePage() {
   return (
     <TooltipProvider delayDuration={200}>
       <div className="space-y-5">
-        <SupplierItemsBanner />
         <RavarerHeaderBanner
           actions={canWrite && <NewRawMaterialButton onClick={() => setNewOpen(true)} />}
         />
+        <SupplierItemsBanner />
 
         <Card className="p-4">
           <div className="flex flex-wrap items-center gap-3">
