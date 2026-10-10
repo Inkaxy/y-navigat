@@ -2,11 +2,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
+import { setPrimarySupplier } from "@/ravarer/lib/supplierLinkRpc";
 import type { ItemType } from "@/ravarer/lib/itemTypes";
 
 /**
- * Massehandlinger fra varelisten. Alle handlinger kjører som én oppdatering
- * mot valgte id-er og gir én samlet toast — ikke én per rad.
+ * Massehandlinger fra varelisten. Én samlet toast — ikke én per rad.
+ * Primærleverandør går via `rm_set_primary_supplier` per råvare.
  */
 export type BulkPatch =
   | { kind: "category"; category: string }
@@ -18,10 +19,9 @@ interface RawMaterialPatch {
   category?: string;
   item_type?: ItemType;
   is_active?: boolean;
-  primary_supplier_id?: string;
 }
 
-function patchFor(patch: BulkPatch): RawMaterialPatch {
+function patchFor(patch: Exclude<BulkPatch, { kind: "primary_supplier" }>): RawMaterialPatch {
   switch (patch.kind) {
     case "category":
       return { category: patch.category };
@@ -29,8 +29,6 @@ function patchFor(patch: BulkPatch): RawMaterialPatch {
       return { item_type: patch.itemType };
     case "active":
       return { is_active: patch.isActive };
-    case "primary_supplier":
-      return { primary_supplier_id: patch.supplierId };
   }
 }
 
@@ -53,6 +51,21 @@ export function useBulkUpdateRawMaterials() {
   return useMutation({
     mutationFn: async ({ ids, patch }: { ids: string[]; patch: BulkPatch }) => {
       if (ids.length === 0) return { count: 0, patch };
+      if (patch.kind === "primary_supplier") {
+        // Primær skrives bare via RPC-en — én råvare om gangen, med fremdrift.
+        const tid = toast.loading(`Setter primærleverandør: 0 av ${ids.length}`);
+        let done = 0;
+        try {
+          for (const id of ids) {
+            await setPrimarySupplier(id, patch.supplierId);
+            done += 1;
+            toast.loading(`Setter primærleverandør: ${done} av ${ids.length}`, { id: tid });
+          }
+        } finally {
+          toast.dismiss(tid);
+        }
+        return { count: done, patch };
+      }
       const { error } = await supabase.from("raw_materials").update(patchFor(patch)).in("id", ids);
       if (error) throw error;
       return { count: ids.length, patch };

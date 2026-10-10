@@ -55,6 +55,7 @@ import { isLargeDeviation } from "@/ravarer/components/vareliste/PriceCells";
 import { SupplierItemsBanner } from "@/ravarer/components/vareliste/SupplierItemsBanner";
 import { SaveViewDialog } from "@/ravarer/components/vareliste/SaveViewDialog";
 import { paths } from "@/ravarer/lib/paths";
+import { VarelistePriceDialogs } from "@/ravarer/components/vareliste/VarelistePriceDialogs";
 import { useHotkeys, type HotkeyBinding } from "@/ravarer/ui/hotkeys";
 import { ShortcutHelp } from "@/ravarer/ui/ShortcutHelp";
 
@@ -221,8 +222,7 @@ export default function VarelistePage() {
       setEditing(null);
       if (field === "agreed") {
         if (value === item.agreedPrice) return;
-        // Avtaleprisen hører til leverandørkoblingen når den finnes;
-        // kun råvarer uten kobling faller tilbake til raw_materials.
+        // Avtaleprisen hører KUN til leverandørkoblingen.
         if (item.primaryLinkId && item.supplierId) {
           upsertLinkMutate({
             id: item.primaryLinkId,
@@ -230,8 +230,6 @@ export default function VarelistePage() {
             supplier_id: item.supplierId,
             agreed_price_per_base_unit: value,
           });
-        } else {
-          updateMutate({ id: item.id, agreed_price: value });
         }
         return;
       }
@@ -246,7 +244,7 @@ export default function VarelistePage() {
         set_as_current: true,
       });
     },
-    [addPriceMutate, updateMutate, upsertLinkMutate],
+    [addPriceMutate, upsertLinkMutate],
   );
 
   const commitCategory = useCallback(
@@ -353,7 +351,7 @@ export default function VarelistePage() {
         keys: ["e"],
         description: "Endre kostpris",
         handler: () => {
-          if (focusedId && canWrite) setEditing({ id: focusedId, field: "cost" });
+          if (focusedId && canWrite) setCostFor(focusedId);
         },
       },
       { keys: ["n"], description: "Ny råvare", handler: () => { if (canWrite) setNewOpen(true); } },
@@ -364,7 +362,17 @@ export default function VarelistePage() {
   );
   useHotkeys(hotkeys);
 
-  const startEdit = useCallback((id: string, field: InlineField) => setEditing({ id, field }), []);
+  // Kostpris går alltid via CostPriceEditor; avtalepris krever primærleverandør.
+  const [costFor, setCostFor] = useState<string | null>(null);
+  const [primaryFor, setPrimaryFor] = useState<string | null>(null);
+  const startEdit = useCallback(
+    (id: string, field: InlineField) => {
+      if (field === "cost") { setCostFor(id); return; }
+      if (field === "agreed" && !items.find((i) => i.id === id)?.primaryLinkId) { setPrimaryFor(id); return; }
+      setEditing({ id, field });
+    },
+    [items],
+  );
   const cancelEdit = useCallback(() => setEditing(null), []);
 
   /** Bulk «Bekreft pakning»: bare varer som faktisk står i pakningskøen. */
@@ -704,6 +712,14 @@ export default function VarelistePage() {
         />
 
         <NewRawMaterialDialog open={newOpen} onOpenChange={setNewOpen} />
+        <VarelistePriceDialogs
+          items={items}
+          costFor={costFor}
+          onCostClose={() => setCostFor(null)}
+          primaryFor={primaryFor}
+          onPrimaryClose={() => setPrimaryFor(null)}
+          suppliers={suppliers}
+        />
         <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} bindings={hotkeys} />
 
         <PackageEditor
