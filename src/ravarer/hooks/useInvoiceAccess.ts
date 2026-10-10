@@ -10,7 +10,7 @@ export function useInvoiceAccess() {
   return useQuery({
     queryKey: ["ravarer-invoice-access"],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("user_has_invoice_access" as any);
+      const { data, error } = await supabase.rpc("user_has_invoice_access");
       if (error) {
         console.error("invoice access check", error);
         return false;

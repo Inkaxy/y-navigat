@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
+import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
 
 export interface RawMaterialUnitRow {
   id: string;
@@ -96,7 +97,7 @@ export function useUpsertRawMaterialUnit() {
       });
       if (error) throw error;
     },
-    onSuccess: (_d, vars) => {
+    onSuccess: (_d, vars) => { invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["raw-material-units", vars.raw_material_id] });
       qc.invalidateQueries({ queryKey: ["raw-material-units-bulk"] });
       toast.success("Enhet lagret");
@@ -112,7 +113,7 @@ export function useDeleteRawMaterialUnit() {
       const { error } = await supabase.from("raw_material_units").delete().eq("id", input.id);
       if (error) throw error;
     },
-    onSuccess: (_d, vars) => {
+    onSuccess: (_d, vars) => { invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["raw-material-units", vars.raw_material_id] });
       qc.invalidateQueries({ queryKey: ["raw-material-units-bulk"] });
       toast.success("Enhet slettet");

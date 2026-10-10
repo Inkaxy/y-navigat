@@ -12,6 +12,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { cleanOrgNumber, orgNumberError } from "@/ravarer/lib/orgNumber";
 import type { SupplierRow } from "@/ravarer/hooks/useSuppliers";
+import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
 
 interface Props {
   open: boolean;
@@ -105,7 +106,7 @@ export function SupplierDialog({ open, onOpenChange, onCreated, supplier = null 
       if (error) throw error;
       return data;
     },
-    onSuccess: (data) => {
+    onSuccess: (data) => { invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["suppliers"] });
       qc.invalidateQueries({ queryKey: ["supplier", data.id] });
       toast.success(isEdit ? "Leverandør lagret" : "Leverandør opprettet");

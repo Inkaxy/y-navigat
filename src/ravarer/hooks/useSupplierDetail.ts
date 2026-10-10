@@ -5,6 +5,7 @@ import { supplierSpendExclVat } from "@/ravarer/lib/purchaseTotals";
 import type { SupplierRow } from "@/ravarer/hooks/useSuppliers";
 import { osloDateISOPlusDays } from "@/lib/osloDate";
 import { fetchAllRows } from "@/lib/supabasePaging";
+import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
 
 export interface SupplierItemRow {
   id: string;
@@ -134,7 +135,7 @@ export function useUpdateSupplierNotes(supplierId: string | undefined) {
       if (error) throw error;
       return notes;
     },
-    onSuccess: () => {
+    onSuccess: () => { invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["supplier", supplierId] });
       qc.invalidateQueries({ queryKey: ["suppliers"] });
       toast.success("Notat lagret");
