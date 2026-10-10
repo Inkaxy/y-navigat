@@ -24,7 +24,7 @@ export const RECIPIENT_STATUS_LABEL: Record<string, string> = {
 
 export function negotiationStatusLabel(status: string | null | undefined): string {
   if (!status) return "—";
-  return NEGOTIATION_STATUS_LABEL[status] ?? status;
+  return NEGOTIATION_STATUS_LABEL[status] ?? "Ukjent status";
 }
 
 export function recipientStatusLabel(status: string | null | undefined): string {
