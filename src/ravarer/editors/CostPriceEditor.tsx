@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAddPriceHistory } from "@/ravarer/hooks/useRmSuppliers";
 import { PRICE_SOURCES } from "@/ravarer/lib/constants";
 import { osloTodayISO } from "@/lib/osloDate";
-import { toPriceHistoryInput, validateCostPrice, type CostPriceDraft, type CostPriceErrors, type CostPriceSource } from "./costPriceLogic";
+import { DEFAULT_COST_SOURCE, toPriceHistoryInput, validateCostPrice, type CostPriceDraft, type CostPriceErrors, type CostPriceSource } from "./costPriceLogic";
 
 export interface CostPriceEditorProps {
   open: boolean;
