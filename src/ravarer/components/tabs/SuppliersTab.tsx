@@ -13,7 +13,7 @@ import { PurchaseStatsCard } from "@/ravarer/components/PurchaseStatsCard";
 import { StartPriceCard } from "@/ravarer/components/tabs/StartPriceCard";
 import { useRawMaterialUnits } from "@/ravarer/hooks/useRawMaterialUnits";
 import { RmSupplierDialog } from "./suppliers/RmSupplierDialog";
-import { AddPriceDialog } from "./suppliers/AddPriceDialog";
+import { CostPriceEditor } from "@/ravarer/editors/CostPriceEditor";
 import { SupplierLinksTable, BASE_UNIT_KEY } from "./suppliers/SupplierLinksTable";
 import { PriceBasisNowCard } from "./suppliers/PriceBasisNowCard";
 import { SupplierItemsForMaterialCard } from "./suppliers/SupplierItemsForMaterialCard";

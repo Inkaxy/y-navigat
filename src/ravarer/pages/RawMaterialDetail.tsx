@@ -331,6 +331,11 @@ export default function RawMaterialDetail() {
             registerSave={(fn) => {
               if (tab === "overview") saveRef.current = fn;
             }}
+            onEditLink={() => {
+              const n = new URLSearchParams(searchParams);
+              n.set("tab", "suppliers");
+              setSearchParams(n, { replace: true });
+            }}
           />
         </TabsContent>
         <TabsContent value="suppliers" className="mt-5">
