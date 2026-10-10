@@ -14,7 +14,7 @@ import {
 import { Loader2, MoreHorizontal, RefreshCw, Search } from "lucide-react";
 
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
-import { NewRawMaterialDialog } from "@/ravarer/components/NewRawMaterialDialog";
+import { RawMaterialCreateSheet } from "@/ravarer/editors/RawMaterialCreateSheet";
 import { LinkRawMaterialDialog } from "@/ravarer/components/matvaretabellen/LinkRawMaterialDialog";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import {
@@ -307,14 +307,14 @@ export default function Matvaretabellen() {
       )}
 
       {createFood && (
-        <NewRawMaterialDialog
+        <RawMaterialCreateSheet
           open={!!createFood}
-          onOpenChange={(v) => !v && setCreateFood(null)}
-          initialName={createFood.food_name}
-          onCreated={async (id) => {
+          onOpenChange={(v) => { if (!v) setCreateFood(null); }}
+          context={{ kind: "standalone", prefill: { name: createFood.food_name, openAfterSave: false } }}
+          onDone={async (id) => {
             const foodId = createFood.food_id;
             setCreateFood(null);
-            await apply.mutateAsync({ rawMaterialId: id, foodId });
+            if (id) await apply.mutateAsync({ rawMaterialId: id, foodId });
           }}
         />
       )}

@@ -1,3 +1,4 @@
+import { setPrimarySupplier } from "@/ravarer/lib/supplierLinkRpc";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -96,37 +97,21 @@ export function useUpsertRmSupplier() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: Partial<RmSupplierRow> & { raw_material_id: string; supplier_id: string }) => {
+      // Primær skrives ALDRI direkte — bare via `rm_set_primary_supplier`.
+      const { is_primary: wantPrimary, ...rest } = input;
       const { data, error } = await supabase
         .from("raw_material_suppliers")
-        .upsert(input, { onConflict: "raw_material_id,supplier_id" })
+        .upsert(rest, { onConflict: "raw_material_id,supplier_id" })
         .select()
         .single();
       if (error) throw error;
       const row = data as RmSupplierRow;
-      // Primær må holdes i synk begge veier: øvrige koblinger nullstilles og
-      // råvaren peker på samme leverandør (kolonnen «Leverandør» i varelisten).
-      if (input.is_primary) {
-        const { error: othersErr } = await supabase
-          .from("raw_material_suppliers")
-          .update({ is_primary: false })
-          .eq("raw_material_id", row.raw_material_id)
-          .neq("id", row.id);
-        if (othersErr) throw othersErr;
-        const { error: rmErr } = await supabase
-          .from("raw_materials")
-          .update({ primary_supplier_id: row.supplier_id })
-          .eq("id", row.raw_material_id);
-        if (rmErr) throw rmErr;
-      } else if (input.is_primary === false) {
-        // Slås primær AV på raden som var primær, må råvaren slutte å peke på
-        // leverandøren — ellers viser varelisten en leverandør som ikke lenger
-        // er hovedleverandør.
-        const { error: rmErr } = await supabase
-          .from("raw_materials")
-          .update({ primary_supplier_id: null })
-          .eq("id", row.raw_material_id)
-          .eq("primary_supplier_id", row.supplier_id);
-        if (rmErr) throw rmErr;
+      if (wantPrimary === true) {
+        await setPrimarySupplier(row.raw_material_id, row.supplier_id);
+        row.is_primary = true;
+      } else if (wantPrimary === false && row.is_primary) {
+        await setPrimarySupplier(row.raw_material_id, null);
+        row.is_primary = false;
       }
       return row;
     },

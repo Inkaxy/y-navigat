@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AgreementDocumentLink } from "@/ravarer/components/AgreementDocumentLink";
 import { formatNok, formatDate } from "@/ravarer/lib/constants";
+import { useSetPrimarySupplier } from "@/ravarer/hooks/useSupplierLinkRpcs";
 import type { RmSupplierRow } from "@/ravarer/hooks/useRmSuppliers";
 
 export const BASE_UNIT_KEY = "__base";
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export function SupplierLinksTable({ links, supplierMap, units, priceUnitId, onPriceUnit, baseUnit, unitFactor, unitLabel, canWrite, isLoading, hasHistory, onNewSupplier, onLink }: Props) {
+  const setPrimary = useSetPrimarySupplier();
   return (
       <Card className="p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -164,6 +166,16 @@ export function SupplierLinksTable({ links, supplierMap, units, priceUnitId, onP
                       <td className="py-3 text-right">
                         {canWrite && (
                           <div className="flex justify-end gap-1">
+                            {!l.is_primary && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={setPrimary.isPending}
+                                onClick={() => setPrimary.mutate({ rawMaterialId: l.raw_material_id, supplierId: l.supplier_id })}
+                              >
+                                Gjør til primær
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="ghost"

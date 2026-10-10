@@ -6,10 +6,11 @@ import { Upload, Loader2, FileText, Check, RefreshCw, AlertCircle, Plus } from "
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
-import { CreateRawMaterialFromDatasheetDialog, type DatasheetExtract } from "@/ravarer/components/CreateRawMaterialFromDatasheetDialog";
+import { RawMaterialCreateSheet } from "@/ravarer/editors/RawMaterialCreateSheet";
+import type { DatasheetAiFields as DatasheetExtract } from "@/ravarer/editors/createSheetLogic";
 import { useDeleteDatasheets, useOrphanDatasheets } from "@/ravarer/hooks/useDatasheets";
 import { formatDate } from "@/ravarer/lib/constants";
-import { SetPackageDialog } from "@/ravarer/components/packages/SetPackageDialog";
+import { PackageEditor } from "@/ravarer/editors/PackageEditor";
 import type { PackageWorklistRow } from "@/ravarer/hooks/usePackageSizes";
 import type { PackageFillSuggestion } from "@/ravarer/lib/packageMath";
 
@@ -382,7 +383,7 @@ export default function DatabladBulk() {
         </Card>
       )}
 
-      <SetPackageDialog
+      <PackageEditor
         row={packageTarget?.row ?? null}
         open={packageTarget !== null}
         onOpenChange={(v) => { if (!v) setPackageTarget(null); }}
@@ -390,14 +391,18 @@ export default function DatabladBulk() {
       />
 
       {createDialogIdx !== null && rows[createDialogIdx]?.datasheet_id && (
-        <CreateRawMaterialFromDatasheetDialog
+        <RawMaterialCreateSheet
           open={createDialogIdx !== null}
           onOpenChange={(v) => { if (!v) setCreateDialogIdx(null); }}
-          datasheetId={rows[createDialogIdx].datasheet_id!}
-          fileName={rows[createDialogIdx].file.name}
-          extracted={rows[createDialogIdx].extracted ?? {}}
-          onCreated={(rmId) => {
+          context={{
+            kind: "datasheet",
+            datasheetId: rows[createDialogIdx].datasheet_id ?? "",
+            fileName: rows[createDialogIdx].file.name,
+            aiFields: rows[createDialogIdx].extracted ?? {},
+          }}
+          onDone={(rmId) => {
             const idx = createDialogIdx;
+            if (!rmId) return;
             updateRow(idx, { candidates: [{ id: rmId, name: rows[idx].extracted?.name ?? "Ny råvare", sku: rows[idx].extracted?.sku ?? "", score: 1 }] });
             // Auto-anvend datablad-felter på den nye råvaren
             void selectRm(idx, rmId).then(() => applyRow(idx));

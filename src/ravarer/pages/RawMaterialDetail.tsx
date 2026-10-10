@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGuardedNavigate } from "@/providers/UnsavedGuardProvider";
@@ -17,6 +17,8 @@ import {
   Pencil,
   X,
 } from "lucide-react";
+import { useHotkeys, type HotkeyBinding } from "@/ravarer/ui/hotkeys";
+import { ShortcutHelp } from "@/ravarer/ui/ShortcutHelp";
 import { useRenameRawMaterial } from "@/ravarer/hooks/useRawMaterials";
 import { useRawMaterialPage } from "@/ravarer/hooks/useRawMaterialPage";
 import { useRawMaterialPurchaseStats } from "@/ravarer/hooks/usePurchaseStats";
@@ -108,28 +110,17 @@ export default function RawMaterialDetail() {
     [navigate, listSearch],
   );
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      const typing =
-        !!target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable);
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
-        e.preventDefault();
-        saveRef.current?.();
-        return;
-      }
-      if (typing || e.altKey || e.metaKey || e.ctrlKey) return;
-      if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="listbox"]')) return;
-      if (e.key === "[" && prev) goTo(prev.id);
-      if (e.key === "]" && next) goTo(next.id);
-
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [prev, next, goTo]);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const hotkeys = useMemo<HotkeyBinding[]>(
+    () => [
+      { keys: ["["], description: "Forrige råvare", handler: () => { if (prev) goTo(prev.id); } },
+      { keys: ["]"], description: "Neste råvare", handler: () => { if (next) goTo(next.id); } },
+      { keys: ["s"], mod: true, description: "Lagre", handler: () => saveRef.current?.() },
+      { keys: ["?"], description: "Vis hurtigtaster", handler: () => setHelpOpen(true) },
+    ],
+    [prev, next, goTo],
+  );
+  useHotkeys(hotkeys);
 
   if (page.isLoading || page.isError || !rm) {
     return (
@@ -340,6 +331,11 @@ export default function RawMaterialDetail() {
             registerSave={(fn) => {
               if (tab === "overview") saveRef.current = fn;
             }}
+            onEditLink={() => {
+              const n = new URLSearchParams(searchParams);
+              n.set("tab", "suppliers");
+              setSearchParams(n, { replace: true });
+            }}
           />
         </TabsContent>
         <TabsContent value="suppliers" className="mt-5">
@@ -365,6 +361,7 @@ export default function RawMaterialDetail() {
           <HistoryTab rm={rm} />
         </TabsContent>
       </Tabs>
+      <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} bindings={hotkeys} />
     </div>
   );
 }

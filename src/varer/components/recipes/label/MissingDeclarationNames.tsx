@@ -1,3 +1,4 @@
+import { DeclarationNameField } from "@/ravarer/editors/DeclarationNameField";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -109,30 +110,13 @@ export function DeclarationNameInline({
   disabled: boolean;
   onSaved: () => void;
 }) {
-  const save = useSaveDeclarationName();
-  const [value, setValue] = useState(fallback ?? "");
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Input
-        aria-label="Deklarasjonsnavn"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="f.eks. hvetemel"
-        disabled={disabled}
-        className="h-8 w-48"
-      />
-      <Button
-        size="sm"
-        variant="outline"
-        className="h-8"
-        disabled={disabled || save.isPending || !value.trim()}
-        onClick={() =>
-          save.mutate({ rawMaterialId, declarationName: value }, { onSuccess: () => onSaved() })
-        }
-      >
-        {save.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
-        Lagre navn
-      </Button>
-    </div>
+    <DeclarationNameField
+      rawMaterialId={rawMaterialId}
+      value={fallback}
+      disabled={disabled}
+      compact
+      onSaved={() => onSaved()}
+    />
   );
 }

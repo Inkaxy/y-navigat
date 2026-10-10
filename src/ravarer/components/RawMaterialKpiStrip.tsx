@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
-import { Kpi } from "@/ravarer/components/Kpi";
+import { OrderDeskKpi } from "@/ordre/components/dashboard/OrderDeskKpi";
+import { BookOpen, Coins, FileText, Handshake, Package, Percent, Truck, Wallet } from "lucide-react";
 import { formatDate, formatNok } from "@/ravarer/lib/constants";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { chooseAgreedPrice, kpiDeviation, pricePerPackage } from "@/ravarer/lib/rawMaterialKpi";
@@ -50,84 +50,52 @@ export function RawMaterialKpiStrip({ rm, links, recipeCount, spend12m }: Props)
 
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <Kpi
+      <OrderDeskKpi
+        icon={Coins}
         label={`Kostpris / ${rm.base_unit}`}
         value={formatNok(rm.current_cost_price)}
-        hint={
-          rm.price_updated_at
-            ? `${rm.price_source ?? "ukjent kilde"} · ${formatDate(rm.price_updated_at)}`
-            : "Ingen kilde registrert"
-        }
+        sub={rm.price_updated_at ? `${rm.price_source ?? "ukjent kilde"} · ${formatDate(rm.price_updated_at)}` : "Ingen kilde registrert"}
       />
-      <Kpi
+      <OrderDeskKpi
+        icon={Package}
         label="Pris per pakning"
         value={perPackage != null ? formatNok(perPackage) : "—"}
-        hint={
-          rm.base_units_per_package
-            ? `${rm.base_units_per_package} ${rm.base_unit} per pakning`
-            : "Pakningsstørrelse mangler"
-        }
+        sub={rm.base_units_per_package ? `${rm.base_units_per_package} ${rm.base_unit} per pakning` : "Pakningsstørrelse mangler"}
       />
-      <Kpi
+      <OrderDeskKpi
+        icon={FileText}
         label="Siste fakturapris"
         value={lastInvoice?.last_invoice_price != null ? formatNok(lastInvoice.last_invoice_price) : "—"}
-        hint={
-          lastInvoice
-            ? `${formatDate(lastInvoice.last_invoice_date)} · ${supplierName(lastInvoice.supplier_id) ?? "—"}`
-            : "Ingen fakturalinjer"
-        }
+        sub={lastInvoice ? `${formatDate(lastInvoice.last_invoice_date)} · ${supplierName(lastInvoice.supplier_id) ?? "—"}` : "Ingen fakturalinjer"}
       />
-      <Kpi
+      <OrderDeskKpi
+        icon={Handshake}
         label={`Avtalepris / ${rm.base_unit}`}
         value={agreed.value != null ? formatNok(agreed.value) : "—"}
-        hint={
+        sub={
           agreed.source === "link"
             ? `Primærkobling${agreed.validTo ? ` · gyldig til ${formatDate(agreed.validTo)}` : " · uten sluttdato"}`
             : agreed.source === "raw_material"
-              ? "Fra råvarekortet"
+              ? "Eldre avtalepris — brukes ikke"
               : "Ingen avtalepris"
         }
       />
-      <Kpi
+      <OrderDeskKpi
+        icon={Percent}
+        tone={deviation.pct != null && deviation.pct > 5 ? "warning" : "default"}
         label="Avvik"
         value={deviation.pct != null ? `${deviation.pct > 0 ? "+" : ""}${deviation.pct.toFixed(1)} %` : "—"}
-        valueClassName={
-          deviation.pct == null
-            ? undefined
-            : deviation.pct > 5
-              ? "text-warning"
-              : deviation.pct < -5
-                ? "text-success"
-                : undefined
-        }
-        hint={deviation.basis ? `Siste faktura mot ${deviation.basis}` : "Mangler grunnlag"}
+        sub={deviation.basis ? `Siste faktura mot ${deviation.basis}` : "Mangler grunnlag"}
       />
-      <Kpi
+      <OrderDeskKpi
+        icon={Truck}
         label="Primærleverandør"
-        value={
-          primarySupplierId ? (
-            <Link
-              to={paths.leverandor(primarySupplierId)}
-              className="text-app underline-offset-2 hover:underline"
-            >
-              <span className="text-lg">{supplierName(primarySupplierId)}</span>
-            </Link>
-          ) : (
-            "—"
-          )
-        }
-        hint={primary?.supplier_sku ? `Lev.nr ${primary.supplier_sku}` : "Ingen leverandør-SKU"}
+        to={primarySupplierId ? paths.leverandor(primarySupplierId) : undefined}
+        value={primarySupplierId ? (supplierName(primarySupplierId) ?? "—") : "—"}
+        sub={primary?.supplier_sku ? `Lev.nr ${primary.supplier_sku}` : "Ingen leverandør-SKU"}
       />
-      <Kpi
-        label="Kjøpt 12 mnd"
-        value={spend12m != null ? formatNok(spend12m) : "—"}
-        hint="Fakturabeløp eks. mva"
-      />
-      <Kpi
-        label="Brukt i oppskrifter"
-        value={String(recipeCount)}
-        hint={recipeCount === 1 ? "1 oppskrift" : `${recipeCount} oppskrifter`}
-      />
+      <OrderDeskKpi icon={Wallet} label="Kjøpt 12 mnd" value={spend12m != null ? formatNok(spend12m) : "—"} sub="Fakturabeløp eks. mva" />
+      <OrderDeskKpi icon={BookOpen} label="Brukt i oppskrifter" value={String(recipeCount)} sub={recipeCount === 1 ? "1 oppskrift" : `${recipeCount} oppskrifter`} />
     </div>
   );
 }

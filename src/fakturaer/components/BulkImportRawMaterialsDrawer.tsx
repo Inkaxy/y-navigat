@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, Sparkles, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
+import { supplierItemKey } from "@/fakturaer/lib/supplierItemKey";
+import { useLinkSupplierItem } from "@/fakturaer/hooks/useSupplierItems";
 import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, deriveLinePackage, parseDecimal, resolveLineCost } from "@/fakturaer/lib/units";
 
 export interface BulkLine {
@@ -60,6 +62,7 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   invoiceId: string;
   legalEntityId: string;
+  supplierId: string;
   lines: BulkLine[];
   onComplete?: () => void;
 }
@@ -102,11 +105,13 @@ function derivePricePerBaseUnit(l: BulkLine, baseUnit: string, pkgSize: number |
   return Number(c.pricePerBaseUnit.toFixed(4));
 }
 
-export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, legalEntityId, lines, onComplete }: Props) {
+export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, legalEntityId, supplierId, lines, onComplete }: Props) {
   const qc = useQueryClient();
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [skipped, setSkipped] = useState<Array<{ line_id: string; reason: string }>>([]);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const link = useLinkSupplierItem();
 
   useEffect(() => {
     if (!open) return;
@@ -229,35 +234,47 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
 
   const importMutation = useMutation({
     mutationFn: async (onlySelected: boolean) => {
-      const items = lines
-        .filter((l) => (onlySelected ? rows[l.id]?.selected : true))
-        .map((l) => {
-          const r = rows[l.id];
+      const chosen = lines.filter((l) => (onlySelected ? rows[l.id]?.selected : true));
+      const created: Array<{ id: string }> = [];
+      const skippedOut: Array<{ line_id: string; reason: string }> = [];
+      let done = 0;
+      setProgress({ done, total: chosen.length });
+      for (const l of chosen) {
+        const r = rows[l.id];
+        const itemKey = supplierItemKey({ supplier_sku: l.supplier_sku, description: l.description });
+        if (!itemKey) {
+          skippedOut.push({ line_id: l.id, reason: "Mangler varenavn og varenummer" });
+        } else {
           const pkgSize = num(r.package_size);
-          const ppbu = num(r.price_per_base_unit);
-          // Avtalepris på leverandørkoblingen = pris per PAKKE, ikke linjens totalbeløp.
-          const pricePerPackage = ppbu != null && pkgSize != null ? Number((ppbu * pkgSize).toFixed(4)) : l.unit_price ?? null;
-          return {
-            line_id: l.id,
-            name: r.name.trim(),
-            sku: r.sku.trim(),
-            category: r.category || FALLBACK_CATEGORY,
-            base_unit: r.base_unit,
-            package_size: pkgSize,
-            package_unit: r.package_unit || null,
-            agreed_price: pricePerPackage,
-            /** Pris per baseenhet fra denne fakturaen — IKKE en framforhandlet avtalepris. */
-            price_per_base_unit: ppbu,
-            set_primary: r.set_primary,
-            supplier_sku: l.supplier_sku,
-            supplier_product_name: l.description,
-          };
-        });
-      const { data, error } = await supabase.functions.invoke("bulk-import-raw-materials-from-invoice", {
-        body: { invoice_id: invoiceId, items },
-      });
-      if (error) throw error;
-      return data as { created: Array<{ id: string }>; skipped: Array<{ line_id: string; reason: string }> };
+          try {
+            // Samme skrivevei som enkeltopprettelse: varekortet kobles og
+            // alle åpne linjer regnes om av matchemotoren.
+            const res = await link.mutateAsync({
+              legal_entity_id: legalEntityId,
+              supplier_id: supplierId,
+              item_key: itemKey,
+              new_raw_material: {
+                name: r.name.trim(),
+                base_unit: r.base_unit,
+                category: r.category || FALLBACK_CATEGORY,
+                item_type: "ravare",
+                sku: r.sku.trim(),
+              },
+              package: pkgSize != null && pkgSize > 0
+                ? { package_size: pkgSize, package_unit: r.package_unit || r.base_unit, confirm: true }
+                : undefined,
+              set_primary: r.set_primary,
+            });
+            if (res.raw_material_id) created.push({ id: res.raw_material_id });
+          } catch (e) {
+            skippedOut.push({ line_id: l.id, reason: e instanceof Error ? e.message : "ukjent feil" });
+          }
+        }
+        done++;
+        setProgress({ done, total: chosen.length });
+      }
+      setProgress(null);
+      return { created, skipped: skippedOut };
     },
     onSuccess: (res) => {
       const created = res.created?.length ?? 0;
@@ -470,7 +487,7 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
           </Button>
           <Button onClick={() => importMutation.mutate(false)} disabled={importMutation.isPending || loadingSuggestions}>
             {importMutation.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-            Importer alle ({lines.length})
+            {progress ? `Oppretter ${Math.min(progress.done + 1, progress.total)} av ${progress.total}` : `Importer alle (${lines.length})`}
           </Button>
         </SheetFooter>
       </SheetContent>

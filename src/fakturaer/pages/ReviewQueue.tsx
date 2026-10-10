@@ -26,7 +26,7 @@ import { MatchDrawer } from "@/fakturaer/components/MatchDrawer";
 import { BulkLinkDialog } from "@/fakturaer/components/BulkLinkDialog";
 import { handleQueueShortcut } from "@/fakturaer/lib/queueShortcuts";
 import { notifyAccepted } from "@/fakturaer/lib/acceptNotice";
-import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
+import { CreateRawMaterialFromLine } from "@/fakturaer/components/CreateRawMaterialFromLine";
 import { BulkCreateRawMaterialsDialog } from "@/fakturaer/components/BulkCreateRawMaterialsDialog";
 import { LinkCreditNoteDialog } from "@/fakturaer/components/LinkCreditNoteDialog";
 import { NotARawMaterialDialog } from "@/fakturaer/components/NotARawMaterialDialog";
@@ -792,7 +792,7 @@ export default function FakturaerInboxPage() {
         supplierName={dialogLine?.invoice.supplier?.name ?? null}
         canWrite={canWrite}
       />
-      <CreateRawMaterialDialog open={createOpen} onOpenChange={setCreateOpen} line={dialogLine} />
+      <CreateRawMaterialFromLine open={createOpen} onOpenChange={setCreateOpen} line={dialogLine} />
       <BulkCreateRawMaterialsDialog
         open={bulkCreateOpen}
         onOpenChange={setBulkCreateOpen}

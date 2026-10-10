@@ -23,7 +23,7 @@ import type { DecisionGroup } from "@/fakturaer/lib/decisionGroups";
 import { createSupplierCase } from "@/fakturaer/lib/supplierCases";
 import { acceptPriceVariance, canAcceptPriceVariance } from "@/fakturaer/lib/queueActions";
 import { cn } from "@/lib/utils";
-import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
+import { CreateRawMaterialFromLine } from "@/fakturaer/components/CreateRawMaterialFromLine";
 import { PriceDeviationNote } from "@/fakturaer/components/PriceDeviationNote";
 import { OpenSupplierItemButton } from "@/fakturaer/components/supplier-item/OpenSupplierItemButton";
 import { useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
@@ -206,7 +206,7 @@ export default function DecisionDetail() {
                           <Plus className="mr-1 h-4 w-4" aria-hidden />Opprett ny råvare
                         </Button>
                       )}
-                      <CreateRawMaterialDialog open={createOpen} onOpenChange={setCreateOpen} line={first} onCreated={(id) => void onRawMaterialCreated(id)} />
+                      <CreateRawMaterialFromLine open={createOpen} onOpenChange={setCreateOpen} line={first} onCreated={(id) => void onRawMaterialCreated(id)} />
                       <p className="text-sm text-ink-secondary">Er det ikke en råvare (frakt, gebyr, pant)? <Link className="text-primary hover:underline" to={paths.fakturaInnboks({ faktura: first.invoice_id })}>Marker som ikke råvare på fakturaen</Link>.</p>
                     </div>
                     <div className="border-t border-line-subtle pt-3 text-sm">

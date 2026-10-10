@@ -12,7 +12,7 @@ import { usePackageWorklist, type PackageWorklistRow } from "@/ravarer/hooks/use
 import { usePackageSuggestions } from "@/ravarer/hooks/usePackageSuggestions";
 import { useSuspiciousPackages } from "@/ravarer/hooks/useSuspiciousPackages";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
-import { SetPackageDialog } from "@/ravarer/components/packages/SetPackageDialog";
+import { PackageEditor } from "@/ravarer/editors/PackageEditor";
 import { SuspiciousPackagesCard } from "@/ravarer/components/packages/SuspiciousPackagesCard";
 import {
   PACKAGE_FILTERS,
@@ -401,7 +401,7 @@ export default function PackageSizesPage() {
         )}
       </Card>
 
-      <SetPackageDialog
+      <PackageEditor
         row={selected}
         open={!!selected}
         suggestion={suggestionForDialog}

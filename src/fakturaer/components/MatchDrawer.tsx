@@ -15,7 +15,7 @@ import { invalidateInvoice } from "@/ravarer/lib/invalidate";
 import { formatNok, formatDate } from "@/fakturaer/lib/constants";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, parseDecimal } from "@/fakturaer/lib/units";
-import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
+import { CreateRawMaterialFromLine } from "@/fakturaer/components/CreateRawMaterialFromLine";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
 import { recalculateLines, startPriceOutcomeLabel } from "@/fakturaer/lib/acceptMatch";
@@ -365,7 +365,7 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
           </div>
         </div>
 
-        <CreateRawMaterialDialog
+        <CreateRawMaterialFromLine
           open={createOpen}
           onOpenChange={setCreateOpen}
           line={line}
