@@ -1,6 +1,7 @@
 import { Wheat, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ReactNode } from "react";
+import { EmbeddedActions, useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
 
 interface Props {
   title?: string;
@@ -13,6 +14,8 @@ export function RavarerHeaderBanner({
   subtitle = "Råvarer, halvfabrikat og emballasje",
   actions,
 }: Props) {
+  const embedded = useIsEmbedded();
+  if (embedded) return <EmbeddedActions>{actions}</EmbeddedActions>;
   return (
     <div
       className="rounded-2xl border border-line-subtle"

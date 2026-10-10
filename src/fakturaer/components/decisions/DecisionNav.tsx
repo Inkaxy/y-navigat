@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
 
 const ITEMS = [
   { to: "/ravarer/fakturaer/i-dag", label: "I dag" },
@@ -11,6 +12,7 @@ const ITEMS = [
 
 /** Inngangen til fakturabehandlingen: I dag · Fakturaer · Råvarer. */
 export function DecisionNav() {
+  if (useIsEmbedded()) return null;
   return (
     <nav aria-label="Fakturabehandling" className="flex gap-1 overflow-x-auto">
       {ITEMS.map((i) => (
