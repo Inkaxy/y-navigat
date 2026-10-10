@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useGuardedNavigate } from "@/providers/UnsavedGuardProvider";
 import { Command } from "cmdk";
-import { Sun, Moon, Monitor, ExternalLink, Users, ShoppingCart, Package, Inbox } from "lucide-react";
+import { Sun, Moon, Monitor, ExternalLink, Users, ShoppingCart, Package, Inbox, Wheat, Truck, Plus, ScanSearch } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTheme, type ThemeMode } from "@/providers/ThemeProvider";
@@ -9,6 +9,8 @@ import { useAccessibleApps } from "@/hooks/useAccessibleApps";
 import { getAppInternalRoute } from "@/lib/appRoutes";
 import { useDebouncedValue } from "@/kunder/hooks/useDebouncedValue";
 import { useEntitySearch } from "@/hooks/useEntitySearch";
+import { useRavarerEntitySearch } from "@/hooks/useRavarerEntitySearch";
+import { paths } from "@/ravarer/lib/paths";
 import { entityRoute, groupEntityHits, type EntityKind } from "@/lib/entitySearch";
 import { Home, User, Bell, HelpCircle, type LucideIcon } from "lucide-react";
 
@@ -24,6 +26,8 @@ const ENTITY_ICON: Record<EntityKind, LucideIcon> = {
   order: ShoppingCart,
   product: Package,
   ticket: Inbox,
+  raw_material: Wheat,
+  supplier: Truck,
 };
 import { cn } from "@/lib/utils";
 
@@ -41,8 +45,20 @@ export function CommandPalette({ open, onOpenChange }: Props) {
   const { data: apps } = useAccessibleApps();
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query, 250);
-  const { hits, isSearching, isSettled, enabled } = useEntitySearch(debouncedQuery);
+  const base = useEntitySearch(debouncedQuery);
+  const rm = useRavarerEntitySearch(debouncedQuery);
+  const hits = [...base.hits, ...rm.hits];
+  const isSearching = base.isSearching || rm.isSearching;
+  const isSettled = base.isSettled && rm.isSettled;
+  const enabled = base.enabled;
   const groups = groupEntityHits(hits);
+  const ravarerActions = rm.canRead
+    ? [
+        ...(rm.canWrite ? [{ to: paths.varer({ ny: "1" }), label: "Ny råvare", icon: Plus }] : []),
+        { to: paths.priskontroll(), label: "Gå til priskontroll", icon: ScanSearch },
+        { to: paths.varer(), label: "Gå til råvarer", icon: Wheat },
+      ]
+    : [];
 
   // Global ⌘K / Ctrl+K toggle
   useEffect(() => {
@@ -113,7 +129,7 @@ export function CommandPalette({ open, onOpenChange }: Props) {
 
             {showNoHits && (
               <div className="px-[18px] py-3 text-sm text-ink-tertiary">
-                Ingen treff på kunder, ordrer, varer eller saker.
+                {rm.canRead ? "Ingen treff på kunder, ordrer, varer, råvarer, leverandører eller saker." : "Ingen treff på kunder, ordrer, varer eller saker."}
               </div>
             )}
 
@@ -149,7 +165,7 @@ export function CommandPalette({ open, onOpenChange }: Props) {
               heading="Naviger"
               className="[&_[cmdk-group-heading]]:eyebrow [&_[cmdk-group-heading]]:px-[18px] [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-2.5"
             >
-              {NAV_ITEMS.map((item) => {
+              {[...ravarerActions, ...NAV_ITEMS].map((item) => {
                 const Icon = item.icon;
                 return (
                   <PaletteItem

@@ -2,6 +2,7 @@
  * Hjelpere for globalt entitetssøk i kommandopaletten.
  * Holdt utenfor komponenten slik at sanitering og gruppering kan testes.
  */
+import { paths } from "@/ravarer/lib/paths";
 
 export const MIN_SEARCH_LENGTH = 2;
 export const MAX_HITS_PER_GROUP = 5;
@@ -63,7 +64,7 @@ export function isNumericTerm(raw: string): boolean {
   return /^\d+$/.test(raw.trim());
 }
 
-export type EntityKind = "customer" | "order" | "product" | "ticket";
+export type EntityKind = "customer" | "order" | "product" | "ticket" | "raw_material" | "supplier";
 
 export type EntityHit = {
   kind: EntityKind;
@@ -77,9 +78,18 @@ export const ENTITY_GROUP_LABEL: Record<EntityKind, string> = {
   order: "Ordrer",
   product: "Varer",
   ticket: "Saker",
+  raw_material: "Råvarer",
+  supplier: "Leverandører",
 };
 
-export const ENTITY_GROUP_ORDER: EntityKind[] = ["customer", "order", "product", "ticket"];
+export const ENTITY_GROUP_ORDER: EntityKind[] = [
+  "customer",
+  "order",
+  "product",
+  "raw_material",
+  "supplier",
+  "ticket",
+];
 
 export function entityRoute(hit: EntityHit): string {
   switch (hit.kind) {
@@ -91,6 +101,10 @@ export function entityRoute(hit: EntityHit): string {
       return `/varer/vareliste/${hit.id}`;
     case "ticket":
       return `/ordre/ticket/${hit.id}`;
+    case "raw_material":
+      return paths.raavare(hit.id);
+    case "supplier":
+      return paths.leverandor(hit.id);
   }
 }
 
@@ -104,4 +118,16 @@ export function groupEntityHits(
     label: ENTITY_GROUP_LABEL[kind],
     hits: hits.filter((h) => h.kind === kind).slice(0, limitPerGroup),
   })).filter((g) => g.hits.length > 0);
+}
+
+/** Slår sammen råvaretreff fra navn/nummer og fra leverandøralias uten duplikater. */
+export function mergeRawMaterialHits(direct: EntityHit[], viaAlias: EntityHit[], limit = MAX_HITS_PER_GROUP): EntityHit[] {
+  const seen = new Set<string>();
+  const out: EntityHit[] = [];
+  for (const h of [...direct, ...viaAlias]) {
+    if (seen.has(h.id)) continue;
+    seen.add(h.id);
+    out.push(h);
+  }
+  return out.slice(0, limit);
 }
