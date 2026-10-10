@@ -37,3 +37,6 @@ export function toPriceHistoryInput(rawMaterialId: string, d: CostPriceDraft, pr
     set_as_current: d.setAsCurrent,
   };
 }
+
+/** Standardkilde for manuell kostpris (prishistorikk, ikke næringsdata). */
+export const DEFAULT_COST_SOURCE = "manual" as const;

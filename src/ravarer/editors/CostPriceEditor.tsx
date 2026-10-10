@@ -36,7 +36,7 @@ export function CostPriceEditor({
     price: initialPrice != null ? String(initialPrice).replace(".", ",") : "",
     date: osloTodayISO(),
     supplierId: initialSupplierId ?? null,
-    source: "manual",
+    source: DEFAULT_COST_SOURCE,
     reason: "",
     setAsCurrent: true,
   });
