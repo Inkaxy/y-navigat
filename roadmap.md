@@ -94,3 +94,9 @@
 - Ordrett speil: `supabase/applied-sql/20260912210449_fix_snapshot_retry_lock_under_rls.sql`.
   Regresjon: 5 nye tester i `src/test/appliedSecuritySql.test.ts`. Dekningen er statisk kontroll av
   speilet SQL pluss brukerens egne PGlite-tester (7/7); ingen test med ekte rollebrukere herfra.
+
+## Råvarer 2.0 fase 1b
+- [x] 0.1 funksjonsliste  - [x] 0.2 rm_price_reference
+- [ ] 0.3 hotkeys  - [ ] 0.4 OrderDeskKpi  - [ ] 0.5 tellerinvalidering
+- [ ] 1 RawMaterialCreateSheet  - [ ] 2 PackageEditor  - [ ] 3 CostPriceEditor
+- [ ] 4 PrimarySupplierControl  - [ ] 5 Avtalepris  - [ ] 6 DeclarationNameField  - [ ] 7 Ikke vare
