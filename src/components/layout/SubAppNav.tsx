@@ -60,6 +60,8 @@ import {
   Printer,
   Globe,
   Warehouse,
+  Wheat,
+  ScanSearch,
   TrendingUp,
   GitCompareArrows,
   FileDown,
