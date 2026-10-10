@@ -50,6 +50,5 @@ export function toReviewLineRow(data: InvoiceDetailData, matchLineRaw: InvoiceDe
         },
 
         suggestions,
-      }
   };
 }

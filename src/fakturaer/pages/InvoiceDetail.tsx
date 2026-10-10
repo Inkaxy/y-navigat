@@ -4,10 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2, CheckCircle2, Flag, Sparkles, RefreshCw, FileText } from "lucide-react";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { InvoiceDocumentPanel } from "@/fakturaer/components/InvoiceDocumentPanel";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
 import { toast } from "sonner";
 import { showError } from "@/lib/userError";
@@ -16,6 +13,8 @@ import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBan
 import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
 import { InvoiceLinesTable } from "@/fakturaer/components/invoice-detail/InvoiceLinesTable";
 import { InvoiceFactsCard } from "@/fakturaer/components/invoice-detail/InvoiceFactsCard";
+import { InvoiceDetailsCard, InvoiceDocumentLayout } from "@/fakturaer/components/invoice-detail/InvoiceDocumentLayout";
+import { toReviewLineRow } from "@/fakturaer/components/invoice-detail/toReviewLineRow";
 import { fetchInvoiceDetail } from "@/fakturaer/components/invoice-detail/fetchInvoiceDetail";
 import { ConfirmReconcileDialog } from "@/fakturaer/components/ConfirmReconcileDialog";
 import { FlagInvoiceDialog } from "@/fakturaer/components/FlagInvoiceDialog";
@@ -23,8 +22,7 @@ import { BulkImportRawMaterialsDrawer } from "@/fakturaer/components/BulkImportR
 import { MatchDrawer } from "@/fakturaer/components/MatchDrawer";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
-import { formatNok, formatDate, INVOICE_SOURCES } from "@/fakturaer/lib/constants";
-import { formatVariancePct, recheckInvoiceLinesSum } from "@/fakturaer/lib/linesSum";
+import { recheckInvoiceLinesSum } from "@/fakturaer/lib/linesSum";
 import { LinesSumMismatchAlert } from "@/fakturaer/components/LinesSumMismatchAlert";
 import { useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
 import { unflagInvoice } from "@/fakturaer/lib/queueActions";
@@ -83,7 +81,6 @@ export default function InvoiceDetailPage() {
   }
 
   const defaultTolerancePct = tolerances.defaultPct;
-  const sourceMeta = INVOICE_SOURCES.find((s) => s.value === data.source);
   const lines = data.invoice_lines ?? [];
   const reviewLineCount = lines.filter((l) => l.requires_review).length;
   const isFinal = ["reconciled", "flagged"].includes(data.status);
@@ -96,56 +93,8 @@ export default function InvoiceDetailPage() {
   const canMatch = canWrite && hasInvoiceAccess && !isFinal;
 
   const matchLineRaw = matchLineId ? lines.find((l) => l.id === matchLineId) : null;
-  const matchLineRow: ReviewLineRow | null = matchLineRaw
-    ? {
-        id: matchLineRaw.id,
-        invoice_id: data.id,
-        line_number: matchLineRaw.line_number,
-        supplier_sku: matchLineRaw.supplier_sku,
-        description: matchLineRaw.description,
-        quantity: matchLineRaw.quantity,
-        unit: matchLineRaw.unit,
-        unit_price: matchLineRaw.unit_price,
-        total_amount: matchLineRaw.total_amount,
-        package_size: matchLineRaw.package_size ?? null,
-        package_unit: matchLineRaw.package_unit ?? null,
-        count_per_package: matchLineRaw.count_per_package ?? null,
-        base_quantity: matchLineRaw.base_quantity ?? null,
-        match_confidence: matchLineRaw.match_confidence,
-        raw_material_id: matchLineRaw.raw_material_id,
-        price_per_base_unit: matchLineRaw.price_per_base_unit,
-        expected_price_per_base_unit: matchLineRaw.expected_price_per_base_unit,
-        price_variance_pct: matchLineRaw.price_variance_pct,
-        variance_status: matchLineRaw.variance_status,
-        review_reason: matchLineRaw.review_reason,
-        requires_review: matchLineRaw.requires_review ?? null,
-        price_reference_source: matchLineRaw.price_reference_source ?? null,
-        price_reference_id: matchLineRaw.price_reference_id ?? null,
-        price_reference_date: matchLineRaw.price_reference_date ?? null,
-        invoice: {
-          id: data.id,
-          invoice_number: data.invoice_number,
-          invoice_date: data.invoice_date,
-          legal_entity_id: data.legal_entity_id,
-          supplier_id: data.supplier_id,
-          status: data.status,
-          source: data.source,
-          currency: data.currency ?? null,
-          is_credit_note: data.is_credit_note ?? null,
-          source_document_url: data.source_document_url,
-          total_amount: data.total_amount ?? null,
-          total_vat: data.total_vat ?? null,
-          lines_sum_status: data.lines_sum_status ?? null,
-          lines_sum_excl_vat: data.lines_sum_excl_vat ?? null,
-          lines_sum_variance_pct: data.lines_sum_variance_pct ?? null,
-          extraction_confidence: data.extraction_confidence ?? null,
-          supplier: data.suppliers ? { name: data.suppliers.name, contact_email: data.suppliers.contact_email ?? null } : null,
-          legal_entity: data.legal_entities ? { legal_name: data.legal_entities.legal_name, short_code: null } : null,
-        },
-
-        suggestions: (matchLineSuggestions ?? []) as ReviewLineRow["suggestions"],
-      }
-    : null;
+  const matchLineRaw = matchLineId ? lines.find((l) => l.id === matchLineId) : null;
+  const matchLineRow: ReviewLineRow | null = matchLineRaw ? toReviewLineRow(data, matchLineRaw, (matchLineSuggestions ?? []) as ReviewLineRow["suggestions"]) : null;
 
   async function rerunAutoMatch() {
     if (!data) return;
@@ -366,100 +315,25 @@ export default function InvoiceDetailPage() {
       />
 
 
-      {(() => {
-      const mainContent = (
-      <div className={docOpen && !isMobile ? "grid grid-cols-1 gap-5" : "grid grid-cols-1 gap-5 lg:grid-cols-3"}>
-        <Card className="p-6 lg:col-span-1">
-          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-ink-secondary">Detaljer</h3>
-          <dl className="space-y-3 text-sm">
-            <div><dt className="text-ink-secondary">Leverandør</dt><dd className="font-medium">{data.suppliers?.name}</dd></div>
-            {data.suppliers?.org_number && <div><dt className="text-ink-secondary">Org.nr</dt><dd className="font-mono text-xs">{data.suppliers.org_number}</dd></div>}
-            <div><dt className="text-ink-secondary">Fakturadato</dt><dd>{formatDate(data.invoice_date)}</dd></div>
-            <div><dt className="text-ink-secondary">Forfall</dt><dd>{formatDate(data.due_date)}</dd></div>
-            <div><dt className="text-ink-secondary">Beløp</dt><dd className="font-semibold">{formatNok(data.total_amount)}</dd></div>
-            <div><dt className="text-ink-secondary">MVA</dt><dd>{formatNok(data.total_vat)}</dd></div>
-            <div><dt className="text-ink-secondary">Kilde</dt><dd>{sourceMeta?.label ?? data.source}</dd></div>
-            {data.extraction_confidence != null && (
-              <div>
-                <dt className="text-ink-secondary">Lesesikkerhet</dt>
-                <dd className={lowConfidence ? "font-medium text-warning" : ""}>
-                  {Math.round(Number(data.extraction_confidence) * 100)} %
-                  {lowConfidence && " — krever gjennomgang"}
-                </dd>
-              </div>
-            )}
-            {data.lines_sum_excl_vat != null && (
-              <div>
-                <dt className="text-ink-secondary">Sum varelinjer (eks. mva)</dt>
-                <dd className={sumMismatch ? "font-medium text-warning" : ""}>
-                  {formatNok(data.lines_sum_excl_vat)}
-                  {data.lines_sum_variance_pct != null && ` (${formatVariancePct(Number(data.lines_sum_variance_pct))})`}
-                </dd>
-              </div>
-            )}
-          </dl>
-        </Card>
-
-        <InvoiceLinesTable
-          lines={lines}
-          supplierId={data.supplier_id}
-          canBulkImport={canBulkImport}
-          canMatch={canMatch}
-          selected={selected}
-          onSelect={(lineId, v) => setSelected((x) => ({ ...x, [lineId]: v }))}
-          showLedgerAccount={showLedgerAccount}
-          onShowLedgerAccount={setShowLedgerAccount}
-          onMatch={setMatchLineId}
-          onRegister={() => navigate(`/ravarer/fakturaer/${id}/registrer-linjer`)}
-          tolerancePct={defaultTolerancePct}
-          settings={tolerances.settings}
-        />
-      </div>
-      );
-      if (!docOpen) return mainContent;
-      const docPanel = (
-        <InvoiceDocumentPanel
-          invoice={{
-            invoice_number: data.invoice_number,
-            invoice_date: data.invoice_date,
-            supplier_name: data.suppliers?.name ?? null,
-            source_document_url: data.source_document_url,
-            total_amount: data.total_amount,
-            total_vat: data.total_vat,
-            lines_sum_status: data.lines_sum_status,
-            lines_sum_excl_vat: data.lines_sum_excl_vat,
-            lines_sum_variance_pct: data.lines_sum_variance_pct,
-            extraction_confidence: data.extraction_confidence,
-          }}
-          tolerancePct={defaultTolerancePct}
-          onClose={() => setDocOpen(false)}
-          className="h-full"
-        />
-      );
-      if (isMobile) {
-        return (
-          <>
-            {mainContent}
-            <Sheet open onOpenChange={(v) => { if (!v) setDocOpen(false); }}>
-              <SheetContent side="bottom" className="h-[92vh] p-0">
-                {docPanel}
-              </SheetContent>
-            </Sheet>
-          </>
-        );
-      }
-      return (
-        <ResizablePanelGroup direction="horizontal" className="min-h-[70vh] items-stretch">
-          <ResizablePanel defaultSize={58} minSize={35}>
-            <div className="pr-3">{mainContent}</div>
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={42} minSize={30} maxSize={65}>
-            <div className="sticky top-4 h-[calc(100vh-8rem)] pl-3">{docPanel}</div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      );
-      })()}
+      <InvoiceDocumentLayout data={data} docOpen={docOpen} isMobile={isMobile} tolerancePct={defaultTolerancePct} onClose={() => setDocOpen(false)}>
+        <div className={docOpen && !isMobile ? "grid grid-cols-1 gap-5" : "grid grid-cols-1 gap-5 lg:grid-cols-3"}>
+          <InvoiceDetailsCard data={data} />
+          <InvoiceLinesTable
+            lines={lines}
+            supplierId={data.supplier_id}
+            canBulkImport={canBulkImport}
+            canMatch={canMatch}
+            selected={selected}
+            onSelect={(lineId, v) => setSelected((x) => ({ ...x, [lineId]: v }))}
+            showLedgerAccount={showLedgerAccount}
+            onShowLedgerAccount={setShowLedgerAccount}
+            onMatch={setMatchLineId}
+            onRegister={() => navigate(`/ravarer/fakturaer/${id}/registrer-linjer`)}
+            tolerancePct={defaultTolerancePct}
+            settings={tolerances.settings}
+          />
+        </div>
+      </InvoiceDocumentLayout>
 
       <MatchDrawer
         open={!!matchLineId}
