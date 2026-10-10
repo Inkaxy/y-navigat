@@ -390,14 +390,18 @@ export default function DatabladBulk() {
       />
 
       {createDialogIdx !== null && rows[createDialogIdx]?.datasheet_id && (
-        <CreateRawMaterialFromDatasheetDialog
+        <RawMaterialCreateSheet
           open={createDialogIdx !== null}
           onOpenChange={(v) => { if (!v) setCreateDialogIdx(null); }}
-          datasheetId={rows[createDialogIdx].datasheet_id!}
-          fileName={rows[createDialogIdx].file.name}
-          extracted={rows[createDialogIdx].extracted ?? {}}
-          onCreated={(rmId) => {
+          context={{
+            kind: "datasheet",
+            datasheetId: rows[createDialogIdx].datasheet_id ?? "",
+            fileName: rows[createDialogIdx].file.name,
+            aiFields: rows[createDialogIdx].extracted ?? {},
+          }}
+          onDone={(rmId) => {
             const idx = createDialogIdx;
+            if (!rmId) return;
             updateRow(idx, { candidates: [{ id: rmId, name: rows[idx].extracted?.name ?? "Ny råvare", sku: rows[idx].extracted?.sku ?? "", score: 1 }] });
             // Auto-anvend datablad-felter på den nye råvaren
             void selectRm(idx, rmId).then(() => applyRow(idx));

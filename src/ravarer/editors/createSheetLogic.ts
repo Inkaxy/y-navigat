@@ -27,6 +27,8 @@ export interface CreatePrefill {
   itemType?: ItemType;
   declarationName?: string;
   supplierId?: string | null;
+  /** Standard for «Åpne råvarekortet etter lagring» (standalone). */
+  openAfterSave?: boolean;
 }
 
 export type CreateContext =
@@ -126,7 +128,7 @@ export function linkExistingBody(
 export function initialDraft(ctx: CreateContext): CreateDraft {
   const base: CreateDraft = {
     name: "", sku: "", itemType: "ravare", category: "", baseUnit: "kg", units: "", packageUnit: "",
-    declarationName: "", primarySupplierId: null, openAfterSave: ctx.kind === "standalone",
+    declarationName: "", primarySupplierId: null, openAfterSave: ctx.kind === "standalone" && (ctx.prefill?.openAfterSave ?? true),
   };
   if (ctx.kind === "datasheet") {
     const a = ctx.aiFields;

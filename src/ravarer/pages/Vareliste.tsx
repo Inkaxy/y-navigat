@@ -27,7 +27,7 @@ import { toast } from "sonner";
 
 import { QueryState } from "@/components/common/QueryState";
 import { RavarerHeaderBanner, NewRawMaterialButton } from "@/ravarer/components/RavarerHeaderBanner";
-import { NewRawMaterialDialog } from "@/ravarer/components/NewRawMaterialDialog";
+import { RawMaterialCreateSheet } from "@/ravarer/editors/RawMaterialCreateSheet";
 import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
 import { VarelisteRow, type InlineField } from "@/ravarer/components/vareliste/VarelisteRow";
 import { VarelisteBulkBar } from "@/ravarer/components/vareliste/VarelisteBulkBar";
@@ -711,7 +711,7 @@ export default function VarelistePage() {
           onSave={saveCurrentView}
         />
 
-        <NewRawMaterialDialog open={newOpen} onOpenChange={setNewOpen} />
+        <RawMaterialCreateSheet open={newOpen} onOpenChange={setNewOpen} context={{ kind: "standalone" }} />
         <VarelistePriceDialogs
           items={items}
           costFor={costFor}
