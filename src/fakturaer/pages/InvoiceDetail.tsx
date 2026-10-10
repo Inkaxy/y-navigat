@@ -250,6 +250,7 @@ export default function InvoiceDetailPage() {
           onOpenChange={setBulkOpen}
           invoiceId={data.id}
           legalEntityId={data.legal_entity_id}
+          supplierId={data.supplier_id}
           lines={selectedLines.map((l) => ({
             id: l.id,
             description: l.description,

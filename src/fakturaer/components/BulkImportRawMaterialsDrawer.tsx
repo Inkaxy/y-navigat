@@ -110,6 +110,8 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [skipped, setSkipped] = useState<Array<{ line_id: string; reason: string }>>([]);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const link = useLinkSupplierItem();
 
   useEffect(() => {
     if (!open) return;
