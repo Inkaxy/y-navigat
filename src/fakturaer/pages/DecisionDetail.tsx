@@ -24,6 +24,9 @@ import { createSupplierCase } from "@/fakturaer/lib/supplierCases";
 import { acceptPriceVariance, canAcceptPriceVariance } from "@/fakturaer/lib/queueActions";
 import { cn } from "@/lib/utils";
 import { CreateRawMaterialDialog } from "@/fakturaer/components/CreateRawMaterialDialog";
+import { PriceDeviationNote } from "@/fakturaer/components/PriceDeviationNote";
+import { OpenSupplierItemButton } from "@/fakturaer/components/supplier-item/OpenSupplierItemButton";
+import { useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
 
 const kr = (v: number | null) => (v == null ? "–" : formatMoney(v, "NOK"));
 
@@ -41,6 +44,7 @@ export default function DecisionDetail() {
   const qc = useQueryClient();
   const { data: company } = useCompany();
   const q = useReviewLines({ legalEntityId: company?.id ?? null, limit: null });
+  const tol = useMatchTolerances(company?.id);
   const live = useMemo(() => buildDecisionGroups(q.data?.rows ?? []).find((g) => g.key === groupKey), [q.data, groupKey]);
   // Listen brukeren ser fryses: lagring gjelder nøyaktig disse linjene, ikke en ny refetch.
   const [frozen, setFrozen] = useState<DecisionGroup | null>(null);
@@ -218,6 +222,7 @@ export default function DecisionDetail() {
                       <div className="rounded-lg bg-muted/40 p-3"><p className="text-sm text-ink-secondary">Referanse ({first.price_reference_source ?? "ukjent kilde"}{first.price_reference_date ? `, ${first.price_reference_date}` : ""})</p><p className="text-2xl font-semibold tabular-nums">{kr(group.expectedPerBase)}</p><p className="text-sm text-ink-secondary">per {first.matched_raw_material?.base_unit ?? "grunnenhet"}</p></div>
                       <div className="rounded-lg bg-muted/40 p-3"><p className="text-sm text-ink-secondary">Fakturert</p><p className="text-2xl font-semibold tabular-nums">{kr(group.observedPerBase)}</p><p className="text-sm text-ink-secondary">per {first.matched_raw_material?.base_unit ?? "grunnenhet"}</p></div>
                     </div>
+                    <PriceDeviationNote className="text-sm" actual={first.price_per_base_unit == null ? null : Number(first.price_per_base_unit)} expected={first.expected_price_per_base_unit == null ? null : Number(first.expected_price_per_base_unit)} baseQuantity={first.base_quantity == null ? null : Number(first.base_quantity)} tolerancePct={tol.toleranceFor(first.matched_raw_material?.category)} settings={tol.settings} />
                   </>
                 )}
 
@@ -242,6 +247,7 @@ export default function DecisionDetail() {
                   <p className="font-medium">{first.description}</p>
                   <p className="text-sm">{kr(first.unit_price)} per {first.unit ?? "enhet"}{first.price_per_base_unit != null ? ` · ${kr(first.price_per_base_unit)} per ${first.matched_raw_material?.base_unit ?? "grunnenhet"}` : ""}</p>
                 </div>
+                {(group.kind === "material" || group.kind === "package") && <OpenSupplierItemButton supplierId={first.invoice.supplier_id} line={first} className="w-full" onDone={() => void done()} />}
                 <p className="text-sm text-ink-secondary">Kilde: {first.invoice.source === "tripletex" ? "Tripletex (tolket fra PDF)" : first.invoice.source ?? "ukjent"}.</p>
                 {group.kind === "price" && (
                   <>

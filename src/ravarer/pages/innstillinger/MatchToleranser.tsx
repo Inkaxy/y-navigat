@@ -22,9 +22,10 @@ import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { showError } from "@/lib/userError";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
-import { useMatchTolerances, FALLBACK_TOLERANCE_PCT } from "@/fakturaer/hooks/useMatchTolerances";
+import { useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
 import { QueryState } from "@/components/common/QueryState";
 import { StartPriceCandidatesCard } from "@/fakturaer/components/StartPriceCandidatesCard";
+import { TieredPriceSettings } from "./TieredPriceSettings";
 
 interface ToleranceRow {
   id: string;
@@ -155,22 +156,17 @@ export default function MatchToleranserPage() {
         subtitle="Én kilde for prisavvik og automatisk matching av fakturalinjer"
       />
 
+      <TieredPriceSettings legalEntityId={legalEntityId} settings={s} canWrite={canWrite} loading={tolerances.isLoading} />
+
       <Card className="space-y-4 p-4">
         <div>
-          <h2 className="text-title text-sm font-semibold">Global toleranse og automatikk</h2>
+          <h2 className="text-title text-sm font-semibold">Matching og automatikk</h2>
           <p className="text-caption text-ink-secondary">
             Gjelder alle råvarer uten egen kategoritoleranse. Brukes både i behandlingskøen og i fargelegging av avvik.
           </p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <NumField
-            label="Prisavvik-toleranse (%)"
-            hint="Avvik under denne grensen regnes som normalt og krever ikke gjennomgang."
-            value={s?.default_price_tolerance_pct ?? tolerances.defaultPct ?? FALLBACK_TOLERANCE_PCT}
-            disabled={!canWrite || tolerances.isLoading}
-            onCommit={(v) => saveSettings.mutate({ default_price_tolerance_pct: v })}
-          />
           <NumField
             label="Fuzzy-terskel for forslag"
             hint="Hvor likt navnet må være (0–1) før linjen får et matchforslag."
@@ -211,13 +207,6 @@ export default function MatchToleranserPage() {
             checked={!!s?.auto_check_against_last_purchase}
             disabled={!canWrite || tolerances.isLoading}
             onChange={(v) => saveSettings.mutate({ auto_check_against_last_purchase: v })}
-          />
-          <ToggleRow
-            label="Avstem rene importer automatisk"
-            hint="Fakturaer der alle linjer matcher og summene stemmer avstemmes uten manuelt trykk."
-            checked={!!s?.auto_reconcile_clean_imports}
-            disabled={!canWrite || tolerances.isLoading}
-            onChange={(v) => saveSettings.mutate({ auto_reconcile_clean_imports: v })}
           />
         </div>
       </Card>

@@ -11,6 +11,7 @@ export interface InvoiceListRow {
   total_amount: number | null;
   currency: string | null;
   status: string;
+  reconciled_mode: string | null;
   source: string | null;
   imported_at: string;
   line_extraction_status: string | null;
@@ -53,7 +54,7 @@ export interface InvoiceFilters {
 }
 
 const SELECT =
-  "id, legal_entity_id, supplier_id, invoice_number, invoice_date, due_date, total_amount, currency, status, source, imported_at, line_extraction_status, line_extraction_error, line_extraction_attempts, extraction_confidence, lines_sum_status, paid_at, tripletex_is_paid, suppliers!inner(name), legal_entities(legal_name, short_code), invoice_lines(id, requires_review)";
+  "id, legal_entity_id, supplier_id, invoice_number, invoice_date, due_date, total_amount, currency, status, reconciled_mode, source, imported_at, line_extraction_status, line_extraction_error, line_extraction_attempts, extraction_confidence, lines_sum_status, paid_at, tripletex_is_paid, suppliers!inner(name), legal_entities(legal_name, short_code), invoice_lines(id, requires_review)";
 
 export function useInvoices(filters: InvoiceFilters) {
   const page = filters.page ?? 1;

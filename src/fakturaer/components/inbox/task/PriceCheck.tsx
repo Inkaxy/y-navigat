@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { formatDate, formatMoney } from "@/fakturaer/lib/constants";
-import { fmtNum } from "@/fakturaer/lib/units";
+import { PriceDeviationNote } from "@/fakturaer/components/PriceDeviationNote";
+import { useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import type { SupplierLinkRow } from "@/fakturaer/hooks/useSupplierLinkContext";
 import { baseUnitOf, reasonsIn } from "@/fakturaer/lib/lineControl";
@@ -24,6 +25,7 @@ function referenceLabel(line: ReviewLineRow): string | null {
 /** Fakturapris per grunnenhet mot riktig sammenligningspris. Resten under «Prisdetaljer». */
 export function PriceCheck({ line, link, tolerancePct }: { line: ReviewLineRow; link: SupplierLinkRow | null; tolerancePct: number }) {
   const [open, setOpen] = useState(false);
+  const { settings } = useMatchTolerances(line.invoice.legal_entity_id);
   const currency = line.invoice.currency ?? "NOK";
   const unit = baseUnitOf(line, link) ?? "grunnenhet";
   const actual = line.price_per_base_unit == null ? null : Number(line.price_per_base_unit);
@@ -48,13 +50,8 @@ export function PriceCheck({ line, link, tolerancePct }: { line: ReviewLineRow; 
           </div>
         </div>
       </div>
-      {variance != null && (
-        <p className="text-caption">
-          {variance > 0 ? "+" : ""}
-          {fmtNum(variance, 1)} % · toleranse {fmtNum(tolerancePct, 1)} %
-        </p>
-      )}
-      {reasons.length > 0 && variance == null && <p className="text-caption text-warning">Må avklares: {reasons.join(" · ")}</p>}
+      <PriceDeviationNote actual={actual} expected={expected} baseQuantity={line.base_quantity == null ? null : Number(line.base_quantity)} tolerancePct={tolerancePct} settings={settings} />
+      {reasons.length > 0 && (variance == null || actual == null || expected == null) && <p className="text-caption text-warning">Må avklares: {reasons.join(" · ")}</p>}
       <button type="button" className="text-caption text-ink-secondary underline underline-offset-2" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
         Prisdetaljer
       </button>

@@ -17,6 +17,7 @@ import { LineStatusBadge } from "@/fakturaer/components/inbox/LineStatusBadge";
 import { MaterialPicker } from "@/fakturaer/components/inbox/task/MaterialPicker";
 import { PackageForm } from "@/fakturaer/components/inbox/task/PackageForm";
 import { PriceCheck } from "@/fakturaer/components/inbox/task/PriceCheck";
+import { OpenSupplierItemButton } from "@/fakturaer/components/supplier-item/OpenSupplierItemButton";
 import { taskCopy, type TaskMode } from "@/fakturaer/components/inbox/task/taskCopy";
 
 export type SecondaryAction = "create" | "not_rm" | "conflict" | "start_price";
@@ -215,6 +216,7 @@ export function LineTask(p: LineTaskProps) {
           </p>
         )}
         {mode !== "done" && <p className="pt-1 text-sm">{copy.missing}</p>}
+        <OpenSupplierItemButton supplierId={line.invoice.supplier_id} line={line} variant="ghost" className="-ml-2 h-7 px-2 text-caption" />
       </header>
 
       <div className="space-y-4 px-4 py-3">

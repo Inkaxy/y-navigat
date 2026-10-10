@@ -4,7 +4,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Loader2, LineChart as LineChartIcon, CheckCircle2, Flag, Sparkles, Link2, Pencil, RefreshCw, FileText } from "lucide-react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -16,6 +15,8 @@ import { showError } from "@/lib/userError";
 import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
+import { ConfidenceBadge, InvoiceLineNotes } from "@/fakturaer/components/InvoiceLineBadges";
+import { OpenSupplierItemButton } from "@/fakturaer/components/supplier-item/OpenSupplierItemButton";
 import { ConfirmReconcileDialog } from "@/fakturaer/components/ConfirmReconcileDialog";
 import { FlagInvoiceDialog } from "@/fakturaer/components/FlagInvoiceDialog";
 import { BulkImportRawMaterialsDrawer } from "@/fakturaer/components/BulkImportRawMaterialsDrawer";
@@ -208,7 +209,7 @@ export default function InvoiceDetailPage() {
         subtitle={`${data.suppliers?.name ?? ""} • ${data.legal_entities?.legal_name ?? ""}`}
         actions={
           <div className="flex items-center gap-2">
-            <InvoiceStatusBadge status={data.status} />
+            <InvoiceStatusBadge status={data.status} reconciledMode={data.reconciled_mode} />
             {data.source_document_url && (
               <Button
                 variant={docOpen ? "default" : "outline"}
@@ -365,6 +366,11 @@ export default function InvoiceDetailPage() {
         />
       )}
 
+      {data.vat_inferred && (
+        <p className="rounded-md bg-muted/40 px-3 py-2 text-sm text-ink-secondary">Mva-beløp utledet fra linjesummen (Tripletex ga ikke mva)</p>
+      )}
+
+
       {(() => {
       const mainContent = (
       <div className={docOpen && !isMobile ? "grid grid-cols-1 gap-5" : "grid grid-cols-1 gap-5 lg:grid-cols-3"}>
@@ -456,23 +462,16 @@ export default function InvoiceDetailPage() {
                                 >
                                   {rm.name}
                                 </Link>
-                                {l.match_confidence && l.match_confidence !== "manual" && (
-                                  <ConfidenceBadge value={l.match_confidence} />
-                                )}
-                                {l.match_confidence === "manual" && (
-                                  <Badge variant="secondary" className="text-[10px]">manuell</Badge>
-                                )}
+                                <ConfidenceBadge value={l.match_confidence} />
+
                               </div>
                               <div className="text-xs text-ink-secondary">{l.description}</div>
+                              <InvoiceLineNotes reviewReason={l.review_reason} lineKind={l.line_kind} resolutionNote={l.resolution_note} />
                             </div>
                           ) : (
                             <div className="space-y-1">
                               <span>{l.description}</span>
-                              {l.review_reason && (
-                                <div className="text-[10px] uppercase tracking-wider text-warning">
-                                  {l.review_reason.replace(/,/g, " · ")}
-                                </div>
-                              )}
+                              <InvoiceLineNotes reviewReason={l.review_reason} lineKind={l.line_kind} resolutionNote={l.resolution_note} />
                             </div>
                           )}
                         </td>
@@ -485,6 +484,7 @@ export default function InvoiceDetailPage() {
                         )}
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1">
+                            <OpenSupplierItemButton supplierId={data.supplier_id} line={l} variant="ghost" iconOnly />
                             {canMatch && (
                               <Button
                                 variant="ghost"
@@ -567,16 +567,4 @@ export default function InvoiceDetailPage() {
 
     </div>
   );
-}
-
-function ConfidenceBadge({ value }: { value: string }) {
-  const map: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
-    auto_high: { label: "auto · høy", variant: "secondary" },
-    auto_medium: { label: "auto · medium", variant: "outline" },
-    auto_low: { label: "auto · lav", variant: "outline" },
-    not_applicable: { label: "ikke aktuell", variant: "secondary" },
-  };
-  const m = map[value];
-  if (!m) return null;
-  return <Badge variant={m.variant} className="text-[10px]">{m.label}</Badge>;
 }

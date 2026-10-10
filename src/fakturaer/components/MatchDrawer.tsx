@@ -20,6 +20,7 @@ import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
 import { recalculateLines, startPriceOutcomeLabel } from "@/fakturaer/lib/acceptMatch";
 import { Sparkles } from "lucide-react";
+import { OpenSupplierItemButton } from "@/fakturaer/components/supplier-item/OpenSupplierItemButton";
 
 interface Props {
   open: boolean;
@@ -122,6 +123,7 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
                 <ExternalLink className="h-3.5 w-3.5" /> Originaldokument
               </a>
             )}
+            <OpenSupplierItemButton supplierId={line.invoice.supplier_id} line={line} />
           </div>
 
           {/* Right – matching */}
