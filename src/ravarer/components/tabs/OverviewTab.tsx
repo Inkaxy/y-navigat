@@ -25,6 +25,7 @@ import { categoryOptions } from "@/ravarer/lib/categories";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { RecalcHistory } from "@/ravarer/components/packages/RecalcHistory";
 import { PackageEditor } from "@/ravarer/editors/PackageEditor";
+import { fallbackPackageRow } from "@/ravarer/lib/packageRow";
 import {
   usePackageWorklistRow,
   type PackageWorklistRow,
@@ -107,28 +108,7 @@ export function OverviewTab({ rm, registerSave, onEditLink }: Props) {
   const { data: worklistRow } = usePackageWorklistRow(rm.id);
   const packageRow = useMemo<PackageWorklistRow>(() => {
     if (worklistRow) return worklistRow;
-    return {
-      id: rm.id,
-      legal_entity_id: rm.legal_entity_id,
-      name: rm.name,
-      base_unit: rm.base_unit,
-      category: rm.category,
-      current_cost_price: rm.current_cost_price,
-      pakningsfaktor: rm.base_units_per_package,
-      faktor_kilde: rm.package_confirmed_at ? "bekreftet" : null,
-      bekreftet_dato: rm.package_confirmed_at,
-      antall_fakturalinjer: null,
-      antall_leverandorer: null,
-      enheter_i_bruk: null,
-      linjer_uten_pris: null,
-      kjopt_kr_totalt: null,
-      siste_faktura: null,
-      pris_spredning: null,
-      implisert_mengde: null,
-      referansepris: null,
-      referansekilde: null,
-      referansedato: null,
-    } as PackageWorklistRow;
+    return fallbackPackageRow(rm);
   }, [worklistRow, rm]);
 
   /** Kornklasser krever kornslag — ellers blir rugandelen feil. */
