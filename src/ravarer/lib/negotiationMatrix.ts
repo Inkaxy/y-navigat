@@ -29,7 +29,7 @@ export function negotiationStatusLabel(status: string | null | undefined): strin
 
 export function recipientStatusLabel(status: string | null | undefined): string {
   if (!status) return "—";
-  return RECIPIENT_STATUS_LABEL[status] ?? status;
+  return RECIPIENT_STATUS_LABEL[status] ?? "Ukjent status";
 }
 
 /** Forhandlingen er avsluttet eller avbrutt — ingen redigering. */
