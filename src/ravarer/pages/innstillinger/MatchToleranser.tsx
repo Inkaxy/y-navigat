@@ -26,6 +26,7 @@ import { useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
 import { QueryState } from "@/components/common/QueryState";
 import { StartPriceCandidatesCard } from "@/fakturaer/components/StartPriceCandidatesCard";
 import { TieredPriceSettings } from "./TieredPriceSettings";
+import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
 
 interface ToleranceRow {
   id: string;
@@ -101,7 +102,7 @@ export default function MatchToleranserPage() {
       );
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: () => { invalidateRavarerCounts(qc);
       invalidate();
       toast.success("Innstillinger lagret");
     },
@@ -125,7 +126,7 @@ export default function MatchToleranserPage() {
         if (error) throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: () => { invalidateRavarerCounts(qc);
       invalidate();
       toast.success("Lagret");
       setNewCat("");
@@ -139,7 +140,7 @@ export default function MatchToleranserPage() {
       const { error } = await supabase.from("invoice_match_category_tolerances").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: () => { invalidateRavarerCounts(qc);
       invalidate();
       setDeleteRow(null);
       toast.success("Kategorien er fjernet");

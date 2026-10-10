@@ -14,6 +14,7 @@ import {
   fetchStartPriceCandidates,
   type StartPriceCandidate,
 } from "@/fakturaer/lib/startPrice";
+import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
 
 /**
  * Forslag til startpriser fra eksisterende historikk.
@@ -59,7 +60,7 @@ export function StartPriceCandidatesCard({
       }
       return { created, failures };
     },
-    onSuccess: ({ created, failures }) => {
+    onSuccess: ({ created, failures }) => { invalidateRavarerCounts(qc);
       setRejected(failures);
       setSelected({});
       void qc.invalidateQueries({ queryKey: ["start-price-candidates"] });

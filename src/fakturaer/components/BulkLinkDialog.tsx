@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { BulkLinkPanel, type BulkLinkCandidate } from "@/fakturaer/components/BulkLinkPanel";
+import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
 
 /** Gjenbruk av teksten for hvorfor en linje ikke kan kobles. */
 export { EXCLUSION_LABELS, exclusionText } from "@/fakturaer/components/BulkLinkPanel";
@@ -139,7 +140,7 @@ export function BulkLinkDialog({
       const batches = groupAppliedLines(res.applied ?? [], rows);
       return { res, failed: await recalculateBatches(batches) };
     },
-    onSuccess: async ({ res, failed }) => {
+    onSuccess: async ({ res, failed }) => { invalidateRavarerCounts(qc);
       const applied = res.applied_count ?? res.applied?.length ?? 0;
       const skipped = res.skipped?.length ?? 0;
       setAppliedCount(applied);
@@ -161,7 +162,7 @@ export function BulkLinkDialog({
 
   const retry = useMutation({
     mutationFn: async () => await recalculateBatches(pendingBatches),
-    onSuccess: async (failed) => {
+    onSuccess: async (failed) => { invalidateRavarerCounts(qc);
       await invalidateQueue();
       if (failed.length > 0) {
         setPendingBatches(failed);

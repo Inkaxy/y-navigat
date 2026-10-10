@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatMoney } from "@/fakturaer/lib/constants";
 import { allocateCredit, maxAllocatable, remainingByInvoice, setCaseStatus, creditNetExclVat } from "@/fakturaer/lib/supplierCases";
 import { parseDecimal } from "@/fakturaer/lib/units";
+import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
 
 const kr = (v: number | null | undefined) => (v == null ? "–" : formatMoney(v, "NOK"));
 const STATUS: Record<string, string> = { open: "Åpen", resolved: "Løst", cancelled: "Avbrutt" };
@@ -68,7 +69,7 @@ export default function SupplierCase() {
   const refresh = () => qc.invalidateQueries({ queryKey: ["supplier-case", id] }).then(() => qc.invalidateQueries({ queryKey: ["invoice-approval-overview"] }));
   const alloc = useMutation({
     mutationFn: () => allocateCredit({ caseId: id, creditInvoiceId: noteId, invoiceId, amountExclVat: parsed ?? 0, clientRef: ref }),
-    onSuccess: async (r) => {
+    onSuccess: async (r) => { invalidateRavarerCounts(qc);
       toast.success(r.already_saved ? "Fordelingen var allerede lagret" : "Kreditten er fordelt på fakturaen");
       setAmount("");
       setRef(crypto.randomUUID());
@@ -78,7 +79,7 @@ export default function SupplierCase() {
   });
   const status = useMutation({
     mutationFn: (s: "open" | "resolved" | "cancelled") => setCaseStatus(id, s, statusNote),
-    onSuccess: async () => { toast.success("Status lagret"); await refresh(); },
+    onSuccess: async () => { invalidateRavarerCounts(qc); toast.success("Status lagret"); await refresh(); },
     onError: (e: Error) => toast.error(e.message),
   });
 
