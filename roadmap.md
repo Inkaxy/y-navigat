@@ -100,3 +100,11 @@
 - [ ] 0.3 hotkeys  - [ ] 0.4 OrderDeskKpi  - [ ] 0.5 tellerinvalidering
 - [ ] 1 RawMaterialCreateSheet  - [ ] 2 PackageEditor  - [ ] 3 CostPriceEditor
 - [ ] 4 PrimarySupplierControl  - [ ] 5 Avtalepris  - [ ] 6 DeclarationNameField  - [ ] 7 Ikke vare
+
+## Råvarer 2.0 fase 1b — gjenstår
+- [ ] Punkt 6: felles `DeclarationNameField` i OverviewTab, DeclarationNameCard, Deklarasjonsnavn-siden, MissingDeclarationNames, DeclarationNameInline
+- [ ] Punkt 7: «Ikke vare» med felles grunnliste (Frakt · Gebyr/avgift · Pant · Rabatt · Annet)
+- [ ] Tester for CostPriceEditor-logikk, createSheetLogic (kontekst → skrivevei), RPC-parsere
+- [ ] Forhåndsvisning 1440/390 med opprettpanel og kostprisdialog
+- [ ] Del opp Vareliste (>400 linjer); `SaveAsRawMaterialDialog` til samme panel-oppsett
+- [ ] Merk riktige rader «Flyttet» i funksjonslisten
