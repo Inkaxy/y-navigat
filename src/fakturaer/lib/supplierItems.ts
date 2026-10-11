@@ -37,6 +37,10 @@ export interface SupplierItem {
   rms_id: string | null;
   /** Merknader på leverandørkoblingen (f.eks. karantene). */
   rms_notes: string | null;
+  /** Varenummeret på leverandørkoblingen. */
+  rms_supplier_sku: string | null;
+  /** Sann når koblingens normaliserte varenummer er det samme som varekortets `item_key`. */
+  rms_sku_matches: boolean;
   package_size: number | null;
   package_unit: string | null;
   base_units_per_package: number | null;
