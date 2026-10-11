@@ -58,7 +58,11 @@ export default function DeclarationMode() {
       try {
         await save.mutateAsync({ rawMaterialId: b.id, declarationName: b.value, silent: true });
         ok++;
-        setDrafts((d) => { const n = { ...d }; delete n[b.id]; return n; });
+        // Fjern bare nøyaktig det innsendte utkastet. Et nyere lokalt utkast beholdes (og er fortsatt ulagret).
+        setDrafts((d) => {
+          if (d[b.id] === undefined || d[b.id].trim() !== b.value) return d;
+          const n = { ...d }; delete n[b.id]; return n;
+        });
       } catch (e) {
         console.error("[deklarasjonsnavn:lagre-alle]", e);
         failed.push(b.id);
@@ -77,7 +81,7 @@ export default function DeclarationMode() {
     { id: "draft", header: "Deklarasjonsnavn", csv: (r) => draftFor(r),
       cell: (r) => (
         <DeclarationNameField rawMaterialId={r.raw_material_id} value={null} initialDraft={initialDeclarationFor(r)} draft={draftFor(r)}
-          onDraftChange={(v) => setDraft(r.raw_material_id, v)} rawMaterialName={r.name} matvaretabellenName={r.matvaretabellen_name} disabled={!canWrite} compact />
+          onDraftChange={(v) => setDraft(r.raw_material_id, v)} rawMaterialName={r.name} matvaretabellenName={r.matvaretabellen_name} disabled={!canWrite || savingAll} compact />
       ) },
   ];
 
