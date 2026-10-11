@@ -185,7 +185,7 @@ export default function DatabladEndringer() {
                 </Card>
                 <Card className="p-4">
                   <div className="text-sm font-medium mb-2">Berørt: {selected.affected_recipes_count} oppskrifter</div>
-                  <Button variant="outline" size="sm" onClick={() => navigate(paths.raavare(selected.raw_material_id, { tab: "nutrition" }))}>
+                  <Button variant="outline" size="sm" onClick={() => navigate(paths.raavare(selected.raw_material_id, { seksjon: "deklarasjon" }))}>
                     Åpne råvare
                   </Button>
                 </Card>

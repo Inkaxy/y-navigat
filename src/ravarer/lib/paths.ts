@@ -31,7 +31,8 @@ export const paths = {
 
   // Varer
   varer: (q?: Q) => withQuery(`${RAVARER_ROOT}/varer`, q),
-  raavare: (id: Id, opts?: { tab?: string } & Q) => withQuery(`${RAVARER_ROOT}/varer/${enc(id)}`, opts),
+  /** `seksjon` = råvarekortets seksjon; gammel `tab` normaliseres av detaljsiden. */
+  raavare: (id: Id, opts?: { seksjon?: "sammendrag" | "pris" | "leverandorer" | "naering" | "deklarasjon" | "bruk" | "lager" | "grunndata" | "historikk"; tab?: string } & Q) => withQuery(`${RAVARER_ROOT}/varer/${enc(id)}`, opts),
   pakninger: (q?: Q) => withQuery(`${RAVARER_ROOT}/varer/pakninger`, q),
   deklarasjonsnavn: (q?: Q) => withQuery(`${RAVARER_ROOT}/varer/deklarasjonsnavn`, q),
   naering: (q?: Q) => withQuery(`${RAVARER_ROOT}/varer/naering`, q),
