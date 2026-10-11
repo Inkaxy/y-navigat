@@ -7,3 +7,5 @@
 - Fakturalinjer rettes bare via `rm_correct_invoice_line` (versjon på `updated_at`, lås, revisjon, rematch-kø); læringseksempler er per selskap + leverandør. Why: korrigering må være sporbar og ikke en klient-UPDATE.
 - Leverandørkladder køes bare via `supplier_case_queue_draft_to_henrik` med server-bestemt mottaker. Why: kladden skal aldri gå direkte til leverandøren.
 - Kostprisføring vurderes som ført/totalt varelinjer; delvis føring er ikke ferdig. Why: `rm_post_safe_line_costs` fører restlinjer senere.
+- E-postkøen tas ut atomisk via `claim_email_outbox_*` (bare pending) og `process-email-outbox` krever cron-secret/service. Why: ingen replay eller duplikat ved samtidige kjøringer.
+- Mva-kontroll (`rm_repair_invoice_vat`) foreslår bare; beløp endres aldri automatisk. Why: et mva-lignende forhold kan være en manglende linje.

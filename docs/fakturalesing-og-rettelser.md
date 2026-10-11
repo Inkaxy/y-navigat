@@ -25,3 +25,10 @@
 ## Begrensninger
 - Live `extract-invoice-from-pdf` (v139 med `fixVatScaledLines`), `tripletex-import-invoice-lines` og `match-invoice-lines` er nyere enn koden i dette prosjektet. Å endre dem her ville rulle ut gammel kode. Derfor er ikke fjerning av `fixVatScaledLines`, nytt forsøk ved tomt resultat og eksempelkontekst i modellkallet lagt inn i edge-funksjonen. Den delte modulen `_shared/invoiceReadCheck.ts` og `rm_extraction_examples_for` er klare til bruk når live-kilden er tilgjengelig. Kontrollene i databasen gjelder uansett for alle nye linjer.
 - `fixVatScaledLines` kan fortsatt skalere beløp før de lagres, og en skalert faktura ser lik ut som en riktig. Den feilen fanges ikke før edge-funksjonen er rettet.
+
+## Tillegg 2026-10-11 (live-kontroll)
+- `rm_repair_invoice_vat` endrer aldri beløp eller mva; returnerer `{ok:false, reason:'kontroll_trengs', suggestion, factor, ratio}`. Gjelder også automatisk kall fra live Tripletex-import og `rm_repair_invoice_vat_batch`. Gamle data er ikke reversert: 15 `linjer_skalert` og 104 `mva_utledet` i revisjonsloggen (`invoice.vat_repaired`) trenger dokumentkontroll.
+- `process-email-outbox` (deployet): krever service-bearer eller `X-Cron-Secret`; atomisk claim (bare `pending`); ingen replay av sendt; ukjent utfall → `failed` med forklaring, ikke ny sending. Trigger låser Henrik-kladder til fast mottaker/mal.
+- Nye tabeller: bare `SELECT` for innloggede (RLS), skriving via RPC-er.
+- Godkjenningstelleren: `rm_work_summary.approval.ready_to_approve` = samme regel som listens «Klare».
+- Gamle beslutningslenker beholder leverandør, varenummer (søk) og gruppe.
