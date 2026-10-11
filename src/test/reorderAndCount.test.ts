@@ -84,14 +84,14 @@ describe("telleutkast", () => {
   });
 
   it("lagrer og henter et påbegynt utkast", () => {
-    saveCountDraft(key, { opId: "op-1", entries: { rm1: [{ amount: "12,5", unitKey: "__base" }] }, lineNotes: { rm1: "Hylle 3" }, note: "" });
+    saveCountDraft(key, { opId: "op-1", expected: { rm1: 10 }, entries: { rm1: [{ amount: "12,5", unitKey: "__base" }] }, lineNotes: { rm1: "Hylle 3" }, note: "" });
     const loaded = loadCountDraft(key);
     expect(loaded?.entries.rm1[0].amount).toBe("12,5");
     expect(loaded?.lineNotes.rm1).toBe("Hylle 3");
   });
 
   it("lagrer ikke et tomt utkast", () => {
-    saveCountDraft(key, { opId: "op-1", entries: { rm1: [{ amount: "", unitKey: "__base" }] }, lineNotes: {}, note: "" });
+    saveCountDraft(key, { opId: "op-1", expected: { rm1: 10 }, entries: { rm1: [{ amount: "", unitKey: "__base" }] }, lineNotes: {}, note: "" });
     expect(loadCountDraft(key)).toBeNull();
     expect(draftHasContent(null)).toBe(false);
   });
@@ -102,13 +102,13 @@ describe("telleutkast", () => {
   });
 
   it("kan forkastes", () => {
-    saveCountDraft(key, { opId: "op-1", entries: { rm1: [{ amount: "3", unitKey: "__base" }] }, lineNotes: {}, note: "" });
+    saveCountDraft(key, { opId: "op-1", expected: { rm1: 10 }, entries: { rm1: [{ amount: "3", unitKey: "__base" }] }, lineNotes: {}, note: "" });
     clearCountDraft(key);
     expect(loadCountDraft(key)).toBeNull();
   });
 
   it("bevarer et lagret utkast når det ikke skjer noen brukerendring", () => {
-    saveCountDraft(key, { opId: "op-1", entries: { rm1: [{ amount: "12", unitKey: "__base" }] }, lineNotes: {}, note: "" });
+    saveCountDraft(key, { opId: "op-1", expected: { rm1: 10 }, entries: { rm1: [{ amount: "12", unitKey: "__base" }] }, lineNotes: {}, note: "" });
     // Simulerer at komponenten ikke autolagrer et tomt state før brukeren faktisk
     // har gjort noe — utkastet skal fortsatt ligge i localStorage uendret.
     expect(loadCountDraft(key)?.entries.rm1[0].amount).toBe("12");
@@ -144,7 +144,7 @@ describe("operasjons-ID på tellingen", () => {
   beforeEach(() => localStorage.clear());
 
   it("beholder samme ID gjennom utkastet", () => {
-    saveCountDraft(key, { opId: "op-42", entries: { rm1: [{ amount: "5", unitKey: "__base" }] }, lineNotes: {}, note: "" });
+    saveCountDraft(key, { opId: "op-42", expected: { rm1: 10 }, entries: { rm1: [{ amount: "5", unitKey: "__base" }] }, lineNotes: {}, note: "" });
     expect(loadCountDraft(key)?.opId).toBe("op-42");
   });
 
