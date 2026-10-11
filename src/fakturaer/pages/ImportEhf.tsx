@@ -12,7 +12,7 @@ import { useSelection } from "@/providers/SelectionProvider";
 import { runAutoMatchAfterImport } from "@/fakturaer/lib/queueActions";
 import { paths } from "@/ravarer/lib/paths";
 
-export default function ImportEhfPage({ embedded = false }: { embedded?: boolean } = {}) {
+export default function ImportEhfPage({ embedded = false, onImported }: { embedded?: boolean; onImported?: (invoiceId: string | null) => void } = {}) {
   const navigate = useNavigate();
   const { canWrite } = useFakturaer();
   const { legalEntityId } = useSelection();
@@ -46,10 +46,12 @@ export default function ImportEhfPage({ embedded = false }: { embedded?: boolean
         // Auto-match kjøres med én gang, slik at brukeren lander på ferdige forslag.
         const matched = await runAutoMatchAfterImport(invoiceId);
         toast.success(matched ? "EHF-faktura importert og matchet" : "EHF-faktura importert — kjør match fra innboksen");
-        navigate(paths.fakturaInnboks({ faktura: invoiceId }));
+        if (onImported) onImported(invoiceId);
+        else navigate(paths.faktura(invoiceId));
       } else {
         toast.success("EHF-faktura importert");
-        navigate(paths.alleFakturaer());
+        if (onImported) onImported(null);
+        else navigate(paths.alleFakturaer());
       }
     } catch (e: unknown) {
       showError("ehf-import", e, "Importen feilet");

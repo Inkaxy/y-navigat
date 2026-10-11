@@ -25,6 +25,11 @@ export interface InboxInvoice {
   paid_at: string | null;
   tripletex_is_paid: boolean | null;
   line_extraction_attempts: number;
+  line_extraction_error: string | null;
+  extraction_confidence: number | null;
+  reconciled_mode: string | null;
+  lines_source: string | null;
+  tripletex_voucher_number: string | null;
   line_count: number;
   assessment: InboxAssessment;
   tab: InboxTab;
@@ -40,7 +45,7 @@ export const OPEN_INVOICE_STATUSES = ["imported", "needs_review", "flagged", "re
 
 const SELECT = `id, invoice_number, invoice_date, imported_at, created_at, due_date, status, legal_entity_id, supplier_id, is_credit_note,
   total_amount, total_vat, lines_sum_status, lines_sum_variance_pct, source_document_url,
-  line_extraction_status, line_extraction_attempts, source, notes, paid_at, tripletex_is_paid, currency, extraction_confidence, suppliers(name),
+  line_extraction_status, line_extraction_attempts, line_extraction_error, reconciled_mode, lines_source, tripletex_voucher_number, source, notes, paid_at, tripletex_is_paid, currency, extraction_confidence, suppliers(name),
   invoice_lines(id, quantity, price_per_base_unit, raw_material_id, requires_review, review_reason, match_confidence, price_variance_pct, variance_status, raw_materials(category))`;
 
 interface RawInvoice {
@@ -65,6 +70,10 @@ interface RawInvoice {
   paid_at: string | null;
   tripletex_is_paid: boolean | null;
   line_extraction_attempts: number;
+  line_extraction_error?: string | null;
+  reconciled_mode?: string | null;
+  lines_source?: string | null;
+  tripletex_voucher_number?: string | null;
   currency?: string | null;
   extraction_confidence?: number | null;
   suppliers: { name: string } | null;
@@ -81,6 +90,9 @@ interface RawInvoice {
     raw_materials: { category: string | null } | null;
   }> | null;
 }
+
+export type { RawInvoice as RawInboxInvoice };
+export const INBOX_INVOICE_SELECT = SELECT;
 
 export function toInboxInvoice(r: RawInvoice): InboxInvoice {
   const lines: InboxLine[] = (r.invoice_lines ?? []).map((l) => ({
@@ -129,6 +141,11 @@ export function toInboxInvoice(r: RawInvoice): InboxInvoice {
     paid_at: r.paid_at,
     tripletex_is_paid: r.tripletex_is_paid,
     line_extraction_attempts: r.line_extraction_attempts ?? 0,
+    line_extraction_error: r.line_extraction_error ?? null,
+    extraction_confidence: r.extraction_confidence == null ? null : Number(r.extraction_confidence),
+    reconciled_mode: r.reconciled_mode ?? null,
+    lines_source: r.lines_source ?? null,
+    tripletex_voucher_number: r.tripletex_voucher_number ?? null,
     line_count: lines.length,
     assessment,
     tab: inboxTabOf({ status: r.status, assessment }),

@@ -74,7 +74,7 @@ async function fileToBase64(file: File): Promise<string> {
   return btoa(binary);
 }
 
-export default function ImportPdfPage({ embedded = false }: { embedded?: boolean } = {}) {
+export default function ImportPdfPage({ embedded = false, onImported }: { embedded?: boolean; onImported?: (invoiceId: string | null) => void } = {}) {
   const navigate = useNavigate();
   const { canWrite } = useFakturaer();
   const { data: entities = [] } = useFakturaerLegalEntities();
@@ -339,13 +339,15 @@ export default function ImportPdfPage({ embedded = false }: { embedded?: boolean
         setQueueIndex(queueIndex + 1);
       } else if (queue.length > 1) {
         toast.success(`Alle ${queue.length} fakturaer lagret og matchet`);
-        navigate(paths.fakturaInnboks());
+        if (onImported) onImported(null);
+        else navigate(paths.alleFakturaer());
       } else if (lines.length === 0) {
         toast.success("Faktura opprettet — registrer linjer");
         navigate(paths.registrerLinjer(invoice.id));
       } else {
         toast.success("Faktura opprettet og matchet");
-        navigate(paths.fakturaInnboks({ faktura: invoice.id }));
+        if (onImported) onImported(invoice.id);
+        else navigate(paths.faktura(invoice.id));
       }
     } catch (e: unknown) {
       showError("pdf-import", e, "Opplastingen feilet");

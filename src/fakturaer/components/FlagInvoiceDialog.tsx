@@ -13,9 +13,12 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   invoiceId: string;
+  /** Flere fakturaer samtidig (masseflagging). Overstyrer `invoiceId`. */
+  invoiceIds?: string[];
 }
 
-export function FlagInvoiceDialog({ open, onOpenChange, invoiceId }: Props) {
+export function FlagInvoiceDialog({ open, onOpenChange, invoiceId, invoiceIds }: Props) {
+  const ids = invoiceIds && invoiceIds.length > 0 ? invoiceIds : [invoiceId];
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const qc = useQueryClient();
@@ -37,10 +40,10 @@ export function FlagInvoiceDialog({ open, onOpenChange, invoiceId }: Props) {
           flag_reason: reason.trim(),
           flag_action_type: "internal_task",
         })
-        .eq("id", invoiceId);
+        .in("id", ids);
       if (error) throw error;
-      toast.success("Faktura flagget for oppfølging");
-      invalidateInvoice(qc, invoiceId);
+      toast.success(ids.length > 1 ? `${ids.length} fakturaer flagget for oppfølging` : "Faktura flagget for oppfølging");
+      invalidateInvoice(qc, ids.length === 1 ? ids[0] : undefined);
       onOpenChange(false);
       setReason("");
     } catch (e: unknown) {

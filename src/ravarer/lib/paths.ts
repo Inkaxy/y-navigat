@@ -41,9 +41,15 @@ export const paths = {
 
   // Priskontroll
   priskontroll: (q?: { fane?: PriskontrollFane } & Q) => withQuery(`${RAVARER_ROOT}/priskontroll`, q),
-  fakturaInnboks: (q?: { innboks?: "klar" | "fullfort"; faktura?: string } & Q) =>
-    withQuery(`${RAVARER_ROOT}/priskontroll`, { fane: "fakturaer", visning: "innboks", ...q }),
+  /** Fakturaer-fanen. Gamle innboksvalg mappes til hurtigfiltrene; `faktura` åpner arbeidsflaten. */
+  fakturaInnboks: (q?: { innboks?: "klar" | "fullfort"; faktura?: string } & Q) => {
+    const { innboks, faktura, ...rest } = q ?? {};
+    if (faktura) return withQuery(`${RAVARER_ROOT}/priskontroll/faktura/${enc(faktura)}`);
+    const visning = innboks === "klar" ? "klar" : innboks === "fullfort" ? "avstemt" : "trenger";
+    return withQuery(`${RAVARER_ROOT}/priskontroll`, { fane: "fakturaer", visning, ...rest });
+  },
   alleFakturaer: (q?: Q) => withQuery(`${RAVARER_ROOT}/priskontroll`, { fane: "fakturaer", visning: "alle", ...q }),
+  fakturaer: (q?: { visning?: "trenger" | "klar" | "avstemt" | "alle" } & Q) => withQuery(`${RAVARER_ROOT}/priskontroll`, { fane: "fakturaer", ...q }),
   varekoblinger: (q?: { leverandor?: string; status?: string; q?: string } & Q) =>
     withQuery(`${RAVARER_ROOT}/priskontroll/varekort`, q),
   alleVarekort: (q?: Q) => withQuery(`${RAVARER_ROOT}/priskontroll/varekort`, q),
@@ -53,7 +59,11 @@ export const paths = {
   faktura: (id: Id, q?: Q) => withQuery(`${RAVARER_ROOT}/priskontroll/faktura/${enc(id)}`, q),
   registrerLinjer: (id: Id) => `${RAVARER_ROOT}/priskontroll/faktura/${enc(id)}/registrer-linjer`,
   sak: (id: Id) => `${RAVARER_ROOT}/priskontroll/saker/${enc(id)}`,
-  importFaktura: (q?: { tab?: "ehf" | "pdf" | "manuelt" } & Q) => withQuery(`${RAVARER_ROOT}/priskontroll/import`, q),
+  /** Import åpnes som sidepanel på Priskontroll (`?importer=`). */
+  importFaktura: (q?: { tab?: "ehf" | "pdf" | "manuelt" } & Q) => {
+    const { tab, ...rest } = q ?? {};
+    return withQuery(`${RAVARER_ROOT}/priskontroll`, { ...rest, importer: tab ?? "ehf" });
+  },
   beslutninger: (q?: { omfang?: "ravarer" } & Q) => withQuery(`${RAVARER_ROOT}/priskontroll/beslutninger`, q),
   beslutning: (key: Id, q?: Q) => withQuery(`${RAVARER_ROOT}/priskontroll/beslutninger/${enc(key)}`, q),
   reberegn: () => `${RAVARER_ROOT}/priskontroll/verktoy/reberegn`,

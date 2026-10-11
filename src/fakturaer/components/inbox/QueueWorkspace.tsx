@@ -1,4 +1,6 @@
+import type { ReactNode } from "react";
 import { SlidersHorizontal } from "lucide-react";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -34,7 +36,7 @@ export interface QueueWorkspaceProps {
   onMultiSelect: (v: boolean) => void;
   selected: Record<string, boolean>;
   onToggleSelect: (id: string, v: boolean) => void;
-  bulk: { count: number; acceptable: number; busy: boolean; onAccept: () => void; onNotApplicable: () => void; onCreate: () => void; onClear: () => void };
+  bulk: { count: number; acceptable: number; busy: boolean; onAccept: () => void; onNotApplicable: () => void; onCreate: () => void; onClear: () => void; /** «Importer som nye råvarer» (bare ukoblede linjer). */ onImport?: () => void; importable?: number };
   loading: boolean;
   error: unknown;
   onRetry: () => void;
@@ -55,6 +57,16 @@ export interface QueueWorkspaceProps {
   onSecondary: (a: SecondaryAction, l: ReviewLineRow) => void;
   onShowDocument: (l: ReviewLineRow) => void;
   onReconcile: () => void;
+  /** Under 1280 px: linjene som liste, inspektøren i et sidepanel. */
+  inspectorAsSheet?: boolean;
+  inspectorOpen?: boolean;
+  onInspectorOpenChange?: (v: boolean) => void;
+  /** Vises øverst i inspektøren. */
+  inspectorNote?: ReactNode;
+  /** Øk tallet for å åpne «Endre råvare» i inspektøren (tast M). */
+  editMaterialSignal?: number;
+  /** Ekstra innhold over linjelisten (f.eks. fakta-kortet). */
+  listHeader?: ReactNode;
 }
 
 /** Smal linjeliste til venstre, valgt oppgave til høyre. Alt sekundært ligger under «Flere valg». */
@@ -78,8 +90,10 @@ export function QueueWorkspace(p: QueueWorkspaceProps) {
       onSecondary={p.onSecondary}
       onShowDocument={p.onShowDocument}
       onReconcile={p.onReconcile}
+      editMaterialSignal={p.editMaterialSignal}
     />
   ) : null;
+  const inspector = task ? <div className="space-y-2">{p.inspectorNote}{task}</div> : null;
 
   const toolbar = (
     <div className="flex items-center justify-between gap-2">
@@ -135,15 +149,29 @@ export function QueueWorkspace(p: QueueWorkspaceProps) {
             </label>
           )}
           <p className="text-caption text-ink-secondary">
-            Hurtigtaster: ↑/↓ bytt linje · Enter godta råvareforslag · m velg råvare · n ny råvare · x ikke råvare · u angre
+            Hurtigtaster: ↑/↓ eller J/K bytt linje · Enter godta forslag · M endre råvare · N ny råvare · X ikke vare · U angre · D dokument · ? hjelp
           </p>
         </PopoverContent>
       </Popover>
     </div>
   );
 
+  const list = (
+    <LineList
+      lines={p.lines}
+      statusOf={p.statusOf}
+      activeLineId={a?.id ?? null}
+      onSelect={p.onSelect}
+      selected={p.selected}
+      onToggleSelect={p.onToggleSelect}
+      showInvoice={p.showInvoice}
+      selectable={p.multiSelect}
+    />
+  );
+
   return (
     <div className="space-y-3">
+      {p.listHeader}
       {p.countsError && <p className="text-caption text-destructive">Tellerne kunne ikke hentes — tallene kan være ufullstendige.</p>}
       {p.multiSelect && p.bulk.count > 0 && (
         <Card className="flex flex-wrap items-center gap-2 border-primary/30 bg-primary/5 p-3">
@@ -152,11 +180,16 @@ export function QueueWorkspace(p: QueueWorkspaceProps) {
             Godta forslag ({p.bulk.acceptable})
           </Button>
           <Button size="sm" variant="outline" disabled={!p.canWrite || p.bulk.busy} onClick={p.bulk.onNotApplicable}>
-            Marker ikke råvare
+            Ikke vare ({p.bulk.count})
           </Button>
           <Button size="sm" variant="outline" disabled={!p.canWrite || p.bulk.busy} onClick={p.bulk.onCreate}>
-            Opprett råvarer
+            Opprett råvarer ({p.bulk.count})
           </Button>
+          {p.bulk.onImport && (
+            <Button size="sm" variant="outline" disabled={!p.canWrite || p.bulk.busy || !p.bulk.importable} onClick={p.bulk.onImport}>
+              Importer som nye råvarer ({p.bulk.importable ?? 0})
+            </Button>
+          )}
           <Button size="sm" variant="ghost" onClick={p.bulk.onClear}>
             Nullstill
           </Button>
@@ -177,26 +210,26 @@ export function QueueWorkspace(p: QueueWorkspaceProps) {
         {p.isMobile ? (
           <div className="space-y-3">
             {toolbar}
-            {task}
+            {inspector}
+          </div>
+        ) : p.inspectorAsSheet ? (
+          <div className="space-y-2">
+            {toolbar}
+            <Card className="p-0">{list}</Card>
+            <Sheet open={!!inspector && !!p.inspectorOpen} onOpenChange={(v) => p.onInspectorOpenChange?.(v)}>
+              <SheetContent side="right" className="w-full overflow-y-auto p-3 sm:max-w-xl">
+                <SheetTitle className="sr-only">Valgt fakturalinje</SheetTitle>
+                {inspector}
+              </SheetContent>
+            </Sheet>
           </div>
         ) : (
-          <div className="grid items-start gap-4 lg:grid-cols-[minmax(240px,300px)_1fr]">
+          <div className="grid items-start gap-4 lg:grid-cols-[minmax(240px,320px)_1fr]">
             <div className="space-y-2 lg:sticky lg:top-4">
               {toolbar}
-              <Card className="max-h-[calc(100vh-12rem)] overflow-y-auto p-0">
-                <LineList
-                  lines={p.lines}
-                  statusOf={p.statusOf}
-                  activeLineId={a?.id ?? null}
-                  onSelect={p.onSelect}
-                  selected={p.selected}
-                  onToggleSelect={p.onToggleSelect}
-                  showInvoice={p.showInvoice}
-                  selectable={p.multiSelect}
-                />
-              </Card>
+              <Card className="max-h-[calc(100vh-12rem)] overflow-y-auto p-0">{list}</Card>
             </div>
-            <div>{task}</div>
+            <div>{inspector}</div>
           </div>
         )}
       </QueryState>
