@@ -1,6 +1,6 @@
 import { useConfirmMany } from "@/ravarer/ui/useConfirmMany";
 import { useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { postSafeCosts } from "@/fakturaer/lib/costPosting";
 import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { firstCostLinesByInvoice, firstCostReport } from "./firstCost";
@@ -43,8 +43,9 @@ export function splitByGate<L extends GateLine>(cands: L[], gateOf: (l: L) => Pr
     const base = { id: l.id, invoice_id: l.invoice_id, invoice_number: l.invoice_number, invoice_date: l.invoice_date };
     if (!g.ok) { blocked.push({ ...base, label: g.label, detail: g.detail }); continue; }
     const s = g.safety;
-    if (s.price_per_base_unit == null || s.expected_price_per_base_unit == null || s.effect_nok == null || priceDirection(s) === "same") continue;
-    rows.push({ ...base, quantity: l.quantity, unit: l.unit, price_per_base_unit: s.price_per_base_unit, expected_price_per_base_unit: s.expected_price_per_base_unit, base_quantity: s.base_quantity, effect_nok: s.effect_nok, reference_source: s.reference_source, reference_id: s.reference_id });
+    if (!s.raw_material_id || !s.base_unit || s.price_per_base_unit == null || s.expected_price_per_base_unit == null || s.effect_nok == null || priceDirection(s) === "same") continue;
+    rows.push({ ...base, quantity: l.quantity, unit: l.unit, price_per_base_unit: s.price_per_base_unit, expected_price_per_base_unit: s.expected_price_per_base_unit, base_quantity: s.base_quantity, effect_nok: s.effect_nok, reference_source: s.reference_source, reference_id: s.reference_id,
+      raw_material_id: s.raw_material_id ?? "", base_unit: s.base_unit ?? "", reference_date: s.reference_date });
   }
   return { rows, blocked };
 }
@@ -74,7 +75,7 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
   const claim = useClaimCredit();
   const rematch = useRematchInvoices();
   // Én autoritativ statusforespørsel per bidragende faktura (begrenset samtidighet i hooken).
-  const safety = useInvoicePriceSafety(cands.map((l) => l.invoice_id), { pending: accept.isPending || claim.isPending });
+  const safety = useInvoicePriceSafety(cands.map((l) => l.invoice_id), { pending: accept.isPending || claim.isPending, rawMaterialId: item.rm_id ?? null });
   const { rows, blocked } = splitByGate(cands, (l) => safety.gateFor({ id: l.id, invoice_id: l.invoice_id }));
   const status: "ready" | "loading" | "error" = cands.length === 0 || safety.allFresh ? "ready" : safety.anyError ? "error" : "loading";
   // Ingen linjer er valgt på forhånd; valg som ikke lenger er kontrollert faller bort.
@@ -90,19 +91,6 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
   const [startOpen, setStartOpen] = useState(false);
   const startLine = startPriceLine(lines);
   const chosen = status === "ready" ? rows.filter((r) => selected.has(r.id)) : [];
-  // Referansedato bare når alle valgte linjer har samme grunnlag.
-  const refLine = chosen.length > 0 && new Set(chosen.map((r) => `${r.reference_source}|${r.reference_id}`)).size === 1 ? chosen[0] : null;
-  // Referansedatoen finnes på fakturalinjen, men ikke i varekortets linjeliste.
-  const refDate = useQuery({
-    queryKey: ["price-reference-date", refLine?.id ?? null],
-    enabled: !!refLine,
-    queryFn: async () => {
-      const { data, error } = await supabase.from("invoice_lines").select("price_reference_date").eq("id", refLine!.id).maybeSingle();
-      if (error) throw error;
-      return data?.price_reference_date ?? null;
-    },
-  });
-
   const toggle = (id: string) => setPicked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const lineRefs = chosen.map((r) => ({ id: r.id, price_per_base_unit: r.price_per_base_unit }));
 
@@ -186,8 +174,7 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
     <>
       {rows.length > 0 || blocked.length > 0 || status !== "ready" ? (
         <PriceBlockView
-          rows={rows} blocked={blocked} status={status} onRetry={safety.refetch} selected={selected} onToggle={toggle} baseUnit={item.rm_base_unit}
-          referenceDate={refDate.data ?? null}
+          rows={rows} blocked={blocked} status={status} onRetry={safety.refetch} selected={selected} onToggle={toggle}
           hasAgreement={item.agreed_price_per_base_unit != null}
           tolerancePct={tol.toleranceFor(item.rm_category)} hardCapPct={tol.settings?.price_hard_cap_pct ?? DEFAULT_HARD_CAP_PCT} settings={tol.settings}
           reason={reason} onReason={setReason} canWrite={canWrite} busy={accept.isPending || claim.isPending || previewing} error={error} errorReasons={errorReasons}
@@ -206,7 +193,7 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
 
       {firstCost.size > 1 && (
         <div className="mt-3 space-y-1 rounded-lg border border-border p-3 text-sm">
-          <p>Varen mangler kostpris og har trygge linjer på {firstCost.size} fakturaer.</p>
+          <p>Varen mangler kostpris og har linjer som kan kontrolleres på {firstCost.size} fakturaer.</p>
           <button type="button" className="text-primary underline underline-offset-2 disabled:opacity-50" disabled={!canWrite || !!fcBusy} onClick={() => void runFirstCost()}>
             {fcBusy ? `Fører … ${fcBusy.done} av ${fcBusy.total}` : `Før første kostpris på ${firstCost.size} fakturaer`}
           </button>

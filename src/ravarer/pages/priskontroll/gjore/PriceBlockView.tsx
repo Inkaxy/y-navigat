@@ -11,7 +11,9 @@ import { paths } from "@/ravarer/lib/paths";
 import { kr, ppbu, priceChange, pricePrimaryAction, showPackageHint, signedPct, type PriceLine } from "./logic";
 
 /** Linje med SERVERKONTROLLERT pris, forventet pris, mengde og absolutt prisavvik (`effect_nok`). */
-export type PriceRow = PriceLine & { invoice_id: string; invoice_number: string | null; invoice_date: string | null; quantity: number | null; unit: string | null; effect_nok: number; reference_source: string | null; reference_id: string | null };
+export type PriceRow = PriceLine & { invoice_id: string; invoice_number: string | null; invoice_date: string | null; quantity: number | null; unit: string | null; effect_nok: number; reference_source: string | null; reference_id: string | null;
+  /** Fra serverens kvittering (schema 2). */
+  raw_material_id: string; base_unit: string; reference_date: string | null };
 /** Linje som ikke kan sammenlignes nå, med serverens årsak. */
 export type BlockedRow = { id: string; invoice_id: string; invoice_number: string | null; invoice_date: string | null; label: string; detail: string };
 
@@ -23,8 +25,6 @@ export type PriceBlockViewProps = {
   onRetry?: () => void;
   selected: Set<string>;
   onToggle: (id: string) => void;
-  baseUnit: string | null;
-  referenceDate: string | null;
   hasAgreement: boolean;
   tolerancePct: number;
   hardCapPct: number;
@@ -47,10 +47,13 @@ const refLabel = (s: string | null) => (s && s in PRICE_REFERENCE_LABEL ? PRICE_
 /** Pris-blokken i varekortet. Bare serverkontrollerte linjer kan sammenlignes, velges og summeres. */
 export function PriceBlockView(p: PriceBlockViewProps) {
   const chosen = p.rows.filter((r) => p.selected.has(r.id));
-  const ch = priceChange(chosen);
+  // Aldri snitt på tvers av råvare eller enhet (kg og l summeres ikke).
+  const groups = new Set(chosen.map((r) => `${r.raw_material_id}|${r.base_unit}`));
+  const mixed = groups.size > 1;
+  const ch = mixed ? null : priceChange(chosen);
   const positiveCount = ch?.positiveIds.length ?? 0;
   const primary = pricePrimaryAction({ pct: positiveCount ? Math.max(ch?.pct ?? 0, 0.0001) : null, hardCapPct: p.hardCapPct, hasAgreement: p.hasAgreement });
-  const unit = p.baseUnit ?? "enhet";
+  const unit = (chosen[0] ?? p.rows[0])?.base_unit ?? "enhet";
   const disabled = !p.canWrite || p.busy || chosen.length === 0 || p.status !== "ready";
   const qty = chosen.reduce((s, r) => s + (r.base_quantity ?? 0), 0);
   // Én felles referanse bare når alle valgte linjer peker på samme grunnlag.
@@ -65,7 +68,7 @@ export function PriceBlockView(p: PriceBlockViewProps) {
       )}
       {p.status === "ready" && (ch ? (
         <div className="space-y-2 rounded-md border border-line-subtle p-3 text-sm">
-          <p className="text-caption text-ink-secondary">Mengdevektet snitt for {chosen.length} valgte {chosen.length === 1 ? "linje" : "linjer"} · {oneRef ? `${refLabel(oneRef.reference_source)}${p.referenceDate ? ` · ${formatDate(p.referenceDate)}` : ""}` : "Ulike sammenligningsgrunnlag — se linjene"}</p>
+          <p className="text-caption text-ink-secondary">Mengdevektet snitt for {chosen.length} valgte {chosen.length === 1 ? "linje" : "linjer"} · {oneRef ? `${refLabel(oneRef.reference_source)}${oneRef.reference_date ? ` · ${formatDate(oneRef.reference_date)}` : ""}` : "Ulike sammenligningsgrunnlag — se linjene"}</p>
           <div className="grid gap-2 sm:grid-cols-2">
             <div><p className="text-caption text-ink-secondary">Forventet (snitt)</p><p className="tabular-nums">{ppbu(ch.expected)} kr/{unit}</p></div>
             <div><p className="text-caption text-ink-secondary">Fakturert (snitt, kontrollert)</p><p className="font-medium tabular-nums">{ppbu(ch.actual)} kr/{unit} <span className="text-ink-secondary">({signedPct(ch.pct)})</span></p></div>
@@ -78,6 +81,8 @@ export function PriceBlockView(p: PriceBlockViewProps) {
           <p className="text-caption text-ink-secondary">Snittet er ikke en ny enhetspris. Lavere pris på én faktura motregner ikke en dyrere linje.</p>
           <PriceDeviationNote actual={ch.actual} expected={ch.expected} baseQuantity={qty || null} tolerancePct={p.tolerancePct} settings={p.settings} />
         </div>
+      ) : mixed ? (
+        <p className="text-sm text-warning">Valgte linjer har ulik råvare eller grunnenhet — sammendrag vises ikke. Velg linjer med samme enhet.</p>
       ) : chosen.length > 0 ? (
         <p className="text-sm text-warning">Mengde mangler eller er ugyldig på en valgt linje — sammendrag vises ikke.</p>
       ) : p.rows.length > 0 ? (
@@ -92,16 +97,16 @@ export function PriceBlockView(p: PriceBlockViewProps) {
         <div className="overflow-x-auto rounded-md border border-line-subtle">
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-left text-caption text-ink-secondary">
-              <tr><th className="w-8 px-2 py-1.5"><span className="sr-only">Velg</span></th><th className="px-2 py-1.5">Faktura</th><th className="px-2 py-1.5">Dato</th><th className="px-2 py-1.5 text-right">Pris/{unit}</th><th className="px-2 py-1.5">Grunnlag</th><th className="px-2 py-1.5 text-right">Endring</th></tr>
+              <tr><th className="w-8 px-2 py-1.5"><span className="sr-only">Velg</span></th><th className="px-2 py-1.5">Faktura</th><th className="px-2 py-1.5">Dato</th><th className="px-2 py-1.5 text-right">Pris / forventet</th><th className="px-2 py-1.5">Grunnlag</th><th className="px-2 py-1.5 text-right">Endring</th></tr>
             </thead>
             <tbody className="divide-y divide-line-subtle">
               {p.rows.map((r) => (
                 <tr key={r.id}>
-                  <td className="px-2 py-1.5"><Checkbox aria-label={`Velg linje på faktura ${r.invoice_number ?? ""}`} checked={p.selected.has(r.id)} onCheckedChange={() => p.onToggle(r.id)} /></td>
+                  <td className="px-0 py-0"><label className="flex h-11 w-11 cursor-pointer items-center justify-center"><Checkbox aria-label={`Velg linje på faktura ${r.invoice_number ?? ""}`} checked={p.selected.has(r.id)} onCheckedChange={() => p.onToggle(r.id)} /></label></td>
                   <td className="px-2 py-1.5"><Link className="underline-offset-2 hover:underline" to={paths.faktura(r.invoice_id)}>{r.invoice_number ?? "—"}</Link></td>
                   <td className="px-2 py-1.5 text-ink-secondary">{formatDate(r.invoice_date)}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums">{ppbu(r.price_per_base_unit)} <span className="text-ink-secondary">/ {ppbu(r.expected_price_per_base_unit)}</span></td>
-                  <td className="px-2 py-1.5 text-caption text-ink-secondary">{refLabel(r.reference_source)}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{ppbu(r.price_per_base_unit)} <span className="text-ink-secondary">/ {ppbu(r.expected_price_per_base_unit)} kr/{r.base_unit}</span></td>
+                  <td className="px-2 py-1.5 text-caption text-ink-secondary">{refLabel(r.reference_source)}{r.reference_date ? ` · ${formatDate(r.reference_date)}` : ""}</td>
                   <td className="px-2 py-1.5 text-right tabular-nums">{r.price_per_base_unit > r.expected_price_per_base_unit ? "+" : "−"}{kr(r.effect_nok)}</td>
                 </tr>
               ))}
@@ -133,7 +138,7 @@ export function PriceBlockView(p: PriceBlockViewProps) {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 [&>button]:min-h-11">
         <Button data-action="accept-price" data-primary-action={primary === "accept" ? "" : undefined} variant={primary === "accept" ? "default" : "outline"} disabled={disabled} onClick={p.onAccept}>Godta ny pris</Button>
         <Button data-action="claim-credit" data-primary-action={primary === "claim" ? "" : undefined} variant={primary === "claim" ? "default" : "outline"} disabled={disabled || positiveCount === 0} onClick={p.onCase}>
           {positiveCount ? `Opprett leverandørsak for ${positiveCount} dyrere ${positiveCount === 1 ? "linje" : "linjer"} …` : "Opprett leverandørsak …"}
