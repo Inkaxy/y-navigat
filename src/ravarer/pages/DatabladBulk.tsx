@@ -17,7 +17,7 @@ import { PackageEditor } from "@/ravarer/editors/PackageEditor";
 import type { PackageWorklistRow } from "@/ravarer/hooks/usePackageSizes";
 import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
-import { recomputeRecipesForRawMaterial } from "@/varer/lib/recomputeFanout";
+import { recomputeRecipesDetailed } from "@/varer/lib/recomputeFanout";
 import { BulkFileRow, type BulkRow, type MaterialOption } from "@/ravarer/components/datablad/BulkFileRow";
 import { DatasheetReviewDialog, type ReviewTarget } from "@/ravarer/components/datablad/DatasheetReviewDialog";
 import { isObj } from "@/fakturaer/lib/parseRpcJson";
@@ -234,17 +234,38 @@ export default function DatabladBulk() {
       }
       const out = parseApplyOutcome(data);
       const followUps = out.allergenRemovalsSkipped.length > 0 ? [`allergenfjerning ikke utført (${out.allergenRemovalsSkipped.join(", ")}) — vurder på råvaren`] : [];
-      if (out.kind !== "failed") void recomputeRecipesForRawMaterial(reviewed.rmId, qc, { silent: true });
       update(op.gen, key, {
         applyState: out.kind, applyError: out.error ?? undefined, applyFailures: out.failures, followUps, packageSuggestion: out.packageSuggestion,
         // Delvis/ukjent: gjennomgangen må gjøres på nytt mot dagens verdier før nytt forsøk.
         reviewed: out.kind === "partial" || out.kind === "unknown" ? null : reviewed,
       });
+      // Etterarbeid etter bekreftet (helt/delvis) lagring fullføres for den frosne råvaren også om
+      // brukeren navigerer; utfallet rapporteres separat. Ukjent utfall: ingen etterarbeid før gjennomgang.
+      if (out.kind === "applied" || out.kind === "partial") void runRecompute(op.gen, key, reviewed.rmId);
       return out.kind;
     } catch (e: unknown) {
       console.error("[datablad:anvend]", e);
       update(op.gen, key, { applyState: linked ? "unknown" : "failed", applyError: errText(e), reviewed: linked ? null : reviewed });
       return linked ? "unknown" : "failed";
+    }
+  };
+
+  const recomputing = useRef(new Set<string>());
+  /** Etterberegning for frosset råvare-ID. Aldri en ny anvendelse; dobbel start for samme rad avvises. */
+  const runRecompute = async (g: number, key: string, rmId: string) => {
+    if (recomputing.current.has(key)) return;
+    recomputing.current.add(key);
+    const label = materials.find((m) => m.id === rmId)?.name ?? "råvaren";
+    update(g, key, { recompute: { state: "running", ok: 0, total: 0, rmId } });
+    try {
+      const r = await recomputeRecipesDetailed(rmId, qc);
+      if (g === gen.current && live.current.mounted) update(g, key, { recompute: { state: r.status, ok: r.ok, total: r.total, rmId } });
+      else if (r.status === "failed" || r.status === "partial") {
+        // Raden finnes ikke lenger (byttet selskap/forlot siden): varsle eksplisitt, ikke stille.
+        toast.warning(`Oppskrifter som bruker «${label}» ble ikke beregnet på nytt. Datablad-anvendelsen står; beregn oppskriftene fra råvaren.`);
+      }
+    } finally {
+      recomputing.current.delete(key);
     }
   };
 
@@ -376,6 +397,7 @@ export default function DatabladBulk() {
                 onRetry={() => void retry(r.key)}
                 onCreate={() => setCreateKey(r.key)}
                 onOpenPackage={() => void openPackage(r.key)}
+                onRetryRecompute={r.recompute && canWrite ? () => { const rc = r.recompute; if (rc) void runRecompute(gen.current, r.key, rc.rmId); } : undefined}
               />
             ))}
           </ul></Card>

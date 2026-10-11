@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { rankBySearch } from "@/lib/textSimilarity";
 import type { Obj } from "@/fakturaer/lib/parseRpcJson";
+import type { RecomputeStatus } from "@/varer/lib/recomputeFanout";
 import type { ApplyKind, ExtractSummary, MatchCandidate, ReviewedOp } from "@/ravarer/lib/datasheetBulk";
 
 export interface BulkRow {
@@ -29,6 +30,8 @@ export interface BulkRow {
   applyError?: string;
   applyFailures?: string[];
   followUps: string[];
+  /** Etterberegning av oppskrifter for den frosne råvaren — rapporteres separat fra selve anvendelsen. */
+  recompute?: { state: "running" | RecomputeStatus; ok: number; total: number; rmId: string } | null;
   packageSuggestion: { size: number | null; unit: string | null } | null;
 }
 
@@ -47,11 +50,13 @@ interface Props {
   onRetry: () => void;
   onCreate: () => void;
   onOpenPackage: () => void;
+  /** Kjør bare etterberegningen på nytt (aldri anvendelsen). */
+  onRetryRecompute?: () => void;
 }
 
 const pct = (s: number) => `${Math.round(s * 100)} %`;
 
-export function BulkFileRow({ row: r, canWrite, locked, reviewedOk, materials, onSelect, onReview, onRetry, onCreate, onOpenPackage }: Props) {
+export function BulkFileRow({ row: r, canWrite, locked, reviewedOk, materials, onSelect, onReview, onRetry, onCreate, onOpenPackage, onRetryRecompute }: Props) {
   const [q, setQ] = useState("");
   const results = useMemo(() => (q.trim().length < 2 ? [] : rankBySearch(materials, q.trim(), (m) => [m.name, m.sku ?? ""]).slice(0, 6)), [materials, q]);
   const busy = r.status === "uploading" || r.status === "extracting" || r.status === "matching";
@@ -131,6 +136,14 @@ export function BulkFileRow({ row: r, canWrite, locked, reviewedOk, materials, o
         <p role="alert" className="rounded-md border border-warning/40 bg-warning/10 px-2.5 py-1.5 text-xs [overflow-wrap:anywhere]">
           Utfallet er ukjent{r.applyError ? ` (${r.applyError})` : ""}. Noe kan være lagret. Gjennomgå på nytt mot dagens verdier før et nytt forsøk.
         </p>
+      )}
+      {r.recompute?.state === "running" && <p role="status" className="text-xs text-ink-secondary">Beregner oppskrifter som bruker råvaren på nytt …</p>}
+      {r.recompute?.state === "done" && <p role="status" className="text-xs text-ink-secondary">{r.recompute.total} {r.recompute.total === 1 ? "oppskrift" : "oppskrifter"} beregnet på nytt</p>}
+      {(r.recompute?.state === "failed" || r.recompute?.state === "partial") && (
+        <div role="alert" className="flex flex-wrap items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-2.5 py-1.5 text-xs">
+          <span>Råvaren er oppdatert, men {r.recompute.total > 0 ? `${r.recompute.total - r.recompute.ok} av ${r.recompute.total} oppskrifter` : "oppskriftene"} ble ikke beregnet på nytt.</span>
+          {onRetryRecompute && <Button size="sm" variant="outline" className="min-h-[44px] md:min-h-0 md:h-7" onClick={onRetryRecompute}>Beregn oppskrifter på nytt</Button>}
+        </div>
       )}
       {r.followUps.length > 0 && <p role="status" className="rounded-md border border-warning/40 bg-warning/10 px-2.5 py-1.5 text-xs">Manuell oppfølging: {r.followUps.join(" · ")}</p>}
       {r.packageSuggestion && canWrite && (
