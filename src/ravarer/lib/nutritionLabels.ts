@@ -89,3 +89,22 @@ export function nutritionObjectDiff(oldValue: unknown, newValue: unknown): Nutri
     });
   return rows.length > 0 ? rows : null;
 }
+
+/**
+ * Næringsverdi i før/etter-visning: norsk desimal uten oppdiktet presisjon. 0,01 vises som 0,01,
+ * 0,1 som 0,1 og 0 som 0. Små verdier ≠ 0 rundes aldri til 0 (tre gjeldende sifre).
+ */
+export function formatNutrientValue(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  if (n === 0) return "0";
+  const opts: Intl.NumberFormatOptions = Math.abs(n) < 0.001 ? { maximumSignificantDigits: 3 } : { maximumFractionDigits: 3 };
+  return n.toLocaleString("nb-NO", opts);
+}
+
+/** Endring som aldri skjuler en reell endring fra/til 0 og aldri viser endring når verdien er lik. */
+export function nutrientChange(oldV: number | null, newV: number): string {
+  if (oldV == null) return "ny";
+  if (oldV === newV) return "uendret";
+  if (oldV === 0) return `fra 0 til ${formatNutrientValue(newV)}`;
+  return changePct(oldV, newV);
+}
