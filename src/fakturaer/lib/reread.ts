@@ -46,6 +46,7 @@ export type ApplyResult = { ok: boolean; applied_count: number; lines_sum_status
 
 type Rec = Record<string, unknown>;
 const isRec = (v: unknown): v is Rec => !!v && typeof v === "object" && !Array.isArray(v);
+const recs = (v: unknown): Rec[] => (Array.isArray(v) ? v.flatMap((x: unknown) => (isRec(x) ? [x] : [])) : []);
 const numOrNull = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && v !== "" && Number.isFinite(Number(v)) ? Number(v) : null);
 const strOrNull = (v: unknown): string | null => (typeof v === "string" ? v : null);
 const NUM_FIELDS: RereadField[] = ["quantity", "unit_price", "total_amount", "package_size", "count_per_package", "discount_amount"];
@@ -56,7 +57,7 @@ function values(r: Rec): Values {
   return out;
 }
 export function parseIssues(v: unknown): Issue[] {
-  return Array.isArray(v) ? v.filter(isRec).map((i) => ({ code: String(i.code ?? "lesevarsel"), message: String(i.message ?? i.code ?? "Lesevarsel") })) : [];
+  return Array.isArray(v) ? recs(v).map((i) => ({ code: String(i.code ?? "lesevarsel"), message: String(i.message ?? i.code ?? "Lesevarsel") })) : [];
 }
 const STATUSES: RunStatus[] = ["reading", "ready", "applied", "cancelled", "failed"];
 
@@ -69,19 +70,19 @@ export type RunRowInput = {
 export function parseRun(row: RunRowInput): RereadRun {
   const snap = isRec(row.snapshot) ? row.snapshot : {};
   const inv = isRec(snap.invoice) ? snap.invoice : {};
-  const corrected = new Set((Array.isArray(snap.corrections) ? snap.corrections : []).filter(isRec).map((c) => String(c.invoice_line_id)));
-  const oldLines: OldLine[] = (Array.isArray(snap.lines) ? snap.lines : []).filter(isRec).map((l) => ({
+  const corrected = new Set(recs(snap.corrections).map((c) => String(c.invoice_line_id)));
+  const oldLines: OldLine[] = recs(snap.lines).map((l) => ({
     ...values(l), id: String(l.id), line_number: numOrNull(l.line_number), issues: parseIssues(l.extraction_issues),
     manuallyLinked: l.match_confidence === "manual" && l.raw_material_id != null, corrected: corrected.has(String(l.id)),
   })).sort((a, b) => (a.line_number ?? 1e9) - (b.line_number ?? 1e9));
   const prop = isRec(row.proposal) ? row.proposal : {};
-  const candidates: Candidate[] = (Array.isArray(prop.candidates) ? prop.candidates : []).filter(isRec).map((c) => {
+  const candidates: Candidate[] = recs(prop.candidates).map((c) => {
     const ev = isRec(c.evidence) ? c.evidence : {};
     return {
       candidate_id: String(c.candidate_id), values: values(isRec(c.values) ? c.values : {}), issues: parseIssues(c.issues),
       evidence: {
         confidence: numOrNull(ev.confidence),
-        number_evidence: (Array.isArray(ev.number_evidence) ? ev.number_evidence : []).filter(isRec).map((e) => ({ field: String(e.field ?? ""), raw: String(e.raw ?? "") })),
+        number_evidence: recs(ev.number_evidence).map((e) => ({ field: String(e.field ?? ""), raw: String(e.raw ?? "") })),
         ean: strOrNull(ev.ean), vat_rate: numOrNull(ev.vat_rate), discount_pct: numOrNull(ev.discount_pct), model_price_basis: strOrNull(ev.model_price_basis),
       },
     };
@@ -108,7 +109,7 @@ export function parseRun(row: RunRowInput): RereadRun {
     extractor: { method: strOrNull(ex.extraction_method), confidence: numOrNull(ex.confidence), warningCount: numOrNull(ex.warning_count) ?? 0 },
     result: res ? {
       ok: res.ok === true, applied_count: numOrNull(res.applied_count) ?? 0, lines_sum_status: strOrNull(res.lines_sum_status), replayed: res.replayed === true,
-      operations: (Array.isArray(res.operations) ? res.operations : []).filter(isRec).map((o) => ({ kind: String(o.kind), candidate_id: String(o.candidate_id), line_id: strOrNull(o.line_id) })),
+      operations: recs(res.operations).map((o) => ({ kind: String(o.kind), candidate_id: String(o.candidate_id), line_id: strOrNull(o.line_id) })),
     } : null,
     appliedOperations: row.applied_operations, applyReason: row.apply_reason,
   };
