@@ -1,3 +1,4 @@
+import { formatDate } from "@/fakturaer/lib/constants";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -148,8 +149,8 @@ export function InvoiceLinesTable({ lines, supplierId, canBulkImport, canMatch, 
                         <td className="px-4 py-3 text-right tabular-nums">{formatMoney(l.unit_price, cur)}</td>
                         <td className="px-4 py-3 text-right tabular-nums">{formatMoney(l.total_amount, cur)}</td>
                         <td className="px-4 py-3 text-right tabular-nums">
-                          {!g.ok || l.expected_price_per_base_unit == null ? "—" : formatMoney(l.expected_price_per_base_unit, cur)}
-                          {g.ok && l.expected_price_per_base_unit != null && <span className="block text-[11px] text-ink-secondary">{lineReferenceLabel(l.price_reference_source)}</span>}
+                          {!g.ok || g.safety.expected_price_per_base_unit == null ? "—" : `${formatMoney(g.safety.expected_price_per_base_unit, "NOK")}${g.safety.base_unit ? `/${g.safety.base_unit}` : ""}`}
+                          {g.ok && g.safety.expected_price_per_base_unit != null && <span className="block text-[11px] text-ink-secondary">{lineReferenceLabel(g.safety.reference_source)}{g.safety.reference_date ? ` · ${formatDate(g.safety.reference_date)}` : ""}</span>}
                         </td>
                         <td className="px-4 py-3">
                           {g.ok ? <PriceDeviationNote compact actual={g.safety.price_per_base_unit} expected={g.safety.expected_price_per_base_unit} baseQuantity={g.safety.base_quantity} tolerancePct={tolerancePct} settings={settings} /> : l.raw_material_id ? <span className="text-xs text-warning" title={g.detail}>{g.label}</span> : <span className="text-ink-secondary">—</span>}

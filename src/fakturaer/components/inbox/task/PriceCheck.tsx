@@ -7,9 +7,10 @@ import type { SupplierLinkRow } from "@/fakturaer/hooks/useSupplierLinkContext";
 import { baseUnitOf, reasonsIn } from "@/fakturaer/lib/lineControl";
 import { usePriceGate } from "@/fakturaer/lib/priceGateContext";
 
-function referenceLabel(line: ReviewLineRow): string | null {
-  const d = line.price_reference_date ? ` ${formatDate(line.price_reference_date)}` : "";
-  switch (line.price_reference_source) {
+/** Etikett fra serverens kvittering — aldri fra en eldre linjekopi. */
+function referenceLabel(source: string | null, date: string | null): string | null {
+  const d = date ? ` ${formatDate(date)}` : "";
+  switch (source) {
     case "agreement":
       return `avtalepris${d}`;
     case "last_purchase":
@@ -28,10 +29,11 @@ export function PriceCheck({ line, link, tolerancePct }: { line: ReviewLineRow; 
   const [open, setOpen] = useState(false);
   const { settings } = useMatchTolerances(line.invoice.legal_entity_id);
   const currency = line.invoice.currency ?? "NOK";
-  const unit = baseUnitOf(line, link) ?? "grunnenhet";
-  const ref = referenceLabel(line);
   const reasons = reasonsIn(line, "price");
   const gate = usePriceGate(line);
+  // Sammenligningsenhet og referanse kommer fra kvitteringen; dokumentets egne tall vises separat.
+  const unit = (gate.ok ? gate.safety.base_unit : null) ?? baseUnitOf(line, link) ?? "grunnenhet";
+  const ref = gate.ok ? referenceLabel(gate.safety.reference_source, gate.safety.reference_date) : null;
   const credit = line.invoice.is_credit_note === true || (!gate.ok && gate.action === "review_credit_note");
 
   return (
