@@ -50,7 +50,7 @@ interface Props {
    * Leser gjeldende identitet på nytt ETTER nedlasting. Stemmer den ikke med `cacheKey|version`,
    * forkastes bytene (lagres aldri som gyldige) og «Originalen er endret» vises.
    */
-  verifyIdentity?: () => Promise<string | null>;
+  verifyIdentity?: (expected: string) => Promise<string | null>;
   /** Bruker+selskap; bytecache deles aldri på tvers av tilgangskontekst. */
   accessScope?: string | null;
   /** Hent ny identitet (etter «Originalen er endret»). */
