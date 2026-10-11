@@ -228,4 +228,55 @@ describe("Opprett som ny råvare — ukjent koblingsutfall", () => {
     expect(apply).toHaveBeenCalledTimes(1);
     expect(createdCalls).toHaveBeenCalledTimes(1);
   });
+
+  const reachUnknown = async () => {
+    apply.mockImplementation(async () => ({ result: null }));
+    const view = page();
+    const trigger = screen.getAllByRole("button", { name: "Handlinger for Hvetemel, siktet" })[0];
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: "Enter" });
+    fireEvent.click(await screen.findByText("Opprett som ny råvare"));
+    fireEvent.click(await screen.findByRole("button", { name: "Fullfør opprettelse" }));
+    expect(await screen.findByText(/utfallet av koblingen .* er ukjent/)).toBeInTheDocument();
+    return view;
+  };
+
+  it("Lukk mens kontroll-lesingen venter: ingen ny kobling og varselet kommer ikke tilbake", async () => {
+    await reachUnknown();
+    expect(apply).toHaveBeenCalledTimes(1);
+    deferred = true;
+    fireEvent.click(screen.getByRole("button", { name: "Kontroller og prøv igjen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Lukk" }));
+    await act(async () => { deferCheck?.({ data: null, error: null }); });
+    expect(apply).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/er ukjent/)).toBeNull();
+  });
+
+  it("avmontering mens kontroll-lesingen venter: ingen ny kobling", async () => {
+    const { unmount } = await reachUnknown();
+    deferred = true;
+    fireEvent.click(screen.getByRole("button", { name: "Kontroller og prøv igjen" }));
+    unmount();
+    await act(async () => { deferCheck?.({ data: null, error: null }); });
+    expect(apply).toHaveBeenCalledTimes(1);
+  });
+
+  it("tapt skrivetilgang mens kontroll-lesingen venter: ingen ny kobling", async () => {
+    const { rerender } = await reachUnknown();
+    deferred = true;
+    fireEvent.click(screen.getByRole("button", { name: "Kontroller og prøv igjen" }));
+    state.canWrite = false;
+    rerender(<MemoryRouter><TooltipProvider><Matvaretabellen /></TooltipProvider></MemoryRouter>);
+    await act(async () => { deferCheck?.({ data: null, error: null }); });
+    expect(apply).toHaveBeenCalledTimes(1);
+  });
+
+  it("kontroll uten eksisterende kobling skriver én gang mot samme opprettede råvare", async () => {
+    await reachUnknown();
+    apply.mockImplementation(async () => confirmed);
+    fireEvent.click(screen.getByRole("button", { name: "Kontroller og prøv igjen" }));
+    await waitFor(() => expect(apply).toHaveBeenCalledTimes(2));
+    expect(apply.mock.calls[1][0]).toMatchObject({ rawMaterialId: "rmNew", foodId: "f1" });
+    await waitFor(() => expect(screen.queryByText(/er ukjent/)).toBeNull());
+  });
 });
