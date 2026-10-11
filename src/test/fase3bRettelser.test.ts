@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { shouldOpenEditMaterial } from "@/fakturaer/lib/editMaterialSignal";
 import { flagSummary, isFlaggable } from "@/fakturaer/lib/flagging";
