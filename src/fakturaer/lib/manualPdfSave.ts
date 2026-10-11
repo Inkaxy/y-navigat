@@ -1,8 +1,8 @@
 import { readingReliability } from "@/fakturaer/lib/invoiceFacts";
 
 /** Tallbevis fra leseren (råtekst → tolket verdi). Lagres uendret som i Tripletex-importen. */
-export interface NumberEvidenceItem { field: string; raw: string | null; value: number | null; [k: string]: unknown }
-export interface ReadIssueItem { code: string; message: string }
+export type NumberEvidenceItem = { field: string; raw: string | null; value: number | null; how: string | null };
+export type ReadIssueItem = { code: string; message: string };
 
 export interface PdfLine {
   description: string | null;
@@ -45,7 +45,7 @@ export function parseReadIssues(v: unknown): ReadIssueItem[] {
 export function parseNumberEvidence(v: unknown): NumberEvidenceItem[] {
   if (!Array.isArray(v)) return [];
   return v.filter(isRec).filter((e) => typeof e.field === "string")
-    .map((e) => ({ ...e, field: String(e.field), raw: strOrNull(e.raw), value: numOrNull(e.value) }));
+    .map((e) => ({ field: String(e.field), raw: strOrNull(e.raw), value: numOrNull(e.value), how: strOrNull(e.how) }));
 }
 
 /** Leserens linje → redigerbar linje med bevis og originalverdier bevart. */
