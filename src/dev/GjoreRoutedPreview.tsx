@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { GjoreWorkspace } from "@/ravarer/pages/priskontroll/gjore/GjoreWorkspace";
 import { parseWorkItems } from "@/ravarer/lib/workRpc";
+import { AuthProvider } from "@/hooks/useAuth";
 import "@/index.css";
 
 /** Lokal sjekk av den EKTE Å gjøre-komponenten med fast cache. Ingen skriving; uhentede oppslag feiler stille. */
@@ -22,7 +23,7 @@ qc.setQueryData(["ravarer", "work-items", LE, "alle", null, null, "impact", 50, 
   parseWorkItems({ total: 802, counts: { alle: 802, kobling: 354, pakning: 173, pris: 185, kontroll: 9, fakturaer: 81 }, items }));
 
 createRoot(document.getElementById("root")!).render(
-  <QueryClientProvider client={qc}><TooltipProvider><MemoryRouter initialEntries={["/ravarer/priskontroll?fane=gjore"]}>
+  <QueryClientProvider client={qc}><AuthProvider><TooltipProvider><MemoryRouter initialEntries={["/ravarer/priskontroll?fane=gjore"]}>
     <div className="min-h-screen bg-background px-4 py-6 md:px-8"><GjoreWorkspace /></div>
-  </MemoryRouter></TooltipProvider></QueryClientProvider>,
+  </MemoryRouter></TooltipProvider></AuthProvider></QueryClientProvider>,
 );
