@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useInvoiceRights } from "@/fakturaer/hooks/useInvoiceRights";
 import { useInvoiceDocumentUrl } from "@/fakturaer/hooks/useInvoiceDocument";
 import { PdfDocumentViewer } from "@/fakturaer/components/PdfDocumentViewer";
+import { snapshotDocumentMatch, useInvoiceDocumentVersion } from "@/fakturaer/hooks/useInvoiceDocumentVersion";
 import { RereadView, ReadingState } from "@/fakturaer/components/reread/RereadView";
 import { useApplyReread, useBeginReread, useCancelReread, useInvokeRereadPreview, useRereadRun } from "@/fakturaer/hooks/useInvoiceReread";
 import { loadPending, persistedApply, rereadErrorText, type Operation } from "@/fakturaer/lib/reread";
@@ -52,7 +53,11 @@ export default function LesPaNytt() {
   const [msg, setMsg] = useState<string | null>(null);
   const [applyMsg, setApplyMsg] = useState<string | null>(null);
   const [pendingTick, setPendingTick] = useState(0);
-  const doc = useInvoiceDocumentUrl(run.data?.document_path ?? inv.data?.source_document_url ?? null);
+  // Lesingen er frosset mot et bestemt dokument. Gjeldende original må være samme objekt/versjon.
+  const ver = useInvoiceDocumentVersion(id);
+  const docMatch = snapshotDocumentMatch(run.data?.snapshot ?? null, ver.data);
+  const current = ver.data?.available ? ver.data : null;
+  const doc = useInvoiceDocumentUrl(docMatch === "match" && current ? current.path : null, current?.version ?? null);
   const back = paths.faktura(id);
 
   const setRun = (rid: string | null) => { const n = new URLSearchParams(sp); if (rid) n.set("kjoring", rid); else n.delete("kjoring"); setSp(n, { replace: false }); };
@@ -85,9 +90,11 @@ export default function LesPaNytt() {
   };
   const retryPending = () => { if (pending) doApply(pending.operations, pending.reason); };
 
-  const document = doc.url && r
-    ? <PdfDocumentViewer url={doc.url} cacheKey={r.document_path} title="Originalfaktura" fallback={<a className="underline" href={doc.url} target="_blank" rel="noreferrer">Åpne originalen</a>} />
-    : <p className="p-4 text-sm text-ink-secondary">{doc.isLoading ? "Henter originalen …" : "Originalen kan ikke vises."}</p>;
+  const document = docMatch === "changed"
+    ? <p role="alert" className="p-4 text-sm text-warning">Originalen er endret siden lesingen. Den nåværende filen er ikke dokumentet forslaget ble lest fra, og vises ikke her. Start en ny lesing.</p>
+    : doc.url && r && current
+      ? <PdfDocumentViewer url={doc.url} cacheKey={current.path} version={current.version} verifyIdentity={ver.recheck} onIdentityChanged={ver.refresh} title="Originalfaktura" fallback={<a className="underline" href={doc.url} target="_blank" rel="noreferrer">Åpne originalen</a>} />
+      : <p className="p-4 text-sm text-ink-secondary">{ver.isLoading || doc.isLoading ? "Henter originalen …" : "Originalen kan ikke kontrolleres eller vises nå."}</p>;
 
   const title = inv.data ? `${inv.data.suppliers?.name ?? "Ukjent leverandør"} · Faktura ${inv.data.invoice_number ?? ""}` : "Faktura";
 
@@ -147,9 +154,16 @@ export default function LesPaNytt() {
             </div>
           )}
           {r && r.invoice_id === id && r.status === "ready" && (
-            <RereadView run={r} document={document} canApply={isOwner && canWrite} pending={pending} saving={apply.isPending}
-              readOnlyReason={!isOwner ? "Lesingen ble startet av en annen bruker. Du kan se den, men ikke ta den i bruk." : !canWrite ? "Du har ikke skrivetilgang." : null}
+            <>
+            {docMatch !== "match" && (
+              <p role="alert" className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
+                {docMatch === "changed" ? "Originalen er endret siden lesingen. Forslaget kan ikke tas i bruk." : "Originalens versjon er ikke kontrollert ennå. Forslaget kan ikke tas i bruk før den er bekreftet uendret."}
+              </p>
+            )}
+            <RereadView run={r} document={document} canApply={isOwner && canWrite && docMatch === "match"} pending={pending} saving={apply.isPending}
+              readOnlyReason={!isOwner ? "Lesingen ble startet av en annen bruker. Du kan se den, men ikke ta den i bruk." : !canWrite ? "Du har ikke skrivetilgang." : docMatch === "changed" ? "Originalen er endret siden lesingen." : docMatch === "unknown" ? "Originalens versjon er ikke kontrollert." : null}
               applyMessage={applyMsg ?? (apply.data?.kind === "unknown" ? "Vi vet ikke om lagringen kom fram." : apply.data?.kind === "already_used" ? rereadErrorText("allerede_brukt_med_andre_valg") : null)} onApply={doApply} onRetryPending={retryPending} />
+            </>
           )}
         </QueryState>
       )}
