@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
@@ -21,6 +21,9 @@ import { agreementBaseUnitsPerPackage } from "@/ravarer/lib/agreementPricing";
 import { agreementFormError, derivePricePerBaseUnit } from "@/ravarer/lib/agreementForm";
 import type { AgreementPayload } from "@/ravarer/lib/rpcContracts";
 import { parseApplyAgreementResult } from "@/ravarer/lib/agreementResult";
+import {
+  clearPendingAgreement, pendingAgreementFor, reconcileAgreement, rememberPendingAgreement, subscribePendingAgreements,
+} from "@/ravarer/lib/agreementRecovery";
 
 interface Props {
   open: boolean;
@@ -52,14 +55,19 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
   const [setPrimary, setSetPrimary] = useState(true);
   const [docFile, setDocFile] = useState<File | null>(null);
   const [rmOpen, setRmOpen] = useState(false);
-  /** Uavklart utfall: lagringen kan ha gått gjennom. Krever ny lesing før ny lagring. */
-  const [unknownOutcome, setUnknownOutcome] = useState(false);
+  /** Avstemming av et uavklart utfall: lest kobling sammenlignes med det frosne innholdet. */
+  const [recon, setRecon] = useState<"idle" | "reading" | "error" | "not_observed">("idle");
   /** Synkron lås: to klikk i samme render skal aldri gi to kall. */
   const busyRef = useRef(false);
   /** Økes når dialogen åpnes på nytt eller konteksten byttes; foreldede fullføringer ignoreres. */
   const genRef = useRef(0);
-  const liveRef = useRef({ open, legalEntityId, canWrite });
-  liveRef.current = { open, legalEntityId, canWrite };
+  const mountedRef = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; genRef.current += 1; }; }, []);
+  const liveRef = useRef({ open, legalEntityId, canWrite, rawMaterialId, supplierId });
+  liveRef.current = { open, legalEntityId, canWrite, rawMaterialId, supplierId };
+  // Uavklart utfall lever utenfor skjemaet: lukk/åpne nullstiller det ikke.
+  const pending = useSyncExternalStore(subscribePendingAgreements, () => pendingAgreementFor(legalEntityId, rawMaterialId, supplierId));
+  useEffect(() => { setRecon("idle"); }, [pending]);
 
   useEffect(() => {
     if (open) {
@@ -70,7 +78,7 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
       setPricePerBaseUnit(""); setPricePerBaseUnitTouched(false);
       setValidFrom(osloTodayISO()); setValidTo("");
       setSetPrimary(true); setDocFile(null);
-      setUnknownOutcome(false);
+      setRecon("idle");
     }
     genRef.current += 1;
   }, [open, defaultRawMaterialId, defaultSupplierId, legalEntityId]);
@@ -101,7 +109,8 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
 
   /** Sjekk at dialogen fortsatt viser samme mål med skrivetilgang før neste sideeffekt. */
   const stillCurrent = (f: Frozen) =>
-    genRef.current === f.gen && liveRef.current.open && liveRef.current.legalEntityId === f.entityId && liveRef.current.canWrite;
+    mountedRef.current && genRef.current === f.gen && liveRef.current.open && liveRef.current.legalEntityId === f.entityId && liveRef.current.canWrite &&
+    liveRef.current.rawMaterialId === f.payloadBase.raw_material_id && liveRef.current.supplierId === f.payloadBase.supplier_id;
 
   const create = useMutation({
     mutationFn: async (f: Frozen): Promise<Outcome> => {
@@ -121,14 +130,14 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
       try {
         res = await supabase.rpc("rm_apply_agreement", { p_payload: payload as unknown as never });
       } catch {
-        throw new UnknownOutcomeError();
+        throw new UnknownOutcomeError(payload, docUrl);
       }
       if (res.error) {
         // SQL-avvisning (tilgang/validering) avbryter transaksjonen. Uten kode vet vi ikke.
         if (res.error.code) throw new KnownError("Avtalen ble avvist og er ikke lagret.");
-        throw new UnknownOutcomeError();
+        throw new UnknownOutcomeError(payload, docUrl);
       }
-      if (!parseApplyAgreementResult(res.data)) throw new UnknownOutcomeError();
+      if (!parseApplyAgreementResult(res.data)) throw new UnknownOutcomeError(payload, docUrl);
       return { kind: "saved", frozen: f };
     },
     onSuccess: (out) => {
@@ -139,7 +148,7 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
       // Bekreftet lagring: invalidering bindes til det frosne målet, uansett hva dialogen viser nå.
       invalidateRawMaterial(qc, out.frozen.rawMaterialId);
       invalidateRavarerCounts(qc);
-      if (genRef.current !== out.frozen.gen) return; // ikke lukk et annet skjema
+      if (!mountedRef.current || genRef.current !== out.frozen.gen) return; // ikke lukk et annet skjema
       toast.success("Avtale lagret");
       onOpenChange(false);
     },
@@ -147,8 +156,9 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
       if (e instanceof UnknownOutcomeError) {
         // Lagringen kan ha gått gjennom. Behold utkastet, les på nytt før noe annet.
         invalidateRawMaterial(qc, f.rawMaterialId);
-        if (genRef.current === f.gen) setUnknownOutcome(true);
-        toast.error("Ukjent utfall: avtalen kan være lagret. Kontroller avtalelisten før du lagrer igjen.");
+        // Bevares utenfor skjemaet (frosset mål, innhold og dokumentsti) til det er avstemt.
+        rememberPendingAgreement({ entityId: f.entityId, payload: e.payload, documentPath: e.documentPath, at: new Date().toISOString() });
+        toast.error("Ukjent utfall: avtalen kan være lagret. Kontroller den lagrede avtalen før du lagrer igjen.");
         return;
       }
       toast.error(e instanceof KnownError ? e.message : "Kunne ikke lagre avtalen.");
@@ -157,7 +167,7 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
   });
 
   const submit = () => {
-    if (busyRef.current || unknownOutcome) return;
+    if (busyRef.current || pending) return;
     if (!canWrite) { toast.error("Du har ikke skrivetilgang."); return; }
     if (!rawMaterialId) { toast.error("Velg råvare"); return; }
     if (!supplierId) { toast.error("Velg leverandør"); return; }
@@ -193,6 +203,32 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
     });
   };
 
+  /** Les nøyaktig kobling for det frosne målet og sammenlign. Aldri automatisk nytt `rm_apply_agreement`. */
+  const reconcile = async () => {
+    const p = pending;
+    if (!p || recon === "reading") return;
+    setRecon("reading");
+    const { data, error } = await supabase
+      .from("raw_material_suppliers")
+      .select("agreed_price, agreed_price_per_base_unit, agreement_valid_from, agreement_valid_to, agreement_document_url")
+      .eq("raw_material_id", p.payload.raw_material_id)
+      .eq("supplier_id", p.payload.supplier_id)
+      .limit(2);
+    if (!mountedRef.current || pendingAgreementFor(p.entityId, p.payload.raw_material_id, p.payload.supplier_id) !== p) return;
+    if (error || !data || data.length > 1) { setRecon("error"); return; }
+    if (reconcileAgreement(p, data[0] ?? null) === "saved") {
+      clearPendingAgreement(p);
+      invalidateRawMaterial(qc, p.payload.raw_material_id);
+      invalidateRavarerCounts(qc);
+      toast.success("Avtalen var lagret.");
+      onOpenChange(false);
+      return;
+    }
+    setRecon("not_observed");
+  };
+
+  const targetLocked = create.isPending;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
@@ -209,7 +245,7 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
                   type="button"
                   variant="outline"
                   role="combobox"
-                  disabled={!!defaultRawMaterialId}
+                  disabled={!!defaultRawMaterialId || targetLocked}
                   className="w-full justify-between font-normal"
                 >
                   <span className="truncate">
@@ -243,7 +279,7 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
           </div>
           <div className="col-span-2">
             <Label>Leverandør *</Label>
-            <Select value={supplierId} onValueChange={setSupplierId} disabled={!!defaultSupplierId}>
+            <Select value={supplierId} onValueChange={setSupplierId} disabled={!!defaultSupplierId || targetLocked}>
               <SelectTrigger><SelectValue placeholder="Velg leverandør…" /></SelectTrigger>
               <SelectContent>
                 {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
@@ -323,12 +359,25 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Avbryt</Button>
-          {unknownOutcome && (
-            <p role="alert" className="text-caption text-destructive sm:mr-auto">
-              Utfallet er ukjent — avtalen kan være lagret. Lukk og kontroller avtalelisten før du lagrer igjen.
-            </p>
+          {pending && (
+            <div role="alert" className="space-y-2 text-caption text-destructive sm:mr-auto" data-testid="agreement-unknown">
+              <p>
+                Utfallet av forrige lagring for denne varen og leverandøren er ukjent — avtalen kan være lagret
+                {pending.documentPath ? " (dokumentet ble lastet opp)" : ""}. Kontroller før du lagrer igjen.
+              </p>
+              {recon === "error" && <p>Kunne ikke lese den lagrede avtalen. Prøv igjen.</p>}
+              {recon === "not_observed" && <p>Den lagrede avtalen er ikke lik det som ble sendt. Den forrige lagringen ser ikke ut til å ha gått gjennom, men det er ikke bevist.</p>}
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" className="min-h-[44px]" onClick={() => void reconcile()} disabled={recon === "reading"}>
+                  {recon === "reading" && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}Kontroller lagret avtale
+                </Button>
+                {recon === "not_observed" && (
+                  <Button type="button" variant="outline" className="min-h-[44px]" onClick={() => clearPendingAgreement(pending)}>Lagre som ny endring</Button>
+                )}
+              </div>
+            </div>
           )}
-          <Button onClick={submit} disabled={create.isPending || !canWrite || unknownOutcome}>
+          <Button onClick={submit} disabled={create.isPending || !canWrite || !!pending}>
             {create.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
             Lagre avtale
           </Button>
@@ -339,4 +388,6 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
 }
 
 class KnownError extends Error {}
-class UnknownOutcomeError extends Error {}
+class UnknownOutcomeError extends Error {
+  constructor(readonly payload: AgreementPayload, readonly documentPath: string | null) { super("ukjent utfall"); }
+}
