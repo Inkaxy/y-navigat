@@ -210,3 +210,16 @@ export const kr = (n: number) => `${n.toLocaleString("nb-NO", { maximumFractionD
 export const signedKr = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${kr(Math.abs(n))}`;
 export const signedPct = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toLocaleString("nb-NO", { maximumFractionDigits: 1 })} %`;
 export const ppbu = (n: number) => n.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** Per-linje toleransevurdering. Et samlet snitt kan skjule store motsatte avvik og vurderes aldri mot toleransen. */
+export function perLineDeviation(
+  lines: PriceLine[],
+  evaluate: (l: PriceLine) => { large: boolean; rule: string },
+): { large: number; within: number; unknown: number } {
+  let large = 0, within = 0, unknown = 0;
+  for (const l of lines) {
+    const r = evaluate(l);
+    if (r.rule === "mangler_grunnlag") unknown++; else if (r.large) large++; else within++;
+  }
+  return { large, within, unknown };
+}
