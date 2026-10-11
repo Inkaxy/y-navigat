@@ -77,6 +77,7 @@ import LagerPage from "@/ravarer/pages/Lager";
 import { lagerReturnHref } from "@/ravarer/lib/lagerReturn";
 import { useSupplierAliases } from "@/ravarer/hooks/useSupplierDetail";
 import { renderHook } from "@testing-library/react";
+import { resetPendingAdjustmentsForTest } from "@/ravarer/lib/adjustmentRecovery";
 
 const qc = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
 const Wrap = ({ children, url = "/" }: { children: ReactNode; url?: string }) => (
@@ -88,6 +89,70 @@ beforeEach(() => {
   st.resale = { data: undefined, isLoading: false, isError: true, error: new Error("nede") };
   st.all = { data: undefined, isLoading: false, isError: true, error: new Error("nede") };
   st.aliasPages = []; st.aliasRows = []; st.aliasCap = 200; st.aliasFail = false;
+  resetPendingAdjustmentsForTest();
+});
+
+describe("mottaksavvik — uavklart bevegelse overlever lukk/åpne", () => {
+  const panel = () => render(<Wrap><InvoiceReceiptPanel invoiceId="INV" invoiceNumber="F1" onClose={() => undefined} canWrite /></Wrap>);
+  const openLine = async (i: number) => {
+    fireEvent.click(screen.getAllByRole("button", { name: "Avvik" })[i]);
+    return screen.findByLabelText("Mengde");
+  };
+  const registrer = () => screen.getByRole("button", { name: "Registrer" }) as HTMLButtonElement;
+  const close = async () => {
+    fireEvent.click(screen.getByRole("button", { name: /^(Avbryt|Lukk)$/, hidden: false, ...{} }).closest("[role=dialog]") ? screen.getAllByRole("button", { name: /^(Avbryt|Lukk)$/ }).at(-1)! : screen.getByRole("button", { name: "Avbryt" }));
+    await waitFor(() => expect(screen.queryByLabelText("Mengde")).toBeNull());
+  };
+
+  it("lukket mens den sendes → sent uklart svar → gjenåpning viser varsel og sperrer ny registrering", async () => {
+    let fail!: () => void;
+    st.moveImpl = () => new Promise((_r, rej) => { fail = () => rej(new Error("Failed to fetch")); });
+    panel();
+    fireEvent.change(await openLine(0), { target: { value: "5" } });
+    fireEvent.click(registrer());
+    await close();
+    await act(async () => { fail(); });
+    fireEvent.change(await openLine(0), { target: { value: "5" } });
+    expect(screen.getByTestId("adjustment-unknown").textContent).toMatch(/−5.*Mottaksavvik faktura F1/);
+    expect(registrer().disabled).toBe(true);
+    fireEvent.click(registrer());
+    expect(st.moveCalls).toHaveLength(1);
+  });
+
+  it("uklart → lukk → gjenåpne: sperret til eksplisitt kontroll; annen vare upåvirket; bekreftelse skriver ingenting", async () => {
+    st.moveImpl = async () => { throw new Error("Failed to fetch"); };
+    panel();
+    fireEvent.change(await openLine(0), { target: { value: "5" } });
+    fireEvent.click(registrer());
+    await screen.findByTestId("adjustment-unknown");
+    await close();
+    // Annen linje/vare er ikke sperret.
+    fireEvent.change(await openLine(1), { target: { value: "2" } });
+    expect(screen.queryByTestId("adjustment-unknown")).toBeNull();
+    expect(registrer().disabled).toBe(false);
+    await close();
+    fireEvent.change(await openLine(0), { target: { value: "5" } });
+    const box = screen.getByTestId("adjustment-unknown");
+    expect(screen.getByRole("link", { name: /lagerbevegelsene for varen/ }).getAttribute("href")).toContain("/varer/RMA?seksjon=lager");
+    expect(registrer().disabled).toBe(true);
+    const ack = screen.getByRole("button", { name: /bekreft kontroll/i }) as HTMLButtonElement;
+    expect(ack.disabled).toBe(true);
+    fireEvent.click(screen.getByRole("checkbox", { name: /kontrollert lagerbevegelsene/ }));
+    fireEvent.click(ack);
+    expect(box.isConnected).toBe(false);
+    expect(st.moveCalls).toHaveLength(1);
+    expect(registrer().disabled).toBe(false);
+  });
+
+  it("kjent avslag fjerner egen markør", async () => {
+    st.moveImpl = async () => { throw { code: "42501", message: "nekt" }; };
+    panel();
+    fireEvent.change(await openLine(0), { target: { value: "5" } });
+    fireEvent.click(registrer());
+    await waitFor(() => expect(st.moveCalls).toHaveLength(1));
+    await waitFor(() => expect(registrer().disabled).toBe(false));
+    expect(screen.queryByTestId("adjustment-unknown")).toBeNull();
+  });
 });
 
 describe("mottaksavvik", () => {
@@ -95,7 +160,7 @@ describe("mottaksavvik", () => {
   it("to klikk i samme render gir én bevegelse; frosset mengde/type/notat", async () => {
     let release!: () => void;
     st.moveImpl = () => new Promise<void>((r) => { release = r; });
-    render(<Wrap><DeviationDialog line={line} invoiceNumber="F1" isCurrent={() => true} onClose={() => undefined} /></Wrap>);
+    render(<Wrap><DeviationDialog line={line} entityId="LE" invoiceId="INV" invoiceNumber="F1" isCurrent={() => true} onClose={() => undefined} /></Wrap>);
     fireEvent.change(screen.getByLabelText("Mengde"), { target: { value: "5" } });
     const btn = screen.getByRole("button", { name: "Registrer" });
     fireEvent.click(btn); fireEvent.click(btn);
@@ -104,14 +169,14 @@ describe("mottaksavvik", () => {
     expect(st.moveCalls).toEqual([{ raw_material_id: "RMA", quantity_base: -5, kind: "adjustment", note: "Mottaksavvik faktura F1" }]);
   });
   it("ikke gjeldende kontekst/tilgang: ingen bevegelse", () => {
-    render(<Wrap><DeviationDialog line={line} invoiceNumber="F1" isCurrent={() => false} onClose={() => undefined} /></Wrap>);
+    render(<Wrap><DeviationDialog line={line} entityId="LE" invoiceId="INV" invoiceNumber="F1" isCurrent={() => false} onClose={() => undefined} /></Wrap>);
     fireEvent.change(screen.getByLabelText("Mengde"), { target: { value: "5" } });
     fireEvent.click(screen.getByRole("button", { name: "Registrer" }));
     expect(st.moveCalls).toHaveLength(0);
   });
   it("uklart svar: sperret, aldri automatisk nytt forsøk", async () => {
     st.moveImpl = async () => { throw new Error("Failed to fetch"); };
-    render(<Wrap><DeviationDialog line={line} invoiceNumber="F1" isCurrent={() => true} onClose={() => undefined} /></Wrap>);
+    render(<Wrap><DeviationDialog line={line} entityId="LE" invoiceId="INV" invoiceNumber="F1" isCurrent={() => true} onClose={() => undefined} /></Wrap>);
     fireEvent.change(screen.getByLabelText("Mengde"), { target: { value: "5" } });
     fireEvent.click(screen.getByRole("button", { name: "Registrer" }));
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
