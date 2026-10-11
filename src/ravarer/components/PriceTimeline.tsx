@@ -58,6 +58,8 @@ interface Props {
   exportName?: string;
   /** Kontrollen av kildelinjer feilet: historikken vises uendret, men rekonstruerte punkter mangler. */
   projectionError?: boolean;
+  /** Prøv kontrollen på nytt (vises ved projeksjonsfeil). */
+  onRetryProjection?: () => void;
 }
 
 const fullPrice = (n: number) => n.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 6 });
@@ -72,6 +74,7 @@ export function PriceTimeline({
   actions,
   exportName = "pristidslinje",
   projectionError = false,
+  onRetryProjection,
 }: Props) {
   const navigate = useNavigate();
   const [preset, setPreset] = useState<PeriodPreset>("last_12m");
@@ -183,6 +186,7 @@ export function PriceTimeline({
       {projectionError && (
         <p role="status" className="rounded-md border border-warning/40 bg-warning/5 p-2 text-caption text-warning">
           Kunne ikke kontrollere eldre kildelinjer nå. Rader uten låst enhet vises som hendelser til kontrollen lykkes.
+          {onRetryProjection && <Button variant="link" size="sm" className="ml-1 h-auto p-0 align-baseline" onClick={onRetryProjection}>Prøv igjen</Button>}
         </p>
       )}
       {rows.length === 0 ? (

@@ -111,6 +111,22 @@ const PRICE_EPS = 1e-9;
  * Uten projeksjon (null: feil eller laster) er gjeldende kontroll UKJENT for fakturarader: de beholdes
  * som hendelser med originalverdi, men tas ut av graf/Δ (`controlUnknown`). Andre rader er urørt.
  */
+/**
+ * Fakturalinjer som er gyldig kostgrunnlag NÅ. Bruker de FLETTEDE radene, så samme identitetsbeslutning
+ * gjelder graf og «Gyldig»: kun serverens eligible-ID med eksakt verifisert linjeidentitet, ikke holdt,
+ * ikke duplikat, ikke kontroll-ukjent. Uten gjeldende projeksjon: null (ukjent), aldri «gyldig».
+ */
+export function eligibleLineIdsFrom(merged: readonly TimelineHistoryRow[], proj: MaterialPriceProjection | null): Set<string> | null {
+  if (!proj) return null;
+  const eligible = new Set(proj.eligible_history_ids);
+  const out = new Set<string>();
+  for (const r of merged) {
+    if (!eligible.has(r.id) || r.source !== "invoice" || !r.identityVerified || r.held || r.duplicateSource || r.controlUnknown) continue;
+    if (r.invoice_line_id) out.add(r.invoice_line_id);
+  }
+  return out;
+}
+
 export function mergeProjection(
   rows: readonly TimelineHistoryRow[],
   proj: MaterialPriceProjection | null,
@@ -130,6 +146,7 @@ export function mergeProjection(
       r.source === "invoice" && r.invoice_id === p.invoice_id && !!r.invoice_line_id && r.invoice_line_id === p.invoice_line_id &&
       r.effective_date === p.effective_date && r.supplier_id === p.supplier_id;
     if (!sameIdentity) return { ...out, controlUnknown: "identitet" };
+    out = { ...out, identityVerified: true };
     if (!r.unitSource && Math.abs(Number(r.price) - p.price) <= PRICE_EPS) {
       out = {
         ...out, unit: p.unit, currency: "NOK", unitSource: "currently_verified_line", checkedAt: proj.checked_at,

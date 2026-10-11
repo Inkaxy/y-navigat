@@ -47,6 +47,8 @@ export interface TimelineHistoryRow {
    * eller identiteten stemte ikke. Originalverdien beholdes som hendelse, men er ikke sammenlignbar.
    */
   controlUnknown?: "feil" | "laster" | "identitet" | null;
+  /** Satt av mergeProjection når serverens projeksjon har eksakt samme faktura/linje/dato/leverandør. */
+  identityVerified?: boolean;
 }
 
 /**

@@ -161,6 +161,7 @@ export function HistoryTab({ rm }: Props) {
       {projectionError && (
         <p role="status" className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-caption text-warning">
           Serverkontrollen av fakturalinjer kunne ikke hentes. Lagret historikk vises uendret; ingen rader er merket som kontrollert.
+          <Button variant="link" size="sm" className="ml-1 h-auto p-0 align-baseline" onClick={prices.retryProjection}>Prøv igjen</Button>
         </p>
       )}
       <QueryState
