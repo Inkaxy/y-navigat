@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/userError";
 import { formatDate, formatNok } from "@/fakturaer/lib/constants";
 import { parseRematchQueued, parseRepairVat } from "@/fakturaer/lib/parseRpcJson";
-import { confidenceLabel, linesSourceLabel, repairVatMessage, sumCheck } from "@/fakturaer/lib/invoiceFacts";
+import { linesSourceLabel, readingReliability, repairVatMessage, sumCheck } from "@/fakturaer/lib/invoiceFacts";
 import { invalidateInvoice } from "@/ravarer/lib/invalidate";
 import { cn } from "@/lib/utils";
 

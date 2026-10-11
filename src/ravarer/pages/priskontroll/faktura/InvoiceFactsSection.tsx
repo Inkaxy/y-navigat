@@ -5,7 +5,7 @@ import { InvoiceFactsCard } from "@/fakturaer/components/invoice-detail/InvoiceF
 import { INVOICE_SOURCES } from "@/fakturaer/lib/constants";
 import type { InvoiceDetailData } from "@/fakturaer/components/invoice-detail/fetchInvoiceDetail";
 import { LinesSumMismatchAlert } from "@/fakturaer/components/LinesSumMismatchAlert";
-import { confidenceLabel, linesSourceLabel } from "@/fakturaer/lib/invoiceFacts";
+import { linesSourceLabel, readingReliability } from "@/fakturaer/lib/invoiceFacts";
 import { recheckInvoiceLinesSum } from "@/fakturaer/lib/linesSum";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +25,7 @@ export function factsSummary(d: Pick<InvoiceDetailData, "lines_sum_status" | "li
   const parts = [sum, linesSourceLabel(d.lines_source).toLowerCase()];
   if (d.extraction_confidence != null) {
     const r = readingReliability({ confidence: Number(d.extraction_confidence), linesSumStatus: d.lines_sum_status });
-    parts.push(r.validated || d.lines_sum_status !== "mismatch" ? r.label.toLowerCase() : "lesing ikke bekreftet");
+    parts.push(r.label.startsWith("Ikke") ? `lesing ikke bekreftet (rå AI-score ${r.rawScore})` : r.label.toLowerCase());
   }
   return parts.join(" · ");
 }
