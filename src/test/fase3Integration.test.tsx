@@ -4,6 +4,7 @@ import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-li
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
+import type { Json } from "@/integrations/supabase/types";
 
 // Ingen ekte nettverk: alle kall går til mocken.
 const rpc = vi.fn();
@@ -107,8 +108,8 @@ describe("varekort: ulik råvare/enhet summeres ikke", () => {
 });
 
 // ---------- Utdatert forhåndsvisning ----------
-const basis = (o: Record<string, unknown> = {}) => ({ case_kind: "price_inquiry", amount_excl_vat: 0, observed_effect_excl_vat: 8886, price_per_base_unit: 28.81, base_quantity: 600, price_reference_source: "last_purchase", ...o });
-const prev = (b: Record<string, unknown>[]) => parseClaimPreview({ lines: b.map((x, i) => ({ line_id: `l${i}`, eligible: true, basis: x })) }, b.map((_, i) => `l${i}`));
+const basis = (o: { [k: string]: Json } = {}): { [k: string]: Json } => ({ case_kind: "price_inquiry", amount_excl_vat: 0, observed_effect_excl_vat: 8886, price_per_base_unit: 28.81, base_quantity: 600, price_reference_source: "last_purchase", ...o });
+const prev = (b: { [k: string]: Json }[]) => parseClaimPreview({ lines: b.map((x, i) => ({ line_id: `l${i}`, eligible: true, basis: x })) }, b.map((_, i) => `l${i}`));
 
 describe("grunnlaget er endret → kontroller på nytt", () => {
   it.each([
