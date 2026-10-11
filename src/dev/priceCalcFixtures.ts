@@ -1,10 +1,11 @@
+import { osloDateISO } from "@/lib/osloDate";
 import type { TimelineHistoryRow } from "@/ravarer/lib/priceTimeline";
 import type { BakersLine, BakersRawMaterial } from "@/varer/lib/bakers";
 
 /** Realistisk historikk: samme dag med omvendt id, enhetsbytte, ukjent eldre enhet, rettelse og kreditnota. */
 const MANUAL_SRC = ["man", "ual"].join("");
 const today = new Date();
-const iso = (daysAgo: number) => new Date(today.getTime() - daysAgo * 86400000).toISOString().slice(0, 10);
+const iso = (daysAgo: number) => osloDateISO(new Date(today.getTime() - daysAgo * 86400000));
 
 export const PRICE_HISTORY_FIXTURE: TimelineHistoryRow[] = [
   { id: "z-early", effective_date: iso(10), price: 10, supplier_id: "s1", source: "invoice", invoice_id: "i1", invoiceNumber: "F-1001", createdAt: `${iso(10)}T08:00:00Z`, currency: "NOK", unit: "kg", unitSource: "fakturalinje", packageText: "25 kg" },
