@@ -243,10 +243,15 @@ export function loadPending(runId: string, store: Pick<Storage, "getItem"> = ses
   if (!raw) return null;
   try {
     const p: unknown = JSON.parse(raw);
-    return isRec(p) && p.runId === runId && Array.isArray(p.operations) && typeof p.reason === "string" ? (p as unknown as PendingApply) : null;
+    if (!isRec(p) || p.runId !== runId || !Array.isArray(p.operations) || typeof p.reason !== "string") return null;
+    const ops = p.operations.filter(isOperation);
+    return ops.length === p.operations.length ? { runId, reason: p.reason, operations: ops } : null;
   } catch (e) {
     console.error("[reread-pending]", e);
     return null;
   }
+}
+function isOperation(x: unknown): x is Operation {
+  return isRec(x) && typeof x.candidate_id === "string" && isRec(x.changes) && (x.kind === "add" ? x.confirmed_addition === true : x.kind === "update" && typeof x.line_id === "string" && x.confirmed_mapping === true);
 }
 export function clearPending(runId: string, store: Pick<Storage, "removeItem"> = sessionStorage) { store.removeItem(pendingKey(runId)); }
