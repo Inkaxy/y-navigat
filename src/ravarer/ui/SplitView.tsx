@@ -34,9 +34,17 @@ type PeekProps = {
 /** Sidepanel med fast topp (tittel, «Åpne fullt», lukk), rullende innhold og fast bunnlinje. */
 export function PeekPanel({ title, fullHref, onClose, footer, children, emptyText = "Velg noe i listen" }: PeekProps) {
   if (!children) {
+    // Tom/utilgjengelig valgt rad: behold lukk, ellers blir smal visning en blindvei.
     return (
-      <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-border bg-card p-8 text-sm text-muted-foreground">
-        {emptyText}
+      <div className="flex h-full flex-col rounded-lg border border-dashed border-border bg-card">
+        {onClose && (
+          <div className="flex justify-end p-1">
+            <Button variant="ghost" size="icon" className="h-11 w-11 xl:h-8 xl:w-8" onClick={onClose} aria-label="Lukk panelet">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+        <div className="flex flex-1 items-center justify-center p-8 text-sm text-muted-foreground">{emptyText}</div>
       </div>
     );
   }

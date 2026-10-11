@@ -90,11 +90,22 @@ export function DataTable<T>(p: Props<T>) {
     return sortRows(p.rows ?? [], col?.sortKey, sort?.dir ?? "asc");
   }, [p.rows, p.columns, sort, controlled]);
   const ids = sorted.map(p.getId);
-  const clickable = !!p.onRowClick || !!p.rowHref;
+  const clickable = !!p.onRowClick || !!p.rowHref || !!p.onActiveChange;
 
   const open = (row: T) => {
     if (p.onRowClick) p.onRowClick(row);
     else if (p.rowHref) navigate(p.rowHref(row));
+  };
+  /** Én aktivering for desktop-rad, mobilkort og tastatur: velg (hvis styrt) og åpne. */
+  const activate = (row: T) => {
+    p.onActiveChange?.(p.getId(row));
+    open(row);
+  };
+  /** Klikk på kontroller i raden/kortet (knapper, felt, lenker) skal ikke aktivere raden. */
+  const fromControl = (target: EventTarget | null, container: Element) => {
+    const el = target instanceof Element ? target : null;
+    const hit = el?.closest(INTERACTIVE_SELECTOR);
+    return !!hit && hit !== container && container.contains(hit);
   };
 
   useHotkeys(
@@ -166,11 +177,13 @@ export function DataTable<T>(p: Props<T>) {
               )}
               {/* Ikke <button>: kortet kan ha egne knapper (ingen nøstede knapper). Knappene stopper klikket selv. */}
               <div
-                role={clickable ? "link" : undefined}
+                role={clickable ? "button" : undefined}
                 tabIndex={clickable ? 0 : undefined}
-                className={cn("w-full min-w-0 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", clickable && "cursor-pointer")}
-                onClick={() => open(r)}
-                onKeyDown={(e) => { if (clickable && e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(r); } }}
+                aria-pressed={p.onActiveChange ? p.getId(r) === p.activeId : undefined}
+                data-active={p.getId(r) === p.activeId || undefined}
+                className={cn("w-full min-w-0 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", clickable && "cursor-pointer", p.getId(r) === p.activeId && "ring-2 ring-primary/40")}
+                onClick={(e) => { if (!clickable || fromControl(e.target, e.currentTarget)) return; activate(r); }}
+                onKeyDown={(e) => { if (clickable && e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); activate(r); } }}
               >
                 {p.renderMobileCard?.(r)}
               </div>
@@ -212,14 +225,12 @@ export function DataTable<T>(p: Props<T>) {
                   key={id}
                   aria-selected={active}
                   onClick={(e) => {
-                    const t = e.target as HTMLElement | null;
-                    if (t?.closest(INTERACTIVE_SELECTOR) && t.closest("tr") === e.currentTarget) return;
+                    if (fromControl(e.target, e.currentTarget)) return;
                     if (window.getSelection()?.toString()) return;
-                    p.onActiveChange?.(id);
-                    open(r);
+                    activate(r);
                   }}
                   className={cn(
-                    "h-9", (clickable || p.onActiveChange) && "cursor-pointer hover:bg-muted/40",
+                    "h-9", clickable && "cursor-pointer hover:bg-muted/40",
                     active && "bg-primary/5 shadow-[inset_2px_0_0_0_hsl(var(--primary))]",
                     p.rowClassName?.(r),
                   )}
