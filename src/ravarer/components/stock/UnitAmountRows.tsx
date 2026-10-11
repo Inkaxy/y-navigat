@@ -86,7 +86,7 @@ export function UnitAmountRows({ rows, onChange, units, baseUnit, allowMultiple 
         </div>
       ))}
       {allowMultiple && units.length > 0 && (
-        <Button variant="ghost" size="sm" onClick={() => onChange([...rows, emptyRow()])}>
+        <Button variant="ghost" size="sm" className="min-h-[44px] sm:min-h-0" onClick={() => onChange([...rows, emptyRow()])}>
           <Plus className="mr-1.5 h-3.5 w-3.5" /> Legg til delsum
         </Button>
       )}
