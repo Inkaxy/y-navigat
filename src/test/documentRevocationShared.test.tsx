@@ -9,14 +9,15 @@ import type { ReactNode } from "react";
 // Stubbet: nettverk (rpc/signering/fetch/from), innlogget bruker, rettigheter, lesekjøringens nettverkshooks,
 // PDF.js-tegning, og RereadView (bare for å lese `canApply` som LesPaNytt faktisk beregner).
 type RpcResult = { data: unknown; error: unknown };
-const rpcImpl = vi.fn<() => Promise<RpcResult>>();
+const rpcImpl = vi.fn<(kind?: "meta" | "check") => Promise<RpcResult>>();
 const thenable = (p: Promise<RpcResult>) => Object.assign(p, { abortSignal: () => p });
 const chain: Record<string, unknown> = {};
 for (const k of ["select", "eq", "in", "order", "limit"]) chain[k] = () => chain;
 chain.maybeSingle = async () => ({ data: { id: "i1", invoice_number: "1", source_document_url: "c1/doc.pdf", status: "ready", suppliers: { name: "L" } }, error: null });
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    rpc: () => thenable(rpcImpl()),
+    // Metadataoppslag bruker abortSignal; kontroll før/etter nedlasting gjør det ikke.
+    rpc: () => ({ then: (a: (r: RpcResult) => unknown, b?: (e: unknown) => unknown) => rpcImpl("check").then(a, b), abortSignal: () => thenable(rpcImpl("meta")) }),
     from: () => chain,
     storage: { from: () => ({ createSignedUrl: async (path: string) => ({ data: { signedUrl: `https://signed/${path}` }, error: null }) }) },
   },
@@ -117,9 +118,8 @@ describe("delt tilbakekalling av dokumentverifisering (panel + Les på nytt)", (
 
   it("dokument fjernet (available:false) i kontrollen før nedlasting sperrer bruk", async () => {
     const gone: RpcResult = { data: { available: false, invoice_id: "i1", reason: "document_missing" }, error: null };
-    let n = 0;
-    // Metadataoppslagene gir v1; første kontroll i visningen (før nedlasting) finner dokumentet borte.
-    rpcImpl.mockImplementation(async () => (fetchMock.mock.calls.length === 0 && getDocument.mock.calls.length === 0 && ++n > 2 ? gone : meta("v1")));
+    // Metadataoppslagene gir v1; kontrollen i visningen (før nedlasting) finner dokumentet borte.
+    rpcImpl.mockImplementation(async (kind) => (kind === "check" ? gone : meta("v1")));
     setup();
     await screen.findByText(/Ingenting fra den gamle versjonen vises/);
     expect(canApply()).toBe("false");
