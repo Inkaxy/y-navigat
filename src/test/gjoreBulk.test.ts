@@ -72,3 +72,21 @@ describe("F18/F28: fryste ID-er og forslag", () => {
     expect(correctionDocLine(null, [hassel], hassel)).toBe(hassel);
   });
 });
+
+describe("F28: forhåndsvalg krever forslag for alle valgte linjer", () => {
+  const s = (line: string, rm: string) => ({ invoice_line_id: line, raw_material_id: rm, rank: 1, match_reason: null, name: rm });
+  it("2 valgte, 1 forslag => ikke entydig, kandidat står for eksplisitt valg", async () => {
+    const { candidatesFrom } = await import("@/ravarer/pages/priskontroll/gjore/bulkPreview");
+    const r = candidatesFrom([s("l1", "mel")], ["l1", "l2"]);
+    expect(r.unambiguous).toBeNull();
+    expect(r.candidates.map((c) => c.id)).toEqual(["mel"]);
+  });
+  it("2 valgte med samme forslag => forhåndsvalgt", async () => {
+    const { candidatesFrom } = await import("@/ravarer/pages/priskontroll/gjore/bulkPreview");
+    expect(candidatesFrom([s("l1", "mel"), s("l2", "mel")], ["l1", "l2"]).unambiguous?.id).toBe("mel");
+  });
+  it("tomt utvalg => null", async () => {
+    const { candidatesFrom } = await import("@/ravarer/pages/priskontroll/gjore/bulkPreview");
+    expect(candidatesFrom([s("l1", "mel")], []).unambiguous).toBeNull();
+  });
+});
