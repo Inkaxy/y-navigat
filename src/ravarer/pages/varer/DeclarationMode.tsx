@@ -128,7 +128,7 @@ export default function DeclarationMode() {
                   <Badge variant="outline">Sammensatt — deklareres via komponentene</Badge>
                 ) : (
                   <DeclarationNameField rawMaterialId={active.raw_material_id} value={null} initialDraft={initialDeclarationFor(active)} draft={draftFor(active)}
-                    onDraftChange={(v) => setDraft(active.raw_material_id, v)} rawMaterialName={active.name} matvaretabellenName={active.matvaretabellen_name} disabled={!canWrite} />
+                    onDraftChange={(v) => setDraft(active.raw_material_id, v)} rawMaterialName={active.name} matvaretabellenName={active.matvaretabellen_name} disabled={!canWrite || savingAll} />
                 )}
                 <Link className="inline-flex items-center gap-1.5 text-sm underline underline-offset-2" to={`${paths.raavare(active.raw_material_id)}${sectionSearch(new URLSearchParams(listSearch), "deklarasjon")}`}><Maximize2 className="h-3.5 w-3.5" aria-hidden />Åpne deklarasjon på råvarekortet</Link>
               </div>
