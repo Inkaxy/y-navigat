@@ -20,8 +20,8 @@ export function tripletexSaveBlock(cred: TripletexCredentialRow | null, d: Tripl
   if (!cred && !newSecret) return d.mode === "jwt" ? "Lim inn API-nøkkelen for å lagre første oppsett." : "Lim inn employee token for å lagre første oppsett.";
   if (cred && cred.mode !== d.mode && !newSecret) return "Ved bytte av modus må du lime inn en ny nøkkel for den nye modusen. Lagrede nøkler følger ikke med over til en annen modus.";
   if (d.mode === "standard" && !has(t.consumer)) {
-    if (cred?.has_consumer_token === null) return "Vi kunne ikke lese om consumer token er lagret. Lim inn consumer token, eller last siden på nytt.";
-    if (!(cred?.mode === "standard" && cred.has_consumer_token === true) && !cred?.has_consumer_token) return "Standardmodus krever consumer token.";
+    if (cred && cred.has_consumer_token === null) return "Vi kunne ikke lese om consumer token er lagret. Lim inn consumer token, eller last siden på nytt.";
+    if (cred?.has_consumer_token !== true) return "Standardmodus krever consumer token.";
   }
   return null;
 }

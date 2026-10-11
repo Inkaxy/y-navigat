@@ -1,11 +1,19 @@
 import { labelFor, SYNC_STATUS_LABELS } from "@/ravarer/lib/labels";
 import { cn } from "@/lib/utils";
 import { useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { SettingsSaveBar } from "./SettingsSaveBar";
+import {
+  baselineOf, isTripletexSaved, sameNonSecret, tripletexSaveBlock, tripletexSavePayload,
+  type TripletexMode, type TripletexNonSecret, type TripletexTokens,
+} from "@/ravarer/lib/tripletexSettings";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
 import { useTripletexCredentials, useTripletexSyncLog } from "@/ravarer/hooks/useTripletex";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { isObj } from "@/fakturaer/lib/parseRpcJson";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,6 +49,11 @@ export default function TripletexSettings() {
   // Kun aktive selskaper — hindrer at API-nøkler lagres på inaktive placeholder-selskaper.
   const entities = useMemo(() => allEntities.filter((e) => e.status !== "inactive"), [allEntities]);
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
+  // Kladden for ett selskap flyttes aldri til et annet: bytte krever bekreftelse ved ulagret, og er sperret under lagring.
+  const [child, setChild] = useState({ dirty: false, saving: false });
+  const onChildState = useCallback((dirty: boolean, saving: boolean) => setChild((c) => (c.dirty === dirty && c.saving === saving ? c : { dirty, saving })), []);
+  const guard = useUnsavedChangesGuard(child.dirty || child.saving);
+  const pickEntity = (id: string) => { if (id !== selectedEntity) guard.requestAction(() => { setChild({ dirty: false, saving: false }); setSelectedEntity(id); }); };
 
   useEffect(() => {
     if (!selectedEntity && entities[0]) setSelectedEntity(entities[0].id);
@@ -62,8 +75,8 @@ export default function TripletexSettings() {
         {!entitiesLoading && entities.length > 0 && (
           <div className="w-full sm:w-72">
             <label className="text-xs font-medium text-muted-foreground">Selskap</label>
-            <Select value={selectedEntity ?? undefined} onValueChange={setSelectedEntity}>
-              <SelectTrigger className="mt-1"><SelectValue placeholder="Velg selskap" /></SelectTrigger>
+            <Select value={selectedEntity ?? undefined} onValueChange={pickEntity} disabled={child.saving}>
+              <SelectTrigger className="mt-1 min-h-[44px] md:min-h-10" aria-label="Selskap"><SelectValue placeholder="Velg selskap" /></SelectTrigger>
               <SelectContent>
                 {entities.map((e) => (
                   <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
@@ -107,8 +120,9 @@ export default function TripletexSettings() {
       ) : entities.length === 0 ? (
         <Card><CardContent className="p-6 text-sm text-muted-foreground">Du har ikke admin-tilgang til noen selskaper.</CardContent></Card>
       ) : (
-        selectedEntity && <EntityConfig legalEntityId={selectedEntity} />
+        selectedEntity && <EntityConfig key={selectedEntity} legalEntityId={selectedEntity} onState={onChildState} />
       )}
+      <UnsavedChangesDialog {...guard.dialogProps} />
 
     </div>
   );
@@ -124,105 +138,135 @@ interface SyncInvoiceResult {
   errors?: { invoice_number: string; reason: string }[];
 }
 
-function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
+function EntityConfig({ legalEntityId, onState }: { legalEntityId: string; onState: (dirty: boolean, saving: boolean) => void }) {
   const qc = useQueryClient();
-  const { data: cred, isLoading } = useTripletexCredentials(legalEntityId);
+  const { canWrite, accessLevel } = useRavarer();
+  const credQ = useTripletexCredentials(legalEntityId);
+  const { data: cred, isLoading } = credQ;
   const { data: log = [] } = useTripletexSyncLog(legalEntityId);
 
-  type TripletexMode = "jwt" | "standard" | "private";
-  const [mode, setMode] = useState<TripletexMode>("jwt");
-  const [jwtToken, setJwtToken] = useState("");
-  const [consumerToken, setConsumerToken] = useState("");
-  const [employeeToken, setEmployeeToken] = useState("");
-  const [syncEnabled, setSyncEnabled] = useState(false);
+  // Ikke-hemmelige felt: null = følg lagret verdi. Hemmeligheter er egne felt som aldri forhåndsutfylles.
+  const [draft, setDraft] = useState<{ rev: number; value: TripletexNonSecret } | null>(null);
+  const [tokens, setTokens] = useState<TripletexTokens>({ jwt: "", consumer: "", employee: "" });
   const [supplierSyncing, setSupplierSyncing] = useState(false);
   const [lastRun, setLastRun] = useState<SyncInvoiceResult | null>(null);
-  const [frequency, setFrequency] = useState(60);
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [saveOutcome, setSaveOutcome] = useState<{ kind: "saved" | "unknown" | "rejected"; message: string } | null>(null);
+  const busy = useRef(false);
+  const live = useRef({ mounted: true, canEdit: false });
+  const canEdit = canWrite && accessLevel === "admin";
+  live.current.canEdit = canEdit;
+  useEffect(() => { live.current.mounted = true; return () => { live.current.mounted = false; }; }, []);
 
-  // Initialiser skjemaet kun én gang per selskap — ellers overskriver en refetch
-  // brukerens valgte modus og innskrevne nøkler (ga «Consumer token er påkrevd»).
-  const initializedFor = useRef<string | null>(null);
-  useEffect(() => {
-    if (isLoading || initializedFor.current === legalEntityId) return;
-    initializedFor.current = legalEntityId;
-    if (cred) {
-      setMode(cred.mode);
-      setSyncEnabled(cred.sync_enabled);
-      setFrequency(cred.sync_frequency_minutes);
-    } else {
-      setMode("jwt");
-      setSyncEnabled(false);
-      setFrequency(60);
-    }
-    setJwtToken("");
-    setConsumerToken("");
-    setEmployeeToken("");
-    setTestResult(null);
-  }, [cred, isLoading, legalEntityId]);
+  const loaded = credQ.isSuccess;
+  const baseline = baselineOf(cred ?? null);
+  const form = draft?.value ?? baseline;
+  const { mode, syncEnabled, frequency } = form;
+  const tokensEntered = !!(tokens.jwt.trim() || tokens.consumer.trim() || tokens.employee.trim());
+  const dirty = (!!draft && !sameNonSecret(draft.value, baseline)) || tokensEntered;
+  useEffect(() => { onState(dirty, saving); }, [dirty, saving, onState]);
+  useEffect(() => () => onState(false, false), [onState]);
 
+  const setForm = (p: Partial<TripletexNonSecret>) => {
+    if (busy.current) return;
+    setSaveOutcome(null);
+    setDraft((cur) => ({ rev: (cur?.rev ?? 0) + 1, value: { ...(cur?.value ?? baseline), ...p } }));
+  };
+  const setMode = (m: TripletexMode) => setForm({ mode: m });
+  const setSyncEnabled = (v: boolean) => setForm({ syncEnabled: v });
+  const setFrequency = (v: number) => setForm({ frequency: v });
+  const setToken = (k: keyof TripletexTokens, v: string) => { setSaveOutcome(null); setTokens((t) => ({ ...t, [k]: v })); };
+  const jwtToken = tokens.jwt, consumerToken = tokens.consumer, employeeToken = tokens.employee;
+  const setJwtToken = (v: string) => setToken("jwt", v);
+  const setConsumerToken = (v: string) => setToken("consumer", v);
+  const setEmployeeToken = (v: string) => setToken("employee", v);
 
   // Ved jwt-modus finnes ikke et eget token-flagg i status-RPC-en; en lagret rad
   // med mode='jwt' betyr at nøkkelen ligger kryptert i basen.
   const hasStoredJwt = cred?.mode === "jwt";
   const isConfigured = mode === "jwt" ? hasStoredJwt : !!cred?.has_employee_token;
+  const block = loaded ? tripletexSaveBlock(cred ?? null, form, tokens) : "Konfigurasjonen er ikke lest.";
+  const blankTest = mode === "jwt" ? !tokens.jwt.trim() : !tokens.employee.trim();
 
   const buildTokenPayload = () => ({
     legal_entity_id: legalEntityId,
     mode,
-    jwt_token: mode === "jwt" ? (jwtToken || undefined) : undefined,
-    consumer_token: mode === "standard" ? (consumerToken || undefined) : undefined,
-    employee_token: mode === "jwt" ? undefined : (employeeToken || undefined),
+    jwt_token: mode === "jwt" ? (jwtToken.trim() || undefined) : undefined,
+    consumer_token: mode === "standard" ? (consumerToken.trim() || undefined) : undefined,
+    employee_token: mode === "jwt" ? undefined : (employeeToken.trim() || undefined),
   });
 
+  /** Eksplisitt test — lagrer ingenting. Uten ny nøkkel testes LAGRET konfigurasjon (lagret modus). */
   const handleTest = async () => {
     setTesting(true); setTestResult(null);
     try {
       const { data, error } = await supabase.functions.invoke("tripletex-test-connection", {
         body: buildTokenPayload(),
       });
+      if (!live.current.mounted) return;
       if (error) throw new Error(await edgeErrorMessage(error, "Test feilet"));
-      if (data?.ok) {
-        const navn = data.company?.name ?? "Tripletex";
-        const orgnr = data.company?.organization_number;
+      if (isObj(data) && data.ok === true) {
+        const company = isObj(data.company) ? data.company : null;
+        const navn = company && typeof company.name === "string" ? company.name : "Tripletex";
+        const orgnr = company && typeof company.organization_number === "string" ? company.organization_number : null;
         setTestResult({
           ok: true,
-          message: `OK – tilkoblet ${navn}${orgnr ? ` (org.nr ${orgnr})` : ""}`,
+          message: `OK – tilkoblet ${navn}${orgnr ? ` (org.nr ${orgnr})` : ""}${blankTest ? " · testet lagret konfigurasjon" : ""}`,
         });
       } else {
-        setTestResult({ ok: false, message: data?.error ?? "Test feilet" });
+        setTestResult({ ok: false, message: isObj(data) && typeof data.error === "string" ? data.error : "Test feilet" });
       }
     } catch (e) {
-      setTestResult({ ok: false, message: e instanceof Error ? e.message : String(e) });
+      if (live.current.mounted) setTestResult({ ok: false, message: e instanceof Error ? e.message : String(e) });
     } finally {
-      setTesting(false);
+      if (live.current.mounted) setTesting(false);
     }
   };
 
   const handleSave = async () => {
+    if (busy.current || block || !dirty || !canEdit) return;
+    busy.current = true;
     setSaving(true);
+    setSaveOutcome(null);
+    // Frosset innhold: selskap, ikke-hemmelige felt (med revisjon) og de innsendte nøklene.
+    const frozen = { rev: draft?.rev ?? 0, form, tokens: { ...tokens } };
     try {
       const { data, error } = await supabase.functions.invoke("tripletex-save-credentials", {
-        body: {
-          ...buildTokenPayload(),
-          sync_enabled: syncEnabled,
-          sync_frequency_minutes: frequency,
-        },
+        body: tripletexSavePayload(legalEntityId, frozen.form, frozen.tokens),
       });
-      if (error) throw new Error(await edgeErrorMessage(error, "Lagring feilet"));
-      if (isObj(data) && typeof data.error === "string" && data.error) throw new Error(data.error);
-      toast.success("Tripletex-konfigurasjon lagret");
-      setJwtToken(""); setConsumerToken(""); setEmployeeToken("");
-      qc.invalidateQueries({ queryKey: ["tripletex-credentials", legalEntityId] });
+      if (!live.current.mounted) return;
+      if (error) {
+        const msg = await edgeErrorMessage(error, "Lagring feilet");
+        const status = (error as { context?: Response })?.context?.status;
+        // 4xx = avvist (ingenting lagret). Ellers kan utfallet være ukjent.
+        if (status != null && status >= 400 && status < 500) setSaveOutcome({ kind: "rejected", message: msg });
+        else setSaveOutcome({ kind: "unknown", message: "Utfallet er ukjent. Konfigurasjonen er lest på nytt — kontroller den før du lagrer igjen." });
+      } else if (!isTripletexSaved(data)) {
+        setSaveOutcome({ kind: "unknown", message: "Uventet svar: lagringen er ikke bekreftet. Konfigurasjonen er lest på nytt — kontroller den før du lagrer igjen." });
+      } else {
+        // Bare innsendte verdier kvitteres: en nøkkel skrevet inn etter trykk på Lagre beholdes.
+        setTokens((t) => ({
+          jwt: t.jwt === frozen.tokens.jwt ? "" : t.jwt,
+          consumer: t.consumer === frozen.tokens.consumer ? "" : t.consumer,
+          employee: t.employee === frozen.tokens.employee ? "" : t.employee,
+        }));
+        setDraft((cur) => (cur && cur.rev === frozen.rev ? null : cur));
+        setSaveOutcome({ kind: "saved", message: "Konfigurasjonen er lagret. Tilkoblingen er ikke testet — bruk «Test tilkobling»." });
+      }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Lagring feilet");
+      console.warn("[tripletex] lagring: ukjent utfall", e instanceof Error ? e.name : "ukjent");
+      if (live.current.mounted) setSaveOutcome({ kind: "unknown", message: "Utfallet er ukjent. Kontroller konfigurasjonen før du lagrer igjen." });
     } finally {
-      setSaving(false);
+      busy.current = false;
+      void qc.invalidateQueries({ queryKey: ["tripletex-credentials", legalEntityId] });
+      if (live.current.mounted) setSaving(false);
     }
   };
+
+  const cancel = () => { if (busy.current) return; setDraft(null); setTokens({ jwt: "", consumer: "", employee: "" }); setSaveOutcome(null); };
 
   const handleSyncNow = async () => {
     setSyncing(true);
@@ -268,6 +312,15 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
   };
 
   if (isLoading) return <Card><CardContent className="p-6 text-sm text-muted-foreground">Laster…</CardContent></Card>;
+  if (credQ.isError) {
+    return (
+      <Card><CardContent className="space-y-2 p-6 text-sm">
+        <p className="text-destructive">Kunne ikke lese Tripletex-konfigurasjonen. Ingenting kan lagres før den er lest.</p>
+        <Button variant="outline" className="min-h-[44px]" onClick={() => void credQ.refetch()}>Prøv igjen</Button>
+      </CardContent></Card>
+    );
+  }
+  const inputsDisabled = saving || !canEdit;
 
   return (
     <>
@@ -283,14 +336,14 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
           </div>
           <CardDescription>
             {isConfigured
-              ? "Nøkler er lagret kryptert. La feltene stå tomme for å beholde dem, eller skriv inn nye for å erstatte."
+              ? "Nøkler er lagret kryptert og vises aldri. La feltene stå tomme for å beholde dem i samme modus, eller skriv inn nye for å erstatte."
               : "Lim inn nøkkel fra Tripletex."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="space-y-2">
             <Label>Modus</Label>
-            <RadioGroup value={mode} onValueChange={(v) => setMode(v as TripletexMode)}>
+            <RadioGroup value={mode} disabled={inputsDisabled} onValueChange={(v) => { if (v === "jwt" || v === "standard" || v === "private") setMode(v); }}>
               <div className="flex items-start gap-3">
                 <RadioGroupItem id="mode-jwt" value="jwt" />
                 <div>
@@ -318,7 +371,7 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
           {mode === "jwt" ? (
             <div className="space-y-2">
               <Label htmlFor="jwt">API-nøkkel</Label>
-              <Input id="jwt" type="password" autoComplete="off"
+              <Input id="jwt" type="password" autoComplete="off" disabled={!canEdit}
                 placeholder={hasStoredJwt ? "•••••••• (lagret – la stå for å beholde)" : "Lim inn API-nøkkel"}
                 value={jwtToken} onChange={(e) => setJwtToken(e.target.value)} />
               <p className="text-xs text-muted-foreground">
@@ -330,7 +383,7 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
               {mode === "standard" && (
                 <div className="space-y-2">
                   <Label htmlFor="consumer">Consumer token</Label>
-                  <Input id="consumer" type="password" autoComplete="off"
+                  <Input id="consumer" type="password" autoComplete="off" disabled={!canEdit}
                     placeholder={cred?.has_consumer_token ? "•••••••• (lagret – la stå for å beholde)" : "Lim inn consumer token"}
                     value={consumerToken} onChange={(e) => setConsumerToken(e.target.value)} />
                 </div>
@@ -338,7 +391,7 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
 
               <div className="space-y-2">
                 <Label htmlFor="employee">Employee token</Label>
-                <Input id="employee" type="password" autoComplete="off"
+                <Input id="employee" type="password" autoComplete="off" disabled={!canEdit}
                   placeholder={cred?.has_employee_token ? "•••••••• (lagret – la stå for å beholde)" : "Lim inn employee token"}
                   value={employeeToken} onChange={(e) => setEmployeeToken(e.target.value)} />
               </div>
@@ -350,13 +403,13 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
               <Label className="font-medium">Aktiver automatisk synkronisering</Label>
               <p className="text-xs text-muted-foreground">Henter nye fakturaer i bakgrunnen.</p>
             </div>
-            <Switch checked={syncEnabled} onCheckedChange={setSyncEnabled} />
+            <Switch checked={syncEnabled} disabled={inputsDisabled} onCheckedChange={setSyncEnabled} aria-label="Aktiver automatisk synkronisering" />
           </div>
 
           <div className="space-y-2">
             <Label>Sync-frekvens</Label>
-            <Select value={String(frequency)} onValueChange={(v) => setFrequency(Number(v))}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Select value={String(frequency)} disabled={inputsDisabled} onValueChange={(v) => setFrequency(Number(v))}>
+              <SelectTrigger aria-label="Sync-frekvens"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="15">Hvert 15. minutt</SelectItem>
                 <SelectItem value="60">Hver time</SelectItem>
@@ -373,12 +426,17 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
             </Alert>
           )}
 
+          {saveOutcome && (
+            <Alert variant={saveOutcome.kind === "saved" ? "default" : "destructive"}>
+              {saveOutcome.kind === "saved" ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+              <AlertDescription>{saveOutcome.message}</AlertDescription>
+            </Alert>
+          )}
+          {dirty && block && <p className="text-sm text-warning" role="note">{block}</p>}
+
           <div className="flex flex-wrap gap-2 pt-2">
-            <Button variant="outline" onClick={handleTest} disabled={testing}>
-              {testing ? "Tester…" : "Test tilkobling"}
-            </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? "Lagrer…" : "Lagre"}
+            <Button variant="outline" className="min-h-[44px] md:min-h-10" onClick={handleTest} disabled={testing || !canEdit}>
+              {testing ? "Tester…" : blankTest ? "Test lagret tilkobling" : "Test tilkobling"}
             </Button>
             {isConfigured && (
               <>
@@ -395,6 +453,9 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
           </div>
         </CardContent>
       </Card>
+      {canEdit && (
+        <SettingsSaveBar dirty={dirty} saving={saving} canSave={dirty && !block && !saving && loaded} onSave={() => void handleSave()} onCancel={cancel} />
+      )}
 
       {isConfigured && (
         <Card>
