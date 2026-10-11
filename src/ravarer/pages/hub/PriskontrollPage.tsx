@@ -13,8 +13,6 @@ import { normalizePriskontrollSearch } from "@/ravarer/pages/priskontroll/faktur
 import { ImportSheet } from "@/ravarer/pages/priskontroll/import/ImportSheet";
 import { GjoreWorkspace } from "@/ravarer/pages/priskontroll/gjore/GjoreWorkspace";
 import { useCompany } from "@/hooks/useCompany";
-import { useApprovalOverview } from "@/ravarer/pages/priskontroll/godkjenning/useGodkjenning";
-import { countByStatus } from "@/ravarer/pages/priskontroll/godkjenning/approvalLogic";
 import { PriskontrollToolsMenu } from "./PriskontrollToolsMenu";
 import { PRISKONTROLL_TAB_PARAMS, PRISKONTROLL_TABS, priskontrollTabs, RAVARER_EYEBROW } from "./hubTabs";
 
@@ -28,9 +26,6 @@ export default function PriskontrollPage() {
   const redirect = normalizePriskontrollSearch(search);
   const tab = activeTabFrom(sp, "fane", [...PRISKONTROLL_TABS], "gjore");
   const { data: summary } = useWorkSummary({ includeApproval: true });
-  const { data: company } = useCompany();
-  const approval = useApprovalOverview(company?.id ?? null);
-  const approvalReady = approval.data ? countByStatus(approval.data).klare : null;
   if (redirect) return <Navigate to={redirect} replace />;
   const openImport = () => setSp((prev) => { const p = new URLSearchParams(prev); p.set("importer", "ehf"); return p; });
 
@@ -47,7 +42,7 @@ export default function PriskontrollPage() {
           </Button>
         </>
       }
-      tabs={<SectionTabs ariaLabel="Priskontroll" tabs={priskontrollTabs(summary, approvalReady)} defaultTab="gjore" clearParams={PRISKONTROLL_TAB_PARAMS} />}
+      tabs={<SectionTabs ariaLabel="Priskontroll" tabs={priskontrollTabs(summary)} defaultTab="gjore" clearParams={PRISKONTROLL_TAB_PARAMS} />}
     >
       <Suspense fallback={<QueryLoadingState rows={6} />}>
         {tab === "gjore" && (
