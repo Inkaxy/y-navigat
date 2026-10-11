@@ -17743,6 +17743,10 @@ export type Database = {
         }
         Returns: Json
       }
+      rm_extraction_example_is_safe: {
+        Args: { p_id: string }
+        Returns: boolean
+      }
       rm_extraction_examples_for: {
         Args: {
           p_legal_entity_id: string
