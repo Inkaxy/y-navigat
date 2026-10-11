@@ -34,6 +34,7 @@ import { toast } from "sonner";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
 import { paths } from "@/ravarer/lib/paths";
+import { DeclarationNameField } from "@/ravarer/editors/DeclarationNameField";
 
 /** Felt som redigeres i denne fanen. Lager styres i lagerkortet. */
 const CEREAL_TYPES = [
@@ -51,7 +52,6 @@ const CEREAL_TYPES = [
 const EDITABLE_FIELDS = [
   "sku",
   "name",
-  "declaration_name",
   "description",
   "category",
   "categories",
@@ -230,20 +230,18 @@ export function OverviewTab({ rm, registerSave, onEditLink }: Props) {
         </div>
         <div>
           <Label>Deklarasjonsnavn</Label>
-          <Input
-            value={draft.declaration_name ?? ""}
-            onChange={(e) =>
-              setDraft((d) => ({
-                ...d,
-                declaration_name: e.target.value === "" ? null : e.target.value,
-              }))
-            }
-            disabled={!canWrite}
-            placeholder="f.eks. hvetemel"
-          />
+          <div className="mt-1.5">
+            <DeclarationNameField
+              rawMaterialId={rm.id}
+              value={rm.declaration_name}
+              rawMaterialName={rm.name}
+              disabled={!canWrite}
+            />
+          </div>
           <p className="mt-1 text-xs text-ink-secondary">
             Navnet slik det skal stå i ingrediensdeklarasjonen, med små
-            bokstaver (f.eks. hvetemel). Tomt = bruk råvarenavnet.
+            bokstaver (f.eks. hvetemel). Tomt = bruk råvarenavnet. Lagres for
+            seg.
           </p>
         </div>
         <div>
