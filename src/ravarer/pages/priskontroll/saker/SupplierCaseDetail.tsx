@@ -20,7 +20,7 @@ import { CaseCreditForm } from "./CaseCreditForm";
 import { useSupplierCaseDetail } from "./useSupplierCaseDetail";
 
 const kr = (v: number | null | undefined) => (v == null ? "–" : formatMoney(v, "NOK"));
-const per = (v: number | null | undefined) => (v == null ? "–" : `${fmtNum(v, 2)} kr`);
+const per = (v: number | null | undefined, unit: string | null) => (v == null ? "–" : `${fmtNum(v, 2)} kr${unit ? `/${unit}` : ""}`);
 
 function Stat({ k, v, tone }: { k: string; v: string; tone?: string }) {
   return <div className="rounded-lg border border-border bg-card px-3 py-2"><p className="text-caption text-ink-secondary">{k}</p><p className={`font-semibold tabular-nums ${tone ?? ""}`}>{v}</p></div>;
@@ -92,9 +92,9 @@ export function SupplierCaseDetail({ id }: { id: string }) {
                       {key ? <Link className="text-primary hover:underline" to={paths.varekort(d.c.supplier_id, key)}>{l.line?.description ?? "Vare"}</Link> : (l.line?.description ?? "Vare")}
                       {l.line?.raw_material?.name && <span className="block text-caption text-ink-secondary">{l.line.raw_material.name}</span>}
                     </td>
-                    <td className="px-3 py-2 text-right">{per(l.basis.expected_price_per_base_unit)}</td>
-                    <td className="px-3 py-2 text-right">{per(l.basis.price_per_base_unit)}</td>
-                    <td className="px-3 py-2 text-right">{l.basis.base_quantity != null ? fmtNum(l.basis.base_quantity, 2) : l.line?.quantity != null ? `${fmtNum(Number(l.line.quantity), 2)} ${l.line.unit ?? ""}` : "–"}</td>
+                    <td className="px-3 py-2 text-right">{per(l.basis.expected_price_per_base_unit, l.basis.base_unit ?? l.line?.raw_material?.base_unit ?? null)}</td>
+                    <td className="px-3 py-2 text-right">{per(l.basis.price_per_base_unit, l.basis.base_unit ?? l.line?.raw_material?.base_unit ?? null)}</td>
+                    <td className="px-3 py-2 text-right">{l.basis.base_quantity != null ? `${fmtNum(l.basis.base_quantity, 2)} ${l.basis.base_unit ?? l.line?.raw_material?.base_unit ?? ""}`.trim() : l.line?.quantity != null ? `${fmtNum(Number(l.line.quantity), 2)} ${l.line.unit ?? ""}` : "–"}</td>
                     <td className="px-3 py-2 text-right">{kr(l.amount_excl_vat)}</td>
                   </tr>
                 );
