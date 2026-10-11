@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { legacyVarerUrl, listeHref, readListe } from "@/ravarer/lib/varerWorklist";
 import { paths } from "@/ravarer/lib/paths";
 import { parseListQuery } from "@/ravarer/lib/rawMaterialViews";
-import { resolveLegacy } from "@/ravarer/lib/legacyRoutes";
+import { resolveLegacyRavarerUrl as resolveLegacy } from "@/ravarer/lib/legacyRoutes";
 
 const sp = (s: string) => new URLSearchParams(s);
 
