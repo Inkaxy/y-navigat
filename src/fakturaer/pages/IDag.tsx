@@ -74,7 +74,7 @@ export default function IDag() {
               return (
                 <li key={g.key}>
                   <Link
-                    to={paths.beslutning(encodeGroupKey(g.key))}
+                    to={paths.priskontroll({ fane: "gjore" })}
                     className="group block rounded-xl border border-line-subtle bg-card p-5 transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <div className="flex items-start justify-between gap-4">
@@ -97,7 +97,7 @@ export default function IDag() {
             })}
             {groups.length > top.length && (
               <li>
-                <Link to={paths.beslutninger()} className="inline-flex items-center gap-1 rounded-lg border border-line-subtle px-3 py-2 text-sm text-primary hover:bg-muted/50">
+                <Link to={paths.priskontroll({ fane: "gjore" })} className="inline-flex items-center gap-1 rounded-lg border border-line-subtle px-3 py-2 text-sm text-primary hover:bg-muted/50">
                   Se alle {groups.length} beslutninger, også prisavvik <ArrowUpRight className="h-4 w-4" aria-hidden />
                 </Link>
               </li>

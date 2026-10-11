@@ -29,7 +29,7 @@ export default function RavarerQueue({ scope = "ravarer" }: { scope?: QueueScope
     if (k !== "side") n.delete("side");
     setSp(n, { replace: true });
   };
-  const detailHref = (key: string) => `${paths.beslutning(encodeGroupKey(key), { fra: scope })}${sp.toString() ? `&${sp.toString()}` : ""}`;
+  const detailHref = (key: string) => paths.priskontroll({ fane: "gjore" });
 
   return (
     <div className="px-page py-6 space-y-5">

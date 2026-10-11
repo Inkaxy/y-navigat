@@ -64,8 +64,6 @@ export const paths = {
     const { tab, ...rest } = q ?? {};
     return withQuery(`${RAVARER_ROOT}/priskontroll`, { ...rest, importer: tab ?? "ehf" });
   },
-  beslutninger: (q?: { omfang?: "ravarer" } & Q) => withQuery(`${RAVARER_ROOT}/priskontroll/beslutninger`, q),
-  beslutning: (key: Id, q?: Q) => withQuery(`${RAVARER_ROOT}/priskontroll/beslutninger/${enc(key)}`, q),
   reberegn: () => `${RAVARER_ROOT}/priskontroll/verktoy/reberegn`,
 
   // Leverandører
