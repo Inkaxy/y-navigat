@@ -78,7 +78,7 @@ export function toTimelineRow(h: PriceHistoryRow): TimelineHistoryRow {
     source: h.source ?? "manual", invoice_id: h.invoice_id, invoiceNumber: h.invoices?.invoice_number ?? null,
     isCreditNote: h.invoices?.is_credit_note ?? false, notes: h.notes ?? null,
     supersededAt: h.superseded_at ?? null, supersededReason: h.superseded_reason ?? null,
-    isLegacy: !!h.is_legacy, isCredit: !!h.is_credit, currency: h.currency ?? "NOK",
+    isLegacy: !!h.is_legacy, isCredit: !!h.is_credit, currency: h.currency ?? "NOK", createdAt: h.created_at ?? null,
   };
 }
 
@@ -188,20 +188,38 @@ export function useDeleteRmSupplier() {
   });
 }
 
+type HistoryDbRow = Omit<PriceHistoryRow, "invoices">;
+
+/**
+ * Historikk + fakturametadata. Tabellen har ingen FK til invoices, så embed er ikke mulig:
+ * fakturaene hentes i bolker (RLS gjelder) og knyttes på klienten. Feil kastes — aldri tom liste.
+ */
+export async function fetchPriceHistory(rawMaterialId: string): Promise<PriceHistoryRow[]> {
+  const rows = await fetchAllRows<HistoryDbRow>((from, to) =>
+    supabase
+      .from("raw_material_price_history")
+      .select("id, raw_material_id, supplier_id, price, effective_date, source, source_reference, invoice_id, invoice_line_id, notes, created_at, superseded_at, superseded_reason, is_legacy, is_credit, currency")
+      .eq("raw_material_id", rawMaterialId)
+      .order("effective_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, to)
+      .returns<HistoryDbRow[]>());
+  const ids = [...new Set(rows.map((r) => r.invoice_id).filter((x): x is string => !!x))];
+  const inv = new Map<string, { invoice_number: string | null; is_credit_note: boolean | null }>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await supabase.from("invoices").select("id, invoice_number, is_credit_note").in("id", ids.slice(i, i + 200));
+    if (error) throw error;
+    for (const d of data ?? []) inv.set(d.id, { invoice_number: d.invoice_number, is_credit_note: d.is_credit_note });
+  }
+  return rows.map((r) => ({ ...r, invoices: r.invoice_id ? inv.get(r.invoice_id) ?? null : null }));
+}
+
 export function usePriceHistory(rawMaterialId: string | undefined) {
   return useQuery({
     queryKey: ["raw_material_price_history", rawMaterialId],
     enabled: !!rawMaterialId,
-    // Alle rader (sidevis) — ingen stille avkutting ved 1000.
-    queryFn: () => fetchAllRows<PriceHistoryRow>((from, to) =>
-      supabase
-        .from("raw_material_price_history")
-        .select("id, raw_material_id, supplier_id, price, effective_date, source, source_reference, invoice_id, invoice_line_id, notes, created_at, superseded_at, superseded_reason, is_legacy, is_credit, currency, invoices(invoice_number, is_credit_note)")
-        .eq("raw_material_id", rawMaterialId as string)
-        .order("effective_date", { ascending: false })
-        .order("id", { ascending: true })
-        .range(from, to)
-        .returns<PriceHistoryRow[]>()),
+    queryFn: () => fetchPriceHistory(rawMaterialId as string),
   });
 }
 

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { OrderDeskKpi } from "@/ordre/components/dashboard/OrderDeskKpi";
 import { BookOpen, Coins, FileText, Handshake, Package, Percent, Truck, Wallet } from "lucide-react";
-import { formatDate, formatNok } from "@/ravarer/lib/constants";
+import { formatDate, formatNok, priceSourceLabel } from "@/ravarer/lib/constants";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { chooseAgreedPrice, kpiDeviation, pricePerPackage } from "@/ravarer/lib/rawMaterialKpi";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
@@ -54,7 +54,7 @@ export function RawMaterialKpiStrip({ rm, links, recipeCount, spend12m }: Props)
         icon={Coins}
         label={`Kostpris / ${rm.base_unit}`}
         value={formatNok(rm.current_cost_price)}
-        sub={rm.price_updated_at ? `${rm.price_source ?? "ukjent kilde"} · ${formatDate(rm.price_updated_at)}` : "Ingen kilde registrert"}
+        sub={rm.price_updated_at ? `${priceSourceLabel(rm.price_source)} · ${formatDate(rm.price_updated_at)}` : "Ingen kilde registrert"}
       />
       <OrderDeskKpi
         icon={Package}

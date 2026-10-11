@@ -19,7 +19,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatNok, formatDate, PRICE_SOURCES } from "@/ravarer/lib/constants";
+import { formatNok, formatDate, priceSourceLabel } from "@/ravarer/lib/constants";
 import { osloTodayISO } from "@/lib/osloDate";
 import { PeriodPicker } from "@/ravarer/components/PeriodPicker";
 import { PriceEventsList } from "@/ravarer/components/PriceEventsList";
@@ -37,9 +37,7 @@ import {
 } from "@/ravarer/lib/priceTimeline";
 import { paths } from "@/ravarer/lib/paths";
 
-function sourceLabel(value: string): string {
-  return PRICE_SOURCES.find((s) => s.value === value)?.label ?? value;
-}
+const sourceLabel = priceSourceLabel;
 
 function seriesColor(i: number): string {
   return `hsl(${(i * 67) % 360} 65% 50%)`;
