@@ -67,3 +67,19 @@ export function approvalReport(
   ];
   return { ok, failed, title, items };
 }
+
+export const APPROVER_ROLE_TEXT = "Intern godkjenning krever godkjenner- eller admin-rolle";
+export const WRITE_ROLE_TEXT = "Føring av kostpris krever skrivetilgang til fakturaer";
+
+/**
+ * Massehandlingene i Godkjenning. Samme regler som databasen: godkjenning
+ * krever approve/admin, kostprisføring krever skrivetilgang.
+ */
+export function bulkActionGate(r: { canApprove: boolean; canWrite: boolean }) {
+  return {
+    approve: r.canApprove,
+    approveReason: r.canApprove ? null : APPROVER_ROLE_TEXT,
+    costs: r.canWrite,
+    costsReason: r.canWrite ? null : WRITE_ROLE_TEXT,
+  };
+}

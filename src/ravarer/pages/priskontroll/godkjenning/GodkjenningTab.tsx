@@ -25,11 +25,11 @@ import { DeliveryTimeline } from "@/ravarer/pages/priskontroll/faktura/DeliveryT
 import { blockerLabel } from "@/fakturaer/lib/approval";
 import { ApprovalHistorySheet } from "./ApprovalHistorySheet";
 import { ApprovedBy, approvalColumns, RowMenu } from "./approvalColumns";
-import { approvalReport, countByStatus, filterApprovalRows, GODKJENNING_LABEL, GODKJENNING_STATUSER, parseGodkjenningStatus, type GodkjenningStatus } from "./approvalLogic";
+import { APPROVER_ROLE_TEXT, WRITE_ROLE_TEXT, bulkActionGate, approvalReport, countByStatus, filterApprovalRows, GODKJENNING_LABEL, GODKJENNING_STATUSER, parseGodkjenningStatus, type GodkjenningStatus } from "./approvalLogic";
 import { approvalSteps, useApprovalDelivery, useApprovalOverview } from "./useGodkjenning";
 
 const PAGE = 25;
-export const APPROVER_ROLE_TEXT = "Intern godkjenning krever godkjenner- eller admin-rolle";
+export { APPROVER_ROLE_TEXT, WRITE_ROLE_TEXT } from "./approvalLogic";
 
 type Result = { title: string; items: string[]; error: boolean } | null;
 
@@ -39,7 +39,8 @@ export function GodkjenningTab() {
   const location = useLocation();
   const [sp, setSp] = useSearchParams();
   const { data: company } = useCompany();
-  const { canApprove } = useInvoiceRights();
+  const { canApprove, canWrite } = useInvoiceRights();
+  const gate = bulkActionGate({ canApprove, canWrite });
   const status = parseGodkjenningStatus(sp.get("status"));
   const leverandor = sp.get("leverandor");
   const page = Math.max(1, Number(sp.get("side") ?? "1") || 1);
@@ -187,9 +188,9 @@ export function GodkjenningTab() {
             <strong>{chosenRows.length}</strong> valgt{sums.length > 0 && ` · ${sums.map((c) => `${formatMoney(c.total, c.currency)} inkl. mva.`).join(" · ")}`}
           </span>
           <span className="flex-1" />
-          {!canApprove && <span className="text-caption text-ink-secondary">{APPROVER_ROLE_TEXT}</span>}
-          <Button size="sm" disabled={!canApprove || approvable.length === 0 || !!progress} title={!canApprove ? APPROVER_ROLE_TEXT : undefined} onClick={() => setConfirm("approve")}>Godkjenn valgte ({approvable.length})</Button>
-          <Button size="sm" variant="outline" disabled={!canApprove || postable.length === 0 || !!progress} title={!canApprove ? APPROVER_ROLE_TEXT : undefined} onClick={() => setConfirm("costs")}>Før kostpris for trygge linjer ({postable.length})</Button>
+          {(gate.approveReason || gate.costsReason) && <span className="text-caption text-ink-secondary">{[gate.approveReason, gate.costsReason].filter(Boolean).join(" · ")}</span>}
+          <Button size="sm" disabled={!gate.approve || approvable.length === 0 || !!progress} title={gate.approveReason ?? undefined} onClick={() => setConfirm("approve")}>Godkjenn valgte ({approvable.length})</Button>
+          <Button size="sm" variant="outline" disabled={!gate.costs || postable.length === 0 || !!progress} title={gate.costsReason ?? undefined} onClick={() => setConfirm("costs")}>Før kostpris for trygge linjer ({postable.length})</Button>
           <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Fjern valg</Button>
         </div>
       )}
