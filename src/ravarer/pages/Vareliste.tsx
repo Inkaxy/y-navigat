@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { isVarelisteMode, listeHref, viewForListe, VIEW_TO_LISTE, type Liste } from "@/ravarer/lib/varerWorklist";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -99,7 +100,16 @@ function csvCell(value: string): string {
   return /[";\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
-export default function VarelistePage() {
+export interface VarelisteProps {
+  /** Arbeidsliste i varearbeidsflaten (vareliste-familien). */
+  liste?: Liste;
+  /** Radklikk åpner peek-panelet i stedet for full side (lenker beholder full side / ctrl-klikk). */
+  onPeek?: (id: string) => void;
+  /** Rad vist i peek-panelet (aktiv rad — ikke det samme som avkrysset utvalg). */
+  activeId?: string | null;
+}
+
+export default function VarelistePage({ liste, onPeek, activeId = null }: VarelisteProps = {}) {
   const { canWrite, legalEntityId, loading: accessLoading } = useRavarer();
   const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
@@ -657,6 +667,8 @@ export default function VarelistePage() {
                       categoryOptions={allCategoryOptions}
                       selected={selected.has(item.id)}
                       focused={focusedId === item.id}
+                      active={activeId === item.id}
+                      onPeek={onPeek}
                       canWrite={canWrite}
                       tolerance={tolerances.toleranceFor(item.categories[0])}
                       hardCap={hardCap}

@@ -20,6 +20,10 @@ export interface VarelisteRowProps {
   hiddenColumns: readonly string[];
   selected: boolean;
   focused: boolean;
+  /** Raden vises i peek-panelet. */
+  active?: boolean;
+  /** Radklikk åpner peek i stedet for full side. */
+  onPeek?: (id: string) => void;
   canWrite: boolean;
   tolerance: number;
   hardCap: number;
@@ -198,6 +202,8 @@ function RowInner({
   hiddenColumns,
   selected,
   focused,
+  active = false,
+  onPeek,
   canWrite,
   tolerance,
   hardCap,
@@ -223,7 +229,8 @@ function RowInner({
       return;
     }
     if (window.getSelection()?.toString()) return;
-    navigate(detailUrl);
+    if (onPeek) onPeek(item.id);
+    else navigate(detailUrl);
   };
 
   return (
@@ -231,7 +238,9 @@ function RowInner({
       className={cn(
         "cursor-pointer border-t border-border/60 odd:bg-muted/20 hover:bg-muted/50",
         focused && "ring-1 ring-inset ring-primary/50",
+        active && "bg-primary/10 odd:bg-primary/10",
       )}
+      aria-current={active ? "true" : undefined}
       onMouseDown={() => onFocusRow(item.id)}
       onClick={onRowClick}
     >
