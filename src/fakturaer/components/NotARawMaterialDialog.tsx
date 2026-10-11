@@ -14,7 +14,7 @@ import { NOT_A_PRODUCT_REASONS } from "@/ravarer/lib/notAProductReasons";
 
 
 
-export function NotARawMaterialDialog({ open, onOpenChange, line, onDone }: { open: boolean; onOpenChange: (v: boolean) => void; line: ReviewLineRow | null; /** Kalles etter vellykket lagring (f.eks. for angring). */ onDone?: (line: ReviewLineRow) => void }) {
+export function NotARawMaterialDialog({ open, onOpenChange, line, onDone }: { open: boolean; onOpenChange: (v: boolean) => void; line: ReviewLineRow | null; /** Kalles etter vellykket lagring (f.eks. for angring). `patternId` er regelen for fremtidige fakturaer, når den ble lagret. */ onDone?: (line: ReviewLineRow, info: { patternId: string | null }) => void }) {
   const qc = useQueryClient();
   const [reason, setReason] = useState("Frakt");
   const [other, setOther] = useState("");
@@ -37,30 +37,36 @@ export function NotARawMaterialDialog({ open, onOpenChange, line, onDone }: { op
       const { data: { user } } = await supabase.auth.getUser();
       const nowIso = new Date().toISOString();
 
-      await supabase.from("invoice_lines").update({
+      const upd = await supabase.from("invoice_lines").update({
         match_confidence: "not_applicable", requires_review: false, review_reason: null,
         resolution_note: finalReason, resolved_by: user?.id, resolved_at: nowIso,
       }).eq("id", line.id);
+      if (upd.error) throw new Error("Kunne ikke merke linjen som ikke vare");
+      let patternId: string | null = null;
 
       if (remember) {
         const patternValue = patternType === "exact_sku" ? line.supplier_sku
           : patternType === "exact_description" ? line.description
           : (line.description ?? "").split(/\s+/).slice(0, 3).join(" ");
         if (patternValue) {
-          await supabase.from("invoice_line_exclusion_patterns").insert({
+          const ins = await supabase.from("invoice_line_exclusion_patterns").insert({
             legal_entity_id: line.invoice.legal_entity_id, supplier_id: line.invoice.supplier_id,
             pattern_type: patternType, pattern_value: patternValue, reason: finalReason, created_by: user?.id,
-          });
+          }).select("id").single();
+          if (ins.error) throw new Error("Linjen er merket som ikke vare, men regelen for fremtidige fakturaer ble ikke lagret");
+          patternId = ins.data.id;
         }
       }
 
       toast.success("Markert som ikke vare");
       qc.invalidateQueries({ queryKey: ["fakturaer-review-lines"] });
       qc.invalidateQueries({ queryKey: ["fakturaer-review-count"] });
-      onDone?.(line);
+      onDone?.(line, { patternId });
       onOpenChange(false);
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Feil");
+      toast.error(e instanceof Error ? e.message : "Kunne ikke lagre");
+      // Linjen kan være oppdatert selv om regelen feilet — hent listene på nytt.
+      qc.invalidateQueries({ queryKey: ["fakturaer-review-lines"] });
     } finally { setBusy(false); }
   }
 
