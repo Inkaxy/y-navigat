@@ -23,6 +23,8 @@ export interface DeliveryInvoice {
   open_count: number;
   lines_sum_status: string | null;
   reconciled_mode?: string | null;
+  /** Kreditnota: kostprisføring er ikke relevant (RPC-en avviser dem). */
+  is_credit_note?: boolean | null;
 }
 
 export interface DeliveryExtras {
@@ -35,6 +37,14 @@ const EXTRACTION_PENDING = ["pending", "failed", "processing"];
 export function hasLinesRead(inv: Pick<DeliveryInvoice, "line_count" | "lines_source" | "line_extraction_status">): boolean {
   if (inv.lines_source === "manual") return true;
   return inv.line_count > 0 && !EXTRACTION_PENDING.includes(inv.line_extraction_status ?? "");
+}
+
+/**
+ * «Hent linjer» gjør bare noe når linjene ikke allerede er lest
+ * (`rm_claim_invoice_line_extraction` tar bare `line_extraction_status <> 'done'`).
+ */
+export function canFetchLines(inv: { source: string | null; line_extraction_status?: string | null }): boolean {
+  return inv.source === "tripletex" && inv.line_extraction_status !== "done";
 }
 
 /** Summen er kontrollert når den er ok eller overstyrt — ikke ved avvik eller ukontrollert. */
@@ -65,12 +75,14 @@ export function deliverySteps(inv: DeliveryInvoice, extras: DeliveryExtras): Del
     },
     { key: "avstemt", label: "Avstemt", done: avstemt, detail: avstemt ? `Avstemt ${mode}` : "Ikke avstemt" },
     { key: "godkjent", label: "Godkjent", done: extras.approved, detail: extras.approved ? "Internt godkjent" : "Ikke godkjent" },
-    { key: "kostpris", label: "Kostpris ført", done: extras.costPosted, detail: extras.costPosted ? "Kostpris er ført" : "Kostpris er ikke ført" },
+    inv.is_credit_note
+      ? { key: "kostpris", label: "Kostpris ført", done: true, detail: "Ikke relevant for kreditnota" }
+      : { key: "kostpris", label: "Kostpris ført", done: extras.costPosted, detail: extras.costPosted ? "Kostpris er ført" : "Kostpris er ikke ført" },
   ];
 }
 
 export type NextStepKey =
-  | "flagget" | "hent_linjer" | "registrer_linjer" | "rett_sum" | "avklar" | "avstem" | "godkjenn" | "kostpris" | "ferdig";
+  | "flagget" | "koble_kreditnota" | "hent_linjer" | "registrer_linjer" | "rett_sum" | "avklar" | "avstem" | "godkjenn" | "kostpris" | "ferdig";
 
 export interface NextStep {
   key: NextStepKey;
@@ -89,6 +101,12 @@ export interface NextStepInput extends DeliveryInvoice, DeliveryExtras {
   canWrite: boolean;
   canReconcileRight: boolean;
   canApprove: boolean;
+  /** Skrivetilgang til fakturaer (`useInvoiceRights().canWrite`) — det databasen krever for kostprisføring. */
+  canPostCosts?: boolean;
+  /** Kreditnotaen er ikke koblet til en opprinnelig faktura. */
+  creditNoteUnlinked?: boolean;
+  /** Siste kostprisføring fant ingen trygge linjer — steget regnes som ferdig. */
+  noSafeLines?: boolean;
 }
 
 /** ÉN primærhandling — alltid neste steg i leveransen. */
@@ -96,8 +114,11 @@ export function nextInvoiceStep(i: NextStepInput): NextStep {
   if (i.status === "flagged") {
     return { key: "flagget", label: "Fjern flagg", enabled: i.canWrite, hint: "Fakturaen er flagget for oppfølging." };
   }
+  if (i.is_credit_note && i.creditNoteUnlinked && i.status !== "reconciled") {
+    return { key: "koble_kreditnota", label: "Koble kreditnota", enabled: i.canWrite, hint: "Kreditnotaen er ikke koblet til den opprinnelige fakturaen." };
+  }
   if (!hasLinesRead(i) || i.line_count === 0) {
-    return i.source === "tripletex"
+    return canFetchLines(i)
       ? { key: "hent_linjer", label: "Hent linjer", enabled: i.canWrite, hint: "Linjene er ikke hentet fra Tripletex ennå." }
       : { key: "registrer_linjer", label: "Registrer linjer", enabled: i.canWrite, hint: "Linjene må registreres manuelt." };
   }
@@ -121,10 +142,17 @@ export function nextInvoiceStep(i: NextStepInput): NextStep {
       hint: i.canApprove ? "Intern godkjenning. Utløser ikke betaling." : "Krever godkjennerrolle (godkjenne eller admin).",
     };
   }
+  if (i.is_credit_note) {
+    return { key: "ferdig", label: "Ferdig", enabled: false, hint: "Kreditnotaen er avstemt og godkjent. Kostprisføring gjelder ikke kreditnotaer." };
+  }
+  if (i.noSafeLines && !i.costPosted) {
+    return { key: "ferdig", label: "Ferdig", enabled: false, hint: "Ingen trygge linjer å føre kostpris for." };
+  }
   if (!i.costPosted) {
+    const can = i.canPostCosts ?? i.canWrite;
     return {
-      key: "kostpris", label: "Før kostpris", enabled: i.canWrite,
-      hint: i.canWrite ? "Fører kostpris for de trygge linjene." : "Du har ikke skrivetilgang.",
+      key: "kostpris", label: "Før kostpris", enabled: can,
+      hint: can ? "Fører kostpris for de trygge linjene." : "Føring av kostpris krever skrivetilgang til fakturaer.",
     };
   }
   return { key: "ferdig", label: "Ferdig", enabled: false, hint: "Fakturaen er avstemt, godkjent og kostpris er ført." };

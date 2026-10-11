@@ -15,7 +15,7 @@ import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBan
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
 import { useSuppliersFor } from "@/fakturaer/hooks/useSuppliersFor";
-import { todayIso } from "@/fakturaer/lib/constants";
+import { todayIso, LOW_EXTRACTION_CONFIDENCE } from "@/fakturaer/lib/constants";
 import { computeLinesSum } from "@/fakturaer/lib/linesSum";
 import { cn } from "@/lib/utils";
 import { runAutoMatchAfterImport } from "@/fakturaer/lib/queueActions";
@@ -60,7 +60,7 @@ interface ParseResult {
 
 const LOW_CONF = 0.8;
 /** Under denne lesesikkerheten må fakturaen gjennomgås manuelt. */
-const LOW_EXTRACTION_CONF = 0.7;
+const LOW_EXTRACTION_CONF = LOW_EXTRACTION_CONFIDENCE;
 
 
 async function fileToBase64(file: File): Promise<string> {

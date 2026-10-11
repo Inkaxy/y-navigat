@@ -15,9 +15,8 @@ import { SupplierItemHistory } from "@/fakturaer/components/supplier-item/Suppli
 import { AuditHistory } from "@/fakturaer/components/decisions/AuditHistory";
 import { RawMaterialCreateSheet } from "@/ravarer/editors/RawMaterialCreateSheet";
 import { NOT_A_PRODUCT_REASONS } from "@/ravarer/lib/notAProductReasons";
-import { savePrimaryChoice } from "@/ravarer/lib/primaryChoice";
+import { savePrimaryAndRefresh } from "@/ravarer/lib/primaryChoice";
 import { paths } from "@/ravarer/lib/paths";
-import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { ResultBox } from "@/ravarer/ui/ResultBox";
 import { VarekortHeaderView, VBlock } from "./VarekortHeaderView";
 import { PriceBlock, hasPriceWork } from "./PriceBlock";
@@ -103,9 +102,7 @@ function VarekortBody({ item, lines, canWrite, onDone, onNext, onSkip, onClose }
     if (!primary || !item.rm_id) return true;
     setPrimarySaving(true);
     try {
-      await savePrimaryChoice(true, item);
-      invalidateRawMaterial(qc, item.rm_id);
-      void qc.invalidateQueries({ queryKey: ["supplier-items"] });
+      await savePrimaryAndRefresh(qc, true, item);
       setPrimary(false);
       return true;
     } catch (e) {

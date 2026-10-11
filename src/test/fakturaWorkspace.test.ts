@@ -123,7 +123,7 @@ describe("hurtigtaster i arbeidsflaten", () => {
   const k = (over: Partial<WorkspaceKeys> = {}) => {
     const calls: string[] = [];
     const h: WorkspaceKeys = {
-      enabled: true, activeLine: null, next: () => calls.push("next"), prev: () => calls.push("prev"), enter: () => calls.push("enter"),
+      enabled: true, canWrite: true, activeLine: null, next: () => calls.push("next"), prev: () => calls.push("prev"), enter: () => calls.push("enter"),
       editMaterial: () => calls.push("m"), create: () => calls.push("n"), notItem: () => calls.push("x"), undo: () => calls.push("u"),
       toggleDoc: () => calls.push("d"), escape: () => calls.push("esc"), help: () => calls.push("?"), ...over,
     };

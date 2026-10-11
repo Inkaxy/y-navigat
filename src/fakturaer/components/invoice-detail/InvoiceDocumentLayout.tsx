@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { InvoiceDocumentPanel } from "@/fakturaer/components/InvoiceDocumentPanel";
-import { formatNok, formatDate, INVOICE_SOURCES } from "@/fakturaer/lib/constants";
+import { formatNok, formatDate, INVOICE_SOURCES, LOW_EXTRACTION_CONFIDENCE } from "@/fakturaer/lib/constants";
 import { formatVariancePct } from "@/fakturaer/lib/linesSum";
 import type { InvoiceDetailData } from "./fetchInvoiceDetail";
 
@@ -11,7 +11,7 @@ import type { InvoiceDetailData } from "./fetchInvoiceDetail";
 export function InvoiceDetailsCard({ data }: { data: InvoiceDetailData }) {
   const sourceMeta = INVOICE_SOURCES.find((s) => s.value === data.source);
   const sumMismatch = data.lines_sum_status === "mismatch";
-  const lowConfidence = data.extraction_confidence != null && Number(data.extraction_confidence) < 0.7;
+  const lowConfidence = data.extraction_confidence != null && Number(data.extraction_confidence) < LOW_EXTRACTION_CONFIDENCE;
   return (
   <Card className="p-6 lg:col-span-1">
     <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-ink-secondary">Detaljer</h3>

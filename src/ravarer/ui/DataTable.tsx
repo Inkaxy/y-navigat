@@ -41,6 +41,12 @@ type Props<T> = {
   renderMobileCard?: (row: T) => ReactNode;
   footer?: ReactNode;
   hotkeys?: boolean;
+  /**
+   * Styrt sortering: radene er allerede sortert av kalleren (f.eks. på serveren
+   * eller over hele listen før sideinndeling). DataTable sorterer da ikke selv.
+   */
+  sort?: { id: string; dir: SortDir } | null;
+  onSortChange?: (s: { id: string; dir: SortDir } | null) => void;
   ariaLabel: string;
 };
 
@@ -48,7 +54,9 @@ const ALIGN = { left: "text-left", right: "text-right", center: "text-center" } 
 
 export function DataTable<T>(p: Props<T>) {
   const navigate = useNavigate();
-  const [sort, setSort] = useState<{ id: string; dir: SortDir } | null>(null);
+  const [localSort, setLocalSort] = useState<{ id: string; dir: SortDir } | null>(null);
+  const controlled = !!p.onSortChange;
+  const sort = controlled ? p.sort ?? null : localSort;
   const anchor = useRef<string | null>(null);
   const defaultHidden = useMemo(() => p.columns.filter((c) => c.defaultHidden).map((c) => c.id), [p.columns]);
   const { value: hiddenPref, setValue: setHiddenPref } = useUiPreference<string[]>(p.preferenceScope ?? "ravarer:datatable:ephemeral", defaultHidden);
@@ -56,9 +64,10 @@ export function DataTable<T>(p: Props<T>) {
   const cols = p.columns.filter((c) => !hidden.has(c.id));
 
   const sorted = useMemo(() => {
+    if (controlled) return p.rows ?? [];
     const col = sort ? p.columns.find((c) => c.id === sort.id) : undefined;
     return sortRows(p.rows ?? [], col?.sortKey, sort?.dir ?? "asc");
-  }, [p.rows, p.columns, sort]);
+  }, [p.rows, p.columns, sort, controlled]);
   const ids = sorted.map(p.getId);
 
   const open = (row: T) => {
@@ -80,7 +89,9 @@ export function DataTable<T>(p: Props<T>) {
 
   const toggleSort = (c: Column<T>) => {
     if (!c.sortKey) return;
-    setSort((s) => (s?.id === c.id ? (s.dir === "asc" ? { id: c.id, dir: "desc" } : null) : { id: c.id, dir: "asc" }));
+    const next = (s: { id: string; dir: SortDir } | null) => (s?.id === c.id ? (s.dir === "asc" ? { id: c.id, dir: "desc" as const } : null) : { id: c.id, dir: "asc" as const });
+    if (controlled) p.onSortChange?.(next(sort));
+    else setLocalSort(next);
   };
 
   const onCheck = (id: string, e: MouseEvent) => {
@@ -125,7 +136,16 @@ export function DataTable<T>(p: Props<T>) {
         <ul className="space-y-2 md:hidden">
           {sorted.map((r) => (
             <li key={p.getId(r)}>
-              <button type="button" className="w-full text-left" onClick={() => open(r)}>{p.renderMobileCard?.(r)}</button>
+              {/* Ikke <button>: kortet kan ha egne knapper (ingen nøstede knapper). Knappene stopper klikket selv. */}
+              <div
+                role="link"
+                tabIndex={0}
+                className="w-full cursor-pointer rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => open(r)}
+                onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(r); } }}
+              >
+                {p.renderMobileCard?.(r)}
+              </div>
             </li>
           ))}
         </ul>

@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { InboxInvoice } from "@/fakturaer/hooks/useInboxInvoices";
 import { inboxPrimaryAction, type InboxPrimaryAction } from "@/fakturaer/lib/inbox";
+import { isFlaggable } from "@/fakturaer/lib/flagging";
+import { canFetchLines } from "@/ravarer/pages/priskontroll/faktura/invoiceSteps";
 
 export type RowAction = InboxPrimaryAction | "open" | "rematch" | "flag" | "unflag";
 
@@ -41,12 +43,12 @@ export function FakturaRowActions({ inv, canWrite, canReconcile, busy, onAction 
           {canWrite && !done && inv.line_count > 0 && !flagged && (
             <DropdownMenuItem onSelect={() => onAction(inv, "rematch")}>Kjør matching på nytt</DropdownMenuItem>
           )}
-          {canWrite && !done && !flagged && <DropdownMenuItem onSelect={() => onAction(inv, "flag")}>Flagg …</DropdownMenuItem>}
+          {canWrite && isFlaggable(inv.status) && <DropdownMenuItem onSelect={() => onAction(inv, "flag")}>Flagg …</DropdownMenuItem>}
           {canWrite && flagged && <DropdownMenuItem onSelect={() => onAction(inv, "unflag")}>Fjern flagg …</DropdownMenuItem>}
           {canWrite && !done && (
             <>
               <DropdownMenuSeparator />
-              {inv.source === "tripletex" && <DropdownMenuItem onSelect={() => onAction(inv, "fetch_lines")}>Hent linjer</DropdownMenuItem>}
+              {canFetchLines(inv) && <DropdownMenuItem onSelect={() => onAction(inv, "fetch_lines")}>Hent linjer</DropdownMenuItem>}
               <DropdownMenuItem onSelect={() => onAction(inv, "register_lines")}>Registrer linjer</DropdownMenuItem>
               {inv.is_credit_note && <DropdownMenuItem onSelect={() => onAction(inv, "link_credit_note")}>Koble kreditnota</DropdownMenuItem>}
             </>

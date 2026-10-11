@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/supabasePaging";
 import type { DeliveryExtras } from "@/ravarer/pages/priskontroll/faktura/invoiceSteps";
 
 export type DeliveryExtrasMap = ReadonlyMap<string, DeliveryExtras>;
@@ -21,14 +22,16 @@ export function useInvoiceDeliveryStatus(ids: readonly string[]) {
     enabled: sorted.length > 0,
     staleTime: 30_000,
     queryFn: async (): Promise<DeliveryExtrasMap> => {
+      // Kostprisføringer er per linje og kan passere API-ets grense på 1000 rader:
+      // hent side for side og dedupliser, så ingen faktura mister «Kostpris ført».
       const [appr, cost] = await Promise.all([
-        supabase.from("invoice_internal_approvals").select("invoice_id").in("invoice_id", sorted).eq("status", "approved").limit(sorted.length * 2),
-        supabase.from("invoice_line_cost_postings").select("invoice_id").in("invoice_id", sorted).is("revoked_at", null).limit(5000),
+        fetchAllRows<{ invoice_id: string }>((from, to) =>
+          supabase.from("invoice_internal_approvals").select("invoice_id").in("invoice_id", sorted).eq("status", "approved").order("invoice_id").range(from, to)),
+        fetchAllRows<{ invoice_id: string }>((from, to) =>
+          supabase.from("invoice_line_cost_postings").select("invoice_id").in("invoice_id", sorted).is("revoked_at", null).order("invoice_id").range(from, to)),
       ]);
-      if (appr.error) throw appr.error;
-      if (cost.error) throw cost.error;
-      const approved = new Set((appr.data ?? []).map((r) => r.invoice_id));
-      const posted = new Set((cost.data ?? []).map((r) => r.invoice_id));
+      const approved = new Set(appr.map((r) => r.invoice_id));
+      const posted = new Set(cost.map((r) => r.invoice_id));
       const out = new Map<string, DeliveryExtras>();
       for (const id of sorted) out.set(id, { approved: approved.has(id), costPosted: posted.has(id) });
       return out;

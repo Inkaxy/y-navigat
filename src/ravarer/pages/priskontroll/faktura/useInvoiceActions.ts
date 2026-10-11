@@ -17,7 +17,7 @@ export function useFetchInvoiceLines() {
   return useMutation({
     mutationFn: async (inv: { id: string; legal_entity_id: string; source: string | null }) => {
       if (inv.source !== "tripletex") throw new Error("Linjer kan bare hentes for Tripletex-fakturaer.");
-      const { data, error } = await supabase.functions.invoke<{ feilet?: number }>("tripletex-import-invoice-lines", {
+      const { data, error } = await supabase.functions.invoke<{ feilet?: number; behandlet?: number }>("tripletex-import-invoice-lines", {
         body: { legal_entity_id: inv.legal_entity_id, invoice_id: inv.id, limit: 1 },
       });
       if (error) {
@@ -25,7 +25,8 @@ export function useFetchInvoiceLines() {
         throw new Error("Linjene kunne ikke hentes. Prøv igjen.");
       }
       if (Number(data?.feilet ?? 0) > 0) throw new Error("Linjene kunne ikke hentes fra fakturaen.");
-      return true;
+      // Edge-funksjonen tar bare fakturaer der linjene ikke allerede er lest.
+      return { behandlet: Number(data?.behandlet ?? 0) };
     },
     onSuccess: (_r, inv) => invalidate(qc, inv.id),
   });

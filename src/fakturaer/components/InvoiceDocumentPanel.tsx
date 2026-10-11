@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { X, AlertTriangle, RefreshCw } from "lucide-react";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
 import { useInvoiceDocumentUrl } from "@/fakturaer/hooks/useInvoiceDocument";
-import { formatNok, formatDate } from "@/fakturaer/lib/constants";
+import { formatNok, formatDate, LOW_EXTRACTION_CONFIDENCE } from "@/fakturaer/lib/constants";
 import { cn } from "@/lib/utils";
 import { FALLBACK_TOLERANCE_PCT } from "@/fakturaer/hooks/useMatchTolerances";
 
@@ -60,7 +60,7 @@ export function InvoiceDocumentPanel({ invoice, line, onClose, className, tolera
   const exclVat = total != null ? total - (vat ?? 0) : null;
   const mismatch = invoice?.lines_sum_status === "mismatch";
   const confidence = num(invoice?.extraction_confidence);
-  const lowConfidence = confidence != null && confidence < 0.7;
+  const lowConfidence = confidence != null && confidence < LOW_EXTRACTION_CONFIDENCE;
 
   const variance = num(line?.price_variance_pct);
   const varianceTone =

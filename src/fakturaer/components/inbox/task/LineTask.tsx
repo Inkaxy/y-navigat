@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, FileText, Loader2, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -7,6 +7,7 @@ import { formatMoney } from "@/fakturaer/lib/constants";
 import { fmtNum, invoiceArithmeticMismatch } from "@/fakturaer/lib/units";
 import { GENERIC_ERROR_MESSAGE } from "@/lib/userError";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
+import { shouldOpenEditMaterial, type EditMaterialSignal } from "@/fakturaer/lib/editMaterialSignal";
 import type { SupplierLinkRow } from "@/fakturaer/hooks/useSupplierLinkContext";
 import { useLineMatchForm } from "@/fakturaer/hooks/useLineMatchForm";
 import { recalculateLines } from "@/fakturaer/lib/acceptMatch";
@@ -40,8 +41,8 @@ export interface LineTaskProps {
   onSecondary: (a: SecondaryAction, line: ReviewLineRow) => void;
   onShowDocument: (line: ReviewLineRow) => void;
   onReconcile: () => void;
-  /** Øk tallet for å åpne «Endre råvare» (tast M i arbeidsflaten). */
-  editMaterialSignal?: number;
+  /** Åpner «Endre råvare» (tast M i arbeidsflaten) — bare for linjen signalet gjelder. */
+  editMaterialSignal?: EditMaterialSignal | null;
 }
 
 /**
@@ -60,9 +61,12 @@ export function LineTask(p: LineTaskProps) {
   const [recalc, setRecalc] = useState<{ lineIds: string[] } | null>(null);
   const [recalcBusy, setRecalcBusy] = useState(false);
   const [agreedOpen, setAgreedOpen] = useState(false);
+  const handledSignal = useRef<number | null>(null);
   useEffect(() => {
-    if (p.editMaterialSignal && p.canWrite) setEditMaterial(true);
-  }, [p.editMaterialSignal, p.canWrite]);
+    if (!p.canWrite || !shouldOpenEditMaterial(p.editMaterialSignal, line.id, handledSignal.current)) return;
+    handledSignal.current = p.editMaterialSignal?.n ?? null;
+    setEditMaterial(true);
+  }, [p.editMaterialSignal, p.canWrite, line.id]);
 
   const mode: TaskMode = editMaterial ? "material" : editPackage ? "package" : taskCopy.modeFor(status.key);
   const copy = taskCopy.forStatus(status.key);

@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QueryState } from "@/components/common/QueryState";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
+import type { EditMaterialSignal } from "@/fakturaer/lib/editMaterialSignal";
 import type { SupplierLinkContext } from "@/fakturaer/hooks/useSupplierLinkContext";
 import type { LineStatus } from "@/fakturaer/lib/lineStatus";
 import { GROUP_LABELS, REVIEW_GROUPS, type QueueSort, type ReviewGroup } from "@/fakturaer/lib/reviewReasons";
@@ -64,7 +65,7 @@ export interface QueueWorkspaceProps {
   /** Vises øverst i inspektøren. */
   inspectorNote?: ReactNode;
   /** Øk tallet for å åpne «Endre råvare» i inspektøren (tast M). */
-  editMaterialSignal?: number;
+  editMaterialSignal?: EditMaterialSignal | null;
   /** Ekstra innhold over linjelisten (f.eks. fakta-kortet). */
   listHeader?: ReactNode;
 }
@@ -217,7 +218,7 @@ export function QueueWorkspace(p: QueueWorkspaceProps) {
             {toolbar}
             <Card className="p-0">{list}</Card>
             <Sheet open={!!inspector && !!p.inspectorOpen} onOpenChange={(v) => p.onInspectorOpenChange?.(v)}>
-              <SheetContent side="right" className="w-full overflow-y-auto p-3 sm:max-w-xl">
+              <SheetContent side="right" data-inspector-sheet="" className="w-full overflow-y-auto p-3 sm:max-w-xl">
                 <SheetTitle className="sr-only">Valgt fakturalinje</SheetTitle>
                 {inspector}
               </SheetContent>

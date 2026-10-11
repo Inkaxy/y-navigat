@@ -48,3 +48,6 @@ export function formatDate(value: string | Date | null | undefined): string {
 export function todayIso(): string {
   return osloTodayISO();
 }
+
+/** Grensen for «lav lesesikkerhet» på en faktura (0–1). Én verdi overalt. */
+export const LOW_EXTRACTION_CONFIDENCE = 0.7;

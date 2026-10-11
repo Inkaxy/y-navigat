@@ -1,8 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useUiPreference } from "@/hooks/useUiPreference";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { QueryState } from "@/components/common/QueryState";
@@ -18,9 +17,10 @@ import { isBulkAcceptable } from "@/fakturaer/lib/lineStatus";
 import { paths } from "@/ravarer/lib/paths";
 import { ResultBox } from "@/ravarer/ui/ResultBox";
 import { ShortcutHelp } from "@/ravarer/ui/ShortcutHelp";
-import { useRematchInvoices } from "@/ravarer/pages/priskontroll/gjore/useGjoreMutations";
+import { useConfirmMany } from "@/ravarer/ui/useConfirmMany";
+import type { EditMaterialSignal } from "@/fakturaer/lib/editMaterialSignal";
 import { FakturaerDialogs, type DialogState } from "@/ravarer/pages/priskontroll/fakturaer/FakturaerDialogs";
-import { fakturaBackHref } from "@/ravarer/pages/priskontroll/fakturaer/visning";
+import { fakturaBackHref, readReturnParam } from "@/ravarer/pages/priskontroll/fakturaer/visning";
 import { InvoiceFactsSection } from "./InvoiceFactsSection";
 import { LineDialogs, type LineDialog } from "./LineDialogs";
 import { SupplierItemScopeNote } from "./SupplierItemScopeNote";
@@ -30,6 +30,8 @@ import { useInvoiceLineQueue } from "./useInvoiceLineQueue";
 import { useInvoiceSteps } from "./useInvoiceSteps";
 import { useIsWide } from "./useIsWide";
 import { useWorkspaceHotkeys } from "./useWorkspaceHotkeys";
+import { useRematchWait } from "./useRematchWait";
+import { canFetchLines } from "./invoiceSteps";
 
 const LS_DOC = "nbhub.faktura.docpanel.open";
 const HELP = [
@@ -56,10 +58,12 @@ export default function FakturaWorkspace() {
   const s = useInvoiceSteps(data);
   const tolerances = useMatchTolerances(data?.legal_entity_id ?? null);
   const fetchLines = useFetchInvoiceLines();
-  const rematch = useRematchInvoices();
+  const rematch = useRematchWait(data?.legal_entity_id ?? null, () => { void detail.refetch(); q.refresh(); });
+  const confirmMany = useConfirmMany();
   const [docOpen, setDocOpen] = useState(() => localStorage.getItem(LS_DOC) === "1");
   const [inspectorOpen, setInspectorOpen] = useState(false);
-  const [editSignal, setEditSignal] = useState(0);
+  const [editSignal, setEditSignal] = useState<EditMaterialSignal | null>(null);
+  const [pendingFocus, setPendingFocus] = useState<string | null>(null);
   const [factsSignal, setFactsSignal] = useState(0);
   const [dialog, setDialog] = useState<DialogState>(null);
   const [lineDialog, setLineDialog] = useState<LineDialog>(null);
@@ -70,8 +74,28 @@ export default function FakturaWorkspace() {
   const [lastLinked, setLastLinked] = useState<{ rmsId: string; name: string } | null>(null);
   const [showLedger, setShowLedger] = useState(false);
 
+  const final = data?.status === "reconciled" || data?.status === "flagged";
+  // Linjene kan bare endres med skrivetilgang og når fakturaen ikke er avstemt/flagget.
+  const lineWrite = s.canWrite && !final;
   const toggleDoc = () => setDocOpen((v) => { localStorage.setItem(LS_DOC, v ? "0" : "1"); return !v; });
-  const editMaterial = () => { setEditSignal((n) => n + 1); setInspectorOpen(true); };
+  const editMaterial = (lineId?: string) => {
+    const target = lineId ?? q.activeLine?.id;
+    if (!target) return;
+    setEditSignal((p) => ({ lineId: target, n: (p?.n ?? 0) + 1 }));
+    setInspectorOpen(true);
+  };
+  // Signalet gjelder bare linjen det ble gitt for — glem det når brukeren går videre.
+  const activeId = q.activeLine?.id ?? null;
+  useEffect(() => {
+    if (editSignal && activeId && activeId !== editSignal.lineId && !pendingFocus) setEditSignal(null);
+  }, [activeId, editSignal, pendingFocus]);
+  // Fokus etter at listen er synkronisert (f.eks. når «bare åpne» slås av samtidig).
+  useEffect(() => {
+    if (!pendingFocus || !q.visible.some((l) => l.id === pendingFocus)) return;
+    q.dispatch({ type: "focus", id: pendingFocus });
+    setPendingFocus(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingFocus, q.visible]);
   const focusFirstOpen = () => {
     q.setOnlyOpen(true);
     const first = q.visible.find((l) => q.statusOf(l).bucket === "needs");
@@ -81,22 +105,17 @@ export default function FakturaWorkspace() {
   const doFetch = () => {
     if (!data) return;
     fetchLines.mutate(data, {
-      onSuccess: () => s.setResult({ title: "Linjene er hentet", items: [] }),
+      onSuccess: (r) => s.setResult(r.behandlet === 0 ? { title: "Ingenting å hente — linjene er allerede lest", items: [] } : { title: "Linjene er hentet", items: [] }),
       onError: (e: Error) => s.setResult({ title: "Linjene ble ikke hentet", items: [e.message], error: true }),
     });
   };
-  const doRematch = () => {
-    if (!data) return;
-    rematch.mutate([data.id], {
-      onSuccess: (r) => toast[r.queued ? "success" : "info"](r.queued ? "Fakturaen er lagt i kø — oppdateres om litt" : r.already_queued ? "Fakturaen ligger allerede i kø" : "Fakturaen kan ikke beregnes på nytt nå"),
-      onError: (e: Error) => toast.error(e.message),
-    });
-  };
+  const doRematch = () => { if (data) rematch.start(data.id); };
 
   const runPrimary = () => {
     if (!data || !s.next) return;
     const k = s.next.key;
     if (k === "flagget") setDialog({ kind: "unflag", inv: data });
+    else if (k === "koble_kreditnota") setDialog({ kind: "credit", inv: data });
     else if (k === "hent_linjer") doFetch();
     else if (k === "registrer_linjer") navigate(paths.registrerLinjer(data.id));
     else if (k === "rett_sum") setFactsSignal((n) => n + 1);
@@ -107,7 +126,7 @@ export default function FakturaWorkspace() {
   };
   const onMenu = (a: HeaderMenuAction) => {
     if (!data) return;
-    if (a === "flag") setDialog({ kind: "flag", ids: [data.id] });
+    if (a === "flag") { if (data.status !== "reconciled" && data.status !== "flagged") setDialog({ kind: "flag", ids: [data.id] }); }
     else if (a === "unflag") setDialog({ kind: "unflag", inv: data });
     else if (a === "rematch") doRematch();
     else if (a === "fetch") doFetch();
@@ -119,22 +138,23 @@ export default function FakturaWorkspace() {
   const anyDialog = !!dialog || !!lineDialog || historyOpen || helpOpen || !!q.bulkLink;
   const keys = useMemo(() => ({
     enabled: !!data && !anyDialog,
+    canWrite: lineWrite,
     activeLine: q.activeLine,
     next: () => q.dispatch({ type: "next" }),
     prev: () => q.dispatch({ type: "prev" }),
     enter: (l: typeof q.activeLine) => {
-      if (l && s.canWrite && !l.raw_material_id && q.statusOf(l).key === "confirm_material") void q.accept(l);
+      if (l && lineWrite && !l.raw_material_id && q.statusOf(l).key === "confirm_material") void q.accept(l);
       else document.querySelector<HTMLButtonElement>('[aria-label="Valgt fakturalinje"] footer button[aria-describedby]:not([disabled])')?.click();
     },
-    editMaterial,
+    editMaterial: () => editMaterial(),
     create: (l: NonNullable<typeof q.activeLine>) => setLineDialog({ kind: "create", line: l }),
     notItem: (l: NonNullable<typeof q.activeLine>) => setLineDialog({ kind: "not_rm", line: l }),
     undo: () => void q.undo(),
     toggleDoc,
-    escape: () => (docOpen && !wide ? setDocOpen(false) : setInspectorOpen(false)),
+    escape: () => (docOpen && !wide ? toggleDoc() : setInspectorOpen(false)),
     help: () => setHelpOpen(true),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [data, anyDialog, q.activeLine, q.accept, q.undo, s.canWrite, docOpen, wide]);
+  }), [data, anyDialog, q.activeLine, q.accept, q.undo, lineWrite, docOpen, wide]);
   useWorkspaceHotkeys(keys);
 
   if (!id) return null;
@@ -153,11 +173,13 @@ export default function FakturaWorkspace() {
     />
   );
   const showDocZone = docOpen && wide && !!data.source_document_url;
-  const final = data.status === "reconciled" || data.status === "flagged";
+  const lockNote = final ? (data.status === "reconciled" ? "Fakturaen er avstemt — linjene er låst" : "Fakturaen er flagget — linjene er låst") : null;
+  const notApplicableCount = q.selectedLines.length;
 
   const linesZone = (
     <div className="min-w-0 space-y-3">
       <InvoiceFactsSection data={data} canWrite={s.canWrite} fetchingLines={fetchLines.isPending} onFetchLines={doFetch} onChanged={() => void detail.refetch()} openSignal={factsSignal} />
+      {lockNote && <p role="note" className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-ink-secondary">{lockNote}</p>}
       {s.result && <ResultBox title={s.result.title} items={s.result.items} onUndo={s.result.undoable && q.undoEntry ? () => { s.setResult(null); void q.undo(); } : undefined} onNext={() => s.setResult(null)} nextLabel="Lukk" />}
       {lastLinked && <SimilarLinesHint rmsId={lastLinked.rmsId} name={lastLinked.name} onOpen={() => q.setBulkLink(lastLinked)} onDismiss={() => setLastLinked(null)} />}
       <div className="flex justify-end">
@@ -168,12 +190,12 @@ export default function FakturaWorkspace() {
           lines={data.invoice_lines ?? []}
           supplierId={data.supplier_id}
           canBulkImport={false}
-          canMatch={s.canWrite && !final}
+          canMatch={lineWrite}
           selected={{}}
           onSelect={() => undefined}
           showLedgerAccount={showLedger}
           onShowLedgerAccount={setShowLedger}
-          onMatch={(lineId) => { setTableView(false); q.setOnlyOpen(false); q.dispatch({ type: "focus", id: lineId }); editMaterial(); }}
+          onMatch={(lineId) => { setTableView(false); q.setOnlyOpen(false); setPendingFocus(lineId); editMaterial(lineId); }}
           onRegister={() => navigate(paths.registrerLinjer(data.id))}
           tolerancePct={tolerances.defaultPct}
           settings={tolerances.settings}
@@ -203,14 +225,15 @@ export default function FakturaWorkspace() {
           onToggleSelect={(lid, v) => q.setSelected((x) => ({ ...x, [lid]: v }))}
           bulk={{
             count: q.selectedLines.length, acceptable: q.selectedLines.filter(isBulkAcceptable).length, busy: q.bulkBusy,
-            onAccept: () => void q.bulkAccept(), onNotApplicable: () => void q.bulkNotApplicable(),
+            onAccept: () => { const n = q.selectedLines.filter(isBulkAcceptable).length; confirmMany.guard(n, "Godta forslag", () => void q.bulkAccept()); },
+            onNotApplicable: () => confirmMany.guard(notApplicableCount, "«Ikke vare»", () => void q.bulkNotApplicable()),
             onCreate: () => setLineDialog({ kind: "bulk_create", line: null }), onClear: () => q.setSelected({}),
             onImport: () => setLineDialog({ kind: "bulk_import", line: null }), importable: q.selectedLines.filter((l) => !l.raw_material_id).length,
           }}
           links={q.links}
           toleranceFor={q.toleranceFor}
           showInvoice={false}
-          canWrite={s.canWrite}
+          canWrite={lineWrite}
           reconcileReady={s.next.key === "avstem" && s.next.enabled}
           isMobile={isMobile}
           countsError={q.countsQuery.isError}
@@ -232,7 +255,7 @@ export default function FakturaWorkspace() {
   return (
     <div className="space-y-4">
       <WorkspaceHeader
-        backHref={fakturaBackHref(sp.get("fra"))}
+        backHref={fakturaBackHref(readReturnParam(sp))}
         supplier={data.suppliers?.name ?? "Leverandør"}
         invoiceNumber={data.invoice_number}
         invoiceDate={data.invoice_date}
@@ -250,8 +273,10 @@ export default function FakturaWorkspace() {
         docOpen={docOpen}
         onToggleDoc={toggleDoc}
         canWrite={s.canWrite}
-        isTripletex={data.source === "tripletex"}
-        rematchBusy={rematch.isPending}
+        canFetch={canFetchLines(data)}
+        rematchBusy={rematch.busy}
+        rematchNote={rematch.note}
+        lineProgress={{ done: q.total - q.needs, total: q.total }}
         onMenu={onMenu}
       />
       {showDocZone ? (
@@ -273,7 +298,8 @@ export default function FakturaWorkspace() {
       </Sheet>
       <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} bindings={HELP} />
       <FakturaerDialogs state={dialog} onClose={() => setDialog(null)} onDone={(k) => { if (k !== "flag") setDialog(null); void detail.refetch(); }} />
-      <LineDialogs dialog={lineDialog} onClose={() => setLineDialog(null)} q={q} canWrite={s.canWrite} invoice={data} onEditMaterial={editMaterial}
+      {confirmMany.dialog}
+      <LineDialogs dialog={lineDialog} onClose={() => setLineDialog(null)} q={q} canWrite={lineWrite} invoice={data} onEditMaterial={() => editMaterial()}
         onNotItemDone={(l) => { q.remember(l, `Ikke vare: ${l.description ?? "linje"}`); q.refresh(); s.setResult({ title: "Linjen er merket som ikke vare", items: [l.description ?? ""].filter(Boolean), undoable: true }); }} />
     </div>
   );

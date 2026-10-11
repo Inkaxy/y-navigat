@@ -27,7 +27,7 @@ import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
 import { useInvoices, useInvoiceSuppliers, type InvoiceSortKey, type SortDir } from "@/fakturaer/hooks/useInvoices";
 import { getPaidBadgeInfo } from "@/fakturaer/lib/paidStatus";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
-import { formatNok, formatDate, INVOICE_STATUSES, INVOICE_SOURCES } from "@/fakturaer/lib/constants";
+import { formatNok, formatDate, INVOICE_STATUSES, INVOICE_SOURCES, LOW_EXTRACTION_CONFIDENCE } from "@/fakturaer/lib/constants";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { useReviewCount } from "@/fakturaer/hooks/useReviewCount";
 import { TripletexStatusCard } from "@/ravarer/components/TripletexStatusCard";
@@ -386,7 +386,7 @@ export default function FakturaerListPage() {
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <InvoiceStatusBadge status={r.status} reconciledMode={r.reconciled_mode} />
-                            {r.extraction_confidence != null && Number(r.extraction_confidence) < 0.7 && (
+                            {r.extraction_confidence != null && Number(r.extraction_confidence) < LOW_EXTRACTION_CONFIDENCE && (
                               <Badge
                                 variant="outline"
                                 className="gap-1 border-warning/30 bg-warning/15 text-warning"

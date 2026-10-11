@@ -14,7 +14,8 @@ type Props = {
 /** Tall per chip: serverens sammendrag der det finnes, ellers listesvaret. */
 export function chipCount(v: FakturaVisning, c: Counts): number | null {
   if (v === "trenger") return c.trenger ?? null;
-  if (v === "klar") return c.inv?.ready_to_reconcile ?? c.klar ?? null;
+  // Samme tall som listen viser (klientens vurdering), serverens sammendrag bare som reserve.
+  if (v === "klar") return c.klar ?? c.inv?.ready_to_reconcile ?? null;
   if (v === "avstemt") return c.inv?.reconciled_total ?? null;
   return c.alle;
 }
