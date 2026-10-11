@@ -16,8 +16,8 @@ import type { InvoiceDetailLine } from "@/fakturaer/components/invoice-detail/fe
 
 const okInv = { currency: "NOK" };
 const safeLine = (over: Record<string, unknown> = {}) => ({ line_id: "l1", line_version: "2026-10-11T10:00:00Z", raw_material_id: "rm1", can_compare: true, effect_nok: 200,
-  reason_code: null, reference_source: "agreement", reference_id: "a1", expected_price_per_base_unit: 8, price_per_base_unit: 10, base_quantity: 100, ...over });
-const resp = (lines: unknown[]) => ({ invoice_id: "i1", checked_at: "2026-10-11T10:00:01Z", lines });
+  reason_code: null, reference_source: "agreement", reference_id: "a1", reference_date: "2026-01-01", base_unit: "kg", currency: "NOK", expected_price_per_base_unit: 8, price_per_base_unit: 10, base_quantity: 100, ...over });
+const resp = (lines: unknown[]) => ({ schema_version: 2, legal_entity_id: "e1", invoice_id: "i1", checked_at: "2026-10-11T10:00:01Z", lines });
 const gateOf = (raw: Record<string, unknown>, fresh = true, ver: string | null = "2026-10-11T10:00:00Z") => safetyGate(parsePriceSafety(resp([raw]), "i1")?.lines.get("l1"), fresh, ver);
 
 describe("autoritativ prisstatus (rm_invoice_line_price_safety)", () => {
