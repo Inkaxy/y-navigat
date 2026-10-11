@@ -15,7 +15,7 @@ let applyImpl: () => Promise<Res> = async () => ({ data: { applied: true, failur
 let linkImpl: () => Promise<Res> = async () => ({ data: null, error: null });
 let pkgImpl: () => Promise<Res> = async () => ({ data: null, error: null });
 let orphanRows: { id: string; file_name: string; file_path: string; supplier_name: string | null; uploaded_at: string }[] = [];
-const AI = { name: "Combisur", nutrition: { fat_g: 2.5, salt_g: 1.1 }, allergens: [{ allergen: "milk", presence: "contains" }], ingredient_declaration: "hvetemel, salt", grain_classification_hint: "grovt", package_size_value: 20, package_size_unit: "kg" };
+const AI = { name: "Combisur", nutrition: { fat_g: 2.5, salt_g: 1.1 }, allergens: [{ allergen: "milk", presence: "contains" }], ingredient_declaration: "hvetemel, salt", grain_classification_hint: "grovt", e_numbers: ["E300", " "], country_of_origin: "Norge", package_size_value: 20, package_size_unit: "kg" };
 
 vi.mock("@/ravarer/context/RavarerContext", () => ({ useRavarer: () => ({ canWrite: ctx.canWrite, legalEntityId: ctx.legalEntityId }) }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), warning: vi.fn(), error: vi.fn(), info: vi.fn() } }));
@@ -29,7 +29,9 @@ vi.mock("@/ravarer/hooks/useNutrition", () => ({
 }));
 vi.mock("@/ravarer/editors/PackageEditor", () => ({ PackageEditor: ({ open }: { open: boolean }) => (open ? <div>Pakningsdialog åpen</div> : null) }));
 vi.mock("@/ravarer/editors/RawMaterialCreateSheet", () => ({ RawMaterialCreateSheet: () => null }));
-vi.mock("@/varer/lib/recomputeFanout", () => ({ recomputeRecipesForRawMaterial: vi.fn(async () => undefined) }));
+type Rc = { status: "none" | "done" | "partial" | "failed"; ok: number; total: number; failedRecipeIds: string[] };
+let recomputeImpl: (id: string) => Promise<Rc> = async () => ({ status: "done", ok: 2, total: 2, failedRecipeIds: [] });
+vi.mock("@/varer/lib/recomputeFanout", () => ({ recomputeRecipesDetailed: vi.fn(async (id: string) => { log.push({ kind: "recompute", payload: id }); return recomputeImpl(id); }) }));
 vi.mock("@/integrations/supabase/client", () => {
   const chain = (table: string) => {
     let op = "select"; let cols = ""; let payload: unknown = null;
@@ -98,6 +100,7 @@ beforeEach(() => {
   applyImpl = async () => ({ data: { applied: true, failures: [], changes_logged: 3, follow_ups: {} }, error: null });
   linkImpl = async () => ({ data: null, error: null });
   pkgImpl = async () => ({ data: null, error: null });
+  recomputeImpl = async () => ({ status: "done", ok: 2, total: 2, failedRecipeIds: [] });
 });
 
 describe("gjennomgang før anvend", () => {
@@ -141,6 +144,66 @@ describe("gjennomgang før anvend", () => {
     await waitFor(() => expect(count("apply-datasheet-update")).toBe(1));
     const body = log.find((l) => l.kind === "apply-datasheet-update")?.payload as Record<string, unknown>;
     expect(body.accepted_fields).toEqual(["nutrition", "allergens", "ingredient_declaration"]);
+  });
+});
+
+describe("koblede næringsfelt", () => {
+  it("E-numre og opprinnelsesland vises som en del av næringsgruppen, med ærlig gruppesemantikk", async () => {
+    await uploadOne();
+    fireEvent.click(screen.getByRole("button", { name: /Gjennomgå og anvend/ }));
+    const dlg = await screen.findByRole("dialog");
+    const box = within(dlg).getByTestId("coupled-nutrition");
+    expect(within(box).getByText("E300")).toBeInTheDocument();
+    expect(within(box).getByText("Norge")).toBeInTheDocument();
+    expect(within(box).getByText(/uansett hvilke enkeltfelt/)).toBeInTheDocument();
+    // Fravalg av hele næringsgruppen sender ikke næring (og dermed ikke de koblede feltene).
+    fireEvent.click(within(dlg).getByRole("checkbox", { name: "Bruk næring" }));
+    fireEvent.click(within(dlg).getByRole("button", { name: /Anvend valgte/ }));
+    await waitFor(() => expect(count("apply-datasheet-update")).toBe(1));
+    const body = log.find((l) => l.kind === "apply-datasheet-update")?.payload as Record<string, unknown>;
+    expect(body.accepted_fields).not.toContain("nutrition");
+    expect(body.accepted_nutrition_fields).toEqual([]);
+  });
+});
+
+describe("etterberegning av oppskrifter", () => {
+  const applyNow = async () => {
+    fireEvent.click(screen.getByRole("button", { name: /Gjennomgå og anvend/ }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: /Anvend valgte/ }));
+  };
+  it("feilet etterberegning vises separat; «prøv igjen» kjører bare etterberegningen", async () => {
+    recomputeImpl = async () => ({ status: "failed", ok: 0, total: 3, failedRecipeIds: ["r1", "r2", "r3"] });
+    await uploadOne();
+    await applyNow();
+    expect(await screen.findByText(/Anvendt på Hvetemel/)).toBeInTheDocument();
+    expect(await screen.findByText(/3 av 3 oppskrifter ble ikke beregnet på nytt/)).toBeInTheDocument();
+    recomputeImpl = async () => ({ status: "done", ok: 3, total: 3, failedRecipeIds: [] });
+    fireEvent.click(screen.getByRole("button", { name: "Beregn oppskrifter på nytt" }));
+    expect(await screen.findByText(/3 oppskrifter beregnet på nytt/)).toBeInTheDocument();
+    expect(count("apply-datasheet-update")).toBe(1);
+    expect(count("link")).toBe(1);
+    expect(log.filter((l) => l.kind === "recompute").map((l) => l.payload)).toEqual(["rmA", "rmA"]);
+  });
+  it("selskapsbytte etter bekreftet lagring: etterberegningen fullføres for frosset råvare, feil varsles", async () => {
+    const { toast } = await import("sonner");
+    let finish!: (r: Rc) => void;
+    recomputeImpl = () => new Promise<Rc>((r) => { finish = r; });
+    const { rerender, client } = await uploadOne();
+    await applyNow();
+    await waitFor(() => expect(count("recompute")).toBe(1));
+    ctx.legalEntityId = "B"; ctx.canWrite = false;
+    rerender(tree(client));
+    await act(async () => { finish({ status: "failed", ok: 0, total: 1, failedRecipeIds: ["r1"] }); });
+    expect(log.find((l) => l.kind === "recompute")?.payload).toBe("rmA");
+    expect(toast.warning).toHaveBeenCalledWith(expect.stringMatching(/ble ikke beregnet på nytt/));
+    expect(count("apply-datasheet-update")).toBe(1);
+  });
+  it("ukjent anvendelsesutfall starter ingen etterberegning", async () => {
+    applyImpl = async () => ({ data: {}, error: null });
+    await uploadOne();
+    await applyNow();
+    expect(await screen.findByText(/Ukjent utfall/)).toBeInTheDocument();
+    expect(count("recompute")).toBe(0);
   });
 });
 

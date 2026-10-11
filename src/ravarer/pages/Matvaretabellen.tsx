@@ -90,7 +90,7 @@ function LinkStatus({ linked, loading, error }: { linked: FoodLink[]; loading: b
 
 /** Verktøy: Matvaretabellen (R108–R115). Felles DataTable med mobilkort; skrivehandlinger krever skrivetilgang. */
 export default function Matvaretabellen() {
-  const { canWrite } = useRavarer();
+  const { canWrite, legalEntityId } = useRavarer();
   const foodsQ = useMatvaretabellenFoods();
   const foods = useMemo(() => foodsQ.data ?? [], [foodsQ.data]);
   const linksQ = useMatvaretabellenLinks();
@@ -141,20 +141,43 @@ export default function Matvaretabellen() {
 
   const linkedOf = (f: FoodRow) => linksQ.data?.get(f.food_id) ?? [];
 
+  // Gjenopprettingsøkt: lukk, avmontering, selskapsbytte eller tapt skrivetilgang avslutter den,
+  // og hver ny sideeffekt etter en await krever at økten fortsatt gjelder.
+  const recovery = useRef({ gen: 0, busy: false });
+  const recCtx = useRef({ canWrite, legalEntityId });
+  recCtx.current = { canWrite, legalEntityId };
+  useEffect(() => {
+    const r = recovery.current;
+    r.gen += 1;
+    return () => { r.gen += 1; };
+  }, [canWrite, legalEntityId]);
+  const dismissCreated = () => { recovery.current.gen += 1; setCreatedUnlinked(null); };
+
   const tryLinkCreated = async (rawMaterialId: string, food: FoodRow, prev: CreatedState | null) => {
+    const rec = recovery.current;
+    if (rec.busy) return;
+    const g = ++rec.gen;
+    const entity = recCtx.current.legalEntityId;
+    const alive = () => rec.gen === g && recCtx.current.canWrite && recCtx.current.legalEntityId === entity;
+    if (!alive()) return;
+    rec.busy = true;
     try {
       // Etter ukjent utfall: les gjeldende kobling først, så vi ikke skriver på nytt unødig.
       if (prev?.unknown) {
         const { data, error } = await supabase.from("raw_material_nutrition").select("matvaretabellen_food_id").eq("raw_material_id", rawMaterialId).maybeSingle();
+        if (!alive()) return;
         if (error) throw error;
         if (data?.matvaretabellen_food_id === food.food_id) { setCreatedUnlinked(null); void linksQ.refetch(); return; }
       }
       const res = await apply.mutateAsync({ rawMaterialId, foodId: food.food_id });
+      if (rec.gen !== g) return; // lukket/avmontert/byttet: ikke gjenopprett varselet
       // Ukjent svar: behold målet (råvaren opprettes aldri på nytt) og krev kontroll før nytt forsøk.
       setCreatedUnlinked(res.result ? null : { rawMaterialId, food, unknown: true });
     } catch (e: unknown) {
       console.error("[matvaretabellen:koble-ny]", e);
-      setCreatedUnlinked({ rawMaterialId, food, unknown: prev?.unknown ?? false });
+      if (rec.gen === g) setCreatedUnlinked({ rawMaterialId, food, unknown: prev?.unknown ?? false });
+    } finally {
+      rec.busy = false;
     }
   };
 
@@ -234,7 +257,7 @@ export default function Matvaretabellen() {
             ? <>Råvaren er opprettet, men utfallet av koblingen til «{createdUnlinked.food.food_name}» er ukjent. Den blir ikke opprettet på nytt; koblingen kontrolleres før nytt forsøk.</>
             : <>Råvaren er opprettet, men koblingen til «{createdUnlinked.food.food_name}» feilet. Den blir ikke opprettet på nytt.</>}
           <Button size="sm" variant="outline" disabled={apply.isPending || !canWrite} onClick={() => void tryLinkCreated(createdUnlinked.rawMaterialId, createdUnlinked.food, createdUnlinked)}>{createdUnlinked.unknown ? "Kontroller og prøv igjen" : "Prøv koblingen igjen"}</Button>
-          <Button size="sm" variant="ghost" onClick={() => setCreatedUnlinked(null)}>Lukk</Button>
+          <Button size="sm" variant="ghost" onClick={dismissCreated}>Lukk</Button>
         </div>
       )}
 

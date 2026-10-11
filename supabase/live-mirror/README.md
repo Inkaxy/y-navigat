@@ -60,3 +60,12 @@ byte-identisk speil av SQL-teksten root leverte i oppdraget (uten tilført komme
 | Fil | sha256 |
 |---|---|
 | live-mirror/20261011163018_material_price_verified_line_projection.sql | c57923724011a9ac1d291291136da5facac8d153fee29216b9976b35fae8f7ed |
+
+## Listens prisgrunnlag (root, 2026-10-11 ~21:16 UTC)
+
+`raw_material_list_price_evidence.sql` = migrasjonen `raw_material_list_price_evidence` som root har kjørt live
+(`rm_list_price_evidence(uuid,uuid[])`, STABLE, SECURITY DEFINER, fast search_path; anon uten EXECUTE, authenticated med).
+Teksten er SQL-en root oppga som kjørt, inkludert den historiske overskriften «LOCAL PROPOSAL, NOT APPLIED», som bare viser
+opphavet. ALDRI kjør på nytt og ALDRI legg den i `supabase/migrations`. Live-versjonsnummer og md5 mot
+`schema_migrations.statements` er ikke lest i denne økten (agenten har ingen innlogget live-tilgang) — root må kontrollere
+byte-likheten og eventuelt gi filen versjonsprefikset.

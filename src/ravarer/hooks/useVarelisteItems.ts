@@ -3,9 +3,11 @@ import { useRawMaterials, type RawMaterialRow } from "@/ravarer/hooks/useRawMate
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { useAllRawMaterialPurchaseStats } from "@/ravarer/hooks/usePurchaseStats";
 import { useRawMaterialSearchIndex } from "@/ravarer/hooks/useRawMaterialSearchIndex";
+import { useRavarerScope } from "@/ravarer/hooks/useRavarerScope";
+import { useListPriceEvidence } from "@/ravarer/hooks/useListPriceEvidence";
+import { comparisonFor, costStatusOf, PENDING_LOADING, PENDING_UNCHECKED } from "@/ravarer/lib/listPriceEvidence";
 import {
   buildSearchText,
-  deviationPct,
   type PackageState,
   type RawMaterialListItem,
 } from "@/ravarer/lib/rawMaterialViews";
@@ -32,6 +34,9 @@ export function useVarelisteItems(options?: { enabled?: boolean }) {
   const suppliers = useSuppliers();
   const stats = useAllRawMaterialPurchaseStats({ enabled });
   const index = useRawMaterialSearchIndex({ enabled });
+  const { legalEntityId } = useRavarerScope();
+  const ids = useMemo(() => (rawMaterials.data ?? []).map((r) => r.id), [rawMaterials.data]);
+  const evidence = useListPriceEvidence(legalEntityId, ids, enabled);
 
   const supplierMap = useMemo(
     () => new Map((suppliers.data ?? []).map((s) => [s.id, s.name])),
@@ -53,6 +58,7 @@ export function useVarelisteItems(options?: { enabled?: boolean }) {
       const supplierId = r.primary_supplier_id ?? primary?.supplierId ?? null;
       const supplierName = supplierId ? (supplierMap.get(supplierId) ?? null) : null;
 
+      // Leverandørbufferens siste pris er bare en visningsverdi; den sertifiserer aldri et avvik.
       const lastInvoice = rowLinks.reduce<{ price: number | null; date: string | null }>(
         (acc, l) => {
           if (l.lastInvoiceDate && (!acc.date || l.lastInvoiceDate > acc.date)) {
@@ -71,6 +77,9 @@ export function useVarelisteItems(options?: { enabled?: boolean }) {
 
       const agreedPrice = primary?.agreedPricePerBaseUnit ?? r.agreed_price ?? null;
       const stat = statsMap?.get(r.id);
+      const comparison = evidence.certified
+        ? comparisonFor({ id: r.id, updatedAt: r.updated_at, costPrice: r.current_cost_price, baseUnit: r.base_unit }, evidence.certified.byId.get(r.id), evidence.certified.checkedAt)
+        : evidence.loading ? PENDING_LOADING : PENDING_UNCHECKED;
 
       return {
         id: r.id,
@@ -82,6 +91,7 @@ export function useVarelisteItems(options?: { enabled?: boolean }) {
         isActive: r.is_active,
         baseUnit: r.base_unit,
         costPrice: r.current_cost_price,
+        costStatus: costStatusOf(r.cost_basis_status),
         costSource: r.price_source,
         costUpdatedAt: r.price_updated_at,
         agreedPrice,
@@ -93,7 +103,8 @@ export function useVarelisteItems(options?: { enabled?: boolean }) {
 
         lastInvoicePrice: lastInvoice.price,
         lastInvoiceDate: lastInvoice.date ?? stat?.last_invoice_date ?? null,
-        deviation: deviationPct(lastInvoice.price, r.current_cost_price),
+        comparison,
+        deviation: comparison.state === "eligible" ? comparison.deviation : null,
         packageState: packageStateOf(r),
         volume12m: stat?.quantity_12m ?? 0,
         currentStock: r.current_stock,
@@ -115,7 +126,7 @@ export function useVarelisteItems(options?: { enabled?: boolean }) {
         ]),
       } satisfies RawMaterialListItem;
     });
-  }, [rawMaterials.data, index.data, stats.data, supplierMap]);
+  }, [rawMaterials.data, index.data, stats.data, supplierMap, evidence.certified, evidence.loading]);
 
   // Feil i søke-/statusindeksen eller kjøpsstatistikken må vises, ikke
   // svelges — ellers ser listen komplett ut med tomme kolonner.
@@ -130,7 +141,10 @@ export function useVarelisteItems(options?: { enabled?: boolean }) {
     isLoading: rawMaterials.isLoading || index.isLoading || stats.isLoading,
     isError,
     error,
+    /** Listens prisgrunnlag: én samlet status og én «prøv igjen» (ingen per-rad-forsøk). */
+    priceEvidence: { loading: evidence.loading, isError: evidence.isError, checkedAt: evidence.checkedAt, refetch: evidence.refetch },
     refetch: () => {
+      evidence.refetch();
       void rawMaterials.refetch();
       void index.refetch();
       void stats.refetch();

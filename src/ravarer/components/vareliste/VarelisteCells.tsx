@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { DeviationCell, PriceSourceCell } from "./PriceCells";
+import { ComparisonCell, CostStatusMark, PriceSourceCell } from "./PriceCells";
+import { COST_STATUS_LABEL } from "@/ravarer/lib/listPriceEvidence";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -10,7 +11,7 @@ import { formatDate, formatNok, formatNumber } from "@/ravarer/lib/constants";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import type { RawMaterialListItem } from "@/ravarer/lib/rawMaterialViews";
 import { LIST_COLUMNS } from "@/ravarer/lib/varelisteColumns";
-import { csvValue } from "@/ravarer/lib/varelisteCsv";
+import { csvValue, priceSourceLabel } from "@/ravarer/lib/varelisteCsv";
 import type { Column } from "@/ravarer/ui/DataTable";
 import { paths } from "@/ravarer/lib/paths";
 
@@ -225,17 +226,21 @@ function cellFor(id: string, ctx: VarelisteCellContext): (item: RawMaterialListI
       return (item) => editingField(ctx, item.id) === "cost" ? (
         <PriceEditor initial={item.costPrice} withReason onCommit={(v, reason) => ctx.onCommitPrice(item, "cost", v, reason)} onCancel={ctx.onCancelEdit} />
       ) : (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button type="button" disabled={!ctx.canWrite} onClick={() => ctx.onStartEdit(item.id, "cost")} className="tabular-nums hover:underline disabled:cursor-default disabled:no-underline">
-              {formatNok(item.costPrice)} <span className="text-xs text-muted-foreground">/ {item.baseUnit}</span>
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            {item.costSource ? `Kilde: ${item.costSource}. ` : ""}
-            {item.costUpdatedAt ? `Oppdatert ${formatDate(item.costUpdatedAt)}` : "Ingen dato"}
-          </TooltipContent>
-        </Tooltip>
+        <span className="inline-flex flex-wrap items-center">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button type="button" disabled={!ctx.canWrite} onClick={() => ctx.onStartEdit(item.id, "cost")} className="tabular-nums hover:underline disabled:cursor-default disabled:no-underline">
+                {formatNok(item.costPrice)} <span className="text-xs text-muted-foreground">/ {item.baseUnit}</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {`Kostpris: ${COST_STATUS_LABEL[item.costStatus]}. `}
+              {item.costSource ? `Kilde: ${priceSourceLabel(item.costSource)}. ` : ""}
+              {item.costUpdatedAt ? `Oppdatert ${formatDate(item.costUpdatedAt)}` : "Ingen dato"}
+            </TooltipContent>
+          </Tooltip>
+          <CostStatusMark status={item.costStatus} />
+        </span>
       );
     case "agreed":
       return (item) => editingField(ctx, item.id) === "agreed" ? (
@@ -246,7 +251,7 @@ function cellFor(id: string, ctx: VarelisteCellContext): (item: RawMaterialListI
         </button>
       );
     case "deviation":
-      return (item) => <DeviationCell deviation={item.deviation} tolerance={ctx.toleranceFor(item.categories[0])} hardCap={ctx.hardCap} />;
+      return (item) => <ComparisonCell comparison={item.comparison} baseUnit={item.baseUnit} tolerance={ctx.toleranceFor(item.categories[0])} hardCap={ctx.hardCap} />;
     case "package":
       return (item) => <span className="text-xs"><PackageCell item={item} /></span>;
     case "volume_12m":

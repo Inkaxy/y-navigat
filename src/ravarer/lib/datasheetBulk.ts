@@ -175,3 +175,15 @@ export function retryStage(r: { storage_path?: string; datasheet_id?: string }):
   if (r.storage_path) return "extract";
   return "upload";
 }
+
+/**
+ * Felt som `apply-datasheet-update` skriver SAMMEN med næring når næring er valgt, uavhengig av
+ * `accepted_nutrition_fields` (samme regel som endepunktet: ikke-tomme E-numre, opprinnelsesland).
+ * Kan bare avvises ved å avvise hele næringsgruppen.
+ */
+export function coupledNutritionMeta(ai: Obj): { eNumbers: string[] | null; countryOfOrigin: string | null } {
+  const e = Array.isArray(ai.e_numbers) ? ai.e_numbers.map((x) => String(x).trim()).filter(Boolean) : [];
+  const c = ai.country_of_origin;
+  const country = typeof c === "string" ? c.trim() : c != null && c !== false && c !== 0 && c !== "" ? String(c).trim() : "";
+  return { eNumbers: e.length > 0 ? e : null, countryOfOrigin: country ? country : null };
+}

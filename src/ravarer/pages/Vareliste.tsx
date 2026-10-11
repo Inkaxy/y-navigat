@@ -38,6 +38,8 @@ import { VarelisteBulkBar } from "@/ravarer/components/vareliste/VarelisteBulkBa
 import { PackageEditor } from "@/ravarer/editors/PackageEditor";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useVarelisteItems } from "@/ravarer/hooks/useVarelisteItems";
+import { ComparisonCell, CostStatusMark } from "@/ravarer/components/vareliste/PriceCells";
+import { PriceEvidenceStatus } from "@/ravarer/components/vareliste/PriceEvidenceStatus";
 import { useUpdateRawMaterial } from "@/ravarer/hooks/useRawMaterials";
 import { useAddPriceHistory, useUpsertRmSupplier } from "@/ravarer/hooks/useRmSuppliers";
 import { usePackageWorklist } from "@/ravarer/hooks/usePackageSizes";
@@ -112,7 +114,7 @@ export default function VarelistePage({ liste, onActiveChange, activeId = null }
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const { items, suppliers, isLoading, isError, error, refetch } = useVarelisteItems();
+  const { items, suppliers, isLoading, isError, error, refetch, priceEvidence } = useVarelisteItems();
   const updateMut = useUpdateRawMaterial();
   const addPrice = useAddPriceHistory();
   const upsertLink = useUpsertRmSupplier();
@@ -196,6 +198,7 @@ export default function VarelistePage({ liste, onActiveChange, activeId = null }
   // Samme avviksregel (kategoritoleranse + maksgrense) som detaljens forrige/neste — én kilde.
   const deviationRule = useMemo(() => deviationRuleFor(tolerances.toleranceFor, hardCap), [tolerances, hardCap]);
   const filtered = useMemo(() => filterAndSortItems(items, listQuery, deviationRule), [items, listQuery, deviationRule]);
+  const controlCount = useMemo(() => items.filter((i) => i.comparison.state === "unknown" && i.comparison.needsControl).length, [items]);
 
   /** Filtrene følger med til detaljen, slik at «Tilbake» og «forrige/neste» beholder dem. Valgt rad er ikke listekontekst. */
   const listSearch = useMemo(() => { const n = new URLSearchParams(params); n.delete("valgt"); return n.toString(); }, [params]);
@@ -518,6 +521,11 @@ export default function VarelistePage({ liste, onActiveChange, activeId = null }
             <span className="text-sm text-muted-foreground">
               {filtered.length} av {items.length}
             </span>
+            <PriceEvidenceStatus
+              state={priceEvidence}
+              controlCount={controlCount}
+              onShowControl={() => setParam({ view: "price_control", liste: null })}
+            />
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -612,10 +620,16 @@ export default function VarelistePage({ liste, onActiveChange, activeId = null }
                   <p className="font-medium">{item.name}</p>
                   <p className="text-xs text-muted-foreground">
                     {item.supplierName ?? "Uten leverandør"} · {formatNok(item.costPrice)} / {item.baseUnit}
+                    <CostStatusMark status={item.costStatus} />
                   </p>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {deviationRule(item) && item.deviation != null && (
-                      <Badge variant="outline" className="border-destructive/40 text-destructive">Avvik {formatNumber(item.deviation, 1)} %</Badge>
+                  <div className="mt-1 flex flex-wrap items-center gap-1">
+                    {/* Samme vakt som tabellen: bare serverbevist avvik, ukjent viser status/handling. */}
+                    {item.comparison.state === "eligible" ? (
+                      deviationRule(item) && (
+                        <Badge variant="outline" className="border-destructive/40 text-destructive">Fakturaavvik {formatNumber(item.comparison.deviation, 1)} %</Badge>
+                      )
+                    ) : (
+                      <ComparisonCell comparison={item.comparison} baseUnit={item.baseUnit} tolerance={tolerances.toleranceFor(item.categories[0])} hardCap={hardCap} />
                     )}
                     {!item.declarationName && <Badge variant="outline">Mangler deklarasjon</Badge>}
                     {!item.isActive && <Badge variant="outline">Inaktiv</Badge>}

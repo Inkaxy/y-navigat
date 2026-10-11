@@ -6,12 +6,14 @@ import { useEffect, useRef } from "react";
  */
 export function shouldIgnoreShortcut(e: KeyboardEvent, opts: { allowWithin?: string } = {}): boolean {
   if (e.ctrlKey || e.metaKey || e.altKey) return true;
+  // Allerede håndtert av et fokusert element (f.eks. mobilkortets Enter): aldri en handling til.
+  if (e.defaultPrevented) return true;
   const el = e.target instanceof HTMLElement ? e.target : null;
   if (!el) return false;
   if (el.isContentEditable) return true;
   if (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName)) return true;
   // En knapp med fokus svelger bare Enter og mellomrom (knappens egen aktivering).
-  if (el.closest("button") && (e.key === "Enter" || e.key === " ")) return true;
+  if (el.closest('button, a[href], [role="button"], [role="link"], [role="checkbox"], [role="switch"]') && (e.key === "Enter" || e.key === " ")) return true;
   if (el.closest('[role="combobox"], [role="menu"], [role="listbox"]')) return true;
   // Et panel som er en del av arbeidsflaten (f.eks. inspektørens Sheet) kan tillate snarveier.
   if (el.closest('[role="dialog"]') && !(opts.allowWithin && el.closest(opts.allowWithin))) return true;
