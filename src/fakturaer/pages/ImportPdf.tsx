@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ArrowLeft, Upload, Loader2, Sparkles, CheckCircle2, AlertCircle, AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Upload, Loader2, Sparkles, CheckCircle2, AlertCircle, AlertTriangle, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { showError } from "@/lib/userError";
 import { supabase } from "@/integrations/supabase/client";
