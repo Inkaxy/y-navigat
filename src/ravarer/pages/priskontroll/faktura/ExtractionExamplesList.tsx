@@ -24,6 +24,7 @@ export function ExtractionExamplesList({ supplierId, canWrite }: { supplierId: s
               <span className="min-w-0">
                 <span className="block truncate">{e.description ?? e.sku ?? "Linje"}</span>
                 <span className="block text-caption text-ink-secondary">{format(new Date(e.created_at), "EEE d. MMM yyyy, HH:mm", { locale: nb })}{e.note ? ` · «${e.note}»` : ""}</span>
+                {e.withIssues && <span className="block text-caption text-warning">Lagret med godtatte avvik. Brukes bare hvis du slår det på manuelt, og gjør aldri nye fakturaer automatisk trygge.</span>}
               </span>
               <Switch
                 checked={e.is_active}

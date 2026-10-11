@@ -67,7 +67,7 @@ export function useCorrectLine() {
   });
 }
 
-export type ExtractionExample = { id: string; description: string | null; sku: string | null; note: string | null; created_at: string; is_active: boolean };
+export type ExtractionExample = { id: string; description: string | null; sku: string | null; note: string | null; created_at: string; is_active: boolean; withIssues: boolean };
 
 /** Læringseksempler for leverandøren (samme selskap via RLS). */
 export function useExtractionExamples(supplierId: string | null) {
@@ -76,14 +76,14 @@ export function useExtractionExamples(supplierId: string | null) {
     enabled: !!supplierId,
     queryFn: async (): Promise<ExtractionExample[]> => {
       const { data, error } = await supabase.from("invoice_extraction_examples")
-        .select("id, corrected, note, created_at, is_active")
+        .select("id, corrected, note, created_at, is_active, accepted_issues")
         .eq("supplier_id", supplierId as string).order("created_at", { ascending: false }).limit(50);
       if (error) throw new Error("Kunne ikke hente læringseksemplene");
       return (data ?? []).map((e) => {
         const c = e.corrected && typeof e.corrected === "object" && !Array.isArray(e.corrected) ? e.corrected : {};
         const desc = "description" in c && typeof c.description === "string" ? c.description : null;
         const sku = "supplier_sku" in c && typeof c.supplier_sku === "string" ? c.supplier_sku : null;
-        return { id: e.id, description: desc, sku, note: e.note, created_at: e.created_at, is_active: e.is_active };
+        return { id: e.id, description: desc, sku, note: e.note, created_at: e.created_at, is_active: e.is_active, withIssues: Array.isArray(e.accepted_issues) && e.accepted_issues.length > 0 };
       });
     },
   });
