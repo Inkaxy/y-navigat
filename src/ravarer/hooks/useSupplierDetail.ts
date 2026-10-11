@@ -3,7 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { supplierSpendExclVat } from "@/ravarer/lib/purchaseTotals";
 import type { SupplierRow } from "@/ravarer/hooks/useSuppliers";
-import { osloDateISOPlusDays } from "@/lib/osloDate";
+import { osloDateISOPlusDays, osloTodayISO } from "@/lib/osloDate";
+import { fetchAllCounted } from "@/lib/countedPaging";
+import { summarizeSpend, type SpendSourceRow, type SupplierSpendSummary } from "@/ravarer/lib/supplierSpend";
 import { fetchAllRows } from "@/lib/supabasePaging";
 import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
 
@@ -65,14 +67,18 @@ export function useSupplierItems(supplierId: string | undefined) {
     queryKey: ["supplier-items", supplierId],
     enabled: !!supplierId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("raw_material_suppliers")
-        .select(
-          "id, raw_material_id, supplier_sku, supplier_product_name, package_size, package_unit, agreed_price_per_base_unit, agreed_price_set_at, agreed_price_set_by, agreement_valid_from, agreement_valid_to, agreement_document_url, last_invoice_price, last_invoice_date, raw_material:raw_materials(id, name, base_unit, item_type)",
-        )
-        .eq("supplier_id", supplierId!);
-      if (error) throw error;
-      return (data ?? []) as unknown as SupplierItemRow[];
+      const cols =
+        "id, raw_material_id, supplier_sku, supplier_product_name, package_size, package_unit, agreed_price_per_base_unit, agreed_price_set_at, agreed_price_set_by, agreement_valid_from, agreement_valid_to, agreement_document_url, last_invoice_price, last_invoice_date, raw_material:raw_materials(id, name, base_unit, item_type)";
+      // Komplett med antallsbevis: aliasoppslaget bygger på disse ID-ene.
+      const rows = await fetchAllCounted<{ id: string }>({
+        count: () => supabase.from("raw_material_suppliers").select("id", { count: "exact", head: true }).eq("supplier_id", supplierId!),
+        page: (after, size) => {
+          let q = supabase.from("raw_material_suppliers").select(cols).eq("supplier_id", supplierId!).order("id").limit(size);
+          if (after) q = q.gt("id", after);
+          return q as unknown as PromiseLike<{ data: { id: string }[] | null; error: unknown }>;
+        },
+      });
+      return rows as unknown as SupplierItemRow[];
     },
   });
 }
@@ -83,14 +89,32 @@ export function useSupplierInvoices(supplierId: string | undefined, limit: numbe
     queryKey: ["supplier-invoices", supplierId, limit],
     enabled: !!supplierId,
     queryFn: async () => {
-      const { data, error, count } = await supabase
-        .from("invoices")
-        .select("id, invoice_number, invoice_date, total_amount, status, lines_sum_status, currency", { count: "exact" })
-        .eq("supplier_id", supplierId!)
-        .order("invoice_date", { ascending: false })
-        .range(0, limit - 1);
-      if (error) throw error;
-      return { rows: (data ?? []) as unknown as SupplierInvoiceRow[], total: count ?? 0 };
+      // Serverens radgrense kan være lavere enn `limit`: hent videre fra faktisk antall mottatte
+      // rader til ønsket antall eller totalen er nådd. Stabil rekkefølge (dato, id).
+      const { count, error: cErr } = await supabase
+        .from("invoices").select("id", { count: "exact", head: true }).eq("supplier_id", supplierId!);
+      if (cErr || typeof count !== "number") throw cErr ?? new Error("Antall fakturaer ukjent");
+      const want = Math.min(limit, count);
+      const rows: SupplierInvoiceRow[] = [];
+      const seen = new Set<string>();
+      while (rows.length < want) {
+        const { data, error } = await supabase
+          .from("invoices")
+          .select("id, invoice_number, invoice_date, total_amount, status, lines_sum_status, currency")
+          .eq("supplier_id", supplierId!)
+          .order("invoice_date", { ascending: false })
+          .order("id", { ascending: true })
+          .range(rows.length, want - 1);
+        if (error) throw error;
+        const page = (data ?? []) as unknown as SupplierInvoiceRow[];
+        if (page.length === 0) throw new Error("Fakturalisten sluttet før forventet antall");
+        for (const r of page) {
+          if (seen.has(r.id)) throw new Error("Fakturalisten endret seg under henting");
+          seen.add(r.id);
+          rows.push(r);
+        }
+      }
+      return { rows, total: count };
     },
   });
 }
@@ -108,21 +132,37 @@ export function spendSummary(rows: readonly SpendRow[]): SpendSummary {
   return { nok: supplierSpendExclVat(nok), otherCurrencyCount: rows.length - nok.length };
 }
 
-/** Sum kjøpt siste 365 dager. */
-export function useSupplierSpend(supplierId: string | undefined) {
-  return useQuery({
-    queryKey: ["supplier-spend", supplierId],
-    enabled: !!supplierId,
-    queryFn: async () => {
-      const since = osloDateISOPlusDays(-365);
-      const { data, error } = await supabase
-        .from("invoices")
-        .select("total_amount, total_vat, is_credit_note, currency")
-        .eq("supplier_id", supplierId!)
-        .gte("invoice_date", since);
-      if (error) throw error;
-      return spendSummary(data ?? []);
+/** Frosset periode (Oslo): i dag − 365 til og med i dag. */
+export function spendPeriod(): { start: string; end: string } {
+  return { start: osloDateISOPlusDays(-365), end: osloTodayISO() };
+}
+
+/** Felles komplett henting for teller og nevner (eksplisitt selskap, samme filter). */
+export async function fetchSpendSummary(legalEntityId: string, supplierId: string | null, period = spendPeriod(), signal?: AbortSignal): Promise<SupplierSpendSummary> {
+  const cols = "id, status, currency, total_amount, total_vat, is_credit_note";
+  const base = <Q extends { eq: (c: string, v: string) => Q; gte: (c: string, v: string) => Q; lte: (c: string, v: string) => Q }>(q: Q): Q => {
+    let r = q.eq("legal_entity_id", legalEntityId).gte("invoice_date", period.start).lte("invoice_date", period.end);
+    if (supplierId) r = r.eq("supplier_id", supplierId);
+    return r;
+  };
+  const rows = await fetchAllCounted<SpendSourceRow>({
+    signal,
+    count: () => base(supabase.from("invoices").select("id", { count: "exact", head: true })),
+    page: (after, size) => {
+      let q = base(supabase.from("invoices").select(cols)).order("id").limit(size);
+      if (after) q = q.gt("id", after);
+      return q as unknown as PromiseLike<{ data: SpendSourceRow[] | null; error: unknown }>;
     },
+  });
+  return summarizeSpend(rows, period.start, period.end);
+}
+
+/** Sum kjøpt siste 365 dager for leverandøren (komplett eller ukjent). */
+export function useSupplierSpend(supplierId: string | undefined, legalEntityId: string | undefined) {
+  return useQuery({
+    queryKey: ["supplier-spend", legalEntityId, supplierId],
+    enabled: !!supplierId && !!legalEntityId,
+    queryFn: ({ signal }) => fetchSpendSummary(legalEntityId!, supplierId!, spendPeriod(), signal),
   });
 }
 
@@ -170,24 +210,12 @@ export function useUpdateSupplierNotes(supplierId: string | undefined) {
   });
 }
 
-/** Totalt innkjøp fra alle leverandører siste 365 dager, eks. mva. */
+/** Totalt innkjøp fra alle leverandører siste 365 dager, eks. mva — samme grunnlag som leverandøren. */
 export function useTotalSpend(legalEntityId: string | undefined) {
   return useQuery({
     queryKey: ["total-supplier-spend", legalEntityId],
     enabled: !!legalEntityId,
-    queryFn: async () => {
-      const since = osloDateISOPlusDays(-365);
-      const rows = await fetchAllRows<SpendRow>(
-        (from, to) =>
-          supabase
-            .from("invoices")
-            .select("total_amount, total_vat, is_credit_note, currency")
-            .eq("legal_entity_id", legalEntityId!)
-            .gte("invoice_date", since)
-            .range(from, to),
-      );
-      return spendSummary(rows);
-    },
+    queryFn: ({ signal }) => fetchSpendSummary(legalEntityId!, null, spendPeriod(), signal),
   });
 }
 

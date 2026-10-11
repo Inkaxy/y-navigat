@@ -58,9 +58,11 @@ export function AliasEditDialog({ target, supplierId, onClose, onSaved }: Props)
   const allowed = p ? aliasActions(p) : new Set<AliasAction>();
   const draftError = action && p ? validateAliasDraft(action, reason, newValue, p.aliasValue) : null;
   const busy = edit.pending;
+  /** Bare et vellykket, ferdig hentet forhåndsoppslag kan ligge til grunn for lagring. */
+  const previewFresh = preview.isSuccess && !preview.isError && !preview.isFetching;
 
   const submit = async () => {
-    if (!p || !action || draftError || needsReread || !allowed.has(action)) return;
+    if (!p || !previewFresh || !action || draftError || needsReread || !allowed.has(action)) return;
     const gen = generation.current;
     setFailure(null);
     const r = await edit.submit({ aliasId: p.aliasId, rmsId: p.rmsId, expectedSnapshot: p.expectedSnapshot, action, reason, newValue: action === "replace" ? newValue : null });
@@ -134,10 +136,10 @@ export function AliasEditDialog({ target, supplierId, onClose, onSaved }: Props)
         </div>
         <DialogFooter className="shrink-0 gap-2 border-t border-line-subtle bg-background p-4 sm:p-4">
           <Button variant="outline" className="min-h-[44px] md:min-h-0" disabled={busy} onClick={onClose}>Lukk</Button>
-          {needsReread ? (
+          {needsReread || preview.isError ? (
             <Button className="min-h-[44px] md:min-h-0" disabled={preview.isFetching} onClick={() => void reread()}>Hent aliaset på nytt</Button>
           ) : (
-            <Button className="min-h-[44px] md:min-h-0" disabled={busy || !p || !action || !!draftError || preview.isFetching} title={draftError ?? undefined} onClick={() => void submit()}>
+            <Button className="min-h-[44px] md:min-h-0" disabled={busy || !p || !previewFresh || !action || !!draftError} title={draftError ?? undefined} onClick={() => void submit()}>
               {busy && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />}{action ? ACTION_LABEL[action] : "Velg handling"}
             </Button>
           )}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
@@ -19,7 +19,8 @@ import { osloTodayISO } from "@/lib/osloDate";
 import { parseDecimal } from "@/ravarer/lib/packageMath";
 import { agreementBaseUnitsPerPackage } from "@/ravarer/lib/agreementPricing";
 import { agreementFormError, derivePricePerBaseUnit } from "@/ravarer/lib/agreementForm";
-import type { AgreementPayload, ApplyAgreementResult } from "@/ravarer/lib/rpcContracts";
+import type { AgreementPayload } from "@/ravarer/lib/rpcContracts";
+import { parseApplyAgreementResult } from "@/ravarer/lib/agreementResult";
 
 interface Props {
   open: boolean;
@@ -30,7 +31,7 @@ interface Props {
 
 export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, defaultSupplierId }: Props) {
   const qc = useQueryClient();
-  const { legalEntityId, user } = useRavarer();
+  const { legalEntityId, user, canWrite } = useRavarer();
   const { data: rms = [] } = useRawMaterials();
   const { data: suppliers = [] } = useSuppliers();
 
@@ -51,6 +52,14 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
   const [setPrimary, setSetPrimary] = useState(true);
   const [docFile, setDocFile] = useState<File | null>(null);
   const [rmOpen, setRmOpen] = useState(false);
+  /** Uavklart utfall: lagringen kan ha gått gjennom. Krever ny lesing før ny lagring. */
+  const [unknownOutcome, setUnknownOutcome] = useState(false);
+  /** Synkron lås: to klikk i samme render skal aldri gi to kall. */
+  const busyRef = useRef(false);
+  /** Økes når dialogen åpnes på nytt eller konteksten byttes; foreldede fullføringer ignoreres. */
+  const genRef = useRef(0);
+  const liveRef = useRef({ open, legalEntityId, canWrite });
+  liveRef.current = { open, legalEntityId, canWrite };
 
   useEffect(() => {
     if (open) {
@@ -61,8 +70,10 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
       setPricePerBaseUnit(""); setPricePerBaseUnitTouched(false);
       setValidFrom(osloTodayISO()); setValidTo("");
       setSetPrimary(true); setDocFile(null);
+      setUnknownOutcome(false);
     }
-  }, [open, defaultRawMaterialId, defaultSupplierId]);
+    genRef.current += 1;
+  }, [open, defaultRawMaterialId, defaultSupplierId, legalEntityId]);
 
   const selectedRm = useMemo(() => rms.find((r) => r.id === rawMaterialId), [rms, rawMaterialId]);
   const activeRms = useMemo(() => rms.filter((r) => r.is_active), [rms]);
@@ -85,67 +96,102 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
     setPricePerBaseUnitTouched(false);
   }, [rawMaterialId, selectedRm?.base_unit]);
 
-  const create = useMutation({
-    mutationFn: async () => {
-      if (!rawMaterialId) throw new Error("Velg råvare");
-      if (!supplierId) throw new Error("Velg leverandør");
-      // Valider før opplasting, så et ugyldig skjema aldri etterlater en foreldreløs fil.
-      const invalid = agreementFormError({ agreedPrice, pricePerBaseUnit, validFrom, validTo });
-      if (invalid) throw new Error(invalid);
-      const entered = parseDecimal(agreedPrice);
-      const ppbu = parseDecimal(pricePerBaseUnit);
-      const bupp = parseDecimal(baseUnitsPerPackage);
-      // Begge prisfeltene lagres konsistent: per pakning og per grunnenhet.
-      const ap =
-        priceBasis === "package"
-          ? entered
-          : entered != null && unitsPerPackage != null && unitsPerPackage > 0
-            ? entered * unitsPerPackage
-            : null;
+  interface Frozen { gen: number; entityId: string; rawMaterialId: string; payloadBase: Omit<AgreementPayload, "agreement_document_url">; docFile: File | null }
+  type Outcome = { kind: "saved"; frozen: Frozen } | { kind: "stale"; frozen: Frozen };
 
-      // Last opp dokument hvis valgt
+  /** Sjekk at dialogen fortsatt viser samme mål med skrivetilgang før neste sideeffekt. */
+  const stillCurrent = (f: Frozen) =>
+    genRef.current === f.gen && liveRef.current.open && liveRef.current.legalEntityId === f.entityId && liveRef.current.canWrite;
+
+  const create = useMutation({
+    mutationFn: async (f: Frozen): Promise<Outcome> => {
       let docUrl: string | null = null;
-      if (docFile) {
-        const path = `${legalEntityId}/${supplierId}_${Date.now()}_${docFile.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-        const { error: upErr } = await supabase.storage.from("supplier-agreements").upload(path, docFile);
-        if (upErr) throw upErr;
+      if (f.docFile) {
+        if (!stillCurrent(f)) return { kind: "stale", frozen: f };
+        const path = `${f.entityId}/${f.payloadBase.supplier_id}_${Date.now()}_${f.docFile.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+        const { error: upErr } = await supabase.storage.from("supplier-agreements").upload(path, f.docFile);
+        if (upErr) throw new KnownError("Dokumentet kunne ikke lastes opp. Avtalen er ikke lagret.");
         docUrl = path;
       }
+      // Kontekst kan ha endret seg mens opplastingen pågikk: ikke start lagring for et annet mål.
+      if (!stillCurrent(f)) return { kind: "stale", frozen: f };
+      // Én transaksjon i basen: da kan avtalen ikke bli halvveis lagret med to primærleverandører.
+      const payload: AgreementPayload = { ...f.payloadBase, agreement_document_url: docUrl };
+      let res: { data: unknown; error: { code?: string } | null };
+      try {
+        res = await supabase.rpc("rm_apply_agreement", { p_payload: payload as unknown as never });
+      } catch {
+        throw new UnknownOutcomeError();
+      }
+      if (res.error) {
+        // SQL-avvisning (tilgang/validering) avbryter transaksjonen. Uten kode vet vi ikke.
+        if (res.error.code) throw new KnownError("Avtalen ble avvist og er ikke lagret.");
+        throw new UnknownOutcomeError();
+      }
+      if (!parseApplyAgreementResult(res.data)) throw new UnknownOutcomeError();
+      return { kind: "saved", frozen: f };
+    },
+    onSuccess: (out) => {
+      if (out.kind === "stale") {
+        toast.message("Avtalen ble ikke lagret fordi skjemaet eller tilgangen endret seg.");
+        return;
+      }
+      // Bekreftet lagring: invalidering bindes til det frosne målet, uansett hva dialogen viser nå.
+      invalidateRawMaterial(qc, out.frozen.rawMaterialId);
+      invalidateRavarerCounts(qc);
+      if (genRef.current !== out.frozen.gen) return; // ikke lukk et annet skjema
+      toast.success("Avtale lagret");
+      onOpenChange(false);
+    },
+    onError: (e: unknown, f) => {
+      if (e instanceof UnknownOutcomeError) {
+        // Lagringen kan ha gått gjennom. Behold utkastet, les på nytt før noe annet.
+        invalidateRawMaterial(qc, f.rawMaterialId);
+        if (genRef.current === f.gen) setUnknownOutcome(true);
+        toast.error("Ukjent utfall: avtalen kan være lagret. Kontroller avtalelisten før du lagrer igjen.");
+        return;
+      }
+      toast.error(e instanceof KnownError ? e.message : "Kunne ikke lagre avtalen.");
+    },
+    onSettled: () => { busyRef.current = false; },
+  });
 
-      // Én transaksjon i basen: da kan avtalen ikke bli halvveis lagret med to
-      // primærleverandører.
-      const payload: AgreementPayload = {
+  const submit = () => {
+    if (busyRef.current || unknownOutcome) return;
+    if (!canWrite) { toast.error("Du har ikke skrivetilgang."); return; }
+    if (!rawMaterialId) { toast.error("Velg råvare"); return; }
+    if (!supplierId) { toast.error("Velg leverandør"); return; }
+    // Valider før opplasting, så et ugyldig skjema aldri etterlater en foreldreløs fil.
+    const invalid = agreementFormError({ agreedPrice, pricePerBaseUnit, validFrom, validTo });
+    if (invalid) { toast.error(invalid); return; }
+    const entered = parseDecimal(agreedPrice);
+    const ap =
+      priceBasis === "package"
+        ? entered
+        : entered != null && unitsPerPackage != null && unitsPerPackage > 0 ? entered * unitsPerPackage : null;
+    busyRef.current = true;
+    create.mutate({
+      gen: genRef.current,
+      entityId: legalEntityId,
+      rawMaterialId,
+      docFile,
+      payloadBase: {
         raw_material_id: rawMaterialId,
         supplier_id: supplierId,
         supplier_sku: supplierSku.trim() || null,
         supplier_product_name: supplierProductName.trim() || null,
         agreed_price: ap,
-        agreed_price_per_base_unit: ppbu,
+        agreed_price_per_base_unit: parseDecimal(pricePerBaseUnit),
         package_size: parseDecimal(packageSize),
         package_unit: packageUnit || null,
-        base_units_per_package: bupp,
+        base_units_per_package: parseDecimal(baseUnitsPerPackage),
         agreement_valid_from: validFrom || null,
         agreement_valid_to: validTo || null,
         agreement_priority: null,
-        agreement_document_url: docUrl,
         is_primary: setPrimary,
-      };
-      const { data, error } = await supabase.rpc("rm_apply_agreement", {
-        p_payload: payload as unknown as never,
-      });
-      if (error) throw error;
-      const res = data as unknown as ApplyAgreementResult;
-      if (res.ok === false) throw new Error("Avtalen kunne ikke lagres");
-    },
-    onSuccess: () => {
-      invalidateRawMaterial(qc, rawMaterialId);
-      // Avtalepris kan endre sammenligningsgrunnlaget for andre fakturaer.
-      invalidateRavarerCounts(qc);
-      toast.success("Avtale lagret");
-      onOpenChange(false);
-    },
-    onError: (e: unknown) => toast.error(`Kunne ikke lagre: ${e instanceof Error ? e.message : String(e)}`),
-  });
+      },
+    });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -249,7 +295,10 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
             />
           </div>
           <div className="col-span-2">
-            <Label>Pris pr {selectedRm?.base_unit ?? "base unit"} (auto)</Label>
+            <Label>
+              Pris pr {selectedRm?.base_unit ?? "grunnenhet"}{" "}
+              <span className="text-muted-foreground">{pricePerBaseUnitTouched ? "(manuelt overstyrt)" : "(beregnet)"}</span>
+            </Label>
             <Input
               value={pricePerBaseUnit}
               onChange={(e) => { setPricePerBaseUnit(e.target.value); setPricePerBaseUnitTouched(true); }}
@@ -274,7 +323,12 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Avbryt</Button>
-          <Button onClick={() => create.mutate()} disabled={create.isPending}>
+          {unknownOutcome && (
+            <p role="alert" className="text-caption text-destructive sm:mr-auto">
+              Utfallet er ukjent — avtalen kan være lagret. Lukk og kontroller avtalelisten før du lagrer igjen.
+            </p>
+          )}
+          <Button onClick={submit} disabled={create.isPending || !canWrite || unknownOutcome}>
             {create.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
             Lagre avtale
           </Button>
@@ -283,3 +337,6 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
     </Dialog>
   );
 }
+
+class KnownError extends Error {}
+class UnknownOutcomeError extends Error {}

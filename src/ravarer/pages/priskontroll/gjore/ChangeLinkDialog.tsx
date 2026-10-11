@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -10,7 +10,7 @@ import type { SupplierItem, SupplierItemLine } from "@/fakturaer/lib/supplierIte
 import { cn } from "@/lib/utils";
 import { lockedLinesText } from "./logic";
 import { useConfirmMany } from "@/ravarer/ui/useConfirmMany";
-import { useChangeSupplierLink } from "./useGjoreMutations";
+import { ChangeLinkUnknownError, useChangeSupplierLink } from "./useGjoreMutations";
 import type { PanelResult } from "./types";
 
 /**
@@ -31,25 +31,33 @@ export function ChangeLinkDialog({ open, onOpenChange, item, lines, onDone }: Pr
   const [pick, setPick] = useState<{ id: string; name: string } | null>(null);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [unknown, setUnknown] = useState(false);
+  const busyRef = useRef(false);
   const { results } = useMaterialChoices(null, search);
   const change = useChangeSupplierLink();
   const scope = changeLinkScope(lines, item.rm_id);
-  useEffect(() => { if (open) { setSearch(""); setPick(null); setReason(""); setError(null); } }, [open]);
+  useEffect(() => { if (open) { setSearch(""); setPick(null); setReason(""); setError(null); setUnknown(false); } }, [open]);
 
   const many = useConfirmMany();
   const submit = async () => {
-    if (!item.rms_id || !pick) return;
+    if (!item.rms_id || !pick || busyRef.current || unknown) return;
+    busyRef.current = true;
     setError(null);
+    const target = { name: pick.name };
     try {
-      const r = await change.mutateAsync({ rmsId: item.rms_id, oldRawMaterialId: item.rm_id, newRawMaterialId: pick.id, reason: reason.trim(), lineIds: scope.lineIds });
+      const r = await change.mutateAsync({ rmsId: item.rms_id, oldRawMaterialId: item.rm_id, newRawMaterialId: pick.id, reason: reason.trim(), lineIds: [...scope.lineIds] });
+      if (!r.ok) throw new ChangeLinkUnknownError();
       onOpenChange(false);
       const locked = lockedLinesText(r.lockedLines);
       onDone({
-        title: `Koblingen er endret til ${pick.name} · ${r.changedLineIds.length} ${r.changedLineIds.length === 1 ? "linje" : "linjer"} flyttet`,
+        title: `Koblingen er endret til ${target.name} · ${r.changedLineIds.length} ${r.changedLineIds.length === 1 ? "linje" : "linjer"} flyttet`,
         items: [locked, r.rematchQueued > 0 ? `${r.rematchQueued} fakturaer regnes om` : null].filter((x): x is string => !!x),
       });
     } catch (e) {
+      if (e instanceof ChangeLinkUnknownError) setUnknown(true);
       setError(e instanceof Error ? e.message : "Koblingen kunne ikke endres.");
+    } finally {
+      busyRef.current = false;
     }
   };
 
@@ -81,13 +89,14 @@ export function ChangeLinkDialog({ open, onOpenChange, item, lines, onDone }: Pr
             <Textarea id="change-reason" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Hvorfor er koblingen feil?" />
           </div>
           <p className="rounded-md bg-muted/40 p-2 text-sm">
-            {scope.movable} åpne {scope.movable === 1 ? "linje flyttes" : "linjer flyttes"}{scope.locked > 0 ? `, ${scope.locked} er låst (kostpris ført)` : ""}.
+            Inntil {scope.movable} åpne {scope.movable === 1 ? "linje" : "linjer"} kan flyttes{scope.locked > 0 ? `, ${scope.locked} er låst (kostpris ført)` : ""}.
+            {" "}Endelig antall avgjøres av serveren — linjer med prishistorikk eller andre låser blir stående.
           </p>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={change.isPending}>Avbryt</Button>
-          <Button onClick={() => many.guard(scope.lineIds.length, "Endre kobling", () => void submit())} disabled={change.isPending || !pick || reason.trim().length === 0}>
+          <Button onClick={() => many.guard(scope.lineIds.length, "Endre kobling", () => void submit())} disabled={change.isPending || unknown || !pick || reason.trim().length === 0}>
             {change.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />}Endre kobling
           </Button>
         </DialogFooter>

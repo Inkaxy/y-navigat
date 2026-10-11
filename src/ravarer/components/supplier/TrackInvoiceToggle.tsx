@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -16,17 +16,38 @@ export const TRACK_HELP_SHORT =
 export function TrackInvoiceToggle({ supplier, canWrite }: { supplier: Pick<SupplierRow, "id" | "name" | "track_invoice_lines">; canWrite: boolean }) {
   const setTracking = useSetTrackInvoiceLines();
   const backfill = useBackfillSupplierInvoices();
-  const [confirm, setConfirm] = useState(false);
+  /** Bekreftelsen er frosset til leverandøren den ble åpnet for. */
+  const [confirm, setConfirm] = useState<{ supplierId: string; name: string } | null>(null);
+  const busyRef = useRef(false);
+  const liveRef = useRef({ canWrite, supplierId: supplier.id });
+  liveRef.current = { canWrite, supplierId: supplier.id };
+  const confirmValid = !!confirm && canWrite && confirm.supplierId === supplier.id;
 
   async function enable() {
-    setConfirm(false);
+    const target = confirm;
+    setConfirm(null);
+    // Synkron lås + gjeldende tilgang/mål sjekkes før hver sideeffekt.
+    if (busyRef.current || !target) return;
+    if (!liveRef.current.canWrite || liveRef.current.supplierId !== target.supplierId) return;
+    busyRef.current = true;
     try {
-      await setTracking.mutateAsync({ id: supplier.id, value: true });
-    } catch {
-      return; // feilen vises av mutasjonen; ingen henting startes
+      try {
+        await setTracking.mutateAsync({ id: target.supplierId, value: true });
+      } catch {
+        return; // feilen vises av mutasjonen; ingen henting startes
+      }
+      if (!liveRef.current.canWrite || liveRef.current.supplierId !== target.supplierId) {
+        toast.message("Følging er slått på. Henting av historikk ble ikke startet fordi tilgang eller valg endret seg.");
+        return;
+      }
+      toast.info(`Henter 12 måneder med fakturaer fra ${target.name}…`);
+      backfill.mutate(
+        { supplierId: target.supplierId, months: 12 },
+        { onError: () => toast.error("Følging er slått på, men henting av historiske fakturaer feilet. Prøv hentingen igjen.") },
+      );
+    } finally {
+      busyRef.current = false;
     }
-    toast.info(`Henter 12 måneder med fakturaer fra ${supplier.name}…`);
-    backfill.mutate({ supplierId: supplier.id, months: 12 });
   }
 
   return (
@@ -36,13 +57,14 @@ export function TrackInvoiceToggle({ supplier, canWrite }: { supplier: Pick<Supp
           checked={!!supplier.track_invoice_lines}
           disabled={!canWrite || setTracking.isPending || backfill.isPending}
           onCheckedChange={(value) => {
-            if (value) setConfirm(true);
+            if (!canWrite || busyRef.current) return;
+            if (value) setConfirm({ supplierId: supplier.id, name: supplier.name });
             else setTracking.mutate({ id: supplier.id, value: false });
           }}
           aria-label={`Følg fakturalinjer for ${supplier.name}`}
         />
       </label>
-      <AlertDialog open={confirm} onOpenChange={(o) => !o && setConfirm(false)}>
+      <AlertDialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Følg fakturaer fra {supplier.name}?</AlertDialogTitle>
@@ -53,7 +75,7 @@ export function TrackInvoiceToggle({ supplier, canWrite }: { supplier: Pick<Supp
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Avbryt</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void enable()}>Slå på og hent 12 måneder</AlertDialogAction>
+            <AlertDialogAction disabled={!confirmValid} onClick={() => void enable()}>Slå på og hent 12 måneder</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
