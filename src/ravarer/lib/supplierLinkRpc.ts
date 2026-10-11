@@ -82,19 +82,9 @@ export async function setPrimarySupplier(rawMaterialId: string, supplierId: stri
     if (error) throw new Error("Kunne ikke sette primærleverandør");
     return parseSetPrimarySupplier(data);
   }
-  // Fjerning: RPC-en tar NULL, men den genererte typen (overskrives ved regenerering)
-  // sier `string`. Kall PostgREST direkte med brukerens token i stedet for å omgå typene.
-  const { data: s } = await supabase.auth.getSession();
-  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/rpc/rm_set_primary_supplier`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-      Authorization: `Bearer ${s.session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-    },
-    body: JSON.stringify({ p_raw_material_id: rawMaterialId, p_supplier_id: null }),
+  const { data, error } = await supabase.rpc("rm_clear_primary_supplier", {
+    p_raw_material_id: rawMaterialId,
   });
-  if (!res.ok) throw new Error("Kunne ikke fjerne primærleverandør");
-  const body: Json = await res.json();
-  return parseSetPrimarySupplier(body);
+  if (error) throw new Error("Kunne ikke fjerne primærleverandør");
+  return parseSetPrimarySupplier(data);
 }
