@@ -117,7 +117,7 @@ describe("DataTable-logikk", () => {
 describe("stibygger", () => {
   it("bygger nye stier", () => {
     expect(paths.raavare("x", { tab: "suppliers" })).toBe("/ravarer/varer/x?tab=suppliers");
-    expect(paths.fakturaInnboks({ faktura: "f" })).toBe("/ravarer/priskontroll?fane=fakturaer&visning=innboks&faktura=f");
+    expect(paths.fakturaInnboks({ faktura: "f" })).toBe("/ravarer/priskontroll/faktura/f");
     expect(paths.innstillinger({ seksjon: "ai" })).toBe("/ravarer/innstillinger?seksjon=ai");
   });
 });

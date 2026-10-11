@@ -146,7 +146,7 @@ describe("Oppdater matching med delvis feil", () => {
         id, invoice_number: num, invoice_date: "2026-09-01", received_at: null, due_date: null, status: "needs_review", legal_entity_id: "le", supplier_id: "s",
         supplier_name: "ASKO", is_credit_note: false, total_amount: 100, total_vat: 0, lines_sum_status: "ok",
         lines_sum_variance_pct: null, source_document_url: null, line_extraction_status: "done", source: "ehf", notes: null,
-        paid_at: null, tripletex_is_paid: null, line_extraction_attempts: 0, line_count: 1, assessment, tab: inboxTabOf({ status: "needs_review", assessment }),
+        paid_at: null, tripletex_is_paid: null, line_extraction_attempts: 0, line_extraction_error: null, extraction_confidence: null, reconciled_mode: null, lines_source: null, tripletex_voucher_number: null, line_count: 1, assessment, tab: inboxTabOf({ status: "needs_review", assessment }),
       };
     };
     const batch = vi.fn()
