@@ -31,14 +31,14 @@ export function useApprovalDelivery(ids: readonly string[]) {
     queryFn: async (): Promise<ReadonlyMap<string, ApprovalDelivery>> => {
       const { data, error } = await supabase
         .from("invoices")
-        .select("id, received_at, lines_sum_status, reconciled_mode, line_extraction_status, lines_source, flagged_at, invoice_lines(count)")
+        .select("id, imported_at, created_at, lines_sum_status, reconciled_mode, line_extraction_status, lines_source, flagged_at, invoice_lines(count)")
         .in("id", sorted)
         .limit(sorted.length);
       if (error) throw error;
       const m = new Map<string, ApprovalDelivery>();
       for (const r of data ?? []) {
         m.set(r.id, {
-          received_at: r.received_at, lines_sum_status: r.lines_sum_status, reconciled_mode: r.reconciled_mode,
+          received_at: r.imported_at ?? r.created_at, lines_sum_status: r.lines_sum_status, reconciled_mode: r.reconciled_mode,
           line_extraction_status: r.line_extraction_status, lines_source: r.lines_source, flagged: !!r.flagged_at,
           line_count: r.invoice_lines?.[0]?.count ?? 0,
         });
