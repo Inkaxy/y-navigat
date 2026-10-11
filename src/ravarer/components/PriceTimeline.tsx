@@ -37,9 +37,7 @@ import {
 } from "@/ravarer/lib/priceTimeline";
 import { paths } from "@/ravarer/lib/paths";
 
-function sourceLabel(value: string): string {
-  return PRICE_SOURCES.find((s) => s.value === value)?.label ?? value;
-}
+const sourceLabel = priceSourceLabel;
 
 function seriesColor(i: number): string {
   return `hsl(${(i * 67) % 360} 65% 50%)`;

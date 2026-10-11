@@ -24,6 +24,13 @@ export const PRICE_SOURCES = [
   { value: "invoice", label: "Faktura" },
 ] as const;
 
+/** Én kilde for norsk etikett på priskilde (aldri rå verdi som «invoice»). */
+export function priceSourceLabel(value: string | null | undefined): string {
+  if (!value) return "Ukjent kilde";
+  if (value.startsWith("invoice")) return "Faktura";
+  return PRICE_SOURCES.find((s) => s.value === value)?.label ?? "Annen kilde";
+}
+
 export const ALLERGENS = [
   { value: "gluten_wheat", label: "Gluten — hvete", group: "Gluten" },
   { value: "gluten_rye", label: "Gluten — rug", group: "Gluten" },
