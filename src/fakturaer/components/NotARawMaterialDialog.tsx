@@ -68,7 +68,7 @@ export function NotARawMaterialDialog({ open, onOpenChange, line }: { open: bool
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogHeader><DialogTitle>Ikke en råvare</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Ikke vare</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <p className="rounded-lg border border-line-subtle bg-muted/30 p-3 text-xs text-ink-secondary">
             Gjelder linjer som ikke er varer (frakt, gebyr, pant). Er dette emballasje eller forbruksvarer?
@@ -105,7 +105,7 @@ export function NotARawMaterialDialog({ open, onOpenChange, line }: { open: bool
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Avbryt</Button>
-          <Button onClick={submit} disabled={busy}>Marker som ikke-råvare</Button>
+          <Button onClick={submit} disabled={busy}>Marker som ikke vare</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
