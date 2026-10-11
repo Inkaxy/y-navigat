@@ -61,6 +61,7 @@ export function deviationPct(
 }
 
 export type PackageState = "confirmed" | "unconfirmed" | "missing";
+import type { CostStatus, ListComparison } from "@/ravarer/lib/listPriceEvidence";
 
 /** Rad slik varelisten trenger den — uavhengig av databaseformen. */
 export interface RawMaterialListItem {
@@ -73,6 +74,8 @@ export interface RawMaterialListItem {
   isActive: boolean;
   baseUnit: string;
   costPrice: number | null;
+  /** Serverens kostprisstatus; bare «verifisert» er brukbar kost. */
+  costStatus: CostStatus;
   costSource: string | null;
   costUpdatedAt: string | null;
   agreedPrice: number | null;
@@ -86,6 +89,9 @@ export interface RawMaterialListItem {
   matchedAlias: string | null;
   lastInvoicePrice: number | null;
   lastInvoiceDate: string | null;
+  /** Siste faktura mot gjeldende kostpris, bevist av serveren. Kun `eligible` gir et tall. */
+  comparison: ListComparison;
+  /** Serverens eksakte avvik (%) når `comparison.state === "eligible"`, ellers null = ukjent (aldri 0). */
   deviation: number | null;
   packageState: PackageState;
   volume12m: number;
@@ -136,6 +142,11 @@ export const BUILTIN_VIEWS: ViewDefinition[] = [
   { id: "not_purchased", label: "Ikke kjøpt 12 mnd", predicate: (i) => i.volume12m <= 0 },
   { id: "no_supplier", label: "Uten leverandør", predicate: (i) => !i.supplierId },
   { id: "inactive", label: "Inaktive", predicate: (i) => !i.isActive },
+  {
+    id: "price_control",
+    label: "Prisgrunnlag må kontrolleres",
+    predicate: (i) => i.comparison.state === "unknown" && i.comparison.needsControl,
+  },
 ];
 
 export function viewById(id: string): ViewDefinition | undefined {

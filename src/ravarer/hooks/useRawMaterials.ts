@@ -33,6 +33,8 @@ export interface RawMaterialRow {
   current_cost_price: number | null;
   /** Serverens prisstatus (`verifisert | uverifisert | mangler`); null/ukjent er aldri verifisert. */
   cost_basis_status?: string | null;
+  /** Prishistorikkraden kostprisen er satt fra (serverens kildeidentitet). */
+  cost_source_history_id?: string | null;
   /** Eksplisitt allergenvurdering; null = ikke vurdert (aldri «ingen allergener»). */
   allergens_reviewed_at?: string | null;
   agreed_price: number | null;
