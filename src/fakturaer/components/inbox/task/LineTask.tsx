@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, FileText, Loader2, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -7,6 +7,7 @@ import { formatMoney } from "@/fakturaer/lib/constants";
 import { fmtNum, invoiceArithmeticMismatch } from "@/fakturaer/lib/units";
 import { GENERIC_ERROR_MESSAGE } from "@/lib/userError";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
+import { shouldOpenEditMaterial, type EditMaterialSignal } from "@/fakturaer/lib/editMaterialSignal";
 import type { SupplierLinkRow } from "@/fakturaer/hooks/useSupplierLinkContext";
 import { useLineMatchForm } from "@/fakturaer/hooks/useLineMatchForm";
 import { recalculateLines } from "@/fakturaer/lib/acceptMatch";

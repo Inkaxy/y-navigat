@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QueryState } from "@/components/common/QueryState";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
+import type { EditMaterialSignal } from "@/fakturaer/lib/editMaterialSignal";
 import type { SupplierLinkContext } from "@/fakturaer/hooks/useSupplierLinkContext";
 import type { LineStatus } from "@/fakturaer/lib/lineStatus";
 import { GROUP_LABELS, REVIEW_GROUPS, type QueueSort, type ReviewGroup } from "@/fakturaer/lib/reviewReasons";
