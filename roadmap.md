@@ -108,3 +108,11 @@
 - [ ] Forhåndsvisning 1440/390 med opprettpanel og kostprisdialog
 - [ ] Del opp Vareliste (>400 linjer); `SaveAsRawMaterialDialog` til samme panel-oppsett
 - [ ] Merk riktige rader «Flyttet» i funksjonslisten
+
+## Råvarer 2.0 — fase 2 (10. okt)
+- [x] 0.1 DeclarationNameField i alle steder (OverviewTab, Deklarasjonsnavn, DeclarationNameCard, MissingDeclarationNames, DeclarationNameInline).
+- [x] 0.2 Ett «Ikke vare»-vokabular (labels, badges, toasts, historikk; NotARawMaterialDialog bruker felles grunnliste).
+- [x] 0.3 Vitest for writePathFor, setPrimarySupplier og CostPriceEditor-validering.
+- [x] 0.4 RavarerOversiktPreview + ravarer-oversikt-preview.html.
+- [x] 0.5 Grep-rapport: ingen rester av gamle dialoger, agreed_price-skriving til raw_materials eller forbudt primary_supplier_id-insert.
+- [x] 1–7 Ny Oversikt med Header/KPI/Til deg/Aktivitet/Prisbevegelser/Datakvalitet.
