@@ -148,14 +148,6 @@ export default function RawMaterialDetail() {
         eyebrow={`Råvarer · ${ITEM_TYPE_LABEL[rm.item_type] ?? rm.item_type}${rm.is_active ? "" : " · Inaktiv"}`}
         title={rm.name}
         subtitle={`SKU ${rm.sku} · ${rm.base_unit}`}
-        meta={
-          <Link to={sectionHref("pris")} className="inline-flex flex-wrap items-baseline gap-x-2 rounded-md text-sm hover:underline" aria-label={`Kostpris ${cost.value} per ${rm.base_unit}, ${cost.status}`} data-testid="header-cost">
-            <span className="font-semibold tabular-nums">{cost.value}{cost.precise ? ` / ${rm.base_unit}` : ""}</span>
-            <span className={cost.verified ? "text-success" : "text-warning"}>{cost.status}</span>
-            {cost.precise && <span className="tabular-nums text-ink-secondary">{cost.precise}</span>}
-            {cost.source && <span className="text-ink-secondary">{cost.source}</span>}
-          </Link>
-        }
         crumbs={[
           { label: "Råvarer", to: paths.varer() },
           { label: "Varer", to: `${paths.varer()}${listSearch ? `?${listSearch}` : ""}` },
@@ -180,6 +172,16 @@ export default function RawMaterialDetail() {
           </div>
         }
       />
+
+      {/* Gjeldende kostpris holdes synlig mens man jobber i andre seksjoner (samme tolkning som prisvisningen). */}
+      <div className="sticky top-0 z-20 -mx-1 border-b border-line-subtle bg-background/95 px-1 py-2 backdrop-blur">
+        <Link to={sectionHref("pris")} className="inline-flex flex-wrap items-baseline gap-x-2 rounded-md text-sm hover:underline" aria-label={`Kostpris ${cost.value} per ${rm.base_unit}, ${cost.status}`} data-testid="header-cost">
+            <span className="font-semibold tabular-nums">{cost.value}{cost.precise ? ` / ${rm.base_unit}` : ""}</span>
+            <span className={cost.verified ? "text-success" : "text-warning"}>{cost.status}</span>
+            {cost.precise && <span className="tabular-nums text-ink-secondary">{cost.precise}</span>}
+            {cost.source && <span className="text-ink-secondary">{cost.source}</span>}
+          </Link>
+      </div>
 
       {editingName && (
         <div className="flex items-center gap-2">
