@@ -313,7 +313,7 @@ export default function InvoiceDetailPage() {
         invoice={data}
         canWrite={canWrite && hasInvoiceAccess}
         fetchingLines={fetchingLines}
-        onFetchLines={fetchLinesFromPdf}
+        onFetchLines={(data.invoice_lines ?? []).length === 0 ? fetchLinesFromPdf : undefined}
       />
 
 
