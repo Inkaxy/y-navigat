@@ -73,11 +73,11 @@ export function deliverySteps(inv: DeliveryInvoice, extras: DeliveryExtras): Del
             ? `${inv.open_count} ${inv.open_count === 1 ? "linje" : "linjer"} må avklares`
             : "Ikke kontrollert ennå",
     },
-    { key: "avstemt", label: "Avstemt", done: avstemt, detail: avstemt ? `Avstemt ${mode}` : "Ikke avstemt" },
-    { key: "godkjent", label: "Godkjent", done: extras.approved, detail: extras.approved ? "Internt godkjent" : "Ikke godkjent" },
     inv.is_credit_note
       ? { key: "kostpris", label: "Kostpris ført", done: true, detail: "Ikke relevant for kreditnota" }
-      : { key: "kostpris", label: "Kostpris ført", done: extras.costPosted, detail: extras.costPosted ? "Kostpris er ført" : "Kostpris er ikke ført" },
+      : { key: "kostpris", label: "Kostpris ført", done: extras.costPosted, detail: extras.costPosted ? "Kostpris er ført" : avstemt ? "Ikke ført – kostpris føres bare før avstemming" : "Kostpris er ikke ført" },
+    { key: "avstemt", label: "Avstemt", done: avstemt, detail: avstemt ? `Avstemt ${mode}` : "Ikke avstemt" },
+    { key: "godkjent", label: "Godkjent", done: extras.approved, detail: extras.approved ? "Internt godkjent" : "Ikke godkjent" },
   ];
 }
 
@@ -129,6 +129,15 @@ export function nextInvoiceStep(i: NextStepInput): NextStep {
     const n = i.open_count;
     return { key: "avklar", label: `Avklar ${n} ${n === 1 ? "linje" : "linjer"}`, enabled: true, hint: "Går til første åpne linje." };
   }
+  // Kostpris føres FØR avstemming: `rm_post_safe_line_costs` godtar bare åpne
+  // statuser og aldri kreditnota (krever ikke godkjenning).
+  if (costPostingAllowed(i) && !i.costPosted && !i.noSafeLines) {
+    const can = i.canPostCosts ?? i.canWrite;
+    return {
+      key: "kostpris", label: "Før kostpris", enabled: can,
+      hint: can ? "Fører kostpris for de trygge linjene før fakturaen avstemmes." : "Føring av kostpris krever skrivetilgang til fakturaer.",
+    };
+  }
   if (i.status !== "reconciled") {
     const enabled = i.canReconcile && i.canReconcileRight;
     return {
@@ -145,15 +154,16 @@ export function nextInvoiceStep(i: NextStepInput): NextStep {
   if (i.is_credit_note) {
     return { key: "ferdig", label: "Ferdig", enabled: false, hint: "Kreditnotaen er avstemt og godkjent. Kostprisføring gjelder ikke kreditnotaer." };
   }
-  if (i.noSafeLines && !i.costPosted) {
-    return { key: "ferdig", label: "Ferdig", enabled: false, hint: "Ingen trygge linjer å føre kostpris for." };
-  }
   if (!i.costPosted) {
-    const can = i.canPostCosts ?? i.canWrite;
-    return {
-      key: "kostpris", label: "Før kostpris", enabled: can,
-      hint: can ? "Fører kostpris for de trygge linjene." : "Føring av kostpris krever skrivetilgang til fakturaer.",
-    };
+    return { key: "ferdig", label: "Ferdig", enabled: false, hint: i.noSafeLines ? "Ingen trygge linjer å føre kostpris for." : "Fakturaen er avstemt og godkjent. Kostpris føres bare før avstemming." };
   }
   return { key: "ferdig", label: "Ferdig", enabled: false, hint: "Fakturaen er avstemt, godkjent og kostpris er ført." };
+}
+
+/** Statusene `rm_post_safe_line_costs` godtar. */
+export const COST_POSTING_STATUSES = ["imported", "needs_review", "ready"] as const;
+
+/** Samme regel som serveren: åpen status og ikke kreditnota. Godkjenning kreves ikke. */
+export function costPostingAllowed(i: { status: string | null; is_credit_note?: boolean | null }): boolean {
+  return (COST_POSTING_STATUSES as readonly string[]).includes(i.status ?? "") && !i.is_credit_note;
 }
