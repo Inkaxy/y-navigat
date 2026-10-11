@@ -8,6 +8,7 @@ import { LinesSumMismatchAlert } from "@/fakturaer/components/LinesSumMismatchAl
 import { linesSourceLabel, readingReliability } from "@/fakturaer/lib/invoiceFacts";
 import { recheckInvoiceLinesSum } from "@/fakturaer/lib/linesSum";
 import { cn } from "@/lib/utils";
+import { sumStatusLabel } from "./invoiceSteps";
 
 type Props = {
   data: InvoiceDetailData;
@@ -21,7 +22,7 @@ type Props = {
 
 /** Én oppsummeringslinje når kortet er lukket. */
 export function factsSummary(d: Pick<InvoiceDetailData, "lines_sum_status" | "lines_source" | "extraction_confidence">): string {
-  const sum = d.lines_sum_status === "mismatch" ? "Sum stemmer ikke" : d.lines_sum_status == null ? "Sum ikke kontrollert" : "Sum stemmer";
+  const sum = sumStatusLabel(d.lines_sum_status);
   const parts = [sum, linesSourceLabel(d.lines_source).toLowerCase()];
   if (d.extraction_confidence != null) {
     const r = readingReliability({ confidence: Number(d.extraction_confidence), linesSumStatus: d.lines_sum_status });

@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useFetchInvoiceLines } from "@/ravarer/pages/priskontroll/faktura/useInvoiceActions";
+import { canFetchLines } from "@/ravarer/pages/priskontroll/faktura/invoiceSteps";
 import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useInvoiceDocumentUrl } from "@/fakturaer/hooks/useInvoiceDocument";
 import { QueryState } from "@/components/common/QueryState";
-import { supabase } from "@/integrations/supabase/client";
 import { fetchInvoiceDetail } from "@/fakturaer/components/invoice-detail/fetchInvoiceDetail";
 import { InvoiceFactsCard } from "@/fakturaer/components/invoice-detail/InvoiceFactsCard";
 import { LinesSumMismatchAlert } from "@/fakturaer/components/LinesSumMismatchAlert";
@@ -49,18 +50,25 @@ export function FakturasakPanel({ invoiceId, kind, onDone, onNext, onSkip }: Pro
   const refresh = () => { void qc.invalidateQueries({ queryKey: ["invoice", invoiceId] }); invalidateRavarerCounts(qc); };
   const done = (r: PanelResult) => { setResult(r); onDone?.(r); };
 
-  const fetchLines = useMutation({
-    mutationFn: async () => {
+  // Samme handling som arbeidsflaten. Null behandlet er ikke suksess.
+  const fetchMut = useFetchInvoiceLines();
+  const [fetchMsg, setFetchMsg] = useState<string | null>(null);
+  const fetchLines = {
+    isPending: fetchMut.isPending,
+    mutate: () => {
       const d = q.data;
-      if (!d) throw new Error("Fakturaen er ikke lastet.");
-      const { data, error } = await supabase.functions.invoke("tripletex-import-invoice-lines", { body: { legal_entity_id: d.legal_entity_id, invoice_id: d.id, limit: 1 } });
-      if (error) throw new Error("Kunne ikke hente linjer. Prøv igjen.");
-      const failed = typeof data === "object" && data !== null && "feilet" in data ? Number(data.feilet) : 0;
-      if (failed > 0) throw new Error("Kunne ikke lese linjer fra PDF-en.");
+      if (!d) return;
+      setFetchMsg(null);
+      fetchMut.mutate(d, {
+        onSettled: refresh,
+        onSuccess: (r) => {
+          if (r.behandlet === 0) setFetchMsg("Ingen linjer ble hentet. Fakturaen kan være opptatt eller allerede lest — åpne fakturaen eller registrer linjene manuelt.");
+          else done({ title: "Linjene er hentet", items: ["Fakturaen regnes om og dukker opp igjen hvis noe må avklares."] });
+        },
+        onError: (e: Error) => setFetchMsg(`${e.message} ${attemptsText(d.line_extraction_attempts)}`),
+      });
     },
-    onSettled: refresh,
-    onSuccess: () => done({ title: "Linjene er hentet", items: ["Fakturaen regnes om og dukker opp igjen hvis noe må avklares."] }),
-  });
+  };
   const unflag = useMutation({
     mutationFn: () => unflagInvoice(invoiceId),
     onSuccess: () => { invalidateInvoice(qc, invoiceId); invalidateRavarerCounts(qc); done({ title: "Flagget er fjernet", items: [] }); },
@@ -94,12 +102,12 @@ export function FakturasakPanel({ invoiceId, kind, onDone, onNext, onSkip }: Pro
               </div>
             </header>
 
-            <InvoiceFactsCard invoice={d} canWrite={canWrite && !isFinal} fetchingLines={fetchLines.isPending} onFetchLines={() => fetchLines.mutate()} />
-            {fetchLines.isError && <p role="alert" className="text-sm text-destructive">{fetchLines.error.message} {attemptsText(d.line_extraction_attempts)}</p>}
+            <InvoiceFactsCard invoice={d} canWrite={canWrite && !isFinal} fetchingLines={fetchLines.isPending} />
+            {fetchMsg && <p role="alert" className="text-sm text-destructive">{fetchMsg}</p>}
 
             {k === "faktura_mangler_linjer" && (
               <div className="flex flex-wrap gap-2">
-                <Button data-primary-action disabled={!canWrite || fetchLines.isPending} onClick={() => fetchLines.mutate()}>Hent linjer</Button>
+                {canFetchLines({ source: d.source, line_extraction_status: d.line_extraction_status, line_count: d.invoice_lines.length }) && <Button data-primary-action disabled={!canWrite || fetchLines.isPending} onClick={() => fetchLines.mutate()}>Hent linjer</Button>}
                 <Button variant="outline" asChild><Link to={paths.registrerLinjer(d.id)}>Registrer linjer manuelt</Link></Button>
               </div>
             )}

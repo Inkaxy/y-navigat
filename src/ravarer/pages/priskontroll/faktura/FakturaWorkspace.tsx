@@ -21,7 +21,13 @@ import { useConfirmMany } from "@/ravarer/ui/useConfirmMany";
 import type { EditMaterialSignal } from "@/fakturaer/lib/editMaterialSignal";
 import { FakturaerDialogs, type DialogState } from "@/ravarer/pages/priskontroll/fakturaer/FakturaerDialogs";
 import { fakturaBackHref, readReturnParam } from "@/ravarer/pages/priskontroll/fakturaer/visning";
-import { InvoiceFactsSection } from "./InvoiceFactsSection";
+import { ControlSummary } from "./ControlSummary";
+import { SumOverrideDialog } from "./SumOverrideDialog";
+import { recheckInvoiceLinesSum } from "@/fakturaer/lib/linesSum";
+import { supabase } from "@/integrations/supabase/client";
+import { parseRepairVat } from "@/fakturaer/lib/parseRpcJson";
+import { repairVatMessage } from "@/fakturaer/lib/invoiceFacts";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { notItemResultItems } from "./notItemResult";
 import { LineDialogs, type LineDialog } from "./LineDialogs";
 import { SupplierItemScopeNote } from "./SupplierItemScopeNote";
@@ -35,10 +41,10 @@ import { useRematchWait } from "./useRematchWait";
 import { canFetchLines } from "./invoiceSteps";
 import { CorrectLineDialog } from "./CorrectLineDialog";
 import { correctionDocLine } from "./correctionDocLine";
-import { ReadIssuesBanner } from "./ReadIssuesBanner";
 import { parseReadIssues } from "@/fakturaer/lib/lineCorrection";
 
-const LS_DOC = "nbhub.faktura.docpanel.open";
+// v2: originaldokumentet er åpent som standard; bare et eksplisitt «skjul» huskes.
+const LS_DOC = "nbhub.faktura.docpanel.v2";
 const HELP = [
   { keys: ["↑", "↓", "j", "k"], description: "Forrige / neste linje", handler: () => undefined },
   { keys: ["Enter"], description: "Godta toppforslag / hovedhandling", handler: () => undefined },
@@ -66,7 +72,7 @@ export default function FakturaWorkspace() {
   const fetchLines = useFetchInvoiceLines();
   const rematch = useRematchWait(data?.legal_entity_id ?? null, () => { void detail.refetch(); q.refresh(); });
   const confirmMany = useConfirmMany();
-  const [docOpen, setDocOpen] = useState(() => localStorage.getItem(LS_DOC) === "1");
+  const [docOpen, setDocOpen] = useState(() => localStorage.getItem(LS_DOC) !== "0" && typeof window !== "undefined" && window.matchMedia("(min-width: 1280px)").matches);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [editSignal, setEditSignal] = useState<EditMaterialSignal | null>(null);
   const [pendingFocus, setPendingFocus] = useState<string | null>(null);
@@ -79,6 +85,8 @@ export default function FakturaWorkspace() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [lastLinked, setLastLinked] = useState<{ rmsId: string; name: string } | null>(null);
   const [showLedger, setShowLedger] = useState(false);
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [zone, setZone] = useState<"dokument" | "linjer" | "kontroll">("linjer");
 
   const final = data?.status === "reconciled" || data?.status === "flagged";
   // Linjene kan bare endres med skrivetilgang og når fakturaen ikke er avstemt/flagget.
@@ -124,7 +132,7 @@ export default function FakturaWorkspace() {
     else if (k === "koble_kreditnota") setDialog({ kind: "credit", inv: data });
     else if (k === "hent_linjer") doFetch();
     else if (k === "registrer_linjer") navigate(paths.registrerLinjer(data.id));
-    else if (k === "rett_sum") setFactsSignal((n) => n + 1);
+    else if (k === "rett_sum") { setFactsSignal((n) => n + 1); setZone("kontroll"); if (!docOpen && data.source_document_url) toggleDoc(); }
     else if (k === "avklar") focusFirstOpen();
     else if (k === "avstem" && s.assessment) setDialog({ kind: "reconcile", inv: { id: data.id, invoice_number: data.invoice_number, assessment: s.assessment } });
     else if (k === "godkjenn") void s.approve();
@@ -138,10 +146,27 @@ export default function FakturaWorkspace() {
     else if (a === "fetch") doFetch();
     else if (a === "register") navigate(paths.registrerLinjer(data.id));
     else if (a === "credit") setDialog({ kind: "credit", inv: data });
+    else if (a === "correct") {
+      const lines = data.invoice_lines ?? [];
+      const target = lines.find((l) => parseReadIssues(l.extraction_issues).length > 0) ?? q.activeLine ?? lines[0];
+      if (target) setCorrectFor(target.id);
+    }
+    else if (a === "recheck") {
+      void recheckInvoiceLinesSum(data.id).then(() => { void detail.refetch(); s.setResult({ title: "Summen er kontrollert på nytt", items: [] }); },
+        () => s.setResult({ title: "Summen kunne ikke kontrolleres", items: ["Prøv igjen."], error: true }));
+    }
+    else if (a === "vat") {
+      void (async () => {
+        const { data: r, error } = await supabase.rpc("rm_repair_invoice_vat", { p_invoice_id: data.id });
+        if (error) { console.error("[mva-forslag]", error); s.setResult({ title: "Mva-avviket kunne ikke kontrolleres", items: ["Prøv igjen."], error: true }); return; }
+        s.setResult({ title: "Forslag ved mva-avvik", items: [repairVatMessage(parseRepairVat(r))] });
+      })();
+    }
+    else if (a === "override") setOverrideOpen(true);
     else setHistoryOpen(true);
   };
 
-  const anyDialog = !!dialog || !!lineDialog || historyOpen || helpOpen || !!q.bulkLink;
+  const anyDialog = !!dialog || !!lineDialog || historyOpen || helpOpen || overrideOpen || !!q.bulkLink;
   const keys = useMemo(() => ({
     enabled: !!data && !anyDialog,
     canWrite: lineWrite,
@@ -185,11 +210,12 @@ export default function FakturaWorkspace() {
   const lockNote = final ? (data.status === "reconciled" ? "Fakturaen er avstemt — linjene er låst" : "Fakturaen er flagget — linjene er låst") : null;
   const notApplicableCount = q.selectedLines.length;
 
+  const control = (expanded?: boolean) => (
+    <ControlSummary data={data} openCount={q.needs} totalCount={q.total} canWrite={s.canWrite} locked={final} openSignal={factsSignal} expanded={expanded} />
+  );
   const linesZone = (
     <div className="min-w-0 space-y-3">
-      <InvoiceFactsSection data={data} canWrite={s.canWrite} fetchingLines={fetchLines.isPending} onFetchLines={doFetch} onChanged={() => void detail.refetch()} openSignal={factsSignal} />
-      <ReadIssuesBanner invoiceId={data.id} issues={parseReadIssues(data.extraction_issues)} canWrite={s.canWrite} locked={final}
-        lineIssueCount={(data.invoice_lines ?? []).filter((l) => l.match_confidence !== "not_applicable" && parseReadIssues(l.extraction_issues).length > 0).length} />
+      {!isMobile && control()}
       {lockNote && <p role="note" className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-ink-secondary">{lockNote}</p>}
       {s.result && <ResultBox title={s.result.title} items={s.result.items} onUndo={s.result.undoable && q.undoEntry ? () => { s.setResult(null); void q.undo(); } : undefined} onNext={() => s.setResult(null)} nextLabel="Lukk" />}
       {lastLinked && <SimilarLinesHint rmsId={lastLinked.rmsId} name={lastLinked.name} onOpen={() => q.setBulkLink(lastLinked)} onDismiss={() => setLastLinked(null)} />}
@@ -252,7 +278,7 @@ export default function FakturaWorkspace() {
           onSaved={q.handleSaved}
           onLinked={(rmsId, name) => setLastLinked({ rmsId, name })}
           onSecondary={(a, l) => setLineDialog({ kind: a, line: l })}
-          onShowDocument={() => { if (!docOpen) toggleDoc(); }}
+          onShowDocument={() => { if (isMobile) setZone("dokument"); else if (!docOpen) toggleDoc(); }}
           onReconcile={runPrimary}
           inspectorAsSheet={!wide && !isMobile}
           inspectorOpen={inspectorOpen}
@@ -290,23 +316,44 @@ export default function FakturaWorkspace() {
         docOpen={docOpen}
         onToggleDoc={toggleDoc}
         canWrite={s.canWrite}
-        canFetch={canFetchLines(data)}
+        canFetch={canFetchLines({ source: data.source, line_extraction_status: data.line_extraction_status, line_count: (data.invoice_lines ?? []).length })}
+        backLabel={new URLSearchParams(readReturnParam(sp) ?? "").get("fane") === "gjore" ? "Å gjøre" : "Fakturaer"}
+        sumMismatch={data.lines_sum_status === "mismatch"}
+        canCorrect={(data.invoice_lines ?? []).length > 0}
         rematchBusy={rematch.busy}
         rematchNote={rematch.note}
         lineProgress={{ done: q.total - q.needs, total: q.total }}
         onMenu={onMenu}
       />
-      {showDocZone ? (
-        <div className="grid items-start gap-4 xl:grid-cols-[minmax(320px,32%)_1fr]">
-          <aside className="sticky top-28 h-[calc(100vh-8rem)] overflow-hidden rounded-lg border border-border bg-card">{docEl}</aside>
+      {isMobile ? (
+        <div className="space-y-3 pb-24">
+          <Tabs value={zone} onValueChange={(v) => { if (v === "dokument" || v === "linjer" || v === "kontroll") setZone(v); }}>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="dokument" disabled={!data.source_document_url}>Dokument</TabsTrigger>
+              <TabsTrigger value="linjer">Linjer{q.needs > 0 ? ` (${q.needs})` : ""}</TabsTrigger>
+              <TabsTrigger value="kontroll">Kontroll</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          {zone === "dokument" && data.source_document_url && <div className="h-[75vh] overflow-hidden rounded-lg border border-border bg-card">{docEl}</div>}
+          {zone === "linjer" && linesZone}
+          {zone === "kontroll" && control(true)}
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 py-3 backdrop-blur">
+            <p className="mb-1.5 truncate text-caption text-ink-secondary">{s.next.hint}</p>
+            <Button className="w-full" disabled={!s.next.enabled || s.busy || fetchLines.isPending} onClick={runPrimary}>{s.next.label}</Button>
+          </div>
+        </div>
+      ) : showDocZone ? (
+        <div className="grid items-start gap-4 xl:grid-cols-[minmax(300px,34%)_minmax(0,1fr)]">
+          <aside className="sticky top-28 h-[calc(100vh-8rem)] min-w-0 overflow-hidden rounded-lg border border-border bg-card">{docEl}</aside>
           {linesZone}
         </div>
       ) : linesZone}
-      {docOpen && !wide && !!data.source_document_url && (
+      {docOpen && !wide && !isMobile && !!data.source_document_url && (
         <Sheet open onOpenChange={(v) => { if (!v) toggleDoc(); }}>
           <SheetContent side="bottom" className="h-[90vh] p-0"><SheetTitle className="sr-only">Originalfaktura</SheetTitle>{docEl}</SheetContent>
         </Sheet>
       )}
+      <SumOverrideDialog open={overrideOpen} onOpenChange={setOverrideOpen} data={data} canOverride={s.canWrite && !final} onDone={() => { setOverrideOpen(false); void detail.refetch(); }} />
       <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
           <SheetHeader><SheetTitle>Revisjonshistorikk</SheetTitle></SheetHeader>

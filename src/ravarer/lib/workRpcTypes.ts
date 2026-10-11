@@ -45,8 +45,23 @@ export type WorkItem = {
   supplier_id: string | null; supplier_name: string | null; item_key: string | null;
   invoice_id: string | null; invoice_number: string | null; title: string; sku: string | null;
   rm_id: string | null; rm_name: string | null; open_lines: number; open_invoices: number; invoice_count: number;
-  amount: number; impact_nok: number; last_date: string | null; last_open_line_id: string | null; reasons: string[];
+  amount: number;
+  /** Prisvirkning. Null = ikke beregnet (gammel server eller usikker lesing) — aldri bruttobeløp. */
+  impact_nok: number | null;
+  last_date: string | null; last_open_line_id: string | null; reasons: string[];
+  /** Fravær = «unknown»: eldre servere har ikke feltet og vises konservativt. */
+  effect_status: WorkEffectStatus;
+  effect_label: string | null;
+  read_integrity: ReadIntegrity;
+  read_integrity_flags: string[];
+  unknown_effect_lines: number | null;
+  amount_kind: string | null;
 };
+
+export const WORK_EFFECT_STATUSES = ["verified_price_effect", "unknown", "not_price_effect"] as const;
+export type WorkEffectStatus = (typeof WORK_EFFECT_STATUSES)[number];
+export const READ_INTEGRITY = ["checked", "needs_review", "unknown"] as const;
+export type ReadIntegrity = (typeof READ_INTEGRITY)[number];
 
 export type WorkItemsCounts = Record<WorkGroup | "faktura_mangler_linjer" | "faktura_sumavvik" | "faktura_flagget" | "faktura_klar", number>;
 export type WorkItemsResult = { total: number; counts: WorkItemsCounts; items: WorkItem[]; generated_at: string | null };
@@ -89,3 +104,8 @@ export type AcceptPriceResult = {
   invoices: string[];
   rematch: { ok: boolean; queued: number; already_queued: number; pending: number } | null;
 };
+
+/** Konservative standardverdier når serveren ikke sender effektfeltene. */
+export const WORK_ITEM_EFFECT_DEFAULTS = {
+  effect_status: "unknown", effect_label: null, read_integrity: "unknown", read_integrity_flags: [], unknown_effect_lines: null, amount_kind: null,
+} as const satisfies Pick<WorkItem, "effect_status" | "effect_label" | "read_integrity" | "read_integrity_flags" | "unknown_effect_lines" | "amount_kind">;

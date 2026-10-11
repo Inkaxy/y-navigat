@@ -82,10 +82,9 @@ export function InvoiceFactsView({ invoice: d, actions, details }: { invoice: In
               {d.lines_sum_variance_pct != null && `${d.lines_sum_variance_pct.toLocaleString("nb-NO", { maximumFractionDigits: 1 })} % `}
               <span className={cn(chk.tone === "success" && "text-success", chk.tone === "danger" && "text-destructive", chk.tone === "muted" && "text-ink-secondary")}>{chk.label}</span>
             </Row>
-            <Row k="Lesesikkerhet">{(() => {
+            <Row k="Lesekontroll">{(() => {
               const r = readingReliability({ confidence: conf, linesSumStatus: d.lines_sum_status, variancePct: d.lines_sum_variance_pct });
-              if (r.rawScore == null) return r.label;
-              return r.validated || r.label.startsWith("Ikke") ? <span className={cn(!r.validated && r.label.startsWith("Ikke") && "text-destructive")}>{r.label}{r.label.startsWith("Ikke") ? <span className="ml-1 text-ink-secondary">(rå AI-score {r.rawScore}, ikke validert)</span> : ` (${r.rawScore})`}</span> : `${r.label} (${r.rawScore}, sum ikke kontrollert)`;
+              return <span className={cn(!r.validated && r.label.startsWith("Ikke bekreftet") && "text-destructive")}>{r.label}{r.rawScore && <span className="ml-1 text-caption text-ink-secondary">(rå AI-score {r.rawScore})</span>}</span>;
             })()}</Row>
             <Row k="Forsøk">{d.line_extraction_attempts ?? 0}</Row>
             <Row k="Linjekilde">{linesSourceLabel(d.lines_source)}</Row>
@@ -97,7 +96,7 @@ export function InvoiceFactsView({ invoice: d, actions, details }: { invoice: In
   );
 }
 
-export function InvoiceFactsCard({ invoice, canWrite, fetchingLines, onFetchLines, details }: { invoice: InvoiceFacts; canWrite: boolean; fetchingLines: boolean; onFetchLines: () => void; details?: InvoiceHeaderFacts }) {
+export function InvoiceFactsCard({ invoice, canWrite, fetchingLines, onFetchLines, details }: { invoice: InvoiceFacts; canWrite: boolean; fetchingLines: boolean; onFetchLines?: () => void; details?: InvoiceHeaderFacts }) {
   const qc = useQueryClient();
   const [repairMsg, setRepairMsg] = useState<string | null>(null);
   const timers = useRef<number[]>([]);
@@ -132,9 +131,11 @@ export function InvoiceFactsCard({ invoice, canWrite, fetchingLines, onFetchLine
 
   const actions = canWrite ? (
     <>
-      <Button size="sm" variant="outline" disabled={fetchingLines} onClick={onFetchLines}>
-        {fetchingLines ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden /> : <RefreshCw className="mr-1.5 h-4 w-4" aria-hidden />}Hent linjer på nytt
-      </Button>
+      {onFetchLines && (
+        <Button size="sm" variant="outline" disabled={fetchingLines} onClick={onFetchLines}>
+          {fetchingLines ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden /> : <RefreshCw className="mr-1.5 h-4 w-4" aria-hidden />}Hent linjer
+        </Button>
+      )}
       {invoice.lines_sum_status === "mismatch" && (
         <Button size="sm" variant="outline" disabled={repair.isPending} onClick={() => repair.mutate()}>
           {repair.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden /> : <Wrench className="mr-1.5 h-4 w-4" aria-hidden />}Kontroller mva-avvik

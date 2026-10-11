@@ -1,23 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Search } from "lucide-react";
+import { Keyboard, Search, SlidersHorizontal } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QueryState } from "@/components/common/QueryState";
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
 import { useWorkItems } from "@/ravarer/hooks/useWorkData";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
-import { WORK_GROUPS, type WorkItem } from "@/ravarer/lib/workRpcTypes";
+import type { WorkGroup, WorkItem } from "@/ravarer/lib/workRpcTypes";
 import { paths } from "@/ravarer/lib/paths";
-import { SectionTabs } from "@/ravarer/ui/SectionTabs";
 import { PeekPanel, SplitView } from "@/ravarer/ui/SplitView";
 import { ShortcutHelp } from "@/ravarer/ui/ShortcutHelp";
 import { useHotkeys, type HotkeyBinding } from "@/ravarer/ui/hotkeys";
-import { GJORE_SORTS, GROUP_LABELS, parseGruppe, parseSort, parseValgt, pickNext, stepKey } from "./logic";
+import { GJORE_SORTS, parseGruppe, parseSort, parseValgt, pickNext, stepKey } from "./logic";
 import { WorkListView } from "./WorkListView";
 import { GjoreBulkBar } from "./GjoreBulkBar";
 import { VarekortPanel } from "./VarekortPanel";
 import { FakturasakPanel } from "./FakturasakPanel";
+import { WorkGroupNav } from "./WorkGroupNav";
+import { GROUP_COPY, groupCountText } from "./groupCopy";
+import { GjoreEmptyPanel } from "./GjoreEmptyPanel";
 
 const PAGE = 50;
 const AUTO_NEXT_MS = 1200;
@@ -60,12 +64,13 @@ export function GjoreWorkspace() {
   const { data: suppliers = [] } = useSuppliers();
 
   // Funksjonell oppdatering: en forsinket skriving bruker alltid gjeldende query.
-  const set = (patch: Record<string, string | null>) => {
+  // Filtre erstatter historikken; et klikk-valg legges i historikken så «Tilbake» virker.
+  const set = (patch: Record<string, string | null>, push = false) => {
     setSp((prev) => {
       const n = new URLSearchParams(prev);
       for (const [k, v] of Object.entries(patch)) { if (v) n.set(k, v); else n.delete(k); }
       return n;
-    }, { replace: true });
+    }, { replace: !push });
   };
   const clearTimer = () => { if (timer.current != null) { window.clearTimeout(timer.current); timer.current = null; } };
   useEffect(() => clearTimer, []);
@@ -91,13 +96,19 @@ export function GjoreWorkspace() {
 
   /** Fullside for et element; varekortet får med listetilstanden så «Tilbake» lander samme sted. */
   const fullPage = (v: NonNullable<ReturnType<typeof parseValgt>>) => {
-    if (v.type === "faktura") return paths.faktura(v.invoiceId);
+    if (v.type === "faktura") {
+      // Fakturaen får med Å gjøre-filtrene, så «Tilbake» lander i samme gruppe/søk.
+      const ret = new URLSearchParams(sp);
+      ret.delete("valgt");
+      ret.set("fane", "gjore");
+      return `${paths.faktura(v.invoiceId)}?retur=${encodeURIComponent(ret.toString())}`;
+    }
     const back = new URLSearchParams();
     for (const k of ["gruppe", "sort", "q", "leverandor"]) { const x = sp.get(k); if (x) back.set(k, x); }
     const qs = back.toString();
     return `${paths.varekort(v.supplierId, v.itemKey)}${qs ? `?${qs}` : ""}`;
   };
-  const select = (key: string | null) => {
+  const select = (key: string | null, push = false) => {
     clearTimer();
     viaKeyboard.current = null;
     setNextKey(null);
@@ -106,7 +117,7 @@ export function GjoreWorkspace() {
       navigate(fullPage(v));
       return;
     }
-    set({ valgt: key });
+    set({ valgt: key }, push);
   };
   const onDone = () => {
     const nk = items.some((i) => i.key === valgt) ? pickNext(items, valgt) : nextRef.current;
@@ -147,32 +158,56 @@ export function GjoreWorkspace() {
   useHotkeys(bindings);
 
   const counts = work.data?.counts;
-  const tabs = WORK_GROUPS.map((g) => ({ id: g, label: GROUP_LABELS[g], count: counts ? counts[g] : null }));
+  const copy = GROUP_COPY[gruppe];
+  const countText = groupCountText(gruppe, counts);
+  const pickGroup = (g: WorkGroup) => set({ gruppe: g === "alle" ? null : g, valgt: null });
+  const filterCount = (leverandor ? 1 : 0) + (sort !== "impact" ? 1 : 0);
+  const supplierSelect = (
+    <Select value={leverandor ?? "alle"} onValueChange={(v) => set({ leverandor: v === "alle" ? null : v })}>
+      <SelectTrigger className="lg:w-48" aria-label="Leverandør"><SelectValue placeholder="Alle leverandører" /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="alle">Alle leverandører</SelectItem>
+        {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  );
+  const sortSelect = (
+    <Select value={sort} onValueChange={(v) => set({ sort: v === "impact" ? null : v })}>
+      <SelectTrigger className="lg:w-48" aria-label="Sortering"><SelectValue /></SelectTrigger>
+      <SelectContent>{GJORE_SORTS.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+    </Select>
+  );
 
   const list = (
     <div className="space-y-3">
-      <SectionTabs tabs={tabs} param="gruppe" defaultTab="alle" clearParams={["valgt"]} ariaLabel="Grupper" />
-      <div className="flex flex-col gap-2 sm:flex-row">
+      <header className="space-y-1">
+        <h2 className="font-serif text-lg leading-tight">{copy.title}</h2>
+        <p className="text-sm text-ink-secondary">{copy.explain}</p>
+        {countText && <p className="text-caption tabular-nums text-ink-secondary" aria-live="polite">{countText} i køen</p>}
+      </header>
+      <div className="flex gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-ink-secondary" aria-hidden />
           <Input ref={searchRef} className="pl-8" aria-label="Søk" placeholder="Søk vare, leverandør eller faktura" value={qText} onChange={(e) => setQText(e.target.value)} />
         </div>
-        <Select value={leverandor ?? "alle"} onValueChange={(v) => set({ leverandor: v === "alle" ? null : v })}>
-          <SelectTrigger className="sm:w-48" aria-label="Leverandør"><SelectValue placeholder="Alle leverandører" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="alle">Alle leverandører</SelectItem>
-            {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={sort} onValueChange={(v) => set({ sort: v === "impact" ? null : v })}>
-          <SelectTrigger className="sm:w-48" aria-label="Sortering"><SelectValue /></SelectTrigger>
-          <SelectContent>{GJORE_SORTS.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
-        </Select>
+        <div className="hidden gap-2 lg:flex">{supplierSelect}{sortSelect}</div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="gap-1.5 lg:hidden" aria-label="Filtre">
+              <SlidersHorizontal className="h-4 w-4" aria-hidden />{filterCount > 0 ? filterCount : null}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-72 space-y-3">
+            <div className="space-y-1"><p className="text-caption text-ink-secondary">Leverandør</p>{supplierSelect}</div>
+            <div className="space-y-1"><p className="text-caption text-ink-secondary">Rekkefølge</p>{sortSelect}</div>
+          </PopoverContent>
+        </Popover>
+        <Button variant="ghost" size="icon" className="hidden lg:inline-flex" aria-label="Vis hurtigtaster" onClick={() => setHelp(true)}><Keyboard className="h-4 w-4" /></Button>
       </div>
       <GjoreBulkBar selected={[...checked.values()]} onClear={() => setChecked(new Map())} />
       <QueryState isLoading={false} isError={work.isError} error={work.error} scope="ravarer:gjore" onRetry={() => void work.refetch()}>
         <WorkListView items={items} total={work.data?.total ?? 0} selectedKey={valgt} loading={work.isLoading} fetchingMore={work.isFetching && limit > items.length}
-          onSelect={(it: WorkItem) => { select(it.key); focusPanel(); }} onMore={() => setLimit((n) => n + PAGE)}
+          onSelect={(it: WorkItem) => { select(it.key, true); focusPanel(); }} onMore={() => setLimit((n) => n + PAGE)}
           checked={new Set(checked.keys())} onToggle={toggle} />
       </QueryState>
     </div>
@@ -188,13 +223,20 @@ export function GjoreWorkspace() {
 
   return (
     <>
-      <SplitView list={list} panel={
-        <PeekPanel onClose={sel ? () => select(null) : undefined}
-          fullHref={sel ? (sel.type === "varekort" ? paths.varekort(sel.supplierId, sel.itemKey) : paths.faktura(sel.invoiceId)) : undefined}
-          emptyText="Velg noe i listen — eller trykk J for å starte øverst.">
-          {panelBody}
-        </PeekPanel>
-      } />
+      <div className="grid gap-4 lg:grid-cols-[200px_minmax(0,1fr)]">
+        <aside className="lg:sticky lg:top-4 lg:self-start">
+          <WorkGroupNav active={gruppe} counts={counts} onPick={pickGroup} />
+        </aside>
+        <SplitView list={list} panel={sel ? (
+          <PeekPanel onClose={() => select(null)}
+            fullHref={sel.type === "varekort" ? paths.varekort(sel.supplierId, sel.itemKey) : fullPage(sel)}>
+            {panelBody}
+          </PeekPanel>
+        ) : (
+          <GjoreEmptyPanel group={gruppe} total={work.data?.total ?? null} first={items[0] ?? null}
+            onStart={() => { if (items[0]) { select(items[0].key, true); focusPanel(); } }} onHelp={() => setHelp(true)} />
+        )} />
+      </div>
       <ShortcutHelp open={help} onOpenChange={setHelp} bindings={bindings} />
     </>
   );

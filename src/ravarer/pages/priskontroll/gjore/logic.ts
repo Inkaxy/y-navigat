@@ -33,7 +33,7 @@ export const fakturaKey = (invoiceId: string) => `faktura:${invoiceId}`;
 
 // ---------- URL-parametre ----------
 export const GJORE_SORTS: { id: WorkSort; label: string }[] = [
-  { id: "impact", label: "Størst kronevirkning" },
+  { id: "impact", label: "Prioritet" },
   { id: "frequency", label: "Går oftest igjen" },
   { id: "newest", label: "Nyeste" },
 ];

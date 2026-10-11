@@ -9,7 +9,7 @@ import { isFlaggable } from "@/fakturaer/lib/flagging";
 import { DeliveryTimeline } from "./DeliveryTimeline";
 import type { DeliveryStep, NextStep } from "./invoiceSteps";
 
-export type HeaderMenuAction = "flag" | "unflag" | "rematch" | "fetch" | "register" | "credit" | "history";
+export type HeaderMenuAction = "flag" | "unflag" | "rematch" | "fetch" | "register" | "credit" | "history" | "recheck" | "vat" | "override" | "correct";
 
 type Props = {
   backHref: string;
@@ -38,6 +38,12 @@ type Props = {
   /** «N av M linjer avklart». */
   lineProgress?: { done: number; total: number } | null;
   onMenu: (a: HeaderMenuAction) => void;
+  /** Tekst på tilbakeknappen («Fakturaer» eller «Å gjøre»). */
+  backLabel?: string;
+  /** Linjesummen avviker: vis mva-forslag og overstyring. */
+  sumMismatch?: boolean;
+  /** Fakturaen har linjer som kan rettes manuelt mot originalen. */
+  canCorrect?: boolean;
 };
 
 /** Sticky header: hvem/hva, leveransestatus og ÉN primærknapp for neste steg. */
@@ -48,7 +54,7 @@ export function WorkspaceHeader(p: Props) {
     <header className="sticky top-0 z-20 space-y-2 border-b border-border bg-background/95 py-3 backdrop-blur">
       <div className="flex flex-wrap items-center gap-2">
         <Button asChild variant="ghost" size="sm" className="-ml-2 gap-1.5">
-          <Link to={p.backHref}><ArrowLeft className="h-4 w-4" aria-hidden />Fakturaer</Link>
+          <Link to={p.backHref}><ArrowLeft className="h-4 w-4" aria-hidden />{p.backLabel ?? "Fakturaer"}</Link>
         </Button>
         {p.undoLabel && (
           <Button variant="ghost" size="sm" className="gap-1.5" onClick={p.onUndo}>
@@ -88,7 +94,12 @@ export function WorkspaceHeader(p: Props) {
                 <DropdownMenuItem disabled={p.rematchBusy} onSelect={() => p.onMenu("rematch")}>Beregn på nytt</DropdownMenuItem>
               )}
               {p.canWrite && p.canFetch && <DropdownMenuItem onSelect={() => p.onMenu("fetch")}>Hent linjer</DropdownMenuItem>}
-              {p.canWrite && !final && <DropdownMenuItem onSelect={() => p.onMenu("register")}>Registrer linjer</DropdownMenuItem>}
+              {p.canWrite && !final && !p.canCorrect && <DropdownMenuItem onSelect={() => p.onMenu("register")}>Registrer linjer</DropdownMenuItem>}
+              {p.canWrite && !final && p.canCorrect && <DropdownMenuItem onSelect={() => p.onMenu("correct")}>Rett linjer mot originalen …</DropdownMenuItem>}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => p.onMenu("recheck")}>Kontroller summen på nytt</DropdownMenuItem>
+              {p.canWrite && p.sumMismatch && <DropdownMenuItem onSelect={() => p.onMenu("vat")}>Forslag ved mva-avvik</DropdownMenuItem>}
+              {p.canWrite && p.sumMismatch && !final && <DropdownMenuItem onSelect={() => p.onMenu("override")}>Overstyr sumavvik med begrunnelse …</DropdownMenuItem>}
               {p.canWrite && p.isCreditNote && <DropdownMenuItem onSelect={() => p.onMenu("credit")}>Koble kreditnota</DropdownMenuItem>}
               <DropdownMenuSeparator />
               <DropdownMenuItem disabled={!doc.url} onSelect={() => { if (doc.url) window.open(doc.url, "_blank", "noopener,noreferrer"); }}>
@@ -97,13 +108,13 @@ export function WorkspaceHeader(p: Props) {
               <DropdownMenuItem onSelect={() => p.onMenu("history")}>Revisjonshistorikk</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button size="sm" data-primary-action disabled={!p.next.enabled || p.busy} title={p.next.hint} onClick={p.onPrimary}>
+          <Button size="sm" className="hidden sm:inline-flex" data-primary-action disabled={!p.next.enabled || p.busy} title={p.next.hint} onClick={p.onPrimary}>
             {p.busy && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden />}
             {p.next.label}
           </Button>
         </div>
       </div>
-      <p className="text-right text-caption text-ink-secondary" aria-live="polite">{p.rematchNote ? `${p.rematchNote} · ` : ""}{p.next.hint}</p>
+      <p className="hidden text-right text-caption sm:block text-ink-secondary" aria-live="polite">{p.rematchNote ? `${p.rematchNote} · ` : ""}{p.next.hint}</p>
     </header>
   );
 }

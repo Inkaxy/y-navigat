@@ -10,12 +10,13 @@ import { WorkListView } from "@/ravarer/pages/priskontroll/gjore/WorkListView";
 import { VarekortHeaderView, VBlock } from "@/ravarer/pages/priskontroll/gjore/VarekortHeaderView";
 import { PriceBlockView, type PriceRow } from "@/ravarer/pages/priskontroll/gjore/PriceBlockView";
 import "@/index.css";
+import { WORK_ITEM_EFFECT_DEFAULTS } from "@/ravarer/lib/workRpcTypes";
 
 const w = (key: string, kind: WorkItem["kind"], title: string, supplier: string, impact: number, extra: Partial<WorkItem> = {}): WorkItem => ({
   key, grp: kind.startsWith("faktura") ? "fakturaer" : "pris", type: kind.startsWith("faktura") ? "faktura" : "varekort", kind,
   supplier_id: "s", supplier_name: supplier, item_key: null, invoice_id: null, invoice_number: null, title, sku: null,
   rm_id: null, rm_name: null, open_lines: 3, open_invoices: 3, invoice_count: 3, amount: 0, impact_nok: impact,
-  last_date: "2026-10-08", last_open_line_id: null, reasons: [], ...extra,
+  last_date: "2026-10-08", last_open_line_id: null, reasons: [], ...WORK_ITEM_EFFECT_DEFAULTS, read_integrity_flags: [], ...extra,
 });
 const ITEMS: WorkItem[] = [
   w("v1", "prisavvik", "SOFTISMIKS UHT 5L DIPLOM-IS", "Diplom-Is AS", 1240, { sku: "40213" }),

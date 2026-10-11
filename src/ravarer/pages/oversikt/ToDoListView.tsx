@@ -1,3 +1,4 @@
+import { workEffect } from "@/ravarer/lib/workEffect";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,13 @@ const PRIMARY_LABEL: Record<string, string> = {
   faktura_mangler_linjer: "Åpne", faktura_sumavvik: "Åpne",
   faktura_flagget: "Åpne", faktura_klar: "Åpne",
 };
+
+function EffectText({ it }: { it: WorkItem }) {
+  const e = workEffect(it);
+  return e.kind === "verified"
+    ? <div className="text-sm tabular-nums" title={e.label}>{kr(e.value)}</div>
+    : <div className={e.kind === "read" ? "text-caption text-warning" : "text-caption text-ink-secondary"}>{e.label}</div>;
+}
 
 function itemHref(item: WorkItem): string {
   if (item.type === "faktura" && item.invoice_id) return paths.faktura(item.invoice_id);
@@ -76,7 +84,7 @@ export function ToDoListView({ data, loading }: ToDoListViewProps) {
                     {sub && <div className="truncate text-caption text-ink-secondary">{sub}</div>}
                   </div>
                   <div className="shrink-0 text-right">
-                    <div className="tabular-nums text-sm">{kr(it.impact_nok)}</div>
+                    <EffectText it={it} />
                     <div className="text-caption text-primary">{PRIMARY_LABEL[it.kind] ?? "Åpne"} →</div>
                   </div>
                 </Link>
