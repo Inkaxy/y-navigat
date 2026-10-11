@@ -40,6 +40,7 @@ vi.mock("@/ravarer/hooks/useMatvaretabellen", () => ({
 }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
+    auth: { getUser: async () => ({ data: { user: null } }) },
     from: () => ({ select: () => ({ eq: () => ({ maybeSingle: () => (deferred
       ? new Promise((resolve) => { deferCheck = resolve; })
       : Promise.resolve({ data: nutritionSource, error: null })) }) }) }),
