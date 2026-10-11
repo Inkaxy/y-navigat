@@ -80,6 +80,7 @@ export function resolveLineNumbers(l: Record<string, unknown>, factor = 1): Reso
   for (const f of fields) {
     const raw = l[`${f}_raw`];
     if (typeof raw === "string" && raw.trim()) parsed.set(f, { raw: raw.trim(), p: parseNumberToken(raw) });
+    else if (typeof l[f] === "string" && String(l[f]).trim()) parsed.set(f, { raw: String(l[f]).trim(), p: parseNumberToken(l[f]) });
     else parsed.set(f, { raw: null, p: parseNumberToken(l[f]) });
   }
   const evidence: NumberEvidence[] = [];
