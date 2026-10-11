@@ -131,7 +131,7 @@ export function PageHeader({
         </div>
         {actions && (
           // Under md: egen rad, bryter linje, og knapper/lenker får minst 44 CSS-px trefflate (px, ikke rem).
-          <div className="flex w-full flex-wrap items-center gap-2 max-md:[&_a]:min-h-[44px] max-md:[&_button]:min-h-[44px] md:w-auto md:shrink-0 md:justify-end">{actions}</div>
+          <div className="flex w-full flex-wrap items-center gap-2 max-md:[&_a]:min-h-[44px] max-md:[&_button]:min-h-[44px] max-md:[&_button]:min-w-[44px] md:w-auto md:shrink-0 md:justify-end">{actions}</div>
         )}
       </div>
     </header>
