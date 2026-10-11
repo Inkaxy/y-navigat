@@ -71,7 +71,7 @@ export function RecipeStatsBar({
           : nok(cost.totalCost),
         hint: cost.incomplete
           ? `Ufullstendig — ${cost.missing.length} linje${cost.missing.length === 1 ? "" : "r"} mangler grunnlag${
-              cost.unverifiedCount > 0 ? `, ${cost.unverifiedCount} uverifisert` : ""
+              cost.unverifiedCount > 0 ? `, ${cost.unverifiedCount} uten verifisert kilde` : ""
             }`
           : cost.newestVerifiedDate
             ? `Verifiserte priser, nyeste ${fmtDate(cost.newestVerifiedDate)}`
