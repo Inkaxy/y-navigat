@@ -18,7 +18,7 @@ const base: SupplierItem = {
   supplier_id: "s1", supplier_name: "Regal Mølle", item_key: "sku:10042", supplier_sku: "10042", description: "HVETEMEL SIKTET 25KG",
   line_count: 41, invoice_count: 22, first_seen: "2025-11-02", last_seen: "2026-10-06", open_lines: 8, last_line_id: "l1", last_open_line_id: "l1", last_invoice_id: "i1",
   last_invoice_date: "2026-10-06", linked_rm_id: "rm1", rm_id: "rm1", rm_name: "Hvetemel siktet", rm_sku: "R-3", rm_base_unit: "kg", rm_category: "Mel",
-  rm_cost: 11.2, rms_id: "rms1", rms_notes: null, package_size: 25, package_unit: "sekk", base_units_per_package: null, package_confirmed_at: null,
+  rm_cost: 11.2, rms_id: "rms1", rms_notes: null, rms_supplier_sku: null, rms_sku_matches: false, package_size: 25, package_unit: "sekk", base_units_per_package: null, package_confirmed_at: null,
   agreed_price_per_base_unit: null, is_primary: true, variants: 1, last_ppbu: 11.6, prev_ppbu: 11.2, last_conf: "auto_high",
   reasons_raw: "unknown_package_size", status: "mangler_pakning",
 };
