@@ -98,7 +98,7 @@ describe("1b-rettelser", () => {
     const { applyInference, initialDraft } = await import("@/ravarer/editors/createSheetLogic");
     const base = initialDraft({ kind: "supplier_item", supplierId: "s", itemKey: "sku:1" });
     const inf = { base_unit: "kg", suggested_bupp: 0.5, auto_confirmable: false, agrees: false, direct: false, line_unit: null };
-    expect(applyInference(base, inf, "KRT")).toMatchObject({ units: "0,5", packageUnit: "kartong" });
+    expect(applyInference(base, inf, "KRT")).toMatchObject({ units: "0,5", packageUnit: "eske" });
     expect(applyInference(base, inf, "sk").packageUnit).toBe("sekk");
     expect(applyInference(base, inf, "tullball").packageUnit).toBe("");
   });
