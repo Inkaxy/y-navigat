@@ -17,7 +17,7 @@ export type ReviewReason =
 export interface ReviewLineRow {
   id: string;
   /** Radversjon; kvitteringen for prisstatus må gjelde nøyaktig denne. */
-  updated_at: string | null;
+  updated_at?: string | null;
   invoice_id: string;
   line_number: number | null;
   supplier_sku: string | null;

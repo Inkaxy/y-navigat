@@ -184,12 +184,12 @@ describe("PDF-identitet", () => {
 
 describe("MELIS 25 KG – blandet retning", () => {
   const rows = [
-    { id: "085d68a6", invoice_id: "666738", invoice_number: "666738", invoice_date: "2026-09-21", quantity: 600, unit: "kg", price_per_base_unit: 28.81, expected_price_per_base_unit: 14, base_quantity: 600, effect_nok: 8886, reference_source: "last_purchase", reference_id: "8b999cac" },
-    { id: "d4738b98", invoice_id: "525582", invoice_number: "525582", invoice_date: "2025-10-13", quantity: 600, unit: "kg", price_per_base_unit: 14.5, expected_price_per_base_unit: 25.76, base_quantity: 600, effect_nok: 6756, reference_source: "last_purchase", reference_id: "042239c2" },
+    { id: "085d68a6", invoice_id: "666738", invoice_number: "666738", invoice_date: "2026-09-21", quantity: 600, unit: "kg", price_per_base_unit: 28.81, expected_price_per_base_unit: 14, base_quantity: 600, effect_nok: 8886, reference_source: "last_purchase", reference_id: "8b999cac", raw_material_id: "melis", base_unit: "kg", reference_date: "2026-09-01" },
+    { id: "d4738b98", invoice_id: "525582", invoice_number: "525582", invoice_date: "2025-10-13", quantity: 600, unit: "kg", price_per_base_unit: 14.5, expected_price_per_base_unit: 25.76, base_quantity: 600, effect_nok: 6756, reference_source: "last_purchase", reference_id: "042239c2", raw_material_id: "melis", base_unit: "kg", reference_date: "2025-09-01" },
   ];
   it("viser netto, absolutt og bare dyrere linje til sak; ulike grunnlag", async () => {
     const { PriceBlockView } = await import("@/ravarer/pages/priskontroll/gjore/PriceBlockView");
-    wrap(<PriceBlockView rows={rows} blocked={[]} status="ready" selected={new Set(["085d68a6", "d4738b98"])} onToggle={() => undefined} baseUnit="kg" referenceDate={null}
+    wrap(<PriceBlockView rows={rows} blocked={[]} status="ready" selected={new Set(["085d68a6", "d4738b98"])} onToggle={() => undefined}
       hasAgreement={false} tolerancePct={3} hardCapPct={15} settings={null} reason="" onReason={() => undefined} canWrite busy={false}
       onAccept={() => undefined} onCase={() => undefined} onFixAgreement={() => undefined} onCheckPackage={() => undefined} />);
     expect(screen.getByText(/Ulike sammenligningsgrunnlag/)).toBeInTheDocument();
@@ -200,7 +200,7 @@ describe("MELIS 25 KG – blandet retning", () => {
   });
   it("bare lavere pris valgt: ingen sak", async () => {
     const { PriceBlockView } = await import("@/ravarer/pages/priskontroll/gjore/PriceBlockView");
-    wrap(<PriceBlockView rows={rows} blocked={[]} status="ready" selected={new Set(["d4738b98"])} onToggle={() => undefined} baseUnit="kg" referenceDate={null}
+    wrap(<PriceBlockView rows={rows} blocked={[]} status="ready" selected={new Set(["d4738b98"])} onToggle={() => undefined}
       hasAgreement={false} tolerancePct={3} hardCapPct={15} settings={null} reason="" onReason={() => undefined} canWrite busy={false}
       onAccept={() => undefined} onCase={() => undefined} onFixAgreement={() => undefined} onCheckPackage={() => undefined} />);
     expect(screen.getByRole("button", { name: /Opprett leverandørsak/ })).toBeDisabled();

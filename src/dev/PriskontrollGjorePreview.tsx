@@ -38,7 +38,7 @@ const ITEM: SupplierItem = {
 };
 const r = (id: string, inv: string, date: string, qty: number): PriceRow => ({
   id, invoice_id: inv, invoice_number: inv, invoice_date: date, quantity: qty / 5, unit: "kanne",
-  price_per_base_unit: 78.4, expected_price_per_base_unit: 70.13, base_quantity: qty, effect_nok: Math.round(8.27 * qty * 100) / 100, reference_source: "agreement", reference_id: "ref1",
+  price_per_base_unit: 78.4, expected_price_per_base_unit: 70.13, base_quantity: qty, effect_nok: Math.round(8.27 * qty * 100) / 100, reference_source: "agreement", reference_id: "ref1", raw_material_id: "rm1", base_unit: "l", reference_date: "2026-01-01",
 });
 const ROWS = [r("a", "771201", "2026-09-24", 50), r("b", "771455", "2026-10-01", 50), r("c", "771702", "2026-10-08", 50)];
 const FACTS: InvoiceFacts = {
@@ -61,7 +61,7 @@ function Preview() {
             <VBlock n={1} title="Råvare" done summary={<span className="font-medium underline">Softismiks</span>} />
             <VBlock n={2} title="Pakning" done summary={<span className="text-ink-secondary">5 l per kanne</span>} />
             <VBlock n={3} title="Pris">
-              <PriceBlockView rows={ROWS} blocked={[{ id: "k", invoice_id: "8050625", invoice_number: "8050625", invoice_date: "2026-10-02", label: "Kreditnota – ikke sammenlignbar varepris", detail: "" }]} status="ready" selected={sel} onToggle={toggle} baseUnit="l" referenceDate="2026-01-01"
+              <PriceBlockView rows={ROWS} blocked={[{ id: "k", invoice_id: "8050625", invoice_number: "8050625", invoice_date: "2026-10-02", label: "Kreditnota – ikke sammenlignbar varepris", detail: "" }]} status="ready" selected={sel} onToggle={toggle}
                 hasAgreement tolerancePct={3} hardCapPct={15} settings={null} reason="" onReason={() => undefined} canWrite busy={false}
                 onAccept={() => undefined} onCase={() => undefined} onFixAgreement={() => undefined} onCheckPackage={() => undefined} />
             </VBlock>
