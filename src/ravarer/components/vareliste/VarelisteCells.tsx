@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { DeviationCell, PriceSourceCell } from "./PriceCells";
+import { ComparisonCell, CostStatusMark, PriceSourceCell } from "./PriceCells";
+import { COST_STATUS_LABEL } from "@/ravarer/lib/listPriceEvidence";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -232,11 +233,12 @@ function cellFor(id: string, ctx: VarelisteCellContext): (item: RawMaterialListI
             </button>
           </TooltipTrigger>
           <TooltipContent>
+            {`Kostpris: ${COST_STATUS_LABEL[item.costStatus]}. `}
             {item.costSource ? `Kilde: ${item.costSource}. ` : ""}
             {item.costUpdatedAt ? `Oppdatert ${formatDate(item.costUpdatedAt)}` : "Ingen dato"}
           </TooltipContent>
         </Tooltip>
-      );
+      ) ;
     case "agreed":
       return (item) => editingField(ctx, item.id) === "agreed" ? (
         <PriceEditor initial={item.agreedPrice} withReason={false} onCommit={(v) => ctx.onCommitPrice(item, "agreed", v, "")} onCancel={ctx.onCancelEdit} />
