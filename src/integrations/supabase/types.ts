@@ -17908,6 +17908,14 @@ export type Database = {
         }
         Returns: Json
       }
+      rm_price_reference_now: {
+        Args: {
+          p_date?: string
+          p_raw_material_id: string
+          p_supplier_id: string
+        }
+        Returns: Json
+      }
       rm_price_repeat_count: {
         Args: {
           p_actual: number
