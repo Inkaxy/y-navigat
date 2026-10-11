@@ -242,3 +242,30 @@ export const SUPPLIER_CASE_STATUS_LABELS: LabelMap = {
   resolved: { label: "Løst", tokenVar: "--state-success" },
   cancelled: { label: "Avbrutt", tokenVar: "--state-neutral" },
 };
+
+/** Norske etiketter for hendelser i revisjonsloggen (`rm_audit_history`). */
+export const AUDIT_ACTION_LABEL: Readonly<Record<string, string>> = {
+  "invoice.internal_approved": "Internt godkjent",
+  "invoice.internal_approval_revoked": "Godkjenning trukket tilbake",
+  "invoice.safe_costs_posted": "Kostpris ført for trygge linjer",
+  "invoice.auto_reconciled": "Avstemt automatisk",
+  "invoice.auto_reconcile_reopened": "Automatisk avstemming åpnet igjen",
+  "invoice.reconciled": "Avstemt",
+  "invoice.vat_repaired": "Mva rettet",
+  "supplier_link.changed": "Kobling endret",
+  invoice_line_match_confirmed: "Råvare/pakning bekreftet",
+  "package.auto_confirmed": "Pakning bekreftet automatisk",
+  "supplier_item.linked": "Koblet",
+  "supplier_item.not_item": "Merket som ikke vare",
+  "supplier_item.price_accepted": "Pris godtatt",
+  "supplier_item.credit_claimed": "Kreditt krevd",
+  "invoice_line.price_variance_accepted": "Pris godtatt",
+  "prices.quarantined": "Priser satt i karantene",
+  "supplier_case.created": "Sak opprettet",
+  "supplier_case.status": "Status endret",
+  "supplier_case.credit_allocated": "Kreditt fordelt",
+};
+
+export function auditActionLabel(action: string): string {
+  return AUDIT_ACTION_LABEL[action] ?? "Endring";
+}
