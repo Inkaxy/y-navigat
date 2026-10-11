@@ -36,3 +36,39 @@ describe("fryst varekort", () => {
     expect(frozenChange([l("1")], [l("1", false)], it0, it0)).toContain("løst et annet sted");
   });
 });
+
+import { candidatesFrom } from "@/ravarer/pages/priskontroll/gjore/bulkPreview";
+import { correctionDocLine } from "@/ravarer/pages/priskontroll/faktura/correctionDocLine";
+
+describe("F18/F28: fryste ID-er og forslag", () => {
+  it("sender nøyaktige fryste linje-ID-er og hopper over tomt utvalg uten kall", async () => {
+    const link = vi.fn().mockResolvedValue({ ...res("rm1"), skipped_line_ids: ["l2"] });
+    const pv = new Map([
+      ["a", { lineIds: ["l1", "l2"], candidates: [], unambiguous: null, error: null }],
+      ["b", { lineIds: [], candidates: [], unambiguous: null, error: null }],
+    ]);
+    const out = await runBulk([w({ key: "a" }), w({ key: "b" })], { kind: "ikke_vare", reason: "Frakt" }, "le", link, undefined, pv);
+    expect(link).toHaveBeenCalledTimes(1);
+    expect(link.mock.calls[0][0].line_ids).toEqual(["l1", "l2"]);
+    expect(out[1]).toMatchObject({ ok: false, text: expect.stringContaining("ingen åpne linjer") });
+  });
+  it("godta: entydig forslag kobles, manglende forslag hoppes over", async () => {
+    const link = vi.fn().mockResolvedValue(res("rmX"));
+    const pv = new Map([["a", { lineIds: ["l1"], candidates: [], unambiguous: null, error: null }], ["b", { lineIds: ["l9"], candidates: [], unambiguous: null, error: null }]]);
+    const out = await runBulk([w({ key: "a" }), w({ key: "b" })], { kind: "godta", choices: new Map([["a", "rmX"]]) }, "le", link, undefined, pv);
+    expect(link.mock.calls[0][0]).toMatchObject({ raw_material_id: "rmX", line_ids: ["l1"] });
+    expect(out[1].text).toContain("ingen entydig");
+  });
+  it("kandidater: entydig bare når samme førstevalg på alle linjer", () => {
+    const row = (l: string, rm: string, rank: number) => ({ invoice_line_id: l, raw_material_id: rm, rank, match_reason: "SKU", name: rm });
+    expect(candidatesFrom([row("l1", "A", 1), row("l1", "B", 2), row("l2", "A", 1)], ["l1", "l2"]).unambiguous?.id).toBe("A");
+    expect(candidatesFrom([row("l1", "A", 1), row("l2", "B", 1)], ["l1", "l2"]).unambiguous).toBeNull();
+    expect(candidatesFrom([row("lx", "A", 1)], ["l1"]).candidates).toHaveLength(0);
+  });
+  it("rettedialogens dokument viser linjen som rettes, ikke køens aktive", () => {
+    const hassel = { id: "h", d: "HASSEL" }, mandler = { id: "m", d: "MANDLER" };
+    expect(correctionDocLine("m", [hassel, mandler], hassel)).toBe(mandler);
+    expect(correctionDocLine("ukjent", [hassel], hassel)).toBeNull();
+    expect(correctionDocLine(null, [hassel], hassel)).toBe(hassel);
+  });
+});
