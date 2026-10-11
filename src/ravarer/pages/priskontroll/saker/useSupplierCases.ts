@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaging";
 import { caseSums, type CaseSums } from "./caseLogic";
+import { caseKindOf, type DraftKind } from "@/fakturaer/lib/supplierCaseDraft";
 
 export type CaseListRow = {
   id: string;
@@ -13,6 +14,8 @@ export type CaseListRow = {
   follow_up_on: string | null;
   created_at: string;
   sums: CaseSums;
+  /** Fra saklinjenes låste grunnlag; null = eldre/blandet sak. */
+  kind: DraftKind;
 };
 
 const ZERO: CaseSums = { krav: 0, kreditert: 0, gjenstar: 0 };
@@ -39,14 +42,16 @@ export function useSupplierCaseList(legalEntityId: string | null) {
       const ids = cases.map((c) => c.id);
       if (ids.length === 0) return { rows: [], total: count ?? 0 };
       const [lines, credits] = await Promise.all([
-        fetchAllRows((from, to) => supabase.from("supplier_deviation_case_lines").select("id, case_id, amount_excl_vat").in("case_id", ids).order("id").range(from, to)),
+        fetchAllRows((from, to) => supabase.from("supplier_deviation_case_lines").select("id, case_id, amount_excl_vat, case_kind:basis->>case_kind").in("case_id", ids).order("id").range(from, to)),
         fetchAllRows((from, to) => supabase.from("supplier_deviation_credits").select("id, case_id, amount_excl_vat").in("case_id", ids).order("id").range(from, to)),
       ]);
       const sums = caseSums(lines, credits);
+      const kinds = new Map<string, (string | null)[]>();
+      for (const l of lines) kinds.set(l.case_id, [...(kinds.get(l.case_id) ?? []), typeof l.case_kind === "string" ? l.case_kind : null]);
       const rows = cases.map((c) => ({
         id: c.id, title: c.title, status: c.status, supplier_id: c.supplier_id, supplier_name: c.supplier?.name ?? null,
         responsible_user_id: c.responsible_user_id, follow_up_on: c.follow_up_on, created_at: c.created_at,
-        sums: sums.get(c.id) ?? ZERO,
+        sums: sums.get(c.id) ?? ZERO, kind: caseKindOf(kinds.get(c.id) ?? []),
       }));
       return { rows, total: count ?? rows.length };
     },
