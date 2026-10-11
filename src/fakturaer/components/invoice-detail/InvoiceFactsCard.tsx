@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/userError";
 import { formatDate, formatNok } from "@/fakturaer/lib/constants";
 import { parseRematchQueued, parseRepairVat } from "@/fakturaer/lib/parseRpcJson";
-import { confidenceLabel, linesSourceLabel, repairVatMessage, sumCheck } from "@/fakturaer/lib/invoiceFacts";
+import { linesSourceLabel, readingReliability, repairVatMessage, sumCheck } from "@/fakturaer/lib/invoiceFacts";
 import { invalidateInvoice } from "@/ravarer/lib/invalidate";
 import { cn } from "@/lib/utils";
 
@@ -82,7 +82,11 @@ export function InvoiceFactsView({ invoice: d, actions, details }: { invoice: In
               {d.lines_sum_variance_pct != null && `${d.lines_sum_variance_pct.toLocaleString("nb-NO", { maximumFractionDigits: 1 })} % `}
               <span className={cn(chk.tone === "success" && "text-success", chk.tone === "danger" && "text-destructive", chk.tone === "muted" && "text-ink-secondary")}>{chk.label}</span>
             </Row>
-            <Row k="Lesesikkerhet">{conf == null ? "—" : `${confidenceLabel(conf)} (${Math.round(conf * 100)} %)`}</Row>
+            <Row k="Lesesikkerhet">{(() => {
+              const r = readingReliability({ confidence: conf, linesSumStatus: d.lines_sum_status, variancePct: d.lines_sum_variance_pct });
+              if (r.rawScore == null) return r.label;
+              return r.validated || r.label.startsWith("Ikke") ? <span className={cn(!r.validated && r.label.startsWith("Ikke") && "text-destructive")}>{r.label}{r.label.startsWith("Ikke") ? <span className="ml-1 text-ink-secondary">(rå AI-score {r.rawScore}, ikke validert)</span> : ` (${r.rawScore})`}</span> : `${r.label} (${r.rawScore}, sum ikke kontrollert)`;
+            })()}</Row>
             <Row k="Forsøk">{d.line_extraction_attempts ?? 0}</Row>
             <Row k="Linjekilde">{linesSourceLabel(d.lines_source)}</Row>
           </dl>

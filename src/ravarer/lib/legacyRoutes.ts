@@ -112,6 +112,36 @@ const KIND_TO_GRUPPE: Record<string, string> = { m: "kobling", p: "pakning", f: 
  * eller `line:{id}`) → Å gjøre med leverandør, søk på varenummer og gruppe. Query fra den gamle
  * lenken (søk, leverandør, type) følger med; verdier fra nøkkelen vinner bare når de mangler.
  */
+export type LegacyDecisionTarget = { kind: "line"; lineId: string } | { kind: "key"; supplierId: string; sku: string } | null;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Hva den gamle nøkkelen peker på — løses til kanonisk varekort av LegacyRavarerRedirect (innlogget). */
+export function legacyDecisionTarget(rawKey: string): LegacyDecisionTarget {
+  let key = rawKey;
+  try { key = decodeURIComponent(rawKey); } catch (e) { if (!(e instanceof URIError)) throw e; }
+  const parts = key.split(":");
+  if (parts[0] === "line") return parts[1] && UUID.test(parts[1]) ? { kind: "line", lineId: parts[1] } : null;
+  if (parts.length >= 6 && KIND_TO_GRUPPE[parts[0]] && UUID.test(parts[4] ?? "") && parts[5]) return { kind: "key", supplierId: parts[4], sku: parts[5] };
+  return null;
+}
+
+/** Gammel beslutnings-sti (i-dag/:key eller beslutninger/:key)? Gir rå nøkkel. */
+export function legacyDecisionKeyFromPath(pathname: string): string | null {
+  const p = pathname.replace(/\/+$/, "");
+  const m = p.match(/^\/ravarer\/fakturaer\/i-dag\/([^/]+)$/) ?? p.match(/^\/ravarer\/priskontroll\/beslutninger\/([^/]+)$/);
+  return m ? m[1] : null;
+}
+
+/** Å gjøre-URL med valgt varekort; query fra den gamle lenken bevares. */
+export function withSelected(url: string, valgt: string | null): string {
+  if (!valgt) return url;
+  const [path, q = ""] = url.split("?");
+  const sp = new URLSearchParams(q);
+  sp.set("valgt", valgt);
+  return `${path}?${sp.toString()}`;
+}
+
 export function legacyDecisionUrl(rawKey: string, search: string): string {
   let key = rawKey;
   try { key = decodeURIComponent(rawKey); } catch (e) { if (!(e instanceof URIError)) throw e; }

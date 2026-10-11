@@ -149,7 +149,7 @@ export function CorrectLineDialog({ open, onOpenChange, lineId, invoice, canWrit
                   <p>Etter rettelsen: {preview.map((p) => p.message).join(" ")}</p>
                   <label className="flex items-start gap-2"><Checkbox checked={acceptIssues} onCheckedChange={(v) => setAcceptIssues(v === true)} disabled={!!lock} />
                     <span>Tallene er kontrollert mot originalen og stemmer likevel. Registrer heller rabatt og prisgrunnlag over når det er mulig.</span></label>
-                  {acceptIssues && learn && <p className="text-caption text-ink-secondary">Rettelser med godtatte avvik brukes ikke automatisk ved senere lesing. Eksempelet lagres avslått og må slås på manuelt.</p>}
+                  {acceptIssues && learn && <p className="text-caption text-ink-secondary">Rettelser med godtatte avvik blir aldri brukt ved senere lesing. Rett tallene og prisgrunnlaget i stedet hvis du vil lære av linjen.</p>}
                 </div>
               ) : <p className="text-caption text-ink-secondary">Regnestykket går opp med disse tallene.</p>}
               <div>

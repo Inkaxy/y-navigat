@@ -15,6 +15,7 @@ import { ShortcutHelp } from "@/ravarer/ui/ShortcutHelp";
 import { useHotkeys, type HotkeyBinding } from "@/ravarer/ui/hotkeys";
 import { GJORE_SORTS, GROUP_LABELS, parseGruppe, parseSort, parseValgt, pickNext, stepKey } from "./logic";
 import { WorkListView } from "./WorkListView";
+import { GjoreBulkBar } from "./GjoreBulkBar";
 import { VarekortPanel } from "./VarekortPanel";
 import { FakturasakPanel } from "./FakturasakPanel";
 
@@ -74,6 +75,9 @@ export function GjoreWorkspace() {
 
   const work = useWorkItems({ group: gruppe, search: q || null, supplierId: leverandor, sort, limit });
   const items = useMemo(() => work.data?.items ?? [], [work.data]);
+  // Masseutvalg beholder hele elementet, så valget overlever filterbytte og paginering.
+  const [checked, setChecked] = useState<Map<string, WorkItem>>(new Map());
+  const toggle = (it: WorkItem, on: boolean) => setChecked((m) => { const n = new Map(m); if (on) n.set(it.key, it); else n.delete(it.key); return n; });
   const sel = parseValgt(valgt);
   const selItem = items.find((i) => i.key === valgt) ?? null;
   // Husk neste mens det valgte fortsatt står i listen — etter en handling kan listen være hentet på nytt uten det.
@@ -165,9 +169,11 @@ export function GjoreWorkspace() {
           <SelectContent>{GJORE_SORTS.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
         </Select>
       </div>
+      <GjoreBulkBar selected={[...checked.values()]} onClear={() => setChecked(new Map())} />
       <QueryState isLoading={false} isError={work.isError} error={work.error} scope="ravarer:gjore" onRetry={() => void work.refetch()}>
         <WorkListView items={items} total={work.data?.total ?? 0} selectedKey={valgt} loading={work.isLoading} fetchingMore={work.isFetching && limit > items.length}
-          onSelect={(it: WorkItem) => { select(it.key); focusPanel(); }} onMore={() => setLimit((n) => n + PAGE)} />
+          onSelect={(it: WorkItem) => { select(it.key); focusPanel(); }} onMore={() => setLimit((n) => n + PAGE)}
+          checked={new Set(checked.keys())} onToggle={toggle} />
       </QueryState>
     </div>
   );

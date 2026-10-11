@@ -22,6 +22,7 @@ interface Body {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  let sendAttempted = false;
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -128,6 +129,8 @@ Deno.serve(async (req) => {
       body: { contentType: "HTML", content: htmlBody },
       toRecipients: [{ emailAddress: { address: body.recipient_email } }],
     };
+    // Fra her kan meldingen ha nådd Graph: alle feil rapporteres som ukjent leveringsutfall.
+    sendAttempted = true;
     const graphRes = await fetch(
       `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(mailbox)}/sendMail`,
       {
@@ -140,14 +143,18 @@ Deno.serve(async (req) => {
       },
     );
     if (!graphRes.ok) {
-      const errTxt = await graphRes.text();
+      const errTxt = await graphRes.text().catch(() => "");
+      if (graphRes.status >= 500) {
+        return json({ success: false, delivery_unknown: true, error: `Graph sendMail svarte ${graphRes.status}; leveringen er ukjent` }, 502);
+      }
+      // 4xx fra Graph: meldingen ble avvist og ikke sendt.
       return json(
-        { success: false, error: `Graph sendMail feilet (${graphRes.status}): ${errTxt}` },
-        502,
+        { success: false, delivery_unknown: false, error: `Graph sendMail avviste meldingen (${graphRes.status}): ${errTxt.slice(0, 300)}` },
+        422,
       );
     }
     // Konsumer body for å unngå resource leak
-    await graphRes.text();
+    await graphRes.text().catch(() => "");
 
     return json({
       success: true,
@@ -158,7 +165,10 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     console.error("microsoft-graph-send error", e);
-    return json({ error: e instanceof Error ? e.message : String(e) }, 500);
+    const msg = e instanceof Error ? e.message : String(e);
+    if (sendAttempted) return json({ success: false, delivery_unknown: true, error: `Leveringen er ukjent: ${msg}` }, 502);
+    // Feil før sending (token, mal o.l.): kjent ikke sendt.
+    return json({ success: false, delivery_unknown: false, error: msg }, 424);
   }
 });
 

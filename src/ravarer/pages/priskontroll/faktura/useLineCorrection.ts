@@ -92,9 +92,15 @@ export function useExtractionExamples(supplierId: string | null) {
 export function useToggleExample() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (a: { id: string; active: boolean }) => {
-      const { error } = await supabase.rpc("rm_set_extraction_example_active", { p_example_id: a.id, p_active: a.active });
-      if (error) throw new Error(/forbidden/.test(error.message) ? "Du mangler skrivetilgang til fakturaer." : "Kunne ikke endre eksempelet.");
+    mutationFn: async (a: { id: string; active: boolean; reason?: string }) => {
+      const { error } = await supabase.rpc("rm_set_extraction_example_active", { p_example_id: a.id, p_active: a.active, p_reason: a.reason });
+      if (error) {
+        const m = error.message;
+        throw new Error(/forbidden/.test(m) ? "Du mangler skrivetilgang til fakturaer."
+          : /uavklart_eksempel/.test(m) ? "Eksempelet kan ikke slås på: tallene eller prisgrunnlaget er ikke avklart. Rett fakturalinjen og lagre et nytt eksempel."
+          : /begrunnelse/.test(m) ? "Skriv hvordan du har kontrollert eksempelet mot originalen."
+          : "Kunne ikke endre eksempelet.");
+      }
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["extraction-examples"] }),
   });

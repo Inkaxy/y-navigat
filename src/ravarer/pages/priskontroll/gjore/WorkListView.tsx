@@ -1,6 +1,7 @@
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { StatusPill } from "@/ordre/components/ui/status-pill";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatNok } from "@/fakturaer/lib/constants";
 import { WORK_KIND_LABELS, labelFor } from "@/ravarer/lib/labels";
@@ -24,10 +25,13 @@ type Props = {
   fetchingMore: boolean;
   onSelect: (it: WorkItem) => void;
   onMore?: () => void;
+  /** Masseutvalg (varekort på tvers av fakturaer). Avkrysning ligger ved siden av radknappen. */
+  checked?: ReadonlySet<string>;
+  onToggle?: (it: WorkItem, on: boolean) => void;
 };
 
 /** Én prioritert liste: varekort og fakturasaker. */
-export function WorkListView({ items, total, selectedKey, loading, fetchingMore, onSelect, onMore }: Props) {
+export function WorkListView({ items, total, selectedKey, loading, fetchingMore, onSelect, onMore, checked, onToggle }: Props) {
   if (loading) {
     return (
       <div className="space-y-2" aria-busy="true" aria-label="Laster listen">
@@ -50,7 +54,14 @@ export function WorkListView({ items, total, selectedKey, loading, fetchingMore,
           const meta = labelFor(WORK_KIND_LABELS, it.kind, "Oppgave");
           const active = it.key === selectedKey;
           return (
-            <li key={it.key} role="option" aria-selected={active}>
+            <li key={it.key} role="option" aria-selected={active} className="flex items-stretch">
+              {onToggle && (
+                <span className="flex items-center pl-3">
+                  {it.type === "varekort"
+                    ? <Checkbox aria-label={`Velg ${it.title}`} checked={checked?.has(it.key) ?? false} onCheckedChange={(v) => onToggle(it, v === true)} />
+                    : <span className="w-4" aria-hidden />}
+                </span>
+              )}
               <button
                 type="button"
                 data-key={it.key}

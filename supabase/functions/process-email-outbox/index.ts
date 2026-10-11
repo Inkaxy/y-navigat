@@ -4,9 +4,11 @@
 //   FØR utsending — sendte rader kan ikke spilles av på nytt, og samtidige kjøringer tar ikke samme rad.
 // - Leverandørutsending skjer utenfor databasetransaksjonen.
 // - Ukjent leveringsutfall (nettverksfeil/timeout etter at forespørselen kan ha nådd fram) → «failed»
-//   med forklaring, ikke ny automatisk sending (unngår duplikater). Avvist av leverandøren → nytt forsøk.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+//   med forklaring, ikke ny automatisk sending (unngår duplikater). Det gjelder også 5xx og 2xx uten gyldig
+//   bekreftelse. Kjent avvisning før sending (4xx) → nytt forsøk.
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { authorizeCron, CRON_CORS_HEADERS } from "../_shared/cron-auth.ts";
+import { classifyGraphSendResponse, UNKNOWN_NOTE } from "../_shared/outboxOutcome.ts";
 
 const MAX_BATCH = 20;
 const MAX_ATTEMPTS = 5;
@@ -62,30 +64,26 @@ Deno.serve(async (req) => {
         const msg = err instanceof Error ? err.message : String(err);
         await admin.from("email_outbox").update({
           status: "failed",
-          error_message: `Ukjent leveringsutfall (${msg.slice(0, 200)}). Kontroller i postkassen før ny sending.`,
+          error_message: `${UNKNOWN_NOTE} (${msg.slice(0, 200)})`,
         }).eq("id", row.id).eq("status", "sending");
         results.push({ outbox_id: row.id, status: "unknown", error: "ukjent leveringsutfall" });
         continue;
       }
-      const txt = await res.text();
-      let success = false; let errMsg = `graph-send returnerte ${res.status}`;
-      try {
-        const parsed: unknown = JSON.parse(txt);
-        if (parsed && typeof parsed === "object") {
-          success = res.ok && (parsed as { success?: unknown }).success === true;
-          const e = (parsed as { error?: unknown }).error;
-          if (typeof e === "string") errMsg = e;
-        }
-      } catch { /* ikke-JSON svar behandles som avvist */ }
-      if (success) {
+      const txt = await res.text().catch(() => "");
+      const outcome = classifyGraphSendResponse(res.status, txt);
+      if (outcome.kind === "sent") {
         await admin.from("email_outbox").update({ status: "sent", sent_at: new Date().toISOString(), error_message: null })
           .eq("id", row.id).eq("status", "sending");
         results.push({ outbox_id: row.id, status: "sent" });
+      } else if (outcome.kind === "unknown") {
+        await admin.from("email_outbox").update({ status: "failed", error_message: outcome.error.slice(0, 500) })
+          .eq("id", row.id).eq("status", "sending");
+        results.push({ outbox_id: row.id, status: "unknown", error: "ukjent leveringsutfall" });
       } else {
         const isFinal = row.attempt_count >= MAX_ATTEMPTS;
-        await admin.from("email_outbox").update({ status: isFinal ? "failed" : "pending", error_message: errMsg.slice(0, 500) })
+        await admin.from("email_outbox").update({ status: isFinal ? "failed" : "pending", error_message: outcome.error.slice(0, 500) })
           .eq("id", row.id).eq("status", "sending");
-        results.push({ outbox_id: row.id, status: isFinal ? "failed" : "retry", error: errMsg });
+        results.push({ outbox_id: row.id, status: isFinal ? "failed" : "retry", error: outcome.error });
       }
     }
     return json({ processed: results.length, results });

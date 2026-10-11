@@ -5,7 +5,7 @@ import { InvoiceFactsCard } from "@/fakturaer/components/invoice-detail/InvoiceF
 import { INVOICE_SOURCES } from "@/fakturaer/lib/constants";
 import type { InvoiceDetailData } from "@/fakturaer/components/invoice-detail/fetchInvoiceDetail";
 import { LinesSumMismatchAlert } from "@/fakturaer/components/LinesSumMismatchAlert";
-import { confidenceLabel, linesSourceLabel } from "@/fakturaer/lib/invoiceFacts";
+import { linesSourceLabel, readingReliability } from "@/fakturaer/lib/invoiceFacts";
 import { recheckInvoiceLinesSum } from "@/fakturaer/lib/linesSum";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +23,10 @@ type Props = {
 export function factsSummary(d: Pick<InvoiceDetailData, "lines_sum_status" | "lines_source" | "extraction_confidence">): string {
   const sum = d.lines_sum_status === "mismatch" ? "Sum stemmer ikke" : d.lines_sum_status == null ? "Sum ikke kontrollert" : "Sum stemmer";
   const parts = [sum, linesSourceLabel(d.lines_source).toLowerCase()];
-  if (d.extraction_confidence != null) parts.push(`${confidenceLabel(Number(d.extraction_confidence)).toLowerCase()} sikkerhet`);
+  if (d.extraction_confidence != null) {
+    const r = readingReliability({ confidence: Number(d.extraction_confidence), linesSumStatus: d.lines_sum_status });
+    parts.push(r.label.startsWith("Ikke") ? `lesing ikke bekreftet (rå AI-score ${r.rawScore})` : r.label.toLowerCase());
+  }
   return parts.join(" · ");
 }
 

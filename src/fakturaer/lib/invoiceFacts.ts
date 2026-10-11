@@ -15,6 +15,21 @@ export function confidenceLabel(c: number | null | undefined): string {
   return "lav";
 }
 
+/**
+ * Lesingens pålitelighet. Modellens lagrede score er bare en rå AI-score; den gir aldri
+ * «høy sikkerhet» når sumkontrollen avviker eller linjer har lesevarsler.
+ */
+export function readingReliability(i: {
+  confidence: number | null | undefined; linesSumStatus: string | null | undefined; variancePct?: number | null; readIssueCount?: number | null;
+}): { label: string; validated: boolean; rawScore: string | null } {
+  const raw = i.confidence != null && Number.isFinite(i.confidence) ? `${Math.round(i.confidence * 100)} %` : null;
+  const mismatch = i.linesSumStatus === "mismatch" || (i.variancePct != null && Number.isFinite(i.variancePct) && Math.abs(i.variancePct) > 2);
+  const issues = (i.readIssueCount ?? 0) > 0;
+  if (mismatch || issues) return { label: mismatch ? "Ikke bekreftet – sum avviker" : "Ikke bekreftet – lesevarsler", validated: false, rawScore: raw };
+  if (raw == null) return { label: "—", validated: false, rawScore: null };
+  return { label: `${confidenceLabel(i.confidence)} sikkerhet`, validated: i.linesSumStatus != null, rawScore: raw };
+}
+
 export function linesSourceLabel(s: string | null | undefined): string {
   switch (s) {
     case "pdf_extracted": return "Lest fra PDF";

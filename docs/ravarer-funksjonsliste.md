@@ -312,7 +312,7 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 |---|---|---|---|---|
 | R27 | «Ny råvare» (SKU, kategori, varetype, flere kategorier, navn, basisenhet, pakning, kostpris, beskrivelse, emballasje; åpner råvaren) | RawMaterialCreateSheet fra /varer header, tasten `n` og ⌘K | 1 | Flyttet |
 | F50 | Opprett råvare fra linje (varetype, navn, foreslått SKU, lev.-SKU, kategori/ny, grunnenhet, pakning, bekreft pakning, live kostpris) | RawMaterialCreateSheet i fakturakontekst via `link-supplier-item` (regner om linjene) | 1 | Flyttet |
-| F51 | Masseopprettelse av råvarer fra valgte linjer (felles kategori) | /priskontroll?fane=gjore › masseutvalg › «Opprett råvarer» | 3 | Flyttet |
+| F51 | Masseopprettelse av råvarer fra valgte linjer (felles kategori) | /priskontroll?fane=gjore › avkrysning › «Opprett råvarer …» (`GjoreBulkBar`/`bulkGjore.ts`, på tvers av fakturaer/leverandører, forhåndsvisning, bekreftelse > 10 linjer, rapport per varekort; test `gjoreBulk.test.ts`). Per faktura fortsatt i fakturaarbeidsflaten | 3 | Flyttet |
 | F52 | Masseimport av umatchede linjer som nye råvarer, med AI-forslag | /priskontroll/faktura/:id › linjer › masseutvalg «Importer som nye råvarer» | 3 | Flyttet |
 
 ## Fakturaer: I dag / Beslutninger / Råvarespørsmål
@@ -332,7 +332,7 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 | F15 | Price: godta avviket for alle linjer, med sjekk av at linjene er uendret | Prisblokk › «Godta ny pris» (`rm_supplier_item_accept_price`) | 3 | Flyttet |
 | F16 | Price: opprett én leverandørsak for gruppen | Prisblokk › «Opprett leverandørsak» | 3 | Flyttet |
 | F17 | Gå automatisk til neste etter lagring, i samme filterrekkefølge | Resultatboks + «Neste» (auto ved tastatur) | 3 | Flyttet |
-| F18 | Frys gruppen mens den vises | Varekort-panel fryser valgt element (`?valgt=`) | 3 | Flyttet |
+| F18 | Frys gruppen mens den vises | `VarekortPanel` viser et fryst øyeblikksbilde; nye/løste linjer gir varsel + «Oppdater»; «Ikke vare» sender bare viste linje-ID-er (`p_line_ids`). Begrensning: koblingsskjemaet sender ikke linje-ID-er | 3 | Flyttet (delvis) |
 
 ## Varekoblinger / varekort
 
@@ -366,7 +366,7 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 | F25 | Varsel om feil på fakturanivå med «Rett registreringen» | /faktura/:id › faktasone | 3 | Flyttet |
 | F26 | Linjekø: årsaksfilter (13 grupper), tre sorteringer | ?fane=gjore (kronevirkning, hyppighet, dato) + /faktura/:id › linjefilter | 3 | Flyttet |
 | F27 | «Kontroller linjer på tvers av fakturaer» (opptil 200) | ?fane=gjore (gruppert per varekort på tvers av fakturaer) | 3 | Gammel plass |
-| F28 | Masse: godta forslag, ikke aktuell, opprett råvarer | ?fane=gjore › masseutvalg | 3 | Gammel plass |
+| F28 | Masse: godta forslag, ikke aktuell, opprett råvarer | ?fane=gjore › avkrysning: «Ikke vare …» og «Opprett råvarer …» finnes. «Godta forslag» i masse mangler: arbeidslisten har ingen forslagsdata for ukoblede varekort | 3 | Delvis |
 | F44 | Hurtigtaster ↑/↓, Enter, m, n, x, u, Esc | Å gjøre: J/K, Enter, L, P, G, X, U, `?`; linjeinspektør: m, n, x, u | 3 | Gammel plass |
 | F45 | Angre siste linjehandling | U / «Angre» i resultatboks og linjeinspektør | 3 | Gammel plass |
 | F46 | Dokumentpanel ved siden av køen; tilstand huskes | /faktura/:id › dokumentsone (kan skjules) | 3 | Flyttet |
