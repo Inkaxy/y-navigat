@@ -99,15 +99,15 @@ export async function decideApply(
   let persisted: RereadRun | null | "unavailable";
   try { persisted = await fetchRun(req.runId); } catch (e) { console.error("[reread-apply-status]", e); persisted = "unavailable"; }
   const state = persisted === "unavailable" ? null : persistedApply(persisted, req);
-  if (state === "match") {
-    const respOk = "thrown" in call || call.error || applyResponseValid(call.data, req, invoiceId);
-    if (respOk) { store.clear(req.runId); return { kind: "applied" }; }
-  }
+  // Lagret kjøring med nøyaktig samme operasjoner og begrunnelse er bevis — uansett hva svaret var.
+  if (state === "match") { store.clear(req.runId); return { kind: "applied" }; }
   if (state === "differs") return { kind: "already_used" };
   if (!("thrown" in call) && call.error && classifyDbError(call.error.code) === "rejected" && state === "not_applied") {
     store.clear(req.runId);
     return { kind: "rejected", message: call.error.message ?? "" };
   }
+  // Gyldig svar uten bekreftet lagret kjøring (statuslesing utilgjengelig): fortsatt ukjent, valgene beholdes.
+  if (!("thrown" in call) && !call.error && applyResponseValid(call.data, req, invoiceId)) console.warn("[reread-apply] svar ok, lagret status ikke bekreftet");
   return { kind: "unknown" };
 }
 
