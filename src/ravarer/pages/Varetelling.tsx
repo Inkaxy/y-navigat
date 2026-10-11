@@ -436,8 +436,8 @@ export default function Varetelling() {
             const drifted = base != null && base !== r.current_stock;
             return (
               <Card key={r.raw_material_id} className="p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1 sm:min-w-[200px]">
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+                  <div className="w-full min-w-0 sm:w-auto sm:min-w-[200px] sm:flex-1">
                     <p className="break-words font-medium">{r.name}</p>
                     <p className="text-xs text-ink-secondary">
                       Bokført: {formatNumber(r.current_stock, 2)} {r.base_unit}
@@ -479,8 +479,9 @@ export default function Varetelling() {
                       className="mt-2 h-[44px] text-sm sm:h-9"
                     />
                   </div>
-                  <div className="flex flex-col items-end gap-2">
+                  <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
                     <UnitAmountRows
+                      label={`Telt mengde for ${r.name}`}
                       rows={rowsFor(r.raw_material_id)}
                       onChange={next => {
                         setDirty(true);
