@@ -81,10 +81,10 @@ const STATIC: Record<string, Entry> = {
   "/fakturaer/import-pdf": { ...IMP, extra: [["importer", "pdf"]] },
 };
 
-const DYNAMIC: { re: RegExp; to: (m: RegExpMatchArray) => string; dropQuery?: boolean }[] = [
+const DYNAMIC: { re: RegExp; to: (m: RegExpMatchArray) => string; dropQuery?: boolean; legacyKey?: boolean }[] = [
   { re: /^\/ravarer\/vareliste\/([^/]+)$/, to: (m) => `${R}/varer/${m[1]}` },
-  { re: /^\/ravarer\/fakturaer\/i-dag\/[^/]+$/, to: () => `${R}/priskontroll?fane=gjore`, dropQuery: true },
-  { re: /^\/ravarer\/priskontroll\/beslutninger\/[^/]+$/, to: () => `${R}/priskontroll?fane=gjore`, dropQuery: true },
+  { re: /^\/ravarer\/fakturaer\/i-dag\/([^/]+)$/, to: () => "", legacyKey: true },
+  { re: /^\/ravarer\/priskontroll\/beslutninger\/([^/]+)$/, to: () => "", legacyKey: true },
   { re: /^\/ravarer\/fakturaer\/saker\/([^/]+)$/, to: (m) => `${R}/priskontroll/saker/${m[1]}` },
   { re: /^\/ravarer\/fakturaer\/([^/]+)\/registrer-linjer$/, to: (m) => `${R}/priskontroll/faktura/${m[1]}/registrer-linjer` },
   { re: /^\/ravarer\/fakturaer\/([^/]+)$/, to: (m) => `${R}/priskontroll/faktura/${m[1]}` },
@@ -105,6 +105,27 @@ export const LEGACY_RAVARER_PATHS: string[] = [
   "/ravarer/forhandlinger/*",
 ];
 
+const KIND_TO_GRUPPE: Record<string, string> = { m: "kobling", p: "pakning", f: "pris", pr: "pris" };
+
+/**
+ * Gammel beslutningsnøkkel (`{type}:{selskap}:{valuta}:{debet|kredit}:{leverandør}:{varenr}:…`
+ * eller `line:{id}`) → Å gjøre med leverandør, søk på varenummer og gruppe. Query fra den gamle
+ * lenken (søk, leverandør, type) følger med; verdier fra nøkkelen vinner bare når de mangler.
+ */
+export function legacyDecisionUrl(rawKey: string, search: string): string {
+  let key = rawKey;
+  try { key = decodeURIComponent(rawKey); } catch (e) { if (!(e instanceof URIError)) throw e; }
+  const parts = key.split(":");
+  const extra: [string, string][] = [["fane", "gjore"]];
+  const src = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+  if (parts[0] !== "line" && parts.length >= 6 && KIND_TO_GRUPPE[parts[0]]) {
+    if (!src.has("type") && !src.has("omfang")) extra.push(["gruppe", KIND_TO_GRUPPE[parts[0]]]);
+    if (parts[4] && !src.has("leverandor")) extra.push(["leverandor", parts[4]]);
+    if (parts[5] && !src.has("q")) extra.push(["q", parts[5]]);
+  }
+  return `${R}/priskontroll${merge(search, extra, GJORE.rename, GJORE.values)}`;
+}
+
 export function resolveLegacyRavarerUrl(pathname: string, search: string): string | null {
   const p = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
   const st = STATIC[p];
@@ -115,6 +136,7 @@ export function resolveLegacyRavarerUrl(pathname: string, search: string): strin
   }
   for (const d of DYNAMIC) {
     const m = p.match(d.re);
+    if (m && d.legacyKey) return legacyDecisionUrl(m[1], search);
     if (m) return d.dropQuery ? d.to(m) : d.to(m) + merge(search, []);
   }
   return null;

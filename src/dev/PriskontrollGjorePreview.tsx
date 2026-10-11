@@ -73,7 +73,7 @@ function Preview() {
             <InvoiceFactsView invoice={FACTS} />
             <div className="rounded-md border border-line-subtle p-3 text-sm">
               Linjene summerer til 14 012 kr, fakturaen sier 14 761,60 kr eks. mva — avvik 749,60 kr (−5,1 %).
-              <div className="mt-2 flex flex-wrap gap-2"><Button size="sm">Rett mva-avvik</Button><Button size="sm" variant="outline">Hent linjer på nytt</Button><Button size="sm" variant="ghost">Overstyr med begrunnelse</Button></div>
+              <div className="mt-2 flex flex-wrap gap-2"><Button size="sm">Kontroller mva-avvik</Button><Button size="sm" variant="outline">Hent linjer på nytt</Button><Button size="sm" variant="ghost">Overstyr med begrunnelse</Button></div>
             </div>
           </div>
         </div>

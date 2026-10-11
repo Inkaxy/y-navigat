@@ -39,9 +39,11 @@ describe("parseRpcJson", () => {
     expect(parseRematchStatus({ queued: 4, in_flight: 2 })).toMatchObject({ queued: 4, in_flight: 2, done_last_hour: 0 });
     expect(parsePriceReference({ source: "agreement", price: 11.2 }).source).toBe("agreement");
     expect(parsePriceReference({ source: "x" }).source).toBe("none");
-    expect(repairVatMessage(parseRepairVat({ ok: true, mode: "linjer_skalert", lines: 5 }))).toContain("5 linjer regnes om");
+    const f = parseRepairVat({ ok: false, reason: "kontroll_trengs", suggestion: "linjer_skalert", factor: 1.25, ratio: 0.8 });
+    expect(f).toEqual({ kind: "forslag", suggestion: "linjer_skalert", factor: 1.25, ratio: 0.8 });
+    expect(repairVatMessage(f)).toMatch(/manglende linje.*Ingen beløp er endret/);
     expect(repairVatMessage(parseRepairVat({ ok: false, reason: "kostpris_fort" }))).toBe("Kostpris er allerede ført fra denne fakturaen");
-    expect(repairVatMessage(parseRepairVat({ ok: true, mode: "mva_utledet" }))).toContain("utledet");
+    expect(repairVatMessage(parseRepairVat({ ok: false, reason: "kontroll_trengs", suggestion: "mva_utledet", factor: 1.15 }))).toMatch(/ikke utledet automatisk/);
   });
 });
 
