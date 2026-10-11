@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { LineChart as LineChartIcon, Link2, Pencil } from "lucide-react";
+import { FilePenLine, LineChart as LineChartIcon, Link2, Pencil } from "lucide-react";
 import { ConfidenceBadge, InvoiceLineNotes } from "@/fakturaer/components/InvoiceLineBadges";
 import { OpenSupplierItemButton } from "@/fakturaer/components/supplier-item/OpenSupplierItemButton";
 import { PriceDeviationNote } from "@/fakturaer/components/PriceDeviationNote";
