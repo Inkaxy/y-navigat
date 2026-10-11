@@ -252,7 +252,7 @@ export const AUDIT_ACTION_LABEL: Readonly<Record<string, string>> = {
   "invoice.auto_reconciled": "Avstemt automatisk",
   "invoice.auto_reconcile_reopened": "Automatisk avstemming åpnet igjen",
   "invoice.reconciled": "Avstemt",
-  "invoice.vat_repaired": "Mva rettet",
+  "invoice.vat_repaired": "Mva rettet automatisk (eldre – kontroller mot dokumentet)",
   "supplier_link.changed": "Kobling endret",
   invoice_line_match_confirmed: "Råvare/pakning bekreftet",
   "package.auto_confirmed": "Pakning bekreftet automatisk",

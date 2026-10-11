@@ -1,117 +1,96 @@
-// process-email-outbox (B.1): Drainer email_outbox-tabellen.
-// - Default: henter pending-rader (max 20 per kjøring), kalles av pg_cron
-// - Med { outbox_id }: prosesser kun den raden (test-send fra UI)
+// process-email-outbox: drainer email_outbox.
+// - Krever service-bearer eller X-Cron-Secret (verify_cron_secret). Ingen anonyme kall.
+// - Rader tas ut atomisk (claim_email_outbox_batch/_one: bare status «pending», attempt_count økes ved claim)
+//   FØR utsending — sendte rader kan ikke spilles av på nytt, og samtidige kjøringer tar ikke samme rad.
+// - Leverandørutsending skjer utenfor databasetransaksjonen.
+// - Ukjent leveringsutfall (nettverksfeil/timeout etter at forespørselen kan ha nådd fram) → «failed»
+//   med forklaring, ikke ny automatisk sending (unngår duplikater). Avvist av leverandøren → nytt forsøk.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { authorizeCron, CRON_CORS_HEADERS } from "../_shared/cron-auth.ts";
 
 const MAX_BATCH = 20;
 const MAX_ATTEMPTS = 5;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type Row = { id: string; template_key: string; recipient_email: string; variables: Record<string, unknown> | null; attempt_count: number };
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { ...CRON_CORS_HEADERS, "Content-Type": "application/json" } });
+}
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const admin = createClient(supabaseUrl, serviceKey);
+  if (req.method === "OPTIONS") return new Response(null, { headers: CRON_CORS_HEADERS });
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const admin = createClient(supabaseUrl, serviceKey);
 
-    let outboxId: string | undefined;
+  const who = await authorizeCron(req, admin);
+  if (!who) return json({ error: "unauthorized" }, 401);
+
+  try {
+    let outboxId: string | null = null;
     if (req.method === "POST") {
-      try {
-        const body = await req.json();
-        outboxId = body?.outbox_id;
-      } catch {
-        // ingen body — kjør default drain
+      const text = await req.text();
+      if (text.trim()) {
+        let body: unknown;
+        try { body = JSON.parse(text); } catch { return json({ error: "ugyldig JSON" }, 400); }
+        const v = body && typeof body === "object" && "outbox_id" in body ? (body as { outbox_id: unknown }).outbox_id : null;
+        if (v != null) {
+          if (typeof v !== "string" || !UUID_RE.test(v)) return json({ error: "ugyldig outbox_id" }, 400);
+          outboxId = v;
+        }
       }
     }
 
-    let rows: Array<{ id: string; template_key: string; recipient_email: string; variables: Record<string, unknown> | null; attempt_count: number }> = [];
-
-    if (outboxId) {
-      const { data, error } = await admin
-        .from("email_outbox")
-        .select("id, template_key, recipient_email, variables, attempt_count")
-        .eq("id", outboxId)
-        .maybeSingle();
-      if (error) throw new Error(`Kunne ikke lese outbox-rad: ${error.message}`);
-      if (data) rows = [data as typeof rows[number]];
-    } else {
-      const { data, error } = await admin
-        .from("email_outbox")
-        .select("id, template_key, recipient_email, variables, attempt_count")
-        .eq("status", "pending")
-        .lt("attempt_count", MAX_ATTEMPTS)
-        .order("created_at", { ascending: true })
-        .limit(MAX_BATCH);
-      if (error) throw new Error(`Kunne ikke lese outbox: ${error.message}`);
-      rows = (data ?? []) as typeof rows;
-    }
+    const claim = outboxId
+      ? await admin.rpc("claim_email_outbox_one", { p_id: outboxId })
+      : await admin.rpc("claim_email_outbox_batch", { p_limit: MAX_BATCH });
+    if (claim.error) throw new Error(`Kunne ikke ta ut e-post fra køen: ${claim.error.message}`);
+    const rows = (claim.data ?? []) as Row[];
 
     const results: Array<{ outbox_id: string; status: string; error?: string }> = [];
-
     for (const row of rows) {
-      const newAttempt = (row.attempt_count ?? 0) + 1;
+      let res: Response;
       try {
-        const res = await fetch(`${supabaseUrl}/functions/v1/microsoft-graph-send`, {
+        res = await fetch(`${supabaseUrl}/functions/v1/microsoft-graph-send`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${serviceKey}`,
-          },
-          body: JSON.stringify({
-            template_key: row.template_key,
-            recipient_email: row.recipient_email,
-            variables: row.variables ?? {},
-          }),
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+          body: JSON.stringify({ template_key: row.template_key, recipient_email: row.recipient_email, variables: row.variables ?? {} }),
+          signal: AbortSignal.timeout(45_000),
         });
-        const txt = await res.text();
-        if (!res.ok) {
-          throw new Error(`graph-send returnerte ${res.status}: ${txt}`);
-        }
-        const parsed = JSON.parse(txt);
-        if (!parsed.success) {
-          throw new Error(parsed.error ?? "Ukjent feil fra graph-send");
-        }
-        await admin
-          .from("email_outbox")
-          .update({
-            status: "sent",
-            sent_at: new Date().toISOString(),
-            attempt_count: newAttempt,
-            last_attempt_at: new Date().toISOString(),
-            error_message: null,
-          })
-          .eq("id", row.id);
-        results.push({ outbox_id: row.id, status: "sent" });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        const isFinal = newAttempt >= MAX_ATTEMPTS;
-        await admin
-          .from("email_outbox")
-          .update({
-            status: isFinal ? "failed" : "pending",
-            attempt_count: newAttempt,
-            last_attempt_at: new Date().toISOString(),
-            error_message: msg.slice(0, 500),
-          })
-          .eq("id", row.id);
-        results.push({ outbox_id: row.id, status: isFinal ? "failed" : "retry", error: msg });
+        await admin.from("email_outbox").update({
+          status: "failed",
+          error_message: `Ukjent leveringsutfall (${msg.slice(0, 200)}). Kontroller i postkassen før ny sending.`,
+        }).eq("id", row.id).eq("status", "sending");
+        results.push({ outbox_id: row.id, status: "unknown", error: "ukjent leveringsutfall" });
+        continue;
+      }
+      const txt = await res.text();
+      let success = false; let errMsg = `graph-send returnerte ${res.status}`;
+      try {
+        const parsed: unknown = JSON.parse(txt);
+        if (parsed && typeof parsed === "object") {
+          success = res.ok && (parsed as { success?: unknown }).success === true;
+          const e = (parsed as { error?: unknown }).error;
+          if (typeof e === "string") errMsg = e;
+        }
+      } catch { /* ikke-JSON svar behandles som avvist */ }
+      if (success) {
+        await admin.from("email_outbox").update({ status: "sent", sent_at: new Date().toISOString(), error_message: null })
+          .eq("id", row.id).eq("status", "sending");
+        results.push({ outbox_id: row.id, status: "sent" });
+      } else {
+        const isFinal = row.attempt_count >= MAX_ATTEMPTS;
+        await admin.from("email_outbox").update({ status: isFinal ? "failed" : "pending", error_message: errMsg.slice(0, 500) })
+          .eq("id", row.id).eq("status", "sending");
+        results.push({ outbox_id: row.id, status: isFinal ? "failed" : "retry", error: errMsg });
       }
     }
-
     return json({ processed: results.length, results });
   } catch (e) {
     console.error("process-email-outbox error", e);
-    return json({ error: e instanceof Error ? e.message : String(e) }, 500);
+    return json({ error: "Køen kunne ikke behandles" }, 500);
   }
 });
-
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
