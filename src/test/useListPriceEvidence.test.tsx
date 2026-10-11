@@ -65,7 +65,8 @@ describe("useListPriceEvidence", () => {
   it("feil: ingen sertifisering, én liste-status", async () => {
     fail = true;
     const { result } = renderHook(() => useListPriceEvidence("A", ids.slice(0, 3), true), { wrapper });
-    await waitFor(() => expect(result.current.isError).toBe(true));
+    await waitFor(() => expect(result.current.isError).toBe(true), { timeout: 4000 });
+    expect(calls).toHaveLength(2); // ett nytt forsøk, ingen storm
     expect(result.current.certified).toBeNull();
   });
 });
