@@ -100,7 +100,7 @@ describe("mottaksavvik — uavklart bevegelse overlever lukk/åpne", () => {
   };
   const registrer = () => screen.getByRole("button", { name: "Registrer" }) as HTMLButtonElement;
   const close = async () => {
-    fireEvent.click(screen.getByRole("button", { name: /^(Avbryt|Lukk)$/, hidden: false, ...{} }).closest("[role=dialog]") ? screen.getAllByRole("button", { name: /^(Avbryt|Lukk)$/ }).at(-1)! : screen.getByRole("button", { name: "Avbryt" }));
+    fireEvent.click(screen.getAllByRole("button", { name: /^(Avbryt|Lukk)$/ }).at(-1)!);
     await waitFor(() => expect(screen.queryByLabelText("Mengde")).toBeNull());
   };
 
