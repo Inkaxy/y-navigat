@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { OrderDeskKpi } from "@/ordre/components/dashboard/OrderDeskKpi";
 import { BookOpen, Coins, FileText, Handshake, Package, Percent, Truck, Wallet } from "lucide-react";
-import { formatDate, formatNok, priceSourceLabel } from "@/ravarer/lib/constants";
+import { formatDate, formatNok } from "@/ravarer/lib/constants";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { chooseAgreedPrice, kpiDeviation, pricePerPackage } from "@/ravarer/lib/rawMaterialKpi";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
