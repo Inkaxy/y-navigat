@@ -131,13 +131,13 @@ describe("felles modell: filter, sortering, CSV", () => {
     expect(applyView(items, "price_control", rule).map((i) => i.id)).toEqual(["ali"]);
   });
   it("sortering på avvik legger ukjent nederst og beholder fortegn/0", () => {
-    const sorted = filterAndSortItems(items, { search: "", view: "all", sort: { key: "deviation", dir: "desc" } } as Parameters<typeof filterAndSortItems>[1], rule).map((i) => i.id);
+    const sorted = filterAndSortItems(items, { q: "", kat: "", type: "", status: "all", view: "all", sortKey: "deviation", sortDir: "desc" }, rule).map((i) => i.id);
     expect(sorted.slice(0, 3)).toEqual(["big", "neg", "combi"]);
     expect(sorted.slice(3).sort()).toEqual(["ali", "pend"]);
   });
   it("CSV: ukjent eksporteres som status, aldri 0; uverifisert kost merkes", () => {
     expect(csvValue("deviation", items[0])).toBe("Kostprisen er ikke verifisert");
-    expect(csvValue("deviation", items[1])).toBe("0,0");
+    expect(csvValue("deviation", items[1])).toBe("0");
     expect(csvValue("deviation", items[4])).toBe("Prisgrunnlag ikke kontrollert");
     expect(csvValue("cost", items[0])).toMatch(/\(ikke verifisert\)$/);
     expect(csvValue("cost", items[1])).not.toMatch(/verifisert/);
