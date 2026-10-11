@@ -62,8 +62,23 @@ export interface PriceHistoryRow {
   notes: string | null;
   created_at: string;
   superseded_reason?: string | null;
+  superseded_at?: string | null;
   is_legacy?: boolean | null;
+  is_credit?: boolean | null;
+  currency?: string | null;
+  invoice_line_id?: string | null;
   invoices?: { invoice_number: string | null; is_credit_note: boolean | null } | null;
+}
+
+/** Én mapping fra historikkrad til tidslinjerad — brukes av alle visninger (skjerm og CSV). */
+export function toTimelineRow(h: PriceHistoryRow): TimelineHistoryRow {
+  return {
+    id: h.id, effective_date: h.effective_date, price: Number(h.price), supplier_id: h.supplier_id,
+    source: h.source ?? "manual", invoice_id: h.invoice_id, invoiceNumber: h.invoices?.invoice_number ?? null,
+    isCreditNote: h.invoices?.is_credit_note ?? false, notes: h.notes ?? null,
+    supersededAt: h.superseded_at ?? null, supersededReason: h.superseded_reason ?? null,
+    isLegacy: !!h.is_legacy, isCredit: !!h.is_credit, currency: h.currency ?? "NOK",
+  };
 }
 
 /** Delt kontrakt for ["raw_material_suppliers", id] — komplette koblingsrader. */
@@ -176,27 +191,28 @@ export function usePriceHistory(rawMaterialId: string | undefined) {
   return useQuery({
     queryKey: ["raw_material_price_history", rawMaterialId],
     enabled: !!rawMaterialId,
-    queryFn: async () => {
-      const { data, error } = await supabase
+    // Alle rader (sidevis) — ingen stille avkutting ved 1000.
+    queryFn: () => fetchAllRows<PriceHistoryRow>((from, to) =>
+      supabase
         .from("raw_material_price_history")
-        .select("id, raw_material_id, supplier_id, price, effective_date, source, source_reference, invoice_id, notes, created_at, superseded_reason, is_legacy, invoices(invoice_number, is_credit_note)")
-        .eq("raw_material_id", rawMaterialId!)
+        .select("id, raw_material_id, supplier_id, price, effective_date, source, source_reference, invoice_id, invoice_line_id, notes, created_at, superseded_at, superseded_reason, is_legacy, is_credit, currency, invoices(invoice_number, is_credit_note)")
+        .eq("raw_material_id", rawMaterialId as string)
         .order("effective_date", { ascending: false })
-        .returns<PriceHistoryRow[]>();
-      if (error) throw error;
-      return data ?? [];
-    },
+        .order("id", { ascending: true })
+        .range(from, to)
+        .returns<PriceHistoryRow[]>()),
   });
 }
 
 /** @deprecated bruk usePriceHistory */
 export const n = usePriceHistory;
 
+/**
+ * Manuell dokumentert pris: én atomisk server-RPC (historikk + revisjon + felles prisvelger).
+ * Serveren avgjør om prisen blir gjeldende (nyeste gyldige pris etter dato); `set_as_current` er bare ønsket.
+ */
 export function useAddPriceHistory() {
   const qc = useQueryClient();
-  // Innlogget bruker ligger allerede i konteksten — ingen ekstra rundtur
-  // til auth per lagring.
-  const { user } = useRavarerScope();
   return useMutation({
     mutationFn: async (input: {
       raw_material_id: string;
@@ -206,76 +222,20 @@ export function useAddPriceHistory() {
       source: string;
       notes?: string | null;
       set_as_current: boolean;
-    }) => {
-      const { error: histErr } = await supabase.from("raw_material_price_history").insert({
-        raw_material_id: input.raw_material_id,
-        created_by: user?.id ?? null,
-        supplier_id: input.supplier_id,
-        price: input.price,
-        effective_date: input.effective_date,
-        source: input.source,
-        notes: input.notes ?? null,
+    }): Promise<DocumentedPriceResult> => {
+      const { data, error } = await supabase.rpc("rm_set_documented_cost_price", {
+        p_raw_material_id: input.raw_material_id,
+        p_price: input.price,
+        p_effective_date: input.effective_date,
+        p_reason: (input.notes ?? "").trim(),
+        p_supplier_id: input.supplier_id ?? undefined,
+        p_source: ["manual", "agreement", "price_list"].includes(input.source) ? input.source : "manual",
       });
-      if (histErr) throw histErr;
-      if (input.set_as_current) {
-        const { error: rmErr } = await supabase
-          .from("raw_materials")
-          .update({
-            current_cost_price: input.price,
-            price_updated_at: new Date().toISOString(),
-            price_source: input.source,
-          })
-          .eq("id", input.raw_material_id);
-        if (rmErr) throw rmErr;
-      }
+      if (error) throw new Error(documentedPriceError(error.message));
+      return parseDocumentedPrice(data);
     },
-    // Optimistisk: kostprisen i listen og på detaljen oppdateres med én gang.
-    onMutate: async (input) => {
-      if (!input.set_as_current) {
-        return {
-          lists: [] as Array<[unknown[], RawMaterialRow[] | undefined]>,
-          detail: [] as Array<[unknown[], RawMaterialRow | null | undefined]>,
-        };
-      }
-      const id = input.raw_material_id;
-      await qc.cancelQueries({ queryKey: ["raw_materials"] });
-      await qc.cancelQueries({ queryKey: ["raw_material", id] });
-      const lists = qc
-        .getQueriesData<RawMaterialRow[]>({ queryKey: ["raw_materials"] })
-        .map(([key, rows]) => [key as unknown[], rows] as [unknown[], RawMaterialRow[] | undefined]);
-      const detail = qc
-        .getQueriesData<RawMaterialRow | null>({ queryKey: ["raw_material", id] })
-        .map(
-          ([key, row]) => [key as unknown[], row] as [unknown[], RawMaterialRow | null | undefined],
-        );
-      const patch = {
-        current_cost_price: input.price,
-        price_source: input.source,
-        price_updated_at: new Date().toISOString(),
-      };
-      for (const [key, rows] of lists) {
-        if (!Array.isArray(rows)) continue;
-        qc.setQueryData(
-          key,
-          rows.map((r) => (r.id === id ? { ...r, ...patch } : r)),
-        );
-      }
-      for (const [key, row] of detail) {
-        if (!row) continue;
-        qc.setQueryData(key, { ...row, ...patch });
-      }
-      return { lists, detail };
-    },
-    onError: (e: unknown, _vars, context) => {
-      context?.lists.forEach(([key, rows]) => qc.setQueryData(key, rows));
-      context?.detail.forEach(([key, row]) => qc.setQueryData(key, row));
-      toast.error(`Kunne ikke registrere: ${errText(e)}`);
-    },
-    onSuccess: () => {
-      toast.success("Pris registrert");
-    },
-    onSettled: (_d, _e, vars) => {
-      invalidateRawMaterial(qc, vars.raw_material_id);
-    },
+    onError: (e: unknown) => toast.error(`Kunne ikke registrere: ${errText(e)}`),
+    onSuccess: (r) => { toast.success(documentedPriceMessage(r)); },
+    onSettled: (_d, _e, vars) => { invalidateRawMaterial(qc, vars.raw_material_id); },
   });
 }
