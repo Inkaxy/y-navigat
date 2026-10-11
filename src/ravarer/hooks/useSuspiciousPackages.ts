@@ -42,11 +42,11 @@ const fmt = (n: number) => new Intl.NumberFormat("nb-NO", { maximumFractionDigit
  *  - ubekreftet pakning som er uenig med varenavnet med mer enn en faktor 1,5
  * Bekreftede pakninger tas aldri med.
  */
-export function useSuspiciousPackages() {
+export function useSuspiciousPackages(options?: { enabled?: boolean }) {
   const { legalEntityId } = useRavarer();
   return useQuery({
     queryKey: ["suspicious_packages", legalEntityId],
-    enabled: !!legalEntityId,
+    enabled: !!legalEntityId && (options?.enabled ?? true),
     queryFn: async (): Promise<SuspiciousPackageRow[]> => {
       const { data, error } = await supabase
         .from("raw_material_suppliers")
