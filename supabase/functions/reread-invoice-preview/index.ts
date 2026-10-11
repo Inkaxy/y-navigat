@@ -2,7 +2,7 @@
 // Skriver ALDRI til fakturaen eller linjene. Forespørsel: { run_id }.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { runPreview, type RunRow } from "./flow.ts";
+import { classifyRegister, runPreview, type RunRow } from "./flow.ts";
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
@@ -53,17 +53,22 @@ Deno.serve(async (req) => {
       register: async (id, sha, proposal, extractor) => {
         try {
           const { data, error } = await admin.rpc("rm_register_invoice_reread", { p_run_id: id, p_document_sha256: sha, p_proposal: proposal, p_extractor: extractor });
-          if (error) {
-            console.error("register", error.code, error.message);
-            // Valideringsavvisning fra databasen er et kjent utfall; nettverksfeil er ukjent.
-            if (error.code && /^[0-9A-Z]{5}$/.test(error.code)) { await admin.rpc("rm_fail_invoice_reread", { p_run_id: id, p_code: "forslag_avvist" }); return { ok: false, code: "forslag_avvist" }; }
-            return "unknown";
+          if (error) console.error("register", error.code);
+          const c = classifyRegister(data, error);
+          if (c === "rejected") {
+            // Kjent avvisning. rm_fail endrer bare kjøringer som fortsatt leses; klar/brukt/avbrutt overskrives aldri.
+            await admin.rpc("rm_fail_invoice_reread", { p_run_id: id, p_code: "forslag_avvist" });
+            return { ok: false, code: "forslag_avvist" };
           }
-          const d = data as { ok?: boolean; code?: string; replayed?: boolean };
-          return { ok: d?.ok === true, code: d?.code, replayed: d?.replayed };
+          return c;
         } catch {
           return "unknown";
         }
+      },
+      readRunState: async (id) => {
+        const { data, error } = await admin.from("invoice_reread_runs").select("status, document_sha256").eq("id", id).maybeSingle();
+        if (error) throw new Error("run_state");
+        return (data as { status: string; document_sha256: string | null } | null) ?? null;
       },
       fail: async (id, code) => { await admin.rpc("rm_fail_invoice_reread", { p_run_id: id, p_code: code }); },
       now: () => Date.now(),
