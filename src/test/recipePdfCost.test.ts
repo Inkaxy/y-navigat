@@ -5,7 +5,7 @@ import type { BakersLine, BakersRawMaterial } from "@/varer/lib/bakers";
 const rm = (o: Partial<BakersRawMaterial>): BakersRawMaterial =>
   ({ id: "r", name: "Råvare", base_unit: "kg", current_cost_price: 10, cost_basis_status: "verifisert", ...o });
 const line = (id: string, r: BakersRawMaterial, grams: number): BakersLine =>
-  ({ id, recipe_part_id: "p", raw_material_id: r.id, quantity: grams, unit: "g", _rm: r } as BakersLine);
+  ({ id, recipe_part_id: "p", raw_material_id: r.id, quantity: grams, unit: "g", _rm: r });
 
 const input = (lines: BakersLine[]): BuildRecipePDFInput => ({
   name: "Brød", scaledUnits: 10, factor: 1, unitWeightGrams: 200, includeCosts: true,
