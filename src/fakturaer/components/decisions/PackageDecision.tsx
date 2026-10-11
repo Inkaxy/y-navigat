@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { PackageFields } from "@/ravarer/editors/PackageFields";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import type { DecisionGroup } from "@/fakturaer/lib/decisionGroups";
@@ -82,8 +82,16 @@ export function PackageDecision({ g, canWrite, onSaved }: { g: DecisionGroup; ca
       </p>
       {canWrite ? (
         <div className="space-y-2">
-          <Label htmlFor={id}>Hvor mye {unit} er det i én {first.unit ?? "pakning"}?</Label>
-          <Input id={id} inputMode="decimal" className="w-40" value={raw} onChange={(e) => setRaw(e.target.value)} />
+          <PackageFields
+            inputId={id}
+            baseUnit={unit}
+            unitsLabel={`Hvor mye ${unit} er det i én ${first.unit ?? "pakning"}?`}
+            units={raw}
+            onUnitsChange={setRaw}
+            packageUnit={first.unit ?? ""}
+            onPackageUnitChange={() => undefined}
+            lockedUnit={first.unit ?? ""}
+          />
           {preview && (
             <p className="text-sm text-ink-secondary tabular-nums">
               {first.quantity} × {fmtNum(content ?? 0)} = {fmtNum(preview.baseQuantity)} {unit}
