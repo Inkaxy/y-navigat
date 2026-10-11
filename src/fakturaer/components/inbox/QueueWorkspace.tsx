@@ -64,7 +64,7 @@ export interface QueueWorkspaceProps {
   /** Vises øverst i inspektøren. */
   inspectorNote?: ReactNode;
   /** Øk tallet for å åpne «Endre råvare» i inspektøren (tast M). */
-  editMaterialSignal?: number;
+  editMaterialSignal?: EditMaterialSignal | null;
   /** Ekstra innhold over linjelisten (f.eks. fakta-kortet). */
   listHeader?: ReactNode;
 }
@@ -217,7 +217,7 @@ export function QueueWorkspace(p: QueueWorkspaceProps) {
             {toolbar}
             <Card className="p-0">{list}</Card>
             <Sheet open={!!inspector && !!p.inspectorOpen} onOpenChange={(v) => p.onInspectorOpenChange?.(v)}>
-              <SheetContent side="right" className="w-full overflow-y-auto p-3 sm:max-w-xl">
+              <SheetContent side="right" data-inspector-sheet="" className="w-full overflow-y-auto p-3 sm:max-w-xl">
                 <SheetTitle className="sr-only">Valgt fakturalinje</SheetTitle>
                 {inspector}
               </SheetContent>

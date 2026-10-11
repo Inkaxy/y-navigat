@@ -40,8 +40,8 @@ export interface LineTaskProps {
   onSecondary: (a: SecondaryAction, line: ReviewLineRow) => void;
   onShowDocument: (line: ReviewLineRow) => void;
   onReconcile: () => void;
-  /** Øk tallet for å åpne «Endre råvare» (tast M i arbeidsflaten). */
-  editMaterialSignal?: number;
+  /** Åpner «Endre råvare» (tast M i arbeidsflaten) — bare for linjen signalet gjelder. */
+  editMaterialSignal?: EditMaterialSignal | null;
 }
 
 /**
@@ -60,9 +60,12 @@ export function LineTask(p: LineTaskProps) {
   const [recalc, setRecalc] = useState<{ lineIds: string[] } | null>(null);
   const [recalcBusy, setRecalcBusy] = useState(false);
   const [agreedOpen, setAgreedOpen] = useState(false);
+  const handledSignal = useRef<number | null>(null);
   useEffect(() => {
-    if (p.editMaterialSignal && p.canWrite) setEditMaterial(true);
-  }, [p.editMaterialSignal, p.canWrite]);
+    if (!p.canWrite || !shouldOpenEditMaterial(p.editMaterialSignal, line.id, handledSignal.current)) return;
+    handledSignal.current = p.editMaterialSignal?.n ?? null;
+    setEditMaterial(true);
+  }, [p.editMaterialSignal, p.canWrite, line.id]);
 
   const mode: TaskMode = editMaterial ? "material" : editPackage ? "package" : taskCopy.modeFor(status.key);
   const copy = taskCopy.forStatus(status.key);

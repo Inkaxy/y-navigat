@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
  * Felles vakt for hurtigtaster: ingen snarveier mens brukeren skriver i et felt,
  * har en dialog/meny åpen, eller holder en modifikatortast.
  */
-export function shouldIgnoreShortcut(e: KeyboardEvent): boolean {
+export function shouldIgnoreShortcut(e: KeyboardEvent, opts: { allowWithin?: string } = {}): boolean {
   if (e.ctrlKey || e.metaKey || e.altKey) return true;
   const el = e.target instanceof HTMLElement ? e.target : null;
   if (!el) return false;
@@ -12,7 +12,9 @@ export function shouldIgnoreShortcut(e: KeyboardEvent): boolean {
   if (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName)) return true;
   // En knapp med fokus svelger bare Enter og mellomrom (knappens egen aktivering).
   if (el.closest("button") && (e.key === "Enter" || e.key === " ")) return true;
-  if (el.closest('[role="combobox"], [role="dialog"], [role="menu"], [role="listbox"]')) return true;
+  if (el.closest('[role="combobox"], [role="menu"], [role="listbox"]')) return true;
+  // Et panel som er en del av arbeidsflaten (f.eks. inspektørens Sheet) kan tillate snarveier.
+  if (el.closest('[role="dialog"]') && !(opts.allowWithin && el.closest(opts.allowWithin))) return true;
   return false;
 }
 
