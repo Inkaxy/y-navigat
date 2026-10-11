@@ -34,8 +34,8 @@ type Status = "open" | "resolved" | "cancelled";
  * Statusendring via `set_supplier_deviation_case_status` (bare saksstatus; endrer aldri fakturapris
  * eller godkjenning). Krever skriverett og begrunnelse.
  */
-export function CaseStatusSection({ id, status, resolutionNote, canWrite, supplierId, invoices }: {
-  id: string; status: string; resolutionNote: string | null; canWrite: boolean; supplierId: string; invoices: [string, string][];
+export function CaseStatusSection({ id, status, resolutionNote, canWrite, invoices }: {
+  id: string; status: string; resolutionNote: string | null; canWrite: boolean; invoices: [string, string][];
 }) {
   const qc = useQueryClient();
   const [note, setNote] = useState("");
@@ -90,7 +90,6 @@ export function CaseStatusSection({ id, status, resolutionNote, canWrite, suppli
         </>
       )}
       {resolutionNote && <p className="text-sm text-ink-secondary">Siste begrunnelse: {resolutionNote}</p>}
-      <span hidden data-supplier={supplierId} />
     </section>
   );
 }

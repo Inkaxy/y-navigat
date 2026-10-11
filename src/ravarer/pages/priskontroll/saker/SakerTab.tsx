@@ -115,7 +115,7 @@ export function SakerTab() {
       {wide ? (
         <SplitView
           list={table}
-          panel={<PeekPanel title={valgt ? "Leverandørsak" : undefined} fullHref={valgt ? paths.sak(valgt) : undefined} onClose={() => update({ sak: null })} emptyText="Velg en sak i listen">{valgt ? <SupplierCaseDetail id={valgt} /> : null}</PeekPanel>}
+          panel={<PeekPanel title={valgt ? "Leverandørsak" : undefined} fullHref={valgt ? paths.sak(valgt) : undefined} onClose={() => update({ sak: null })} emptyText="Velg en sak i listen">{valgt ? <SupplierCaseDetail key={valgt} id={valgt} /> : null}</PeekPanel>}
         />
       ) : table}
     </div>

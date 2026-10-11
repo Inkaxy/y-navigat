@@ -137,7 +137,7 @@ export function SupplierCaseDetail({ id }: { id: string }) {
 
       {d.c.status === "open" && kind === "documented_claim" && rights.canWrite && <section className="rounded-lg border border-border p-4"><CaseCreditForm d={d} invoices={invoices} /></section>}
 
-      <CaseStatusSection id={id} status={d.c.status} resolutionNote={d.c.resolution_note} canWrite={rights.canWrite} supplierId={d.c.supplier_id} invoices={invoices} />
+      <CaseStatusSection id={id} status={d.c.status} resolutionNote={d.c.resolution_note} canWrite={rights.canWrite} invoices={invoices} />
 
       <CaseEmailDraft caseId={id} canWrite={rights.canWrite} recoveryHint={<LegacyRecovery invoices={invoices} />} input={{
         supplier_name: d.c.supplier?.name ?? null, case_title: d.c.title, credited: kreditert, kind,
@@ -155,7 +155,7 @@ export function SupplierCaseDetail({ id }: { id: string }) {
       }} />
 
       <section className="space-y-2">
-        <h3 className="font-semibold">Historikk</h3>
+        <h3 id="sak-historikk" className="font-semibold">Historikk</h3>
         <AuditHistory entityId={id} kind="supplier_case" />
       </section>
     </div>
