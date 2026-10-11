@@ -116,7 +116,10 @@ describe("delt tilbakekalling av dokumentverifisering (panel + Les på nytt)", (
   });
 
   it("dokument fjernet (available:false) i kontrollen før nedlasting sperrer bruk", async () => {
-    sequence([meta("v1"), { data: { available: false, invoice_id: "i1", reason: "document_missing" }, error: null }], () => meta("v1"));
+    const gone: RpcResult = { data: { available: false, invoice_id: "i1", reason: "document_missing" }, error: null };
+    let n = 0;
+    // Metadataoppslagene gir v1; første kontroll i visningen (før nedlasting) finner dokumentet borte.
+    rpcImpl.mockImplementation(async () => (fetchMock.mock.calls.length === 0 && getDocument.mock.calls.length === 0 && ++n > 2 ? gone : meta("v1")));
     setup();
     await screen.findByText(/Ingenting fra den gamle versjonen vises/);
     expect(canApply()).toBe("false");
