@@ -221,7 +221,7 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
       // 1. PDF lagres under selskapets mappe; samme sti gjenbrukes ved nytt forsøk.
       let path = docPath;
       if (!path) {
-        path = `${legalEntityId}/${crypto.randomUUID()}_${file.name.replace(/[^\w.\-]+/g, "_")}`;
+        path = `${legalEntityId}/${crypto.randomUUID()}_${file.name.replace(/[^\w.-]+/g, "_")}`;
         const { error: upErr } = await supabase.storage.from("invoice-pdfs").upload(path, file, { upsert: true });
         if (upErr) throw upErr;
         uploadedNow = path;
