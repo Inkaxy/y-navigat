@@ -12,14 +12,15 @@ describe("RawMaterialCreateSheet — skrivevei per kontekst", () => {
   it("datasheet → datasheet", () => {
     expect(writePathFor({ kind: "datasheet", datasheetId: "d", fileName: "x.pdf", aiFields: {} })).toBe("datasheet");
   });
-  it("supplier_item-body setter primær og tar med linjer når gitt", () => {
-    const ctx = { kind: "supplier_item" as const, supplierId: "s1", itemKey: "sku:a", lineIds: ["l1", "l2"] };
+  it("supplier_item-body setter primær og kobler ALLE åpne linjer (ingen line_ids)", () => {
+    const ctx = { kind: "supplier_item" as const, supplierId: "s1", itemKey: "sku:a", inferLineId: "l1" };
     const draft = { ...initialDraft(ctx), name: "Hvetemel", units: "25", packageUnit: "kg" };
     const body = linkCreateBody(ctx, draft, "le-1");
     expect(body.supplier_id).toBe("s1");
     expect(body.item_key).toBe("sku:a");
     expect(body.set_primary).toBe(true);
-    expect(body.line_ids).toEqual(["l1", "l2"]);
+    expect(body.line_ids).toBeUndefined();
+    expect(body.package?.confirm).toBe(false);
     expect(body.new_raw_material?.name).toBe("Hvetemel");
     expect(body.package?.base_units_per_package).toBe(25);
   });
@@ -71,5 +72,43 @@ describe("CostPriceEditor — validering", () => {
   it("mapper riktig til prishistorikk-input", () => {
     const r = toPriceHistoryInput("rm-1", { ...base, price: "7,25", reason: "Faktura 123", supplierId: "s-1" }, 7.25);
     expect(r).toEqual({ raw_material_id: "rm-1", supplier_id: "s-1", price: 7.25, effective_date: "2026-10-10", source: "manual", notes: "Faktura 123", set_as_current: true });
+  });
+});
+
+describe("1b-rettelser", () => {
+  it("kostpris 0 avvises", async () => {
+    const { validateCostPrice } = await import("@/ravarer/editors/costPriceLogic");
+    const r = validateCostPrice({ price: "0", date: "2026-10-10", supplierId: null, source: "manual", reason: "Test", setAsCurrent: true });
+    expect(r.ok).toBe(false);
+  });
+  it("pakningsforslag fyller grunnenhet, pakningsenhet og forhåndskrysser bekreftelse når enige", async () => {
+    const { applyInference, initialDraft } = await import("@/ravarer/editors/createSheetLogic");
+    const d = applyInference(initialDraft({ kind: "supplier_item", supplierId: "s", itemKey: "sku:1" }),
+      { base_unit: "kg", suggested_bupp: 25, auto_confirmable: true, agrees: true, direct: false, line_unit: "sekk" }, "SEKK");
+    expect(d).toMatchObject({ baseUnit: "kg", units: "25", packageUnit: "sekk", confirmPackage: true });
+  });
+  it("pakning er påkrevd når validering ber om det", async () => {
+    const { validateCreate, initialDraft } = await import("@/ravarer/editors/createSheetLogic");
+    const d = { ...initialDraft({ kind: "standalone" }), name: "Mel" };
+    expect(validateCreate(d, { packageRequired: true })).toMatch(/pakningen/);
+    expect(validateCreate(d)).toBeNull();
+  });
+  it("masseopprettelse dedupliserer per varekort", async () => {
+    const { dedupeBySupplierItem } = await import("@/fakturaer/lib/bulkLink");
+    const rows = [{ s: "a", k: "sku:1" }, { s: "a", k: "sku:1" }, { s: "b", k: "sku:1" }, { s: "a", k: null }];
+    const r = dedupeBySupplierItem(rows, (x) => ({ supplierId: x.s, itemKey: x.k }));
+    expect(r.unique).toHaveLength(3);
+    expect(r.duplicates).toHaveLength(1);
+  });
+  it("statusfilter fra URL", async () => {
+    const { parsePackageFilter, parsePackageStatusFilter } = await import("@/ravarer/lib/packageFilter");
+    expect(parsePackageStatusFilter("ustabil_pris")).toBe("ustabil_pris");
+    expect(parsePackageFilter("ustabil_pris")).toBe("alle");
+  });
+  it("tastesekvens g p", async () => {
+    const { matchSequence } = await import("@/ravarer/ui/hotkeys");
+    const b = [{ keys: ["g p"], sequence: ["g", "p"], description: "x", handler: () => undefined }];
+    expect(matchSequence(b, "g", "p")).toBe(b[0]);
+    expect(matchSequence(b, null, "p")).toBeNull();
   });
 });

@@ -2,19 +2,11 @@ import { RawMaterialCreateSheet } from "@/ravarer/editors/RawMaterialCreateSheet
 import { supplierItemKey } from "@/fakturaer/lib/supplierItemKey";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 
-/** Grunnenhet foreslått fra fakturaenheten — kan overstyres i skjemaet. */
-function baseUnitFromInvoiceUnit(unit: string | null): string {
-  const u = (unit ?? "").trim().toLowerCase();
-  if (["ml", "cl", "dl", "l", "liter"].includes(u)) return "l";
-  if (["stk", "st", "pk", "pakke", "eske", "kart"].includes(u)) return "stk";
-  return "kg";
-}
-
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   line: ReviewLineRow | null;
-  /** Kalles når råvaren faktisk ble opprettet eller koblet. */
+  /** Kalles når råvaren er opprettet og koblet — etter at brukeren har lukket resultatet. */
   onCreated?: (rawMaterialId: string) => void;
 }
 
@@ -33,12 +25,13 @@ export function CreateRawMaterialFromLine({ open, onOpenChange, line, onCreated 
         kind: "supplier_item",
         supplierId: line.invoice.supplier_id,
         itemKey,
-        lineIds: [line.id],
+        // Linjen brukes bare til pakningsforslag; ALLE åpne linjer på varekortet kobles.
+        inferLineId: line.id,
+        lineUnit: line.unit,
         invoiceId: line.invoice_id,
         prefill: {
           name: line.description ?? "",
           sku: line.supplier_sku ?? "",
-          baseUnit: baseUnitFromInvoiceUnit(line.unit),
         },
       }}
       onDone={(id) => { if (id) onCreated?.(id); }}

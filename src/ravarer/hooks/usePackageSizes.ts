@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { useRavarerScope } from "@/ravarer/hooks/useRavarerScope";
 import { toast } from "sonner";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import type { Database } from "@/integrations/supabase/types";
@@ -60,7 +60,7 @@ export interface PackageRpcResult {
 
 export interface SetPackageInput {
   p_raw_material_id: string;
-  p_base_units_per_package: number;
+  p_base_units_per_package: number | null;
   p_supplier_id?: string | null;
   p_supplier_base_units?: number | null;
   p_package_unit?: string | null;
@@ -69,7 +69,7 @@ export interface SetPackageInput {
 }
 
 export function usePackageWorklist() {
-  const { legalEntityId } = useRavarer();
+  const { legalEntityId } = useRavarerScope();
   return useQuery({
     queryKey: ["raw_material_package_worklist", legalEntityId],
     enabled: !!legalEntityId,
@@ -121,9 +121,10 @@ export function normalizePackageUnit(unit: string | null | undefined): string | 
 async function callSetPackage(input: SetPackageInput): Promise<PackageRpcResult> {
   const args: Record<string, unknown> = {
     p_raw_material_id: input.p_raw_material_id,
-    p_base_units_per_package: input.p_base_units_per_package,
     p_apply: input.p_apply,
   };
+  // Null = råvarens egen pakning røres ikke (leverandørmodus).
+  if (input.p_base_units_per_package != null) args.p_base_units_per_package = input.p_base_units_per_package;
   if (input.p_supplier_id) args.p_supplier_id = input.p_supplier_id;
   if (input.p_supplier_base_units != null) args.p_supplier_base_units = input.p_supplier_base_units;
   if (input.p_package_unit) args.p_package_unit = input.p_package_unit;

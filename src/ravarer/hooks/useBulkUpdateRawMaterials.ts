@@ -55,14 +55,25 @@ export function useBulkUpdateRawMaterials() {
         // Primær skrives bare via RPC-en — én råvare om gangen, med fremdrift.
         const tid = toast.loading(`Setter primærleverandør: 0 av ${ids.length}`);
         let done = 0;
+        const failed: string[] = [];
         try {
+          // Fortsett ved feil — rapporter til slutt.
           for (const id of ids) {
-            await setPrimarySupplier(id, patch.supplierId);
-            done += 1;
-            toast.loading(`Setter primærleverandør: ${done} av ${ids.length}`, { id: tid });
+            try {
+              await setPrimarySupplier(id, patch.supplierId);
+              done += 1;
+            } catch (e) {
+              failed.push(e instanceof Error ? e.message : "ukjent feil");
+            }
+            toast.loading(`Setter primærleverandør: ${done + failed.length} av ${ids.length}`, { id: tid });
           }
         } finally {
           toast.dismiss(tid);
+        }
+        if (failed.length > 0) {
+          invalidateRawMaterial(qc);
+          toast.warning(`${done} av ${ids.length} satt, ${failed.length} feilet: ${[...new Set(failed)].join("; ")}`);
+          return { count: 0, patch };
         }
         return { count: done, patch };
       }

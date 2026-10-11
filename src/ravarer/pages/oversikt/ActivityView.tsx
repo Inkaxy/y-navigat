@@ -6,7 +6,17 @@ import { formatDistanceToNowStrict } from "date-fns";
 import { nb } from "date-fns/locale";
 import { paths } from "@/ravarer/lib/paths";
 import { ACTIVITY_KIND_LABELS, labelFor, toneStyle } from "@/ravarer/lib/labels";
-import type { ActivityFeed, ActivityItem } from "@/ravarer/lib/workRpcTypes";
+import type { ActivityFeed, ActivityItem, ActivityKind } from "@/ravarer/lib/workRpcTypes";
+import {
+  AlertTriangle, BadgeCheck, CheckCircle2, CircleDot, Coins, FileCheck2, Link2, Package, Percent, Repeat, RotateCcw, ShieldAlert, Tag,
+  type LucideIcon,
+} from "lucide-react";
+
+const KIND_ICON: Record<ActivityKind, LucideIcon> = {
+  faktura_avstemt_auto: FileCheck2, faktura_avstemt: CheckCircle2, faktura_gjenapnet: RotateCcw, mva_rettet: Percent,
+  kostpris_fort: Coins, pakning_bekreftet_auto: Package, priser_karantene: ShieldAlert, pris_godtatt: BadgeCheck,
+  kobling_bekreftet: Link2, ikke_vare: Tag, forste_pris: CircleDot, gjentatt_pris: Repeat, annet: AlertTriangle,
+};
 
 export type ActivityViewProps = { data: ActivityFeed | null; loading?: boolean };
 
@@ -58,15 +68,17 @@ export function ActivityView({ data, loading }: ActivityViewProps) {
           {visible.map((it) => {
             const meta = labelFor(ACTIVITY_KIND_LABELS, it.kind, "Hendelse");
             const href = subjectHref(it);
+            const Icon = KIND_ICON[it.kind] ?? AlertTriangle;
             const when = formatDistanceToNowStrict(new Date(it.at), { addSuffix: true, locale: nb });
             return (
               <li key={it.id} className="flex items-start gap-3 px-5 py-3 text-sm">
                 <span
-                  aria-hidden
-                  className="shrink-0 rounded-full px-2 py-0.5 text-caption font-medium"
+                  className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
                   style={toneStyle(meta.tokenVar)}
+                  title={meta.label}
                 >
-                  {meta.label}
+                  <Icon className="h-3.5 w-3.5" aria-hidden />
+                  <span className="sr-only">{meta.label}</span>
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="font-medium">{it.title}</div>

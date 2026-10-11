@@ -21,6 +21,7 @@ import {
   PACKAGE_FILTER_LABEL,
   matchesPackageFilter,
   parsePackageFilter,
+  parsePackageStatusFilter,
 } from "@/ravarer/lib/packageFilter";
 import type { PackageFillSuggestion } from "@/ravarer/lib/packageMath";
 
@@ -136,7 +137,7 @@ export default function PackageSizesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const filter = parsePackageFilter(searchParams.get("filter"));
   const [q, setQ] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string | null>(() => parsePackageStatusFilter(searchParams.get("filter")));
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "kjopt_kr_totalt", dir: "desc" });
   const [selected, setSelected] = useState<PackageWorklistRow | null>(null);
   const [suggestionForDialog, setSuggestionForDialog] = useState<PackageFillSuggestion | null>(null);

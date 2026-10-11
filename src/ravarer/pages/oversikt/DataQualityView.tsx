@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
+import { QueryErrorState } from "@/components/common/QueryState";
 import { paths } from "@/ravarer/lib/paths";
 import type { DataQualityCounts, SupplierItemCounts } from "@/ravarer/lib/workRpcTypes";
 
@@ -8,6 +9,9 @@ export type DataQualityViewProps = {
   supplier: SupplierItemCounts | null;
   stockBelowMin: number;
   loading?: boolean;
+  /** Oppsummeringen feilet — vis feilkort, ikke evig skjelett. */
+  error?: unknown;
+  onRetry?: () => void;
 };
 
 type Row = { label: string; ok: number; total: number; to: string };
@@ -27,7 +31,15 @@ function Bar({ ok, total }: { ok: number; total: number }) {
   );
 }
 
-export function DataQualityView({ dq, stockBelowMin, loading }: DataQualityViewProps) {
+export function DataQualityView({ dq, stockBelowMin, loading, error, onRetry }: DataQualityViewProps) {
+  if (error) {
+    return (
+      <Card id="datakvalitet" className="space-y-3 p-5">
+        <h2 className="font-display text-xl">Datakvalitet</h2>
+        <QueryErrorState error={error} scope="ravarer:oversikt:datakvalitet" onRetry={onRetry} />
+      </Card>
+    );
+  }
   if (loading || !dq) {
     return (
       <Card id="datakvalitet" className="space-y-3 p-5">
@@ -43,7 +55,7 @@ export function DataQualityView({ dq, stockBelowMin, loading }: DataQualityViewP
     { label: "Næringsdata", ok: active - dq.missing_nutrition, total: active, to: paths.naering() },
     { label: "Stabil pris", ok: active - dq.unstable_price, total: active, to: paths.pakninger({ filter: "ustabil_pris" }) },
     { label: "Datablad bekreftet", ok: active - dq.datasheet_changes, total: active, to: paths.databladEndringer() },
-    { label: "Over minimumslager", ok: Math.max(0, active - stockBelowMin), total: active, to: paths.lager() },
+    { label: "Lager over minimum", ok: Math.max(0, active - stockBelowMin), total: active, to: paths.lager() },
   ];
 
   return (

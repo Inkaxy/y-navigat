@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, ClipboardList, FileWarning, TrendingUp, Warehouse } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardList, FileWarning, TrendingUp } from "lucide-react";
 import { OrderDeskKpi } from "@/ordre/components/dashboard/OrderDeskKpi";
 import { paths } from "@/ravarer/lib/paths";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,7 +31,7 @@ export function KpiRowView({ summary, movers, loading }: KpiRowViewProps) {
   const expiring30 = summary?.other.agreements_expiring_30d ?? 0;
   const expiring90 = summary?.other.agreements_expiring_90d ?? 0;
 
-  const gridCls = "-mx-page grid grid-flow-col auto-cols-[minmax(78%,1fr)] gap-3 overflow-x-auto px-page pb-1 sm:mx-0 sm:grid-flow-row sm:auto-cols-auto sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-3 2xl:grid-cols-6";
+  const gridCls = "-mx-page grid grid-flow-col auto-cols-[40%] gap-3 overflow-x-auto px-page pb-1 sm:mx-0 sm:grid-flow-row sm:auto-cols-auto sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-3 2xl:grid-cols-6";
   // Til fakturatilgangen er kjent vises nøytrale skjelett — aldri fliser/tall brukeren kanskje ikke skal se.
   if (!summary) {
     return (
@@ -42,7 +42,7 @@ export function KpiRowView({ summary, movers, loading }: KpiRowViewProps) {
   }
 
   return (
-    <div className="-mx-page grid grid-flow-col auto-cols-[minmax(78%,1fr)] gap-3 overflow-x-auto px-page pb-1 sm:mx-0 sm:grid-flow-row sm:auto-cols-auto sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-3 2xl:grid-cols-6">
+    <div className="-mx-page grid grid-flow-col auto-cols-[40%] gap-3 overflow-x-auto px-page pb-1 sm:mx-0 sm:grid-flow-row sm:auto-cols-auto sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-3 2xl:grid-cols-6">
       {hasInvoice && (
         <>
           <OrderDeskKpi
@@ -78,13 +78,6 @@ export function KpiRowView({ summary, movers, loading }: KpiRowViewProps) {
         tone={expiring30 > 0 ? "warning" : "default"} loading={loading}
         icon={AlertTriangle} to={paths.avtaler()}
       />
-      {!hasInvoice && (
-        <OrderDeskKpi
-          label="Under minimumslager" value={summary?.other.stock_below_min ?? 0}
-          tone={(summary?.other.stock_below_min ?? 0) > 0 ? "warning" : "default"}
-          loading={loading} icon={Warehouse} to={paths.lager()}
-        />
-      )}
     </div>
   );
 }

@@ -410,6 +410,13 @@ export default function DatabladBulk() {
             // Auto-anvend datablad-felter på den nye råvaren
             void selectRm(idx, rmId).then(() => applyRow(idx));
           }}
+          onUseExisting={(rmId) => {
+            const idx = createDialogIdx;
+            setCreateDialogIdx(null);
+            const known = rows[idx].candidates?.find((c) => c.id === rmId);
+            updateRow(idx, { candidates: [known ?? { id: rmId, name: "Valgt råvare", sku: "", score: 1 }, ...(rows[idx].candidates ?? []).filter((c) => c.id !== rmId)] });
+            void selectRm(idx, rmId);
+          }}
         />
       )}
     </div>

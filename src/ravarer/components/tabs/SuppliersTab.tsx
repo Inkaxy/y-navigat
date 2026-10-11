@@ -145,7 +145,8 @@ export function SuppliersTab({ rm }: Props) {
         open={!!packageLink}
         onOpenChange={(v) => { if (!v) setPackageLink(null); }}
         forceSupplierSection
-        initialSupplier={packageLink ? { supplierId: packageLink.supplier_id, supplierUnits: packageLink.base_units_per_package ?? rm.base_units_per_package ?? 0 } : null}
+        supplierOnly={!!packageLink}
+        initialSupplier={packageLink ? { supplierId: packageLink.supplier_id, supplierUnits: packageLink.base_units_per_package ?? null } : null}
       />
       <CostPriceEditor
         open={priceOpen}

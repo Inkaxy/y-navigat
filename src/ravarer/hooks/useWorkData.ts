@@ -39,6 +39,7 @@ export function useWorkItems({ group = "alle", search = null, supplierId = null,
   return useQuery({
     queryKey: ["ravarer", "work-items", legalEntityId, group, search, supplierId, sort, limit, offset],
     enabled: enabled && !!legalEntityId,
+    refetchOnWindowFocus: true,
     placeholderData: keepPreviousData,
     staleTime: 30_000,
     queryFn: async () => {
@@ -58,6 +59,7 @@ export function useActivityFeed({ days = 7, limit = 50, enabled = true }: { days
   return useQuery({
     queryKey: ["ravarer", "activity-feed", legalEntityId, days, limit],
     enabled: enabled && !!legalEntityId,
+    refetchOnWindowFocus: true,
     staleTime: 60_000,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("rm_activity_feed", {
@@ -75,6 +77,7 @@ export function usePriceMovers({ days = 30, limit = 20, enabled = true }: { days
   return useQuery({
     queryKey: ["ravarer", "price-movers", legalEntityId, days, limit],
     enabled: enabled && !!legalEntityId,
+    refetchOnWindowFocus: true,
     staleTime: 5 * 60_000,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("rm_price_movers", { p_legal_entity_id: legalEntityId!, p_days: days, p_limit: limit });

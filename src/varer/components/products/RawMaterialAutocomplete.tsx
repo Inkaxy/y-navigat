@@ -145,14 +145,14 @@ export function RawMaterialAutocomplete({
     queryKey: ["halvfabrikat_autocomplete", legalEntityId],
     enabled: !!onSelectSubProduct && !!legalEntityId,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("products")
         .select("id, display_name")
         .eq("legal_entity_id", legalEntityId!)
         .eq("calc_type", "halvfabrikat")
         .order("display_name");
       if (error) throw error;
-      return (data ?? []) as { id: string; display_name: string }[];
+      return (data ?? []);
     },
   });
 
@@ -287,7 +287,7 @@ export function RawMaterialAutocomplete({
         )}
       </div>
 
-      <RawMaterialCreateSheet
+      {createOpen && <RawMaterialCreateSheet
         open={createOpen}
         onOpenChange={setCreateOpen}
         context={{ kind: "standalone", prefill: { name: prefilledName, openAfterSave: false } }}
@@ -301,7 +301,17 @@ export function RawMaterialAutocomplete({
           if (error || !data) return;
           onChange(data.id, data);
         }}
-      />
+        onUseExisting={async (id) => {
+          setCreateOpen(false);
+          const { data, error } = await supabase
+            .from("raw_materials")
+            .select("id, sku, name, category, base_unit, current_cost_price")
+            .eq("id", id)
+            .single();
+          if (error || !data) return;
+          onChange(data.id, data);
+        }}
+      />}
     </>
   );
 }

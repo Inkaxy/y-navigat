@@ -156,7 +156,7 @@ export default function Matvaretabellen() {
 
       {linksError && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          Kunne ikke hente koblinger: {(linksErrorObj as any)?.message ?? "ukjent feil"} — statuskolonnen kan vise feil.
+          Kunne ikke hente koblinger: {linksErrorObj instanceof Error ? linksErrorObj.message : "ukjent feil"} — statuskolonnen kan vise feil.
         </div>
       )}
 
@@ -315,6 +315,11 @@ export default function Matvaretabellen() {
             const foodId = createFood.food_id;
             setCreateFood(null);
             if (id) await apply.mutateAsync({ rawMaterialId: id, foodId });
+          }}
+          onUseExisting={(id) => {
+            const foodId = createFood.food_id;
+            setCreateFood(null);
+            apply.mutate({ rawMaterialId: id, foodId });
           }}
         />
       )}

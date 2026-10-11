@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { useRavarerScope } from "@/ravarer/hooks/useRavarerScope";
 import { toast } from "sonner";
 import { showError } from "@/lib/userError";
 import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
@@ -34,9 +34,10 @@ function edgeBodyError(data: unknown): string | null {
 }
 
 export function useSuppliers() {
-  const { legalEntityId } = useRavarer();
+  const { legalEntityId } = useRavarerScope();
   return useQuery({
     queryKey: ["suppliers", legalEntityId],
+    enabled: !!legalEntityId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("suppliers")
@@ -52,7 +53,7 @@ export function useSuppliers() {
 
 export function useCreateSupplier() {
   const qc = useQueryClient();
-  const { legalEntityId } = useRavarer();
+  const { legalEntityId } = useRavarerScope();
   return useMutation({
     mutationFn: async (input: { name: string; org_number?: string; contact_email?: string; contact_phone?: string }) => {
       const { data, error } = await supabase
@@ -76,7 +77,7 @@ export function useCreateSupplier() {
 /** Slår «følg fakturalinjer» av/på for en leverandør. */
 export function useSetTrackInvoiceLines() {
   const qc = useQueryClient();
-  const { user } = useRavarer();
+  const { user } = useRavarerScope();
   return useMutation({
     mutationFn: async ({ id, value }: { id: string; value: boolean }) => {
       const { error } = await supabase
@@ -101,7 +102,7 @@ export function useSetTrackInvoiceLines() {
 /** Etterhenter fakturaer for én leverandør (brukes når sporing skrus på). */
 export function useBackfillSupplierInvoices() {
   const qc = useQueryClient();
-  const { legalEntityId } = useRavarer();
+  const { legalEntityId } = useRavarerScope();
   return useMutation({
     mutationFn: async ({ supplierId, months = 12 }: { supplierId: string; months?: number }) => {
       const { data, error } = await supabase.functions.invoke("tripletex-sync-invoices", {
@@ -126,7 +127,7 @@ export function useBackfillSupplierInvoices() {
 /** Speiler leverandører fra Tripletex til suppliers-tabellen. */
 export function useSyncSuppliersFromTripletex() {
   const qc = useQueryClient();
-  const { legalEntityId } = useRavarer();
+  const { legalEntityId } = useRavarerScope();
   return useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("tripletex-sync-suppliers", {

@@ -3,7 +3,8 @@ import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { paths } from "@/ravarer/lib/paths";
-import { sparklinePoints } from "./logic";
+import { isPriceWarning, sparklinePoints } from "./logic";
+import { formatDate } from "@/fakturaer/lib/constants";
 import type { PriceMover, PriceMovers } from "@/ravarer/lib/workRpcTypes";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +23,7 @@ function fmtPrice(n: number | null, base: string | null): string {
 function fmtPct(n: number | null): { text: string; up: boolean; strong: boolean; neg: boolean } {
   if (n == null) return { text: "—", up: false, strong: false, neg: false };
   const up = n > 0;
-  return { text: `${up ? "+" : ""}${n.toFixed(1)} %`, up, strong: Math.abs(n) > 10, neg: n < 0 };
+  return { text: `${up ? "+" : ""}${n.toFixed(1)} %`, up, strong: isPriceWarning(n), neg: n < 0 };
 }
 
 function Sparkline({ item }: { item: PriceMover }) {
@@ -91,8 +92,8 @@ export function PriceMoversView({ data, period, onPeriodChange, loading }: Price
                       {it.suspicious && <div className="text-caption text-destructive">Mistenkelig — sjekk pakning</div>}
                     </td>
                     <td className="px-3 py-2.5 text-ink-secondary">{it.supplier_name ?? "—"}</td>
-                    <td className="px-3 py-2.5 tabular-nums">{fmtPrice(it.before_price, it.base_unit)}</td>
-                    <td className="px-3 py-2.5 tabular-nums">{fmtPrice(it.now_price, it.base_unit)}</td>
+                    <td className="px-3 py-2.5 tabular-nums">{fmtPrice(it.before_price, it.base_unit)}{it.before_date && <div className="text-caption text-ink-secondary">{formatDate(it.before_date)}</div>}</td>
+                    <td className="px-3 py-2.5 tabular-nums">{fmtPrice(it.now_price, it.base_unit)}{it.now_date && <div className="text-caption text-ink-secondary">{formatDate(it.now_date)}</div>}</td>
                     <td className={cn(
                       "px-3 py-2.5 text-right tabular-nums",
                       pct.strong && pct.up && "text-destructive",

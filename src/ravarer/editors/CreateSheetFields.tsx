@@ -26,10 +26,14 @@ interface Props {
   ai?: { name?: AiConfidence | null; sku?: AiConfidence | null; package?: AiConfidence | null };
   baseUnitHint?: string | null;
   showSupplier: boolean;
+  /** Fakturaenheten kan ikke regnes direkte — pakning er påkrevd. */
+  packageRequired?: boolean;
+  /** Vis «Bekreft pakningen» (varekort-modus). */
+  showConfirm?: boolean;
 }
 
 /** Feltene i RawMaterialCreateSheet. */
-export function CreateSheetFields({ draft, set, suppliers, ai, baseUnitHint, showSupplier }: Props) {
+export function CreateSheetFields({ draft, set, suppliers, ai, baseUnitHint, showSupplier, packageRequired, showConfirm }: Props) {
   return (
     <div className="space-y-4">
       <div>
@@ -77,7 +81,7 @@ export function CreateSheetFields({ draft, set, suppliers, ai, baseUnitHint, sho
         </div>
       </div>
       <div className="rounded-lg border p-3">
-        <p className="mb-2 text-sm font-medium">Pakning (valgfritt)<AiTag level={ai?.package} /></p>
+        <p className="mb-2 text-sm font-medium">{packageRequired ? "Pakning *" : "Pakning (valgfritt)"}<AiTag level={ai?.package} /></p>
         <PackageFields
           baseUnit={draft.baseUnit}
           units={draft.units}
@@ -85,6 +89,12 @@ export function CreateSheetFields({ draft, set, suppliers, ai, baseUnitHint, sho
           packageUnit={draft.packageUnit}
           onPackageUnitChange={(v) => set({ packageUnit: v })}
         />
+        {showConfirm && (draft.units.trim() || draft.packageUnit === "bulk") && (
+          <label className="mt-2 flex items-center gap-2 text-sm">
+            <input type="checkbox" className="h-4 w-4 accent-primary" checked={draft.confirmPackage} onChange={(e) => set({ confirmPackage: e.target.checked })} />
+            Bekreft pakningen
+          </label>
+        )}
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>

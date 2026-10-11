@@ -1,7 +1,7 @@
 import { setPrimarySupplier } from "@/ravarer/lib/supplierLinkRpc";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { useRavarerScope } from "@/ravarer/hooks/useRavarerScope";
 import { toast } from "sonner";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 
@@ -47,7 +47,7 @@ export interface RawMaterialRow {
 }
 
 export function useRawMaterials(options?: { enabled?: boolean }) {
-  const { legalEntityId } = useRavarer();
+  const { legalEntityId } = useRavarerScope();
   const enabled = (options?.enabled ?? true) && !!legalEntityId;
   return useQuery({
     queryKey: ["raw_materials", legalEntityId],
@@ -82,9 +82,10 @@ export function useRawMaterial(id: string | undefined) {
 
 export function useCreateRawMaterial() {
   const qc = useQueryClient();
-  const { legalEntityId, user } = useRavarer();
+  const { legalEntityId, user } = useRavarerScope();
   return useMutation({
     mutationFn: async (input: Partial<RawMaterialRow> & { sku: string; name: string; base_unit: string }) => {
+      if (!legalEntityId) throw new Error("Fant ikke selskapet");
       const { data, error } = await supabase
         .from("raw_materials")
         .insert({

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { useRavarerScope } from "@/ravarer/hooks/useRavarerScope";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 import type { RawMaterialSearchIndex } from "@/ravarer/hooks/useRawMaterialSearchIndex";
@@ -196,7 +196,7 @@ export function useAddPriceHistory() {
   const qc = useQueryClient();
   // Innlogget bruker ligger allerede i konteksten — ingen ekstra rundtur
   // til auth per lagring.
-  const { user } = useRavarer();
+  const { user } = useRavarerScope();
   return useMutation({
     mutationFn: async (input: {
       raw_material_id: string;

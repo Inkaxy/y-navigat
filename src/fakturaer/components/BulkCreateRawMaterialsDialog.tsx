@@ -9,11 +9,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { showError } from "@/lib/userError";
-import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { supplierItemKey } from "@/fakturaer/lib/supplierItemKey";
-import { useLinkSupplierItem } from "@/fakturaer/hooks/useSupplierItems";
+import { invalidateAfterLink, linkSupplierItem } from "@/fakturaer/hooks/useSupplierItems";
+import { dedupeBySupplierItem, failedRow, reportLinkRow, type BulkRowReport } from "@/fakturaer/lib/bulkLink";
 import {
   CANONICAL_BASE_UNITS,
   CANONICAL_PACKAGE_UNITS,
@@ -99,7 +99,6 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
   const [sharedCategory, setSharedCategory] = useState("");
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const link = useLinkSupplierItem();
 
   const lineIds = useMemo(() => lines.map((l) => l.id).join(","), [lines]);
 
@@ -138,63 +137,72 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
   );
 
   async function submit() {
+    // Én råvare per varekort: like linjer fra samme leverandør gir bare ett kall.
+    const { unique, duplicates } = dedupeBySupplierItem(included, (d) => {
+      const line = lines.find((l) => l.id === d.lineId);
+      return { supplierId: line?.invoice.supplier_id ?? "", itemKey: line ? supplierItemKey(line) : null };
+    });
     setBusy(true);
-    setProgress({ done: 0, total: included.length });
-    let ok = 0;
-    const failed: string[] = [];
-    const createdIds = new Set<string>();
-    const invoiceIds = new Set<string>();
+    setProgress({ done: 0, total: unique.length });
+    const reports: BulkRowReport[] = [];
+    const createdIds = new Set<string>(duplicates.map((d) => d.lineId));
     try {
       let done = 0;
-      for (const d of included) {
+      for (const d of unique) {
+        const label = d.name || d.sku || "uten navn";
         const line = lines.find((l) => l.id === d.lineId);
         const itemKey = line ? supplierItemKey(line) : null;
-        if (!line || !itemKey) continue;
-        setProgress({ done, total: included.length });
-        const size = parseDecimal(d.packageSize);
-        const perPackage = packageBaseUnits(size, d.packageUnit, d.baseUnit);
-        try {
-          // Samme skrivevei som enkeltopprettelse: alle åpne linjer på
-          // varekortet kobles og regnes om av matchemotoren.
-          await link.mutateAsync({
-            legal_entity_id: line.invoice.legal_entity_id,
-            supplier_id: line.invoice.supplier_id,
-            item_key: itemKey,
-            new_raw_material: {
-              name: d.name.trim(),
-              base_unit: d.baseUnit,
-              category: d.category.trim() || sharedCategory.trim(),
-              item_type: "ravare",
-              sku: d.sku.trim(),
-            },
-            package: size != null && size > 0
-              ? { package_size: size, package_unit: d.packageUnit, base_units_per_package: perPackage ?? undefined, confirm: true }
-              : undefined,
-          });
-          createdIds.add(d.lineId);
-          invoiceIds.add(line.invoice_id);
-          ok++;
-        } catch (e) {
-          const why = e instanceof Error ? e.message : "ukjent feil";
-          failed.push(`${d.name || d.sku || "uten navn"} (${why})`);
+        setProgress({ done, total: unique.length });
+        if (!line || !itemKey) {
+          reports.push(failedRow(label, "linjen mangler varenavn og varenummer"));
+        } else {
+          const size = parseDecimal(d.packageSize);
+          const perPackage = packageBaseUnits(size, d.packageUnit, d.baseUnit);
+          try {
+            // Samme skrivevei som enkeltopprettelse: alle åpne linjer på varekortet kobles og regnes om.
+            const res = await linkSupplierItem({
+              legal_entity_id: line.invoice.legal_entity_id,
+              supplier_id: line.invoice.supplier_id,
+              item_key: itemKey,
+              new_raw_material: {
+                name: d.name.trim(),
+                base_unit: d.baseUnit,
+                category: d.category.trim() || sharedCategory.trim(),
+                item_type: "ravare",
+                sku: d.sku.trim(),
+              },
+              package: size != null && size > 0
+                ? { package_size: size, package_unit: d.packageUnit, base_units_per_package: perPackage ?? undefined, confirm: true }
+                : undefined,
+            });
+            createdIds.add(d.lineId);
+            reports.push(reportLinkRow(label, res));
+          } catch (e) {
+            reports.push(failedRow(label, e instanceof Error ? e.message : "ukjent feil"));
+          }
         }
         done++;
-        setProgress({ done, total: included.length });
+        setProgress({ done, total: unique.length });
       }
-      invoiceIds.forEach((id) => invalidateInvoice(qc, id));
-      invalidateRawMaterial(qc);
+      // Én samlet invalidering til slutt.
+      invalidateAfterLink(qc);
+      const ok = reports.filter((r) => r.ok).length;
+      const failed = reports.filter((r) => !r.ok);
+      const notes = reports.filter((r) => r.ok && r.text !== "opprettet");
       if (failed.length === 0) {
-        toast.success(`${ok} varer opprettet`);
+        toast.success(`${ok} varer opprettet${duplicates.length ? ` (${duplicates.length} like linjer slått sammen)` : ""}`, {
+          description: notes.length ? notes.map((r) => `${r.name}: ${r.text}`).join(" · ") : undefined,
+        });
         onDone?.();
         onOpenChange(false);
       } else {
-        // Bare de opprettede radene fjernes. Utkastet til radene som feilet
-        // står urørt — navn, varenummer og pakning må ikke skrives på nytt.
-        // `onDone` kalles bevisst IKKE her: den tømmer utvalget i
-        // ReviewQueue, som ville tømt `lines` og nullstilt utkastene mens
-        // dialogen fortsatt står åpen med rader som feilet.
-        setDrafts((d) => d.filter((x) => !createdIds.has(x.lineId)));
-        toast.warning(`${ok} opprettet. Feilet: ${failed.join(" · ")}`);
+        // Bare de opprettede radene fjernes; utkastet til radene som feilet står urørt.
+        // `onDone` kalles bevisst IKKE her (den tømmer utvalget i ReviewQueue).
+        setDrafts((x) => x.filter((r) => !createdIds.has(r.lineId)));
+        toast.warning(`${ok} opprettet, ${failed.length} feilet`, {
+          description: [...failed, ...notes].map((r) => `${r.name}: ${r.text}`).join(" · "),
+          duration: 15000,
+        });
         onPartial?.([...createdIds]);
       }
     } catch (e: unknown) {
@@ -333,7 +341,7 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
           </Button>
           <Button onClick={() => void submit()} disabled={busy || included.length === 0 || missing.length > 0}>
             {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {progress ? `Oppretter ${Math.min(progress.done + 1, progress.total)} av ${progress.total}` : `Opprett ${included.length} varer`}
+            {progress ? `${Math.min(progress.done + 1, progress.total)} av ${progress.total}` : `Opprett ${included.length} varer`}
           </Button>
         </DialogFooter>
       </DialogContent>

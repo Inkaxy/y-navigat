@@ -58,3 +58,20 @@ describe("todo-aggregater", () => {
       reconciled_7d: 0, reconciled_auto_7d: 0, imported_7d: 0 })).toBe(10);
   });
 });
+
+describe("Oversikt-rettelser", () => {
+  it("entall: 1 ting venter på deg", async () => {
+    const { statusLine } = await import("@/ravarer/pages/oversikt/logic");
+    const r = statusLine({ todo_total: 1, hasInvoiceAccess: true, supplier: null, invoices: null, dq: emptyDq });
+    expect(r.headline).toBe("1 ting venter på deg");
+  });
+  it("varer med mangler teller ikke ubekreftet pakning", async () => {
+    const { dataRydding } = await import("@/ravarer/pages/oversikt/logic");
+    expect(dataRydding({ ...emptyDq, unconfirmed_package: 5, missing_package: 1, datasheet_changes: 2 })).toBe(3);
+  });
+  it("prisvarsel fra +5 %", async () => {
+    const { isPriceWarning } = await import("@/ravarer/pages/oversikt/logic");
+    expect(isPriceWarning(5)).toBe(true);
+    expect(isPriceWarning(4.9)).toBe(false);
+  });
+});

@@ -107,23 +107,29 @@ export async function linkErrorMessage(err: unknown): Promise<string> {
   return FALLBACK;
 }
 
+/** Rått kall til `link-supplier-item` uten invalidering (masseløp samler invalideringen selv). */
+export async function linkSupplierItem(body: LinkSupplierItemBody): Promise<LinkSupplierItemResult> {
+  const { data, error } = await supabase.functions.invoke("link-supplier-item", { body });
+  if (error) throw new Error(await linkErrorMessage(error));
+  if (data == null) throw new Error(FALLBACK);
+  const r = parseLinkResult(data);
+  if ("error" in r) throw new Error(r.error || FALLBACK);
+  return r;
+}
+
+/** Én samlet invalidering etter kobling (enkelt eller masse). */
+export function invalidateAfterLink(qc: ReturnType<typeof useQueryClient>, rawMaterialId?: string) {
+  ["supplier-items", "supplier-item-lines", "package-inference", "inbox-invoices", "invoice-approval-overview"].forEach((k) =>
+    void qc.invalidateQueries({ queryKey: [k] }),
+  );
+  invalidateInvoice(qc);
+  invalidateRawMaterial(qc, rawMaterialId);
+}
+
 export function useLinkSupplierItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (body: LinkSupplierItemBody): Promise<LinkSupplierItemResult> => {
-      const { data, error } = await supabase.functions.invoke("link-supplier-item", { body });
-      if (error) throw new Error(await linkErrorMessage(error));
-      if (data == null) throw new Error(FALLBACK);
-      const r = parseLinkResult(data);
-      if ("error" in r) throw new Error(r.error || FALLBACK);
-      return r;
-    },
-    onSuccess: (r) => {
-      ["supplier-items", "supplier-item-lines", "package-inference", "inbox-invoices", "invoice-approval-overview"].forEach((k) =>
-        void qc.invalidateQueries({ queryKey: [k] }),
-      );
-      invalidateInvoice(qc);
-      invalidateRawMaterial(qc, r.raw_material_id ?? undefined);
-    },
+    mutationFn: linkSupplierItem,
+    onSuccess: (r) => invalidateAfterLink(qc, r.raw_material_id ?? undefined),
   });
 }

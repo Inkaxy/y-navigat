@@ -24,12 +24,15 @@ export default function Deklarasjonsnavn() {
   const { data: rows = [], isLoading } = useDeclarationWorklist(legalEntityId);
   const save = useSaveDeclarationName();
   const [savingAll, setSavingAll] = useState(false);
+  // Utkast per rad, løftet hit så «Lagre alle» lagrer det brukeren faktisk ser.
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const draftFor = (r: DeclarationWorklistRow) => drafts[r.raw_material_id] ?? initialFor(r);
 
   const simple = useMemo(() => rows.filter((r) => !r.is_composite), [rows]);
   const composite = useMemo(() => rows.filter((r) => r.is_composite), [rows]);
   const prefilled = useMemo(
-    () => simple.filter((r) => initialFor(r).length > 0),
-    [simple],
+    () => simple.filter((r) => (drafts[r.raw_material_id] ?? initialFor(r)).trim().length > 0),
+    [simple, drafts],
   );
 
   async function saveAll() {
@@ -37,11 +40,12 @@ export default function Deklarasjonsnavn() {
     let ok = 0;
     let failed = 0;
     for (const r of prefilled) {
-      const v = initialFor(r);
+      const v = draftFor(r).trim();
       try {
         await save.mutateAsync({ rawMaterialId: r.raw_material_id, declarationName: v, silent: true });
         ok++;
-      } catch {
+      } catch (e) {
+        console.error("[deklarasjonsnavn:lagre-alle]", e);
         failed++;
       }
     }
@@ -87,7 +91,10 @@ export default function Deklarasjonsnavn() {
               </div>
               <DeclarationNameField
                 rawMaterialId={r.raw_material_id}
-                value={initialFor(r)}
+                value={null}
+                initialDraft={initialFor(r)}
+                draft={draftFor(r)}
+                onDraftChange={(v) => setDrafts((d) => ({ ...d, [r.raw_material_id]: v }))}
                 rawMaterialName={r.name}
                 matvaretabellenName={r.matvaretabellen_name}
                 disabled={!canWrite}

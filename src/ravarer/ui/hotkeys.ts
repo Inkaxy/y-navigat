@@ -25,7 +25,18 @@ export type HotkeyBinding = {
   listed?: boolean;
   /** Krever ⌘/Ctrl og virker også mens man skriver i et felt (f.eks. ⌘S). */
   mod?: boolean;
+  /** Tastesekvens, f.eks. ["g", "p"]. `keys` brukes da bare til visning (f.eks. ["g p"]). */
+  sequence?: string[];
 };
+
+const SEQUENCE_MS = 1200;
+
+/** Finner en sekvensbinding som fullføres av `key` etter `prev` (begge små bokstaver). */
+export function matchSequence(bindings: HotkeyBinding[], prev: string | null, key: string): HotkeyBinding | null {
+  if (!prev) return null;
+  const k = key.toLowerCase();
+  return bindings.find((b) => b.sequence?.length === 2 && b.sequence[0].toLowerCase() === prev && b.sequence[1].toLowerCase() === k) ?? null;
+}
 
 /** Finner bindingen for en tast (bokstaver uavhengig av store/små). */
 export function matchBinding(bindings: HotkeyBinding[], key: string, mod = false): HotkeyBinding | null {
@@ -39,6 +50,7 @@ export function useHotkeys(bindings: HotkeyBinding[], { enabled = true }: { enab
   ref.current = bindings;
   useEffect(() => {
     if (!enabled) return;
+    let prev: { key: string; at: number } | null = null;
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && !e.altKey) {
         const m = matchBinding(ref.current, e.key, true);
@@ -49,7 +61,16 @@ export function useHotkeys(bindings: HotkeyBinding[], { enabled = true }: { enab
         }
       }
       if (shouldIgnoreShortcut(e)) return;
-      const b = matchBinding(ref.current, e.key);
+      const recent = prev && Date.now() - prev.at < SEQUENCE_MS ? prev.key : null;
+      const seq = matchSequence(ref.current, recent, e.key);
+      prev = e.key.length === 1 ? { key: e.key.toLowerCase(), at: Date.now() } : null;
+      if (seq) {
+        prev = null;
+        e.preventDefault();
+        seq.handler(e);
+        return;
+      }
+      const b = matchBinding(ref.current.filter((x) => !x.sequence), e.key);
       if (!b) return;
       e.preventDefault();
       b.handler(e);

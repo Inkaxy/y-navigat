@@ -9,10 +9,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Sparkles, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { supplierItemKey } from "@/fakturaer/lib/supplierItemKey";
-import { useLinkSupplierItem } from "@/fakturaer/hooks/useSupplierItems";
-import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, deriveLinePackage, parseDecimal, resolveLineCost } from "@/fakturaer/lib/units";
+import { invalidateAfterLink, linkSupplierItem } from "@/fakturaer/hooks/useSupplierItems";
+import { dedupeBySupplierItem, reportLinkRow } from "@/fakturaer/lib/bulkLink";
+import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, deriveLinePackage, packageBaseUnits, parseDecimal, resolveLineCost } from "@/fakturaer/lib/units";
 
 export interface BulkLine {
   id: string;
@@ -111,7 +111,6 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [skipped, setSkipped] = useState<Array<{ line_id: string; reason: string }>>([]);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const link = useLinkSupplierItem();
 
   useEffect(() => {
     if (!open) return;
@@ -234,8 +233,11 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
 
   const importMutation = useMutation({
     mutationFn: async (onlySelected: boolean) => {
-      const chosen = lines.filter((l) => (onlySelected ? rows[l.id]?.selected : true));
+      const picked = lines.filter((l) => (onlySelected ? rows[l.id]?.selected : true));
+      // Én råvare per varekort.
+      const { unique: chosen } = dedupeBySupplierItem(picked, (l) => ({ supplierId, itemKey: supplierItemKey({ supplier_sku: l.supplier_sku, description: l.description }) }));
       const created: Array<{ id: string }> = [];
+      const notes: string[] = [];
       const skippedOut: Array<{ line_id: string; reason: string }> = [];
       let done = 0;
       setProgress({ done, total: chosen.length });
@@ -249,7 +251,8 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
           try {
             // Samme skrivevei som enkeltopprettelse: varekortet kobles og
             // alle åpne linjer regnes om av matchemotoren.
-            const res = await link.mutateAsync({
+            const perPackage = packageBaseUnits(pkgSize, r.package_unit || r.base_unit, r.base_unit);
+            const res = await linkSupplierItem({
               legal_entity_id: legalEntityId,
               supplier_id: supplierId,
               item_key: itemKey,
@@ -261,11 +264,13 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
                 sku: r.sku.trim(),
               },
               package: pkgSize != null && pkgSize > 0
-                ? { package_size: pkgSize, package_unit: r.package_unit || r.base_unit, confirm: true }
+                ? { package_size: pkgSize, package_unit: r.package_unit || r.base_unit, base_units_per_package: perPackage ?? undefined, confirm: perPackage != null }
                 : undefined,
               set_primary: r.set_primary,
             });
             if (res.raw_material_id) created.push({ id: res.raw_material_id });
+            const rep = reportLinkRow(r.name.trim() || r.sku.trim() || "uten navn", res);
+            if (rep.text !== "opprettet") notes.push(`${rep.name}: ${rep.text}`);
           } catch (e) {
             skippedOut.push({ line_id: l.id, reason: e instanceof Error ? e.message : "ukjent feil" });
           }
@@ -274,7 +279,7 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
         setProgress({ done, total: chosen.length });
       }
       setProgress(null);
-      return { created, skipped: skippedOut };
+      return { created, skipped: skippedOut, notes };
     },
     onSuccess: (res) => {
       const created = res.created?.length ?? 0;
@@ -286,8 +291,8 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
       }
       // Samme invalidering som enkeltopprettelse (CreateRawMaterialDialog/MatchDrawer),
       // slik at vareliste, behandlingskø og fakturaen viser fersk tilstand.
-      invalidateRawMaterial(qc);
-      invalidateInvoice(qc, invoiceId);
+      invalidateAfterLink(qc);
+      if (res.notes.length) toast.info("Noen linjer står fortsatt åpne", { description: res.notes.join(" · "), duration: 15000 });
 
       setSkipped(skippedRows);
       if (skippedRows.length > 0) {

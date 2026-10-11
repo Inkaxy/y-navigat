@@ -171,7 +171,7 @@ function VarekortBody({ item, lines, canWrite, onDone, onNext, onSkip, onClose }
       <ChangeLinkDialog open={changeOpen} onOpenChange={setChangeOpen} item={item} lines={lines} onDone={onDone} />
       {createOpen && (
         <RawMaterialCreateSheet open={createOpen} onOpenChange={setCreateOpen}
-          context={{ kind: "supplier_item", supplierId: item.supplier_id, itemKey: item.item_key, lineIds: lines.filter((l) => l.requires_review).map((l) => l.id), prefill: { name: item.description ?? undefined, supplierId: item.supplier_id } }}
+          context={{ kind: "supplier_item", supplierId: item.supplier_id, itemKey: item.item_key, inferLineId: (lines.find((l) => l.requires_review) ?? lines[0])?.id ?? item.last_open_line_id ?? item.last_line_id ?? null, lineUnit: (lines.find((l) => l.requires_review) ?? lines[0])?.unit ?? null, prefill: { name: item.description ?? undefined, sku: item.supplier_sku ?? "", supplierId: item.supplier_id } }}
           onDone={(_id, outcome) => onDone({ title: "Råvare opprettet og koblet", items: outcome.kind === "linked" ? linkResultSummary(outcome.result) : [] })}
         />
       )}

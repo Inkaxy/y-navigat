@@ -1,11 +1,7 @@
 import { DeclarationNameField } from "@/ravarer/editors/DeclarationNameField";
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ExternalLink, Loader2, Save } from "lucide-react";
-import { useSaveDeclarationName } from "@/ravarer/hooks/useDeclarationNames";
+import { ExternalLink } from "lucide-react";
 import { paths } from "@/ravarer/lib/paths";
 
 export interface MissingDeclarationNameRow {
@@ -20,32 +16,8 @@ interface Props {
   onSaved: () => void;
 }
 
-/** Lar brukeren fylle inn lovlige ingrediensnavn direkte fra datakvalitet-kortet. */
+/** Lar brukeren fylle inn lovlige ingrediensnavn direkte fra datakvalitet-kortet. Samme felt og skrivevei som resten. */
 export function MissingDeclarationNames({ rows, canWrite, onSaved }: Props) {
-  const save = useSaveDeclarationName();
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState<string | null>(null);
-
-  useEffect(() => {
-    setValues((prev) => {
-      const next = { ...prev };
-      for (const r of rows) if (next[r.raw_material_id] === undefined) next[r.raw_material_id] = r.fallback_used ?? "";
-      return next;
-    });
-  }, [rows]);
-
-  async function saveRow(id: string) {
-    setBusy(id);
-    try {
-      await save.mutateAsync({ rawMaterialId: id, declarationName: values[id] ?? "" });
-      onSaved();
-    } catch {
-      /* toast håndteres i hooken */
-    } finally {
-      setBusy(null);
-    }
-  }
-
   return (
     <div className="space-y-1">
       <div className="flex flex-wrap items-center gap-2">
@@ -72,26 +44,15 @@ export function MissingDeclarationNames({ rows, canWrite, onSaved }: Props) {
               Åpne råvarekortet <ExternalLink className="h-3 w-3" />
             </Link>
           </div>
-          <Input
-            value={values[r.raw_material_id] ?? ""}
-            onChange={(e) => setValues((v) => ({ ...v, [r.raw_material_id]: e.target.value }))}
-            placeholder="f.eks. hvetemel"
+          <DeclarationNameField
+            rawMaterialId={r.raw_material_id}
+            value={null}
+            initialDraft={r.fallback_used}
+            rawMaterialName={r.name}
             disabled={!canWrite}
-            className="h-9 w-56"
+            compact
+            onSaved={() => onSaved()}
           />
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!canWrite || busy === r.raw_material_id || !(values[r.raw_material_id] ?? "").trim()}
-            onClick={() => saveRow(r.raw_material_id)}
-          >
-            {busy === r.raw_material_id ? (
-              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="mr-1.5 h-4 w-4" />
-            )}
-            Lagre
-          </Button>
         </div>
       ))}
     </div>
@@ -113,7 +74,8 @@ export function DeclarationNameInline({
   return (
     <DeclarationNameField
       rawMaterialId={rawMaterialId}
-      value={fallback}
+      value={null}
+      initialDraft={fallback}
       disabled={disabled}
       compact
       onSaved={() => onSaved()}

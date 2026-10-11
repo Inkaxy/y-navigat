@@ -42,16 +42,24 @@ export function CostPriceEditor({
   });
   const [draft, setDraft] = useState<CostPriceDraft>(fresh);
   const [errors, setErrors] = useState<CostPriceErrors>({});
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open) { setDraft(fresh()); setErrors({}); }
+    if (open) { setDraft(fresh()); setErrors({}); setSaveError(null); }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- nullstill bare ved åpning
   }, [open]);
 
   const submit = async () => {
     const v = validateCostPrice(draft);
     if (!v.ok) { setErrors(v.errors); return; }
-    await add.mutateAsync(toPriceHistoryInput(rawMaterialId, draft, v.price));
+    setSaveError(null);
+    try {
+      await add.mutateAsync(toPriceHistoryInput(rawMaterialId, draft, v.price));
+    } catch (e) {
+      console.error("[kostpris:lagre]", e);
+      setSaveError("Kostprisen ble ikke lagret. Prøv igjen.");
+      return;
+    }
     onSaved?.();
     onOpenChange(false);
   };
@@ -108,6 +116,7 @@ export function CostPriceEditor({
             Sett som gjeldende kostpris
             <Switch checked={draft.setAsCurrent} onCheckedChange={(v) => setDraft((d) => ({ ...d, setAsCurrent: v }))} />
           </label>
+          {saveError && <p role="alert" className="text-sm text-destructive">{saveError}</p>}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Avbryt</Button>
