@@ -1,6 +1,6 @@
 import { useConfirmMany } from "@/ravarer/ui/useConfirmMany";
 import { useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { postSafeCosts } from "@/fakturaer/lib/costPosting";
 import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { firstCostLinesByInvoice, firstCostReport } from "./firstCost";
@@ -19,8 +19,8 @@ import { PriceBlockView, type BlockedRow, type PriceRow } from "./PriceBlockView
 import { useInvoicePriceSafety } from "@/fakturaer/hooks/useInvoicePriceSafety";
 import { priceDirection } from "@/fakturaer/lib/priceSafety";
 import type { PriceGate } from "@/fakturaer/lib/financialPresentation";
-import { planClaim, type ClaimPlan } from "@/ravarer/lib/supplierClaim";
-import { fetchClaimPreview } from "@/ravarer/hooks/useClaimPreview";
+import { useClaimFlow } from "./useClaimFlow";
+import { DuplicateCaseNotice } from "@/ravarer/pages/priskontroll/saker/CaseRecovery";
 import { ClaimCreditDialog, type ClaimForm } from "./ClaimCreditDialog";
 import { useClaimCredit, useRematchInvoices } from "./useGjoreMutations";
 import { acceptResultTitle, claimFailureMessage, kr, priceChange, skipLineText } from "./logic";
@@ -43,8 +43,9 @@ export function splitByGate<L extends GateLine>(cands: L[], gateOf: (l: L) => Pr
     const base = { id: l.id, invoice_id: l.invoice_id, invoice_number: l.invoice_number, invoice_date: l.invoice_date };
     if (!g.ok) { blocked.push({ ...base, label: g.label, detail: g.detail }); continue; }
     const s = g.safety;
-    if (s.price_per_base_unit == null || s.expected_price_per_base_unit == null || s.effect_nok == null || priceDirection(s) === "same") continue;
-    rows.push({ ...base, quantity: l.quantity, unit: l.unit, price_per_base_unit: s.price_per_base_unit, expected_price_per_base_unit: s.expected_price_per_base_unit, base_quantity: s.base_quantity, effect_nok: s.effect_nok, reference_source: s.reference_source, reference_id: s.reference_id });
+    if (!s.raw_material_id || !s.base_unit || s.price_per_base_unit == null || s.expected_price_per_base_unit == null || s.effect_nok == null || priceDirection(s) === "same") continue;
+    rows.push({ ...base, quantity: l.quantity, unit: l.unit, price_per_base_unit: s.price_per_base_unit, expected_price_per_base_unit: s.expected_price_per_base_unit, base_quantity: s.base_quantity, effect_nok: s.effect_nok, reference_source: s.reference_source, reference_id: s.reference_id,
+      raw_material_id: s.raw_material_id ?? "", base_unit: s.base_unit ?? "", reference_date: s.reference_date });
   }
   return { rows, blocked };
 }
@@ -74,7 +75,7 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
   const claim = useClaimCredit();
   const rematch = useRematchInvoices();
   // Én autoritativ statusforespørsel per bidragende faktura (begrenset samtidighet i hooken).
-  const safety = useInvoicePriceSafety(cands.map((l) => l.invoice_id), { pending: accept.isPending || claim.isPending });
+  const safety = useInvoicePriceSafety(cands.map((l) => l.invoice_id), { pending: accept.isPending || claim.isPending, rawMaterialId: item.rm_id ?? null });
   const { rows, blocked } = splitByGate(cands, (l) => safety.gateFor({ id: l.id, invoice_id: l.invoice_id }));
   const status: "ready" | "loading" | "error" = cands.length === 0 || safety.allFresh ? "ready" : safety.anyError ? "error" : "loading";
   // Ingen linjer er valgt på forhånd; valg som ikke lenger er kontrollert faller bort.
@@ -83,26 +84,14 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [errorReasons, setErrorReasons] = useState<string[]>([]);
-  const [plan, setPlan] = useState<Extract<ClaimPlan, { ok: true }> | null>(null);
+  const flow = useClaimFlow();
+  const plan = flow.state.plan;
   const [claimError, setClaimError] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [agreementOpen, setAgreementOpen] = useState(false);
   const [startOpen, setStartOpen] = useState(false);
   const startLine = startPriceLine(lines);
   const chosen = status === "ready" ? rows.filter((r) => selected.has(r.id)) : [];
-  // Referansedato bare når alle valgte linjer har samme grunnlag.
-  const refLine = chosen.length > 0 && new Set(chosen.map((r) => `${r.reference_source}|${r.reference_id}`)).size === 1 ? chosen[0] : null;
-  // Referansedatoen finnes på fakturalinjen, men ikke i varekortets linjeliste.
-  const refDate = useQuery({
-    queryKey: ["price-reference-date", refLine?.id ?? null],
-    enabled: !!refLine,
-    queryFn: async () => {
-      const { data, error } = await supabase.from("invoice_lines").select("price_reference_date").eq("id", refLine!.id).maybeSingle();
-      if (error) throw error;
-      return data?.price_reference_date ?? null;
-    },
-  });
-
   const toggle = (id: string) => setPicked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const lineRefs = chosen.map((r) => ({ id: r.id, price_per_base_unit: r.price_per_base_unit }));
 
@@ -149,10 +138,8 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
     const ids = priceChange(chosen)?.positiveIds ?? [];
     setPreviewing(true);
     try {
-      const preview = await fetchClaimPreview(ids);
-      const pl = planClaim(preview);
-      if (!pl.ok) { setError(pl.message); setErrorReasons(pl.reasons); return; }
-      setPlan(pl);
+      const bad = await flow.start(ids);
+      if (bad) { setError(bad.message); setErrorReasons(bad.reasons); return; }
     } catch (e) {
       console.error("[claim-preview]", e);
       setError("Linjene kunne ikke kontrolleres. Prøv igjen.");
@@ -168,14 +155,14 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
       const r = await claim.mutateAsync({ supplierId: item.supplier_id, itemKey: item.item_key, lines: plan.lines, title: f.title.trim(), reason: f.reason.trim() || null, followUpOn: f.followUpOn || null });
       if (!r.ok) { setClaimError(claimFailureMessage(r.reason, r.skipped)); return; }
       const kind = r.caseKind ?? plan.kind;
-      setPlan(null);
+      flow.close();
       onDone({
         title: kind === "documented_claim" ? `Krav opprettet (${kr(plan.amount)} eks. mva) · fakturaen kan avstemmes` : "Prisforespørsel opprettet · fakturaen kan avstemmes",
         items: r.skipped.map(skipLineText),
         link: r.caseId ? { to: paths.sak(r.caseId), label: "Åpne leverandørsaken" } : undefined,
       });
     } catch (e) {
-      setClaimError(e instanceof Error ? e.message : "Saken kunne ikke opprettes.");
+      setClaimError(await flow.onSubmitError(e));
     }
   };
 
@@ -186,8 +173,7 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
     <>
       {rows.length > 0 || blocked.length > 0 || status !== "ready" ? (
         <PriceBlockView
-          rows={rows} blocked={blocked} status={status} onRetry={safety.refetch} selected={selected} onToggle={toggle} baseUnit={item.rm_base_unit}
-          referenceDate={refDate.data ?? null}
+          rows={rows} blocked={blocked} status={status} onRetry={safety.refetch} selected={selected} onToggle={toggle}
           hasAgreement={item.agreed_price_per_base_unit != null}
           tolerancePct={tol.toleranceFor(item.rm_category)} hardCapPct={tol.settings?.price_hard_cap_pct ?? DEFAULT_HARD_CAP_PCT} settings={tol.settings}
           reason={reason} onReason={setReason} canWrite={canWrite} busy={accept.isPending || claim.isPending || previewing} error={error} errorReasons={errorReasons}
@@ -206,7 +192,7 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
 
       {firstCost.size > 1 && (
         <div className="mt-3 space-y-1 rounded-lg border border-border p-3 text-sm">
-          <p>Varen mangler kostpris og har trygge linjer på {firstCost.size} fakturaer.</p>
+          <p>Varen mangler kostpris og har linjer som kan kontrolleres på {firstCost.size} fakturaer.</p>
           <button type="button" className="text-primary underline underline-offset-2 disabled:opacity-50" disabled={!canWrite || !!fcBusy} onClick={() => void runFirstCost()}>
             {fcBusy ? `Fører … ${fcBusy.done} av ${fcBusy.total}` : `Før første kostpris på ${firstCost.size} fakturaer`}
           </button>
@@ -223,9 +209,12 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
       )}
 
       <ClaimCreditDialog
-        open={!!plan} onOpenChange={(v) => { if (!v) setPlan(null); }} kind={plan?.kind ?? null} amount={plan?.amount ?? null} observed={plan?.observed ?? null} lineCount={plan?.lines.length ?? 0}
+        open={flow.open} onOpenChange={(v) => { if (!v) { flow.close(); setClaimError(null); } }} kind={flow.state.duplicate ? null : plan?.kind ?? null} amount={plan?.amount ?? null} observed={plan?.observed ?? null} lineCount={plan?.lines.length ?? 0}
         defaultTitle={`${plan?.kind === "documented_claim" ? "Krav" : "Prisforespørsel"} ${name} ${formatDate(osloTodayISO())}`}
         busy={claim.isPending} error={claimError} onSubmit={(f) => void onClaim(f)}
+        stale={!!flow.state.stalePlan} onRecheck={() => { setClaimError(null); void flow.recheck(); }} recheckBusy={flow.state.recheck === "busy"} recheckError={flow.state.recheck === "error"}
+        blocked={flow.state.blocked} changes={flow.state.changes}
+        notice={flow.state.duplicate ? <DuplicateCaseNotice openCaseId={flow.state.duplicate.openCaseId} supplierId={item.supplier_id} /> : null}
       />
       {agreementOpen && (
         <NewAgreementDialog open={agreementOpen} onOpenChange={setAgreementOpen} defaultRawMaterialId={item.rm_id ?? undefined} defaultSupplierId={item.supplier_id} />

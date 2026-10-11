@@ -9,9 +9,10 @@ const BUCKET = "invoice-pdfs";
  * så lenge den er gyldig (1 time), slik at vi ikke signerer på nytt for hver
  * fakturalinje man klikker gjennom på samme faktura.
  */
-export function useInvoiceDocumentUrl(path: string | null | undefined) {
+export function useInvoiceDocumentUrl(path: string | null | undefined, version?: string | null) {
   const query = useQuery({
-    queryKey: ["invoice-doc-url", path],
+    // Ny versjon gir ny signering; samme versjon gjenbrukes ved linjenavigering.
+    queryKey: ["invoice-doc-url", path, version ?? null],
     enabled: !!path,
     staleTime: 50 * 60 * 1000,
     gcTime: 60 * 60 * 1000,

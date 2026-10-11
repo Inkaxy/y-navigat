@@ -196,12 +196,13 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
       {!canWrite && <p className="text-caption text-ink-secondary">Du har bare lesetilgang.</p>}
 
       {!editForm && (
-        <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-line-subtle bg-card px-4 py-3">
+        // Med prisarbeid ligger hovedhandlingene i Pris-blokken; da skal ikke «Ikke vare …» være eneste klebrige handling.
+        <div className={`${priceWork ? "" : "sticky bottom-0 z-10 "}-mx-4 flex flex-wrap items-center gap-2 border-t border-line-subtle bg-card px-4 py-3 [&>button]:min-h-11`}>
           {!priceWork && <Button data-primary-action disabled={(!canWrite && primary) || primarySaving} onClick={() => void finish()}>Ferdig — neste</Button>}
           {/* Hurtigtast X: Radix åpner ikke på .click(), så menyen styres direkte. */}
           <button type="button" hidden data-action="not-item" disabled={!canWrite || link.isPending} onClick={() => setMenuOpen(true)} />
           <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-            <DropdownMenuTrigger asChild><Button variant="ghost" disabled={!canWrite || link.isPending}>Ikke vare …</Button></DropdownMenuTrigger>
+            <DropdownMenuTrigger asChild><Button variant="ghost" className="min-h-11" disabled={!canWrite || link.isPending}>Ikke vare …</Button></DropdownMenuTrigger>
             <DropdownMenuContent>
               {NOT_A_PRODUCT_REASONS.map((r) => <DropdownMenuItem key={r} onSelect={() => void notItem(r)}>{r}</DropdownMenuItem>)}
             </DropdownMenuContent>

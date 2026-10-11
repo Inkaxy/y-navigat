@@ -16,6 +16,8 @@ export type ReviewReason =
 
 export interface ReviewLineRow {
   id: string;
+  /** Radversjon; kvitteringen for prisstatus må gjelde nøyaktig denne. */
+  updated_at?: string | null;
   invoice_id: string;
   line_number: number | null;
   supplier_sku: string | null;
@@ -74,7 +76,7 @@ export interface ReviewLineRow {
 /** Fakturastatuser som ikke skal kunne behandles fra køen. */
 export const HIDDEN_INVOICE_STATUSES = ["flagged", "reconciled", "ready"];
 
-const SELECT = `id, invoice_id, line_number, supplier_sku, description, quantity, unit, unit_price, total_amount,
+const SELECT = `id, updated_at, invoice_id, line_number, supplier_sku, description, quantity, unit, unit_price, total_amount,
    package_size, package_unit, count_per_package, base_quantity,
    match_confidence, raw_material_id, price_per_base_unit, expected_price_per_base_unit, price_variance_pct,
    variance_status, review_reason, requires_review,

@@ -44,6 +44,14 @@ export function caseKindOf(kinds: readonly (string | null | undefined)[]): Draft
   return k;
 }
 
+/** Hva prisforespørselen sammenlignes med — aldri «det vi har betalt» når grunnlaget er en startpris. */
+export function inquiryBasisText(lines: readonly DraftLine[]): string {
+  const src = [...new Set(lines.map((l) => l.reference_source ?? null))];
+  if (src.length === 1 && src[0] === "last_purchase") return "prisen ved tidligere kjøp";
+  if (src.length === 1 && src[0] === "start_price") return "bekreftet startpris";
+  return "sammenligningsprisen som er oppgitt for hver linje";
+}
+
 export function buildSupplierCaseDraft(i: DraftInput): Draft {
   const numbers = [...new Set(i.lines.map((l) => l.invoice_number).filter((x): x is string => !!x))];
   const ref = numbers.length ? `faktura ${numbers.join(", ")}` : i.case_title;
@@ -66,7 +74,7 @@ export function buildSupplierCaseDraft(i: DraftInput): Draft {
     const obs = i.lines.every((l) => l.observed_excl_vat != null) ? Math.round(i.lines.reduce((s, l) => s + (l.observed_excl_vat ?? 0), 0) * 100) / 100 : null;
     const body = [
       hello, "",
-      "Vi ser at prisen på fakturaene under er annerledes enn det vi har betalt tidligere:", "",
+      `Vi ser at prisen på fakturaene under er annerledes enn ${inquiryBasisText(i.lines)}:`, "",
       ...i.lines.map(head), "",
       ...(obs != null ? [`Observert prisforskjell: ${nok(obs)} kr eks. mva. Dette er ikke et krav.`, ""] : []),
       "Kan dere bekrefte gjeldende pris og årsaken til endringen?",

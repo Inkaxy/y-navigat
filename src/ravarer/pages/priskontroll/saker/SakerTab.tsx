@@ -57,9 +57,9 @@ export function SakerTab() {
     { id: "tittel", header: "Tittel", cell: (r) => <span className="font-medium">{r.title}</span>, sortKey: (r) => r.title },
     { id: "lev", header: "Leverandør", cell: (r) => r.supplier_name ?? "Ukjent", sortKey: (r) => r.supplier_name ?? "" },
     { id: "status", header: "Status", cell: (r) => { const m = labelFor(SUPPLIER_CASE_STATUS_LABELS, r.status, "Ukjent"); return <StatusPill label={m.label} tokenVar={m.tokenVar} />; } },
-    { id: "krav", header: "Krav", align: "right", cell: (r) => kr(r.sums.krav), sortKey: (r) => r.sums.krav },
-    { id: "kreditert", header: "Kreditert", align: "right", cell: (r) => kr(r.sums.kreditert), sortKey: (r) => r.sums.kreditert },
-    { id: "gjenstar", header: "Gjenstår", align: "right", cell: (r) => <span className={cn(r.sums.gjenstar > 0.005 && r.status === "open" && "text-warning")}>{kr(r.sums.gjenstar)}</span>, sortKey: (r) => r.sums.gjenstar },
+    { id: "krav", header: "Krav", align: "right", cell: (r) => (r.kind === "documented_claim" ? kr(r.sums.krav) : <span className="text-ink-secondary">{r.kind === "price_inquiry" ? "Prisforespørsel" : "Må gjennomgås"}</span>), sortKey: (r) => r.sums.krav },
+    { id: "kreditert", header: "Kreditert", align: "right", cell: (r) => (r.kind === "documented_claim" ? kr(r.sums.kreditert) : "—"), sortKey: (r) => r.sums.kreditert },
+    { id: "gjenstar", header: "Gjenstår", align: "right", cell: (r) => (r.kind === "documented_claim" ? <span className={cn(r.sums.gjenstar > 0.005 && r.status === "open" && "text-warning")}>{kr(r.sums.gjenstar)}</span> : "—"), sortKey: (r) => r.sums.gjenstar },
     { id: "ansvarlig", header: "Ansvarlig", hideable: true, cell: (r) => (r.responsible_user_id ? names.data?.get(r.responsible_user_id) ?? "Ukjent bruker" : <span className="text-ink-secondary">—</span>) },
     { id: "oppfolging", header: "Oppfølging", cell: (r) => (r.follow_up_on ? <span className={cn(isFollowUpDue(r, today) && "font-medium text-destructive")}>{formatDate(r.follow_up_on)}</span> : "—"), sortKey: (r) => r.follow_up_on ?? "" },
     { id: "opprettet", header: "Opprettet", hideable: true, cell: (r) => formatDate(r.created_at), sortKey: (r) => r.created_at },
@@ -100,7 +100,7 @@ export function SakerTab() {
             <div className="space-y-1 rounded-lg border border-border bg-card p-3">
               <div className="flex items-start justify-between gap-2"><span className="font-medium">{r.title}</span><StatusPill label={m.label} tokenVar={m.tokenVar} /></div>
               <p className="text-caption text-ink-secondary">{r.supplier_name ?? "Ukjent"}{r.follow_up_on && <> · <span className={cn(isFollowUpDue(r, today) && "text-destructive")}>oppfølging {formatDate(r.follow_up_on)}</span></>}</p>
-              <p className="text-sm tabular-nums">Krav {kr(r.sums.krav)} · gjenstår {kr(r.sums.gjenstar)}</p>
+              <p className="text-sm tabular-nums">{r.kind === "documented_claim" ? `Krav ${kr(r.sums.krav)} · gjenstår ${kr(r.sums.gjenstar)}` : r.kind === "price_inquiry" ? "Prisforespørsel — ingen penger kreves" : "Eldre sak — må gjennomgås"}</p>
             </div>
           );
         }}
@@ -115,7 +115,7 @@ export function SakerTab() {
       {wide ? (
         <SplitView
           list={table}
-          panel={<PeekPanel title={valgt ? "Leverandørsak" : undefined} fullHref={valgt ? paths.sak(valgt) : undefined} onClose={() => update({ sak: null })} emptyText="Velg en sak i listen">{valgt ? <SupplierCaseDetail id={valgt} /> : null}</PeekPanel>}
+          panel={<PeekPanel title={valgt ? "Leverandørsak" : undefined} fullHref={valgt ? paths.sak(valgt) : undefined} onClose={() => update({ sak: null })} emptyText="Velg en sak i listen">{valgt ? <SupplierCaseDetail key={valgt} id={valgt} /> : null}</PeekPanel>}
         />
       ) : table}
     </div>

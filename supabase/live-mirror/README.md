@@ -41,3 +41,13 @@ Kjørt av root direkte mot live og registrert i `schema_migrations`. Filene er b
 Live ACL ved speiling: `rm_invoice_line_price_safety` og `rm_supplier_claim_preview` = postgres, authenticated;
 `_rm_claim_basis` = postgres; `rm_supplier_item_claim_credit`, `supplier_case_save_email_draft`,
 `supplier_case_queue_draft_to_henrik` = postgres, authenticated, service_role.
+
+## Prisstatus schema 2 og dokumentversjon (root, 2026-10-11)
+
+Anvendt av root direkte mot live (ALREADY APPLIED). Filene er repositoryspeil av SQL-teksten root leverte, med en
+innledende kommentar «ALREADY APPLIED». ALDRI kjør på nytt. Ikke kontrollert mot `schema_migrations` fra denne økten.
+
+| Fil | sha256 |
+|---|---|
+| live-mirror/rm_invoice_line_price_safety_v2.sql | 41078fc5c368b8d4903f1d7becd9bfd391c6c58e7e3dcbe80f388087104094e6 |
+| live-mirror/rm_invoice_document_version.sql | d570a82948ea74738538dbc63e72d0dc61b4cbfeb1072158b3f0a065133d3720 |

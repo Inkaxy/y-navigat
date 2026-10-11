@@ -46,13 +46,42 @@ interface Props {
   title: string;
   fallback: React.ReactNode;
   className?: string;
+  /**
+   * Leser gjeldende identitet på nytt ETTER nedlasting. Stemmer den ikke med `cacheKey|version`,
+   * forkastes bytene (lagres aldri som gyldige) og «Originalen er endret» vises.
+   */
+  verifyIdentity?: () => Promise<string | null>;
+  /** Hent ny identitet (etter «Originalen er endret»). */
+  onIdentityChanged?: () => void;
+}
+
+export class DocumentChangedError extends Error {
+  constructor() { super("dokument_endret"); this.name = "DocumentChangedError"; }
 }
 
 /** Originaldokumentet tegnet med PDF.js i appen: sider, zoom, lasting, feil og «Prøv igjen». */
-export function PdfDocumentViewer({ url, cacheKey, version, title, fallback, className }: Props) {
-  const q = useQuery({ queryKey: ["invoice-document-render", cacheKey, version ?? null], queryFn: () => loadDocumentBytes(url), staleTime: 10 * 60_000, gcTime: 10 * 60_000, retry: 1 });
+export function PdfDocumentViewer({ url, cacheKey, version, title, fallback, className, verifyIdentity, onIdentityChanged }: Props) {
+  const q = useQuery({
+    queryKey: ["invoice-document-render", cacheKey, version ?? null],
+    queryFn: async () => {
+      const bytes = await loadDocumentBytes(url);
+      // Kontrollen fullføres før bytene publiseres; ved avvik caches de aldri som gyldige.
+      if (verifyIdentity && (await verifyIdentity()) !== `${cacheKey}|${version ?? ""}`) throw new DocumentChangedError();
+      return bytes;
+    },
+    staleTime: 10 * 60_000, gcTime: 10 * 60_000,
+    retry: (n, e) => !(e instanceof DocumentChangedError) && n < 1,
+  });
 
   if (q.isLoading) return <Loading className={className} />;
+  if (q.error instanceof DocumentChangedError) {
+    return (
+      <div role="alert" className={cn("flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm", className)}>
+        <span>Originalen er endret mens den ble hentet. Ingenting fra den gamle versjonen vises.</span>
+        <Button size="sm" variant="outline" className="min-h-11" onClick={() => { onIdentityChanged?.(); void q.refetch(); }}><RefreshCw className="h-4 w-4" /> Hent på nytt</Button>
+      </div>
+    );
+  }
   if (q.isError || !q.data) return <Failed className={className} fallback={fallback} onRetry={() => void q.refetch()} busy={q.isFetching} />;
   // Ny identitet (annen sti, versjon eller innhold) gir ny visning: side, zoom og feil nullstilles.
   return <DocumentView key={documentIdentity(cacheKey, version, q.data.fingerprint)} data={q.data} title={title} fallback={fallback} className={className} onReload={() => void q.refetch()} />;

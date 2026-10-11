@@ -5,6 +5,7 @@ import { PdfDocumentViewer } from "@/fakturaer/components/PdfDocumentViewer";
 import { invoiceFigures, type PriceGate } from "@/fakturaer/lib/financialPresentation";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
 import { useInvoiceDocumentUrl } from "@/fakturaer/hooks/useInvoiceDocument";
+import { useInvoiceDocumentVersion } from "@/fakturaer/hooks/useInvoiceDocumentVersion";
 import { formatMoney, formatDate } from "@/fakturaer/lib/constants";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +46,8 @@ export interface DocPanelLine {
 }
 
 interface Props {
+  /** Kallerens faktiske faktura-ID (brukes til versjonsoppslag). */
+  invoiceId: string | null;
   invoice: DocPanelInvoice | null;
   line?: DocPanelLine | null;
   onClose: () => void;
@@ -64,9 +67,16 @@ function num(v: number | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export function InvoiceDocumentPanel({ invoice, line, onClose, className, showSumWarning, gate: gateIn }: Props) {
-  const path = invoice?.source_document_url ?? null;
-  const { url, isLoading, error, refetch } = useInvoiceDocumentUrl(path);
+export function InvoiceDocumentPanel({ invoiceId, invoice, line, onClose, className, showSumWarning, gate: gateIn }: Props) {
+  // Gjeldende identitet hentes fersk; uten den vises aldri bufret (mulig gammel) original.
+  const ver = useInvoiceDocumentVersion(invoice?.source_document_url ? invoiceId : null);
+  const current = ver.data?.available ? ver.data : null;
+  const path = current?.path ?? null;
+  const { url, isLoading: urlLoading, error: urlError, refetch: refetchUrl } = useInvoiceDocumentUrl(path, current?.version ?? null);
+  const isLoading = ver.isLoading || urlLoading;
+  const error = ver.error ?? urlError;
+  const refetch = () => { if (ver.error) void ver.refetch(); else void refetchUrl(); };
+  const missing = !invoice?.source_document_url || !invoiceId || ver.data?.available === false;
   const fig = invoiceFigures(invoice ?? {});
   const cur = fig.currency;
   const mismatch = showSumWarning && invoice?.lines_sum_status === "mismatch";
@@ -116,9 +126,9 @@ export function InvoiceDocumentPanel({ invoice, line, onClose, className, showSu
       )}
 
       <div className="min-h-0 flex-1 bg-muted/20">
-        {!path ? (
+        {missing ? (
           <div className="flex h-full items-center justify-center p-6 text-center text-sm text-ink-secondary">
-            Originalfaktura ikke tilgjengelig.
+            {ver.data?.available === false && ver.data.reason === "document_path_invalid" ? "Originalens lagringssti er ugyldig. Dokumentet vises ikke." : "Originalfaktura ikke tilgjengelig."}
           </div>
         ) : error ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm text-ink-secondary">
@@ -128,13 +138,13 @@ export function InvoiceDocumentPanel({ invoice, line, onClose, className, showSu
             </Button>
             {open}
           </div>
-        ) : isLoading || !url ? (
+        ) : isLoading || !url || !path || !current ? (
           <div className="space-y-3 p-4">
             <Skeleton className="h-6 w-1/3" />
             <Skeleton className="h-[60vh] w-full" />
           </div>
         ) : (
-          <PdfDocumentViewer url={url} cacheKey={path} title={`Originalfaktura ${invoice?.invoice_number ?? ""}`} fallback={open} />
+          <PdfDocumentViewer url={url} cacheKey={path} version={current.version} verifyIdentity={ver.recheck} onIdentityChanged={ver.refresh} title={`Originalfaktura ${invoice?.invoice_number ?? ""}`} fallback={open} />
         )}
       </div>
     </div>

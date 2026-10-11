@@ -11,7 +11,7 @@ export default function SupplierCase() {
       <Link to={paths.saker()} className="inline-flex items-center gap-1 text-caption text-ink-secondary hover:text-foreground">
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden />Leverandørsaker
       </Link>
-      {id && <SupplierCaseDetail id={id} />}
+      {id && <SupplierCaseDetail key={id} id={id} />}
     </div>
   );
 }

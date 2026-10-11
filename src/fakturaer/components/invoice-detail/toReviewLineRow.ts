@@ -5,6 +5,7 @@ import type { InvoiceDetailData, InvoiceDetailLine } from "./fetchInvoiceDetail"
 export function toReviewLineRow(data: InvoiceDetailData, matchLineRaw: InvoiceDetailLine, suggestions: ReviewLineRow["suggestions"]): ReviewLineRow {
   return {
         id: matchLineRaw.id,
+        updated_at: matchLineRaw.updated_at ?? null,
         invoice_id: data.id,
         line_number: matchLineRaw.line_number,
         supplier_sku: matchLineRaw.supplier_sku,

@@ -31,6 +31,8 @@ export type HeaderCompare = { label: string; old: Value; next: Value }[];
 export type RereadRun = {
   id: string; invoice_id: string; legal_entity_id: string; created_by: string; status: RunStatus; error_code: string | null;
   created_at: string; expires_at: string; document_path: string;
+  /** Frosset dokumentidentitet fra lesingens øyeblikksbilde (id/navn/versjon/tidspunkt). */
+  snapshotDocument: Json | null;
   invoice: { invoice_number: string | null; is_credit_note: boolean; total_amount: number | null; total_vat: number | null; currency: string | null; issues: Issue[] };
   oldLines: OldLine[];
   candidates: Candidate[];
@@ -108,6 +110,7 @@ export function parseRun(row: RunRowInput): RereadRun {
     id: row.id, invoice_id: row.invoice_id, legal_entity_id: row.legal_entity_id, created_by: row.created_by,
     status: (STATUSES as string[]).includes(row.status) ? (row.status as RunStatus) : "failed",
     error_code: row.error_code, created_at: row.created_at, expires_at: row.expires_at, document_path: row.document_path,
+    snapshotDocument: isRec(row.snapshot) && isRec(row.snapshot.document) ? (row.snapshot.document as Json) : null,
     invoice: { invoice_number: strOrNull(inv.invoice_number), is_credit_note: inv.is_credit_note === true, total_amount: numOrNull(inv.total_amount), total_vat: numOrNull(inv.total_vat), currency: strOrNull(inv.currency), issues: parseIssues(inv.extraction_issues) },
     oldLines, candidates, invoiceIssues: parseIssues(prop.invoice_issues), header,
     // Forslagets header.is_credit_note er kopiert fra fakturaen i dag og er IKKE en vurdering fra leseren.

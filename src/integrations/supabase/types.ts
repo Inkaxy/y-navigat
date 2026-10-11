@@ -17979,6 +17979,10 @@ export type Database = {
         Args: { p_base_unit?: string; p_line_id: string }
         Returns: Json
       }
+      rm_invoice_document_version: {
+        Args: { p_invoice_id: string }
+        Returns: Json
+      }
       rm_invoice_has_read_issues: {
         Args: { p_invoice_id: string }
         Returns: boolean

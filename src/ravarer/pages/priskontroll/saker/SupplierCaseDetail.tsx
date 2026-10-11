@@ -1,22 +1,15 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { QueryState } from "@/components/common/QueryState";
 import { StatusPill } from "@/ordre/components/ui/status-pill";
 import { AuditHistory } from "@/fakturaer/components/decisions/AuditHistory";
 import { formatDate, formatMoney } from "@/fakturaer/lib/constants";
-import { setCaseStatus } from "@/fakturaer/lib/supplierCases";
 import { supplierItemKey } from "@/fakturaer/lib/supplierItemKey";
 import { fmtNum } from "@/fakturaer/lib/units";
 import { labelFor, SUPPLIER_CASE_STATUS_LABELS } from "@/ravarer/lib/labels";
-import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
 import { paths } from "@/ravarer/lib/paths";
 import { useUserNames } from "@/ravarer/hooks/useUserNames";
 import { CaseCreditForm } from "./CaseCreditForm";
+import { CaseStatusSection, LegacyRecovery } from "./CaseRecovery";
 import { CaseEmailDraft } from "./CaseEmailDraft";
 import { caseKindOf } from "@/fakturaer/lib/supplierCaseDraft";
 import { useInvoiceRights } from "@/fakturaer/hooks/useInvoiceRights";
@@ -29,28 +22,18 @@ function Stat({ k, v, tone }: { k: string; v: string; tone?: string }) {
   return <div className="rounded-lg border border-border bg-card px-3 py-2"><p className="text-caption text-ink-secondary">{k}</p><p className={`font-semibold tabular-nums ${tone ?? ""}`}>{v}</p></div>;
 }
 
+const REF_TEXT: Record<string, string> = { agreement: "avtalt pris", last_purchase: "tidligere kjøp", start_price: "bekreftet startpris" };
+function refText(source: string | null, date: string | null): string {
+  const t = (source && REF_TEXT[source]) ?? "ukjent grunnlag";
+  return date ? `${t} (${formatDate(date)})` : t;
+}
+
 /** Saksdetalj — brukes både i panelet på listen og på egen side. */
 export function SupplierCaseDetail({ id }: { id: string }) {
-  const qc = useQueryClient();
   const q = useSupplierCaseDetail(id);
   const d = q.data;
   const names = useUserNames([d?.c.responsible_user_id]);
   const rights = useInvoiceRights();
-  const [statusNote, setStatusNote] = useState("");
-  const status = useMutation({
-    mutationFn: (s: "open" | "resolved" | "cancelled") => setCaseStatus(id, s, statusNote),
-    onSuccess: async () => {
-      invalidateRavarerCounts(qc);
-      toast.success("Status lagret");
-      setStatusNote("");
-      await qc.invalidateQueries({ queryKey: ["supplier-case", id] });
-      void qc.invalidateQueries({ queryKey: ["supplier-cases"] });
-      void qc.invalidateQueries({ queryKey: ["invoice-approval-overview"] });
-      void qc.invalidateQueries({ queryKey: ["audit-history"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
   if (!d) return <QueryState isLoading={q.isLoading} isError={q.isError} error={q.error} scope="ravarer:leverandorsak" onRetry={() => void q.refetch()} isEmpty={!q.isLoading} emptyTitle="Saken finnes ikke">{null}</QueryState>;
 
   const invoices: [string, string][] = [...new Map(d.lines.map((l) => [l.invoice_id, l.invoice?.invoice_number ?? "Faktura"])).entries()];
@@ -59,6 +42,8 @@ export function SupplierCaseDetail({ id }: { id: string }) {
   const kind = caseKindOf(d.lines.map((l) => l.basis.case_kind));
   const observed = d.lines.every((l) => l.basis.observed_effect_excl_vat != null) ? Math.round(d.lines.reduce((s, l) => s + (l.basis.observed_effect_excl_vat ?? 0), 0) * 100) / 100 : null;
   const meta = labelFor(SUPPLIER_CASE_STATUS_LABELS, d.c.status, "Ukjent status");
+  const refs = [...new Set(d.lines.map((l) => refText(l.basis.price_reference_source, l.basis.price_reference_date)))];
+  const refSummary = refs.length === 1 ? refs[0] : "ulike grunnlag — se linjene";
   const responsible = d.c.responsible_user_id ? names.data?.get(d.c.responsible_user_id) ?? "Ukjent bruker" : null;
 
   return (
@@ -73,18 +58,30 @@ export function SupplierCaseDetail({ id }: { id: string }) {
         <p className="text-caption text-ink-secondary">
           Opprettet {formatDate(d.c.created_at)}{responsible && ` · ansvarlig ${responsible}`}{d.c.follow_up_on && ` · oppfølging ${formatDate(d.c.follow_up_on)}`}
         </p>
-        <p className="text-sm font-medium">{kind === "documented_claim" ? "Dokumentert krav (avtalepris)" : kind === "price_inquiry" ? "Prisforespørsel — ingen penger kreves" : "Eldre sak uten kontrollert grunnlag"}</p>
-        {kind === "price_inquiry" ? (
-          <div className="grid grid-cols-2 gap-2">
-            <Stat k="Observert prisforskjell" v={observed != null ? kr(observed) : "–"} />
-            <Stat k="Kreditert" v={kr(kreditert)} />
+        {kind === "documented_claim" ? (
+          <>
+            <p className="text-sm font-medium">Dokumentert krav (avtalepris)</p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <Stat k="Krav" v={kr(krav)} />
+              <Stat k="Kreditert" v={kr(kreditert)} />
+              <Stat k="Gjenstår" v={kr(Math.round((krav - kreditert) * 100) / 100)} tone={krav - kreditert > 0.005 ? "text-warning" : "text-success"} />
+            </div>
+          </>
+        ) : kind === "price_inquiry" ? (
+          <div className="space-y-2" data-testid="inquiry-summary">
+            <p className="text-sm font-medium">Prisforespørsel — ingen penger kreves</p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <Stat k="Observert prisforskjell (bare en observasjon, ikke skyldig beløp)" v={observed != null ? kr(observed) : "Ukjent"} />
+              <Stat k="Oppfølging" v={d.c.status !== "open" ? meta.label : d.c.follow_up_on ? formatDate(d.c.follow_up_on) : "Ingen dato satt"} />
+            </div>
+            <p className="text-caption text-ink-secondary">Sammenlignet med: {refSummary}</p>
           </div>
         ) : (
-        <div className="grid grid-cols-3 gap-2">
-          <Stat k={kind === "documented_claim" ? "Krav" : "Registrert beløp"} v={kr(krav)} />
-          <Stat k="Kreditert" v={kr(kreditert)} />
-          <Stat k="Gjenstår" v={kr(Math.round((krav - kreditert) * 100) / 100)} tone={krav - kreditert > 0.005 ? "text-warning" : "text-success"} />
-        </div>
+          <div role="note" className="space-y-1 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm" data-testid="legacy-case">
+            <p className="font-medium">Eldre sak uten kontrollert grunnlag — må gjennomgås</p>
+            <p>Saken mangler låst, kontrollert prisgrunnlag. Ingen beløp vises som krav, og kladd kan ikke lagres eller sendes. Ingenting fylles inn automatisk.</p>
+            <LegacyRecovery invoices={invoices} />
+          </div>
         )}
         <p className="text-caption text-ink-secondary">Ingen e-post sendes automatisk. Avtaleprisen endres ikke av saken.</p>
       </header>
@@ -94,7 +91,7 @@ export function SupplierCaseDetail({ id }: { id: string }) {
         <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full text-sm tabular-nums">
             <thead className="bg-muted/40 text-caption text-ink-secondary">
-              <tr><th className="px-3 py-2 text-left font-medium">Faktura</th><th className="px-3 py-2 text-left font-medium">Vare</th><th className="px-3 py-2 text-right font-medium">Forventet</th><th className="px-3 py-2 text-right font-medium">Fakturert</th><th className="px-3 py-2 text-right font-medium">Mengde</th><th className="px-3 py-2 text-right font-medium">Beløp</th></tr>
+              <tr><th className="px-3 py-2 text-left font-medium">Faktura</th><th className="px-3 py-2 text-left font-medium">Vare</th><th className="px-3 py-2 text-right font-medium">Forventet</th><th className="px-3 py-2 text-right font-medium">Fakturert</th><th className="px-3 py-2 text-right font-medium">Mengde</th><th className="px-3 py-2 text-right font-medium">{kind === "documented_claim" ? "Krav" : kind === "price_inquiry" ? "Observert forskjell" : "Registrert"}</th></tr>
             </thead>
             <tbody className="divide-y divide-border">
               {d.lines.map((l) => {
@@ -109,22 +106,23 @@ export function SupplierCaseDetail({ id }: { id: string }) {
                     <td className="px-3 py-2 text-right">{per(l.basis.expected_price_per_base_unit, l.basis.base_unit ?? l.line?.raw_material?.base_unit ?? null)}</td>
                     <td className="px-3 py-2 text-right">{per(l.basis.price_per_base_unit, l.basis.base_unit ?? l.line?.raw_material?.base_unit ?? null)}</td>
                     <td className="px-3 py-2 text-right">{l.basis.base_quantity != null ? `${fmtNum(l.basis.base_quantity, 2)} ${l.basis.base_unit ?? l.line?.raw_material?.base_unit ?? ""}`.trim() : l.line?.quantity != null ? `${fmtNum(Number(l.line.quantity), 2)} ${l.line.unit ?? ""}` : "–"}</td>
-                    <td className="px-3 py-2 text-right">{kr(l.amount_excl_vat)}</td>
+                    <td className="px-3 py-2 text-right">{kind === "price_inquiry" ? (l.basis.observed_effect_excl_vat != null ? kr(l.basis.observed_effect_excl_vat) : "–") : kr(l.amount_excl_vat)}<span className="block text-caption text-ink-secondary">{refText(l.basis.price_reference_source, l.basis.price_reference_date)}</span></td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
-        <ul className="divide-y divide-border text-sm">
+        {kind === "documented_claim" && <ul className="divide-y divide-border text-sm">
           {invoices.map(([invId, no]) => (
             <li key={invId} className="flex justify-between gap-3 py-1.5"><span>{no}</span><span className="tabular-nums">Restavvik {kr(d.remaining.get(invId) ?? 0)} ekskl. mva.</span></li>
           ))}
-        </ul>
+        </ul>}
       </section>
 
-      <section className="space-y-2">
-        <h3 className="font-semibold">Kreditfordeling</h3>
+      {(kind === "documented_claim" || d.credits.length > 0) && <section className="space-y-2">
+        <h3 className="font-semibold">{kind === "documented_claim" ? "Kreditfordeling" : "Registrert kreditfordeling (historikk)"}</h3>
+        {kind !== "documented_claim" && <p className="text-caption text-ink-secondary">Vises som lagret historikk. Saken er ikke et krav, så ingen saldo regnes.</p>}
         {d.credits.length === 0 ? <p className="text-sm text-ink-secondary">Ingen kreditt fordelt ennå.</p> : (
           <ul className="divide-y divide-border text-sm">
             {d.credits.map((c) => (
@@ -135,27 +133,13 @@ export function SupplierCaseDetail({ id }: { id: string }) {
             ))}
           </ul>
         )}
-      </section>
+      </section>}
 
-      {d.c.status === "open" && <section className="rounded-lg border border-border p-4"><CaseCreditForm d={d} invoices={invoices} /></section>}
+      {d.c.status === "open" && kind === "documented_claim" && rights.canWrite && <section className="rounded-lg border border-border p-4"><CaseCreditForm d={d} invoices={invoices} /></section>}
 
-      <section className="space-y-2 rounded-lg border border-border p-4">
-        <Label htmlFor={`case-note-${id}`}>Begrunnelse for statusendring</Label>
-        <Textarea id={`case-note-${id}`} value={statusNote} onChange={(e) => setStatusNote(e.target.value)} />
-        <div className="flex flex-wrap gap-2">
-          {d.c.status === "open" ? (
-            <>
-              <Button variant="outline" disabled={status.isPending || !statusNote.trim()} onClick={() => status.mutate("resolved")}>Merk som løst</Button>
-              <Button variant="ghost" disabled={status.isPending || !statusNote.trim()} onClick={() => status.mutate("cancelled")}>Avbryt saken</Button>
-            </>
-          ) : (
-            <Button variant="outline" disabled={status.isPending || !statusNote.trim()} onClick={() => status.mutate("open")}>Åpne saken igjen</Button>
-          )}
-        </div>
-        {d.c.resolution_note && <p className="text-sm text-ink-secondary">Siste begrunnelse: {d.c.resolution_note}</p>}
-      </section>
+      <CaseStatusSection id={id} status={d.c.status} resolutionNote={d.c.resolution_note} canWrite={rights.canWrite} invoices={invoices} />
 
-      <CaseEmailDraft caseId={id} canWrite={rights.canWrite} input={{
+      <CaseEmailDraft caseId={id} canWrite={rights.canWrite} recoveryHint={<LegacyRecovery invoices={invoices} />} input={{
         supplier_name: d.c.supplier?.name ?? null, case_title: d.c.title, credited: kreditert, kind,
         lines: d.lines.map((l) => {
           const unit = l.basis.base_unit ?? l.line?.raw_material?.base_unit ?? null;
@@ -171,7 +155,7 @@ export function SupplierCaseDetail({ id }: { id: string }) {
       }} />
 
       <section className="space-y-2">
-        <h3 className="font-semibold">Historikk</h3>
+        <h3 id="sak-historikk" className="font-semibold">Historikk</h3>
         <AuditHistory entityId={id} kind="supplier_case" />
       </section>
     </div>

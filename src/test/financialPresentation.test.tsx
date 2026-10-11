@@ -16,8 +16,8 @@ import type { InvoiceDetailLine } from "@/fakturaer/components/invoice-detail/fe
 
 const okInv = { currency: "NOK" };
 const safeLine = (over: Record<string, unknown> = {}) => ({ line_id: "l1", line_version: "2026-10-11T10:00:00Z", raw_material_id: "rm1", can_compare: true, effect_nok: 200,
-  reason_code: null, reference_source: "agreement", reference_id: "a1", expected_price_per_base_unit: 8, price_per_base_unit: 10, base_quantity: 100, ...over });
-const resp = (lines: unknown[]) => ({ invoice_id: "i1", checked_at: "2026-10-11T10:00:01Z", lines });
+  reason_code: null, reference_source: "agreement", reference_id: "a1", reference_date: "2026-01-01", base_unit: "kg", currency: "NOK", expected_price_per_base_unit: 8, price_per_base_unit: 10, base_quantity: 100, ...over });
+const resp = (lines: unknown[]) => ({ schema_version: 2, legal_entity_id: "e1", invoice_id: "i1", checked_at: "2026-10-11T10:00:01Z", lines });
 const gateOf = (raw: Record<string, unknown>, fresh = true, ver: string | null = "2026-10-11T10:00:00Z") => safetyGate(parsePriceSafety(resp([raw]), "i1")?.lines.get("l1"), fresh, ver);
 
 describe("autoritativ prisstatus (rm_invoice_line_price_safety)", () => {
@@ -136,7 +136,7 @@ describe("faktiske komponenter", () => {
     expect(screen.getAllByText(/Valuta må avklares/).length).toBeGreaterThan(0);
   });
   it("dokumentpanel: kreditnota uten prisavvik, ingen rå score-banner", () => {
-    wrap(<InvoiceDocumentPanel onClose={() => undefined}
+    wrap(<InvoiceDocumentPanel invoiceId={null} onClose={() => undefined}
       invoice={{ invoice_number: "8050625", invoice_date: "2026-10-01", is_credit_note: true, currency: "NOK", lines_sum_status: "ok", extraction_confidence: 1, total_amount: -268885, total_vat: null }}
       line={line({})} gate={gateOf(safeLine({ can_compare: false, reason_code: "credit_note", effect_nok: null }))} />);
     expect(screen.queryByText(/22\s?377/)).toBeNull();
@@ -145,13 +145,13 @@ describe("faktiske komponenter", () => {
     expect(screen.queryByText(/Prisen avviker|Se over pris/)).toBeNull();
   });
   it("dokumentpanel: ukjent status (lasting/feil) viser ingen prosent selv om linjen har lagret avvik", () => {
-    wrap(<InvoiceDocumentPanel onClose={() => undefined}
+    wrap(<InvoiceDocumentPanel invoiceId={null} onClose={() => undefined}
       invoice={{ invoice_number: "1", invoice_date: "2026-10-01", is_credit_note: false, currency: "NOK", lines_sum_status: "ok", extraction_issues: [] }}
       line={line({ total_amount: 1000, unit_price: 100, price_per_base_unit: 10, expected_price_per_base_unit: 8, price_variance_pct: 25 })} gate={gateOf(safeLine(), false)} />);
     expect(screen.queryByText(/\+25 %/)).toBeNull();
   });
   it("dokumentpanel: verifisert normal NOK viser sammenligning", () => {
-    wrap(<InvoiceDocumentPanel onClose={() => undefined}
+    wrap(<InvoiceDocumentPanel invoiceId={null} onClose={() => undefined}
       invoice={{ invoice_number: "1", invoice_date: "2026-10-01", is_credit_note: false, currency: "NOK", lines_sum_status: "ok", extraction_issues: [] }}
       line={line({ total_amount: 1000, unit_price: 100, price_per_base_unit: 10, expected_price_per_base_unit: 8, price_variance_pct: 25 })} gate={gateOf(safeLine({ effect_nok: 200, expected_price_per_base_unit: 8, price_per_base_unit: 10 }))} />);
     expect(screen.getByText(/Kontrollert pris\/grunnenhet/)).toBeInTheDocument();
@@ -184,12 +184,12 @@ describe("PDF-identitet", () => {
 
 describe("MELIS 25 KG – blandet retning", () => {
   const rows = [
-    { id: "085d68a6", invoice_id: "666738", invoice_number: "666738", invoice_date: "2026-09-21", quantity: 600, unit: "kg", price_per_base_unit: 28.81, expected_price_per_base_unit: 14, base_quantity: 600, effect_nok: 8886, reference_source: "last_purchase", reference_id: "8b999cac" },
-    { id: "d4738b98", invoice_id: "525582", invoice_number: "525582", invoice_date: "2025-10-13", quantity: 600, unit: "kg", price_per_base_unit: 14.5, expected_price_per_base_unit: 25.76, base_quantity: 600, effect_nok: 6756, reference_source: "last_purchase", reference_id: "042239c2" },
+    { id: "085d68a6", invoice_id: "666738", invoice_number: "666738", invoice_date: "2026-09-21", quantity: 600, unit: "kg", price_per_base_unit: 28.81, expected_price_per_base_unit: 14, base_quantity: 600, effect_nok: 8886, reference_source: "last_purchase", reference_id: "8b999cac", raw_material_id: "melis", base_unit: "kg", reference_date: "2026-09-01" },
+    { id: "d4738b98", invoice_id: "525582", invoice_number: "525582", invoice_date: "2025-10-13", quantity: 600, unit: "kg", price_per_base_unit: 14.5, expected_price_per_base_unit: 25.76, base_quantity: 600, effect_nok: 6756, reference_source: "last_purchase", reference_id: "042239c2", raw_material_id: "melis", base_unit: "kg", reference_date: "2025-09-01" },
   ];
   it("viser netto, absolutt og bare dyrere linje til sak; ulike grunnlag", async () => {
     const { PriceBlockView } = await import("@/ravarer/pages/priskontroll/gjore/PriceBlockView");
-    wrap(<PriceBlockView rows={rows} blocked={[]} status="ready" selected={new Set(["085d68a6", "d4738b98"])} onToggle={() => undefined} baseUnit="kg" referenceDate={null}
+    wrap(<PriceBlockView rows={rows} blocked={[]} status="ready" selected={new Set(["085d68a6", "d4738b98"])} onToggle={() => undefined}
       hasAgreement={false} tolerancePct={3} hardCapPct={15} settings={null} reason="" onReason={() => undefined} canWrite busy={false}
       onAccept={() => undefined} onCase={() => undefined} onFixAgreement={() => undefined} onCheckPackage={() => undefined} />);
     expect(screen.getByText(/Ulike sammenligningsgrunnlag/)).toBeInTheDocument();
@@ -200,7 +200,7 @@ describe("MELIS 25 KG – blandet retning", () => {
   });
   it("bare lavere pris valgt: ingen sak", async () => {
     const { PriceBlockView } = await import("@/ravarer/pages/priskontroll/gjore/PriceBlockView");
-    wrap(<PriceBlockView rows={rows} blocked={[]} status="ready" selected={new Set(["d4738b98"])} onToggle={() => undefined} baseUnit="kg" referenceDate={null}
+    wrap(<PriceBlockView rows={rows} blocked={[]} status="ready" selected={new Set(["d4738b98"])} onToggle={() => undefined}
       hasAgreement={false} tolerancePct={3} hardCapPct={15} settings={null} reason="" onReason={() => undefined} canWrite busy={false}
       onAccept={() => undefined} onCase={() => undefined} onFixAgreement={() => undefined} onCheckPackage={() => undefined} />);
     expect(screen.getByRole("button", { name: /Opprett leverandørsak/ })).toBeDisabled();

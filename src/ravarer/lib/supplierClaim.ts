@@ -110,3 +110,29 @@ const CLAIM_ERRORS: [RegExp, string][] = [
 export function claimSubmitError(raw: string | null | undefined): string {
   return CLAIM_ERRORS.find(([re]) => re.test(raw ?? ""))?.[1] ?? "Saken kunne ikke opprettes. Ingenting er lagret.";
 }
+
+export type ClaimSubmitCode = "stale" | "duplicate" | "other";
+/** Feil ved oppretting med kode, slik at UI kan velge riktig gjenopprettingsvei. */
+export class ClaimSubmitError extends Error {
+  constructor(public readonly code: ClaimSubmitCode, message: string) { super(message); this.name = "ClaimSubmitError"; }
+}
+export function claimSubmitCode(raw: string | null | undefined): ClaimSubmitCode {
+  const m = raw ?? "";
+  if (/claim_preview_required_or_changed/.test(m)) return "stale";
+  if (/linje_allerede_i_aapen_sak/.test(m)) return "duplicate";
+  return "other";
+}
+
+type OkPlan = Extract<ClaimPlan, { ok: true }>;
+const nok2 = (n: number) => n.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** Hva som er endret mellom gammelt (forkastet) og nytt kontrollert utvalg — til gjennomgang, ikke godkjenning. */
+export function planChanges(prev: OkPlan, next: OkPlan): string[] {
+  const out: string[] = [];
+  if (prev.kind !== next.kind) out.push(`Sakstype endret: ${KIND_COPY[prev.kind].title} → ${KIND_COPY[next.kind].title}`);
+  if (Math.abs(prev.amount - next.amount) > 0.005) out.push(`Kravbeløp endret: ${nok2(prev.amount)} → ${nok2(next.amount)} kr eks. mva`);
+  if ((prev.observed ?? null) !== (next.observed ?? null)) out.push(`Observert prisforskjell endret: ${prev.observed == null ? "ukjent" : nok2(prev.observed)} → ${next.observed == null ? "ukjent" : nok2(next.observed)} kr`);
+  if (prev.lines.length !== next.lines.length) out.push(`Antall linjer endret: ${prev.lines.length} → ${next.lines.length}`);
+  const same = prev.lines.length === next.lines.length && prev.lines.every((l, i) => JSON.stringify(l.basis) === JSON.stringify(next.lines[i]?.basis));
+  if (!same && out.length === 0) out.push("Grunnlaget (mengde, referanse eller dato) er endret");
+  return out;
+}
