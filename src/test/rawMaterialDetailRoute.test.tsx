@@ -15,7 +15,6 @@ let blockNav = false;
 
 vi.mock("@/providers/UnsavedGuardProvider", () => ({
   useGuardedNavigate: () => {
-    // eslint-disable-next-line react-hooks/rules-of-hooks -- mockens hook kalles fra en komponent
     const nav = useNavigate();
     return (to: To | number, opts?: NavigateOptions) => {
       if (blockNav) return; // brukeren valgte «Bli» i ulagret-dialogen
