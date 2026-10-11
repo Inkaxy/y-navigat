@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  buildChanges, CORRECTION_FIELDS, CORRECTION_FIELD_LABEL, correctionLockReason, draftFrom, LINE_KIND_OPTIONS,
+  buildChanges, CORRECTION_FIELDS, CORRECTION_FIELD_LABEL, correctionLockReason, draftFrom, LINE_KIND_OPTIONS, PRICE_BASIS_OPTIONS,
   NUMERIC_FIELDS, type CorrectionDraft, type CorrectionField, type CorrectionResult,
 } from "@/fakturaer/lib/lineCorrection";
 import { lineReadIssues, parseNorwegianNumber } from "@/fakturaer/lib/invoiceReadCheck";
@@ -49,6 +49,7 @@ export function CorrectLineDialog({ open, onOpenChange, lineId, invoice, canWrit
     return lineReadIssues({
       quantity: n("quantity"), unit: draft.unit || null, unit_price: n("unit_price"), total_amount: n("total_amount"),
       package_size: n("package_size"), package_unit: draft.package_unit || null, count_per_package: n("count_per_package"),
+      unit_price_basis: draft.unit_price_basis || null, discount_amount: n("discount_amount"), line_kind: draft.line_kind || null,
     });
   }, [draft]);
 
@@ -86,6 +87,17 @@ export function CorrectLineDialog({ open, onOpenChange, lineId, invoice, canWrit
             <SelectContent>{LINE_KIND_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
           </Select>
           {hint && <p className="mt-1 text-caption text-ink-secondary">{hint}</p>}
+        </div>
+      );
+    }
+    if (f === "unit_price_basis") {
+      return (
+        <div key={f}>
+          <Label htmlFor={id} className="mb-1 block">{CORRECTION_FIELD_LABEL[f]}</Label>
+          <Select value={draft.unit_price_basis || "ukjent"} onValueChange={(v) => setDraft({ ...draft, unit_price_basis: v === "ukjent" ? "" : v })} disabled={!!lock}>
+            <SelectTrigger id={id}><SelectValue /></SelectTrigger>
+            <SelectContent>{PRICE_BASIS_OPTIONS.map((o) => <SelectItem key={o.value || "ukjent"} value={o.value || "ukjent"}>{o.label}</SelectItem>)}</SelectContent>
+          </Select>
         </div>
       );
     }
@@ -136,7 +148,8 @@ export function CorrectLineDialog({ open, onOpenChange, lineId, invoice, canWrit
                 <div className="space-y-2 rounded-md border border-border px-3 py-2 text-sm">
                   <p>Etter rettelsen: {preview.map((p) => p.message).join(" ")}</p>
                   <label className="flex items-start gap-2"><Checkbox checked={acceptIssues} onCheckedChange={(v) => setAcceptIssues(v === true)} disabled={!!lock} />
-                    <span>Tallene er kontrollert mot originalen og stemmer likevel (for eksempel rabatt uten egen linje).</span></label>
+                    <span>Tallene er kontrollert mot originalen og stemmer likevel. Registrer heller rabatt og prisgrunnlag over når det er mulig.</span></label>
+                  {acceptIssues && learn && <p className="text-caption text-ink-secondary">Rettelser med godtatte avvik brukes ikke automatisk ved senere lesing. Eksempelet lagres avslått og må slås på manuelt.</p>}
                 </div>
               ) : <p className="text-caption text-ink-secondary">Regnestykket går opp med disse tallene.</p>}
               <div>

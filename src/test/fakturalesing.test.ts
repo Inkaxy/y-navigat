@@ -42,16 +42,29 @@ describe("sikkerhet 0–1", () => {
 
 describe("regnestykke per linje (speiler rm_line_read_issues)", () => {
   it("36x90g: pris per eske", () => expect(lineReadIssues(line({ quantity: 1, unit: "eske", unit_price: 97.2, total_amount: 97.2, package_size: 90, package_unit: "g", count_per_package: 36 }))).toEqual([]));
-  it("36x90g: pris per kg (3,24 kg × 30)", () => expect(lineReadIssues(line({ quantity: 1, unit: "eske", unit_price: 30, total_amount: 97.2, package_size: 90, package_unit: "g", count_per_package: 36 }))).toEqual([]));
-  it("96 kg fakturert, pris per 2 kg-spann", () => expect(lineReadIssues(line({ quantity: 96, unit: "kg", unit_price: 90, total_amount: 4320, package_size: 2, package_unit: "kg" }))).toEqual([]));
-  it("500 ml-flasker, pris per liter", () => expect(lineReadIssues(line({ quantity: 8, unit: "stk", unit_price: 40, total_amount: 160, package_size: 500, package_unit: "ml" }))).toEqual([]));
+  it("36x90g: pris per kg (3,24 kg × 30) med prisgrunnlag kg", () => expect(lineReadIssues(line({ quantity: 1, unit: "eske", unit_price: 30, total_amount: 97.2, package_size: 90, package_unit: "g", count_per_package: 36, unit_price_basis: "kg" }))).toEqual([]));
+  it("36x90g: pris per kg uten prisgrunnlag er uavklart", () => expect(lineReadIssues(line({ quantity: 1, unit: "eske", unit_price: 30, total_amount: 97.2, package_size: 90, package_unit: "g", count_per_package: 36 }))[0].code).toBe("prisgrunnlag_uavklart"));
+  it("36x90g: rå gram-kandidat godtas ikke (324000)", () => expect(lineReadIssues(line({ quantity: 1, unit: "eske", unit_price: 100, total_amount: 324000, package_size: 90, package_unit: "g", count_per_package: 36 }))[0].code).toBe("prisgrunnlag_uavklart"));
+  it("36x90g: pris per kg gir 324, ikke 324000", () => { const b = { quantity: 1, unit: "eske", unit_price: 100, package_size: 90, package_unit: "g", count_per_package: 36, unit_price_basis: "kg" }; expect(lineReadIssues(line({ ...b, total_amount: 324 }))).toEqual([]); expect(lineReadIssues(line({ ...b, total_amount: 324000 }))[0].code).toBe("regnestykke"); });
+  it("96 kg fakturert, pris per 2 kg-spann", () => expect(lineReadIssues(line({ quantity: 96, unit: "kg", unit_price: 90, total_amount: 4320, package_size: 2, package_unit: "kg", unit_price_basis: "pakning" }))).toEqual([]));
+  it("500 ml-flasker, pris per liter", () => expect(lineReadIssues(line({ quantity: 8, unit: "stk", unit_price: 40, total_amount: 160, package_size: 500, package_unit: "ml", unit_price_basis: "l" }))).toEqual([]));
   it("store norske tall", () => expect(lineReadIssues(line({ quantity: 1200, unit: "kg", unit_price: 82.5, total_amount: parseNorwegianNumber("99 000,00") }))).toEqual([]));
   it("rabatt uten egen linje varsles som mulig rabatt", () => expect(lineReadIssues(line({ quantity: 10, unit_price: 100, total_amount: 900 }))[0].code).toBe("mulig_rabatt"));
   it("feillest linjesum", () => expect(lineReadIssues(line({ quantity: 3, unit_price: 100, total_amount: 30 }))[0].code).toBe("regnestykke"));
   it("kreditnota med negative tall", () => expect(lineReadIssues(line({ quantity: -2, unit_price: 50, total_amount: -100 }))).toEqual([]));
   it("mengde 0 med beløp", () => expect(lineReadIssues(line({ quantity: 0, unit_price: 50, total_amount: 100 }))[0].code).toBe("mengde_null"));
   it("manglende linjesum", () => expect(lineReadIssues(line({ quantity: 1, unit_price: 50 }))[0].code).toBe("linjesum_mangler"));
-  it("frakt med bare sum kontrolleres ikke", () => expect(lineReadIssues(line({ total_amount: 150 }))).toEqual([]));
+  it("frakt med bare sum har særregel", () => expect(lineReadIssues(line({ total_amount: 150, line_kind: "frakt" }))).toEqual([]));
+  it("varelinje uten mengde og pris får kontrollbehov", () => expect(lineReadIssues(line({ total_amount: 150 }))[0].code).toBe("mengde_eller_pris_mangler"));
+  it("varelinje uten pris får kontrollbehov", () => expect(lineReadIssues(line({ quantity: 2, total_amount: 150, line_kind: "vare" }))[0].code).toBe("mengde_eller_pris_mangler"));
+  it("negativ sum på vanlig faktura: fortegn", () => expect(lineReadIssues(line({ quantity: 1, unit_price: 100, total_amount: -100 }))[0].code).toBe("fortegn"));
+  it("negativ sum på kreditnota godtas", () => expect(lineReadIssues(line({ quantity: 1, unit_price: 100, total_amount: -100, is_credit: true }))).toEqual([]));
+  it("returlinje med negativ mengde godtas", () => expect(lineReadIssues(line({ quantity: -1, unit_price: 100, total_amount: -100 }))).toEqual([]));
+  it("positiv rabattlinje på vanlig faktura: fortegn", () => expect(lineReadIssues(line({ total_amount: 50, line_kind: "rabatt" }))[0].code).toBe("fortegn"));
+  it("negativ rabattlinje godtas", () => expect(lineReadIssues(line({ total_amount: -50, line_kind: "rabatt" }))).toEqual([]));
+  it("registrert rabatt i kr gjør regnestykket riktig", () => expect(lineReadIssues(line({ quantity: 10, unit_price: 100, total_amount: 900, discount_amount: 100 }))).toEqual([]));
+  it("feil rabatt gir regnestykke", () => expect(lineReadIssues(line({ quantity: 10, unit_price: 100, total_amount: 900, discount_amount: 50 }))[0].code).toBe("regnestykke"));
+  it("prisgrunnlag kg uten vekt er uavklart", () => expect(lineReadIssues(line({ quantity: 2, unit: "stk", unit_price: 50, total_amount: 100, unit_price_basis: "kg" }))[0].code).toBe("prisgrunnlag_uavklart"));
 });
 
 describe("sumavvik med mva-forhold skaleres aldri", () => {
@@ -76,7 +89,7 @@ describe("tomt resultat", () => {
   });
 });
 
-const orig: CorrectionValues = { supplier_sku: "123", description: "SMØR 10KG", quantity: 3, unit: "stk", package_size: 10, package_unit: "kg", count_per_package: null, unit_price: 100, total_amount: 30, line_kind: "vare" };
+const orig: CorrectionValues = { supplier_sku: "123", description: "SMØR 10KG", quantity: 3, unit: "stk", package_size: 10, package_unit: "kg", count_per_package: null, unit_price: 100, total_amount: 30, line_kind: "vare", unit_price_basis: null, discount_amount: null };
 
 describe("Rett fakturalinje", () => {
   it("sender bare endrede felt, med norske tall", () => {
@@ -104,7 +117,7 @@ describe("Rett fakturalinje", () => {
   });
   it("leser svaret typet", () => {
     const r = parseCorrectionResult({ ok: true, changed: ["total_amount"], remaining_issues: [{ code: "mulig_rabatt", message: "m" }], example_id: "e1", lines_sum_status: "mismatch" });
-    expect(r).toEqual({ ok: true, changed: ["total_amount"], remainingIssues: [{ code: "mulig_rabatt", message: "m" }], exampleId: "e1", linesSumStatus: "mismatch" });
+    expect(r).toEqual({ ok: true, changed: ["total_amount"], remainingIssues: [{ code: "mulig_rabatt", message: "m" }], exampleId: "e1", exampleActive: null, linesSumStatus: "mismatch" });
     expect(parseReadIssues("x")).toEqual([]);
   });
 });

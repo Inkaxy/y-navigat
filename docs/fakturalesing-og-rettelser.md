@@ -42,3 +42,11 @@
 - Grunnenhetsbytte setter eksisterende observasjoner som utgått (`enhet_endret`).
 - Testet i rullet-tilbake SQL-fixture: eldste → sekundær +30 % → gammel importert etter → avkoblet nyeste faller tilbake → samme dato (senest opprettet) → manuell gammel påvirker ikke → manuell fremtidig planlagt → manuell i dag gjeldende → pris 0 avvist → kreditnota teller ikke → ingen kilde = uverifisert → 36x90g = 30 kr/kg, 5/10 kg = 20/18 kr/kg → gram→liter = null → enhetsbytte fjerner kandidater.
 - Begrensninger: avviksoversikten er ikke kjørt innlogget mot live (tallene 34/35 er fra kontrollen); avvikene rettes først når noen trykker «Oppdater valgte» eller en faktura endres. Utgåtte hendelser viser årsak og dato, men ikke «etter»-verdien side om side. Oppskrifter merker manglende pris, men ikke «uverifisert». Åpne kalkyler hentes på nytt ved fokus og hvert 2. minutt (ikke sanntid).
+
+## Linjekontroll v2 (2026-10-11)
+- `rm_line_read_issues_v2(..., p_is_credit, p_basis, p_discount, p_line_kind)` er regelen; den gamle 8-parameter-funksjonen kaller v2 uten grunnlag.
+- `invoice_lines.unit_price_basis` (mengdeenhet|pakning|stk|kg|g|l|ml) og `discount_amount` (positiv kr). Ukjent grunnlag godtar bare mengde × pris; passer summen bare via pakning/vekt → `prisgrunnlag_uavklart`.
+- Varelinjer uten mengde/pris → `mengde_eller_pris_mangler`; frakt/gebyr/avrunding/mva/pant/annet/rabatt kan ha bare beløp. Positiv rabattlinje på vanlig faktura → `fortegn`.
+- Fortegn kontrolleres med fortegn: motsatt fortegn på vanlig faktura → `fortegn`; kreditnota godtar begge.
+- Rettelse med godtatte avvik lager læringseksempel som er AV og merket `accepted_issues`; må slås på manuelt. Eksempler gjør aldri linjer trygge — kontrollen kjøres alltid.
+- Begrensning: live-uttrekkene (PDF v139, Tripletex v67) kunne ikke hentes; de fyller ennå ikke `unit_price_basis`/`discount_amount`. Inntil da blir pakning-/vektprisede linjer «prisgrunnlag uavklart» ved import og må avklares i «Rett fakturalinje».

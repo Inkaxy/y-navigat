@@ -5,6 +5,7 @@
 
 export type ReadIssueCode =
   | "linjesum_mangler" | "ugyldig_tall" | "mengde_null" | "mulig_rabatt" | "regnestykke"
+  | "mengde_eller_pris_mangler" | "fortegn" | "prisgrunnlag_uavklart"
   | "sumavvik_mva_forhold" | "tomt_resultat";
 
 export interface ReadIssue { code: ReadIssueCode | string; message: string }
@@ -65,35 +66,82 @@ export function unitFactor(from: string | null | undefined, to: string | null | 
 const fin = (v: number | null | undefined): v is number => typeof v === "number" && Number.isFinite(v);
 const r2 = (n: number) => (Math.round(n * 100) / 100).toFixed(2);
 
+/** Hva enhetsprisen gjelder per. null = ukjent (godtas aldri stille via pakning/vekt). */
+export type PriceBasis = "mengdeenhet" | "pakning" | "stk" | "kg" | "g" | "l" | "ml";
+export const PRICE_BASES: readonly PriceBasis[] = ["mengdeenhet", "pakning", "stk", "kg", "g", "l", "ml"];
+
 export interface ReadLine {
   quantity: number | null; unit: string | null; unit_price: number | null; total_amount: number | null;
   package_size: number | null; package_unit: string | null; count_per_package: number | null;
+  unit_price_basis?: string | null; discount_amount?: number | null; line_kind?: string | null; is_credit?: boolean;
 }
 
-/** Samme regel som rm_line_read_issues: mengde × pris mot linjesum, også via pakning og enhetsfaktor. */
+const MEASURE = ["g", "kg", "ml", "cl", "dl", "l"];
+
+/** Samme regel som rm_line_read_issues_v2: fortegn, prisgrunnlag og rabatt kontrolleres eksplisitt. */
 export function lineReadIssues(l: ReadLine): ReadIssue[] {
   const { quantity: q, unit_price: p, total_amount: t } = l;
+  const kind = (l.line_kind ?? "").trim().toLowerCase() || "vare";
+  const basis = (l.unit_price_basis ?? "").trim().toLowerCase() || null;
+  const unit = (l.unit ?? "").toLowerCase();
+  const pu = (l.package_unit ?? "").toLowerCase();
+  const credit = l.is_credit === true;
+  const disc = fin(l.discount_amount) ? l.discount_amount : 0;
   if (t == null) return [{ code: "linjesum_mangler", message: "Linjesummen mangler. Les den av originalen." }];
   if (!fin(t) || (q != null && !fin(q)) || (p != null && !fin(p))) return [{ code: "ugyldig_tall", message: "Et tall på linjen er ikke gyldig." }];
-  if (q == null || p == null) return [];
+  if (kind === "rabatt" && !credit && t > 0) {
+    return [{ code: "fortegn", message: "Rabattlinjen har positivt beløp på en vanlig faktura. Kontroller fortegnet mot originalen." }];
+  }
+  if (q == null || p == null) {
+    if (kind !== "vare") return [];
+    const msg = q == null && p == null ? "Mengde og enhetspris mangler. Les dem av originalen." : q == null ? "Mengden mangler. Les den av originalen." : "Enhetsprisen mangler. Les den av originalen.";
+    return [{ code: "mengde_eller_pris_mangler", message: msg }];
+  }
   if (q === 0 && t !== 0) return [{ code: "mengde_null", message: "Mengden er 0, men linjen har et beløp." }];
   const tol = Math.max(0.02, 0.015 * Math.abs(t));
   const plain = q * p;
-  const cands = [plain];
   const pkg = fin(l.package_size) && l.package_size > 0 ? l.package_size * (l.count_per_package && l.count_per_package !== 0 ? l.count_per_package : 1) : null;
-  if (pkg != null) {
-    cands.push(q * pkg * p);
-    const base = TO_BASE[(l.package_unit ?? "").toLowerCase()];
-    const f1 = base ? unitFactor(l.package_unit, base) : null;
-    if (f1 != null) cands.push(q * pkg * f1 * p);
-    const f2 = unitFactor(l.package_unit, l.unit);
-    if (f2 != null && f2 > 0 && ["g", "kg", "ml", "cl", "dl", "l"].includes((l.unit ?? "").toLowerCase())) cands.push((q / (pkg * f2)) * p);
+  let expected: number;
+  if (basis == null || basis === "mengdeenhet") expected = plain;
+  else if (basis === "pakning") {
+    const f = unitFactor(unit, pu);
+    expected = MEASURE.includes(unit) && pkg != null && f != null ? ((q * f) / pkg) * p : plain;
+  } else if (basis === "stk") {
+    const c = l.count_per_package;
+    expected = fin(c) && c > 0 && !MEASURE.includes(unit) && unit !== "stk" && unit !== "st" ? q * c * p : plain;
+  } else {
+    const f = unitFactor(unit, basis);
+    const fp = unitFactor(pu, basis);
+    const qb = f != null ? q * f : pkg != null && fp != null ? q * pkg * fp : null;
+    if (qb == null) return [{ code: "prisgrunnlag_uavklart", message: `Prisen er per ${basis}, men mengden kan ikke regnes om (mangler pakning i vekt/volum).` }];
+    expected = qb * p;
   }
-  if (cands.some((c) => Math.abs(Math.abs(c) - Math.abs(t)) <= tol)) return [];
-  if (Math.abs(t) < Math.abs(plain) && Math.abs(t) >= 0.5 * Math.abs(plain)) {
-    return [{ code: "mulig_rabatt", message: `Linjesummen ${r2(t)} er lavere enn mengde × pris (${r2(plain)}). Kontroller rabatt mot originalen.` }];
+  if (disc > 0) expected = expected - Math.sign(expected) * disc;
+  if (Math.abs(expected - t) <= tol) return [];
+  if (credit && Math.abs(-expected - t) <= tol) return [];
+  if (!credit && Math.abs(Math.abs(expected) - Math.abs(t)) <= tol) {
+    return [{ code: "fortegn", message: `Beløpet ${r2(t)} har motsatt fortegn av mengde × pris (${r2(expected)}) på en vanlig faktura. Kontroller retur/rabatt mot originalen.` }];
   }
-  return [{ code: "regnestykke", message: `Mengde × pris (${r2(plain)}) stemmer ikke med linjesummen (${r2(t)}).` }];
+  if (basis == null && pkg != null) {
+    const base = TO_BASE[pu];
+    const f1 = base ? unitFactor(pu, base) : null;
+    const f2 = unitFactor(unit, pu);
+    const c = l.count_per_package;
+    const cands = [
+      q * pkg * p,
+      q * pkg * (f1 ?? 0) * p,
+      MEASURE.includes(unit) && f2 != null ? ((q * f2) / pkg) * p : null,
+      fin(c) && c > 0 ? q * c * p : null,
+    ];
+    const hit = cands.find((x): x is number => x != null && x !== 0 && (Math.abs(x - t) <= tol || (credit && Math.abs(-x - t) <= tol)));
+    if (hit != null) {
+      return [{ code: "prisgrunnlag_uavklart", message: `Mengde × pris (${r2(plain)}) stemmer ikke, men summen passer med pris per pakning/vekt (${r2(hit)}). Angi prisgrunnlaget i «Rett fakturalinje».` }];
+    }
+  }
+  if (Math.abs(t) < Math.abs(expected) && Math.abs(t) >= 0.5 * Math.abs(expected) && Math.sign(t) === Math.sign(expected) && disc === 0) {
+    return [{ code: "mulig_rabatt", message: `Linjesummen ${r2(t)} er lavere enn mengde × pris (${r2(expected)}). Registrer rabatten eller kontroller mot originalen.` }];
+  }
+  return [{ code: "regnestykke", message: `Mengde × pris (${r2(expected)}) stemmer ikke med linjesummen (${r2(t)}).` }];
 }
 
 const VAT_RATIOS = [1.25, 1.15, 1.12, 1 / 1.25, 1 / 1.15, 1 / 1.12];

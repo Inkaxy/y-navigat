@@ -21,7 +21,7 @@ export function useCorrectionLine(lineId: string | null) {
     queryFn: async (): Promise<CorrectionLine> => {
       const [line, posting] = await Promise.all([
         supabase.from("invoice_lines")
-          .select("id, invoice_id, line_number, updated_at, supplier_sku, description, quantity, unit, package_size, package_unit, count_per_package, unit_price, total_amount, line_kind, extraction_issues")
+          .select("id, invoice_id, line_number, updated_at, supplier_sku, description, quantity, unit, package_size, package_unit, count_per_package, unit_price, total_amount, line_kind, unit_price_basis, discount_amount, extraction_issues")
           .eq("id", lineId as string).single(),
         supabase.from("invoice_line_cost_postings").select("invoice_line_id").eq("invoice_line_id", lineId as string).is("revoked_at", null).limit(1),
       ]);
@@ -32,7 +32,7 @@ export function useCorrectionLine(lineId: string | null) {
         id: l.id, invoice_id: l.invoice_id, line_number: l.line_number, updated_at: l.updated_at ?? "",
         values: {
           supplier_sku: l.supplier_sku, description: l.description, quantity: l.quantity, unit: l.unit, package_size: l.package_size,
-          package_unit: l.package_unit, count_per_package: l.count_per_package, unit_price: l.unit_price, total_amount: l.total_amount, line_kind: l.line_kind,
+          package_unit: l.package_unit, count_per_package: l.count_per_package, unit_price: l.unit_price, total_amount: l.total_amount, line_kind: l.line_kind, unit_price_basis: l.unit_price_basis, discount_amount: l.discount_amount,
         },
         issues: parseReadIssues(l.extraction_issues),
         costPosted: (posting.data ?? []).length > 0,
@@ -67,7 +67,7 @@ export function useCorrectLine() {
   });
 }
 
-export type ExtractionExample = { id: string; description: string | null; sku: string | null; note: string | null; created_at: string; is_active: boolean };
+export type ExtractionExample = { id: string; description: string | null; sku: string | null; note: string | null; created_at: string; is_active: boolean; withIssues: boolean };
 
 /** Læringseksempler for leverandøren (samme selskap via RLS). */
 export function useExtractionExamples(supplierId: string | null) {
@@ -76,14 +76,14 @@ export function useExtractionExamples(supplierId: string | null) {
     enabled: !!supplierId,
     queryFn: async (): Promise<ExtractionExample[]> => {
       const { data, error } = await supabase.from("invoice_extraction_examples")
-        .select("id, corrected, note, created_at, is_active")
+        .select("id, corrected, note, created_at, is_active, accepted_issues")
         .eq("supplier_id", supplierId as string).order("created_at", { ascending: false }).limit(50);
       if (error) throw new Error("Kunne ikke hente læringseksemplene");
       return (data ?? []).map((e) => {
         const c = e.corrected && typeof e.corrected === "object" && !Array.isArray(e.corrected) ? e.corrected : {};
         const desc = "description" in c && typeof c.description === "string" ? c.description : null;
         const sku = "supplier_sku" in c && typeof c.supplier_sku === "string" ? c.supplier_sku : null;
-        return { id: e.id, description: desc, sku, note: e.note, created_at: e.created_at, is_active: e.is_active };
+        return { id: e.id, description: desc, sku, note: e.note, created_at: e.created_at, is_active: e.is_active, withIssues: Array.isArray(e.accepted_issues) && e.accepted_issues.length > 0 };
       });
     },
   });
