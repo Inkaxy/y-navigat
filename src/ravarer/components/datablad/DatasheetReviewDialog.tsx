@@ -11,7 +11,7 @@ import { useRawMaterial } from "@/ravarer/hooks/useRawMaterials";
 import { NUTRITION_NUMBER_FIELDS } from "@/ravarer/lib/nutritionSource";
 import { NUTRITION_LABELS, changePct } from "@/ravarer/lib/nutritionLabels";
 import { formatNumber } from "@/ravarer/lib/constants";
-import { FIELD_LABEL, presentFields, type BulkField } from "@/ravarer/lib/datasheetBulk";
+import { FIELD_LABEL, coupledNutritionMeta, presentFields, type BulkField } from "@/ravarer/lib/datasheetBulk";
 import { AllergenPreview, BeforeAfter } from "./DatasheetDiff";
 
 export interface ReviewTarget {
@@ -48,6 +48,7 @@ export function DatasheetReviewDialog({ target, canWrite, busy, onClose, onConfi
   const allergens = Array.isArray(ai.allergens) ? ai.allergens.filter(isObj) : [];
   const present = presentFields(ai);
   const nutFields = NUTRITION_NUMBER_FIELDS.filter((f) => numberOf(nutrition[f]) != null);
+  const coupled = coupledNutritionMeta(ai);
 
   const [fields, setFields] = useState<Set<BulkField>>(new Set());
   const [nutSel, setNutSel] = useState<Set<string>>(new Set());
@@ -117,6 +118,14 @@ export function DatasheetReviewDialog({ target, canWrite, busy, onClose, onConfi
                       })}
                     </tbody>
                   </table>
+                )}
+                {f === "nutrition" && (coupled.eNumbers || coupled.countryOfOrigin) && (
+                  <div className="mt-2 space-y-1 rounded-md border border-warning/30 bg-warning/5 p-2 text-xs" data-testid="coupled-nutrition">
+                    <p className="font-medium">Følger med når næring anvendes</p>
+                    <p className="text-ink-secondary">Disse skrives sammen med næringsverdiene, uansett hvilke enkeltfelt over som er valgt. Vil du ikke ha dem, fjern hele næringsgruppen.</p>
+                    {coupled.eNumbers && <BeforeAfter label="E-numre" before={(before?.e_numbers ?? []).join(", ") || null} after={coupled.eNumbers.join(", ")} />}
+                    {coupled.countryOfOrigin && <BeforeAfter label="Opprinnelsesland" before={before?.country_of_origin ?? null} after={coupled.countryOfOrigin} />}
+                  </div>
                 )}
                 {f === "allergens" && <AllergenPreview current={all.data ?? []} incoming={allergens} />}
                 {f === "ingredient_declaration" && <BeforeAfter before={before?.ingredient_declaration ?? null} after={str(ai, "ingredient_declaration")} />}
