@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { APPROVAL_BLOCKER_LABEL } from "@/ravarer/lib/labels";
+import { APPROVAL_BLOCKER_LABEL, isApprovalBlockerCode } from "@/ravarer/lib/labels";
 
 /**
  * Intern fakturagodkjenning (attestasjon i NBhub). Den utløser IKKE betaling
@@ -29,7 +29,7 @@ export type ApprovalBucket = "ready" | "waiting" | "done";
 export const BLOCKER_LABEL = APPROVAL_BLOCKER_LABEL;
 
 export function blockerLabel(code: string): string {
-  return BLOCKER_LABEL[code] ?? "Kan ikke godkjennes ennå";
+  return isApprovalBlockerCode(code) ? BLOCKER_LABEL[code] : "Kan ikke godkjennes ennå";
 }
 
 export function approvalBucket(r: Pick<OverviewRow, "approved_at" | "blockers">): ApprovalBucket {

@@ -215,7 +215,11 @@ export const APPROVAL_BLOCKER_CODES = [
 ] as const;
 export type ApprovalBlockerCode = (typeof APPROVAL_BLOCKER_CODES)[number];
 
-export const APPROVAL_BLOCKER_LABEL: Record<string, string> = {
+export function isApprovalBlockerCode(v: string): v is ApprovalBlockerCode {
+  return (APPROVAL_BLOCKER_CODES as readonly string[]).includes(v);
+}
+
+export const APPROVAL_BLOCKER_LABEL: Record<ApprovalBlockerCode, string> = {
   flagget: "Fakturaen er flagget",
   kansellert: "Fakturaen er kansellert",
   sumavvik: "Linjesummen stemmer ikke med fakturabeløpet",
