@@ -39,7 +39,8 @@ export default function LeverandorDetailPage() {
   const backHref = `${paths.leverandorer()}${listReturnSearch(sp)}`;
   const go = (s: SupplierSectionId) => guard.requestAction(() => navigate(hrefFor(s), { replace: true }));
 
-  if (supplier.isLoading || supplier.isError || !supplier.data) {
+  // Bakgrunnsfeil med bufret leverandør holder kortet (og notatutkastet) montert med synlig feil.
+  if (!supplier.data) {
     return (
       <QueryState isLoading={supplier.isLoading} isError={supplier.isError} error={supplier.error} onRetry={() => void supplier.refetch()}
         scope="Leverandøren" isEmpty={!supplier.data} emptyTitle="Fant ikke leverandøren" emptyDescription="Den kan være slettet, eller lenken kan være feil.">
@@ -52,6 +53,12 @@ export default function LeverandorDetailPage() {
 
   return (
     <div className="space-y-5">
+      {supplier.isError && (
+        <div role="alert" className="flex flex-wrap items-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+          <span>Kunne ikke oppdatere leverandøren. Viser sist hentede data; ulagrede notater beholdes.</span>
+          <Button size="sm" variant="outline" className="min-h-[44px] md:min-h-9" onClick={() => void supplier.refetch()}>Prøv igjen</Button>
+        </div>
+      )}
       <RavarerHeaderBanner
         title={s.name}
         subtitle="Leverandørkort"

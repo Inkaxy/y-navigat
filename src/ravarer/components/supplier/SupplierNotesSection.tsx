@@ -23,7 +23,19 @@ export function SupplierNotesSection({ supplier, canWrite, onDirtyChange }: { su
     setDirty(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- nytt utkast bare ved ny leverandør
   }, [supplier.id]);
-  useEffect(() => { if (!dirty) setDraft(supplier.notes ?? ""); }, [supplier.notes, dirty]);
+  // Bare en faktisk ny serververdi oppdaterer et rent utkast. Etter vellykket lagring er den
+  // innsendte teksten ren grunnlinje — en eldre bufret verdi skal ikke erstatte den.
+  const lastServer = useRef(supplier.notes ?? "");
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+  useEffect(() => {
+    const next = supplier.notes ?? "";
+    if (next === lastServer.current) return;
+    lastServer.current = next;
+    if (!dirtyRef.current) setDraft(next);
+  }, [supplier.notes]);
+  const [baseline, setBaseline] = useState(supplier.notes ?? "");
+  useEffect(() => { setBaseline(supplier.notes ?? ""); lastServer.current = supplier.notes ?? ""; /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [supplier.id]);
   useEffect(() => { onDirtyChange(dirty); }, [dirty, onDirtyChange]);
   useEffect(() => () => onDirtyChange(false), [onDirtyChange]);
 
@@ -34,6 +46,7 @@ export function SupplierNotesSection({ supplier, canWrite, onDirtyChange }: { su
       onSuccess: () => {
         if (owner.current !== forId) return;
         // Bare rent hvis brukeren ikke har skrevet videre mens lagringen pågikk.
+        setBaseline(text);
         if (draftRef.current === text) setDirty(false);
       },
     });
@@ -48,7 +61,7 @@ export function SupplierNotesSection({ supplier, canWrite, onDirtyChange }: { su
           <Button className="min-h-[44px] md:min-h-9" size="sm" disabled={!dirty || save.isPending} onClick={submit}>
             {save.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />}Lagre notat
           </Button>
-          <Button className="min-h-[44px] md:min-h-9" size="sm" variant="ghost" disabled={!dirty || save.isPending} onClick={() => { setDraft(supplier.notes ?? ""); setDirty(false); }}>Forkast</Button>
+          <Button className="min-h-[44px] md:min-h-9" size="sm" variant="ghost" disabled={!dirty || save.isPending} onClick={() => { setDraft(baseline); setDirty(false); }}>Forkast</Button>
           <span className="text-caption text-ink-secondary" aria-live="polite">{save.isPending ? "Lagrer…" : dirty ? "Ulagrede endringer" : "Lagret"}</span>
         </div>
       )}
