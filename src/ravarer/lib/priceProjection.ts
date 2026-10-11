@@ -104,10 +104,17 @@ const PRICE_EPS = 1e-9;
  * - duplikat-kilde → `duplicateSource: true` (hendelse, ikke trend/Δ)
  * - projeksjon → enhet/valuta/kilde «Kontrollert fra fakturalinje» KUN når raden mangler låst enhet,
  *   identiteten stemmer (faktura, kilde) og prisen er identisk.
- * Uten projeksjon (null) returneres radene uendret.
+ * Identitet: historikk-ID + kilde + faktura + fakturalinje + effektiv dato + leverandør må alle stemme.
+ * Pris er aldri en erstatning for identitet. Avvik → `controlUnknown: "identitet"`.
+ * Uten projeksjon (null: feil eller laster) er gjeldende kontroll UKJENT for fakturarader: de beholdes
+ * som hendelser med originalverdi, men tas ut av graf/Δ (`controlUnknown`). Andre rader er urørt.
  */
-export function mergeProjection(rows: readonly TimelineHistoryRow[], proj: MaterialPriceProjection | null): TimelineHistoryRow[] {
-  if (!proj) return [...rows];
+export function mergeProjection(
+  rows: readonly TimelineHistoryRow[],
+  proj: MaterialPriceProjection | null,
+  unknownReason: "feil" | "laster" = "feil",
+): TimelineHistoryRow[] {
+  if (!proj) return rows.map((r) => (r.source === "invoice" ? { ...r, controlUnknown: unknownReason } : r));
   const byId = new Map(proj.projections.map((p) => [p.history_id, p]));
   const held = new Set(proj.held_history_ids);
   const dup = new Set(proj.duplicate_history_ids);
@@ -116,7 +123,12 @@ export function mergeProjection(rows: readonly TimelineHistoryRow[], proj: Mater
     if (held.has(r.id)) out = { ...out, held: true };
     if (dup.has(r.id)) out = { ...out, duplicateSource: true };
     const p = byId.get(r.id);
-    if (p && !r.unitSource && r.source === "invoice" && r.invoice_id === p.invoice_id && Math.abs(Number(r.price) - p.price) <= PRICE_EPS) {
+    if (!p) return out;
+    const sameIdentity =
+      r.source === "invoice" && r.invoice_id === p.invoice_id && !!r.invoice_line_id && r.invoice_line_id === p.invoice_line_id &&
+      r.effective_date === p.effective_date && r.supplier_id === p.supplier_id;
+    if (!sameIdentity) return { ...out, controlUnknown: "identitet" };
+    if (!r.unitSource && Math.abs(Number(r.price) - p.price) <= PRICE_EPS) {
       out = {
         ...out, unit: p.unit, currency: "NOK", unitSource: "currently_verified_line", checkedAt: proj.checked_at,
         invoiceNumber: out.invoiceNumber ?? p.invoice_number, sourceBasePerPackage: p.base_units_per_package,
