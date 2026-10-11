@@ -1,10 +1,9 @@
-import { LOW_EXTRACTION_CONFIDENCE } from "@/fakturaer/lib/constants";
 import type { ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { InvoiceDocumentPanel } from "@/fakturaer/components/InvoiceDocumentPanel";
-import { formatNok, formatDate, INVOICE_SOURCES } from "@/fakturaer/lib/constants";
+import { formatNok, formatDate, INVOICE_SOURCES, LOW_EXTRACTION_CONFIDENCE } from "@/fakturaer/lib/constants";
 import { formatVariancePct } from "@/fakturaer/lib/linesSum";
 import type { InvoiceDetailData } from "./fetchInvoiceDetail";
 

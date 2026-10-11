@@ -1,10 +1,9 @@
-import { LOW_EXTRACTION_CONFIDENCE } from "@/fakturaer/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { X, AlertTriangle, RefreshCw } from "lucide-react";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
 import { useInvoiceDocumentUrl } from "@/fakturaer/hooks/useInvoiceDocument";
-import { formatNok, formatDate } from "@/fakturaer/lib/constants";
+import { formatNok, formatDate, LOW_EXTRACTION_CONFIDENCE } from "@/fakturaer/lib/constants";
 import { cn } from "@/lib/utils";
 import { FALLBACK_TOLERANCE_PCT } from "@/fakturaer/hooks/useMatchTolerances";
 

@@ -1,4 +1,3 @@
-import { LOW_EXTRACTION_CONFIDENCE } from "@/fakturaer/lib/constants";
 import { useState } from "react";
 import { resetParamsKeeping } from "@/lib/resetParamsKeeping";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -28,7 +27,7 @@ import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
 import { useInvoices, useInvoiceSuppliers, type InvoiceSortKey, type SortDir } from "@/fakturaer/hooks/useInvoices";
 import { getPaidBadgeInfo } from "@/fakturaer/lib/paidStatus";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
-import { formatNok, formatDate, INVOICE_STATUSES, INVOICE_SOURCES } from "@/fakturaer/lib/constants";
+import { formatNok, formatDate, INVOICE_STATUSES, INVOICE_SOURCES, LOW_EXTRACTION_CONFIDENCE } from "@/fakturaer/lib/constants";
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { useReviewCount } from "@/fakturaer/hooks/useReviewCount";
 import { TripletexStatusCard } from "@/ravarer/components/TripletexStatusCard";
