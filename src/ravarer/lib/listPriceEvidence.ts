@@ -188,10 +188,9 @@ export function comparisonFor(
   ev: ListPriceEvidence | undefined,
   checkedAt: string,
 ): ListComparison {
-  if (!ev || ev.rawMaterialId !== row.id) return PENDING_UNCHECKED;
-  const v = versionKey(row.updatedAt);
-  if (v == null || v !== versionKey(ev.materialUpdatedAt)) return PENDING_UNCHECKED;
-  if (ev.currentPrice !== row.costPrice) return PENDING_UNCHECKED;
+  const b = bindEvidence(row, ev);
+  if (!b) return PENDING_UNCHECKED;
+  ev = b;
   if (ev.status === "eligible") {
     if (ev.baseUnit !== row.baseUnit || ev.deviationPct == null || ev.invoicePricePerBaseUnit == null || !ev.invoiceId) return PENDING_UNCHECKED;
     return { state: "eligible", deviation: ev.deviationPct, invoicePpbu: ev.invoicePricePerBaseUnit, invoiceDate: ev.invoiceDate, invoiceNumber: ev.invoiceNumber, invoiceId: ev.invoiceId, checkedAt };
@@ -202,7 +201,7 @@ export function comparisonFor(
   return { state: "unknown", label: reasonLabel(code), needsControl, invoiceId: ev.invoiceId, invoiceDate: ev.invoiceDate, checkedAt };
 }
 
-export type CostStatus = "verifisert" | "uverifisert" | "mangler" | "ukjent";
+export type CostStatus = "verifisert" | "uverifisert" | "mangler" | "kontroll" | "ukjent";
 export function costStatusOf(v: string | null | undefined): CostStatus {
   return v === "verifisert" || v === "uverifisert" || v === "mangler" ? v : "ukjent";
 }
@@ -210,5 +209,45 @@ export const COST_STATUS_LABEL: Record<CostStatus, string> = {
   verifisert: "Verifisert",
   uverifisert: "Ikke verifisert",
   mangler: "Mangler grunnlag",
+  kontroll: "Kilde må kontrolleres",
   ukjent: "Status ukjent",
 };
+
+/** Serverbeviset bare når det gjelder nøyaktig denne råvareversjonen og kostprisen; ellers null. */
+export function bindEvidence(
+  row: { id: string; updatedAt: string; costPrice: number | null },
+  ev: ListPriceEvidence | undefined,
+): ListPriceEvidence | null {
+  if (!ev || ev.rawMaterialId !== row.id) return null;
+  const v = versionKey(row.updatedAt);
+  if (v == null || v !== versionKey(ev.materialUpdatedAt)) return null;
+  return ev.currentPrice === row.costPrice ? ev : null;
+}
+
+export interface CostEvidence { status: CostStatus; reason: string | null }
+
+/**
+ * Kostprisens status for visning/eksport. Lagret «verifisert» er bare gyldig når ferskt, bundet
+ * serverbevis bekrefter kilden (`cost_evidence_status = eligible`). Lasting/feil/oppfrisking og
+ * avvist kilde gir aldri «Verifisert». Den lagrede prisen beholdes og merkes.
+ */
+export function costEvidenceFor(persisted: string | null | undefined, bound: ListPriceEvidence | null, pending: boolean): CostEvidence {
+  const p = costStatusOf(persisted);
+  if (p !== "verifisert") return { status: p, reason: null };
+  if (!bound) return { status: "ukjent", reason: pending ? "Kontrollerer kostprisens kilde …" : "Kostprisens kilde er ikke kontrollert" };
+  if (bound.costEvidence === "eligible" && bound.costBasisStatus === "verifisert") return { status: "verifisert", reason: null };
+  return { status: "kontroll", reason: reasonLabel(bound.costReason ?? "cost_source_stale") };
+}
+
+/** Siste fakturaobservasjon fra bundet bevis. Pris bare når fakturabeviset er godkjent. */
+export function latestInvoiceOf(bound: ListPriceEvidence | null): { date: string | null; price: number | null; id: string | null; number: string | null; reason: string | null } {
+  if (!bound) return { date: null, price: null, id: null, number: null, reason: null };
+  const ok = bound.invoiceEvidence === "eligible";
+  return {
+    date: bound.invoiceDate,
+    price: ok ? bound.invoicePricePerBaseUnit : null,
+    id: bound.invoiceId,
+    number: bound.invoiceNumber,
+    reason: ok ? null : reasonLabel(bound.invoiceReason ?? bound.reason),
+  };
+}

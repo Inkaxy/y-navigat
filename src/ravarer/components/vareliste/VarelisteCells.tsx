@@ -235,6 +235,7 @@ function cellFor(id: string, ctx: VarelisteCellContext): (item: RawMaterialListI
             </TooltipTrigger>
             <TooltipContent>
               {`Kostpris: ${COST_STATUS_LABEL[item.costStatus]}. `}
+              {item.costReason ? `${item.costReason}. ` : ""}
               {item.costSource ? `Kilde: ${priceSourceLabel(item.costSource)}. ` : ""}
               {item.costUpdatedAt ? `Oppdatert ${formatDate(item.costUpdatedAt)}` : "Ingen dato"}
             </TooltipContent>

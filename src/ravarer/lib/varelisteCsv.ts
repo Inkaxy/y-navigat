@@ -23,7 +23,7 @@ export function csvValue(colId: string, i: RawMaterialListItem): string {
             return i.supplierName ?? "";
           case "cost":
             // Status følger prisen i eksporten, så en ikke-verifisert kost aldri ser brukbar ut.
-            return i.costStatus === "verifisert" || i.costPrice == null ? formatNok(i.costPrice) : `${formatNok(i.costPrice)} (${COST_STATUS_LABEL[i.costStatus].toLowerCase()})`;
+            return i.costStatus === "verifisert" || i.costPrice == null ? formatNok(i.costPrice) : `${formatNok(i.costPrice)} (${(i.costReason ?? COST_STATUS_LABEL[i.costStatus]).toLowerCase()})`;
           case "agreed":
             return i.agreedPrice != null ? formatNok(i.agreedPrice) : "";
           case "deviation":

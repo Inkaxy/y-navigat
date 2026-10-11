@@ -5,7 +5,7 @@ import { useAllRawMaterialPurchaseStats } from "@/ravarer/hooks/usePurchaseStats
 import { useRawMaterialSearchIndex } from "@/ravarer/hooks/useRawMaterialSearchIndex";
 import { useRavarerScope } from "@/ravarer/hooks/useRavarerScope";
 import { useListPriceEvidence } from "@/ravarer/hooks/useListPriceEvidence";
-import { comparisonFor, costStatusOf, PENDING_LOADING, PENDING_UNCHECKED } from "@/ravarer/lib/listPriceEvidence";
+import { bindEvidence, comparisonFor, costEvidenceFor, latestInvoiceOf, PENDING_LOADING, PENDING_UNCHECKED } from "@/ravarer/lib/listPriceEvidence";
 import {
   buildSearchText,
   type PackageState,
@@ -58,17 +58,6 @@ export function useVarelisteItems(options?: { enabled?: boolean }) {
       const supplierId = r.primary_supplier_id ?? primary?.supplierId ?? null;
       const supplierName = supplierId ? (supplierMap.get(supplierId) ?? null) : null;
 
-      // Leverandørbufferens siste pris er bare en visningsverdi; den sertifiserer aldri et avvik.
-      const lastInvoice = rowLinks.reduce<{ price: number | null; date: string | null }>(
-        (acc, l) => {
-          if (l.lastInvoiceDate && (!acc.date || l.lastInvoiceDate > acc.date)) {
-            return { price: l.lastInvoicePrice, date: l.lastInvoiceDate };
-          }
-          return acc;
-        },
-        { price: primary?.lastInvoicePrice ?? null, date: primary?.lastInvoiceDate ?? null },
-      );
-
       const aliases = rowLinks.flatMap((l) => l.aliases);
       const supplierSkus = rowLinks.map((l) => l.supplierSku).filter((s): s is string => !!s);
       const supplierNames = rowLinks
@@ -77,9 +66,15 @@ export function useVarelisteItems(options?: { enabled?: boolean }) {
 
       const agreedPrice = primary?.agreedPricePerBaseUnit ?? r.agreed_price ?? null;
       const stat = statsMap?.get(r.id);
+      const rowKey = { id: r.id, updatedAt: r.updated_at, costPrice: r.current_cost_price, baseUnit: r.base_unit };
+      const ev = evidence.certified?.byId.get(r.id);
       const comparison = evidence.certified
-        ? comparisonFor({ id: r.id, updatedAt: r.updated_at, costPrice: r.current_cost_price, baseUnit: r.base_unit }, evidence.certified.byId.get(r.id), evidence.certified.checkedAt)
+        ? comparisonFor(rowKey, ev, evidence.certified.checkedAt)
         : evidence.loading ? PENDING_LOADING : PENDING_UNCHECKED;
+      // Kost og siste faktura leses av samme bundne bevis; aldri leverandørbufferen.
+      const bound = evidence.certified ? bindEvidence(rowKey, ev) : null;
+      const costEv = costEvidenceFor(r.cost_basis_status, bound, evidence.loading);
+      const latest = latestInvoiceOf(bound);
 
       return {
         id: r.id,
@@ -91,7 +86,8 @@ export function useVarelisteItems(options?: { enabled?: boolean }) {
         isActive: r.is_active,
         baseUnit: r.base_unit,
         costPrice: r.current_cost_price,
-        costStatus: costStatusOf(r.cost_basis_status),
+        costStatus: costEv.status,
+        costReason: costEv.reason,
         costSource: r.price_source,
         costUpdatedAt: r.price_updated_at,
         agreedPrice,
@@ -101,8 +97,8 @@ export function useVarelisteItems(options?: { enabled?: boolean }) {
         primaryLinkId: primary?.id ?? null,
         matchedAlias: null,
 
-        lastInvoicePrice: lastInvoice.price,
-        lastInvoiceDate: lastInvoice.date ?? stat?.last_invoice_date ?? null,
+        lastInvoicePrice: latest.price,
+        lastInvoiceDate: latest.date,
         comparison,
         deviation: comparison.state === "eligible" ? comparison.deviation : null,
         packageState: packageStateOf(r),

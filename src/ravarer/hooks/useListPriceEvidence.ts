@@ -58,11 +58,11 @@ export function useListPriceEvidence(legalEntityId: string | null | undefined, i
     return () => clearTimeout(t);
   }, [expiry]);
   const clock = Math.max(now, Date.now());
-  const fresh = q.isSuccess && !q.isFetching && !q.isError && !!q.data
+  const fresh = enabled && sorted.length > 0 && !!legalEntityId && q.isSuccess && !q.isFetching && !q.isError && !!q.data
     && q.data.entity === legalEntityId && clock - q.data.receivedAt <= LIST_EVIDENCE_MAX_AGE_MS;
   return {
     certified: fresh && q.data ? { checkedAt: q.data.checkedAt, byId: q.data.byId } : null,
-    loading: q.isFetching,
+    loading: enabled && q.isFetching,
     isError: q.isError,
     checkedAt: fresh && q.data ? q.data.checkedAt : null,
     refetch: () => { void q.refetch(); },
