@@ -37,7 +37,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function show(value: unknown): string {
   if (value == null || value === "") return "—";
-  if (typeof value === "number") return formatNumber(value, 1);
+  if (typeof value === "number") return formatNutrientValue(value);
   if (typeof value === "boolean") return value ? "ja" : "nei";
   if (Array.isArray(value)) return value.map((v) => String(v)).join(", ") || "—";
   return String(value);
@@ -59,7 +59,7 @@ export function nutritionValueDiff(
     label: NUTRITION_LABELS[field] ?? field,
     before: show(oldValue),
     after: show(newValue),
-    change: n != null ? changePct(typeof oldValue === "number" ? oldValue : null, n) : null,
+    change: n != null ? nutrientChange(typeof oldValue === "number" ? oldValue : null, n) : null,
   };
 }
 
@@ -84,27 +84,34 @@ export function nutritionObjectDiff(oldValue: unknown, newValue: unknown): Nutri
         before: show(o),
         after: show(n),
         change:
-          typeof n === "number" ? changePct(typeof o === "number" ? o : null, n) : null,
+          typeof n === "number" ? nutrientChange(typeof o === "number" ? o : null, n) : null,
       };
     });
   return rows.length > 0 ? rows : null;
 }
 
 /**
- * Næringsverdi i før/etter-visning: norsk desimal uten oppdiktet presisjon. 0,01 vises som 0,01,
- * 0,1 som 0,1 og 0 som 0. Små verdier ≠ 0 rundes aldri til 0 (tre gjeldende sifre).
+ * Næringsverdi i før/etter-visning og historikk: norsk desimal med kildens presisjon
+ * (inntil 15 gjeldende sifre, nok for lagrede desimaltall uten flyttallsstøy). 0,01 → 0,01,
+ * 0,1 → 0,1, 0 → 0, 1,0004 → 1,0004. Ikke-endelige verdier → «—».
  */
 export function formatNutrientValue(n: number): string {
   if (!Number.isFinite(n)) return "—";
   if (n === 0) return "0";
-  const opts: Intl.NumberFormatOptions = Math.abs(n) < 0.001 ? { maximumSignificantDigits: 3 } : { maximumFractionDigits: 3 };
-  return n.toLocaleString("nb-NO", opts);
+  return n.toLocaleString("nb-NO", { maximumSignificantDigits: 15 });
 }
 
-/** Endring som aldri skjuler en reell endring fra/til 0 og aldri viser endring når verdien er lik. */
+/**
+ * Endring for næringsverdier. Aldri «+0 %» for ulike verdier: under 0,05 % vises «+<0,1 %»/«−<0,1 %».
+ * Fra 0 vises absolutt endring; lik verdi = «uendret»; manglende før = «ny».
+ */
 export function nutrientChange(oldV: number | null, newV: number): string {
+  if (!Number.isFinite(newV) || (oldV != null && !Number.isFinite(oldV))) return "—";
   if (oldV == null) return "ny";
   if (oldV === newV) return "uendret";
   if (oldV === 0) return `fra 0 til ${formatNutrientValue(newV)}`;
-  return changePct(oldV, newV);
+  const pct = ((newV - oldV) / Math.abs(oldV)) * 100;
+  const sign = pct > 0 ? "+" : "\u2212";
+  if (Math.abs(pct) < 0.05) return `${sign}<0,1 %`;
+  return `${sign}${formatNumber(Math.abs(pct), 1)} %`;
 }

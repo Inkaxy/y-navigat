@@ -96,7 +96,7 @@ export function DatasheetReviewView({ target, canWrite, busy, onClose, onConfirm
 
   return (
     <Dialog open={!!target} onOpenChange={(v) => { if (!v && !busy) onClose(); }}>
-      <DialogContent className="flex max-h-[calc(100dvh-1.5rem)] max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:p-0" closeClassName="flex h-11 w-11 items-center justify-center right-1 top-1">
+      <DialogContent className="flex max-h-[calc(100dvh-1.5rem)] max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:p-0" closeClassName="flex h-[44px] w-[44px] items-center justify-center right-1 top-1">
         <DialogHeader className="shrink-0 border-b border-line-subtle p-4 pr-12 sm:p-6 sm:pr-12">
           <DialogTitle className="[overflow-wrap:anywhere]">Gjennomgå {target?.fileName}</DialogTitle>
           <DialogDescription>
@@ -129,7 +129,7 @@ export function DatasheetReviewView({ target, canWrite, busy, onClose, onConfirm
                         return (
                           <tr key={k} className="border-t border-line-subtle/60">
                             <td className="p-0">
-                              <label className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center md:min-h-8 md:min-w-8" data-testid="nutrient-target">
+                              <label className="flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center md:min-h-8 md:min-w-8" data-testid="nutrient-target">
                                 <Checkbox aria-label={`Bruk ${NUTRITION_LABELS[k] ?? k} fra databladet`} checked={nutSel.has(k)} disabled={!fields.has("nutrition")} onCheckedChange={() => toggleNut(k)} />
                               </label>
                             </td>

@@ -39,12 +39,12 @@ export function PriceBasisNowView({ rows, baseUnit, tolerancePct, tolIsCategory 
                 <span className="text-ink-secondary">
                   {loading ? "Henter…" : error ? "Kunne ikke hente prisgrunnlag" : ref ? (ref.source === "agreement" && !(link.agreed_price_set_at && link.agreed_price_set_by) ? "Registrert avtalepris — ikke bekreftet" : priceReferenceLabel(ref.source)) : "—"}
                 </span>
-                {ref?.price != null && <span className="tabular-nums font-medium">{formatNok(ref.price)} / {baseUnit}</span>}
-                {ref && priceReferenceDateText(ref) && <span className="text-caption text-ink-secondary">{priceReferenceDateText(ref)}</span>}
+                {!loading && !error && ref?.price != null && <span className="tabular-nums font-medium">{formatNok(ref.price)} / {baseUnit}</span>}
+                {!loading && !error && ref && priceReferenceDateText(ref) && <span className="text-caption text-ink-secondary">{priceReferenceDateText(ref)}</span>}
                 <span className="ml-auto text-caption text-ink-secondary">Toleranse {tol}</span>
               </div>
-              {ref && priceReferenceReasonText(ref) && <p className="text-caption text-ink-secondary">{priceReferenceReasonText(ref)}</p>}
-              {ref?.source === "agreement" && !(link.agreed_price_set_at && link.agreed_price_set_by) && (
+              {!loading && !error && ref && priceReferenceReasonText(ref) && <p className="text-caption text-ink-secondary">{priceReferenceReasonText(ref)}</p>}
+              {!loading && !error && ref?.source === "agreement" && !(link.agreed_price_set_at && link.agreed_price_set_by) && (
                 <p className="text-caption text-warning">Motoren bruker i dag denne registrerte prisen, men hvem/når avtalen ble satt er ikke registrert. Bekreft avtalen før den brukes som dokumentert grunnlag.</p>
               )}
               {link.notes && <p className="text-caption text-ink-secondary">{link.notes}</p>}
@@ -81,7 +81,9 @@ export function PriceBasisNowCard({ rawMaterialId, category, baseUnit, links, su
   });
   const rows: ViewRow[] = links.map((link, i) => ({
     link, name: supplierNames.get(link.supplier_id) ?? "Ukjent leverandør",
-    ref: refs[i]?.data, loading: !!refs[i]?.isLoading, error: !!refs[i]?.isError,
+    // Bare ferdig, vellykket og ikke-oppfriskende svar vises som «akkurat nå»; ellers ingen tall.
+    ref: refs[i]?.isSuccess && !refs[i]?.isFetching ? refs[i]?.data : undefined,
+    loading: !!refs[i]?.isFetching && !refs[i]?.isError, error: !!refs[i]?.isError,
   }));
   return (
     <PriceBasisNowView rows={rows} baseUnit={baseUnit} tolerancePct={tol.toleranceFor(category)} tolIsCategory={!!category && tol.byCategory[category] != null} />

@@ -128,7 +128,7 @@ export default function RawMaterialDetail() {
     setEditingName(false);
   };
 
-  const checklist = completenessChecklist({ rm, linkCount: page.links.length, nutrition: page.nutrition, hasDatasheet: page.hasDatasheet });
+  const checklist = completenessChecklist({ rm, linkCount: page.links.length, nutrition: page.nutrition, hasDatasheet: page.hasDatasheet, costEvidence: priceEvidence.cost });
   const sections = sectionsFor(rm.is_packaging);
   const sectionHref = (sid: SectionId) => `${paths.raavare(rm.id)}${sectionSearch(searchParams, sid)}`;
   const openCount = checklist.filter((c) => c.status !== "ok").length;
