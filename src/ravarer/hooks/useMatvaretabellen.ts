@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { fetchAllRows } from "@/lib/supabasePaging";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { recomputeRecipesForRawMaterial } from "@/varer/lib/recomputeFanout";
+import { applyResultMessage, parseApplyResult, parseSyncResult, type ApplyMatvaretabellenResult } from "@/ravarer/lib/matvaretabellenResult";
 import { escapeIlikePattern, normalizeForServerSearch } from "@/ravarer/lib/textNormalize";
 
 export interface FoodRow {
@@ -185,24 +186,17 @@ export function useSyncMatvaretabellen() {
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("matvaretabellen-sync");
       if (error) throw error;
-      return data as { ok: boolean; foods: number; upserted: number; groups: number };
+      return parseSyncResult(data);
     },
     onSuccess: (res) => {
-      qc.invalidateQueries({ queryKey: ["matvaretabellen_foods"] });
-      toast.success(`Matvaretabellen oppdatert — ${res?.upserted ?? 0} matvarer lagret`);
+      void qc.invalidateQueries({ queryKey: ["matvaretabellen_foods"] });
+      toast.success(`Matvaretabellen oppdatert — ${res.upserted} av ${res.foods} matvarer lagret`);
     },
     onError: (e: unknown) => toast.error(`Kunne ikke oppdatere: ${e instanceof Error ? e.message : e}`),
   });
 }
 
-export interface ApplyMatvaretabellenResult {
-  written: string[];
-  skipped: string[];
-  water_content_set: boolean;
-  water_g_skipped: boolean;
-  declaration_name_set: string | null;
-  forced: boolean;
-}
+export type { ApplyMatvaretabellenResult };
 
 export function useApplyMatvaretabellen() {
   const qc = useQueryClient();
@@ -217,7 +211,7 @@ export function useApplyMatvaretabellen() {
         p_force: input.force ?? false,
       });
       if (error) throw error;
-      return { ...input, result: (data ?? null) as unknown as ApplyMatvaretabellenResult };
+      return { ...input, result: parseApplyResult(data) };
     },
     onSuccess: (input) => {
       invalidateRawMaterial(qc, input.rawMaterialId);
@@ -226,12 +220,8 @@ export function useApplyMatvaretabellen() {
       // Oppskriftene som bruker råvaren beregnes på nytt i bakgrunnen.
       void recomputeRecipesForRawMaterial(input.rawMaterialId, qc, { silent: input.silent });
       if (input.silent) return;
-      const declarationNameSet = input.result?.declaration_name_set ?? null;
-      toast.success(
-        declarationNameSet
-          ? `Næringsverdier hentet fra Matvaretabellen · Deklarasjonsnavn satt til «${declarationNameSet}»`
-          : "Næringsverdier hentet fra Matvaretabellen",
-      );
+      const m = applyResultMessage(input.result);
+      if (m.tone === "success") toast.success(m.text); else toast.warning(m.text);
     },
     onError: (e: unknown, input) => {
       if (input?.silent) return;
