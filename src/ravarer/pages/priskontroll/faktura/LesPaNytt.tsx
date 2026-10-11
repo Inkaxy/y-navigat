@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -163,7 +163,8 @@ export default function LesPaNytt() {
             <>
             {docMatch !== "match" && (
               <p role="alert" className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
-                {docMatch === "changed" ? "Originalen er endret siden lesingen. Forslaget kan ikke tas i bruk." : "Originalens versjon er ikke kontrollert ennå. Forslaget kan ikke tas i bruk før den er bekreftet uendret."}
+                {docMatch === "changed" ? "Originalen er endret siden lesingen. Forslaget kan ikke tas i bruk." : ver.isError ? "Gjeldende original kunne ikke kontrolleres. Forslaget kan ikke tas i bruk." : "Originalens versjon er ikke kontrollert ennå. Forslaget kan ikke tas i bruk før den er bekreftet uendret."}
+                {ver.isError && <Button size="sm" variant="outline" className="ml-2 min-h-11" onClick={() => void ver.refetch()}>Kontroller originalen på nytt</Button>}
               </p>
             )}
             <RereadView run={r} document={document} canApply={allowApply} pending={pending} saving={apply.isPending}
