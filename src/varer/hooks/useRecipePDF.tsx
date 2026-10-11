@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import type { RecipeDepartment } from "@/varer/lib/departments";
-import { lineCost } from "@/varer/lib/recipeCost";
+import { lineCost, lineCostStatus } from "@/varer/lib/recipeCost";
 import type { ScaleMode, ScaledBatchLine } from "@/varer/lib/scaling";
 import {
   calcWaterTemp,
@@ -111,7 +111,11 @@ export interface RecipePDFData {
   steps: RecipePDFStep[];
   totalProcessMinutes: number;
 
-  costs: { total: number; perUnit: number | null } | null;
+  /**
+   * Råvarekost. `total`/`perUnit` er null når kalkylen er ufullstendig: en manglende eller
+   * uverifisert pris skal aldri bli 0 kr og gi en «full» sum. `missing` forklarer hvorfor.
+   */
+  costs: { total: number | null; perUnit: number | null; incomplete: boolean; missing: { name: string; reason: string }[] } | null;
 
   /** Per-batch-oppstilling — satt når oppskriften er delt i flere fysiske batcher. */
   batches?: {
@@ -166,8 +170,13 @@ export interface BuildRecipePDFInput {
   scaleResult?: { mode: ScaleMode; batchCount: number; perBatch: ScaledBatchLine[] } | null;
 }
 
-function lineCostOrNull(line: BakersLine, grams: number): number | null {
-  return lineCost(line, grams).cost;
+/** Linjekost bare når prisen er verifisert og kan regnes om; ellers null med grunn. */
+export function pdfLineCost(line: BakersLine, grams: number): { cost: number | null; reason: string | null } {
+  const st = lineCostStatus(line);
+  const r = lineCost(line, grams);
+  if (r.cost == null) return { cost: null, reason: r.reason ?? "Kan ikke beregnes" };
+  if (!st.ok || r.unverified) return { cost: null, reason: st.reason ?? r.reason ?? "Uverifisert kostpris" };
+  return { cost: r.cost, reason: null };
 }
 
 /**
@@ -201,6 +210,7 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
   const waterTemp = weightedTemp?.waterTempC ?? null;
   const waterTempFeasible = waterTemp != null && waterTemp >= 0 && waterTemp <= 60;
 
+  const missing: { name: string; reason: string }[] = [];
   function buildPart(p: BuildRecipePDFInput["parts"][number]): RecipePDFPart {
     const partLines = input.lines.filter((l) => l.recipe_part_id === p.id);
     const summary = computePartSummary(partLines, baseTotals.totalFlourG);
@@ -210,6 +220,13 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
       const exactWeight = s ? s.exact : true;
       const exactGrams = s?.exactGrams ?? toGrams(l.quantity, l.unit) * input.factor;
       const grams = roundBakerGrams(exactGrams);
+      let cost: number | null = null;
+      if (input.includeCosts) {
+        // Ukjent vekt gir ingen kostpris — 0 g ville blitt 0 kr og skjult mangelen.
+        const c = exactWeight ? pdfLineCost(l, exactGrams) : { cost: null, reason: "Ukjent vekt" };
+        cost = c.cost;
+        if (c.reason) missing.push({ name: lineDisplayName(l), reason: c.reason });
+      }
       return {
         id: l.id,
         name: lineDisplayName(l),
@@ -223,8 +240,7 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
         isFlour: isFlourLine(l),
         isSubRecipe: !!l.sub_product_id || !!l._rm?.produced_by_recipe_id,
 
-        // Ukjent vekt gir ingen kostpris — 0 g ville blitt 0 kr og skjult mangelen.
-        cost: input.includeCosts && exactWeight ? lineCostOrNull(l, exactGrams) : null,
+        cost,
       };
     });
     return {
@@ -297,7 +313,13 @@ export function buildRecipePDFData(input: BuildRecipePDFInput): RecipePDFData {
       0,
     );
     const units = uw > 0 ? Math.floor(exactDoughG / uw) : Math.round(input.scaledUnits);
-    costs = { total, perUnit: units > 0 ? total / units : null };
+    const incomplete = missing.length > 0;
+    costs = {
+      total: incomplete ? null : total,
+      perUnit: !incomplete && units > 0 ? total / units : null,
+      incomplete,
+      missing,
+    };
   }
 
   return {

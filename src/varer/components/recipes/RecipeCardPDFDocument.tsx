@@ -213,10 +213,18 @@ export function RecipeCardPDFDocument({ data, showCosts = false }: Props) {
           {showCosts && data.costs && (
             <View style={styles.fact}>
               <Text style={styles.factLabel}>Råvarekost</Text>
-              <Text style={styles.factValue}>
-                {fmtNum(data.costs.total, 2)} kr
-                {data.costs.perUnit != null ? ` · ${fmtNum(data.costs.perUnit, 2)} kr/stk` : ""}
-              </Text>
+              {data.costs.total != null ? (
+                <Text style={styles.factValue}>
+                  {fmtNum(data.costs.total, 2)} kr
+                  {data.costs.perUnit != null ? ` · ${fmtNum(data.costs.perUnit, 2)} kr/stk` : ""}
+                </Text>
+              ) : (
+                <Text style={styles.factValue}>
+                  Ufullstendig – {data.costs.missing.length} {data.costs.missing.length === 1 ? "linje mangler" : "linjer mangler"} verifisert kostpris
+                  {": " + data.costs.missing.slice(0, 3).map((m) => `${m.name} (${m.reason.toLowerCase()})`).join(", ")}
+                  {data.costs.missing.length > 3 ? " …" : ""}
+                </Text>
+              )}
             </View>
           )}
           {!data.imageUrl && <Image style={styles.factsSeal} src={logoRund} />}
