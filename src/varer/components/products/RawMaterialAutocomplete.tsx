@@ -287,7 +287,7 @@ export function RawMaterialAutocomplete({
         )}
       </div>
 
-      <RawMaterialCreateSheet
+      {createOpen && <RawMaterialCreateSheet
         open={createOpen}
         onOpenChange={setCreateOpen}
         context={{ kind: "standalone", prefill: { name: prefilledName, openAfterSave: false } }}
@@ -301,7 +301,17 @@ export function RawMaterialAutocomplete({
           if (error || !data) return;
           onChange(data.id, data);
         }}
-      />
+        onUseExisting={async (id) => {
+          setCreateOpen(false);
+          const { data, error } = await supabase
+            .from("raw_materials")
+            .select("id, sku, name, category, base_unit, current_cost_price")
+            .eq("id", id)
+            .single();
+          if (error || !data) return;
+          onChange(data.id, data);
+        }}
+      />}
     </>
   );
 }

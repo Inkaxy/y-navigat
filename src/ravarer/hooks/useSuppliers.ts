@@ -37,6 +37,7 @@ export function useSuppliers() {
   const { legalEntityId } = useRavarerScope();
   return useQuery({
     queryKey: ["suppliers", legalEntityId],
+    enabled: !!legalEntityId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("suppliers")

@@ -85,6 +85,7 @@ export function useCreateRawMaterial() {
   const { legalEntityId, user } = useRavarerScope();
   return useMutation({
     mutationFn: async (input: Partial<RawMaterialRow> & { sku: string; name: string; base_unit: string }) => {
+      if (!legalEntityId) throw new Error("Fant ikke selskapet");
       const { data, error } = await supabase
         .from("raw_materials")
         .insert({
