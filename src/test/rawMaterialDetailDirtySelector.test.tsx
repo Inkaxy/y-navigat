@@ -82,7 +82,8 @@ Object.assign(Element.prototype, { hasPointerCapture: () => false, releasePointe
 
 async function pickSection(label: string) {
   const trigger = screen.getByRole("combobox", { name: "Velg seksjon" });
-  await act(async () => { fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" }); });
+  trigger.focus();
+  await act(async () => { fireEvent.keyDown(trigger, { key: "Enter" }); });
   const opt = await screen.findByRole("option", { name: label });
   await act(async () => { fireEvent.click(opt); });
 }
