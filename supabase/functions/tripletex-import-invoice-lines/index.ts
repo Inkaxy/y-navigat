@@ -163,6 +163,8 @@ Deno.serve(async (req) => {
       for (const inv of invoices ?? []) {
         behandlet++;
         const ttId = inv.tripletex_supplier_invoice_id as string;
+        // Eierskap for denne kjøringen: alle skriv på fakturaen krever samme token.
+        const token = inv.claim_token as string;
         try {
           // 0) Fakturahode med leverandør (kontrollfakta til uthentingen)
           const { data: head } = await admin
@@ -198,10 +200,12 @@ Deno.serve(async (req) => {
             .upload(path, new Uint8Array(buf), { upsert: true, contentType: "application/pdf" });
           if (upErr) throw Object.assign(new Error(upErr.message), { pdfFail: true });
 
-          await admin
+          const { error: pdfErr } = await admin
             .from("invoices")
             .update({ source_document_url: path, pdf_status: "stored" })
-            .eq("id", inv.id);
+            .eq("id", inv.id)
+            .eq("line_extraction_token", token);
+          if (pdfErr) throw Object.assign(new Error(pdfErr.message), { pdfFail: true });
 
           // 2b) Bilagets posteringer: hovedbokskonto og — når mva mangler — inngående mva.
           //     Feil her skal ikke velte fakturaen.
@@ -219,9 +223,9 @@ Deno.serve(async (req) => {
               if (totalVat == null) {
                 const vat = vatFromPostings(postings);
                 if (vat != null && totalAmount != null && vat < Math.abs(totalAmount)) {
+                  // Lagres først i ferdigstillingen (samme transaksjon som linjene).
                   totalVat = vat;
                   vatInferred = true;
-                  await admin.from("invoices").update({ total_vat: vat, vat_inferred: true }).eq("id", inv.id);
                 }
               }
             } else {
@@ -274,46 +278,36 @@ Deno.serve(async (req) => {
           const confidence = num(extractJsonBody?.confidence);
           const lowConfidence = needsReviewFromConfidence(confidence);
 
+          const sumCheck0 = computeLinesSum({ lineTotals: rows.map((r) => r.total_amount), totalAmount, totalVat });
+          // Fakturanivåets forklaringer (manglende beløp, mva-lignende forhold) lagres på fakturaen.
+          const invoiceIssues = Array.isArray(extractJsonBody?.issues) ? extractJsonBody.issues
+            : Array.isArray(extractJsonBody?.sum_check?.issues) ? extractJsonBody.sum_check.issues : [];
+          // Linjer + status i ÉN transaksjon, med token- og manuell-endringsvakt.
+          const { data: fin, error: finErr } = await admin.rpc("rm_finalize_invoice_line_extraction", {
+            p_invoice_id: inv.id,
+            p_token: token,
+            p_rows: rows,
+            p_invoice: {
+              extraction_confidence: confidence,
+              ...(rows.length ? sumCheck0 : computeLinesSum({ lineTotals: [], totalAmount, totalVat })),
+              total_vat_from_postings: vatInferred ? totalVat : null,
+              issues: invoiceIssues,
+              low_confidence: lowConfidence,
+            },
+          });
+          if (finErr) throw new Error(`Lagring feilet: ${finErr.message}`);
+          const finRes = (fin ?? {}) as { ok?: boolean; code?: string; lines?: number };
+          if (!finRes.ok) {
+            // Utdatert kjøring eller manuell endring: ingenting lagret, ingenting overskrevet.
+            detaljer.push({ invoice_id: inv.id, skipped: finRes.code ?? "ukjent" });
+            continue;
+          }
           if (rows.length === 0) {
-            await admin
-              .from("invoices")
-              .update({
-                extraction_confidence: confidence,
-                ...computeLinesSum({ lineTotals: [], totalAmount, totalVat }),
-                lines_source: null,
-                line_extraction_status: "done",
-                line_extraction_at: new Date().toISOString(),
-                line_extraction_error: "PDF-en ga ingen lesbare linjer",
-              })
-              .eq("id", inv.id);
             vellykket++;
             detaljer.push({ invoice_id: inv.id, lines: 0 });
             continue;
           }
-
-          const { error: linesErr } = await admin.from("invoice_lines").insert(rows);
-          if (linesErr) throw new Error(linesErr.message);
-
-          // Sumkontroll: linjene er eks. mva, fakturaens totalbeløp inkl. mva.
-          let sumCheck = computeLinesSum({
-            lineTotals: rows.map((r: any) => r.total_amount),
-            totalAmount,
-            totalVat,
-          });
-
-          await admin
-            .from("invoices")
-            .update({
-              lines_source: "pdf_extracted",
-              line_extraction_status: "done",
-              line_extraction_at: new Date().toISOString(),
-              line_extraction_error: null,
-              extraction_confidence: confidence,
-              ...sumCheck,
-              // Usikker uthenting skal ikke gli gjennom som ferdig importert.
-              ...(lowConfidence && inv.status === "imported" ? { status: "needs_review" } : {}),
-            })
-            .eq("id", inv.id);
+          let sumCheck: Record<string, unknown> = { ...sumCheck0 };
 
           // 4) Sumavvik eller manglende mva: rm_repair_invoice_vat returnerer bare forslag/kontrollbehov.
           //    Den endrer aldri beløp (et mva-lignende forhold kan være en manglende linje).
@@ -375,7 +369,11 @@ Deno.serve(async (req) => {
             status: (inv as any).status ?? null,
             pdfFail: !!(e as any)?.pdfFail,
           });
-          await admin.from("invoices").update(patch).eq("id", inv.id);
+          // Bare kjøringen som eier tokenet kan skrive feilstatus; en utdatert kjøring rører ingenting.
+          const { error: failErr } = await admin.rpc("rm_fail_invoice_line_extraction", {
+            p_invoice_id: inv.id, p_token: (inv as any).claim_token, p_patch: patch,
+          });
+          if (failErr) console.error("rm_fail_invoice_line_extraction", failErr.message);
           detaljer.push({ invoice_id: inv.id, error: msg });
         }
       }
