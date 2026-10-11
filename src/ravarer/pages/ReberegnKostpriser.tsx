@@ -43,7 +43,7 @@ export default function ReberegnKostpriser() {
   }, [rows, q]);
 
   // Åpne på første ikke-tomme bøtte når en ny skanning er ferdig.
-  const openedFor = useRef<RecalcRow[] | null>(null);
+  const openedFor = useRef<typeof rows | null>(null);
   useEffect(() => {
     if (!rows || openedFor.current === rows) return;
     openedFor.current = rows;
