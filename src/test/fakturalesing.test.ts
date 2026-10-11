@@ -182,7 +182,7 @@ describe("delvis kostprisføring (3C)", () => {
     expect(canPostCosts({ ...r, is_credit_note: true })).toBe(false);
   });
   it("avstemt etter delvis føring: ferdig med delvis-merknad", () => {
-    const n = nextInvoiceStep({ ...base, status: "reconciled", approved: true, ...extrasFromCounts(true, 1, 3) });
+    const n = nextInvoiceStep({ ...base, status: "reconciled", ...extrasFromCounts(true, 1, 3) });
     expect(n.key).toBe("ferdig");
     expect(n.hint).toMatch(/delvis ført \(1 av 3/);
   });
