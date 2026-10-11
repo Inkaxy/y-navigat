@@ -5,7 +5,7 @@ import type { WorkItem } from "@/ravarer/lib/workRpcTypes";
 import type { LinkSupplierItemResult, SupplierItem, SupplierItemLine } from "@/fakturaer/lib/supplierItems";
 
 const w = (o: Partial<WorkItem>): WorkItem => ({ key: o.key ?? "k", grp: "kobling", type: "varekort", kind: "ukoblet", supplier_id: "s1", supplier_name: "A", item_key: "sku:1", invoice_id: null, invoice_number: null, title: "Mel", sku: null, rm_id: null, rm_name: null, open_lines: 3, open_invoices: 2, invoice_count: 2, amount: 0, impact_nok: 0, last_date: null, last_open_line_id: null, reasons: [], ...o });
-const res = (id: string): LinkSupplierItemResult => ({ ok: true, mode: "koblet", raw_material_id: id, raw_material_supplier_id: null, created_raw_material: true, lines_updated: 2, invoices: [], still_open_lines: 0, failures: [] } as unknown as LinkSupplierItemResult);
+const res = (id: string): LinkSupplierItemResult => ({ ok: true, mode: "koblet", raw_material_id: id, raw_material_supplier_id: null, created_raw_material: true, lines_updated: 2, invoices: [], still_open_lines: 0, failures: [] });
 
 describe("masseutvalg i Å gjøre", () => {
   it("opprett gjelder bare ukoblede varekort, ikke fakturasaker", () => {
