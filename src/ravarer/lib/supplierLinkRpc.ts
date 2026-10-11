@@ -72,16 +72,13 @@ export function parseChangeLinkRematch(data: Json | null | undefined): ChangeLin
 
 /**
  * Eneste skrivevei for primærleverandør. `null` fjerner primær.
- * Generert type-signatur mangler `null`-varianten; vi omtyper RPC-kallet
- * (ikke `as any`/`as unknown as`) så kontrakten mot serveren bevares.
+ * Serveren godtar `null` på `p_supplier_id`; generert type-signatur gjør det
+ * ikke, så vi må overstyre typesjekken på selve argumentet.
  */
-type SetPrimaryArgs = { p_raw_material_id: string; p_supplier_id: string | null };
-type RpcSetPrimary = (fn: "rm_set_primary_supplier", args: SetPrimaryArgs) => ReturnType<typeof supabase.rpc<"rm_set_primary_supplier">>;
-
 export async function setPrimarySupplier(rawMaterialId: string, supplierId: string | null): Promise<SetPrimarySupplierResult> {
-  const rpc = supabase.rpc as unknown as RpcSetPrimary;
-  const { data, error } = await rpc("rm_set_primary_supplier", {
+  const { data, error } = await supabase.rpc("rm_set_primary_supplier", {
     p_raw_material_id: rawMaterialId,
+    // @ts-expect-error — generert type savner `null`-varianten; serveren godtar null.
     p_supplier_id: supplierId,
   });
   if (error) throw new Error("Kunne ikke sette primærleverandør");
