@@ -30,3 +30,19 @@ describe("Ikke vare — regelen beholdes ved angring", () => {
     expect(notItemResultItems("Frakt", null)).toEqual(["Frakt"]);
   });
 });
+
+import { firstCostLinesByInvoice, firstCostReport } from "@/ravarer/pages/priskontroll/gjore/firstCost";
+import type { SupplierItemLine } from "@/fakturaer/lib/supplierItems";
+
+describe("F13 første kostpris på tvers av fakturaer", () => {
+  const l = (p: Partial<SupplierItemLine>): SupplierItemLine => ({ id: "l", invoice_id: "i1", invoice_status: "ready", is_credit_note: false, cost_posted: false, raw_material_id: "rm", price_per_base_unit: 10, base_quantity: 2, match_confidence: "high", requires_review: true, ...p } as Partial<SupplierItemLine> as SupplierItemLine);
+  it("grupperer trygge linjer per faktura", () => {
+    const m = firstCostLinesByInvoice({ rm_id: "rm", rm_cost: null }, [
+      l({ id: "a" }), l({ id: "b", invoice_id: "i2" }), l({ id: "c", invoice_id: "i3", invoice_status: "reconciled" }),
+      l({ id: "d", invoice_id: "i4", is_credit_note: true }), l({ id: "e", base_quantity: null }),
+    ]);
+    expect([...m.keys()].sort()).toEqual(["i1", "i2"]);
+  });
+  it("tomt når varen har kostpris", () => expect(firstCostLinesByInvoice({ rm_id: "rm", rm_cost: 5 }, [l({})]).size).toBe(0));
+  it("rapport", () => expect(firstCostReport([{ posted: 2, error: null }, { posted: 0, error: "x" }]).title).toContain("feilet"));
+});

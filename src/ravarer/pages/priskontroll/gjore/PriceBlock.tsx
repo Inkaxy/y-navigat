@@ -1,6 +1,9 @@
 import { useConfirmMany } from "@/ravarer/ui/useConfirmMany";
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { postSafeCosts } from "@/fakturaer/lib/costPosting";
+import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
+import { firstCostLinesByInvoice, firstCostReport } from "./firstCost";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
 import { useMatchTolerances, DEFAULT_HARD_CAP_PCT } from "@/fakturaer/hooks/useMatchTolerances";
@@ -82,6 +85,26 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
   const lineRefs = chosen.map((r) => ({ id: r.id, price_per_base_unit: r.price_per_base_unit }));
 
   const many = useConfirmMany();
+  const qc = useQueryClient();
+  const firstCost = useMemo(() => firstCostLinesByInvoice(item, lines), [item, lines]);
+  const [fcBusy, setFcBusy] = useState<{ done: number; total: number } | null>(null);
+  const runFirstCost = async () => {
+    const entries = [...firstCost.entries()];
+    setFcBusy({ done: 0, total: entries.length });
+    const results: { posted: number; error: string | null }[] = [];
+    try {
+      for (const [invoiceId, lineIds] of entries) {
+        const [r] = await postSafeCosts([invoiceId], lineIds);
+        results.push(r ?? { posted: 0, error: "Føringen ble avvist" });
+        setFcBusy({ done: results.length, total: entries.length });
+      }
+    } finally {
+      setFcBusy(null);
+      for (const [invoiceId] of entries) invalidateInvoice(qc, invoiceId);
+      invalidateRawMaterial(qc, item.rm_id ?? undefined);
+    }
+    onDone(firstCostReport(results));
+  };
   const onAccept = async () => {
     setError(null);
     try {
@@ -138,6 +161,15 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
         <p className="text-sm text-ink-secondary">Ingen åpne linjer har prisavvik.</p>
       )}
 
+      {firstCost.size > 1 && (
+        <div className="mt-3 space-y-1 rounded-lg border border-border p-3 text-sm">
+          <p>Varen mangler kostpris og har trygge linjer på {firstCost.size} fakturaer.</p>
+          <button type="button" className="text-primary underline underline-offset-2 disabled:opacity-50" disabled={!canWrite || !!fcBusy} onClick={() => void runFirstCost()}>
+            {fcBusy ? `Fører … ${fcBusy.done} av ${fcBusy.total}` : `Før første kostpris på ${firstCost.size} fakturaer`}
+          </button>
+          {!canWrite && <p className="text-caption text-ink-secondary">Krever skrivetilgang til fakturaer.</p>}
+        </div>
+      )}
       {rematch.isSuccess && (
         <p role="status" className="mt-2 text-caption text-ink-secondary">{rematch.data.queued} fakturaer lagt i kø for ny beregning.</p>
       )}
