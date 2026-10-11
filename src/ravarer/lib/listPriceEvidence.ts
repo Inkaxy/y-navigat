@@ -196,8 +196,8 @@ export function comparisonFor(
     return { state: "eligible", deviation: ev.deviationPct, invoicePpbu: ev.invoicePricePerBaseUnit, invoiceDate: ev.invoiceDate, invoiceNumber: ev.invoiceNumber, invoiceId: ev.invoiceId, checkedAt };
   }
   const code = ev.costReason ?? ev.invoiceReason ?? ev.reason;
-  // Kostprisgrunn vises først; fakturagrunnen er like fullt et kontrollbehov hvis den finnes.
-  const needsControl = !(ev.costReason == null && ev.invoiceReason != null && NOT_CONTROL.has(ev.invoiceReason)) && !(code != null && NOT_CONTROL.has(code));
+  // Kostprisgrunn vises først. Ingen kjøp/ingen tilgang er ikke et kontrollbehov.
+  const needsControl = !(code != null && NOT_CONTROL.has(code));
   return { state: "unknown", label: reasonLabel(code), needsControl, invoiceId: ev.invoiceId, invoiceDate: ev.invoiceDate, checkedAt };
 }
 
