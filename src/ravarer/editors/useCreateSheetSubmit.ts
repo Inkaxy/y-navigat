@@ -8,6 +8,11 @@ import { useLinkSupplierItem } from "@/fakturaer/hooks/useSupplierItems";
 import type { LinkSupplierItemResult } from "@/fakturaer/lib/supplierItems";
 import { isObj, str } from "@/fakturaer/lib/parseRpcJson";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
+import { useAddPriceHistory } from "@/ravarer/hooks/useRmSuppliers";
+import { readFunctionError } from "@/varer/lib/functionError";
+import { parseDecimal } from "@/ravarer/lib/packageMath";
+import { osloTodayISO } from "@/lib/osloDate";
+import { DEFAULT_COST_SOURCE } from "./costPriceLogic";
 import { linkCreateBody, linkExistingBody, packageOf, suggestSku, writePathFor, type CreateContext, type CreateDraft } from "./createSheetLogic";
 
 export type CreateOutcome =
@@ -20,6 +25,7 @@ export function useCreateSheetSubmit(ctx: CreateContext) {
   const { data: company } = useCompany();
   const create = useCreateRawMaterial();
   const link = useLinkSupplierItem();
+  const addPrice = useAddPriceHistory();
   const [datasheetPending, setDatasheetPending] = useState(false);
 
   const submit = async (d: CreateDraft): Promise<CreateOutcome> => {
@@ -32,13 +38,21 @@ export function useCreateSheetSubmit(ctx: CreateContext) {
         base_unit: d.baseUnit,
         item_type: d.itemType,
         category: d.category || null,
-        categories: d.category ? [d.category] : [],
+        categories: [...new Set([d.category, ...d.extraCategories].filter(Boolean))],
+        description: d.description.trim() || null,
         is_packaging: d.itemType === "emballasje",
         declaration_name: d.declarationName.trim() ? d.declarationName.trim().toLowerCase() : null,
         base_units_per_package: pkg?.base_units_per_package ?? null,
         package_unit: pkg?.package_unit ?? null,
         primary_supplier_id: d.primarySupplierId,
       });
+      const cost = d.startCost.trim() ? parseDecimal(d.startCost) : null;
+      if (cost != null && cost > 0) {
+        await addPrice.mutateAsync({
+          raw_material_id: row.id, supplier_id: d.primarySupplierId, price: cost, effective_date: osloTodayISO(),
+          source: DEFAULT_COST_SOURCE, notes: "Startkostpris ved opprettelse", set_as_current: true,
+        });
+      }
       return { kind: "created", rawMaterialId: row.id };
     }
     if (path === "link_supplier_item" && ctx.kind === "supplier_item") {
@@ -62,7 +76,10 @@ export function useCreateSheetSubmit(ctx: CreateContext) {
           is_packaging: d.itemType === "emballasje",
         },
       });
-      if (error) throw new Error("Råvaren kunne ikke opprettes fra databladet");
+      if (error) {
+        const fe = await readFunctionError(error, data);
+        throw new Error(fe.message ?? "Råvaren kunne ikke opprettes fra databladet");
+      }
       const id = isObj(data) ? str(data, "raw_material_id") : null;
       if (!id) throw new Error(isObj(data) ? (str(data, "error") ?? "Ingen respons") : "Ingen respons");
       invalidateRawMaterial(qc, id);
@@ -81,5 +98,5 @@ export function useCreateSheetSubmit(ctx: CreateContext) {
     return { kind: "linked", result };
   };
 
-  return { submit, linkExisting, isPending: create.isPending || link.isPending || datasheetPending };
+  return { submit, linkExisting, isPending: create.isPending || addPrice.isPending || link.isPending || datasheetPending };
 }
