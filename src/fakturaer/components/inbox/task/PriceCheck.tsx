@@ -56,7 +56,7 @@ export function PriceCheck({ line, link, tolerancePct }: { line: ReviewLineRow; 
         <div role="note" className="rounded-md border border-warning/30 bg-warning/10 p-2 text-caption">
           <p className="font-medium text-warning">{credit ? "Kreditnota – ikke en prisendring" : gate.label}</p>
           <p className="text-ink-secondary">{credit ? "Beløpene vises som på dokumentet. Koble kreditnotaen til opprinnelig faktura." : gate.detail}</p>
-          <p className="mt-1 text-ink-secondary">Originalt på dokumentet: {line.quantity ?? "—"} {line.unit ?? ""} × {formatMoney(line.unit_price, currency)} = {formatMoney(line.total_amount, currency)}. Utledet pris per {unit} vises ikke før grunnlaget er kontrollert.</p>
+          <p className="mt-1 text-ink-secondary">Lagret lesing (må kontrolleres mot originalen): {line.quantity ?? "—"} {line.unit ?? ""} × {formatMoney(line.unit_price, currency)} = {formatMoney(line.total_amount, currency)}. Utledet pris per {unit} vises ikke før grunnlaget er kontrollert.</p>
         </div>
       )}
       {reasons.length > 0 && !gate.ok && !credit && <p className="text-caption text-warning">Må avklares: {reasons.join(" · ")}</p>}

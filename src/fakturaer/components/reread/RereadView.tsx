@@ -134,8 +134,10 @@ export function ReadingState({ startedAt, invoked, invoking, invokeCode, canAct,
   useEffect(() => { const h = window.setInterval(() => setT(now()), 5000); return () => window.clearInterval(h); }, [now]);
   const elapsed = Math.max(0, t - Date.parse(startedAt));
   const mins = Math.floor(elapsed / 60_000), secs = Math.floor((elapsed % 60_000) / 1000);
-  const stale = !invoking && (elapsed >= READING_WAIT_MS || (invoked && !!invokeCode));
-  const spinning = invoking || (invoked && !stale);
+  // Overtid vises uavhengig av om kallet fortsatt pågår; tid alene betyr aldri feilet/avvist.
+  const overdue = elapsed >= READING_WAIT_MS;
+  const stale = overdue || (!invoking && invoked && !!invokeCode);
+  const spinning = !stale && (invoking || invoked);
   return (
     <div className="mx-auto max-w-lg space-y-3 rounded-lg border border-border p-6 text-center" role="status" aria-live="polite">
       {spinning ? <Loader2 className="mx-auto h-6 w-6 animate-spin" aria-hidden /> : null}
@@ -143,12 +145,12 @@ export function ReadingState({ startedAt, invoked, invoking, invokeCode, canAct,
       <p className="text-caption text-ink-secondary tabular-nums">Startet for {mins > 0 ? `${mins} min ` : ""}{secs} s siden</p>
       {invokeCode && <p className="text-sm text-warning">{invokeCode === "ukjent_utfall" ? "Svaret fra leseren kom ikke fram. Lesingen kan fortsatt bli ferdig." : rereadErrorText(invokeCode)}</p>}
       <p className="text-sm text-ink-secondary">
-        {stale ? "Oppdater status først. Fakturaen er ikke endret." : invoked || invoking ? "Dette tar vanligvis under ett minutt. Du kan lukke siden og komme tilbake – lesingen er lagret." : "Kjør leseren én gang, eller avbryt. Den kan allerede være i gang fra en annen fane."}
+        {stale ? (invoking ? "Svaret fra leseren er ikke kommet ennå, og utfallet er ukjent. Lesingen kan fortsatt bli ferdig. Oppdater status eller avbryt. Fakturaen er ikke endret." : "Oppdater status først. Fakturaen er ikke endret.") : invoked || invoking ? "Dette tar vanligvis under ett minutt. Du kan lukke siden og komme tilbake – lesingen er lagret." : "Kjør leseren én gang, eller avbryt. Den kan allerede være i gang fra en annen fane."}
       </p>
       <div className="flex flex-wrap justify-center gap-2">
         <Button size="sm" variant="outline" onClick={onRefresh}>Oppdater status</Button>
         {!invoked && !invoking && <Button size="sm" disabled={busy || !canAct} onClick={onInvoke}>Kjør leseren</Button>}
-        {stale && invoked && !confirmAgain && <Button size="sm" variant="outline" disabled={busy || !canAct} onClick={() => setConfirmAgain(true)}>Kjør leseren på nytt …</Button>}
+        {stale && invoked && !invoking && !confirmAgain && <Button size="sm" variant="outline" disabled={busy || !canAct} onClick={() => setConfirmAgain(true)}>Kjør leseren på nytt …</Button>}
         <Button size="sm" variant="outline" disabled={busy || !canAct} onClick={onCancel}>Avbryt lesingen</Button>
       </div>
       {confirmAgain && (

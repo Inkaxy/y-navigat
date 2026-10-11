@@ -137,3 +137,26 @@ describe("pakningsetikett (MELIS)", () => {
     expect(packageConflict({ ...melis, package_size: 25 })).toBeNull();
   });
 });
+
+describe("per-linje toleranse og pakningsdimensjon", () => {
+  it("20 og 5 mot 12,5 med lik mengde: begge stort avvik selv om netto er 0", async () => {
+    const { perLineDeviation, priceChange } = await import("@/ravarer/pages/priskontroll/gjore/logic");
+    const { evaluatePriceDeviation } = await import("@/fakturaer/lib/priceDeviation");
+    const lines = [
+      { id: "a", price_per_base_unit: 20, expected_price_per_base_unit: 12.5, base_quantity: 100 },
+      { id: "b", price_per_base_unit: 5, expected_price_per_base_unit: 12.5, base_quantity: 100 },
+    ];
+    expect(Math.abs(priceChange(lines)!.impactNok)).toBeLessThan(1e-9);
+    const d = perLineDeviation(lines, (l) => evaluatePriceDeviation({ actual: l.price_per_base_unit, expected: l.expected_price_per_base_unit, baseQuantity: l.base_quantity, tolPct: 3, minImpactNok: 50, hardCapPct: 15 }));
+    expect(d).toEqual({ large: 2, within: 0, unknown: 0 });
+  });
+  it("pakningskonflikt g/kg og ml/l med eksakt omregning, aldri vekt↔volum", async () => {
+    const { packageConflict } = await import("@/ravarer/pages/priskontroll/gjore/packageLabel");
+    const b = { base_units_per_package: 25, rm_base_unit: "kg" };
+    expect(packageConflict({ ...b, package_unit: "g", package_size: 250 })).toMatch(/250 g stemmer ikke/);
+    expect(packageConflict({ ...b, package_unit: "g", package_size: 25000 })).toBeNull();
+    expect(packageConflict({ base_units_per_package: 1, rm_base_unit: "l", package_unit: "ml", package_size: 1000 })).toBeNull();
+    expect(packageConflict({ base_units_per_package: 1, rm_base_unit: "l", package_unit: "ml", package_size: 500 })).toMatch(/500 ml/);
+    expect(packageConflict({ ...b, package_unit: "l", package_size: 25 })).toBeNull();
+  });
+});

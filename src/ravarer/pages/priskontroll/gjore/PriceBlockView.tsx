@@ -4,11 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { PriceDeviationNote } from "@/fakturaer/components/PriceDeviationNote";
+import { DEFAULT_HARD_CAP_PCT, DEFAULT_MIN_IMPACT_NOK } from "@/fakturaer/hooks/useMatchTolerances";
+import { evaluatePriceDeviation } from "@/fakturaer/lib/priceDeviation";
 import type { MatchSettings } from "@/fakturaer/hooks/useMatchTolerances";
 import { formatDate } from "@/fakturaer/lib/constants";
 import { PRICE_REFERENCE_LABEL } from "@/ravarer/lib/labels";
 import { paths } from "@/ravarer/lib/paths";
-import { kr, ppbu, priceChange, pricePrimaryAction, showPackageHint, signedPct, type PriceLine } from "./logic";
+import { kr, perLineDeviation, ppbu, priceChange, pricePrimaryAction, showPackageHint, signedPct, type PriceLine } from "./logic";
 
 /** Linje med SERVERKONTROLLERT pris, forventet pris, mengde og absolutt prisavvik (`effect_nok`). */
 export type PriceRow = PriceLine & { invoice_id: string; invoice_number: string | null; invoice_date: string | null; quantity: number | null; unit: string | null; effect_nok: number; reference_source: string | null; reference_id: string | null;
@@ -55,7 +57,6 @@ export function PriceBlockView(p: PriceBlockViewProps) {
   const primary = pricePrimaryAction({ pct: positiveCount ? Math.max(ch?.pct ?? 0, 0.0001) : null, hardCapPct: p.hardCapPct, hasAgreement: p.hasAgreement });
   const unit = (chosen[0] ?? p.rows[0])?.base_unit ?? "enhet";
   const disabled = !p.canWrite || p.busy || chosen.length === 0 || p.status !== "ready";
-  const qty = chosen.reduce((s, r) => s + (r.base_quantity ?? 0), 0);
   // Én felles referanse bare når alle valgte linjer peker på samme grunnlag.
   const refKeys = [...new Set(chosen.map((r) => `${r.reference_source}|${r.reference_id}`))];
   const oneRef = refKeys.length === 1 ? chosen[0] : null;
@@ -79,7 +80,12 @@ export function PriceBlockView(p: PriceBlockViewProps) {
             <div><dt className="text-caption text-ink-secondary">Dyrere linjer (mulig sak)</dt><dd className={positiveCount ? "tabular-nums text-warning" : "tabular-nums"}>{positiveCount ? `${kr(ch.positiveNok)} · ${positiveCount} ${positiveCount === 1 ? "linje" : "linjer"}` : "Ingen"}</dd></div>
           </dl>
           <p className="text-caption text-ink-secondary">Snittet er ikke en ny enhetspris. Lavere pris på én faktura motregner ikke en dyrere linje.</p>
-          <PriceDeviationNote actual={ch.actual} expected={ch.expected} baseQuantity={qty || null} tolerancePct={p.tolerancePct} settings={p.settings} />
+          {chosen.length === 1 ? (
+            <PriceDeviationNote actual={chosen[0].price_per_base_unit} expected={chosen[0].expected_price_per_base_unit} baseQuantity={chosen[0].base_quantity} tolerancePct={p.tolerancePct} settings={p.settings} />
+          ) : (() => {
+            const d = perLineDeviation(chosen, (l) => evaluatePriceDeviation({ actual: l.price_per_base_unit, expected: l.expected_price_per_base_unit, baseQuantity: l.base_quantity, tolPct: p.tolerancePct, minImpactNok: p.settings?.price_min_impact_nok ?? DEFAULT_MIN_IMPACT_NOK, hardCapPct: p.settings?.price_hard_cap_pct ?? DEFAULT_HARD_CAP_PCT }));
+            return <p data-testid="per-line-deviation" className={d.large ? "text-caption text-warning" : "text-caption text-ink-secondary"}>Vurdert per linje: {d.large} med stort avvik, {d.within} innenfor toleranse{d.unknown ? `, ${d.unknown} uten grunnlag` : ""}. Snittet vurderes ikke mot toleransen.</p>;
+          })()}
         </div>
       ) : mixed ? (
         <p className="text-sm text-warning">Valgte linjer har ulik råvare eller grunnenhet — sammendrag vises ikke. Velg linjer med samme enhet.</p>
