@@ -45,7 +45,8 @@ export function GjoreWorkspace() {
     for (const [k, v] of Object.entries(patch)) { if (v) n.set(k, v); else n.delete(k); }
     setSp(n, { replace: true });
   };
-  useEffect(() => { if ((sp.get("q") ?? "") !== q) set({ q: q || null }); /* eslint-disable-next-line react-hooks/exhaustive-deps -- bare ved nytt søk */ }, [q]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- synk bare ved nytt søk
+  useEffect(() => { if ((sp.get("q") ?? "") !== q) set({ q: q || null }); }, [q]);
   useEffect(() => setLimit(PAGE), [gruppe, sort, leverandor, q]);
 
   const work = useWorkItems({ group: gruppe, search: q || null, supplierId: leverandor, sort, limit });
