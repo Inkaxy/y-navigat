@@ -34,6 +34,7 @@ import { useWorkspaceHotkeys } from "./useWorkspaceHotkeys";
 import { useRematchWait } from "./useRematchWait";
 import { canFetchLines } from "./invoiceSteps";
 import { CorrectLineDialog } from "./CorrectLineDialog";
+import { correctionDocLine } from "./correctionDocLine";
 import { ReadIssuesBanner } from "./ReadIssuesBanner";
 import { parseReadIssues } from "@/fakturaer/lib/lineCorrection";
 
@@ -168,15 +169,18 @@ export default function FakturaWorkspace() {
   }
 
   const active = q.activeLine;
-  const docEl = (
+  const docFor = (line: typeof active) => (
     <InvoiceDocumentPanel
       invoice={{ invoice_number: data.invoice_number, invoice_date: data.invoice_date, supplier_name: data.suppliers?.name ?? null, source_document_url: data.source_document_url, total_amount: data.total_amount, total_vat: data.total_vat, lines_sum_status: data.lines_sum_status, lines_sum_excl_vat: data.lines_sum_excl_vat, lines_sum_variance_pct: data.lines_sum_variance_pct, extraction_confidence: data.extraction_confidence }}
-      line={active ? { ...active, matched_name: active.matched_raw_material?.name ?? null } : null}
+      line={line ? { ...line, matched_name: line.matched_raw_material?.name ?? null } : null}
       tolerancePct={tolerances.defaultPct}
       onClose={() => toggleDoc()}
       className="h-full"
     />
   );
+  const docEl = docFor(active);
+  // Rettedialogen viser samme linje som skjemaet (tabell eller kø), aldri køens forrige valg.
+  const correctDocEl = docFor(correctionDocLine(correctFor, q.linesQuery.data?.rows ?? [], null));
   const showDocZone = docOpen && wide && !!data.source_document_url;
   const lockNote = final ? (data.status === "reconciled" ? "Fakturaen er avstemt — linjene er låst" : "Fakturaen er flagget — linjene er låst") : null;
   const notApplicableCount = q.selectedLines.length;
@@ -318,7 +322,8 @@ export default function FakturaWorkspace() {
         lineId={correctFor}
         invoice={{ id: data.id, status: data.status, approved: !!s.steps?.find((x) => x.key === "godkjent")?.done, supplier_id: data.supplier_id, supplier_name: data.suppliers?.name ?? null }}
         canWrite={s.canWrite}
-        document={docEl}
+        key={correctFor ?? "lukket"}
+        document={correctDocEl}
         onSaved={(r) => { q.refresh(); void detail.refetch(); s.setResult({ title: "Fakturalinjen er rettet", items: [
           `${r.changed.length} ${r.changed.length === 1 ? "felt" : "felt"} endret. Kobling og pris beregnes på nytt.`,
           ...(r.exampleId ? ["Lagret som bekreftet eksempel for leverandøren (gjenbruk, ikke retrening)."] : []),

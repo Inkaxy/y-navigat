@@ -149,6 +149,8 @@ export interface LinkSupplierItemResult {
   }[];
   still_open_lines: number;
   failures: { invoice_id: string; reason: string }[];
+  /** Linjer i utvalget som ble hoppet over (allerede løst, låst eller ført). */
+  skipped_line_ids?: string[];
 }
 
 export const EMPTY_COUNTS: SupplierItemCounts = { ukoblet: 0, mangler_pakning: 0, prisavvik: 0, kontroll: 0, koblet: 0, ikke_vare: 0 };

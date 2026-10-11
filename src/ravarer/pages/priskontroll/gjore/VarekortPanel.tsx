@@ -122,7 +122,8 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
     try {
       // Bare linjene som vises (fryst utvalg) — nye linjer krever «Oppdater» først.
       const lineIds = lines.filter((l) => l.requires_review).map((l) => l.id);
-      const r = await link.mutateAsync({ legal_entity_id: company.id, supplier_id: item.supplier_id, item_key: item.item_key, not_raw_material: true, reason, line_ids: lineIds.length ? lineIds : undefined });
+      if (lineIds.length === 0) { setError("Ingen åpne linjer i utvalget. Trykk «Oppdater» først."); return; }
+      const r = await link.mutateAsync({ legal_entity_id: company.id, supplier_id: item.supplier_id, item_key: item.item_key, not_raw_material: true, reason, line_ids: lineIds });
       onDone({ title: `Merket som ikke vare (${reason})`, items: linkResultSummary(r) });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Kunne ikke lagre.");

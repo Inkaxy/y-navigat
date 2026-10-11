@@ -92,8 +92,10 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
   const doSubmit = async (body: Partial<LinkSupplierItemBody>) => {
     if (!company) return;
     setError(null);
+    // Bare de åpne linjene som vises (fryst utvalg). Tomt utvalg sendes aldri — tomt ville betydd «alle».
+    if (scope.lineIds.length === 0) { setError("Ingen åpne linjer i utvalget. Trykk «Oppdater» for å hente nye linjer."); return; }
     try {
-      const r = await link.mutateAsync({ legal_entity_id: company.id, supplier_id: item.supplier_id, item_key: item.item_key, ...body });
+      const r = await link.mutateAsync({ legal_entity_id: company.id, supplier_id: item.supplier_id, item_key: item.item_key, ...body, line_ids: scope.lineIds });
       setResult(r);
       onDone?.(r);
     } catch (e) {
