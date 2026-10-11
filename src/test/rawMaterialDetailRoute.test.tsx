@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * Produksjonsruten for råvarekortet (RawMaterialDetail, uendret) med data-hooks og tunge seksjoner mocket.
  * Barnestubbene registrerer lagring slik NutritionTab/OverviewTab gjør (effekt uten opprydding).
