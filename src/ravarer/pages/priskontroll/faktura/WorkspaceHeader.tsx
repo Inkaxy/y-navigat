@@ -5,6 +5,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
 import { formatDate, formatNok } from "@/fakturaer/lib/constants";
 import { useInvoiceDocumentUrl } from "@/fakturaer/hooks/useInvoiceDocument";
+import { isFlaggable } from "@/fakturaer/lib/flagging";
 import { DeliveryTimeline } from "./DeliveryTimeline";
 import type { DeliveryStep, NextStep } from "./invoiceSteps";
 
@@ -81,7 +82,7 @@ export function WorkspaceHeader(p: Props) {
               <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Flere valg for fakturaen"><MoreHorizontal className="h-4 w-4" /></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {p.canWrite && !final && p.status !== "flagged" && <DropdownMenuItem onSelect={() => p.onMenu("flag")}>Flagg …</DropdownMenuItem>}
+              {p.canWrite && isFlaggable(p.status) && <DropdownMenuItem onSelect={() => p.onMenu("flag")}>Flagg …</DropdownMenuItem>}
               {p.canWrite && p.status === "flagged" && <DropdownMenuItem onSelect={() => p.onMenu("unflag")}>Fjern flagg …</DropdownMenuItem>}
               {p.canWrite && !final && (
                 <DropdownMenuItem disabled={p.rematchBusy} onSelect={() => p.onMenu("rematch")}>Beregn på nytt</DropdownMenuItem>
