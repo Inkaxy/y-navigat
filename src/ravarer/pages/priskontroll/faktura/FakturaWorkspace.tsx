@@ -22,6 +22,7 @@ import type { EditMaterialSignal } from "@/fakturaer/lib/editMaterialSignal";
 import { FakturaerDialogs, type DialogState } from "@/ravarer/pages/priskontroll/fakturaer/FakturaerDialogs";
 import { fakturaBackHref, readReturnParam } from "@/ravarer/pages/priskontroll/fakturaer/visning";
 import { InvoiceFactsSection } from "./InvoiceFactsSection";
+import { notItemResultItems } from "./notItemResult";
 import { LineDialogs, type LineDialog } from "./LineDialogs";
 import { SupplierItemScopeNote } from "./SupplierItemScopeNote";
 import { WorkspaceHeader, type HeaderMenuAction } from "./WorkspaceHeader";
