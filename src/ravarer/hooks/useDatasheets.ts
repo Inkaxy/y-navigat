@@ -83,7 +83,7 @@ export function useOrphanDatasheets(legalEntityId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("raw_material_datasheets")
-        .select("id, file_name, supplier_name, uploaded_at, status, ai_confidence")
+        .select("id, file_name, file_path, supplier_name, uploaded_at, status, ai_confidence")
         .eq("legal_entity_id", legalEntityId!)
         .is("raw_material_id", null)
         .order("uploaded_at", { ascending: false })
@@ -94,20 +94,36 @@ export function useOrphanDatasheets(legalEntityId: string | undefined) {
   });
 }
 
+export interface DeleteOrphansResult { deleted: string[]; kept: string[] }
+
+/**
+ * Rydder FORELDRELØSE datablad. Én DELETE-setning med betingelsene i samme spørring
+ * (id i det frosne utvalget + samme selskap + fortsatt uten råvare), så et blad som er koblet
+ * etter at listen ble hentet, blir stående. RLS gjelder. Returnerer faktisk slettede ID-er.
+ */
 export function useDeleteDatasheets() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (ids: string[]) => {
-      if (ids.length === 0) return 0;
-      const { error } = await supabase.from("raw_material_datasheets").delete().in("id", ids);
+    mutationFn: async ({ ids, legalEntityId }: { ids: string[]; legalEntityId: string }): Promise<DeleteOrphansResult> => {
+      if (ids.length === 0) return { deleted: [], kept: [] };
+      const { data, error } = await supabase
+        .from("raw_material_datasheets")
+        .delete()
+        .in("id", ids)
+        .eq("legal_entity_id", legalEntityId)
+        .is("raw_material_id", null)
+        .select("id");
       if (error) throw error;
-      return ids.length;
+      const deleted = (data ?? []).map((r) => r.id);
+      const gone = new Set(deleted);
+      return { deleted, kept: ids.filter((id) => !gone.has(id)) };
     },
-    onSuccess: (n) => {
+    onSuccess: (res) => {
       invalidateRavarerCounts(qc);
-      qc.invalidateQueries({ queryKey: ["orphan-datasheets"] });
-      qc.invalidateQueries({ queryKey: ["raw-material-datasheets"] });
-      toast.success(`${n} datablad slettet`);
+      void qc.invalidateQueries({ queryKey: ["orphan-datasheets"] });
+      void qc.invalidateQueries({ queryKey: ["raw-material-datasheets"] });
+      if (res.kept.length === 0) toast.success(`${res.deleted.length} datablad slettet`);
+      else toast.warning(`${res.deleted.length} slettet · ${res.kept.length} ble ikke slettet (koblet til råvare i mellomtiden eller ikke tilgang)`);
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Kunne ikke slette"),
   });
