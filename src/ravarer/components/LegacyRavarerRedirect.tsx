@@ -40,7 +40,7 @@ async function resolveTarget(le: string, rawKey: string): Promise<Resolved> {
 /** Sender gamle Råvarer-lenker (bokmerker, e-post) videre til ny sti. */
 export function LegacyRavarerRedirect() {
   const { pathname, search, hash } = useLocation();
-  const { data: company } = useCompany();
+  const { data: company, isLoading: companyLoading } = useCompany();
   const le = company?.id ?? null;
   const rawKey = legacyDecisionKeyFromPath(pathname);
   const base = resolveLegacyRavarerUrl(pathname, search) ?? paths.oversikt();
@@ -51,7 +51,7 @@ export function LegacyRavarerRedirect() {
     queryFn: () => resolveTarget(le!, rawKey!),
     retry: false,
   });
-  if (!needsLookup) return <Navigate to={`${base}${hash}`} replace />;
+  if (!needsLookup || (!companyLoading && !le)) return <Navigate to={`${base}${hash}`} replace />;
   if (q.isPending) return <p className="px-page py-6 text-sm text-ink-secondary">Finner elementet fra den gamle lenken …</p>;
   if (q.isError || q.data?.missing) {
     return (
