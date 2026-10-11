@@ -10580,6 +10580,7 @@ export type Database = {
       }
       raw_material_price_history: {
         Row: {
+          cost_eligible: boolean
           created_at: string
           created_by: string | null
           currency: string
@@ -10600,6 +10601,7 @@ export type Database = {
           supplier_id: string | null
         }
         Insert: {
+          cost_eligible?: boolean
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -10620,6 +10622,7 @@ export type Database = {
           supplier_id?: string | null
         }
         Update: {
+          cost_eligible?: boolean
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -11284,6 +11287,8 @@ export type Database = {
           category: string | null
           cereal_type: string | null
           components_reviewed_at: string | null
+          cost_basis_status: string | null
+          cost_source_history_id: string | null
           created_at: string
           created_by: string | null
           current_cost_price: number | null
@@ -11325,6 +11330,8 @@ export type Database = {
           category?: string | null
           cereal_type?: string | null
           components_reviewed_at?: string | null
+          cost_basis_status?: string | null
+          cost_source_history_id?: string | null
           created_at?: string
           created_by?: string | null
           current_cost_price?: number | null
@@ -11366,6 +11373,8 @@ export type Database = {
           category?: string | null
           cereal_type?: string | null
           components_reviewed_at?: string | null
+          cost_basis_status?: string | null
+          cost_source_history_id?: string | null
           created_at?: string
           created_by?: string | null
           current_cost_price?: number | null
@@ -17374,15 +17383,26 @@ export type Database = {
         }[]
       }
       recipe_label_recalc_stale: { Args: { p_limit?: number }; Returns: number }
-      recipe_line_base_qty: {
-        Args: {
-          p_base_unit: string
-          p_quantity: number
-          p_quantity_grams: number
-          p_unit: string
-        }
-        Returns: number
-      }
+      recipe_line_base_qty:
+        | {
+            Args: {
+              p_base_unit: string
+              p_quantity: number
+              p_quantity_grams: number
+              p_unit: string
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              p_base_unit: string
+              p_density_g_per_ml: number
+              p_quantity: number
+              p_quantity_grams: number
+              p_unit: string
+            }
+            Returns: number
+          }
       recipe_line_grams: {
         Args: { p_quantity: number; p_quantity_grams: number; p_unit: string }
         Returns: number
@@ -17458,6 +17478,8 @@ export type Database = {
           category: string | null
           cereal_type: string | null
           components_reviewed_at: string | null
+          cost_basis_status: string | null
+          cost_source_history_id: string | null
           created_at: string
           created_by: string | null
           current_cost_price: number | null
@@ -18108,6 +18130,7 @@ export type Database = {
         Args: { p_raw_material_id: string }
         Returns: undefined
       }
+      rm_usable_cost: { Args: { p_raw_material_id: string }; Returns: number }
       rm_user_names: {
         Args: { p_legal_entity_id: string; p_user_ids: string[] }
         Returns: {
