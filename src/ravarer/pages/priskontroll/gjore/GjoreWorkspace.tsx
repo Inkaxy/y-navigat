@@ -82,16 +82,24 @@ export function GjoreWorkspace() {
   // Smal skjerm: panelet vises ikke — send dyplenker (valgt=…) til fullsiden.
   useEffect(() => {
     if (wide || !sel) return;
-    navigate(sel.type === "varekort" ? paths.varekort(sel.supplierId, sel.itemKey) : paths.faktura(sel.invoiceId), { replace: true });
+    navigate(fullPage(sel), { replace: true });
   }, [wide, sel?.type, valgt]); // eslint-disable-line react-hooks/exhaustive-deps -- sel avledes av valgt
 
+  /** Fullside for et element; varekortet får med listetilstanden så «Tilbake» lander samme sted. */
+  const fullPage = (v: NonNullable<ReturnType<typeof parseValgt>>) => {
+    if (v.type === "faktura") return paths.faktura(v.invoiceId);
+    const back = new URLSearchParams();
+    for (const k of ["gruppe", "sort", "q", "leverandor"]) { const x = sp.get(k); if (x) back.set(k, x); }
+    const qs = back.toString();
+    return `${paths.varekort(v.supplierId, v.itemKey)}${qs ? `?${qs}` : ""}`;
+  };
   const select = (key: string | null) => {
     clearTimer();
     viaKeyboard.current = null;
     setNextKey(null);
     const v = parseValgt(key);
     if (v && !isWide()) {
-      navigate(v.type === "varekort" ? paths.varekort(v.supplierId, v.itemKey) : paths.faktura(v.invoiceId));
+      navigate(fullPage(v));
       return;
     }
     set({ valgt: key });

@@ -22,7 +22,7 @@ export function ResultBox({ title, items = [], onUndo, onNext, nextLabel = "Nest
           <p className="font-medium text-foreground">{title}</p>
           {items.length > 0 && (
             <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-sm text-muted-foreground">
-              {items.map((t) => <li key={t}>{t}</li>)}
+              {items.map((t, i) => <li key={`${i}-${t}`}>{t}</li>)}
             </ul>
           )}
           {children && <div className="mt-2 text-sm">{children}</div>}
