@@ -39,11 +39,16 @@ const GJORE: Entry = {
 
 const STATIC: Record<string, Entry> = {
   "/ravarer/vareliste": { to: `${R}/varer` },
-  "/ravarer/pakninger": { to: `${R}/varer/pakninger`, extra: [["filter", "ubekreftet"]] },
-  "/ravarer/pakningsstorrelser": { to: `${R}/varer/pakninger` },
-  "/ravarer/deklarasjonsnavn": { to: `${R}/varer/deklarasjonsnavn` },
-  "/ravarer/koble-matvaretabellen": { to: `${R}/varer/naering` },
-  "/ravarer/datablad-endringer": { to: `${R}/varer/datablad-endringer` },
+  "/ravarer/pakninger": { to: `${R}/varer`, extra: [["liste", "pakning"], ["filter", "ubekreftet"]] },
+  "/ravarer/pakningsstorrelser": { to: `${R}/varer`, extra: [["liste", "pakning"]] },
+  "/ravarer/deklarasjonsnavn": { to: `${R}/varer`, extra: [["liste", "deklarasjon"]] },
+  "/ravarer/koble-matvaretabellen": { to: `${R}/varer`, extra: [["liste", "naering"]] },
+  "/ravarer/datablad-endringer": { to: `${R}/varer`, extra: [["liste", "datablad"]] },
+  // Mellomfasens egne undersider → samme arbeidsflate.
+  "/ravarer/varer/pakninger": { to: `${R}/varer`, extra: [["liste", "pakning"]] },
+  "/ravarer/varer/deklarasjonsnavn": { to: `${R}/varer`, extra: [["liste", "deklarasjon"]] },
+  "/ravarer/varer/naering": { to: `${R}/varer`, extra: [["liste", "naering"]] },
+  "/ravarer/varer/datablad-endringer": { to: `${R}/varer`, extra: [["liste", "datablad"]] },
   "/ravarer/matvaretabellen": { to: `${R}/varer/matvaretabellen` },
   "/ravarer/datablad-bulk": { to: `${R}/varer/datablad-opplasting` },
   "/ravarer/fakturaer": { to: `${R}/priskontroll`, extra: [["fane", "fakturaer"], ["visning", "alle"]] },

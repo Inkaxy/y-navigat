@@ -33,10 +33,11 @@ export const paths = {
   varer: (q?: Q) => withQuery(`${RAVARER_ROOT}/varer`, q),
   /** `seksjon` = råvarekortets seksjon; gammel `tab` normaliseres av detaljsiden. */
   raavare: (id: Id, opts?: { seksjon?: "sammendrag" | "pris" | "leverandorer" | "naering" | "deklarasjon" | "bruk" | "lager" | "grunndata" | "historikk"; tab?: string } & Q) => withQuery(`${RAVARER_ROOT}/varer/${enc(id)}`, opts),
-  pakninger: (q?: Q) => withQuery(`${RAVARER_ROOT}/varer/pakninger`, q),
-  deklarasjonsnavn: (q?: Q) => withQuery(`${RAVARER_ROOT}/varer/deklarasjonsnavn`, q),
-  naering: (q?: Q) => withQuery(`${RAVARER_ROOT}/varer/naering`, q),
-  databladEndringer: (q?: Q) => withQuery(`${RAVARER_ROOT}/varer/datablad-endringer`, q),
+  // Arbeidslister i den felles varearbeidsflaten (fase 4A). Gamle stier videresendes.
+  pakninger: (q?: Q) => withQuery(`${RAVARER_ROOT}/varer`, { liste: "pakning", ...q }),
+  deklarasjonsnavn: (q?: Q) => withQuery(`${RAVARER_ROOT}/varer`, { liste: "deklarasjon", ...q }),
+  naering: (q?: Q) => withQuery(`${RAVARER_ROOT}/varer`, { liste: "naering", ...q }),
+  databladEndringer: (q?: Q) => withQuery(`${RAVARER_ROOT}/varer`, { liste: "datablad", ...q }),
   matvaretabellen: (q?: Q) => withQuery(`${RAVARER_ROOT}/varer/matvaretabellen`, q),
   databladOpplasting: () => `${RAVARER_ROOT}/varer/datablad-opplasting`,
 
