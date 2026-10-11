@@ -581,7 +581,7 @@ export default function FakturaerInboxPage() {
   );
 
   const docPanel = docLine ? (
-    <InvoiceDocumentPanel
+    <InvoiceDocumentPanel invoiceId={docLine.invoice_id}
       invoice={{
         invoice_number: docLine.invoice.invoice_number,
         invoice_date: docLine.invoice.invoice_date,

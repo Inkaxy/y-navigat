@@ -136,7 +136,7 @@ describe("faktiske komponenter", () => {
     expect(screen.getAllByText(/Valuta må avklares/).length).toBeGreaterThan(0);
   });
   it("dokumentpanel: kreditnota uten prisavvik, ingen rå score-banner", () => {
-    wrap(<InvoiceDocumentPanel onClose={() => undefined}
+    wrap(<InvoiceDocumentPanel invoiceId={null} onClose={() => undefined}
       invoice={{ invoice_number: "8050625", invoice_date: "2026-10-01", is_credit_note: true, currency: "NOK", lines_sum_status: "ok", extraction_confidence: 1, total_amount: -268885, total_vat: null }}
       line={line({})} gate={gateOf(safeLine({ can_compare: false, reason_code: "credit_note", effect_nok: null }))} />);
     expect(screen.queryByText(/22\s?377/)).toBeNull();
@@ -145,13 +145,13 @@ describe("faktiske komponenter", () => {
     expect(screen.queryByText(/Prisen avviker|Se over pris/)).toBeNull();
   });
   it("dokumentpanel: ukjent status (lasting/feil) viser ingen prosent selv om linjen har lagret avvik", () => {
-    wrap(<InvoiceDocumentPanel onClose={() => undefined}
+    wrap(<InvoiceDocumentPanel invoiceId={null} onClose={() => undefined}
       invoice={{ invoice_number: "1", invoice_date: "2026-10-01", is_credit_note: false, currency: "NOK", lines_sum_status: "ok", extraction_issues: [] }}
       line={line({ total_amount: 1000, unit_price: 100, price_per_base_unit: 10, expected_price_per_base_unit: 8, price_variance_pct: 25 })} gate={gateOf(safeLine(), false)} />);
     expect(screen.queryByText(/\+25 %/)).toBeNull();
   });
   it("dokumentpanel: verifisert normal NOK viser sammenligning", () => {
-    wrap(<InvoiceDocumentPanel onClose={() => undefined}
+    wrap(<InvoiceDocumentPanel invoiceId={null} onClose={() => undefined}
       invoice={{ invoice_number: "1", invoice_date: "2026-10-01", is_credit_note: false, currency: "NOK", lines_sum_status: "ok", extraction_issues: [] }}
       line={line({ total_amount: 1000, unit_price: 100, price_per_base_unit: 10, expected_price_per_base_unit: 8, price_variance_pct: 25 })} gate={gateOf(safeLine({ effect_nok: 200, expected_price_per_base_unit: 8, price_per_base_unit: 10 }))} />);
     expect(screen.getByText(/Kontrollert pris\/grunnenhet/)).toBeInTheDocument();
