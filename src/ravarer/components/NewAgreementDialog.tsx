@@ -207,6 +207,7 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
   const reconcile = async () => {
     const p = pending;
     if (!p || recon === "reading") return;
+    const startGen = genRef.current;
     setRecon("reading");
     const { data, error } = await supabase
       .from("raw_material_suppliers")
@@ -215,16 +216,21 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
       .eq("supplier_id", p.payload.supplier_id)
       .limit(2);
     if (!mountedRef.current || pendingAgreementFor(p.entityId, p.payload.raw_material_id, p.payload.supplier_id) !== p) return;
-    if (error || !data || data.length > 1) { setRecon("error"); return; }
+    // Dialogen kan vise et annet mål nå: avstemmingen for A gjelder fortsatt A, men rører aldri B sitt skjema.
+    const sameEditor =
+      genRef.current === startGen && liveRef.current.open && liveRef.current.legalEntityId === p.entityId &&
+      liveRef.current.rawMaterialId === p.payload.raw_material_id && liveRef.current.supplierId === p.payload.supplier_id;
+    if (error || !data || data.length > 1) { if (sameEditor) setRecon("error"); return; }
     if (reconcileAgreement(p, data[0] ?? null) === "saved") {
       clearPendingAgreement(p);
       invalidateRawMaterial(qc, p.payload.raw_material_id);
       invalidateRavarerCounts(qc);
+      if (!sameEditor) return;
       toast.success("Avtalen var lagret.");
       onOpenChange(false);
       return;
     }
-    setRecon("not_observed");
+    if (sameEditor) setRecon("not_observed");
   };
 
   const targetLocked = create.isPending;
