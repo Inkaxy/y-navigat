@@ -148,8 +148,8 @@ describe("3) historisk grunnlag i graf og CSV", () => {
     const r = buildTimeline({ history: h, supplierNames: new Map([["s1", "A"]]), links: [], currentUnit: "kg" });
     expect(timelineCsv(r.rows, r.events).split("\n")).toEqual([
       "Type;Dato;Registrert;Leverandør;Pris;Valuta;Enhet (historisk);Enhetsgrunnlag;Pakning (historisk);Kilde;Faktura;Δ forrige kr;Δ forrige %;Δ avtale %;Årsak;Utgått;Rettelse før → etter;Notat",
-      "Gyldig;2026-05-01;2026-05-01T09:00:00Z;A;12.0000;NOK;kg;Fakturalinjens pris per grunnenhet;25 kg;Faktura;F-2;2.0000;20.0;;;;Mengde: 10 000 → 10;",
-      "Gyldig;2026-05-01;2026-05-01T08:00:00Z;A;10.0000;NOK;kg;Fakturalinjens pris per grunnenhet;Ukjent;Faktura;;;;;;;;",
+      "Gyldig;2026-05-01;2026-05-01T09:00:00Z;A;12.0000;NOK;kg;Låst ved registrering;25 kg;Faktura;F-2;2.0000;20.0;;;;Mengde: 10 000 → 10;",
+      "Gyldig;2026-05-01;2026-05-01T08:00:00Z;A;10.0000;NOK;kg;Låst ved registrering;Ukjent;Faktura;;;;;;;;",
       "Enhet ikke dokumentert;2026-04-01;;A;9.0000;NOK;Ukjent;Ukjent;Ukjent;Manuell;;;;;;;;",
     ]);
   });
@@ -185,11 +185,14 @@ describe("3) fetchPriceHistory: 1000+ rader og metadata", () => {
       id: `h${i}`, raw_material_id: "rm1", supplier_id: "s1", price: 10, effective_date: "2026-01-01", source: "invoice",
       source_reference: null, invoice_id: i === 0 ? "inv1" : null, invoice_line_id: i === 0 ? "il1" : null, invoice_line_ref: null, notes: null,
       created_at: "2026-01-01T00:00:00Z", superseded_at: null, superseded_reason: null, is_legacy: false, is_credit: false, currency: "NOK",
+      snapshot_unit: i === 0 ? "kg" : null, snapshot_source: i === 0 ? "ved_registrering" : null, snapshot_at: i === 0 ? "2026-01-01T00:00:00Z" : null,
+      snapshot_currency: i === 0 ? "NOK" : null,
+      snapshot_package: i === 0 ? { line_unit: "sekk", package_size: 25, package_unit: "kg", count_per_package: null } : null,
     }));
     tables.raw_materials = [{ id: "rm1", base_unit: "kg" }];
     tables.audit_log = [];
     tables.invoices = [{ id: "inv1", invoice_number: "F-1", is_credit_note: false, currency: "NOK" }];
-    tables.invoice_lines = [{ id: "il1", unit: "sekk", package_size: 25, package_unit: "kg", count_per_package: null, price_per_base_unit: 10 }];
+    tables.invoice_lines = [{ id: "il1", unit: "sekk", package_size: 10, package_unit: "kg", count_per_package: null, price_per_base_unit: 10 }];
     tables.invoice_line_corrections = [{ invoice_line_id: "il1", corrected_at: "2026-01-02T00:00:00Z", reason: "Rettet", changed_fields: ["quantity"], original: { quantity: 10000 }, corrected: { quantity: 10 } }];
   });
   it("henter alle sider og gir historisk grunnlag bare der det finnes", async () => {
@@ -200,5 +203,6 @@ describe("3) fetchPriceHistory: 1000+ rader og metadata", () => {
     const f = rows[0].provenance.corrections[0].fields[0];
     expect([f.field, f.before.replace(/\s/g, " "), f.after]).toEqual(["Mengde", "10 000", "10"]);
     expect(rows[1].provenance.unit).toBeNull();
+    expect(rows[1].provenance.packageText).toBeNull();
   });
 });
