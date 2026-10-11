@@ -9,6 +9,12 @@ const ACTION_LABEL: Record<string, string> = {
   "invoice.safe_costs_posted": "Kostpris ført for trygge linjer",
   "supplier_link.changed": "Kobling endret",
   invoice_line_match_confirmed: "Råvare/pakning bekreftet",
+  "supplier_item.linked": "Koblet",
+  "supplier_item.not_item": "Merket som ikke vare",
+  "supplier_item.price_accepted": "Pris godtatt",
+  "supplier_item.credit_claimed": "Kreditt krevd",
+  "invoice_line.price_variance_accepted": "Pris godtatt",
+  "prices.quarantined": "Priser satt i karantene",
 };
 
 interface Row { id: string; occurred_at: string; action: string; reason: string | null; user_display_name: string | null; changes: unknown }
