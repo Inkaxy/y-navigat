@@ -46,6 +46,8 @@ export interface DocPanelLine {
 }
 
 interface Props {
+  /** Kallerens faktiske faktura-ID (brukes til versjonsoppslag). */
+  invoiceId: string | null;
   invoice: DocPanelInvoice | null;
   line?: DocPanelLine | null;
   onClose: () => void;
