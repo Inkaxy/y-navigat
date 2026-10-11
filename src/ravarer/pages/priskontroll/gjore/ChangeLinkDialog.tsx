@@ -13,7 +13,7 @@ import { useChangeSupplierLink } from "./useGjoreMutations";
 import type { PanelResult } from "./types";
 
 /** Linjer som flyttes: ikke avstemte. Linjer med ført kostpris blir liggende (serveren håndhever det). */
-export function changeLinkScope(lines: SupplierItemLine[]) {
+export function changeLinkScope(lines: Pick<SupplierItemLine, "id" | "invoice_status" | "cost_posted">[]) {
   const movable = lines.filter((l) => l.invoice_status !== "reconciled" && l.invoice_status !== "cancelled");
   const locked = movable.filter((l) => !!l.cost_posted).length;
   return { lineIds: movable.filter((l) => !l.cost_posted).map((l) => l.id), locked };

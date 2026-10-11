@@ -6,7 +6,6 @@ import {
 import { parseChangeLink, parseClaimCredit } from "@/ravarer/pages/priskontroll/gjore/rpc";
 import { changeLinkScope } from "@/ravarer/pages/priskontroll/gjore/ChangeLinkDialog";
 import { ACCEPT_SKIP_REASONS } from "@/ravarer/lib/workRpcTypes";
-import type { SupplierItemLine } from "@/fakturaer/lib/supplierItems";
 
 describe("primærhandling i Pris-blokken", () => {
   const cap = 15;
@@ -93,7 +92,7 @@ describe("RPC-parsing", () => {
 });
 
 describe("Endre kobling — omfang", () => {
-  const l = (id: string, status: string, cost_posted: boolean) => ({ id, invoice_status: status, cost_posted }) as unknown as SupplierItemLine;
+  const l = (id: string, status: string, cost_posted: boolean) => ({ id, invoice_status: status, cost_posted });
   it("avstemte utelates, førte telles som låst", () => {
     expect(changeLinkScope([l("a", "pending_review", false), l("b", "reconciled", false), l("c", "pending_review", true)])).toEqual({ lineIds: ["a"], locked: 1 });
   });
