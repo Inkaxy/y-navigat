@@ -57,12 +57,22 @@ export function useChangeSupplierLink() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (i: ChangeLinkInput): Promise<ChangeLinkResult> => {
-      const { data, error } = await supabase.rpc("rm_change_supplier_link", {
-        p_rms_id: i.rmsId, p_new_raw_material_id: i.newRawMaterialId, p_reason: i.reason,
-        p_line_ids: i.lineIds ?? undefined,
-      });
+      let res: { data: unknown; error: { code?: string; message: string } | null };
+      try {
+        res = await supabase.rpc("rm_change_supplier_link", {
+          p_rms_id: i.rmsId, p_new_raw_material_id: i.newRawMaterialId, p_reason: i.reason,
+          p_line_ids: i.lineIds ?? undefined,
+        });
+      } catch (e) {
+        // Nettverk/transport: kallet kan ha nådd basen. Ukjent utfall, aldri nytt forsøk.
+        console.error("[change-supplier-link] transport", e);
+        throw new ChangeLinkUnknownError();
+      }
+      const { data, error } = res;
       if (error) {
         console.error("[change-supplier-link]", error);
+        // Bare en SQL-avvisning (med kode) er en kjent avvisning; uten kode er utfallet ukjent.
+        if (!error.code) throw new ChangeLinkUnknownError();
         throw new Error(changeLinkErrorMessage(error.message));
       }
       const parsed = parseChangeLinkStrict(data, i.lineIds);

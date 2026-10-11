@@ -8,7 +8,7 @@ export type SupplierLatest =
   | { kind: "loading" }
   | { kind: "error" }
   /** Siste faktura for råvaren er fra denne leverandøren og godkjent som prisgrunnlag. */
-  | { kind: "price"; price: number; date: string | null; invoiceId: string }
+  | { kind: "price"; price: number; date: string | null; invoiceId: string; /** Enheten fra samme bevis som prisen. */ unit: string }
   /** Siste faktura er fra denne leverandøren, men prisen må kontrolleres. Ingen eldre pris brukes. */
   | { kind: "control"; date: string | null; invoiceId: string; reason: string | null }
   /** Leverandørens egen siste observasjon kan ikke bevises med dagens lesekontrakt. */
@@ -54,7 +54,9 @@ export function useSupplierLatestPurchase(legalEntityId: string | undefined, sup
       return { kind: "unknown", reason: "Siste kjøp av varen er fra en annen leverandør" };
     }
     const l = latestInvoiceOf(e);
-    if (l.price != null) return { kind: "price", price: l.price, date: l.date, invoiceId: e.invoiceId };
+    // Enheten må komme fra samme bevis som prisen; uten den holdes prisen tilbake.
+    if (l.price != null && e.baseUnit) return { kind: "price", price: l.price, date: l.date, invoiceId: e.invoiceId, unit: e.baseUnit };
+    if (l.price != null) return { kind: "control", date: l.date, invoiceId: e.invoiceId, reason: "Enheten for prisen er ukjent" };
     return { kind: "control", date: l.date, invoiceId: e.invoiceId, reason: l.reason };
   };
 }

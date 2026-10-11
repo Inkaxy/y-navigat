@@ -60,16 +60,16 @@ export function SupplierOverviewSection({ supplier }: { supplier: SupplierRow })
         <p className="text-caption text-ink-secondary">{TRACK_HELP_SHORT}</p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="supplier-kpis">
-        <OrderDeskKpi icon={FileText} label="Fakturaer" value={supplier.invoice_count != null ? formatNumber(supplier.invoice_count, 0) : "—"} sub="Registrert i NBhub" />
-        <OrderDeskKpi icon={CalendarDays} label="Siste faktura" value={formatDate(supplier.last_invoice_date)} />
-        <OrderDeskKpi icon={Boxes} label="Varer koblet" value={kpi(items, (d) => String(d.length))} />
-        <OrderDeskKpi icon={Wallet} label="Kjøpt 12 mnd (eks. mva)" value={kpi(spend, (d) => (d.netNok == null ? "Ukjent" : formatNok(d.netNok)))}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="supplier-kpis">
+        <OrderDeskKpi wrapSub icon={FileText} label="Fakturaer" value={supplier.invoice_count != null ? formatNumber(supplier.invoice_count, 0) : "—"} sub="Registrert i NBhub" />
+        <OrderDeskKpi wrapSub icon={CalendarDays} label="Siste faktura" value={formatDate(supplier.last_invoice_date)} />
+        <OrderDeskKpi wrapSub icon={Boxes} label="Varer koblet" value={kpi(items, (d) => String(d.length))} />
+        <OrderDeskKpi wrapSub icon={Wallet} label="Kjøpt 12 mnd (eks. mva)" value={kpi(spend, (d) => (d.netNok == null ? "Ukjent" : formatNok(d.netNok)))}
           sub={spend.isError ? "Kunne ikke hentes" : spend.data ? spendSub(spend.data) : undefined} />
-        <OrderDeskKpi icon={PieChart} label="Andel av innkjøp" value={spend.isLoading || total.isLoading ? "…" : share == null ? "—" : `${formatNumber(share, 1)} %`} sub={shareSub} />
-        <OrderDeskKpi icon={CalendarClock} tone={expiring > 0 ? "warning" : "default"} label="Avtaler som utløper ≤ 90 d" value={kpi(items, () => String(expiring))} sub="Sluttdato innen 90 dager" />
+        <OrderDeskKpi wrapSub icon={PieChart} label="Andel av innkjøp" value={spend.isLoading || total.isLoading ? "…" : share == null ? "—" : `${formatNumber(share, 1)} %`} sub={shareSub} />
+        <OrderDeskKpi wrapSub icon={CalendarClock} tone={expiring > 0 ? "warning" : "default"} label="Avtaler som utløper ≤ 90 d" value={kpi(items, () => String(expiring))} sub="Sluttdato innen 90 dager" />
         {/* Prisindeksen holdes tilbake til kontrollert sammenlignbar historikk finnes; prisutvikling per vare ligger på råvarekortet. */}
-        <OrderDeskKpi icon={TrendingUp} label="Prisindeks" value="Ukjent" sub="Ikke beregnet: fakturapriser er ikke kontrollert som sammenlignbare. Se prisutvikling per vare." />
+        <OrderDeskKpi wrapSub icon={TrendingUp} label="Prisindeks" value="Ukjent" sub="Ikke beregnet: fakturapriser er ikke kontrollert som sammenlignbare. Se prisutvikling per vare." />
       </div>
     </div>
   );

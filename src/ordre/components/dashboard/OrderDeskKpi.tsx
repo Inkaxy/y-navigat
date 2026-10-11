@@ -32,6 +32,8 @@ export type OrderDeskKpiProps = {
   loading?: boolean;
   /** Vises i stedet for verdien når datasettet feilet. */
   failed?: boolean;
+  /** Bryt undertekst over flere linjer i stedet for å kutte (forklaringer som må leses). */
+  wrapSub?: boolean;
 };
 
 /** Kompakt, klikkbart KPI-felt på ordrekontorets arbeidsbord. */
@@ -44,6 +46,7 @@ export function OrderDeskKpi({
   tone = "default",
   loading,
   failed,
+  wrapSub,
 }: OrderDeskKpiProps) {
   const display = failed ? "–" : value;
   const ariaLabel = `${label}: ${failed ? "ikke tilgjengelig" : display}${sub ? `. ${sub}` : ""}`;
@@ -61,7 +64,7 @@ export function OrderDeskKpi({
             </div>
           )}
           {!loading && (
-            <div className="mt-1.5 truncate text-caption text-muted-foreground">
+            <div className={cn("mt-1.5 text-caption text-muted-foreground", wrapSub ? "break-words" : "truncate")}>
               {failed ? "Kunne ikke hentes" : (sub ?? "\u00a0")}
             </div>
           )}
@@ -76,7 +79,7 @@ export function OrderDeskKpi({
   );
   if (!to) {
     return (
-      <div role="group" aria-label={ariaLabel} className="rounded-lg border border-border bg-card p-3">
+      <div role="group" aria-label={ariaLabel} className="min-w-0 rounded-lg border border-border bg-card p-3">
         {body}
       </div>
     );
@@ -85,7 +88,7 @@ export function OrderDeskKpi({
     <Link
       to={to}
       aria-label={ariaLabel}
-      className="group rounded-lg border border-border bg-card p-3 transition-all hover:border-primary/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="group min-w-0 rounded-lg border border-border bg-card p-3 transition-all hover:border-primary/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       {body}
     </Link>
@@ -126,7 +129,7 @@ export function OrderDeskSplitKpi({
   const sides = [left, right];
 
   return (
-    <div className="rounded-lg border border-border bg-card p-3">
+    <div className="min-w-0 rounded-lg border border-border bg-card p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="truncate text-caption uppercase tracking-wide text-muted-foreground">
           {label}

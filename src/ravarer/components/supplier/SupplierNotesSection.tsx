@@ -32,6 +32,9 @@ export function SupplierNotesSection({ supplier, canWrite, onDirtyChange }: { su
     const next = supplier.notes ?? "";
     if (next === lastServer.current) return;
     lastServer.current = next;
+    // Ren: ny serververdi blir både visning og grunnlinje for Forkast.
+    // Skitten: brukerens tekst beholdes; Forkast gjenoppretter den ferske serververdien.
+    setBaseline(next);
     if (!dirtyRef.current) setDraft(next);
   }, [supplier.notes]);
   const [baseline, setBaseline] = useState(supplier.notes ?? "");
