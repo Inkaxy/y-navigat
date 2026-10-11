@@ -151,7 +151,15 @@ export function CorrectLineDialog({ open, onOpenChange, lineId, invoice, canWrit
                     <span>Tallene er kontrollert mot originalen og stemmer likevel. Registrer heller rabatt og prisgrunnlag over når det er mulig.</span></label>
                   {acceptIssues && learn && <p className="text-caption text-ink-secondary">Rettelser med godtatte avvik blir aldri brukt ved senere lesing. Rett tallene og prisgrunnlaget i stedet hvis du vil lære av linjen.</p>}
                 </div>
-              ) : <p className="text-caption text-ink-secondary">Regnestykket går opp med disse tallene.</p>}
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-caption text-ink-secondary">Regnestykket går opp med disse tallene.</p>
+                  {q.data.issues.length > 0 && (
+                    <label className="flex items-start gap-2 rounded-md border border-border px-3 py-2 text-sm"><Checkbox checked={acceptIssues} onCheckedChange={(v) => setAcceptIssues(v === true)} disabled={!!lock} />
+                      <span>Jeg har kontrollert lesevarslene over mot originalen, og linjen stemmer. Varslene lukkes med begrunnelsen og blir aldri brukt til læring.</span></label>
+                  )}
+                </div>
+              )}
               <div>
                 <Label htmlFor="rett-begrunnelse" className="mb-1 block">Begrunnelse</Label>
                 <Textarea id="rett-begrunnelse" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="F.eks. «Linjesum lest som 30, står 300 på originalen»" disabled={!!lock} />
