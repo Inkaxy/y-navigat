@@ -134,6 +134,13 @@ export function InvoiceDocumentPanel({ invoiceId, invoice, line, onClose, classN
           <div className="flex h-full items-center justify-center p-6 text-center text-sm text-ink-secondary">
             {verified?.available === false && verified.reason === "document_path_invalid" ? "Originalens lagringssti er ugyldig. Dokumentet vises ikke." : "Originalfaktura ikke tilgjengelig."}
           </div>
+        ) : ver.revoked ? (
+          <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm text-ink-secondary">
+            <span>Originalen er endret eller kunne ikke kontrolleres. Ingenting fra den gamle versjonen vises.</span>
+            <Button size="sm" variant="outline" className="min-h-11" onClick={() => ver.refresh()}>
+              <RefreshCw className="h-4 w-4" /> Hent på nytt
+            </Button>
+          </div>
         ) : error ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm text-ink-secondary">
             <span>Kunne ikke hente dokumentet.</span>

@@ -76,23 +76,35 @@ export function useInvoiceDocumentVersion(invoiceId: string | null | undefined) 
     retry: 1,
     queryFn: ({ signal }) => fetchDocumentVersion(invoiceId as string, signal),
   });
-  const needsVerify = enabled && !q.isFetching && !q.isError && q.dataUpdatedAt < epoch;
+  // Delt tilbakekalling (alle visninger for faktura+bruker+selskap): settes når en kontroll før/etter
+  // nedlasting finner avvik, manglende dokument eller feil. Oppheves BARE av eksplisitt `refresh`.
+  const revokeKey = [DOC_VERSION_KEY, "revoked", invoiceId ?? null, companyId, userId] as const;
+  const rv = useQuery({ queryKey: revokeKey, queryFn: () => Promise.resolve(false), enabled: false, initialData: false, staleTime: Infinity, gcTime: Infinity });
+  const revoked = enabled && rv.data === true;
+  const revoke = () => { qc.setQueryData(revokeKey, true); void qc.cancelQueries({ queryKey: key }); };
+  const needsVerify = enabled && !revoked && !q.isFetching && !q.isError && q.dataUpdatedAt < epoch;
   // Én henting per epoke; feil stopper (ingen løkke) til bruker prøver igjen eller ny epoke starter.
   const { refetch } = q;
   useEffect(() => { if (needsVerify) void refetch(); }, [needsVerify, epoch, refetch]);
   const verifiedCurrent: DocumentVersion | null =
-    enabled && q.status === "success" && !q.isFetching && !q.isError && q.dataUpdatedAt >= epoch && q.data.invoice_id === invoiceId ? q.data : null;
+    enabled && !revoked && q.status === "success" && !q.isFetching && !q.isError && q.dataUpdatedAt >= epoch && q.data.invoice_id === invoiceId ? q.data : null;
   /** Leser identiteten på nytt (før/etter nedlasting) uten cache; forkastes hvis konteksten byttet underveis. */
-  const recheck = async (): Promise<string | null> => {
+  const recheck = async (expected?: string): Promise<string | null> => {
     const started = ctxRef.current;
     if (!invoiceId || !started) return null;
-    const v = await fetchDocumentVersion(invoiceId);
+    let v: DocumentVersion;
+    try { v = await fetchDocumentVersion(invoiceId); } catch (e) {
+      if (ctxRef.current === started) revoke();
+      throw e;
+    }
     if (ctxRef.current !== started) return null;
-    return v.available ? `${v.path}|${v.version}` : null;
+    const ident = v.available ? `${v.path}|${v.version}` : null;
+    if (ident === null || (expected !== undefined && ident !== expected)) revoke();
+    return ident;
   };
   /** Ugyldiggjør gjeldende verifisering straks (f.eks. etter avvik ved nedlasting) og hent på nytt. */
-  const refresh = () => { setEpoch(Date.now() + 1); void qc.invalidateQueries({ queryKey: [DOC_VERSION_KEY, invoiceId ?? null] }); };
-  return { ...q, verifiedCurrent, accessScope, verifying: enabled && !verifiedCurrent && !q.isError, recheck, refresh };
+  const refresh = () => { qc.setQueryData(revokeKey, false); setEpoch(Date.now() + 1); void qc.invalidateQueries({ queryKey: [DOC_VERSION_KEY, invoiceId ?? null] }); };
+  return { ...q, verifiedCurrent, accessScope, revoked, verifying: enabled && !verifiedCurrent && !q.isError && !revoked, recheck, refresh };
 }
 
 /** Sammenlign gjeldende original med lesingens frosne dokument (id, sti, lagringsversjon, tidspunkt). */

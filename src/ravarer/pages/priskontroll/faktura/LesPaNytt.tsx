@@ -100,7 +100,7 @@ export default function LesPaNytt() {
     ? <p role="alert" className="p-4 text-sm text-warning">Originalen er endret siden lesingen. Den nåværende filen er ikke dokumentet forslaget ble lest fra, og vises ikke her. Start en ny lesing.</p>
     : doc.url && r && current
       ? <PdfDocumentViewer url={doc.url} cacheKey={current.path} version={current.version} accessScope={ver.accessScope} verifyIdentity={ver.recheck} onIdentityChanged={ver.refresh} title="Originalfaktura" fallback={<a className="underline" href={doc.url} target="_blank" rel="noreferrer">Åpne originalen</a>} />
-      : <p className="p-4 text-sm text-ink-secondary">{ver.isError ? "Gjeldende original kunne ikke kontrolleres. Forslaget kan ikke tas i bruk." : ver.verifying || doc.isLoading ? "Kontrollerer gjeldende original …" : "Originalen kan ikke kontrolleres eller vises nå."}</p>;
+      : <p className="p-4 text-sm text-ink-secondary">{ver.isError || ver.revoked ? "Gjeldende original kunne ikke kontrolleres. Forslaget kan ikke tas i bruk." : ver.verifying || doc.isLoading ? "Kontrollerer gjeldende original …" : "Originalen kan ikke kontrolleres eller vises nå."}</p>;
 
   const title = inv.data ? `${inv.data.suppliers?.name ?? "Ukjent leverandør"} · Faktura ${inv.data.invoice_number ?? ""}` : "Faktura";
 
@@ -163,8 +163,8 @@ export default function LesPaNytt() {
             <>
             {docMatch !== "match" && (
               <p role="alert" className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
-                {docMatch === "changed" ? "Originalen er endret siden lesingen. Forslaget kan ikke tas i bruk." : ver.isError ? "Gjeldende original kunne ikke kontrolleres. Forslaget kan ikke tas i bruk." : "Originalens versjon er ikke kontrollert ennå. Forslaget kan ikke tas i bruk før den er bekreftet uendret."}
-                {ver.isError && <Button size="sm" variant="outline" className="ml-2 min-h-11" onClick={() => void ver.refetch()}>Kontroller originalen på nytt</Button>}
+                {docMatch === "changed" ? "Originalen er endret siden lesingen. Forslaget kan ikke tas i bruk." : ver.isError || ver.revoked ? "Originalen er endret eller kunne ikke kontrolleres etter siste kontroll. Forslaget kan ikke tas i bruk." : "Originalens versjon er ikke kontrollert ennå. Forslaget kan ikke tas i bruk før den er bekreftet uendret."}
+                {(ver.isError || ver.revoked) && <Button size="sm" variant="outline" className="ml-2 min-h-11" onClick={() => ver.refresh()}>Kontroller originalen på nytt</Button>}
               </p>
             )}
             <RereadView run={r} document={document} canApply={allowApply} pending={pending} saving={apply.isPending}
