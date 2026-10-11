@@ -33,6 +33,9 @@ import { useIsWide } from "./useIsWide";
 import { useWorkspaceHotkeys } from "./useWorkspaceHotkeys";
 import { useRematchWait } from "./useRematchWait";
 import { canFetchLines } from "./invoiceSteps";
+import { CorrectLineDialog } from "./CorrectLineDialog";
+import { ReadIssuesBanner } from "./ReadIssuesBanner";
+import { parseReadIssues } from "@/fakturaer/lib/lineCorrection";
 
 const LS_DOC = "nbhub.faktura.docpanel.open";
 const HELP = [
@@ -58,6 +61,7 @@ export default function FakturaWorkspace() {
   const q = useInvoiceLineQueue(id ?? null, data?.legal_entity_id ?? null, data?.supplier_id ?? null);
   const s = useInvoiceSteps(data);
   const tolerances = useMatchTolerances(data?.legal_entity_id ?? null);
+  const [correctFor, setCorrectFor] = useState<string | null>(null);
   const fetchLines = useFetchInvoiceLines();
   const rematch = useRematchWait(data?.legal_entity_id ?? null, () => { void detail.refetch(); q.refresh(); });
   const confirmMany = useConfirmMany();
@@ -180,6 +184,8 @@ export default function FakturaWorkspace() {
   const linesZone = (
     <div className="min-w-0 space-y-3">
       <InvoiceFactsSection data={data} canWrite={s.canWrite} fetchingLines={fetchLines.isPending} onFetchLines={doFetch} onChanged={() => void detail.refetch()} openSignal={factsSignal} />
+      <ReadIssuesBanner invoiceId={data.id} issues={parseReadIssues(data.extraction_issues)} canWrite={s.canWrite} locked={final}
+        lineIssueCount={(data.invoice_lines ?? []).filter((l) => l.match_confidence !== "not_applicable" && parseReadIssues(l.extraction_issues).length > 0).length} />
       {lockNote && <p role="note" className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-ink-secondary">{lockNote}</p>}
       {s.result && <ResultBox title={s.result.title} items={s.result.items} onUndo={s.result.undoable && q.undoEntry ? () => { s.setResult(null); void q.undo(); } : undefined} onNext={() => s.setResult(null)} nextLabel="Lukk" />}
       {lastLinked && <SimilarLinesHint rmsId={lastLinked.rmsId} name={lastLinked.name} onOpen={() => q.setBulkLink(lastLinked)} onDismiss={() => setLastLinked(null)} />}
@@ -246,7 +252,12 @@ export default function FakturaWorkspace() {
           inspectorAsSheet={!wide && !isMobile}
           inspectorOpen={inspectorOpen}
           onInspectorOpenChange={setInspectorOpen}
-          inspectorNote={active ? <SupplierItemScopeNote supplierId={data.supplier_id} line={active} /> : null}
+          inspectorNote={active ? (
+            <div className="space-y-2">
+              <Button variant="outline" size="sm" onClick={() => setCorrectFor(active.id)}>Rett fakturalinje</Button>
+              <SupplierItemScopeNote supplierId={data.supplier_id} line={active} />
+            </div>
+          ) : null}
           editMaterialSignal={editSignal}
         />
       )}
@@ -300,6 +311,20 @@ export default function FakturaWorkspace() {
       <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} bindings={HELP} />
       <FakturaerDialogs state={dialog} onClose={() => setDialog(null)} onDone={(k) => { if (k !== "flag") setDialog(null); void detail.refetch(); }} />
       {confirmMany.dialog}
+      <CorrectLineDialog
+        open={!!correctFor}
+        onOpenChange={(v) => { if (!v) setCorrectFor(null); }}
+        lineId={correctFor}
+        invoice={{ id: data.id, status: data.status, approved: !!s.steps?.find((x) => x.key === "godkjent")?.done, supplier_id: data.supplier_id, supplier_name: data.suppliers?.name ?? null }}
+        canWrite={s.canWrite}
+        document={docEl}
+        onSaved={(r) => { q.refresh(); void detail.refetch(); s.setResult({ title: "Fakturalinjen er rettet", items: [
+          `${r.changed.length} ${r.changed.length === 1 ? "felt" : "felt"} endret. Kobling og pris beregnes på nytt.`,
+          ...(r.exampleId ? ["Lagret som bekreftet eksempel for leverandøren (gjenbruk, ikke retrening)."] : []),
+          ...r.remainingIssues.map((x) => x.message),
+          ...(r.linesSumStatus === "mismatch" ? ["Linjesummen stemmer fortsatt ikke med fakturabeløpet."] : []),
+        ] }); }}
+      />
       <LineDialogs dialog={lineDialog} onClose={() => setLineDialog(null)} q={q} canWrite={lineWrite} invoice={data} onEditMaterial={() => editMaterial()}
         onNotItemDone={(l, info) => { q.remember(l, `Ikke vare: ${l.description ?? "linje"}`); q.refresh(); s.setResult({ title: "Linjen er merket som ikke vare", items: notItemResultItems(l.description, info.patternId), undoable: true }); }} />
     </div>

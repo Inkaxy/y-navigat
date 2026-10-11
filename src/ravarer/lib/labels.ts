@@ -211,7 +211,7 @@ export const toneStyle = (tokenVar: string) => ({
  */
 export const APPROVAL_BLOCKER_CODES = [
   "finnes_ikke", "flagget", "kansellert", "leverandor_mangler", "belop_mangler", "mva_ukjent", "valuta_mangler",
-  "mangler_linjer", "sumavvik", "sum_ukontrollert", "lavt_uttrekk", "duplikat", "mengde", "prisavvik", "leverandorsak",
+  "mangler_linjer", "sumavvik", "sum_ukontrollert", "lavt_uttrekk", "duplikat", "mengde", "prisavvik", "leverandorsak", "lesefeil",
 ] as const;
 export type ApprovalBlockerCode = (typeof APPROVAL_BLOCKER_CODES)[number];
 
@@ -235,6 +235,7 @@ export const APPROVAL_BLOCKER_LABEL: Record<ApprovalBlockerCode, string> = {
   valuta_mangler: "Valuta mangler",
   sum_ukontrollert: "Linjesummen er ikke kontrollert mot fakturabeløpet",
   lavt_uttrekk: "Fakturaen er tolket med lav sikkerhet — kontroller registreringen",
+  lesefeil: "Uavklarte lesevarsler — rett linjen eller bekreft lesingen mot originalen",
 };
 
 export const SUPPLIER_CASE_STATUS_LABELS: LabelMap = {
@@ -264,6 +265,13 @@ export const AUDIT_ACTION_LABEL: Readonly<Record<string, string>> = {
   "supplier_case.created": "Sak opprettet",
   "supplier_case.status": "Status endret",
   "supplier_case.credit_allocated": "Kreditt fordelt",
+  "invoice_line.corrected": "Fakturalinje rettet",
+  "invoice.line_corrected": "Fakturalinje rettet",
+  "invoice.read_issues_confirmed": "Lesevarsler bekreftet mot originalen",
+  "extraction_example.activated": "Læringseksempel slått på",
+  "extraction_example.deactivated": "Læringseksempel slått av",
+  "supplier_case.email_draft_saved": "E-postkladd lagret",
+  "supplier_case.email_draft_queued": "Kladd lagt i kø til Henrik (ikke sendt til leverandør)",
 };
 
 export function auditActionLabel(action: string): string {

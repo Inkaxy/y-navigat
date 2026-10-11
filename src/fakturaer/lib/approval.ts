@@ -21,6 +21,8 @@ export interface OverviewRow {
   blockers: string[];
   open_material_lines: number;
   cost_posted_lines: number;
+  /** Varelinjer (ikke «Ikke vare») — delvis føring vises som N av M. */
+  cost_line_total: number;
 }
 
 export type ApprovalBucket = "ready" | "waiting" | "done";

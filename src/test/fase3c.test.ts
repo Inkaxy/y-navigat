@@ -6,7 +6,7 @@ import { caseSums, countSaker, isFollowUpDue, matchesSakFilter, parseSakFilter }
 
 const row = (p: Partial<OverviewRow>): OverviewRow => ({
   invoice_id: "i", invoice_number: "1", invoice_date: null, supplier_id: "s", supplier_name: "Lev", total_amount: 100, total_vat: 25,
-  currency: "NOK", status: "reconciled", is_credit_note: false, approved_at: null, approved_by: null, blockers: [], open_material_lines: 0, cost_posted_lines: 0, ...p,
+  currency: "NOK", status: "reconciled", is_credit_note: false, approved_at: null, approved_by: null, blockers: [], open_material_lines: 0, cost_posted_lines: 0, cost_line_total: 3, ...p,
 });
 
 describe("blokkeringskoder", () => {
@@ -31,7 +31,8 @@ describe("godkjenning — hurtigfiltre", () => {
     expect(canPostCosts(row({ status: "needs_review", approved_at: null }))).toBe(true);
     expect(canPostCosts(row({ status: "reconciled", approved_at: "2026-10-01T10:00:00Z" }))).toBe(false);
     expect(canPostCosts(row({ status: "ready", is_credit_note: true }))).toBe(false);
-    expect(canPostCosts(row({ status: "ready", cost_posted_lines: 2 }))).toBe(false);
+    expect(canPostCosts(row({ status: "ready", cost_posted_lines: 3 }))).toBe(false);
+    expect(canPostCosts(row({ status: "ready", cost_posted_lines: 2 }))).toBe(true);
   });
   it("mapper gamle statusverdier", () => {
     expect(parseGodkjenningStatus("waiting")).toBe("avventer");

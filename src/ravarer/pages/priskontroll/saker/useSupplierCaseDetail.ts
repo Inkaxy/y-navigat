@@ -26,7 +26,7 @@ export function useSupplierCaseDetail(id: string | null) {
       if (!c) return null;
       const [lines, credits, notes] = await Promise.all([
         supabase.from("supplier_deviation_case_lines")
-          .select("id, invoice_id, invoice_line_id, amount_excl_vat, basis, invoice:invoices(invoice_number), line:invoice_lines(description, supplier_sku, quantity, unit, unit_price, raw_material:raw_materials(name, base_unit))")
+          .select("id, invoice_id, invoice_line_id, amount_excl_vat, basis, invoice:invoices(invoice_number, invoice_date), line:invoice_lines(description, supplier_sku, quantity, unit, unit_price, raw_material:raw_materials(name, base_unit))")
           .eq("case_id", c.id).limit(500),
         supabase.from("supplier_deviation_credits")
           .select("id, invoice_id, credit_invoice_id, amount_excl_vat, note, created_at, credit:invoices!supplier_deviation_credits_credit_invoice_id_fkey(invoice_number)")
