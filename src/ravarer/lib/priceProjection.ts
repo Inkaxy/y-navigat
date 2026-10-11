@@ -93,6 +93,8 @@ export function parseMaterialPriceProjection(data: unknown, rawMaterialId: strin
     if (!parsed) return null;
     projections.push(parsed);
   }
+  // Tvetydig: samme historikk-ID to ganger → kontrollfeil (null), aldri «siste vinner».
+  if (new Set(projections.map((p) => p.history_id)).size !== projections.length) return null;
   return { raw_material_id: rawMaterialId, checked_at, eligible_history_ids: eligible, held_history_ids: held, duplicate_history_ids: dup, projections };
 }
 
