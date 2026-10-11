@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { changeLinkUnknownFor, clearChangeLinkUnknown, rememberChangeLinkUnknown, subscribeChangeLinkUnknown } from "./changeLinkPending";
 import { Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -31,12 +32,14 @@ export function ChangeLinkDialog({ open, onOpenChange, item, lines, onDone }: Pr
   const [pick, setPick] = useState<{ id: string; name: string } | null>(null);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [unknown, setUnknown] = useState(false);
+  // Ukjent utfall overlever lukk/åpne; bare eksplisitt kontroll frigjør nytt forsøk.
+  const pendingUnknown = useSyncExternalStore(subscribeChangeLinkUnknown, () => changeLinkUnknownFor(item.rms_id));
+  const unknown = !!pendingUnknown;
   const busyRef = useRef(false);
   const { results } = useMaterialChoices(null, search);
   const change = useChangeSupplierLink();
   const scope = changeLinkScope(lines, item.rm_id);
-  useEffect(() => { if (open) { setSearch(""); setPick(null); setReason(""); setError(null); setUnknown(false); } }, [open]);
+  useEffect(() => { if (open) { setSearch(""); setPick(null); setReason(""); setError(null); } }, [open]);
 
   const many = useConfirmMany();
   const submit = async () => {
@@ -44,6 +47,7 @@ export function ChangeLinkDialog({ open, onOpenChange, item, lines, onDone }: Pr
     busyRef.current = true;
     setError(null);
     const target = { name: pick.name };
+    const frozenRms = item.rms_id;
     try {
       const r = await change.mutateAsync({ rmsId: item.rms_id, oldRawMaterialId: item.rm_id, newRawMaterialId: pick.id, reason: reason.trim(), lineIds: [...scope.lineIds] });
       if (!r.ok) throw new ChangeLinkUnknownError();
@@ -54,7 +58,7 @@ export function ChangeLinkDialog({ open, onOpenChange, item, lines, onDone }: Pr
         items: [locked, r.rematchQueued > 0 ? `${r.rematchQueued} fakturaer regnes om` : null].filter((x): x is string => !!x),
       });
     } catch (e) {
-      if (e instanceof ChangeLinkUnknownError) setUnknown(true);
+      if (e instanceof ChangeLinkUnknownError) rememberChangeLinkUnknown(frozenRms, pick.id);
       setError(e instanceof Error ? e.message : "Koblingen kunne ikke endres.");
     } finally {
       busyRef.current = false;
@@ -92,7 +96,13 @@ export function ChangeLinkDialog({ open, onOpenChange, item, lines, onDone }: Pr
             Inntil {scope.movable} åpne {scope.movable === 1 ? "linje" : "linjer"} kan flyttes{scope.locked > 0 ? `, ${scope.locked} er låst (kostpris ført)` : ""}.
             {" "}Endelig antall avgjøres av serveren — linjer med prishistorikk eller andre låser blir stående.
           </p>
-          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          {error && !unknown && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          {unknown && item.rms_id && (
+            <div role="alert" className="space-y-2 rounded-md border border-destructive/40 p-2 text-sm text-destructive" data-testid="change-link-unknown">
+              <p>Utfallet av forrige endring er ukjent — koblingen kan være flyttet. Kontroller gjeldende kobling og linjene på varekortet før du prøver igjen. Nå vist: {item.rm_name ?? "ukjent råvare"}.</p>
+              <Button type="button" variant="outline" className="min-h-[44px]" onClick={() => clearChangeLinkUnknown(item.rms_id!)}>Jeg har kontrollert koblingen</Button>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={change.isPending}>Avbryt</Button>
