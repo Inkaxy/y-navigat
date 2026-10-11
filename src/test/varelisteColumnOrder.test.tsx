@@ -21,9 +21,9 @@ const item = {
   id: "r1", sku: "SKU-1", name: "Combisur", declarationName: null, categories: ["Mel"], itemType: "ravare", isActive: true, baseUnit: "kg",
   costPrice: 60.6035, costSource: "invoice", costUpdatedAt: "2026-08-18", agreedPrice: null, supplierId: "s1", supplierName: "Regal", supplierSku: null,
   primaryLinkId: null, matchedAlias: null, lastInvoicePrice: 60.6035, lastInvoiceDate: "2026-08-18", deviation: null,
-  packageState: { kind: "unknown" }, volume12m: 480, currentStock: 7, stockTracking: true, minStock: null,
+  packageState: "unconfirmed", volume12m: 480, currentStock: 7, stockTracking: true, minStock: null,
   hasNutrition: true, hasDatasheet: true, hasAllergens: true, searchText: "", aliases: [],
-} as RawMaterialListItem;
+} satisfies RawMaterialListItem;
 
 const ctx = { canWrite: false, categoryOptions: [], toleranceFor: () => 5, hardCap: 15, editing: null, onStartEdit: vi.fn(), onCancelEdit: vi.fn(), onCommitPrice: vi.fn(), onCommitCategory: vi.fn(), listSearch: "" };
 
