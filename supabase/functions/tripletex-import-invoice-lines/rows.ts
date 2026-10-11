@@ -22,6 +22,21 @@ export interface InvoiceLineRow {
   unit_price_basis: DbPriceBasis | null;
   discount_amount: number | null;
   ledger_account: string | null;
+  /** Leserens strukturerte varsler (f.eks. tvetydig tall) — lagres sammen med databasens egen kontroll. */
+  read_issues: Array<{ code: string; message: string }>;
+  /** Hvordan tallene ble lest (råtekst + tolkning) og linjens egen modellscore. */
+  evidence: { confidence: number | null; number_evidence: unknown[] };
+}
+
+function issuesOf(v: unknown): Array<{ code: string; message: string }> {
+  if (!Array.isArray(v)) return [];
+  const out: Array<{ code: string; message: string }> = [];
+  for (const x of v) {
+    const r = rec(x);
+    if (typeof r.code === "string" && r.code) out.push({ code: r.code.slice(0, 60), message: typeof r.message === "string" ? r.message.slice(0, 300) : "" });
+    if (out.length >= 20) break;
+  }
+  return out;
 }
 
 const BASES: readonly string[] = ["mengdeenhet", "pakning", "stk", "kg", "g", "l", "ml"];
@@ -77,6 +92,16 @@ export function toInvoiceLineRows(rawLines: unknown, invoiceId: string, ledgerAc
         unit_price_basis: basis,
         discount_amount: discount,
         ledger_account: ledgerAccount,
+        read_issues: [
+          ...issuesOf(l.read_issues),
+          ...nums.unresolved
+            .filter(() => !issuesOf(l.read_issues).some((x) => x.code === "tvetydig_tall"))
+            .map((f) => ({ code: "tvetydig_tall", message: `Tvetydig tall i ${f}: kan ikke avgjøres sikkert. Kontroller mot dokumentet.` })),
+        ].slice(0, 20),
+        evidence: {
+          confidence: num(l.confidence),
+          number_evidence: [...(Array.isArray(l.number_evidence) ? l.number_evidence : []), ...nums.evidence].slice(0, 10),
+        },
       };
     });
 }
