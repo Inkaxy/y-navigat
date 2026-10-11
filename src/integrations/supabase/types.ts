@@ -17403,6 +17403,10 @@ export type Database = {
           tripletex_supplier_invoice_id: string
         }[]
       }
+      rm_clear_primary_supplier: {
+        Args: { p_raw_material_id: string }
+        Returns: Json
+      }
       rm_clear_start_price: {
         Args: { p_reason: string; p_rms_id: string }
         Returns: Json
