@@ -14,7 +14,7 @@ const resp = (projections: unknown[], o: Record<string, unknown> = {}) => ({
   raw_material_id: M, checked_at: "2026-10-11T12:00:00Z", eligible_history_ids: [], held_history_ids: [], duplicate_history_ids: [], projections, ...o,
 });
 const legacy = (o: Partial<TimelineHistoryRow>): TimelineHistoryRow => ({
-  id: "h1", effective_date: "2026-08-18", price: 60.6035, supplier_id: "s1", source: "invoice", invoice_id: "i1",
+  id: "h1", effective_date: "2026-08-18", price: 60.6035, supplier_id: "s1", source: "invoice", invoice_id: "i1", invoice_line_id: "l1",
   currency: "NOK", unit: null, unitSource: null, ...o,
 });
 
@@ -32,7 +32,7 @@ describe("rm_material_price_projection — parsing", () => {
 describe("fletting og tidslinje (Combisur)", () => {
   const history = [
     legacy({ id: "h1", effective_date: "2026-08-18", price: 60.6035, invoice_id: "i1" }),
-    legacy({ id: "h2", effective_date: "2026-05-26", price: 60.076, invoice_id: "i2" }),
+    legacy({ id: "h2", effective_date: "2026-05-26", price: 60.076, invoice_id: "i2", invoice_line_id: "l2" }),
     legacy({ id: "h3", effective_date: "2026-09-01", price: 52.52, invoice_id: null, source: "recalc" }),
   ];
   const p = parseMaterialPriceProjection(resp([proj({}), proj({ history_id: "h2", price: 60.076, invoice_id: "i2", effective_date: "2026-05-26", invoice_line_id: "l2" })]), M);
@@ -54,15 +54,40 @@ describe("fletting og tidslinje (Combisur)", () => {
     expect(mergeProjection([legacy({ invoice_id: "annen" })], p)[0].unitSource).toBeNull();
   });
   it("hold og duplikat blir hendelser; lik pris på ulik dato beholdes", () => {
-    const q = parseMaterialPriceProjection(resp([proj({}), proj({ history_id: "h2", price: 60.076, invoice_id: "i2", effective_date: "2026-05-26" })], { held_history_ids: ["h1"], duplicate_history_ids: ["h2"] }), M);
+    const q = parseMaterialPriceProjection(resp([proj({}), proj({ history_id: "h2", price: 60.076, invoice_id: "i2", effective_date: "2026-05-26", invoice_line_id: "l2" })], { held_history_ids: ["h1"], duplicate_history_ids: ["h2"] }), M);
     const t = buildTimeline({ history: mergeProjection(history.slice(0, 2), q), supplierNames: new Map(), links: [], currentUnit: "kg" });
     expect(t.rows).toHaveLength(0);
     expect(t.events.map((e) => e.kind).sort()).toEqual(["duplikat", "til_kontroll"]);
-    const same = mergeProjection([legacy({ id: "a" }), legacy({ id: "b", effective_date: "2026-07-14" })], null);
+    const same = mergeProjection([legacy({ id: "a" }), legacy({ id: "b", effective_date: "2026-07-14" })], p);
     expect(buildTimeline({ history: same, supplierNames: new Map(), links: [] }).rows).toHaveLength(2);
   });
-  it("projeksjon = null (feil) gir uendret historikk, ikke tom", () => {
-    expect(mergeProjection(history, null)).toHaveLength(3);
+  it("projeksjon = null (feil/laster): alle rader beholdes, fakturarader er kontroll-ukjent og ute av graf/Δ", () => {
+    const m = mergeProjection(history, null);
+    expect(m).toHaveLength(3);
+    expect(m.slice(0, 2).every((r) => r.controlUnknown === "feil")).toBe(true);
+    expect(m[2].controlUnknown).toBeUndefined();
+    expect(mergeProjection(history, null, "laster")[0].controlUnknown).toBe("laster");
+  });
+  it("reproduksjon P1: holdt snapshot er 0 punkter med svar OG 0 punkter når kontrollen feiler", () => {
+    const snap = legacy({ unit: "kg", unitSource: "ved_registrering" });
+    const held = parseMaterialPriceProjection(resp([], { held_history_ids: ["h1"] }), M);
+    expect(buildTimeline({ history: mergeProjection([snap], held), supplierNames: new Map(), links: [], currentUnit: "kg" }).rows).toHaveLength(0);
+    const failed = buildTimeline({ history: mergeProjection([snap], null), supplierNames: new Map(), links: [], currentUnit: "kg" });
+    expect(failed.rows).toHaveLength(0);
+    expect(failed.events.map((e) => e.kind)).toEqual(["kontroll_ukjent"]);
+    // Originalsnapshot er urørt.
+    expect(mergeProjection([snap], null)[0]).toMatchObject({ unit: "kg", unitSource: "ved_registrering", price: 60.6035 });
+  });
+  it("reproduksjon P1: linje/dato/leverandør må stemme — annen identitet merkes aldri kontrollert", () => {
+    const other = legacy({ invoice_line_id: "line-b", effective_date: "2025-01-01", supplier_id: "supplier-other" });
+    const pp = parseMaterialPriceProjection(resp([proj({ invoice_line_id: "line-a" })]), M);
+    const m = mergeProjection([other], pp)[0];
+    expect(m.unitSource).toBeNull();
+    expect(m.controlUnknown).toBe("identitet");
+    expect(mergeProjection([legacy({ invoice_line_id: null })], pp)[0].controlUnknown).toBe("identitet");
+  });
+  it("tvetydig: samme history_id to ganger avvises som kontrollfeil", () => {
+    expect(parseMaterialPriceProjection(resp([proj({}), proj({})]), M)).toBeNull();
   });
   it("pakningsvisning: CSV skriver original 60,6035 per kg, ikke 1212,07; hendelser skaleres aldri", () => {
     const merged = mergeProjection(history, p);

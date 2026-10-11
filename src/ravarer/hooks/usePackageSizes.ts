@@ -68,11 +68,11 @@ export interface SetPackageInput {
   p_reason?: string | null;
 }
 
-export function usePackageWorklist() {
+export function usePackageWorklist(options?: { enabled?: boolean }) {
   const { legalEntityId } = useRavarerScope();
   return useQuery({
     queryKey: ["raw_material_package_worklist", legalEntityId],
-    enabled: !!legalEntityId,
+    enabled: !!legalEntityId && (options?.enabled ?? true),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("raw_material_package_worklist")

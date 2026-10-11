@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { OrderDeskKpi } from "@/ordre/components/dashboard/OrderDeskKpi";
 import { BookOpen, Coins, FileText, Handshake, Package, Percent, Truck, Wallet } from "lucide-react";
-import { formatDate, formatNok, priceSourceLabel } from "@/ravarer/lib/constants";
+import { formatDate, formatNok } from "@/ravarer/lib/constants";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { chooseAgreedPrice, kpiDeviation, pricePerPackage } from "@/ravarer/lib/rawMaterialKpi";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
@@ -10,8 +10,7 @@ import { paths } from "@/ravarer/lib/paths";
 import { isAgreementConfirmed } from "@/ravarer/lib/priceTimeline";
 import { confirmedFactor, packageLabel } from "@/ravarer/lib/supplierPackagePrice";
 
-const COST_STATUS: Record<string, string> = { verifisert: "Verifisert", uverifisert: "Uverifisert", mangler: "Mangler gyldig kilde" };
-const fullPrice = (n: number) => n.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+import { costSummary } from "@/ravarer/lib/costSummary";
 
 interface Props {
   rm: RawMaterialRow;
@@ -46,7 +45,8 @@ export function RawMaterialKpiStrip({ rm, links, recipeCount, spend12m }: Props)
 
   // Bare bekreftet avtale (hvem/når) kan brukes som sammenligning; kostpris bare når verifisert.
   const agreementOk = agreed.source === "link" && !!primary && isAgreementConfirmed(primary);
-  const verified = rm.cost_basis_status === "verifisert";
+  const cost = costSummary(rm);
+  const verified = cost.verified;
   const deviation = kpiDeviation(
     lastInvoice?.last_invoice_price ?? null,
     agreementOk ? agreed.value : null,
@@ -63,9 +63,9 @@ export function RawMaterialKpiStrip({ rm, links, recipeCount, spend12m }: Props)
       <OrderDeskKpi
         icon={Coins}
         label={`Kostpris / ${rm.base_unit}`}
-        value={rm.current_cost_price != null ? formatNok(rm.current_cost_price) : "Ukjent"}
-        tone={verified ? "default" : "warning"}
-        sub={`${COST_STATUS[rm.cost_basis_status ?? ""] ?? "Status ukjent"}${rm.current_cost_price != null ? ` · ${fullPrice(rm.current_cost_price)}` : ""}${rm.price_updated_at ? ` · ${priceSourceLabel(rm.price_source)} · ${formatDate(rm.price_updated_at)}` : ""}`}
+        value={cost.value}
+        tone={cost.verified ? "default" : "warning"}
+        sub={[cost.status, cost.precise, cost.source].filter(Boolean).join(" · ")}
       />
       <OrderDeskKpi
         icon={Package}

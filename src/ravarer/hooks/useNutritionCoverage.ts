@@ -75,11 +75,11 @@ const EMPTY_BY_SOURCE = (): NutritionCoverage["bySource"] => ({
  * `raw_material_nutrition_coverage`-viewet — ingen klientberegning lenger.
  * Emballasje og forbruksvarer er allerede filtrert bort av `needs_nutrition`.
  */
-export function useNutritionCoverage() {
+export function useNutritionCoverage(options?: { enabled?: boolean }) {
   const { legalEntityId } = useRavarer();
   return useQuery({
     queryKey: ["nutrition-coverage", legalEntityId],
-    enabled: !!legalEntityId,
+    enabled: !!legalEntityId && (options?.enabled ?? true),
     staleTime: 60_000,
     queryFn: async (): Promise<NutritionCoverage> => {
       const raw = await fetchAllRows<RawCoverageViewRow>((from, to) =>

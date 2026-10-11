@@ -3,6 +3,7 @@
  * og komplett-sjekklisten. Rene funksjoner — testes uten React.
  */
 import { confirmedFactor } from "./supplierPackagePrice";
+import { NUTRITION_FIELD_LABEL, nutritionState, type NutritionValues } from "./nutritionCompleteness";
 
 export const SECTIONS = ["sammendrag", "pris", "leverandorer", "naering", "deklarasjon", "bruk", "lager", "grunndata", "historikk"] as const;
 export type SectionId = (typeof SECTIONS)[number];
@@ -31,6 +32,7 @@ export const LEGACY_TAB: Record<string, SectionId> = {
 
 /** Parametre som tilhører detaljen og aldri skal tolkes som listefilter. */
 export const DETAIL_PARAMS = ["seksjon", "tab"] as const;
+// `valgt`/`endring` er listekontekst (aktiv rad i arbeidslisten) og beholdes bevisst ved retur.
 
 /** Seksjoner som ikke gjelder emballasje (ingen næringskrav). */
 const NOT_FOR_PACKAGING: ReadonlySet<SectionId> = new Set(["naering", "deklarasjon"]);
@@ -102,7 +104,7 @@ export interface CheckInput {
     package_confirmed_by: string | null;
   };
   linkCount: number;
-  nutrition: { verified_at?: string | null } | null;
+  nutrition: (NutritionValues & { verified_at?: string | null; is_complete?: boolean | null }) | null;
   hasDatasheet: boolean;
 }
 
@@ -122,12 +124,26 @@ export function completenessChecklist(i: CheckInput): CheckItem[] {
   if (!rm.is_packaging) {
     items.push(
       { id: "deklarasjonsnavn", label: "Deklarasjonsnavn", status: rm.declaration_name ? "ok" : "missing", detail: rm.declaration_name ?? "Mangler", section: "deklarasjon" },
-      i.nutrition == null
-        ? { id: "naering", label: "Næring", status: "missing", detail: "Ingen næringsdata", section: "naering" }
-        : { id: "naering", label: "Næring", status: i.nutrition.verified_at ? "ok" : "partial", detail: i.nutrition.verified_at ? "Verifisert" : "Finnes, ikke verifisert", section: "naering" },
+      nutritionCheck(i.nutrition),
       { id: "allergener", label: "Allergener", status: rm.allergens_reviewed_at ? "ok" : "missing", detail: rm.allergens_reviewed_at ? "Vurdert" : "Ikke vurdert", section: "naering" },
       { id: "datablad", label: "Datablad", status: i.hasDatasheet ? "ok" : "missing", detail: i.hasDatasheet ? "Gjeldende datablad" : "Mangler", section: "deklarasjon" },
     );
   }
   return items;
+}
+
+/** Næring: finnes / fullstendig / verifisert er tre ulike ting. Verifisert tidspunkt gjør aldri ufullstendig data «ok». */
+function nutritionCheck(n: CheckInput["nutrition"]): CheckItem {
+  const st = nutritionState(n);
+  const base = { id: "naering" as const, label: "Næring", section: "naering" as const };
+  switch (st.kind) {
+    case "mangler": return { ...base, status: "missing", detail: "Ingen næringsdata" };
+    case "ufullstendig": {
+      const names = st.missing.map((f) => NUTRITION_FIELD_LABEL[f]);
+      const what = names.length > 0 ? `mangler ${names.join(", ")}` : "databasen markerer dataene som ufullstendige";
+      return { ...base, status: "partial", detail: `Ufullstendig — ${what}${st.verified ? " (har verifiseringstidspunkt, men er ikke fullstendig)" : ""}` };
+    }
+    case "ikke_verifisert": return { ...base, status: "partial", detail: "Fullstendig, ikke verifisert" };
+    case "verifisert": return { ...base, status: "ok", detail: "Fullstendig og verifisert" };
+  }
 }

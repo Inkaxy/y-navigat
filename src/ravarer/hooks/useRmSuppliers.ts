@@ -66,6 +66,7 @@ export function toTimelineRow(h: PriceHistoryRow): TimelineHistoryRow {
     isLegacy: !!h.is_legacy, isCredit: !!h.is_credit, currency: h.provenance.currency, createdAt: h.created_at ?? null,
     unit: h.provenance.unit, unitSource: h.provenance.unitSource, packageText: h.provenance.packageText,
     corrections: h.provenance.corrections,
+    invoice_line_id: h.invoice_line_id ?? h.invoice_line_ref ?? null,
   };
 }
 
@@ -210,10 +211,14 @@ export function useMaterialPriceProjection(rawMaterialId: string | undefined) {
 export function useTimelineHistory(rawMaterialId: string | undefined) {
   const history = usePriceHistory(rawMaterialId);
   const projection = useMaterialPriceProjection(rawMaterialId);
+  // Feil ELLER pågående første henting: gjeldende kontroll er ukjent. Fakturarader beholdes som
+  // hendelser, men er ikke sammenlignbare før kontrollen er kjent (en feilet oppfrisking kan derfor
+  // aldri «frigjøre» en rad som var holdt).
   const proj = projection.data && projection.data.raw_material_id === rawMaterialId && !projection.isError ? projection.data : null;
+  const unknownReason = projection.isError ? "feil" : "laster";
   const rows = useMemo<TimelineHistoryRow[]>(
-    () => mergeProjection((history.data ?? []).filter((h) => h.raw_material_id === rawMaterialId).map(toTimelineRow), proj),
-    [history.data, proj, rawMaterialId],
+    () => mergeProjection((history.data ?? []).filter((h) => h.raw_material_id === rawMaterialId).map(toTimelineRow), proj, unknownReason),
+    [history.data, proj, rawMaterialId, unknownReason],
   );
   // Fakturalinjer som er gyldig kostgrunnlag NÅ (serverens utvalg); null = ukjent (laster/feil).
   const eligibleLineIds = useMemo(() => {
