@@ -115,7 +115,7 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
                       if (isLinked) return;
                       void choose(r.id, r.name);
                     }}
-                    disabled={isLinked || !!checkingId || apply.isPending}
+                    disabled={isLinked || !!checkingId || flow.isApplying || !flow.canWrite}
                     className={`flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition hover:bg-muted disabled:cursor-default disabled:opacity-70 ${
                       i % 2 === 1 ? "bg-muted/30" : ""
                     }`}
