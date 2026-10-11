@@ -59,3 +59,8 @@ export function useAuth() {
   if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
   return ctx;
 }
+
+/** Innlogget bruker-ID uten å kreve provider (null utenfor `AuthProvider`). Brukes til å avgrense klientminne per bruker. */
+export function useAuthUserId(): string | null {
+  return useContext(AuthContext)?.user?.id ?? null;
+}

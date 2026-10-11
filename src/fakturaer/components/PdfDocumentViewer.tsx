@@ -51,6 +51,8 @@ interface Props {
    * forkastes bytene (lagres aldri som gyldige) og «Originalen er endret» vises.
    */
   verifyIdentity?: () => Promise<string | null>;
+  /** Bruker+selskap; bytecache deles aldri på tvers av tilgangskontekst. */
+  accessScope?: string | null;
   /** Hent ny identitet (etter «Originalen er endret»). */
   onIdentityChanged?: () => void;
 }
@@ -60,13 +62,16 @@ export class DocumentChangedError extends Error {
 }
 
 /** Originaldokumentet tegnet med PDF.js i appen: sider, zoom, lasting, feil og «Prøv igjen». */
-export function PdfDocumentViewer({ url, cacheKey, version, title, fallback, className, verifyIdentity, onIdentityChanged }: Props) {
+export function PdfDocumentViewer({ url, cacheKey, version, title, fallback, className, verifyIdentity, onIdentityChanged, accessScope }: Props) {
   const q = useQuery({
-    queryKey: ["invoice-document-render", cacheKey, version ?? null],
+    queryKey: ["invoice-document-render", cacheKey, version ?? null, accessScope ?? null],
     queryFn: async () => {
+      const expected = `${cacheKey}|${version ?? ""}`;
+      // Før nedlasting: forventet identitet må fortsatt gjelde.
+      if (verifyIdentity && (await verifyIdentity()) !== expected) throw new DocumentChangedError();
       const bytes = await loadDocumentBytes(url);
       // Kontrollen fullføres før bytene publiseres; ved avvik caches de aldri som gyldige.
-      if (verifyIdentity && (await verifyIdentity()) !== `${cacheKey}|${version ?? ""}`) throw new DocumentChangedError();
+      if (verifyIdentity && (await verifyIdentity()) !== expected) throw new DocumentChangedError();
       return bytes;
     },
     staleTime: 10 * 60_000, gcTime: 10 * 60_000,

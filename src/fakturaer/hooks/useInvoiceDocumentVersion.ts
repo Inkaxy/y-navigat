@@ -1,4 +1,6 @@
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuthUserId } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
 import type { Json } from "@/integrations/supabase/types";
@@ -39,28 +41,58 @@ export async function fetchDocumentVersion(invoiceId: string, signal?: AbortSign
   return parsed;
 }
 
-/** Ferskt oppslag ved åpning, fokus og eksplisitt oppdatering. Nøkkelen inkluderer selskap. */
+/**
+ * Ferskt oppslag ved åpning, fokus, bruker-/selskapsbytte og eksplisitt oppdatering.
+ * `verifiedCurrent` er satt BARE når identiteten er bekreftet i denne visningens verifiseringsepoke
+ * (vellykket, ikke under henting, ingen feil, hentet etter epokestart, samme faktura og tilgangskontekst).
+ * Bufret suksess fra før epoken teller aldri som verifisert.
+ */
 export function useInvoiceDocumentVersion(invoiceId: string | null | undefined) {
   const { data: company } = useCompany();
+  const userId = useAuthUserId();
   const qc = useQueryClient();
-  const key = [DOC_VERSION_KEY, invoiceId ?? null, company?.id ?? null] as const;
+  const companyId = company?.id ?? null;
+  const accessScope = userId && companyId ? `${userId}|${companyId}` : null;
+  const enabled = !!invoiceId && !!accessScope;
+  const key = [DOC_VERSION_KEY, invoiceId ?? null, companyId, userId] as const;
+  const [epoch, setEpoch] = useState(() => Date.now());
+  const ctxRef = useRef<string | null>(null);
+  const ctx = enabled ? `${invoiceId}|${accessScope}` : null;
+  ctxRef.current = ctx;
+  // Ny faktura eller tilgangskontekst starter ny verifisering.
+  useEffect(() => { setEpoch(Date.now()); }, [ctx]);
+  useEffect(() => {
+    const onFocus = () => setEpoch(Date.now());
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
   const q = useQuery({
     queryKey: key,
-    enabled: !!invoiceId && !!company?.id,
+    enabled,
     staleTime: 0,
     gcTime: 60_000,
+    refetchOnMount: "always",
     refetchOnWindowFocus: true,
     retry: 1,
     queryFn: ({ signal }) => fetchDocumentVersion(invoiceId as string, signal),
   });
-  /** Leser identiteten på nytt (etter nedlasting) uten å bruke cache. */
+  const needsVerify = enabled && !q.isFetching && !q.isError && q.dataUpdatedAt < epoch;
+  // Én henting per epoke; feil stopper (ingen løkke) til bruker prøver igjen eller ny epoke starter.
+  const { refetch } = q;
+  useEffect(() => { if (needsVerify) void refetch(); }, [needsVerify, epoch, refetch]);
+  const verifiedCurrent: DocumentVersion | null =
+    enabled && q.status === "success" && !q.isFetching && !q.isError && q.dataUpdatedAt >= epoch && q.data.invoice_id === invoiceId ? q.data : null;
+  /** Leser identiteten på nytt (før/etter nedlasting) uten cache; forkastes hvis konteksten byttet underveis. */
   const recheck = async (): Promise<string | null> => {
-    if (!invoiceId) return null;
+    const started = ctxRef.current;
+    if (!invoiceId || !started) return null;
     const v = await fetchDocumentVersion(invoiceId);
+    if (ctxRef.current !== started) return null;
     return v.available ? `${v.path}|${v.version}` : null;
   };
-  const refresh = () => void qc.invalidateQueries({ queryKey: [DOC_VERSION_KEY, invoiceId ?? null] });
-  return { ...q, recheck, refresh };
+  /** Ugyldiggjør gjeldende verifisering straks (f.eks. etter avvik ved nedlasting) og hent på nytt. */
+  const refresh = () => { setEpoch(Date.now() + 1); void qc.invalidateQueries({ queryKey: [DOC_VERSION_KEY, invoiceId ?? null] }); };
+  return { ...q, verifiedCurrent, accessScope, verifying: enabled && !verifiedCurrent && !q.isError, recheck, refresh };
 }
 
 /** Sammenlign gjeldende original med lesingens frosne dokument (id, sti, lagringsversjon, tidspunkt). */

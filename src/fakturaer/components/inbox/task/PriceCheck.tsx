@@ -66,7 +66,7 @@ export function PriceCheck({ line, link, tolerancePct }: { line: ReviewLineRow; 
       {open && (
         <dl className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-2 text-caption">
           <div>
-            <dt className="text-ink-secondary">Fakturert</dt>
+            <dt className="text-ink-secondary">Lagret lesing</dt>
             <dd>
               {line.quantity ?? "—"} {line.unit ?? ""} × {formatMoney(line.unit_price, currency)}
             </dd>
@@ -76,16 +76,17 @@ export function PriceCheck({ line, link, tolerancePct }: { line: ReviewLineRow; 
             <dd>{formatMoney(line.total_amount, currency)}</dd>
           </div>
           <div>
-            <dt className="text-ink-secondary">Avtalepris</dt>
-            <dd>{link?.agreed_price_per_base_unit != null ? `${formatMoney(Number(link.agreed_price_per_base_unit), "NOK")} / ${unit}` : "—"}</dd>
+            <dt className="text-ink-secondary">Avtalepris (lagret, ikke kontrollert)</dt>
+            <dd>{link?.agreed_price_per_base_unit != null ? `${formatMoney(Number(link.agreed_price_per_base_unit), "NOK")} per lagret grunnenhet` : "—"}</dd>
           </div>
           <div>
-            <dt className="text-ink-secondary">Siste fakturapris</dt>
+            <dt className="text-ink-secondary">Siste fakturapris (lagret, ikke kontrollert)</dt>
             <dd>
-              {link?.last_invoice_price != null ? `${formatMoney(Number(link.last_invoice_price), "NOK")} / ${unit}` : "—"}
+              {link?.last_invoice_price != null ? `${formatMoney(Number(link.last_invoice_price), "NOK")} per lagret grunnenhet` : "—"}
               {link?.last_invoice_date ? ` (${formatDate(link.last_invoice_date)})` : ""}
             </dd>
           </div>
+          <p className="col-span-2 text-ink-secondary">Avtale- og siste pris er lagrede leverandørdata uten bekreftet enhet eller versjon. De er ikke grunnlaget for prissammenligningen over.</p>
         </dl>
       )}
     </div>

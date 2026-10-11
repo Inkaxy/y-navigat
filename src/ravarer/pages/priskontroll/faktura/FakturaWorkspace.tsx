@@ -43,6 +43,7 @@ import { CorrectLineDialog } from "./CorrectLineDialog";
 import { correctionDocLine } from "./correctionDocLine";
 import { parseReadIssues } from "@/fakturaer/lib/lineCorrection";
 import { useInvoicePriceSafety } from "@/fakturaer/hooks/useInvoicePriceSafety";
+import { ownLineGate } from "./ownLineGate";
 import { PriceGateProvider } from "@/fakturaer/lib/priceGateContext";
 
 // v2: originaldokumentet er åpent som standard; bare et eksplisitt «skjul» huskes.
@@ -208,8 +209,8 @@ export default function FakturaWorkspace() {
 
   const active = q.activeLine;
   const linesById = new Map((data.invoice_lines ?? []).map((l) => [l.id, l]));
-  // Linjeversjonen fra lastet faktura binder statusen til linjen den gjaldt.
-  const gateFor = (line: { id: string }) => safety.gateFor({ id: line.id, invoice_id: data.id, updated_at: linesById.get(line.id)?.updated_at ?? null, raw_material_id: linesById.get(line.id)?.raw_material_id ?? null });
+  // Kallerens EGEN radversjon/råvare binder statusen. Lånes aldri fra en annen cache; mangler den, er prisen ukjent.
+  const gateFor = ownLineGate(safety.gateFor, data.id);
   const docFor = (line: typeof active) => (
     <InvoiceDocumentPanel invoiceId={data.id}
       invoice={{ invoice_number: data.invoice_number, invoice_date: data.invoice_date, supplier_name: data.suppliers?.name ?? null, source_document_url: data.source_document_url, total_amount: data.total_amount, total_vat: data.total_vat, lines_sum_status: data.lines_sum_status, lines_sum_excl_vat: data.lines_sum_excl_vat, lines_sum_variance_pct: data.lines_sum_variance_pct, extraction_confidence: data.extraction_confidence, currency: data.currency, is_credit_note: data.is_credit_note, flagged_at: data.flagged_at, extraction_issues: data.extraction_issues }}

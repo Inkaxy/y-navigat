@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchClaimPreview } from "@/ravarer/hooks/useClaimPreview";
 import { ClaimSubmitError, planChanges, planClaim, type ClaimPlan, type ClaimPreviewLine } from "@/ravarer/lib/supplierClaim";
@@ -44,6 +44,8 @@ export function useClaimFlow(deps: Deps = {}) {
   const findOpen = deps.findOpenCase ?? findOpenCaseForLines;
   const [st, setSt] = useState<ClaimFlowState>(EMPTY);
   const gen = useRef(0);
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; gen.current++; }; }, []);
 
   /** Første kontroll. Returnerer ikke-godkjent plan (for feilvisning) eller null ved suksess. */
   const start = async (ids: string[]): Promise<Extract<ClaimPlan, { ok: false }> | null> => {
@@ -63,7 +65,10 @@ export function useClaimFlow(deps: Deps = {}) {
     }
     if (e instanceof ClaimSubmitError && e.code === "duplicate") {
       const ids = st.requested;
+      // Sen oppslag fra en lukket/nyere flyt skal aldri åpne dialogen igjen.
+      const my = gen.current;
       const openCaseId = await findOpen(ids);
+      if (my !== gen.current || !alive.current) return null;
       setSt((s) => ({ ...s, duplicate: { openCaseId } }));
       return null;
     }

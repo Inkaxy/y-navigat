@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuthUserId } from "@/hooks/useAuth";
 import { buildSupplierCaseDraft, OUTBOX_LABEL, outboxState, type DraftInput } from "@/fakturaer/lib/supplierCaseDraft";
 
 const errText = (m: string) =>
@@ -27,18 +28,27 @@ export const retainedDraftEdits = new Map<string, { subject: string | null; body
 type Props = { caseId: string; input: DraftInput; canWrite: boolean; recoveryHint?: ReactNode };
 
 /** Nøkles på sak: tekst, valgt versjon, melding og mutasjonsstatus kan aldri lekke mellom saker. */
-export function CaseEmailDraft(props: Props) {
-  return <CaseEmailDraftInner key={props.caseId} {...props} />;
+let retainedFor: string | null = null;
+/** Ulagrede endringer gjelder bare for samme bruker; bytte av innlogget bruker tømmer minnet. */
+function scopeDrafts(userId: string | null) {
+  const owner = userId ?? "";
+  if (retainedFor !== owner) { retainedDraftEdits.clear(); retainedFor = owner; }
+  return owner;
 }
 
-function CaseEmailDraftInner({ caseId, input, canWrite, recoveryHint }: Props) {
+export function CaseEmailDraft(props: Props) {
+  const owner = scopeDrafts(useAuthUserId());
+  return <CaseEmailDraftInner key={`${owner}|${props.caseId}`} {...props} memKey={`${owner}|${props.caseId}`} />;
+}
+
+function CaseEmailDraftInner({ caseId, input, canWrite, recoveryHint, memKey }: Props & { memKey: string }) {
   const qc = useQueryClient();
   const generated = useMemo(() => buildSupplierCaseDraft(input), [input]);
-  const [edits, setEdits] = useState(() => retainedDraftEdits.get(caseId) ?? { subject: null, body: null });
+  const [edits, setEdits] = useState(() => retainedDraftEdits.get(memKey) ?? { subject: null, body: null });
   const subject = edits.subject, body = edits.body;
   const update = (next: { subject: string | null; body: string | null }) => {
     setEdits(next);
-    if (next.subject == null && next.body == null) retainedDraftEdits.delete(caseId); else retainedDraftEdits.set(caseId, next);
+    if (next.subject == null && next.body == null) retainedDraftEdits.delete(memKey); else retainedDraftEdits.set(memKey, next);
   };
   const setSubject = (v: string | null) => update({ subject: v, body });
   const setBody = (v: string | null) => update({ subject, body: v });
