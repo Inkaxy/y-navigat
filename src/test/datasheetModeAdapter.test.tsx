@@ -22,7 +22,7 @@ vi.mock("@/ravarer/hooks/useDatasheets", () => ({
 vi.mock("@/ravarer/context/RavarerContext", () => ({ useRavarer: () => ({ canWrite: true, legalEntityId: "le" }) }));
 vi.mock("@/hooks/useUiPreference", () => ({ useUiPreference: <T,>(_s: string, f: T) => ({ value: f, setValue: vi.fn() }) }));
 
-import { DatasheetMode, withEvent } from "@/ravarer/pages/varer/DatasheetMode";
+import DatasheetMode, { withEvent } from "@/ravarer/pages/varer/DatasheetMode";
 
 let loc = "";
 function Loc() { const l = useLocation(); loc = l.search; return null; }
