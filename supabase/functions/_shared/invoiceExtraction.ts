@@ -174,6 +174,8 @@ export function computeConfidence(input: {
   const fc = isRecord(input.fieldConfidence) ? Object.values(input.fieldConfidence) : [];
   const lineVals = input.lines.map((l) => l.confidence);
   let c = overallConfidence(fc, lineVals) ?? (input.method === "ai" ? 0.7 : input.method === "hybrid" ? 0.6 : 0.35);
+  // Linjer uten egen score arver ikke headerens sikkerhet: ukjent ⇒ høyst moderat.
+  if (input.lines.some((l) => l.confidence == null)) c = Math.min(c, 0.6);
   const issueLines = input.lines.filter((l) => l.read_issues.length > 0).length;
   if (issueLines > 0) c = Math.min(c, 0.5);
   if (input.sumDeviationPct != null && Math.abs(input.sumDeviationPct) > 2) c = Math.min(c, 0.4);
