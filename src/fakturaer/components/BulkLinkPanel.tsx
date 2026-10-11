@@ -30,7 +30,7 @@ export const EXCLUSION_LABELS: Record<string, string> = {
   faktura_flagget: "fakturaen er flagget for oppfølging",
   kreditnota: "linjen står på en kreditnota",
   annen_valuta: "fakturaen er i en annen valuta enn kroner",
-  merket_ikke_aktuell: "linjen er merket som ikke aktuell",
+  merket_ikke_aktuell: "linjen er merket som ikke vare",
   koblet_til_annen_vare: "linjen er allerede koblet manuelt til en annen vare",
   tvetydig_alias: "samme varenummer eller navn peker på flere varer",
   annen_pakning: "pakningen er en annen (størrelse, enhet eller antall per kartong)",

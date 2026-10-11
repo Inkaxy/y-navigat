@@ -84,7 +84,7 @@ export function lineStatus(line: LineStatusInput, startPriceLineIds?: ReadonlySe
   if (line.match_confidence === "not_applicable") {
     return {
       key: "not_applicable",
-      label: "Ikke råvare",
+      label: "Ikke vare",
       tone: "muted",
       bucket: "done",
       steps: { material: "done", package: "done", price: "done" },

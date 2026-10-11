@@ -111,8 +111,8 @@ export async function rematchLines(
   return failures;
 }
 
-/** Merker linjen som «ikke aktuell» (frakt, gebyr, pant og lignende). */
-export async function markNotApplicable(line: ReviewLineRow, reason = "Ikke råvare"): Promise<void> {
+/** Merker linjen som «Ikke vare» (frakt, gebyr, pant og lignende). */
+export async function markNotApplicable(line: ReviewLineRow, reason = "Annet"): Promise<void> {
   const userId = await currentUserId();
   const { error } = await supabase
     .from("invoice_lines")
@@ -125,7 +125,7 @@ export async function markNotApplicable(line: ReviewLineRow, reason = "Ikke råv
       resolved_at: new Date().toISOString(),
     })
     .eq("id", line.id);
-  if (error) throw new Error(`Kunne ikke merke linjen som ikke aktuell: ${error.message}`);
+  if (error) throw new Error(`Kunne ikke merke linjen som ikke vare: ${error.message}`);
 }
 
 /** Setter linjen tilbake slik den var før forrige handling. */

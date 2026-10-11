@@ -10,8 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
+import { NOT_A_PRODUCT_NOT_A_PRODUCT_REASONS } from "@/ravarer/lib/notAProductReasons";
 
-const REASONS = ["Frakt", "Miljø-/palleavgift", "Servicegebyr", "Rabatt", "Pant", "Annet"];
+
 
 export function NotARawMaterialDialog({ open, onOpenChange, line }: { open: boolean; onOpenChange: (v: boolean) => void; line: ReviewLineRow | null }) {
   const qc = useQueryClient();
@@ -53,7 +54,7 @@ export function NotARawMaterialDialog({ open, onOpenChange, line }: { open: bool
         }
       }
 
-      toast.success("Markert som ikke-råvare");
+      toast.success("Markert som ikke vare");
       qc.invalidateQueries({ queryKey: ["fakturaer-review-lines"] });
       qc.invalidateQueries({ queryKey: ["fakturaer-review-count"] });
       onOpenChange(false);
@@ -78,7 +79,7 @@ export function NotARawMaterialDialog({ open, onOpenChange, line }: { open: bool
             <Select value={reason} onValueChange={setReason}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {REASONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                {NOT_A_PRODUCT_REASONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

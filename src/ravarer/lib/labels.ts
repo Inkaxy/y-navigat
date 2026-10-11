@@ -76,7 +76,7 @@ export function invoiceStatusLabel(status: string | null | undefined, reconciled
 export const LINE_STATUS_LABELS: LabelMap = {
   ok: { label: "I orden", tokenVar: "--rm-koblet" },
   review: { label: "Til kontroll", tokenVar: "--rm-kontroll" },
-  excluded: { label: "Utelatt", tokenVar: "--rm-ikke-vare" },
+  excluded: { label: "Ikke vare", tokenVar: "--rm-ikke-vare" },
   posted: { label: "Kostpris ført", tokenVar: "--rm-avstemt" },
   flagged: { label: "Flagget", tokenVar: "--rm-flagget" },
 };

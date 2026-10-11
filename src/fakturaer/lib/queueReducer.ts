@@ -35,7 +35,7 @@ export type QueueAction =
   | { type: "focus"; id: string }
   | { type: "next" }
   | { type: "prev" }
-  /** Linjen er behandlet (godtatt/ikke aktuell) og forsvinner fra køen. */
+  /** Linjen er behandlet (godtatt/ikke vare) og forsvinner fra køen. */
   | { type: "resolved"; id: string; snapshot: QueueLineSnapshot; label: string }
   /** Angrer den siste behandlede linjen og legger den tilbake. */
   | { type: "undo" }

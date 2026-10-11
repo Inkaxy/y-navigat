@@ -5,7 +5,7 @@ import { allReasons, reasonLabel } from "@/fakturaer/lib/reviewReasons";
 
 /** Kort tekst for hvilken råvare linjen peker på — skiller bekreftet kobling fra forslag. */
 export function materialSummary(line: ReviewLineRow): string {
-  if (line.match_confidence === "not_applicable") return "Utelatt — ikke råvare";
+  if (line.match_confidence === "not_applicable") return "Ikke vare";
   if (line.matched_raw_material) return line.matched_raw_material.name;
   const top = line.suggestions?.[0]?.raw_material?.name;
   return top ? `Forslag: ${top}` : "Ingen råvare valgt";
