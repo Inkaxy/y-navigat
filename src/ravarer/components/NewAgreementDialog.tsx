@@ -18,6 +18,7 @@ import { invalidateRavarerCounts, invalidateRawMaterial } from "@/ravarer/lib/in
 import { osloTodayISO } from "@/lib/osloDate";
 import { parseDecimal } from "@/ravarer/lib/packageMath";
 import { agreementBaseUnitsPerPackage } from "@/ravarer/lib/agreementPricing";
+import { agreementFormError, derivePricePerBaseUnit } from "@/ravarer/lib/agreementForm";
 import type { AgreementPayload, ApplyAgreementResult } from "@/ravarer/lib/rpcContracts";
 
 interface Props {
@@ -74,23 +75,23 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
   );
 
   // Auto-beregn pris pr grunnenhet ut fra hva prisen gjelder.
+  // Avledet verdi følger alltid gyldig, gjeldende input; ugyldig input tømmer den (aldri gammel 10 kr/kg).
   useEffect(() => {
     if (pricePerBaseUnitTouched) return;
-    const ap = parseDecimal(agreedPrice);
-    if (ap == null) return;
-    if (priceBasis === "base") {
-      setPricePerBaseUnit(String(ap));
-      return;
-    }
-    if (unitsPerPackage != null && unitsPerPackage > 0) {
-      setPricePerBaseUnit((ap / unitsPerPackage).toFixed(4));
-    }
+    setPricePerBaseUnit(derivePricePerBaseUnit(agreedPrice, priceBasis, unitsPerPackage));
   }, [agreedPrice, unitsPerPackage, priceBasis, pricePerBaseUnitTouched]);
+  // Manuell overstyring er bundet til råvaren/grunnenheten den ble skrevet for.
+  useEffect(() => {
+    setPricePerBaseUnitTouched(false);
+  }, [rawMaterialId, selectedRm?.base_unit]);
 
   const create = useMutation({
     mutationFn: async () => {
       if (!rawMaterialId) throw new Error("Velg råvare");
       if (!supplierId) throw new Error("Velg leverandør");
+      // Valider før opplasting, så et ugyldig skjema aldri etterlater en foreldreløs fil.
+      const invalid = agreementFormError({ agreedPrice, pricePerBaseUnit, validFrom, validTo });
+      if (invalid) throw new Error(invalid);
       const entered = parseDecimal(agreedPrice);
       const ppbu = parseDecimal(pricePerBaseUnit);
       const bupp = parseDecimal(baseUnitsPerPackage);

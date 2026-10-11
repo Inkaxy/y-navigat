@@ -32,6 +32,8 @@ export interface SupplierInvoiceRow {
   total_amount: number | null;
   status: string;
   lines_sum_status: string | null;
+  /** Fakturaens valuta; null = ikke oppgitt (vises ikke som NOK). */
+  currency: string | null;
 }
 
 export interface SupplierAliasRow {
@@ -83,7 +85,7 @@ export function useSupplierInvoices(supplierId: string | undefined, limit: numbe
     queryFn: async () => {
       const { data, error, count } = await supabase
         .from("invoices")
-        .select("id, invoice_number, invoice_date, total_amount, status, lines_sum_status", { count: "exact" })
+        .select("id, invoice_number, invoice_date, total_amount, status, lines_sum_status, currency", { count: "exact" })
         .eq("supplier_id", supplierId!)
         .order("invoice_date", { ascending: false })
         .range(0, limit - 1);
@@ -91,6 +93,19 @@ export function useSupplierInvoices(supplierId: string | undefined, limit: numbe
       return { rows: (data ?? []) as unknown as SupplierInvoiceRow[], total: count ?? 0 };
     },
   });
+}
+
+export interface SpendSummary {
+  /** Sum eks. mva for fakturaer i NOK (kreditnotaer trukket fra). */
+  nok: number;
+  /** Fakturaer i annen eller ukjent valuta — ikke med i NOK-summen. */
+  otherCurrencyCount: number;
+}
+type SpendRow = { total_amount: number | null; total_vat: number | null; is_credit_note: boolean | null; currency: string | null };
+/** NOK summeres; annen/ukjent valuta telles separat og blandes aldri inn som kroner. */
+export function spendSummary(rows: readonly SpendRow[]): SpendSummary {
+  const nok = rows.filter((r) => (r.currency ?? "").toUpperCase() === "NOK");
+  return { nok: supplierSpendExclVat(nok), otherCurrencyCount: rows.length - nok.length };
 }
 
 /** Sum kjøpt siste 365 dager. */
@@ -102,29 +117,37 @@ export function useSupplierSpend(supplierId: string | undefined) {
       const since = osloDateISOPlusDays(-365);
       const { data, error } = await supabase
         .from("invoices")
-        .select("total_amount, total_vat, is_credit_note")
+        .select("total_amount, total_vat, is_credit_note, currency")
         .eq("supplier_id", supplierId!)
         .gte("invoice_date", since);
       if (error) throw error;
-      return supplierSpendExclVat(data ?? []);
+      return spendSummary(data ?? []);
     },
   });
 }
 
-/** Aliaser for leverandørens koblinger. */
+/** Aliaser for leverandørens koblinger (alle sider via fetchAllRows; aldri stille avkortet). */
 export function useSupplierAliases(linkIds: string[]) {
   const key = [...linkIds].sort().join(",");
   return useQuery({
     queryKey: ["supplier-aliases", key],
     enabled: linkIds.length > 0,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("raw_material_supplier_aliases")
-        .select("id, alias_value, alias_type, status, match_count, last_seen_at, raw_material_supplier_id")
-        .in("raw_material_supplier_id", linkIds)
-        .order("alias_value");
-      if (error) throw error;
-      return (data ?? []) as unknown as SupplierAliasRow[];
+      const out: SupplierAliasRow[] = [];
+      for (let i = 0; i < linkIds.length; i += 200) {
+        const chunk = linkIds.slice(i, i + 200);
+        const part = await fetchAllRows<SupplierAliasRow>((from, to) =>
+          supabase
+            .from("raw_material_supplier_aliases")
+            .select("id, alias_value, alias_type, status, match_count, last_seen_at, raw_material_supplier_id")
+            .in("raw_material_supplier_id", chunk)
+            .order("alias_value")
+            .order("id")
+            .range(from, to),
+        );
+        out.push(...part);
+      }
+      return out;
     },
   });
 }
@@ -154,16 +177,16 @@ export function useTotalSpend(legalEntityId: string | undefined) {
     enabled: !!legalEntityId,
     queryFn: async () => {
       const since = osloDateISOPlusDays(-365);
-      const rows = await fetchAllRows<{ total_amount: number | null; total_vat: number | null; is_credit_note: boolean | null }>(
+      const rows = await fetchAllRows<SpendRow>(
         (from, to) =>
           supabase
             .from("invoices")
-            .select("total_amount, total_vat, is_credit_note")
+            .select("total_amount, total_vat, is_credit_note, currency")
             .eq("legal_entity_id", legalEntityId!)
             .gte("invoice_date", since)
             .range(from, to),
       );
-      return supplierSpendExclVat(rows);
+      return spendSummary(rows);
     },
   });
 }
