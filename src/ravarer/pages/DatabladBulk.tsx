@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
 import { RawMaterialCreateSheet } from "@/ravarer/editors/RawMaterialCreateSheet";
@@ -105,6 +106,7 @@ export default function DatabladBulk() {
         if (!id) throw new Error("AI-uttrekk: serveren returnerte ikke datablad");
         dsId = id;
       }
+      if (!dsId) throw new Error("Mangler datablad");
       await matchStage(g, { ...row, storage_path: path }, dsId);
     } catch (e: unknown) {
       console.error(`[datablad] ${row.file.name}:`, e);
@@ -237,7 +239,7 @@ export default function DatabladBulk() {
 
   return (
     <div className="space-y-4">
-      {guard.dialog}
+      <UnsavedChangesDialog {...guard.dialogProps} />
       <div>
         {!embedded && <h1 className="text-2xl font-semibold tracking-tight">Last opp datablad</h1>}
         <p className="text-caption text-ink-secondary">Last opp inntil {MAX_BULK_FILES} datablad. AI foreslår råvare; du kontrollerer og anvender hver fil.</p>
