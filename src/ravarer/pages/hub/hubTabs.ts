@@ -1,20 +1,25 @@
 import type { WorkSummary } from "@/ravarer/lib/workRpc";
-import { paths } from "@/ravarer/lib/paths";
+import { LISTE_LABEL, listeHref, type Liste } from "@/ravarer/lib/varerWorklist";
 import type { SectionTab } from "@/ravarer/ui/SectionTabs";
 
 export const RAVARER_EYEBROW = "Råvarer";
 
-export type VarerTabId = "alle" | "pakninger" | "deklarasjonsnavn" | "naering" | "datablad";
+export type VarerTabId = Liste;
 
-/** Faneraden på Varer-sidene (lenker, aktiv etter sti). */
-export function varerTabs(s: WorkSummary | undefined): SectionTab[] {
+/** Arbeidslistene i varearbeidsflaten (`?liste=`). Søk følger med; uforenlige filtre nullstilles. */
+export function varerTabs(s: WorkSummary | undefined, sp: URLSearchParams = new URLSearchParams()): SectionTab[] {
   const dq = s?.data_quality;
+  const t = (id: Liste, count?: number | null, tone?: "warning"): SectionTab => ({ id, label: LISTE_LABEL[id], href: listeHref(sp, id), count, tone });
   return [
-    { id: "alle", label: "Alle varer", href: paths.varer() },
-    { id: "pakninger", label: "Pakninger", href: paths.pakninger(), count: dq ? dq.missing_package + dq.unconfirmed_package : null, tone: "warning" },
-    { id: "deklarasjonsnavn", label: "Deklarasjonsnavn", href: paths.deklarasjonsnavn(), count: dq?.missing_declaration, tone: "warning" },
-    { id: "naering", label: "Næring", href: paths.naering(), count: dq?.missing_nutrition, tone: "warning" },
-    { id: "datablad", label: "Datablad-endringer", href: paths.databladEndringer(), count: dq?.datasheet_changes, tone: "warning" },
+    t("alle"),
+    t("pakning", dq ? dq.missing_package + dq.unconfirmed_package : null, "warning"),
+    t("deklarasjon", dq?.missing_declaration, "warning"),
+    t("naering", dq?.missing_nutrition, "warning"),
+    t("datablad", dq?.datasheet_changes, "warning"),
+    t("prisavvik"),
+    t("uten-leverandor"),
+    t("ikke-kjopt"),
+    t("inaktive"),
   ];
 }
 
