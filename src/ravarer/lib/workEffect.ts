@@ -1,3 +1,4 @@
+import { ACTION_COPY } from "@/fakturaer/lib/financialPresentation";
 import type { WorkItem } from "@/ravarer/lib/workRpcTypes";
 
 export type WorkEffect =
@@ -10,9 +11,11 @@ export type WorkEffect =
  * Hva arbeidslisten kan si om kronevirkning. Bare server-verifisert prisvirkning
  * vises som beløp; alt annet er en ærlig tekst. Bruttobeløp brukes aldri.
  */
-export function workEffect(it: Pick<WorkItem, "effect_status" | "effect_label" | "impact_nok" | "read_integrity" | "unknown_effect_lines">): WorkEffect {
+export function workEffect(it: Pick<WorkItem, "effect_status" | "effect_label" | "impact_nok" | "read_integrity" | "unknown_effect_lines"> & Partial<Pick<WorkItem, "action_required">>): WorkEffect {
   if (it.read_integrity === "needs_review") {
-    return { kind: "read", label: "Kontroller lesingen", detail: "Linjene må kontrolleres mot originalen før prisvirkning kan beregnes." };
+    // Serverens årsak avgjør teksten: kreditt/valuta/prisgrunnlag/kobling er ikke «lesefeil».
+    const a = it.action_required && it.action_required !== "review_price" && it.action_required !== "review_invoice" ? it.action_required : "review_reading";
+    return { kind: "read", label: ACTION_COPY[a].label, detail: ACTION_COPY[a].detail };
   }
   if (it.effect_status === "verified_price_effect" && it.impact_nok != null && Number.isFinite(it.impact_nok)) {
     return { kind: "verified", label: it.effect_label ?? "Beregnet prisavvik", value: it.impact_nok };

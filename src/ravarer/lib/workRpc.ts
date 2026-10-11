@@ -1,4 +1,5 @@
 import type { Json } from "@/integrations/supabase/types";
+import { toActionRequired } from "@/fakturaer/lib/financialPresentation";
 import { bool, isObj, num, str, type Obj } from "@/fakturaer/lib/parseRpcJson";
 import {
   ACCEPT_SKIP_REASONS, READ_INTEGRITY, WORK_EFFECT_STATUSES, WORK_GROUPS, WORK_KINDS, toActivityKind,
@@ -84,6 +85,7 @@ function parseWorkItem(o: Obj): WorkItem | null {
     read_integrity_flags: strings(o, "read_integrity_flags"),
     unknown_effect_lines: num(o, "unknown_effect_lines"),
     amount_kind: str(o, "amount_kind"),
+    action_required: toActionRequired(o["action_required"]),
   };
 }
 

@@ -587,7 +587,10 @@ export default function FakturaerInboxPage() {
         lines_sum_excl_vat: docLine.invoice.lines_sum_excl_vat,
         lines_sum_variance_pct: docLine.invoice.lines_sum_variance_pct,
         extraction_confidence: docLine.invoice.extraction_confidence,
+        currency: docLine.invoice.currency,
+        is_credit_note: docLine.invoice.is_credit_note,
       }}
+      showSumWarning
       line={{
         description: docLine.description,
         supplier_sku: docLine.supplier_sku,
@@ -598,6 +601,8 @@ export default function FakturaerInboxPage() {
         package_size: docLine.package_size,
         package_unit: docLine.package_unit,
         count_per_package: docLine.count_per_package,
+        raw_material_id: docLine.raw_material_id,
+        base_quantity: docLine.base_quantity,
         price_per_base_unit: docLine.price_per_base_unit,
         expected_price_per_base_unit: docLine.expected_price_per_base_unit,
         price_variance_pct: docLine.price_variance_pct,

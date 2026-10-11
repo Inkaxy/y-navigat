@@ -1,0 +1,138 @@
+import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight, Minus, Plus, RefreshCw, Maximize2 } from "lucide-react";
+import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from "pdfjs-dist";
+// Arbeideren bygges inn som egen fil i appen (førsteparts), ingen ekstern PDF-tjeneste.
+import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+
+GlobalWorkerOptions.workerSrc = workerUrl;
+
+type Loaded = { kind: "pdf"; doc: PDFDocumentProxy } | { kind: "image"; src: string };
+
+async function loadDocument(url: string): Promise<Loaded> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Dokumentet svarte ${res.status}`);
+  const buf = await res.arrayBuffer();
+  const head = new Uint8Array(buf.slice(0, 5));
+  const isPdf = String.fromCharCode(...head) === "%PDF-";
+  if (!isPdf) {
+    const type = res.headers.get("content-type") ?? "";
+    if (type.startsWith("image/")) return { kind: "image", src: URL.createObjectURL(new Blob([buf], { type })) };
+    throw new Error("Ukjent dokumentformat");
+  }
+  const doc = await getDocument({ data: new Uint8Array(buf), isEvalSupported: false }).promise;
+  return { kind: "pdf", doc };
+}
+
+interface Props {
+  /** Signert lenke. Logges aldri. */
+  url: string;
+  /** Stabil nøkkel (lagringssti), slik at ny signering ikke laster dokumentet på nytt. */
+  cacheKey: string;
+  title: string;
+  fallback: React.ReactNode;
+  className?: string;
+}
+
+/** Originaldokumentet tegnet med PDF.js i appen: sider, zoom, lasting, feil og «Prøv igjen». */
+export function PdfDocumentViewer({ url, cacheKey, title, fallback, className }: Props) {
+  const q = useQuery({ queryKey: ["invoice-document-render", cacheKey], queryFn: () => loadDocument(url), staleTime: 10 * 60_000, gcTime: 10 * 60_000, retry: 1 });
+  const [page, setPage] = useState(1);
+  const [zoom, setZoom] = useState<number | "fit">("fit");
+  const [renderError, setRenderError] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setWidth(Math.floor(e.contentRect.width)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [q.data]);
+
+  const doc = q.data?.kind === "pdf" ? q.data.doc : null;
+  const pages = doc?.numPages ?? 0;
+
+  useEffect(() => {
+    if (!doc || !canvasRef.current || width <= 0) return;
+    let cancelled = false;
+    let task: { cancel: () => void; promise: Promise<void> } | null = null;
+    void (async () => {
+      try {
+        const p = await doc.getPage(Math.min(page, doc.numPages));
+        if (cancelled) return;
+        const base = p.getViewport({ scale: 1 });
+        const scale = zoom === "fit" ? Math.max(0.2, (width - 16) / base.width) : zoom;
+        const vp = p.getViewport({ scale });
+        const dpr = window.devicePixelRatio || 1;
+        const c = canvasRef.current;
+        if (!c) return;
+        c.width = Math.floor(vp.width * dpr);
+        c.height = Math.floor(vp.height * dpr);
+        c.style.width = `${Math.floor(vp.width)}px`;
+        c.style.height = `${Math.floor(vp.height)}px`;
+        const ctx = c.getContext("2d");
+        if (!ctx) throw new Error("Lerret mangler");
+        task = p.render({ canvasContext: ctx, viewport: vp, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined });
+        await task.promise;
+        if (!cancelled) setRenderError(false);
+      } catch (e) {
+        if (!cancelled && !(e instanceof Error && e.name === "RenderingCancelledException")) {
+          console.error("[dokumentvisning] side kunne ikke tegnes");
+          setRenderError(true);
+        }
+      }
+    })();
+    return () => { cancelled = true; task?.cancel(); };
+  }, [doc, page, zoom, width]);
+
+  useEffect(() => () => { if (q.data?.kind === "image") URL.revokeObjectURL(q.data.src); }, [q.data]);
+
+  if (q.isLoading) {
+    return (
+      <div className={cn("space-y-3 p-4", className)} role="status" aria-label="Laster originaldokumentet">
+        <Skeleton className="h-6 w-1/3" /><Skeleton className="h-[60vh] w-full" />
+      </div>
+    );
+  }
+  if (q.isError || renderError) {
+    return (
+      <div className={cn("flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm text-ink-secondary", className)}>
+        <span>Dokumentet kunne ikke vises her.</span>
+        <Button size="sm" variant="outline" onClick={() => { setRenderError(false); void q.refetch(); }}><RefreshCw className="h-4 w-4" /> Prøv igjen</Button>
+        {fallback}
+      </div>
+    );
+  }
+  const zoomPct = zoom === "fit" ? null : Math.round(zoom * 100);
+  const step = (d: number) => setZoom((z) => Math.min(4, Math.max(0.5, Math.round(((z === "fit" ? 1 : z) + d) * 100) / 100)));
+
+  return (
+    <div className={cn("flex h-full min-h-0 flex-col", className)}>
+      {doc && (
+        <div className="flex flex-wrap items-center gap-1 border-b border-line-subtle px-2 py-1 text-sm">
+          <Button size="icon" variant="ghost" aria-label="Forrige side" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+          <span className="tabular-nums" aria-live="polite">Side {page} av {pages}</span>
+          <Button size="icon" variant="ghost" aria-label="Neste side" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
+          <span className="ml-auto" />
+          <Button size="icon" variant="ghost" aria-label="Zoom ut" onClick={() => step(-0.25)}><Minus className="h-4 w-4" /></Button>
+          <span className="w-14 text-center tabular-nums">{zoomPct == null ? "Bredde" : `${zoomPct} %`}</span>
+          <Button size="icon" variant="ghost" aria-label="Zoom inn" onClick={() => step(0.25)}><Plus className="h-4 w-4" /></Button>
+          <Button size="icon" variant="ghost" aria-label="Tilpass bredde" aria-pressed={zoom === "fit"} onClick={() => setZoom("fit")}><Maximize2 className="h-4 w-4" /></Button>
+        </div>
+      )}
+      <div ref={wrapRef} className="min-h-0 flex-1 overflow-auto bg-muted/30 p-2">
+        {q.data?.kind === "image" ? (
+          <img src={q.data.src} alt={title} className="mx-auto max-w-full" />
+        ) : (
+          <canvas ref={canvasRef} role="img" aria-label={`${title}, side ${page}`} className="mx-auto block bg-card shadow-sm" />
+        )}
+      </div>
+    </div>
+  );
+}

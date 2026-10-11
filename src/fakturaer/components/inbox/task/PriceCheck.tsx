@@ -5,6 +5,7 @@ import { useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import type { SupplierLinkRow } from "@/fakturaer/hooks/useSupplierLinkContext";
 import { baseUnitOf, reasonsIn } from "@/fakturaer/lib/lineControl";
+import { usePriceGate } from "@/fakturaer/lib/priceGateContext";
 
 function referenceLabel(line: ReviewLineRow): string | null {
   const d = line.price_reference_date ? ` ${formatDate(line.price_reference_date)}` : "";
@@ -33,6 +34,7 @@ export function PriceCheck({ line, link, tolerancePct }: { line: ReviewLineRow; 
   const ref = referenceLabel(line);
   const variance = line.price_variance_pct == null ? null : Number(line.price_variance_pct);
   const reasons = reasonsIn(line, "price");
+  const gate = usePriceGate(line);
 
   return (
     <div className="space-y-2 text-sm">
@@ -46,11 +48,16 @@ export function PriceCheck({ line, link, tolerancePct }: { line: ReviewLineRow; 
         <div>
           <div className="text-caption text-ink-secondary">Sammenlignes med{ref ? ` ${ref}` : ""}</div>
           <div className="text-base font-semibold tabular-nums">
-            {expected == null ? "Mangler prisgrunnlag" : `${formatMoney(expected, currency)} / ${unit}`}
+            {!gate.ok ? "Sammenlignes ikke" : expected == null ? "Mangler prisgrunnlag" : `${formatMoney(expected, currency)} / ${unit}`}
           </div>
         </div>
       </div>
-      <PriceDeviationNote actual={actual} expected={expected} baseQuantity={line.base_quantity == null ? null : Number(line.base_quantity)} tolerancePct={tolerancePct} settings={settings} />
+      {!gate.ok ? (
+        <div role="note" className="rounded-md border border-warning/30 bg-warning/10 p-2 text-caption">
+          <p className="font-medium text-warning">{gate.label}</p>
+          <p className="text-ink-secondary">{gate.detail}</p>
+        </div>
+      ) : <PriceDeviationNote actual={actual} expected={expected} baseQuantity={line.base_quantity == null ? null : Number(line.base_quantity)} tolerancePct={tolerancePct} settings={settings} />}
       {reasons.length > 0 && (variance == null || actual == null || expected == null) && <p className="text-caption text-warning">Må avklares: {reasons.join(" · ")}</p>}
       <button type="button" className="text-caption text-ink-secondary underline underline-offset-2" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
         Prisdetaljer

@@ -1,3 +1,4 @@
+import type { ActionRequired } from "@/fakturaer/lib/financialPresentation";
 /** Typer for arbeidsoppslagene i Råvarer 2.0 (rm_work_summary, rm_work_items, …). */
 
 export type SupplierItemCounts = {
@@ -56,6 +57,8 @@ export type WorkItem = {
   read_integrity_flags: string[];
   unknown_effect_lines: number | null;
   amount_kind: string | null;
+  /** Serverens neste kontrollhandling (rm_work_items.action_required); null = eldre server. */
+  action_required: ActionRequired | null;
 };
 
 export const WORK_EFFECT_STATUSES = ["verified_price_effect", "unknown", "not_price_effect"] as const;
@@ -107,5 +110,5 @@ export type AcceptPriceResult = {
 
 /** Konservative standardverdier når serveren ikke sender effektfeltene. */
 export const WORK_ITEM_EFFECT_DEFAULTS = {
-  effect_status: "unknown", effect_label: null, read_integrity: "unknown", read_integrity_flags: [], unknown_effect_lines: null, amount_kind: null,
-} as const satisfies Pick<WorkItem, "effect_status" | "effect_label" | "read_integrity" | "read_integrity_flags" | "unknown_effect_lines" | "amount_kind">;
+  effect_status: "unknown", effect_label: null, read_integrity: "unknown", read_integrity_flags: [], unknown_effect_lines: null, amount_kind: null, action_required: null,
+} as const satisfies Pick<WorkItem, "effect_status" | "effect_label" | "read_integrity" | "read_integrity_flags" | "unknown_effect_lines" | "amount_kind" | "action_required">;

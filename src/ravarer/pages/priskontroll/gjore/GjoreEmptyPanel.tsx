@@ -1,7 +1,7 @@
 import { ArrowRight, CheckCircle2, Keyboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { WorkGroup, WorkItem } from "@/ravarer/lib/workRpcTypes";
-import { GROUP_COPY, NEXT_ACTION, causeText } from "./groupCopy";
+import { GROUP_COPY, causeText, nextActionText } from "./groupCopy";
 
 type Props = { group: WorkGroup; total: number | null; first: WorkItem | null; onStart: () => void; onHelp: () => void };
 
@@ -27,7 +27,7 @@ export function GjoreEmptyPanel({ group, total, first, onStart, onHelp }: Props)
             <p className="text-caption text-ink-secondary">Øverst i køen</p>
             <p className="font-medium">{first.title}</p>
             <p className="text-sm text-ink-secondary">{first.supplier_name ?? "Ukjent leverandør"} · {causeText(first)}</p>
-            <Button size="sm" className="mt-1 gap-1.5" onClick={onStart}>{NEXT_ACTION[first.kind]}<ArrowRight className="h-3.5 w-3.5" aria-hidden /></Button>
+            <Button size="sm" className="mt-1 gap-1.5" onClick={onStart}>{nextActionText(first)}<ArrowRight className="h-3.5 w-3.5" aria-hidden /></Button>
           </div>
         )}
       </div>

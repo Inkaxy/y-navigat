@@ -9,7 +9,7 @@ import type { WorkItem } from "@/ravarer/lib/workRpcTypes";
 import { cn } from "@/lib/utils";
 import { workEffect } from "@/ravarer/lib/workEffect";
 import { signedKr } from "./logic";
-import { NEXT_ACTION, causeText } from "./groupCopy";
+import { causeText, nextActionText } from "./groupCopy";
 
 function MobileEffect({ it }: { it: WorkItem }) {
   const e = workEffect(it);
@@ -104,7 +104,7 @@ export function WorkListView({ items, total, selectedKey, loading, fetchingMore,
                   <p className="flex flex-wrap items-center gap-x-2 text-caption">
                     <span className="text-ink-secondary">{causeText(it)}</span>
                     <span aria-hidden className="text-ink-secondary">·</span>
-                    <span className="font-medium text-primary">{NEXT_ACTION[it.kind]} →</span>
+                    <span className="font-medium text-primary">{nextActionText(it)} →</span>
                   </p>
                   <MobileEffect it={it} />
                 </div>

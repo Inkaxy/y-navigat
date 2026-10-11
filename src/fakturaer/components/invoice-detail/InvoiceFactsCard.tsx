@@ -6,7 +6,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/userError";
-import { formatDate, formatNok } from "@/fakturaer/lib/constants";
+import { formatDate, formatMoney } from "@/fakturaer/lib/constants";
+import { invoiceFigures, invoiceSourceLabel } from "@/fakturaer/lib/financialPresentation";
 import { parseRematchQueued, parseRepairVat } from "@/fakturaer/lib/parseRpcJson";
 import { linesSourceLabel, readingReliability, repairVatMessage, sumCheck } from "@/fakturaer/lib/invoiceFacts";
 import { invalidateInvoice } from "@/ravarer/lib/invalidate";
@@ -28,6 +29,9 @@ export interface InvoiceFacts {
   extraction_confidence: number | null;
   line_extraction_attempts: number | null;
   lines_source: string | null;
+  currency?: string | null;
+  source?: string | null;
+  tripletex_supplier_invoice_id?: string | number | null;
 }
 
 const Row = ({ k, children }: { k: string; children: React.ReactNode }) => (
@@ -45,12 +49,14 @@ export interface InvoiceHeaderFacts {
 
 /** Ren visning av «Tripletex mot faktura». */
 export function InvoiceFactsView({ invoice: d, actions, details }: { invoice: InvoiceFacts; actions?: React.ReactNode; details?: InvoiceHeaderFacts }) {
-  const net = d.total_amount != null ? d.total_amount - (d.total_vat ?? 0) : null;
+  const fig = invoiceFigures(d);
+  const cur = fig.currency;
+  const src = invoiceSourceLabel(d);
   const chk = sumCheck(d.lines_sum_variance_pct);
   const conf = d.extraction_confidence;
   return (
     <Card className="space-y-3 p-5">
-      <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-secondary">Tripletex mot faktura</h3>
+      <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-secondary">Fakturahode mot linjer</h3>
       <div className={cn("grid gap-5 md:grid-cols-2", details && "xl:grid-cols-3")}>
         {details && (
           <section>
@@ -65,11 +71,11 @@ export function InvoiceFactsView({ invoice: d, actions, details }: { invoice: In
           </section>
         )}
         <section>
-          <h4 className="mb-1 text-caption font-semibold">Fra Tripletex</h4>
+          <h4 className="mb-1 text-caption font-semibold">{src}</h4>
           <dl className="divide-y divide-line-subtle text-sm">
-            <Row k="Beløp inkl. mva">{formatNok(d.total_amount)}</Row>
-            <Row k="Mva">{formatNok(d.total_vat)}{d.vat_inferred && <span className="ml-1.5 rounded border border-line-subtle px-1 text-[11px] text-ink-secondary">utledet</span>}</Row>
-            <Row k="Netto">{formatNok(net)}</Row>
+            <Row k="Beløp inkl. mva">{formatMoney(d.total_amount, cur)}</Row>
+            <Row k="Mva">{d.total_vat == null ? "Ukjent" : formatMoney(d.total_vat, cur)}{d.vat_inferred && <span className="ml-1.5 rounded border border-line-subtle px-1 text-[11px] text-ink-secondary">utledet</span>}</Row>
+            <Row k="Netto">{fig.net == null ? (fig.gross == null ? "—" : "Ukjent (mva mangler)") : formatMoney(fig.net, cur)}</Row>
             <Row k="Bilagsnr">{d.tripletex_voucher_number ?? "—"}</Row>
             <Row k="Betalt">{d.tripletex_is_paid ? (d.paid_at ? `Ja, ${formatDate(d.paid_at)}` : "Ja") : d.tripletex_is_paid === false ? "Nei" : "—"}</Row>
           </dl>
@@ -77,7 +83,7 @@ export function InvoiceFactsView({ invoice: d, actions, details }: { invoice: In
         <section>
           <h4 className="mb-1 text-caption font-semibold">Fra fakturalinjene</h4>
           <dl className="divide-y divide-line-subtle text-sm">
-            <Row k="Linjesum eks. mva">{formatNok(d.lines_sum_excl_vat)}</Row>
+            <Row k="Linjesum eks. mva">{formatMoney(d.lines_sum_excl_vat, cur)}</Row>
             <Row k="Avvik mot netto">
               {d.lines_sum_variance_pct != null && `${d.lines_sum_variance_pct.toLocaleString("nb-NO", { maximumFractionDigits: 1 })} % `}
               <span className={cn(chk.tone === "success" && "text-success", chk.tone === "danger" && "text-destructive", chk.tone === "muted" && "text-ink-secondary")}>{chk.label}</span>
