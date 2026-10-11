@@ -23,6 +23,8 @@ export interface TimelineHistoryRow {
   /** Kreditrad i historikken (is_credit). */
   isCredit?: boolean;
   currency?: string | null;
+  /** Registreringstidspunkt — skiller rader med samme dato (serverens rekkefølge: dato, created_at, id). */
+  createdAt?: string | null;
 }
 
 /**
@@ -194,7 +196,8 @@ export function buildTimeline({
   events.sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
 
   // Stabil rekkefølge innen samme dato (id), så Δ ikke hopper mellom visninger.
-  const sorted = [...valid].sort((a, b) => a.effective_date.localeCompare(b.effective_date) || a.id.localeCompare(b.id));
+  const sorted = [...valid].sort((a, b) => a.effective_date.localeCompare(b.effective_date)
+    || (a.createdAt ?? "").localeCompare(b.createdAt ?? "") || a.id.localeCompare(b.id));
 
   const bySupplier = new Map<string, TimelinePoint[]>();
   for (const h of sorted) {
