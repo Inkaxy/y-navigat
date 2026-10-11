@@ -210,8 +210,14 @@ export function useApplyMatvaretabellen() {
         p_food_id: input.foodId,
         p_force: input.force ?? false,
       });
-      if (error) throw error;
-      return { ...input, result: parseApplyResult(data) };
+      const force = input.force ?? false;
+      // En avvisning med feilkode er sikker; transport-/ukjent feil kan ha blitt utført → ukjent utfall.
+      if (error) {
+        if (typeof error.code === "string" && error.code !== "") throw error;
+        console.error("[matvaretabellen:ukjent-utfall]", error);
+        return { ...input, result: null };
+      }
+      return { ...input, result: parseApplyResult(data, { rawMaterialId: input.rawMaterialId, foodId: input.foodId, force }) };
     },
     onSuccess: (input) => {
       invalidateRawMaterial(qc, input.rawMaterialId);

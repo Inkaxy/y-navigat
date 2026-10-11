@@ -223,7 +223,7 @@ export default function PackageMode() {
         }
         panel={
           <PeekPanel title={active?.name ?? undefined} fullHref={active ? `${paths.raavare(active.id)}${sectionSearch(new URLSearchParams(listSearch), "grunndata")}` : undefined} onClose={valgt ? () => setActive(null) : undefined} emptyText="Velg en råvare i listen"
-            footer={active && canWrite ? <Button className="min-h-11 w-full" onClick={() => openEditor(active)}><Check className="mr-1.5 h-4 w-4" aria-hidden />Bekreft pakning</Button> : undefined}>
+            footer={active && canWrite ? <Button className="min-h-[44px] w-full" onClick={() => openEditor(active)}><Check className="mr-1.5 h-4 w-4" aria-hidden />Bekreft pakning</Button> : undefined}>
             {active ? (
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
                 <dt className="text-ink-secondary">Status</dt><dd><StatusBadge status={active.status} /></dd>

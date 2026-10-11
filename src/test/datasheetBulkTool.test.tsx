@@ -13,7 +13,8 @@ const orphans = [{ id: "o1", file_name: "gammel.pdf", file_path: "le/bulk/x/gamm
 
 vi.mock("@/ravarer/context/RavarerContext", () => ({ useRavarer: () => ({ canWrite: true, legalEntityId: "le" }) }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), warning: vi.fn(), error: vi.fn((m: string) => calls.push(`toast:${m}`)), info: vi.fn() } }));
-vi.mock("@/ravarer/hooks/useRawMaterials", () => ({ useRawMaterials: () => ({ data: [] }) }));
+vi.mock("@/ravarer/hooks/useRawMaterials", () => ({ useRawMaterials: () => ({ data: [] }), useRawMaterial: () => ({ data: undefined, isLoading: false, isError: false }) }));
+vi.mock("@/ravarer/hooks/useNutrition", () => ({ useNutrition: () => ({ data: null, isLoading: false, isError: false }), useAllergens: () => ({ data: [], isLoading: false, isError: false }) }));
 vi.mock("@/ravarer/editors/PackageEditor", () => ({ PackageEditor: () => null }));
 vi.mock("@/ravarer/editors/RawMaterialCreateSheet", () => ({ RawMaterialCreateSheet: () => null }));
 vi.mock("@/integrations/supabase/client", () => {
@@ -83,27 +84,40 @@ describe("DatabladBulk — side", () => {
 });
 
 const row = (o: Partial<BulkRowLike>): BulkRowLike => ({
-  key: "k", status: "ready", applyState: "idle", manualTarget: false, selectedRm: "A",
+  key: "k", status: "ready", datasheet_id: "d", applyState: "idle", manualTarget: false, selectedRm: "A",
   candidates: [{ id: "A", name: "A", sku: "1", score: 0.92 }, { id: "B", name: "B", sku: "2", score: 0.41 }], ...o,
 });
 
 describe("DatabladBulk — regler", () => {
-  it("bare toppkandidat med høy score er trygg for samlet bekreftelse; valgt B arver ikke A sin score", () => {
-    expect(safeForBulk(row({}))).toBe(true);
+  it("bare GJENNOMGÅTT toppkandidat med høy score er trygg for samlet bekreftelse; valgt B arver ikke A sin score", () => {
+    const rev = { entity: "le", gen: 1, datasheetId: "d", rmId: "A", fields: ["nutrition" as const], nutritionFields: ["fat_g"] };
+    expect(safeForBulk(row({}), "le", 1)).toBe(false); // ikke gjennomgått
+    expect(safeForBulk(row({ reviewed: rev }), "le", 1)).toBe(true);
+    expect(safeForBulk(row({ reviewed: rev }), "annet", 1)).toBe(false); // annet selskap
+    expect(safeForBulk(row({ reviewed: rev }), "le", 2)).toBe(false); // ny generasjon
+    expect(safeForBulk(row({ reviewed: { ...rev, rmId: "B" } }), "le", 1)).toBe(false); // gjennomgått mot annet mål
     expect(safeForBulk(row({ selectedRm: "B", manualTarget: true }))).toBe(false);
     expect(safeForBulk(row({ selectedRm: "B" }))).toBe(false);
     expect(safeForBulk(row({ candidates: [{ id: "A", name: "A", sku: "", score: 0.6 }] }))).toBe(false);
     expect(safeForBulk(row({ applyState: "applying" }))).toBe(false);
     expect(safeForBulk(row({ applyState: "applied" }))).toBe(false);
   });
-  it("207 med feltfeil = ikke anvendt; allergenfjerning som ble hoppet over blir oppfølging", () => {
-    const out = parseApplyOutcome({ changes_logged: 3, failures: ["grain: ukjent"], follow_ups: { allergen_removals_skipped: ["melk"], package_suggestion: { suggested: { size: 20, unit: "kg" } } } });
-    expect(out.ok).toBe(false);
+  it("bare applied:true med tom failures er anvendt; 207 er DELVIS; tom/ugyldig/applied:false er UKJENT", () => {
+    const out = parseApplyOutcome({ applied: false, changes_logged: 3, failures: ["grain: ukjent"], follow_ups: { allergen_removals_skipped: ["melk"], package_suggestion: { suggested: { size: 20, unit: "kg" } } } });
+    expect(out.kind).toBe("partial");
     expect(out.failures).toEqual(["grain: ukjent"]);
     expect(out.allergenRemovalsSkipped).toEqual(["melk"]);
     expect(out.packageSuggestion).toEqual({ size: 20, unit: "kg" });
-    expect(parseApplyOutcome({ changes_logged: 2 }).ok).toBe(true);
-    expect(parseApplyOutcome(null).ok).toBe(false);
+    expect(parseApplyOutcome({ applied: true, failures: [], changes_logged: 2 }).kind).toBe("applied");
+    expect(parseApplyOutcome({}).kind).toBe("unknown");
+    expect(parseApplyOutcome({ applied: false, failures: [] }).kind).toBe("unknown");
+    expect(parseApplyOutcome({ applied: true }).kind).toBe("unknown");
+    expect(parseApplyOutcome(null).kind).toBe("unknown");
+    expect(parseApplyOutcome({ error: "Ingen tilgang" }).kind).toBe("failed");
+  });
+  it("forhåndsvisningen viser serverens brødskala (grain_classification_hint), ikke et ja/nei", () => {
+    expect(summarizeExtract({ grain_classification_hint: "grovt" }).grain).toBe("grovt");
+    expect(summarizeExtract({ grain: true }).grain).toBeNull();
   });
   it("nytt forsøk med eksisterende datablad kjører bare matching (ingen ny AI-lesing)", () => {
     expect(retryStage({ storage_path: "p", datasheet_id: "d" })).toBe("match");

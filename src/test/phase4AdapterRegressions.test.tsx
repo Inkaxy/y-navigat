@@ -20,8 +20,9 @@ const declRows: DeclarationWorklistRow[] = [
   { raw_material_id: "A", name: "Hvetemel", recipes_using: 5, is_composite: false, matvaretabellen_name: null, suggested_name: "hvetemel" },
   { raw_material_id: "B", name: "Rugmel", recipes_using: 3, is_composite: false, matvaretabellen_name: null, suggested_name: "rugmel" },
 ] as DeclarationWorklistRow[];
+const declHolder = { rows: declRows };
 vi.mock("@/ravarer/hooks/useDeclarationNames", () => ({
-  useDeclarationWorklist: () => ({ data: declRows, isLoading: false, isError: false, error: null, refetch: vi.fn() }),
+  useDeclarationWorklist: () => ({ data: declHolder.rows, isLoading: false, isError: false, error: null, refetch: vi.fn() }),
   useSaveDeclarationName: () => ({
     mutateAsync: ({ rawMaterialId, declarationName }: { rawMaterialId: string; declarationName: string }) =>
       new Promise<void>((resolve, reject) => { saveCalls.push({ id: rawMaterialId, value: declarationName, resolve, reject }); }),
@@ -50,10 +51,19 @@ vi.mock("@/ravarer/hooks/priceHistoryFetch", () => ({
     { id: "h2", raw_material_id: "M", supplier_id: "s1", price: 60.076, effective_date: "2026-05-26", source: "invoice", invoice_id: "i2", invoice_line_id: "line-wrong", invoice_line_ref: null,
       notes: null, created_at: "2026-05-27T10:00:00Z", superseded_at: null, superseded_reason: null, is_legacy: false, is_credit: false, invoices: { invoice_number: "F2", is_credit_note: false },
       provenance: { unit: null, unitSource: null, currency: "NOK", packageText: null, corrections: [] } },
+    { id: "h3", raw_material_id: "M", supplier_id: "s1", price: 59.9, effective_date: "2026-04-01", source: "invoice", invoice_id: "i3", invoice_line_id: "l-snap", invoice_line_ref: null,
+      notes: null, created_at: "2026-04-01T10:00:00Z", superseded_at: null, superseded_reason: null, is_legacy: false, is_credit: false, invoices: { invoice_number: "F", is_credit_note: false },
+      provenance: { unit: "kg", unitSource: "ved_registrering", currency: "NOK", packageText: null, corrections: [] } },
+    { id: "h4", raw_material_id: "M", supplier_id: "s1", price: 59.9, effective_date: "2026-03-01", source: "invoice", invoice_id: "i4", invoice_line_id: "l-held", invoice_line_ref: null,
+      notes: null, created_at: "2026-03-01T10:00:00Z", superseded_at: null, superseded_reason: null, is_legacy: false, is_credit: false, invoices: { invoice_number: "F", is_credit_note: false },
+      provenance: { unit: null, unitSource: null, currency: "NOK", packageText: null, corrections: [] } },
+    { id: "h5", raw_material_id: "M", supplier_id: "s1", price: 59.9, effective_date: "2026-02-01", source: "invoice", invoice_id: "i5", invoice_line_id: "l-dup", invoice_line_ref: null,
+      notes: null, created_at: "2026-02-01T10:00:00Z", superseded_at: null, superseded_reason: null, is_legacy: false, is_credit: false, invoices: { invoice_number: "F", is_credit_note: false },
+      provenance: { unit: null, unitSource: null, currency: "NOK", packageText: null, corrections: [] } },
   ],
 }));
 
-import DeclarationMode from "@/ravarer/pages/varer/DeclarationMode";
+import DeclarationMode, { declarationDirty } from "@/ravarer/pages/varer/DeclarationMode";
 import { useTimelineHistory } from "@/ravarer/hooks/useRmSuppliers";
 import { RecentInvoiceLinesCard } from "@/ravarer/components/RecentInvoiceLinesCard";
 
@@ -67,7 +77,7 @@ function renderMode(url: string) {
   );
 }
 
-beforeEach(() => { saveCalls.length = 0; rpcQueue.length = 0; });
+beforeEach(() => { saveCalls.length = 0; rpcQueue.length = 0; declHolder.rows = declRows; });
 
 describe("DeclarationMode (ekte adapter) — mobil og panel", () => {
   it("trykk på mobilkortet velger raden (samme aktivering som desktop)", () => {
@@ -100,6 +110,32 @@ describe("DeclarationMode (ekte adapter) — mobil og panel", () => {
   });
 });
 
+describe("DeclarationMode — utkast når en uavhengig oppfrisking fjerner raden", () => {
+  const tree = () => (
+    <MemoryRouter initialEntries={["/ravarer/varer?liste=deklarasjon&valgt=A"]}>
+      <Routes><Route path="/ravarer/varer" element={<><DeclarationMode /><Loc /></>} /></Routes>
+    </MemoryRouter>
+  );
+  it("utkastet beholdes synlig og fortsatt ulagret; Forkast fjerner det", () => {
+    const { rerender } = render(tree());
+    const field = screen.getAllByRole("textbox")[0];
+    fireEvent.change(field, { target: { value: "hvetemel, siktet" } });
+    declHolder.rows = declRows.filter((r) => r.raw_material_id !== "A");
+    rerender(tree());
+    const box = screen.getByRole("status", { name: "Ulagrede utkast utenfor listen" });
+    expect(within(box).getByText(/hvetemel, siktet/)).toBeInTheDocument();
+    expect(within(box).getByText("Hvetemel")).toBeInTheDocument();
+    fireEvent.click(within(box).getByRole("button", { name: "Forkast" }));
+    expect(screen.queryByRole("status", { name: "Ulagrede utkast utenfor listen" })).toBeNull();
+  });
+  it("vakten regner utkast for borte rader som ulagret", () => {
+    const rest = declRows.filter((r) => r.raw_material_id !== "A");
+    expect(declarationDirty(rest, { A: "hvetemel, siktet" })).toBe(false); // uten fanget raddata (gammel oppførsel)
+    expect(declarationDirty(rest, { A: "hvetemel, siktet" }, { A: { name: "Hvetemel", initial: "hvetemel" } })).toBe(true);
+    expect(declarationDirty(rest, { A: "hvetemel" }, { A: { name: "Hvetemel", initial: "hvetemel" } })).toBe(false); // urørt forslag
+  });
+});
+
 describe("DeclarationMode — «Lagre alle» med utsatt svar", () => {
   it("feltene er låst mens lagringen pågår; vellykket rad tømmes, feilet utkast beholdes", async () => {
     renderMode("/ravarer/varer?liste=deklarasjon");
@@ -128,6 +164,25 @@ const projection = (eligible: string[], lines: { h: string; line: string; date: 
 });
 
 describe("useTimelineHistory → RecentInvoiceLinesCard", () => {
+  it("låst opptakssnapshot som serveren sier er gyldig, men uten projeksjon, blir «ukjent» — aldri «ikke gyldig» eller «gyldig»", async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result } = renderHook(() => useTimelineHistory("M"), { wrapper: wrapper(qc) });
+    await waitFor(() => expect(rpcQueue.length).toBeGreaterThan(0));
+    const p = { ...projection(["h1", "h2", "h3", "h4", "h5"], [
+      { h: "h1", line: "l1", date: "2026-08-18", inv: "i1", price: 60.6035 },
+      { h: "h2", line: "line-a", date: "2026-05-26", inv: "i2", price: 60.076 },
+    ]), held_history_ids: ["h4"], duplicate_history_ids: ["h5"] };
+    await act(async () => { rpcQueue[rpcQueue.length - 1]({ data: p, error: null }); });
+    await waitFor(() => expect(result.current.eligibleLineIds).not.toBeNull());
+    expect([...(result.current.eligibleLineIds ?? [])]).toEqual(["l1"]);            // rekonstruert + bevist
+    expect([...(result.current.unknownLineIds ?? [])].sort()).toEqual(["l-snap", "line-wrong"]); // snapshot + identitetsavvik
+    // Holdt og duplikat er verken gyldig eller ukjent.
+    expect(result.current.unknownLineIds?.has("l-held")).toBe(false);
+    expect(result.current.unknownLineIds?.has("l-dup")).toBe(false);
+    // Snapshot beholder låst enhet; ingen omtolkning til «kontrollert fra fakturalinje».
+    expect(result.current.rows.find((r) => r.id === "h3")?.unitSource).toBe("ved_registrering");
+  });
+
   it("under oppfrisking er kontrollen ukjent (null), etter ferskt svar gjelder bare eksakt identitet", async () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const { result } = renderHook(() => useTimelineHistory("M"), { wrapper: wrapper(qc) });
@@ -165,5 +220,9 @@ describe("useTimelineHistory → RecentInvoiceLinesCard", () => {
     expect(screen.getAllByText("Ukjent").length).toBe(2);
     rerender(<RecentInvoiceLinesCard rawMaterialId="M" baseUnit="kg" eligibleLineIds={new Set(["l1"])} />);
     expect(screen.getAllByText("Gyldig")).toHaveLength(1);
+    rerender(<RecentInvoiceLinesCard rawMaterialId="M" baseUnit="kg" eligibleLineIds={new Set(["l1"])} unknownLineIds={new Set(["line-wrong"])} />);
+    expect(screen.getAllByText("Gyldig")).toHaveLength(1);
+    expect(screen.getAllByText("Ukjent")).toHaveLength(1);
+    expect(screen.queryByText(/Ikke gyldig nå/)).toBeNull();
   });
 });

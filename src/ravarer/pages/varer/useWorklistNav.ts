@@ -11,6 +11,7 @@ import { DEFAULT_HARD_CAP_PCT, useMatchTolerances } from "@/fakturaer/hooks/useM
 import { filterAndSortItems, parseListQuery } from "@/ravarer/lib/rawMaterialViews";
 import { deviationRuleFor } from "@/ravarer/lib/varerOrder";
 import { isVarelisteMode, readListe } from "@/ravarer/lib/varerWorklist";
+import { readNutritionSkipped } from "@/ravarer/lib/nutritionSkip";
 import {
   orderDatasheetRows, orderDeclarationRows, orderNutritionRows, orderPackageRows, readDatasheetView, readPackageQuery, stepEntries, type NavEntry,
 } from "./modeLogic";
@@ -39,6 +40,9 @@ export function useWorklistNav(listSearch: string, materialId: string | undefine
   const view = readDatasheetView(sp);
   const ds = useChangelog({ onlyUnacked: view === "unacked" }, { enabled: hasContext && liste === "datablad" });
 
+  // «Hopp over» i næringslisten (økt) — samme utvalg som listen brukeren så.
+  const skippedKey = liste === "naering" ? [...readNutritionSkipped(legalEntityId ?? null)].sort().join(",") : "";
+
   const entries = useMemo<NavEntry[]>(() => {
     if (!hasContext) return [];
     const q = sp.get("q") ?? "";
@@ -52,14 +56,24 @@ export function useWorklistNav(listSearch: string, materialId: string | undefine
         return [...orderDeclarationRows(rows.filter((r) => !r.is_composite), q), ...orderDeclarationRows(rows.filter((r) => r.is_composite), q)].map((r) => ({ materialId: r.raw_material_id }));
       }
       case "naering":
-        return orderNutritionRows((cov.data?.candidates ?? []).map((c) => ({ raw_material_id: c.raw_material_id, name: c.name })), q, new Set()).map((r) => ({ materialId: r.raw_material_id }));
+        return orderNutritionRows((cov.data?.candidates ?? []).map((c) => ({ raw_material_id: c.raw_material_id, name: c.name })), q, new Set(skippedKey ? skippedKey.split(",") : [])).map((r) => ({ materialId: r.raw_material_id }));
       case "datablad":
         return orderDatasheetRows(ds.data ?? [], q).map((r) => ({ materialId: r.raw_material_id, eventId: r.id }));
       default:
         return filterAndSortItems(items, parseListQuery(sp), deviationRuleFor(tolerances.toleranceFor, hardCap)).map((i) => ({ materialId: i.id }));
     }
-  }, [hasContext, liste, sp, susp.data, pkg.data, decl.data, cov.data, ds.data, items, tolerances, hardCap]);
+  }, [hasContext, liste, sp, susp.data, pkg.data, decl.data, cov.data, ds.data, items, tolerances, hardCap, skippedKey]);
 
+  const loaded = hasContext && (
+    liste === "pakning" ? pkg.data !== undefined && susp.data !== undefined
+      : liste === "deklarasjon" ? decl.data !== undefined
+      : liste === "naering" ? cov.data !== undefined
+      : liste === "datablad" ? ds.data !== undefined
+      : items.length > 0
+  );
   const step = materialId ? stepEntries(entries, materialId, liste === "datablad" ? eventId : null) : { prev: null, next: null, index: -1 };
-  return { liste, ...step, total: entries.length };
+  // Raden er borte fra listen (kvittert, hoppet over, løst): ingen falske naboer — «neste» blir første i gjeldende liste.
+  const missing = !!materialId && loaded && step.index < 0;
+  if (missing) return { liste, prev: null, next: entries[0] ?? null, index: -1, total: entries.length, missing };
+  return { liste, ...step, total: entries.length, missing };
 }

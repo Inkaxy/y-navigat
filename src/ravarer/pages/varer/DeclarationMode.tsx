@@ -20,9 +20,26 @@ export function initialDeclarationFor(r: DeclarationWorklistRow): string {
   return (r.matvaretabellen_name ?? r.suggested_name ?? "").trim().toLowerCase();
 }
 
-/** Ulagret = utkast som avviker fra forslaget, på en enkel (ikke sammensatt) rad som fortsatt står i listen. */
-export function declarationDirty(rows: readonly DeclarationWorklistRow[], drafts: Readonly<Record<string, string>>): boolean {
-  return rows.some((r) => !r.is_composite && drafts[r.raw_material_id] != null && drafts[r.raw_material_id].trim() !== initialDeclarationFor(r));
+/** Rad-data fanget da utkastet ble skrevet — så utkastet overlever at raden forsvinner fra listen. */
+export type DraftMeta = Readonly<Record<string, { name: string; initial: string }>>;
+
+/**
+ * Utkast som avviker fra forslaget og ikke lenger har en rad i listen (f.eks. fjernet av en uavhengig oppfrisking).
+ * Disse er fortsatt ulagrede og skal verken forsvinne eller miste vakten.
+ */
+export function orphanDrafts(rows: readonly DeclarationWorklistRow[], drafts: Readonly<Record<string, string>>, meta: DraftMeta): { id: string; name: string; value: string }[] {
+  const present = new Set(rows.map((r) => r.raw_material_id));
+  return Object.entries(drafts).flatMap(([id, v]) => {
+    const m = meta[id];
+    if (present.has(id) || !m || v.trim() === "" || v.trim() === m.initial) return [];
+    return [{ id, name: m.name, value: v }];
+  });
+}
+
+/** Ulagret = utkast som avviker fra forslaget på en enkel rad i listen, ELLER et utkast for en rad som er borte fra listen. */
+export function declarationDirty(rows: readonly DeclarationWorklistRow[], drafts: Readonly<Record<string, string>>, meta: DraftMeta = {}): boolean {
+  return rows.some((r) => !r.is_composite && drafts[r.raw_material_id] != null && drafts[r.raw_material_id].trim() !== initialDeclarationFor(r))
+    || orphanDrafts(rows, drafts, meta).length > 0;
 }
 
 /**
@@ -39,14 +56,33 @@ export default function DeclarationMode() {
   const [savingAll, setSavingAll] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const draftFor = (r: DeclarationWorklistRow) => drafts[r.raw_material_id] ?? initialDeclarationFor(r);
-  const setDraft = (id: string, v: string) => setDrafts((d) => ({ ...d, [id]: v }));
+  const [meta, setMeta] = useState<Record<string, { name: string; initial: string }>>({});
+  const setDraft = (id: string, v: string) => {
+    const r = rows.find((x) => x.raw_material_id === id);
+    if (r) setMeta((m) => (m[id] ? m : { ...m, [id]: { name: r.name, initial: initialDeclarationFor(r) } }));
+    setDrafts((d) => ({ ...d, [id]: v }));
+  };
+  const dropDraft = (id: string) => setDrafts((d) => { const n = { ...d }; delete n[id]; return n; });
+  const orphans = orphanDrafts(rows, drafts, meta);
+  const [savingOrphan, setSavingOrphan] = useState<string | null>(null);
+  async function saveOrphan(o: { id: string; value: string }) {
+    setSavingOrphan(o.id);
+    try {
+      await save.mutateAsync({ rawMaterialId: o.id, declarationName: o.value.trim(), silent: true });
+      setDrafts((d) => (d[o.id] !== undefined && d[o.id].trim() === o.value.trim() ? (() => { const n = { ...d }; delete n[o.id]; return n; })() : d));
+      toast.success("Deklarasjonsnavn lagret");
+    } catch (e: unknown) {
+      console.error("[deklarasjonsnavn:lagre-utenfor-liste]", e);
+      toast.error("Kunne ikke lagre — utkastet er beholdt");
+    } finally { setSavingOrphan(null); }
+  }
 
   const q = sp.get("q") ?? "";
   const simple = useMemo(() => orderDeclarationRows(rows.filter((r) => !r.is_composite), q), [rows, q]);
   const composite = useMemo(() => orderDeclarationRows(rows.filter((r) => r.is_composite), q), [rows, q]);
   const prefilled = simple.filter((r) => draftFor(r).trim().length > 0);
 
-  const guard = useUnsavedChangesGuard(canWrite && declarationDirty(rows, drafts));
+  const guard = useUnsavedChangesGuard(canWrite && declarationDirty(rows, drafts, meta));
 
   async function saveAll() {
     // Frys utvalget: nøyaktig de utfylte radene som vises nå.
@@ -96,6 +132,21 @@ export default function DeclarationMode() {
           </Button>
         )}
       </div>
+      {canWrite && orphans.length > 0 && (
+        <section role="status" aria-label="Ulagrede utkast utenfor listen" className="space-y-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
+          <p className="font-medium">Ulagrede utkast for råvarer som ikke lenger står i listen</p>
+          <p className="text-xs text-ink-secondary">Raden kan ha fått navn et annet sted. Kontroller råvaren før du lagrer.</p>
+          <ul className="space-y-1">
+            {orphans.map((o) => (
+              <li key={o.id} className="flex flex-wrap items-center gap-2">
+                <span className="min-w-0 flex-1 [overflow-wrap:anywhere]"><Link className="underline underline-offset-2" to={`${paths.raavare(o.id)}${sectionSearch(new URLSearchParams(listSearch), "deklarasjon")}`}>{o.name}</Link>: «{o.value}»</span>
+                <Button size="sm" variant="outline" className="min-h-[44px] md:min-h-0" disabled={savingAll || savingOrphan !== null} onClick={() => void saveOrphan(o)}>Lagre</Button>
+                <Button size="sm" variant="ghost" className="min-h-[44px] md:min-h-0" disabled={savingOrphan === o.id} onClick={() => dropDraft(o.id)}>Forkast</Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <SplitView
         selected={!!valgt}
         list={

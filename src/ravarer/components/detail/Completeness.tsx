@@ -46,7 +46,7 @@ export function ChecklistCard({ items, hrefFor }: { items: CheckItem[]; hrefFor:
         {items.map((c) => {
           const Icon = ICON[c.status];
           return (
-            <li key={c.id} className="flex min-h-11 items-center gap-3 py-1.5 text-sm">
+            <li key={c.id} className="flex min-h-[44px] items-center gap-3 py-1.5 text-sm">
               <Icon className={cn("h-4 w-4 shrink-0", TONE[c.status])} aria-hidden />
               <span className="font-medium">{c.label}</span>
               <span className="text-ink-secondary">{c.detail}</span>

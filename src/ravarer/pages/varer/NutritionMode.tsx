@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Info, Link2, Loader2, Maximize2, Search, SkipForward } from "lucide-react";
 import { toast } from "sonner";
@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { QueryState } from "@/components/common/QueryState";
 import { supabase } from "@/integrations/supabase/client";
+import { readNutritionSkipped, writeNutritionSkipped } from "@/ravarer/lib/nutritionSkip";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useNutritionCoverage, type CoverageItem } from "@/ravarer/hooks/useNutritionCoverage";
 import { useApplyMatvaretabellen, useMatvaretabellenFoods } from "@/ravarer/hooks/useMatvaretabellen";
@@ -49,11 +50,14 @@ export function buildNutritionRows(candidates: readonly CoverageItem[] | undefin
  * «Hopp over» (økt) og «Koble entydige treff» med fryst utvalg og delvis-feil-melding.
  */
 export default function NutritionMode() {
-  const { canWrite } = useRavarer();
+  const { canWrite, legalEntityId } = useRavarer();
   const coverage = useNutritionCoverage();
   const foods = useMatvaretabellenFoods();
   const { sp, valgt, setActive, listSearch } = useActiveRow();
-  const [skipped, setSkipped] = useState<Set<string>>(new Set());
+  // Hoppet over i økten — delt med råvarekortets forrige/neste.
+  const [skipped, setSkippedState] = useState<Set<string>>(() => readNutritionSkipped(legalEntityId ?? null));
+  useEffect(() => { setSkippedState(readNutritionSkipped(legalEntityId ?? null)); }, [legalEntityId]);
+  const setSkipped = (f: (p: Set<string>) => Set<string>) => setSkippedState((p) => { const n = f(p); writeNutritionSkipped(legalEntityId ?? null, n); return n; });
   const [linked, setLinked] = useState<Set<string>>(new Set());
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -103,8 +107,9 @@ export default function NutritionMode() {
     if (busy) return;
     setBusyId(rawMaterialId);
     try {
-      await apply.mutateAsync({ rawMaterialId, foodId });
-      setLinked((prev) => new Set(prev).add(rawMaterialId));
+      const res = await apply.mutateAsync({ rawMaterialId, foodId });
+      // Ukjent utfall: ikke vis som koblet; dekningen hentes på nytt og viser faktisk tilstand.
+      if (res.result) setLinked((prev) => new Set(prev).add(rawMaterialId));
       void coverage.refetch();
     } catch (e) {
       // useApplyMatvaretabellen viser feilmeldingen; raden blir stående.
@@ -121,11 +126,12 @@ export default function NutritionMode() {
     setBulk({ done: 0, total: batch.length });
     const ok: string[] = [];
     const failed: string[] = [];
+    const unknown: string[] = [];
     for (let i = 0; i < batch.length; i++) {
       const t = batch[i];
       try {
-        await apply.mutateAsync({ rawMaterialId: t.id, foodId: t.foodId, silent: true });
-        ok.push(t.id);
+        const res = await apply.mutateAsync({ rawMaterialId: t.id, foodId: t.foodId, silent: true });
+        if (res.result) ok.push(t.id); else unknown.push(t.name);
       } catch (e) {
         console.error("[naering:koble-alle]", e);
         failed.push(t.name);
@@ -135,8 +141,8 @@ export default function NutritionMode() {
     setBulk(null);
     setLinked((prev) => { const n = new Set(prev); ok.forEach((id) => n.add(id)); return n; });
     await coverage.refetch();
-    if (failed.length === 0) toast.success(`${ok.length} råvarer koblet til Matvaretabellen`);
-    else toast.warning(`${ok.length} av ${batch.length} koblet. Feilet: ${failed.slice(0, 5).join(", ")}${failed.length > 5 ? ` +${failed.length - 5} til` : ""}`);
+    if (failed.length === 0 && unknown.length === 0) toast.success(`${ok.length} råvarer koblet til Matvaretabellen`);
+    else toast.warning(`${ok.length} av ${batch.length} koblet.${failed.length ? ` Feilet: ${failed.slice(0, 5).join(", ")}${failed.length > 5 ? ` +${failed.length - 5} til` : ""}.` : ""}${unknown.length ? ` Ukjent utfall (kontroller): ${unknown.slice(0, 5).join(", ")}${unknown.length > 5 ? ` +${unknown.length - 5} til` : ""}.` : ""}`);
   };
 
   const active = rows.find((r) => r.raw_material_id === valgt) ?? null;
@@ -246,7 +252,7 @@ export default function NutritionMode() {
                   {active.suggestions.length > 0 ? (
                     <div className="flex flex-col gap-2">
                       {active.suggestions.map((s, i) => (
-                        <Button key={s.food_id} className="min-h-11 justify-between" variant={i === 0 && active.safety.autoLinkAllowed ? "default" : "outline"} disabled={!canWrite || busy} onClick={() => void linkOne(active.raw_material_id, s.food_id)}>
+                        <Button key={s.food_id} className="min-h-[44px] justify-between" variant={i === 0 && active.safety.autoLinkAllowed ? "default" : "outline"} disabled={!canWrite || busy} onClick={() => void linkOne(active.raw_material_id, s.food_id)}>
                           <span className="truncate">{s.food_name}</span>
                           <Badge variant="secondary" className="ml-2 text-[10px]">{Math.round(s.confidence * 100)} %</Badge>
                         </Button>
@@ -257,8 +263,8 @@ export default function NutritionMode() {
                   {!active.item.safe_to_overwrite && <p className="text-xs text-ink-secondary">Har allerede verdier fra {active.item.source ?? "annen kilde"} — kobles ikke automatisk.</p>}
                   <div className="flex flex-wrap items-center gap-2">
                     {busyId === active.raw_material_id && <Loader2 className="h-4 w-4 animate-spin" aria-label="Kobler" />}
-                    <Button variant="outline" className="min-h-11" onClick={() => setPickerFor(active.raw_material_id)} disabled={!canWrite || busy}><Search className="mr-1.5 h-3.5 w-3.5" aria-hidden />Velg annen</Button>
-                    <Button variant="ghost" className="min-h-11" onClick={() => { setSkipped((p) => new Set(p).add(active.raw_material_id)); setActive(null); }} disabled={busy}><SkipForward className="mr-1.5 h-3.5 w-3.5" aria-hidden />Hopp over</Button>
+                    <Button variant="outline" className="min-h-[44px]" onClick={() => setPickerFor(active.raw_material_id)} disabled={!canWrite || busy}><Search className="mr-1.5 h-3.5 w-3.5" aria-hidden />Velg annen</Button>
+                    <Button variant="ghost" className="min-h-[44px]" onClick={() => { setSkipped((p) => new Set(p).add(active.raw_material_id)); setActive(null); }} disabled={busy}><SkipForward className="mr-1.5 h-3.5 w-3.5" aria-hidden />Hopp over</Button>
                   </div>
                   <Link className="inline-flex items-center gap-1.5 text-sm underline underline-offset-2" to={`${paths.raavare(active.raw_material_id)}${sectionSearch(new URLSearchParams(listSearch), "naering")}`}><Maximize2 className="h-3.5 w-3.5" aria-hidden />Åpne næring på råvarekortet</Link>
                 </div>

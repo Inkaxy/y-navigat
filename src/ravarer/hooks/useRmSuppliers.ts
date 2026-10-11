@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import type { RawMaterialSearchIndex } from "@/ravarer/hooks/useRawMaterialSearchIndex";
 import type { TimelineHistoryRow } from "@/ravarer/lib/priceTimeline";
-import { eligibleLineIdsFrom, mergeProjection, parseMaterialPriceProjection, type MaterialPriceProjection } from "@/ravarer/lib/priceProjection";
+import { lineEligibilityFrom, mergeProjection, parseMaterialPriceProjection, type MaterialPriceProjection } from "@/ravarer/lib/priceProjection";
 import { useMemo } from "react";
 import { documentedPriceError, documentedPriceMessage, parseDocumentedPrice, type DocumentedPriceResult } from "@/ravarer/lib/costPriceSource";
 
@@ -224,10 +224,13 @@ export function useTimelineHistory(rawMaterialId: string | undefined) {
     [history.data, proj, rawMaterialId, unknownReason],
   );
   // Fakturalinjer som er gyldig kostgrunnlag NÅ (serverens utvalg); null = ukjent (laster/feil).
-  const eligibleLineIds = useMemo(() => eligibleLineIdsFrom(rows, proj), [rows, proj]);
+  const lineEligibility = useMemo(() => lineEligibilityFrom(rows, proj), [rows, proj]);
+  const eligibleLineIds = lineEligibility?.eligible ?? null;
+  const unknownLineIds = lineEligibility?.unknown ?? null;
   return {
     rows,
     eligibleLineIds,
+    unknownLineIds,
     raw: history.data ?? [],
     isLoading: history.isLoading,
     isError: history.isError,

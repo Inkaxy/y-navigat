@@ -121,7 +121,7 @@ export function SuppliersTab({ rm, part }: Props) {
       />
       )}
 
-      {show("pris") && <RecentInvoiceLinesCard rawMaterialId={rm.id} baseUnit={rm.base_unit} eligibleLineIds={historyQuery.eligibleLineIds} />}
+      {show("pris") && <RecentInvoiceLinesCard rawMaterialId={rm.id} baseUnit={rm.base_unit} eligibleLineIds={historyQuery.eligibleLineIds} unknownLineIds={historyQuery.unknownLineIds} />}
       {show("pris") && <PurchaseStatsCard rawMaterialId={rm.id} baseUnit={rm.base_unit} />}
 
       <NewSupplierDialog open={supplierOpen} onOpenChange={setSupplierOpen} />

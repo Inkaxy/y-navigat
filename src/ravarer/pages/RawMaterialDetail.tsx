@@ -145,6 +145,14 @@ export default function RawMaterialDetail() {
         onRename={startEdit}
       />
 
+      {nav.missing && (
+        <div role="status" className="flex flex-wrap items-center gap-2 rounded-lg border border-line-subtle bg-muted/40 px-3 py-2 text-sm">
+          Råvaren er ikke lenger i arbeidslisten du kom fra (f.eks. kvittert eller hoppet over).
+          {next && <Button variant="outline" size="sm" className="min-h-[44px] md:min-h-0" onClick={() => goTo(next)}>Neste i listen</Button>}
+          <Button variant="ghost" size="sm" className="min-h-[44px] md:min-h-0" onClick={() => { const n = new URLSearchParams(listSearch); n.delete("valgt"); n.delete("endring"); const q = n.toString(); navigate(`${paths.varer()}${q ? `?${q}` : ""}`); }}>Tilbake til listen</Button>
+        </div>
+      )}
+
       {/* Gjeldende kostpris holdes synlig mens man jobber i andre seksjoner (samme tolkning som prisvisningen). */}
       <div className="sticky top-0 z-20 -mx-1 border-b border-line-subtle bg-background/95 px-1 py-2 backdrop-blur">
         <Link to={sectionHref("pris")} className="inline-flex flex-wrap items-baseline gap-x-2 rounded-md text-sm hover:underline" aria-label={`Kostpris ${cost.value} per ${rm.base_unit}, ${cost.status}`} data-testid="header-cost">

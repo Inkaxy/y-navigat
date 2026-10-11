@@ -12,7 +12,9 @@ const state = {
   foods: { data: undefined as FoodRow[] | undefined, isLoading: false, isError: false, error: null as unknown },
   coverage: { data: undefined as unknown, isLoading: false, isError: false },
 };
-const apply = vi.fn(async (_i: { rawMaterialId: string; foodId: string; force?: boolean }) => ({}));
+type ApplyRes = { result: { written: string[]; skipped: string[]; water_content_set: boolean; water_g_skipped: boolean; declaration_name_set: string | null; forced: boolean } | null };
+const confirmed: ApplyRes = { result: { written: ["fat_g"], skipped: [], water_content_set: false, water_g_skipped: false, declaration_name_set: null, forced: false } };
+const apply = vi.fn(async (_i: { rawMaterialId: string; foodId: string; force?: boolean }): Promise<ApplyRes> => confirmed);
 const refetchFoods = vi.fn();
 const refetchCoverage = vi.fn();
 let nutritionSource: { source: string; matvaretabellen_food_id: string | null } | null = null;
@@ -23,7 +25,11 @@ vi.mock("@/ravarer/context/RavarerContext", () => ({ useRavarer: () => ({ canWri
 vi.mock("@/hooks/useUiPreference", () => ({ useUiPreference: <T,>(_s: string, f: T) => ({ value: f, setValue: vi.fn() }) }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), warning: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 vi.mock("@/ravarer/components/RavarerHeaderBanner", () => ({ RavarerHeaderBanner: () => null }));
-vi.mock("@/ravarer/editors/RawMaterialCreateSheet", () => ({ RawMaterialCreateSheet: () => null }));
+const createdCalls = vi.fn();
+vi.mock("@/ravarer/editors/RawMaterialCreateSheet", () => ({
+  RawMaterialCreateSheet: ({ open, onDone }: { open: boolean; onDone: (id: string) => void }) =>
+    open ? <button type="button" onClick={() => { createdCalls(); onDone("rmNew"); }}>Fullfør opprettelse</button> : null,
+}));
 vi.mock("@/ravarer/hooks/useNutritionCoverage", () => ({ useNutritionCoverage: () => ({ ...state.coverage, refetch: refetchCoverage }) }));
 vi.mock("@/ravarer/hooks/useRawMaterials", () => ({
   useRawMaterials: () => ({ data: [
@@ -60,7 +66,7 @@ beforeEach(() => {
   state.canWrite = true;
   state.foods = { data: [food("f1", "Hvetemel, siktet")], isLoading: false, isError: false, error: null };
   state.coverage = { data: { total: 10, complete: 4, incomplete: 3, missing: 3 }, isLoading: false, isError: false };
-  apply.mockClear(); nutritionSource = null; deferred = false; deferCheck = null;
+  apply.mockClear(); apply.mockImplementation(async () => confirmed); nutritionSource = null; deferred = false; deferCheck = null;
 });
 
 describe("Matvaretabellen-siden", () => {
@@ -136,11 +142,82 @@ describe("serverresultater", () => {
     expect(() => parseSyncResult({})).toThrow();
     expect(parseSyncResult({ ok: true, foods: 2100, upserted: 2100, groups: 20 }).upserted).toBe(2100);
   });
-  it("koblingsresultat viser skrevet/beholdt/overskrevet", () => {
-    const r = parseApplyResult({ written: ["fat_g"], skipped: ["salt_g", "protein_g"], forced: false });
-    expect(applyResultMessage(r)).toEqual({ tone: "warning", text: "1 felt hentet fra Matvaretabellen · 2 beholdt fra datablad/manuell kilde" });
-    expect(applyResultMessage(parseApplyResult({ written: ["fat_g"], skipped: [], forced: true })).text).toContain("(overskrevet)");
-    expect(parseApplyResult({ written: "x" })).toBeNull();
-    expect(applyResultMessage(null).tone).toBe("warning");
+  it("koblingsresultat viser skrevet/beholdt/overskrevet og krever full form + identitet", () => {
+    const req = { rawMaterialId: "rm1", foodId: "f1", force: false };
+    const ok = { raw_material_id: "rm1", food_id: "f1", forced: false, written: ["fat_g"], skipped: ["salt_g", "protein_g"], water_content_set: false, water_g_skipped: false, declaration_name_set: null };
+    expect(applyResultMessage(parseApplyResult(ok, req))).toEqual({ tone: "warning", text: "1 felt hentet fra Matvaretabellen · 2 beholdt fra datablad/manuell kilde" });
+    expect(applyResultMessage(parseApplyResult({ ...ok, forced: true, skipped: [] }, { ...req, force: true })).text).toContain("(overskrevet)");
+    expect(parseApplyResult({}, req)).toBeNull();
+    expect(parseApplyResult(null, req)).toBeNull();
+    expect(parseApplyResult({ ...ok, written: "x" }, req)).toBeNull();
+    expect(parseApplyResult({ ...ok, raw_material_id: "annen" }, req)).toBeNull();
+    expect(parseApplyResult({ ...ok, food_id: "annen" }, req)).toBeNull();
+    expect(parseApplyResult({ ...ok, forced: true }, req)).toBeNull();
+    const { water_g_skipped: _w, ...missing } = ok;
+    expect(parseApplyResult(missing, req)).toBeNull();
+    const unknown = applyResultMessage(null);
+    expect(unknown.tone).toBe("warning");
+    expect(unknown.text).not.toMatch(/^Koblet/);
+  });
+});
+
+describe("LinkRawMaterialDialog — avbrudd og ukjent utfall", () => {
+  const pick = () => fireEvent.click(screen.getByRole("button", { name: /Hvetemel/ }));
+  it("avmontering mens kildesjekken venter: sent svar uten kilde gir 0 skrivinger", async () => {
+    deferred = true;
+    const { unmount } = render(dialog());
+    pick();
+    unmount();
+    await act(async () => { deferCheck?.({ data: null, error: null }); });
+    expect(apply).not.toHaveBeenCalled();
+  });
+  it("lukking (open=false) før svar gir 0 skrivinger", async () => {
+    deferred = true;
+    const { rerender } = render(dialog("f1", true));
+    pick();
+    rerender(dialog("f1", false));
+    await act(async () => { deferCheck?.({ data: null, error: null }); });
+    expect(apply).not.toHaveBeenCalled();
+  });
+  it("tapt skrivetilgang før svar gir 0 skrivinger", async () => {
+    deferred = true;
+    const { rerender } = render(dialog());
+    pick();
+    state.canWrite = false;
+    rerender(dialog());
+    await act(async () => { deferCheck?.({ data: null, error: null }); });
+    expect(apply).not.toHaveBeenCalled();
+  });
+  it("ukjent svar (result:null) vises ikke som koblet; ny kontroll leser tilstand og skriver ikke på nytt når koblingen finnes", async () => {
+    apply.mockImplementation(async () => ({ result: null }));
+    render(dialog());
+    pick();
+    await waitFor(() => expect(apply).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText("Ukjent utfall")).toBeInTheDocument();
+    expect(screen.queryByText(/koblet i denne økten/)).toBeNull();
+    nutritionSource = { source: "matvaretabellen", matvaretabellen_food_id: "f1" };
+    pick();
+    expect(await screen.findByText(/1 råvare koblet/)).toBeInTheDocument();
+    expect(apply).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe("Opprett som ny råvare — ukjent koblingsutfall", () => {
+  it("result:null beholder gjenoppretting som «ukjent», ny råvare opprettes ikke på nytt, og kontroll leser før skriving", async () => {
+    apply.mockImplementation(async () => ({ result: null }));
+    page();
+    const trigger = screen.getAllByRole("button", { name: "Handlinger for Hvetemel, siktet" })[0];
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: "Enter" });
+    fireEvent.click(await screen.findByText("Opprett som ny råvare"));
+    fireEvent.click(await screen.findByRole("button", { name: "Fullfør opprettelse" }));
+    await waitFor(() => expect(apply).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText(/utfallet av koblingen .* er ukjent/)).toBeInTheDocument();
+    nutritionSource = { source: "matvaretabellen", matvaretabellen_food_id: "f1" };
+    fireEvent.click(screen.getByRole("button", { name: "Kontroller og prøv igjen" }));
+    await waitFor(() => expect(screen.queryByText(/er ukjent/)).toBeNull());
+    expect(apply).toHaveBeenCalledTimes(1);
+    expect(createdCalls).toHaveBeenCalledTimes(1);
   });
 });
