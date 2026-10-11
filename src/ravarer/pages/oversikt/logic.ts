@@ -14,7 +14,7 @@ export function fakturaTodo(c: InvoiceCounts | null): number {
 }
 
 export function dataRydding(d: DataQualityCounts): number {
-  return d.missing_package + d.unconfirmed_package + d.missing_declaration + d.missing_nutrition + d.datasheet_changes;
+  return d.missing_package + d.missing_declaration + d.missing_nutrition + d.datasheet_changes;
 }
 
 export type StatusLine = { headline: string; sub: string | null };
@@ -36,9 +36,8 @@ export function statusLine(args: {
   if (todo === 0) return { headline: "Alt er kontrollert.", sub: null };
   const vk = varekortTodo(args.supplier);
   const fk = fakturaTodo(args.invoices);
-  const noun = todo === 1 ? "ting venter" : "ting venter på deg";
   return {
-    headline: `${todo} ${noun}`,
+    headline: `${todo} ting venter på deg`,
     sub: `${vk} varer trenger en beslutning · ${fk} fakturaer trenger et menneske`,
   };
 }
@@ -70,3 +69,7 @@ export function sparklinePoints(
     y: height - ((v - min) / span) * height,
   }));
 }
+
+/** Varselfarge på prisendring fra +5 %. */
+export const PRICE_WARN_PCT = 5;
+export const isPriceWarning = (pct: number | null) => pct != null && pct >= PRICE_WARN_PCT;

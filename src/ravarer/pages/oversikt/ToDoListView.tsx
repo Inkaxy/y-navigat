@@ -60,7 +60,7 @@ export function ToDoListView({ data, loading }: ToDoListViewProps) {
             const meta = labelFor(WORK_KIND_LABELS, it.kind, "Oppgave");
             const sub = it.type === "varekort"
               ? `${it.supplier_name ?? "Ukjent leverandør"} · ${it.open_lines} linjer på ${it.open_invoices} fakturaer`
-              : (it.reasons[0] ?? "");
+              : (meta.hint ?? it.reasons[0] ?? "");
             return (
               <li key={it.key}>
                 <Link to={itemHref(it)} className="flex items-center gap-3 px-5 py-3 hover:bg-muted/40">

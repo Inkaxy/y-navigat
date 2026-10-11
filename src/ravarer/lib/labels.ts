@@ -108,8 +108,8 @@ export const WORK_KIND_LABELS: LabelMap = {
   kontroll: { label: "Kontroll", tokenVar: "--rm-kontroll" },
   faktura_mangler_linjer: { label: "Mangler linjer", tokenVar: "--rm-ukoblet", hint: "Fakturalinjene er ikke lest inn." },
   faktura_sumavvik: { label: "Sum stemmer ikke", tokenVar: "--rm-pris", hint: "Linjesummen avviker fra fakturabeløpet." },
-  faktura_flagget: { label: "Flagget", tokenVar: "--rm-flagget" },
-  faktura_klar: { label: "Klar til avstemming", tokenVar: "--rm-avstemt" },
+  faktura_flagget: { label: "Flagget", tokenVar: "--rm-flagget", hint: "Fakturaen er flagget for oppfølging." },
+  faktura_klar: { label: "Klar til avstemming", tokenVar: "--rm-avstemt", hint: "Alle linjer er avklart og summen stemmer." },
 };
 
 export const INVOICE_STATUS_LABELS: LabelMap = {
