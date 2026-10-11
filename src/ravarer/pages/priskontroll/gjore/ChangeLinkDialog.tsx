@@ -12,11 +12,14 @@ import { lockedLinesText } from "./logic";
 import { useChangeSupplierLink } from "./useGjoreMutations";
 import type { PanelResult } from "./types";
 
-/** Linjer som flyttes: ikke avstemte. Linjer med ført kostpris blir liggende (serveren håndhever det). */
-export function changeLinkScope(lines: Pick<SupplierItemLine, "id" | "invoice_status" | "cost_posted">[]) {
-  const movable = lines.filter((l) => l.invoice_status !== "reconciled" && l.invoice_status !== "cancelled");
-  const locked = movable.filter((l) => !!l.cost_posted).length;
-  return { lineIds: movable.filter((l) => !l.cost_posted).map((l) => l.id), locked };
+/**
+ * Linjer som sendes: alle ikke-avstemte linjer på varekortet som er koblet til den gamle råvaren —
+ * også de med ført kostpris (serveren holder dem utenfor og teller dem som låst).
+ */
+export function changeLinkScope(lines: Pick<SupplierItemLine, "id" | "invoice_status" | "cost_posted" | "raw_material_id">[], oldRawMaterialId: string | null) {
+  const open = lines.filter((l) => l.invoice_status !== "reconciled" && l.invoice_status !== "cancelled" && !!oldRawMaterialId && l.raw_material_id === oldRawMaterialId);
+  const locked = open.filter((l) => !!l.cost_posted).length;
+  return { lineIds: open.map((l) => l.id), movable: open.length - locked, locked };
 }
 
 type Props = { open: boolean; onOpenChange: (v: boolean) => void; item: SupplierItem; lines: SupplierItemLine[]; onDone: (r: PanelResult) => void };
@@ -29,14 +32,14 @@ export function ChangeLinkDialog({ open, onOpenChange, item, lines, onDone }: Pr
   const [error, setError] = useState<string | null>(null);
   const { results } = useMaterialChoices(null, search);
   const change = useChangeSupplierLink();
-  const scope = changeLinkScope(lines);
+  const scope = changeLinkScope(lines, item.rm_id);
   useEffect(() => { if (open) { setSearch(""); setPick(null); setReason(""); setError(null); } }, [open]);
 
   const submit = async () => {
     if (!item.rms_id || !pick) return;
     setError(null);
     try {
-      const r = await change.mutateAsync({ rmsId: item.rms_id, newRawMaterialId: pick.id, reason: reason.trim(), lineIds: scope.lineIds });
+      const r = await change.mutateAsync({ rmsId: item.rms_id, oldRawMaterialId: item.rm_id, newRawMaterialId: pick.id, reason: reason.trim(), lineIds: scope.lineIds });
       onOpenChange(false);
       const locked = lockedLinesText(r.lockedLines);
       onDone({
@@ -76,7 +79,7 @@ export function ChangeLinkDialog({ open, onOpenChange, item, lines, onDone }: Pr
             <Textarea id="change-reason" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Hvorfor er koblingen feil?" />
           </div>
           <p className="rounded-md bg-muted/40 p-2 text-sm">
-            {scope.lineIds.length} åpne {scope.lineIds.length === 1 ? "linje flyttes" : "linjer flyttes"}{scope.locked > 0 ? `, ${scope.locked} er låst (kostpris ført)` : ""}.
+            {scope.movable} åpne {scope.movable === 1 ? "linje flyttes" : "linjer flyttes"}{scope.locked > 0 ? `, ${scope.locked} er låst (kostpris ført)` : ""}.
           </p>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         </div>
