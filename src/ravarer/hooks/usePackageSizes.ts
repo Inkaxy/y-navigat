@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { useRavarerScope } from "@/ravarer/hooks/useRavarerScope";
 import { toast } from "sonner";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import type { Database } from "@/integrations/supabase/types";
@@ -69,7 +69,7 @@ export interface SetPackageInput {
 }
 
 export function usePackageWorklist() {
-  const { legalEntityId } = useRavarer();
+  const { legalEntityId } = useRavarerScope();
   return useQuery({
     queryKey: ["raw_material_package_worklist", legalEntityId],
     enabled: !!legalEntityId,
