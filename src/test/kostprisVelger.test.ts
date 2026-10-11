@@ -77,7 +77,7 @@ describe("historikkrader: bare gyldige punkter er priser", () => {
 
   it("usePriceHistory henter alle sider og inkluderer felt for klassifisering", () => {
     const src = readFileSync("src/ravarer/hooks/useRmSuppliers.ts", "utf8");
-    expect(src).toMatch(/fetchAllRows<PriceHistoryRow>/);
+    expect(src).toMatch(/fetchAllRows<HistoryDbRow>/);
     expect(src).toMatch(/superseded_at, superseded_reason, is_legacy, is_credit, currency/);
   });
 });
