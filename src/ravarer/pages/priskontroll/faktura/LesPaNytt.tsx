@@ -55,9 +55,11 @@ export default function LesPaNytt() {
   const [pendingTick, setPendingTick] = useState(0);
   // Lesingen er frosset mot et bestemt dokument. Gjeldende original må være samme objekt/versjon.
   const ver = useInvoiceDocumentVersion(id);
-  const docMatch = snapshotDocumentMatch(run.data?.snapshotDocument ?? null, ver.data);
-  const current = ver.data?.available ? ver.data : null;
-  const doc = useInvoiceDocumentUrl(docMatch === "match" && current ? current.path : null, current?.version ?? null);
+  // Bare identitet bekreftet i denne epoken; lasting/feil/henting = ukjent og blokkerer bruk.
+  const verified = ver.verifiedCurrent;
+  const docMatch = verified ? snapshotDocumentMatch(run.data?.snapshotDocument ?? null, verified) : "unknown";
+  const current = verified?.available ? verified : null;
+  const doc = useInvoiceDocumentUrl(docMatch === "match" && current ? current.path : null, current?.version ?? null, ver.accessScope);
   const back = paths.faktura(id);
 
   const setRun = (rid: string | null) => { const n = new URLSearchParams(sp); if (rid) n.set("kjoring", rid); else n.delete("kjoring"); setSp(n, { replace: false }); };
@@ -80,8 +82,12 @@ export default function LesPaNytt() {
   const r = run.data;
   const isOwner = !!r && !!user && r.created_by === user.id;
   const pending = r ? (void pendingTick, loadPending(r.id)) : null;
+  const allowApply = isOwner && canWrite && docMatch === "match";
+  const allowRef = useRef(allowApply);
+  allowRef.current = allowApply;
   const doApply = (ops: Operation[], reason: string) => {
-    if (!r) return;
+    // Sjekkes på nytt ved kall, så en gammel knapp/closure ikke kan omgå dokumentkontrollen.
+    if (!r || !allowRef.current) return;
     setApplyMsg(null);
     apply.mutate({ runId: r.id, operations: ops, reason }, {
       onSuccess: (o) => { setPendingTick((n) => n + 1); if (o.kind === "rejected") setApplyMsg(rereadErrorText(o.message)); },
@@ -93,8 +99,8 @@ export default function LesPaNytt() {
   const document = docMatch === "changed"
     ? <p role="alert" className="p-4 text-sm text-warning">Originalen er endret siden lesingen. Den nåværende filen er ikke dokumentet forslaget ble lest fra, og vises ikke her. Start en ny lesing.</p>
     : doc.url && r && current
-      ? <PdfDocumentViewer url={doc.url} cacheKey={current.path} version={current.version} verifyIdentity={ver.recheck} onIdentityChanged={ver.refresh} title="Originalfaktura" fallback={<a className="underline" href={doc.url} target="_blank" rel="noreferrer">Åpne originalen</a>} />
-      : <p className="p-4 text-sm text-ink-secondary">{ver.isLoading || doc.isLoading ? "Henter originalen …" : "Originalen kan ikke kontrolleres eller vises nå."}</p>;
+      ? <PdfDocumentViewer url={doc.url} cacheKey={current.path} version={current.version} accessScope={ver.accessScope} verifyIdentity={ver.recheck} onIdentityChanged={ver.refresh} title="Originalfaktura" fallback={<a className="underline" href={doc.url} target="_blank" rel="noreferrer">Åpne originalen</a>} />
+      : <p className="p-4 text-sm text-ink-secondary">{ver.isError ? "Gjeldende original kunne ikke kontrolleres. Forslaget kan ikke tas i bruk." : ver.verifying || doc.isLoading ? "Kontrollerer gjeldende original …" : "Originalen kan ikke kontrolleres eller vises nå."}</p>;
 
   const title = inv.data ? `${inv.data.suppliers?.name ?? "Ukjent leverandør"} · Faktura ${inv.data.invoice_number ?? ""}` : "Faktura";
 
@@ -160,7 +166,7 @@ export default function LesPaNytt() {
                 {docMatch === "changed" ? "Originalen er endret siden lesingen. Forslaget kan ikke tas i bruk." : "Originalens versjon er ikke kontrollert ennå. Forslaget kan ikke tas i bruk før den er bekreftet uendret."}
               </p>
             )}
-            <RereadView run={r} document={document} canApply={isOwner && canWrite && docMatch === "match"} pending={pending} saving={apply.isPending}
+            <RereadView run={r} document={document} canApply={allowApply} pending={pending} saving={apply.isPending}
               readOnlyReason={!isOwner ? "Lesingen ble startet av en annen bruker. Du kan se den, men ikke ta den i bruk." : !canWrite ? "Du har ikke skrivetilgang." : docMatch === "changed" ? "Originalen er endret siden lesingen." : docMatch === "unknown" ? "Originalens versjon er ikke kontrollert." : null}
               applyMessage={applyMsg ?? (apply.data?.kind === "unknown" ? "Vi vet ikke om lagringen kom fram." : apply.data?.kind === "already_used" ? rereadErrorText("allerede_brukt_med_andre_valg") : null)} onApply={doApply} onRetryPending={retryPending} />
             </>

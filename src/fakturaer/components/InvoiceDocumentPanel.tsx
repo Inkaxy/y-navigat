@@ -70,13 +70,17 @@ function num(v: number | null | undefined): number | null {
 export function InvoiceDocumentPanel({ invoiceId, invoice, line, onClose, className, showSumWarning, gate: gateIn }: Props) {
   // Gjeldende identitet hentes fersk; uten den vises aldri bufret (mulig gammel) original.
   const ver = useInvoiceDocumentVersion(invoice?.source_document_url ? invoiceId : null);
-  const current = ver.data?.available ? ver.data : null;
+  // Alt (sti, signering, åpne-knapp, visning) kommer BARE fra identitet bekreftet i denne epoken.
+  const verified = ver.verifiedCurrent;
+  const current = verified?.available ? verified : null;
   const path = current?.path ?? null;
-  const { url, isLoading: urlLoading, error: urlError, refetch: refetchUrl } = useInvoiceDocumentUrl(path, current?.version ?? null);
-  const isLoading = ver.isLoading || urlLoading;
-  const error = ver.error ?? urlError;
-  const refetch = () => { if (ver.error) void ver.refetch(); else void refetchUrl(); };
-  const missing = !invoice?.source_document_url || !invoiceId || ver.data?.available === false;
+  const { url, isLoading: urlLoading, error: urlError, refetch: refetchUrl } = useInvoiceDocumentUrl(path, current?.version ?? null, ver.accessScope);
+  const metaError = ver.isError;
+  const isLoading = !verified || urlLoading;
+  const error = metaError ? ver.error : urlError;
+  // Metadata først; signering prøves bare på nytt etter bekreftet identitet.
+  const refetch = () => { if (metaError || !verified) void ver.refetch(); else void refetchUrl(); };
+  const missing = !invoice?.source_document_url || !invoiceId || verified?.available === false;
   const fig = invoiceFigures(invoice ?? {});
   const cur = fig.currency;
   const mismatch = showSumWarning && invoice?.lines_sum_status === "mismatch";
@@ -128,7 +132,7 @@ export function InvoiceDocumentPanel({ invoiceId, invoice, line, onClose, classN
       <div className="min-h-0 flex-1 bg-muted/20">
         {missing ? (
           <div className="flex h-full items-center justify-center p-6 text-center text-sm text-ink-secondary">
-            {ver.data?.available === false && ver.data.reason === "document_path_invalid" ? "Originalens lagringssti er ugyldig. Dokumentet vises ikke." : "Originalfaktura ikke tilgjengelig."}
+            {verified?.available === false && verified.reason === "document_path_invalid" ? "Originalens lagringssti er ugyldig. Dokumentet vises ikke." : "Originalfaktura ikke tilgjengelig."}
           </div>
         ) : error ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm text-ink-secondary">
@@ -136,7 +140,7 @@ export function InvoiceDocumentPanel({ invoiceId, invoice, line, onClose, classN
             <Button size="sm" variant="outline" onClick={() => refetch()}>
               <RefreshCw className="h-4 w-4" /> Prøv igjen
             </Button>
-            {open}
+            {!metaError && current && open}
           </div>
         ) : isLoading || !url || !path || !current ? (
           <div className="space-y-3 p-4">
@@ -144,7 +148,7 @@ export function InvoiceDocumentPanel({ invoiceId, invoice, line, onClose, classN
             <Skeleton className="h-[60vh] w-full" />
           </div>
         ) : (
-          <PdfDocumentViewer url={url} cacheKey={path} version={current.version} verifyIdentity={ver.recheck} onIdentityChanged={ver.refresh} title={`Originalfaktura ${invoice?.invoice_number ?? ""}`} fallback={open} />
+          <PdfDocumentViewer url={url} cacheKey={path} version={current.version} accessScope={ver.accessScope} verifyIdentity={ver.recheck} onIdentityChanged={ver.refresh} title={`Originalfaktura ${invoice?.invoice_number ?? ""}`} fallback={open} />
         )}
       </div>
     </div>
