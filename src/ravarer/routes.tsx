@@ -16,12 +16,8 @@ const LeverandorerHub = lazy(() => import("@/ravarer/pages/hub/LeverandorerHub")
 const LagerHub = lazy(() => import("@/ravarer/pages/hub/LagerHub"));
 const Innstillinger = lazy(() => import("@/ravarer/pages/hub/RavarerInnstillinger"));
 
-const Vareliste = lazy(() => import("@/ravarer/pages/Vareliste"));
+const VareArbeidsflate = lazy(() => import("@/ravarer/pages/VareArbeidsflate"));
 const RawMaterialDetail = lazy(() => import("@/ravarer/pages/RawMaterialDetail"));
-const PackageSizes = lazy(() => import("@/ravarer/pages/PackageSizes"));
-const Deklarasjonsnavn = lazy(() => import("@/ravarer/pages/Deklarasjonsnavn"));
-const KobleMatvaretabellen = lazy(() => import("@/ravarer/pages/KobleMatvaretabellen"));
-const DatabladEndringer = lazy(() => import("@/ravarer/pages/DatabladEndringer"));
 const Matvaretabellen = lazy(() => import("@/ravarer/pages/Matvaretabellen"));
 const DatabladBulk = lazy(() => import("@/ravarer/pages/DatabladBulk"));
 
@@ -56,11 +52,8 @@ export function ravarerRoutes(Shell: ShellType) {
     <Route key="oversikt" path="/ravarer" element={rv(<Oversikt />)} />,
 
     // Varer
-    <Route key="varer" path="/ravarer/varer" element={rv(<VarerShell active="alle"><Vareliste /></VarerShell>)} />,
-    <Route key="pakninger" path="/ravarer/varer/pakninger" element={rv(<VarerShell active="pakninger"><PackageSizes /></VarerShell>)} />,
-    <Route key="dekl" path="/ravarer/varer/deklarasjonsnavn" element={rv(<VarerShell active="deklarasjonsnavn"><Deklarasjonsnavn /></VarerShell>)} />,
-    <Route key="naering" path="/ravarer/varer/naering" element={rv(<VarerShell active="naering"><KobleMatvaretabellen /></VarerShell>)} />,
-    <Route key="datablad" path="/ravarer/varer/datablad-endringer" element={rv(<VarerShell active="datablad"><DatabladEndringer /></VarerShell>)} />,
+    // Én varearbeidsflate (fase 4A); gamle /varer/pakninger|deklarasjonsnavn|naering|datablad-endringer videresendes (legacyRoutes).
+    <Route key="varer" path="/ravarer/varer" element={rv(<VareArbeidsflate />)} />,
     <Route key="mvt" path="/ravarer/varer/matvaretabellen" element={rv(<VarerShell title="Matvaretabellen"><Matvaretabellen /></VarerShell>)} />,
     <Route key="dbbulk" path="/ravarer/varer/datablad-opplasting" element={rv(<VarerShell title="Last opp datablad"><DatabladBulk /></VarerShell>)} />,
     <Route key="raavare" path="/ravarer/varer/:id" element={rv(<RawMaterialDetail />)} />,

@@ -19,7 +19,7 @@ import {
 import { useChangelog, useAcknowledgeChange, type ChangelogRow } from "@/ravarer/hooks/useDatasheets";
 import { formatDate } from "@/ravarer/lib/constants";
 import { nutritionValueDiff, nutritionObjectDiff, NUTRITION_LABELS } from "@/ravarer/lib/nutritionLabels";
-import { useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
 import { paths } from "@/ravarer/lib/paths";
@@ -43,7 +43,16 @@ export default function DatabladEndringer() {
   const [filter, setFilter] = useState<"unacked" | "all">("unacked");
   const { data: rows = [], isLoading } = useChangelog({ onlyUnacked: filter === "unacked" });
   const ack = useAcknowledgeChange();
-  const [selected, setSelected] = useState<ChangelogRow | null>(null);
+  // Valgt hendelse ligger i URL-en: `endring` = hendelses-ID (stabil), `valgt` = råvaren. To hendelser på samme råvare er to rader.
+  const [sp, setSp] = useSearchParams();
+  const selected: ChangelogRow | null = rows.find((r) => r.id === sp.get("endring")) ?? null;
+  const setSelected = (r: ChangelogRow | null) => setSp((prev) => {
+    const n = new URLSearchParams(prev);
+    if (r) { n.set("endring", r.id); n.set("valgt", r.raw_material_id); } else { n.delete("endring"); n.delete("valgt"); }
+    return n;
+  }, { replace: true });
+  // Massebekreftelse gjelder nøyaktig de viste ID-ene da dialogen ble åpnet.
+  const [frozenIds, setFrozenIds] = useState<string[]>([]);
   const [confirmAllOpen, setConfirmAllOpen] = useState(false);
   const [bulkPending, setBulkPending] = useState(false);
 
@@ -53,12 +62,13 @@ export default function DatabladEndringer() {
   const handleConfirmAll = async () => {
     setBulkPending(true);
     try {
-      const results = await Promise.allSettled(unackedRows.map(r => ack.mutateAsync(r.id)));
+      const ids = frozenIds;
+      const results = await Promise.allSettled(ids.map((id) => ack.mutateAsync(id)));
       const failed = results.filter(r => r.status === "rejected").length;
       if (failed === 0) {
-        toast.success(`${unackedCount} endringer bekreftet`);
+        toast.success(`${ids.length} endringer bekreftet`);
       } else {
-        toast.error(`${failed} av ${unackedCount} feilet`);
+        toast.error(`${failed} av ${ids.length} feilet — de feilede er fortsatt uavklarte`);
       }
     } finally {
       setBulkPending(false);
@@ -84,7 +94,7 @@ export default function DatabladEndringer() {
         <span className="text-sm text-ink-secondary">{rows.length} endringer</span>
         <div className="flex-1" />
         {canWrite && unackedCount > 0 && (
-          <Button variant="brand" size="sm" onClick={() => setConfirmAllOpen(true)} disabled={bulkPending}>
+          <Button variant="brand" size="sm" onClick={() => { setFrozenIds(unackedRows.map((r) => r.id)); setConfirmAllOpen(true); }} disabled={bulkPending}>
             Bekreft alle ({unackedCount})
           </Button>
         )}
@@ -95,7 +105,7 @@ export default function DatabladEndringer() {
           <AlertDialogHeader>
             <AlertDialogTitle>Bekreft alle endringer?</AlertDialogTitle>
             <AlertDialogDescription>
-              Dette markerer {unackedCount} endringer som gjennomgått. Handlingen kan ikke angres.
+              Dette markerer {frozenIds.length} endringer som gjennomgått. Handlingen kan ikke angres.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -185,7 +195,7 @@ export default function DatabladEndringer() {
                 </Card>
                 <Card className="p-4">
                   <div className="text-sm font-medium mb-2">Berørt: {selected.affected_recipes_count} oppskrifter</div>
-                  <Button variant="outline" size="sm" onClick={() => navigate(paths.raavare(selected.raw_material_id, { tab: "nutrition" }))}>
+                  <Button variant="outline" size="sm" onClick={() => navigate(paths.raavare(selected.raw_material_id, { seksjon: "deklarasjon" }))}>
                     Åpne råvare
                   </Button>
                 </Card>

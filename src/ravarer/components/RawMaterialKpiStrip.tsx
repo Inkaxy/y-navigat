@@ -7,6 +7,11 @@ import { chooseAgreedPrice, kpiDeviation, pricePerPackage } from "@/ravarer/lib/
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 import type { RmSupplierRow } from "@/ravarer/hooks/useRmSuppliers";
 import { paths } from "@/ravarer/lib/paths";
+import { isAgreementConfirmed } from "@/ravarer/lib/priceTimeline";
+import { confirmedFactor, packageLabel } from "@/ravarer/lib/supplierPackagePrice";
+
+const COST_STATUS: Record<string, string> = { verifisert: "Verifisert", uverifisert: "Uverifisert", mangler: "Mangler gyldig kilde" };
+const fullPrice = (n: number) => n.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 6 });
 
 interface Props {
   rm: RawMaterialRow;
@@ -39,13 +44,18 @@ export function RawMaterialKpiStrip({ rm, links, recipeCount, spend12m }: Props)
     rawMaterialAgreedPrice: rm.agreed_price,
   });
 
+  // Bare bekreftet avtale (hvem/når) kan brukes som sammenligning; kostpris bare når verifisert.
+  const agreementOk = agreed.source === "link" && !!primary && isAgreementConfirmed(primary);
+  const verified = rm.cost_basis_status === "verifisert";
   const deviation = kpiDeviation(
     lastInvoice?.last_invoice_price ?? null,
-    agreed.value,
-    rm.current_cost_price,
+    agreementOk ? agreed.value : null,
+    verified ? rm.current_cost_price : null,
   );
 
-  const perPackage = pricePerPackage(rm.current_cost_price, rm.base_units_per_package);
+  const factor = confirmedFactor(rm);
+  const perPackage = verified ? pricePerPackage(rm.current_cost_price, factor) : null;
+  const pk = packageLabel(rm, rm.base_unit);
   const primarySupplierId = primary?.supplier_id ?? rm.primary_supplier_id;
 
   return (
@@ -53,14 +63,15 @@ export function RawMaterialKpiStrip({ rm, links, recipeCount, spend12m }: Props)
       <OrderDeskKpi
         icon={Coins}
         label={`Kostpris / ${rm.base_unit}`}
-        value={formatNok(rm.current_cost_price)}
-        sub={rm.price_updated_at ? `${priceSourceLabel(rm.price_source)} · ${formatDate(rm.price_updated_at)}` : "Ingen kilde registrert"}
+        value={rm.current_cost_price != null ? formatNok(rm.current_cost_price) : "Ukjent"}
+        tone={verified ? "default" : "warning"}
+        sub={`${COST_STATUS[rm.cost_basis_status ?? ""] ?? "Status ukjent"}${rm.current_cost_price != null ? ` · ${fullPrice(rm.current_cost_price)}` : ""}${rm.price_updated_at ? ` · ${priceSourceLabel(rm.price_source)} · ${formatDate(rm.price_updated_at)}` : ""}`}
       />
       <OrderDeskKpi
         icon={Package}
         label="Pris per pakning"
         value={perPackage != null ? formatNok(perPackage) : "—"}
-        sub={rm.base_units_per_package ? `${rm.base_units_per_package} ${rm.base_unit} per pakning` : "Pakningsstørrelse mangler"}
+        sub={pk.confirmed ? (pk.label ?? "") : rm.base_units_per_package ? "Pakningsgrunnlag må bekreftes" : "Pakningsstørrelse mangler"}
       />
       <OrderDeskKpi
         icon={FileText}
@@ -73,7 +84,9 @@ export function RawMaterialKpiStrip({ rm, links, recipeCount, spend12m }: Props)
         label={`Avtalepris / ${rm.base_unit}`}
         value={agreed.value != null ? formatNok(agreed.value) : "—"}
         sub={
-          agreed.source === "link"
+          agreed.source === "link" && !agreementOk
+            ? "Registrert avtalepris — ikke bekreftet"
+            : agreed.source === "link"
             ? `Primærkobling${agreed.validTo ? ` · gyldig til ${formatDate(agreed.validTo)}` : " · uten sluttdato"}`
             : agreed.source === "raw_material"
               ? "Eldre avtalepris — brukes ikke"

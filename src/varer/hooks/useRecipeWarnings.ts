@@ -174,7 +174,7 @@ export function useRecipeWarnings({
           lineId: line.id,
           rawMaterialId: rmId,
           message: `«${name}»: mengden kan ikke regnes om til gram`,
-          action: rmId ? { label: "Åpne råvaren", href: paths.raavare(rmId, { tab: "suppliers" }) } : null,
+          action: rmId ? { label: "Åpne råvaren", href: paths.raavare(rmId, { seksjon: "pris" }) } : null,
         });
       }
 
@@ -187,7 +187,7 @@ export function useRecipeWarnings({
             lineId: line.id,
             rawMaterialId: rmId,
             message: `«${name}»: ${costRes.reason ?? "mangler kostpris"}`,
-            action: rmId ? { label: "Åpne råvaren", href: paths.raavare(rmId, { tab: "suppliers" }) } : null,
+            action: rmId ? { label: "Åpne råvaren", href: paths.raavare(rmId, { seksjon: "pris" }) } : null,
           });
         }
       }
@@ -198,7 +198,7 @@ export function useRecipeWarnings({
           lineId: line.id,
           rawMaterialId: rmId,
           message: `«${name}» er ført i stk, men råvaren mangler stykkvekt`,
-          action: { label: "Sett stykkvekt", href: paths.raavare(rmId, { tab: "suppliers" }) },
+          action: { label: "Sett stykkvekt", href: paths.raavare(rmId, { seksjon: "grunndata" }) },
         });
       }
 
@@ -209,7 +209,7 @@ export function useRecipeWarnings({
             lineId: line.id,
             rawMaterialId: rmId,
             message: `«${name}» mangler næringsdata`,
-            action: { label: "Legg inn næring", href: paths.raavare(rmId, { tab: "nutrition" }) },
+            action: { label: "Legg inn næring", href: paths.raavare(rmId, { seksjon: "naering" }) },
           });
         }
         if (!cov.allergens.has(rmId)) {
@@ -218,7 +218,7 @@ export function useRecipeWarnings({
             lineId: line.id,
             rawMaterialId: rmId,
             message: `«${name}» mangler allergeninformasjon`,
-            action: { label: "Legg inn allergener", href: paths.raavare(rmId, { tab: "nutrition" }) },
+            action: { label: "Legg inn allergener", href: paths.raavare(rmId, { seksjon: "naering" }) },
           });
         }
         if (!cov.packages.has(rmId)) {
@@ -227,7 +227,7 @@ export function useRecipeWarnings({
             lineId: line.id,
             rawMaterialId: rmId,
             message: `«${name}» mangler pakning`,
-            action: { label: "Legg inn pakning", href: paths.raavare(rmId, { tab: "suppliers" }) },
+            action: { label: "Legg inn pakning", href: paths.raavare(rmId, { seksjon: "grunndata" }) },
           });
         }
       }

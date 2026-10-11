@@ -59,10 +59,16 @@ interface Props {
   rawMaterialId: string;
   /** Lar råvaredetaljen koble ⌘S til lagring når fanen er aktiv. */
   registerSave?: (save: () => void) => void;
+  /**
+   * Hvilken del av råvarekortet som vises. Samme utkast/hooks for begge; bare én del er montert
+   * om gangen (seksjonsbytte går via lenke og beskyttes av ulagret-vakten). Udefinert = alt.
+   */
+  part?: "naering" | "deklarasjon";
 }
 
 
-export function NutritionTab({ rawMaterialId, registerSave }: Props) {
+export function NutritionTab({ rawMaterialId, registerSave, part }: Props) {
+  const show = (p: "naering" | "deklarasjon") => !part || part === p;
   const { canWrite, user } = useRavarer();
   const nutritionQuery = useNutrition(rawMaterialId);
   const existing = nutritionQuery.data;
@@ -237,14 +243,14 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
 
   return (
     <div className="space-y-5">
-      <DeclarationNameCard rawMaterialId={rawMaterialId} foodId={existing?.matvaretabellen_food_id ?? null} />
-      <DatasheetSection rawMaterialId={rawMaterialId} />
-      <MatvaretabellenSourceCard
+      {show("deklarasjon") && <DeclarationNameCard rawMaterialId={rawMaterialId} foodId={existing?.matvaretabellen_food_id ?? null} />}
+      {show("deklarasjon") && <DatasheetSection rawMaterialId={rawMaterialId} />}
+      {show("naering") && <MatvaretabellenSourceCard
         rawMaterialId={rawMaterialId}
         source={existing?.source ?? null}
         foodId={existing?.matvaretabellen_food_id ?? null}
-      />
-      <Card className="p-5 space-y-4">
+      />}
+      {show("naering") && <Card className="p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-base font-semibold">Næringsinnhold pr 100 g</h3>
@@ -303,9 +309,9 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
             Sum makro + salt + fiber er {formatNumber(macroSum, 1)} g. Bør være ≤ 100 g.
           </div>
         )}
-      </Card>
+      </Card>}
 
-      <Card className="p-5 space-y-4">
+      {show("deklarasjon") && <Card className="p-5 space-y-4">
         <h3 className="text-base font-semibold">Deklarasjon og opprinnelse</h3>
         <div>
           <Label>Ingrediensdeklarasjon</Label>
@@ -350,7 +356,7 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
             disabled={!canWrite}
           />
         </div>
-      </Card>
+      </Card>}
 
       {canWrite && (
         <div className="sticky bottom-4 z-10 flex items-center justify-end gap-3 rounded-xl border border-line-subtle bg-surface-raised/95 p-3 shadow-sm backdrop-blur">
@@ -358,14 +364,17 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
             <span className="text-xs text-ink-secondary">Ulagrede endringer</span>
           )}
           <Button disabled={!dirty || upsert.isPending} onClick={save}>
-            Lagre næringsinnhold
+            {part === "deklarasjon" ? "Lagre deklarasjon" : "Lagre næringsinnhold"}
           </Button>
         </div>
       )}
 
-      <Card className="p-5 space-y-4">
+      {show("naering") && <Card className="p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-base font-semibold">Allergener</h3>
+          <div>
+            <h3 className="text-base font-semibold">Allergener</h3>
+            <p className="text-caption text-ink-secondary">Valg lagres med en gang — ikke en del av «Lagre»-knappen.</p>
+          </div>
           {canWrite && (
             <Button variant="outline" size="sm" onClick={suggestAllergens} disabled={suggesting}>
               {suggesting ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
@@ -466,7 +475,7 @@ export function NutritionTab({ rawMaterialId, registerSave }: Props) {
             </div>
           ))}
         </div>
-      </Card>
+      </Card>}
       <UnsavedChangesDialog {...guard.dialogProps} />
     </div>
   );

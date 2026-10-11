@@ -1,3 +1,4 @@
+import { packageLabel } from "@/ravarer/lib/supplierPackagePrice";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -278,14 +279,9 @@ export function OverviewTab({ rm, registerSave, onEditLink }: Props) {
           <div className="rounded-lg border p-3">
             <Label className="text-sm">Pakning</Label>
             <p className="mt-1 text-sm tabular-nums">
-              {rm.package_size
-                ? `${rm.package_size} ${rm.package_unit ?? ""}`
-                : "Pakningsstørrelse mangler"}
-              {rm.base_units_per_package != null && (
-                <span className="text-ink-secondary">
-                  {" "}
-                  · {rm.base_units_per_package} {rm.base_unit} per pakning
-                </span>
+              {packageLabel(rm, rm.base_unit).label ?? "Pakningsstørrelse mangler"}
+              {!packageLabel(rm, rm.base_unit).confirmed && rm.base_units_per_package != null && (
+                <span className="text-ink-secondary"> · {rm.base_units_per_package} {rm.base_unit} per pakning (ikke bekreftet)</span>
               )}
             </p>
             <p className="mt-1 text-xs text-ink-secondary">

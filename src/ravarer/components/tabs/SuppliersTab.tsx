@@ -3,14 +3,14 @@ import { Button } from "@/components/ui/button";
 import { TrendingUp } from "lucide-react";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { NewSupplierDialog } from "@/ravarer/components/NewSupplierDialog";
-import { useRawMaterialSuppliers, usePriceHistory, toTimelineRow, type RmSupplierRow } from "@/ravarer/hooks/useRmSuppliers";
+import { useRawMaterialSuppliers, useTimelineHistory, type RmSupplierRow } from "@/ravarer/hooks/useRmSuppliers";
 import { PackageEditor } from "@/ravarer/editors/PackageEditor";
 import { fallbackPackageRow } from "@/ravarer/lib/packageRow";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 import { PriceTimeline } from "@/ravarer/components/PriceTimeline";
 import { RecentInvoiceLinesCard } from "@/ravarer/components/RecentInvoiceLinesCard";
-import type { TimelineHistoryRow, TimelineLink } from "@/ravarer/lib/priceTimeline";
+import { isAgreementConfirmed, type TimelineLink } from "@/ravarer/lib/priceTimeline";
 import { PurchaseStatsCard } from "@/ravarer/components/PurchaseStatsCard";
 import { StartPriceCard } from "@/ravarer/components/tabs/StartPriceCard";
 import { useRawMaterialUnits } from "@/ravarer/hooks/useRawMaterialUnits";
@@ -23,14 +23,17 @@ import { QueryErrorState, QueryLoadingState } from "@/components/common/QuerySta
 
 interface Props {
   rm: RawMaterialRow;
+  /** Seksjon på råvarekortet: «pris» (prisgrunnlag/historikk) eller «leverandorer» (koblinger/varekort). Udefinert = begge. */
+  part?: "pris" | "leverandorer";
 }
 
-export function SuppliersTab({ rm }: Props) {
+export function SuppliersTab({ rm, part }: Props) {
+  const show = (p: "pris" | "leverandorer") => !part || part === p;
   const { canWrite } = useRavarer();
   const { data: allSuppliers = [] } = useSuppliers();
   const { data: links = [], isLoading } = useRawMaterialSuppliers(rm.id);
-  const historyQuery = usePriceHistory(rm.id);
-  const history = useMemo(() => historyQuery.data ?? [], [historyQuery.data]);
+  const historyQuery = useTimelineHistory(rm.id);
+  const history = historyQuery.raw;
 
   const [linkOpen, setLinkOpen] = useState<{
     open: boolean;
@@ -53,11 +56,7 @@ export function SuppliersTab({ rm }: Props) {
     [allSuppliers],
   );
 
-  const timelineHistory = useMemo<TimelineHistoryRow[]>(
-    () =>
-      history.map(toTimelineRow),
-    [history],
-  );
+  const timelineHistory = historyQuery.rows;
 
   const timelineLinks = useMemo<TimelineLink[]>(
     () =>
@@ -66,6 +65,7 @@ export function SuppliersTab({ rm }: Props) {
         agreed_price_per_base_unit: l.agreed_price_per_base_unit,
         agreement_valid_from: l.agreement_valid_from,
         agreement_valid_to: l.agreement_valid_to,
+        agreement_confirmed: isAgreementConfirmed(l),
       })),
     [links],
   );
@@ -77,10 +77,10 @@ export function SuppliersTab({ rm }: Props) {
 
   return (
     <div className="space-y-5">
-      <PriceBasisNowCard rawMaterialId={rm.id} category={rm.category} baseUnit={rm.base_unit} links={links} supplierNames={supplierNames} />
-      <SupplierItemsForMaterialCard rawMaterialId={rm.id} />
-      <StartPriceCard links={links} supplierNames={supplierNames} currentBaseUnit={rm.base_unit} />
-      <SupplierLinksTable
+      {show("pris") && <PriceBasisNowCard rawMaterialId={rm.id} category={rm.category} baseUnit={rm.base_unit} links={links} supplierNames={supplierNames} />}
+      {show("leverandorer") && <SupplierItemsForMaterialCard rawMaterialId={rm.id} />}
+      {show("pris") && <StartPriceCard links={links} supplierNames={supplierNames} currentBaseUnit={rm.base_unit} />}
+      {show("leverandorer") && <SupplierLinksTable
         links={links}
         supplierMap={supplierMap}
         units={units}
@@ -94,9 +94,9 @@ export function SuppliersTab({ rm }: Props) {
         hasHistory={(sid) => history.some((h) => h.supplier_id === sid && h.source === "invoice" && !h.is_legacy)}
         onNewSupplier={() => setSupplierOpen(true)}
         onLink={(existingId) => setLinkOpen({ open: true, existingId })}
-      />
+      />}
 
-      {historyQuery.isError ? (
+      {!show("pris") ? null : historyQuery.isError ? (
         <QueryErrorState error={historyQuery.error} scope="ravarer:pristidslinje" title="Kunne ikke hente prishistorikken" onRetry={() => void historyQuery.refetch()} />
       ) : historyQuery.isLoading ? (
         <QueryLoadingState />
@@ -109,6 +109,7 @@ export function SuppliersTab({ rm }: Props) {
         baseUnitsPerPackage={rm.base_units_per_package}
         title="Pristidslinje"
         exportName={`priser-${rm.sku}`}
+        projectionError={historyQuery.projectionError}
         actions={
           canWrite ? (
             <Button size="sm" onClick={() => setPriceOpen(true)}>
@@ -119,8 +120,8 @@ export function SuppliersTab({ rm }: Props) {
       />
       )}
 
-      <RecentInvoiceLinesCard rawMaterialId={rm.id} baseUnit={rm.base_unit} />
-      <PurchaseStatsCard rawMaterialId={rm.id} baseUnit={rm.base_unit} />
+      {show("pris") && <RecentInvoiceLinesCard rawMaterialId={rm.id} baseUnit={rm.base_unit} eligibleLineIds={historyQuery.eligibleLineIds} />}
+      {show("pris") && <PurchaseStatsCard rawMaterialId={rm.id} baseUnit={rm.base_unit} />}
 
       <NewSupplierDialog open={supplierOpen} onOpenChange={setSupplierOpen} />
       <RmSupplierDialog

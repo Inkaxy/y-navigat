@@ -15,6 +15,8 @@ export interface PriceBasisLink {
   supplier_id: string;
   is_primary: boolean | null;
   notes: string | null;
+  agreed_price_set_at?: string | null;
+  agreed_price_set_by?: string | null;
 }
 
 interface ViewRow { link: PriceBasisLink; name: string; ref: PriceReference | undefined; loading: boolean; error: boolean }
@@ -35,19 +37,22 @@ export function PriceBasisNowView({ rows, baseUnit, tolerancePct, tolIsCategory 
                 <span className="font-medium">{name}</span>
                 {link.is_primary && <Badge variant="outline"><Star className="mr-1 h-3 w-3" aria-hidden />Primær</Badge>}
                 <span className="text-ink-secondary">
-                  {loading ? "Henter…" : error ? "Kunne ikke hente prisgrunnlag" : ref ? priceReferenceLabel(ref.source) : "—"}
+                  {loading ? "Henter…" : error ? "Kunne ikke hente prisgrunnlag" : ref ? (ref.source === "agreement" && !(link.agreed_price_set_at && link.agreed_price_set_by) ? "Registrert avtalepris — ikke bekreftet" : priceReferenceLabel(ref.source)) : "—"}
                 </span>
                 {ref?.price != null && <span className="tabular-nums font-medium">{formatNok(ref.price)} / {baseUnit}</span>}
                 {ref && priceReferenceDateText(ref) && <span className="text-caption text-ink-secondary">{priceReferenceDateText(ref)}</span>}
                 <span className="ml-auto text-caption text-ink-secondary">Toleranse {tol}</span>
               </div>
               {ref && priceReferenceReasonText(ref) && <p className="text-caption text-ink-secondary">{priceReferenceReasonText(ref)}</p>}
+              {ref?.source === "agreement" && !(link.agreed_price_set_at && link.agreed_price_set_by) && (
+                <p className="text-caption text-warning">Motoren bruker i dag denne registrerte prisen, men hvem/når avtalen ble satt er ikke registrert. Bekreft avtalen før den brukes som dokumentert grunnlag.</p>
+              )}
               {link.notes && <p className="text-caption text-ink-secondary">{link.notes}</p>}
             </li>
           ))}
         </ul>
       )}
-      <p className="text-caption text-ink-secondary">Dette er prisen fakturalinjer sammenlignes med. Rekkefølge: avtalepris → startpris → siste dokumenterte kjøp.</p>
+      <p className="text-caption text-ink-secondary">Dette er prisen prismotoren sammenligner fakturalinjer med nå; ubekreftet grunnlag er merket. Rekkefølge: avtalepris → startpris → siste dokumenterte kjøp.</p>
     </Card>
   );
 }

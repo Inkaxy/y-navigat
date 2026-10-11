@@ -1,103 +1,62 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/supabasePaging";
+import { BAKERS_RM_SELECT } from "@/varer/lib/bakersRawMaterials";
+import type { BakersRawMaterial } from "@/varer/lib/bakers";
+import { computeRecipeUsage, type RecipeUsageRow, type UsageLineInput } from "@/ravarer/lib/recipeUsage";
 
-export interface RecipeUsageRow {
-  recipeId: string;
-  recipeName: string;
-  status: string | null;
-  /** Sum av mengden råvaren brukes med i oppskriften. */
-  quantity: number;
-  unit: string;
-  /** Kostnad for råvaren i oppskriften (mengde × kostpris), når kostpris finnes. */
-  lineCost: number | null;
-  /** Andel av oppskriftens råvarekost, 0–1. */
-  costShare: number | null;
-}
+export type { RecipeUsageRow } from "@/ravarer/lib/recipeUsage";
 
-interface LineRow {
-  recipe_id: string;
-  quantity: number | null;
-  unit: string | null;
-  raw_material_id: string | null;
+const LINE_SELECT = "id, recipe_id, recipe_part_id, raw_material_id, sub_product_id, ingredient_name, quantity, unit, waste_percent";
+const CHUNK = 200;
+
+function chunks<T>(xs: T[]): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < xs.length; i += CHUNK) out.push(xs.slice(i, i + CHUNK));
+  return out;
 }
 
 /**
- * Oppskrifter som bruker råvaren (recipe_lines.raw_material_id).
- * Andel av kost regnes mot summen av alle råvarelinjene i samme oppskrift.
+ * Oppskrifter som bruker råvaren, med kost fra felles linjemotor (`recipeUsage.ts`).
+ * Alle linjer hentes paginert (ingen stille avkorting); prisen leses fersk fra
+ * `raw_materials` (status/enhet/tetthet/stykkvekt) i samme henting som nevneren.
+ * Nøkkelen er familien `recipes-using-raw-material` — `invalidateRawMaterial` treffer den globalt.
  */
-export function useRecipesUsingRawMaterial(rawMaterialId: string | undefined, costPerBaseUnit: number | null) {
+export function useRecipesUsingRawMaterial(rawMaterialId: string | undefined) {
   return useQuery({
-    queryKey: ["recipes-using-raw-material", rawMaterialId, costPerBaseUnit],
+    queryKey: ["recipes-using-raw-material", rawMaterialId],
     enabled: !!rawMaterialId,
-    queryFn: async (): Promise<RecipeUsageRow[]> => {
-      const { data: mine, error } = await supabase
-        .from("recipe_lines")
-        .select("recipe_id, quantity, unit, raw_material_id")
-        .eq("raw_material_id", rawMaterialId!)
-        .limit(500);
-      if (error) throw error;
-      const lines = (mine ?? []) as LineRow[];
-      if (lines.length === 0) return [];
-
-      const recipeIds = Array.from(new Set(lines.map((l) => l.recipe_id)));
-
-      const [{ data: recipes, error: recErr }, { data: allLines, error: allErr }] = await Promise.all([
-        supabase.from("recipes").select("id, name, status").in("id", recipeIds),
-        supabase
-          .from("recipe_lines")
-          .select("recipe_id, quantity, unit, raw_material_id")
-          .in("recipe_id", recipeIds)
-          .not("raw_material_id", "is", null)
-          .limit(5000),
-      ]);
-      if (recErr) throw recErr;
-      if (allErr) throw allErr;
-
-      const rmIds = Array.from(
-        new Set(((allLines ?? []) as LineRow[]).map((l) => l.raw_material_id).filter((v): v is string => !!v)),
-      );
-      const { data: costs, error: costErr } = await supabase
-        .from("raw_materials")
-        .select("id, current_cost_price")
-        .in("id", rmIds);
-      if (costErr) throw costErr;
-      const costById = new Map<string, number>(
-        (costs ?? []).map((c) => [c.id, Number(c.current_cost_price ?? 0)]),
-      );
-
-      const recipeTotals = new Map<string, number>();
-      for (const l of (allLines ?? []) as LineRow[]) {
-        const cost = costById.get(l.raw_material_id ?? "") ?? 0;
-        recipeTotals.set(l.recipe_id, (recipeTotals.get(l.recipe_id) ?? 0) + cost * Number(l.quantity ?? 0));
-      }
-
-      const byRecipe = new Map<string, { qty: number; unit: string }>();
-      for (const l of lines) {
-        const cur = byRecipe.get(l.recipe_id) ?? { qty: 0, unit: l.unit ?? "" };
-        cur.qty += Number(l.quantity ?? 0);
-        byRecipe.set(l.recipe_id, cur);
-      }
-
-      const nameById = new Map((recipes ?? []).map((r) => [r.id, r]));
-      const cost = costPerBaseUnit ?? costById.get(rawMaterialId!) ?? null;
-
-      return Array.from(byRecipe.entries())
-        .map(([recipeId, v]) => {
-          const total = recipeTotals.get(recipeId) ?? 0;
-          const lineCost = cost != null ? cost * v.qty : null;
-          return {
-            recipeId,
-            recipeName: nameById.get(recipeId)?.name ?? "Uten navn",
-            status: nameById.get(recipeId)?.status ?? null,
-            quantity: v.qty,
-            unit: v.unit,
-            lineCost,
-            costShare: lineCost != null && total > 0 ? lineCost / total : null,
-          };
-        })
-        .sort((a, b) => (b.costShare ?? 0) - (a.costShare ?? 0) || a.recipeName.localeCompare(b.recipeName, "nb"));
-    },
+    queryFn: () => fetchRecipeUsage(rawMaterialId as string),
   });
+}
+
+export async function fetchRecipeUsage(rawMaterialId: string): Promise<RecipeUsageRow[]> {
+  const mine = await fetchAllRows<{ recipe_id: string }>((from, to) =>
+    supabase.from("recipe_lines").select("recipe_id").eq("raw_material_id", rawMaterialId).order("id").range(from, to));
+  const recipeIds = Array.from(new Set(mine.map((l) => l.recipe_id)));
+  if (recipeIds.length === 0) return [];
+
+  const allLines: UsageLineInput[] = [];
+  const recipes = new Map<string, { name: string; status: string | null }>();
+  for (const ids of chunks(recipeIds)) {
+    const [lines, recs] = await Promise.all([
+      fetchAllRows<UsageLineInput>((from, to) =>
+        supabase.from("recipe_lines").select(LINE_SELECT).in("recipe_id", ids).order("id").range(from, to)),
+      supabase.from("recipes").select("id, name, status").in("id", ids),
+    ]);
+    if (recs.error) throw recs.error;
+    allLines.push(...lines);
+    for (const r of recs.data ?? []) recipes.set(r.id, { name: r.name ?? "Uten navn", status: r.status ?? null });
+  }
+
+  const rmIds = Array.from(new Set(allLines.map((l) => l.raw_material_id).filter((v): v is string => !!v)));
+  const materials: Record<string, BakersRawMaterial> = {};
+  for (const ids of chunks(rmIds)) {
+    const { data, error } = await supabase.from("raw_materials").select(BAKERS_RM_SELECT).in("id", ids);
+    if (error) throw error;
+    for (const r of (data ?? []) as BakersRawMaterial[]) materials[r.id] = r;
+  }
+  return computeRecipeUsage({ selectedId: rawMaterialId, allLines, materials, recipes, complete: true });
 }
 
 /** Antall oppskrifter som bruker råvaren — brukt i KPI-stripa. */

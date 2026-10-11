@@ -38,7 +38,8 @@ import {
   useSupplierPriceIndex,
   type SupplierItemRow,
 } from "@/ravarer/hooks/useSupplierDetail";
-import { usePriceHistory, toTimelineRow } from "@/ravarer/hooks/useRmSuppliers";
+import { useTimelineHistory } from "@/ravarer/hooks/useRmSuppliers";
+import { isAgreementConfirmed } from "@/ravarer/lib/priceTimeline";
 import { SupplierDialog } from "@/ravarer/components/NewSupplierDialog";
 import { AgreementDocumentLink } from "@/ravarer/components/AgreementDocumentLink";
 import { getAgreementStatus } from "@/ravarer/lib/agreementStatus";
@@ -565,8 +566,8 @@ function SupplierPriceTimeline({
   const [rawMaterialId, setRawMaterialId] = useState(sorted[0]?.raw_material_id ?? "");
   const selected =
     sorted.find((i) => i.raw_material_id === rawMaterialId) ?? sorted[0] ?? null;
-  const historyQuery = usePriceHistory(selected?.raw_material_id);
-  const history = useMemo(() => historyQuery.data ?? [], [historyQuery.data]);
+  const historyQuery = useTimelineHistory(selected?.raw_material_id);
+  const history = historyQuery.rows;
 
   const supplierNames = useMemo(
     () => new Map<string, string>([[supplierId, supplierName]]),
@@ -581,6 +582,7 @@ function SupplierPriceTimeline({
               agreed_price_per_base_unit: selected.agreed_price_per_base_unit,
               agreement_valid_from: selected.agreement_valid_from,
               agreement_valid_to: selected.agreement_valid_to,
+              agreement_confirmed: isAgreementConfirmed(selected),
             },
           ]
         : [],
@@ -588,9 +590,7 @@ function SupplierPriceTimeline({
   );
   const rows = useMemo(
     () =>
-      history
-        .filter((h) => h.supplier_id === supplierId)
-        .map(toTimelineRow),
+      history.filter((h) => h.supplier_id === supplierId),
     [history, supplierId],
   );
 
@@ -619,6 +619,7 @@ function SupplierPriceTimeline({
       baseUnit={selected.raw_material?.base_unit ?? "enhet"}
       title={`Prisutvikling — ${selected.raw_material?.name ?? "vare"}`}
       exportName={`prisutvikling-${supplierName}`}
+      projectionError={historyQuery.projectionError}
       actions={
         <Select value={selected.raw_material_id} onValueChange={setRawMaterialId}>
           <SelectTrigger className="h-9 w-[240px]" aria-label="Velg vare">

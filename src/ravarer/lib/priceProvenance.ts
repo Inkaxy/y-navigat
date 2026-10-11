@@ -4,12 +4,20 @@
  * grunnlag er enheten ukjent (null), og raden er ikke sammenlignbar i graf/Δ.
  */
 
-export type UnitSource = "ved_registrering" | "revidert_enhetsbytte";
+/**
+ * `currently_verified_line` er IKKE et låst historisk grunnlag: serveren (`rm_material_price_projection`)
+ * har kontrollert nå at den koblede fakturalinjen støtter prisen i denne enheten. Skrives aldri tilbake.
+ */
+export type UnitSource = "ved_registrering" | "revidert_enhetsbytte" | "currently_verified_line";
 
 export const UNIT_SOURCE_LABEL: Record<UnitSource, string> = {
   ved_registrering: "Låst ved registrering",
   revidert_enhetsbytte: "Revidert enhetsbytte",
+  currently_verified_line: "Kontrollert fra fakturalinje",
 };
+
+/** Forklaring som alltid følger en rekonstruert rad. */
+export const RECONSTRUCTED_NOTE = "Kontrollert nå — originalt enhetsgrunnlag var ikke låst";
 
 /** Pakning slik den var på fakturalinjen da prisen ble registrert (`snapshot_package`). */
 export interface PackageSnapshot {

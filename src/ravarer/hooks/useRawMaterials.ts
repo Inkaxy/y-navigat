@@ -31,6 +31,10 @@ export interface RawMaterialRow {
   package_confirmed_at: string | null;
   package_confirmed_by: string | null;
   current_cost_price: number | null;
+  /** Serverens prisstatus (`verifisert | uverifisert | mangler`); null/ukjent er aldri verifisert. */
+  cost_basis_status?: string | null;
+  /** Eksplisitt allergenvurdering; null = ikke vurdert (aldri «ingen allergener»). */
+  allergens_reviewed_at?: string | null;
   agreed_price: number | null;
   price_updated_at: string | null;
   price_source: string | null;

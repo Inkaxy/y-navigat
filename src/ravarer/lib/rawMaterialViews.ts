@@ -250,6 +250,12 @@ const SORT_KEYS: ListSortKey[] = [
   "deviation", "package", "volume_12m", "last_invoice", "active",
 ];
 
+/** `liste` → innebygd visning. Modelister uten egen varelisterekkefølge bruker nærmeste mangelvisning. */
+const LISTE_VIEW: Record<string, string> = {
+  prisavvik: "deviation", "uten-leverandor": "no_supplier", "ikke-kjopt": "not_purchased", inaktive: "inactive",
+  pakning: "missing_package", deklarasjon: "missing_declaration", naering: "missing_nutrition",
+};
+
 export function parseListQuery(params: URLSearchParams): ListQuery {
   const [rawKey, rawDir] = (params.get("sort") ?? "name:asc").split(":");
   return {
@@ -257,7 +263,8 @@ export function parseListQuery(params: URLSearchParams): ListQuery {
     kat: params.get("kat") ?? "all",
     type: params.get("type") ?? "all",
     status: params.get("status") ?? "active",
-    view: params.get("view") ?? "all",
+    // Arbeidslisten (`liste`) i varearbeidsflaten styrer visningen når `view` mangler — samme rekkefølge i detaljens forrige/neste.
+    view: params.get("view") ?? LISTE_VIEW[params.get("liste") ?? ""] ?? "all",
     sortKey: SORT_KEYS.includes(rawKey as ListSortKey) ? (rawKey as ListSortKey) : "name",
     sortDir: rawDir === "desc" ? "desc" : "asc",
   };

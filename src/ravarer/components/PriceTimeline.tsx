@@ -36,6 +36,7 @@ import {
   type TimelinePoint,
 } from "@/ravarer/lib/priceTimeline";
 import { paths } from "@/ravarer/lib/paths";
+import { RECONSTRUCTED_NOTE, UNIT_SOURCE_LABEL } from "@/ravarer/lib/priceProvenance";
 
 const sourceLabel = priceSourceLabel;
 
@@ -55,7 +56,11 @@ interface Props {
   actions?: React.ReactNode;
   /** Filnavn uten filendelse for CSV-eksporten. */
   exportName?: string;
+  /** Kontrollen av kildelinjer feilet: historikken vises uendret, men rekonstruerte punkter mangler. */
+  projectionError?: boolean;
 }
+
+const fullPrice = (n: number) => n.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 6 });
 
 export function PriceTimeline({
   history,
@@ -66,6 +71,7 @@ export function PriceTimeline({
   title = "Pristidslinje",
   actions,
   exportName = "pristidslinje",
+  projectionError = false,
 }: Props) {
   const navigate = useNavigate();
   const [preset, setPreset] = useState<PeriodPreset>("last_12m");
@@ -75,7 +81,7 @@ export function PriceTimeline({
 
   const packageFactor = baseUnitsPerPackage && baseUnitsPerPackage > 0 ? baseUnitsPerPackage : null;
   const unitFactor = unitMode === "package" && packageFactor ? packageFactor : 1;
-  const unitLabel = unitMode === "package" && packageFactor ? "pakning" : baseUnit;
+  const unitLabel = unitMode === "package" && packageFactor ? `dagens ${packageFactor} ${baseUnit}-pakning` : baseUnit;
 
   const { series, bands, rows, events } = useMemo(
     () =>
@@ -116,7 +122,7 @@ export function PriceTimeline({
   }, [rows]);
 
   const exportCsv = () => {
-    const blob = new Blob([`\uFEFF${timelineCsv(rows, events)}`], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob([`\uFEFF${timelineCsv(rows, events, unitFactor !== 1 ? unitLabel : null)}`], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -171,9 +177,17 @@ export function PriceTimeline({
         </div>
       </div>
 
+      {unitFactor !== 1 && (
+        <p className="text-caption text-ink-secondary">Omregnet til {unitLabel} for sammenligning — ikke historisk pakningspris. CSV har originalpris og -enhet.</p>
+      )}
+      {projectionError && (
+        <p role="status" className="rounded-md border border-warning/40 bg-warning/5 p-2 text-caption text-warning">
+          Kunne ikke kontrollere eldre kildelinjer nå. Rader uten låst enhet vises som hendelser til kontrollen lykkes.
+        </p>
+      )}
       {rows.length === 0 ? (
         <p className="py-8 text-center text-sm text-ink-secondary">
-          Ingen prisobservasjoner i valgt periode.
+          {events.length > 0 ? `Ingen sammenlignbare prispunkter i valgt periode — ${events.length} hendelser vises under.` : "Ingen prisobservasjoner i valgt periode."}
         </p>
       ) : (
         <div className="h-72">
@@ -248,7 +262,7 @@ export function PriceTimeline({
                 <th className="pb-2 text-right">Pris per {unitLabel}</th>
                 <th className="pb-2 text-right">Δ forrige</th>
                 <th className="pb-2 text-right">Δ avtale</th>
-                <th className="pb-2">Kilde</th>
+                <th className="pb-2">Kilde / grunnlag</th>
                 <th className="pb-2">Faktura</th>
               </tr>
             </thead>
@@ -264,7 +278,10 @@ export function PriceTimeline({
                       </Badge>
                     )}
                   </td>
-                  <td className="py-2 text-right tabular-nums">{formatNok(r.price)}</td>
+                  <td className="py-2 text-right tabular-nums" title={`${fullPrice(r.originalPrice)} kr per ${r.unit ?? "ukjent enhet"}`}>
+                    {formatNok(r.price)}
+                    <span className="block text-[11px] text-ink-secondary">{fullPrice(r.originalPrice)} / {r.unit ?? "?"}</span>
+                  </td>
                   <td className="py-2 text-right tabular-nums">
                     <Delta pct={r.deltaPrevPct} />
                     {r.deltaPrevKr != null && <span className="ml-1 text-xs text-ink-secondary">({r.deltaPrevKr > 0 ? "+" : ""}{formatNok(r.deltaPrevKr)})</span>}
@@ -274,6 +291,7 @@ export function PriceTimeline({
                   </td>
                   <td className="py-2">
                     <Badge variant="outline">{sourceLabel(r.source)}</Badge>
+                    {r.unitSource && <span className="block text-[11px] text-ink-secondary">{UNIT_SOURCE_LABEL[r.unitSource]}</span>}
                   </td>
                   <td className="py-2">
                     {r.invoiceId ? (
@@ -332,7 +350,10 @@ function TimelineTooltip({ active, payload, unitLabel }: TooltipProps) {
       <div className="text-ink-secondary">{p.supplierName}</div>
       <div className="mt-1 tabular-nums">
         {formatNok(p.price)} per {unitLabel}
+        {p.conversionBasis !== "none" && <span className="block text-ink-secondary">Original: {fullPrice(p.originalPrice)} kr per {p.unit ?? "ukjent enhet"}</span>}
       </div>
+      {p.unitSource && <div className="mt-1">{UNIT_SOURCE_LABEL[p.unitSource]}</div>}
+      {p.unitSource === "currently_verified_line" && <div className="text-ink-secondary">{RECONSTRUCTED_NOTE}{p.checkedAt ? ` (${formatDate(p.checkedAt.slice(0, 10))})` : ""}</div>}
       <div className="mt-1 space-y-0.5 text-ink-secondary">
         <div>
           Δ forrige: {p.deltaPrevPct != null ? `${p.deltaPrevPct > 0 ? "+" : ""}${p.deltaPrevPct.toFixed(1)} %` : "—"}

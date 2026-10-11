@@ -178,7 +178,7 @@ export function InvoiceLinesTable({ lines, supplierId, canBulkImport, canMatch, 
                             )}
                             {rm && (
                               <Button variant="ghost" size="icon" asChild title="Se prishistorikk">
-                                <Link to={paths.raavare(rm.id, { tab: "suppliers" })}>
+                                <Link to={paths.raavare(rm.id, { seksjon: "leverandorer" })}>
                                   <LineChartIcon className="h-4 w-4" />
                                 </Link>
                               </Button>

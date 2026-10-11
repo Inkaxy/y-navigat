@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ChevronDown, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -9,9 +9,10 @@ import { ModulePage } from "@/ravarer/ui/ModulePage";
 import { SectionTabs } from "@/ravarer/ui/SectionTabs";
 import { RAVARER_EYEBROW, varerTabs, type VarerTabId } from "./hubTabs";
 
-/** Ramme for Varer-sidene: én overskrift, faneraden og verktøymenyen. */
+/** Ramme for varearbeidsflaten og verktøysidene: én overskrift, arbeidslistene og verktøymenyen. */
 export function VarerShell({ active, title = "Varer", children }: { active?: VarerTabId; title?: string; children: ReactNode }) {
   const { data: summary } = useWorkSummary({ includeApproval: false });
+  const [sp] = useSearchParams();
   return (
     <ModulePage
       eyebrow={RAVARER_EYEBROW}
@@ -30,7 +31,7 @@ export function VarerShell({ active, title = "Varer", children }: { active?: Var
           </DropdownMenuContent>
         </DropdownMenu>
       }
-      tabs={active ? <SectionTabs ariaLabel="Varer" tabs={varerTabs(summary)} activeId={active} /> : undefined}
+      tabs={active ? <SectionTabs ariaLabel="Varer" tabs={varerTabs(summary, sp)} activeId={active} /> : undefined}
     >
       {children}
     </ModulePage>

@@ -22,7 +22,7 @@ export function PriceEventsList({ events }: { events: readonly TimelineEvent[]; 
     <div className="space-y-2 border-t border-line-subtle pt-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-ink-secondary">
-          {other.length} utgåtte, korrigerte eller ikke sammenlignbare (enhet/valuta) og {credits.length} kreditnota-hendelser vises ikke i grafen og teller ikke som pris.
+          {other.length} utgåtte, til kontroll, duplikate eller ikke sammenlignbare (enhet/valuta) og {credits.length} kreditnota-hendelser vises ikke i grafen og teller ikke som pris.
         </p>
         <Button variant="ghost" size="sm" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
           {open ? "Skjul hendelser" : "Vis hendelser"}
@@ -54,7 +54,7 @@ export function PriceEventsList({ events }: { events: readonly TimelineEvent[]; 
                     {e.packageText && <span className="block">Pakning {e.packageText}</span>}
                   </td>
                   <td className="py-2 text-ink-secondary">
-                    {e.reason ?? (e.kind === "kreditnota" ? "Kreditnota — egen hendelse" : "—")}
+                    {e.reason ?? (e.kind === "kreditnota" ? "Kreditnota — egen hendelse" : e.kind === "til_kontroll" ? "Til kontroll — teller ikke som pris nå" : e.kind === "duplikat" ? "Samme fakturalinje registrert flere ganger" : "—")}
                     {e.supersededAt && <span className="block text-xs">Utgått {formatDate(e.supersededAt.slice(0, 10))}</span>}
                     {e.corrections.map((c) => (
                       <span key={c.at} className="block text-xs">Før → etter: {correctionText(c)}</span>

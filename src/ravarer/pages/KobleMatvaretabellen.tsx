@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Link } from "react-router-dom";
 
 import { PageHeader } from "@/components/layout/PageHeader";
+import { useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
 import { QueryState } from "@/components/common/QueryState";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -53,6 +54,7 @@ interface RowData {
 
 export default function KobleMatvaretabellen() {
   const { canWrite } = useRavarer();
+  const embedded = useIsEmbedded();
   const coverage = useNutritionCoverage();
   const foods = useMatvaretabellenFoods();
 
@@ -202,10 +204,11 @@ export default function KobleMatvaretabellen() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="Koble Matvaretabellen"
-        subtitle="Råvarer uten næringsdata, tyngst brukt først. Godta forslaget eller velg selv."
-      />
+      {embedded ? (
+        <p className="text-sm text-ink-secondary">Råvarer uten næringsdata, tyngst brukt først. Godta forslaget eller velg selv.</p>
+      ) : (
+        <PageHeader title="Koble Matvaretabellen" subtitle="Råvarer uten næringsdata, tyngst brukt først. Godta forslaget eller velg selv." />
+      )}
 
       <Card className="p-5">
         <div className="flex flex-wrap items-center justify-between gap-4">

@@ -147,10 +147,10 @@ describe("3) historisk grunnlag i graf og CSV", () => {
     ];
     const r = buildTimeline({ history: h, supplierNames: new Map([["s1", "A"]]), links: [], currentUnit: "kg" });
     expect(timelineCsv(r.rows, r.events).split("\n")).toEqual([
-      "Type;Dato;Registrert;Leverandør;Pris;Valuta;Enhet (historisk);Enhetsgrunnlag;Pakning (historisk);Kilde;Faktura;Δ forrige kr;Δ forrige %;Δ avtale %;Årsak;Utgått;Rettelse før → etter;Notat",
-      "Gyldig;2026-05-01;2026-05-01T09:00:00Z;A;12.0000;NOK;kg;Låst ved registrering;25 kg;Faktura;F-2;2.0000;20.0;;;;Mengde: 10 000 → 10;",
-      "Gyldig;2026-05-01;2026-05-01T08:00:00Z;A;10.0000;NOK;kg;Låst ved registrering;Ukjent;Faktura;;;;;;;;",
-      "Enhet ikke dokumentert;2026-04-01;;A;9.0000;NOK;Ukjent;Ukjent;Ukjent;Manuell;;;;;;;;",
+      "Type;Dato;Registrert;Leverandør;Pris;Valuta;Enhet (historisk);Enhetsgrunnlag;Pakning (historisk);Kilde;Faktura;Δ forrige kr;Δ forrige %;Δ avtale %;Årsak;Utgått;Rettelse før → etter;Notat;Kontrollert;Visningspris;Visningsenhet;Omregning",
+      "Gyldig;2026-05-01;2026-05-01T09:00:00Z;A;12.0000;NOK;kg;Låst ved registrering;25 kg;Faktura;F-2;2.0000;20.0;;;;Mengde: 10 000 → 10;;;12.0000;kg;Ingen",
+      "Gyldig;2026-05-01;2026-05-01T08:00:00Z;A;10.0000;NOK;kg;Låst ved registrering;Ukjent;Faktura;;;;;;;;;;10.0000;kg;Ingen",
+      "Enhet ikke dokumentert;2026-04-01;;A;9.0000;NOK;Ukjent;Ukjent;Ukjent;Manuell;;;;;;;;;;;;Ingen",
     ]);
   });
   it("proveniens: bare låst grunnlag teller, ellers ukjent", () => {

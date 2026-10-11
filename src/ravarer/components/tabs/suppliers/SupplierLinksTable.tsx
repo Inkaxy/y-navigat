@@ -8,6 +8,7 @@ import { AgreementDocumentLink } from "@/ravarer/components/AgreementDocumentLin
 import { formatNok, formatDate } from "@/ravarer/lib/constants";
 import { useSetPrimarySupplier } from "@/ravarer/hooks/useSupplierLinkRpcs";
 import type { RmSupplierRow } from "@/ravarer/hooks/useRmSuppliers";
+import { agreementStatusLabel, derivedPackagePrice, packageLabel } from "@/ravarer/lib/supplierPackagePrice";
 
 export const BASE_UNIT_KEY = "__base";
 
@@ -81,7 +82,7 @@ export function SupplierLinksTable({ links, supplierMap, units, priceUnitId, onP
                   <th className="pb-2">Leverandør</th>
                   <th className="pb-2">Leverandør-SKU</th>
                   <th className="pb-2">Pakning</th>
-                  <th className="pb-2 text-right">Avtalt pris per pakning</th>
+                  <th className="pb-2 text-right">Avledet pris per pakning</th>
                   <th className="pb-2 text-right">
                     Avtalt pris per {unitLabel}
                   </th>
@@ -121,17 +122,25 @@ export function SupplierLinksTable({ links, supplierMap, units, priceUnitId, onP
                         {l.supplier_sku ?? "—"}
                       </td>
                       <td className="py-3 text-ink-secondary">
-                        {l.package_size
-                          ? `${l.package_size} ${l.package_unit ?? ""}`
-                          : "—"}
-                        {l.base_units_per_package != null && (
-                          <span className="ml-1 text-xs">
-                            ({l.base_units_per_package} pr. pakning)
-                          </span>
-                        )}
+                        {(() => {
+                          const pk = packageLabel(l, baseUnit);
+                          return (
+                            <>
+                              {pk.label ?? "—"}
+                              {!pk.confirmed && l.base_units_per_package != null && (
+                                <span className="block text-[11px] text-warning">Pakningsinnhold ikke bekreftet</span>
+                              )}
+                            </>
+                          );
+                        })()}
                       </td>
                       <td className="py-3 text-right tabular-nums">
-                        {formatNok(l.agreed_price)}
+                        {(() => {
+                          const d = derivedPackagePrice(l);
+                          if (d.kind === "known") return <>{formatNok(d.price)}<span className="block text-[11px] text-ink-secondary">avledet: {formatNok(Number(l.agreed_price_per_base_unit))} × {d.factor}</span></>;
+                          if (d.kind === "needs_confirmation") return <span className="text-[11px] text-warning">Pakningsgrunnlag må bekreftes</span>;
+                          return "—";
+                        })()}
                       </td>
                       <td className="py-3 text-right tabular-nums text-ink-secondary">
                         {l.agreed_price_per_base_unit == null
@@ -139,6 +148,7 @@ export function SupplierLinksTable({ links, supplierMap, units, priceUnitId, onP
                           : formatNok(
                               Number(l.agreed_price_per_base_unit) * unitFactor,
                             )}
+                        {agreementStatusLabel(l) && <span className="block text-[11px] text-warning">{agreementStatusLabel(l)}</span>}
                       </td>
                       <td className="py-3 text-right tabular-nums text-ink-secondary">
                         {l.last_invoice_price == null ? (

@@ -122,6 +122,8 @@ const RAW_MATERIAL_SCOPED_KEYS: readonly string[] = [
   "rm-product-link",
   "rm-suggestion-links",
   "rm-cost-source",
+  // Projeksjon av prishistorikk (rm_material_price_projection): uten id treffes hele familien.
+  "material-price-projection",
 ];
 
 const INVOICE_GLOBAL_KEYS: readonly string[] = [
@@ -137,6 +139,8 @@ const INVOICE_GLOBAL_KEYS: readonly string[] = [
   "supplier-invoices",
   "supplier-aliases",
   "supplier-aliases-all",
+  // Fakturarettelse/ny lesing/hold endrer projeksjonen selv når råvare-id ikke er kjent på kallstedet.
+  "material-price-projection",
 ];
 
 const INVOICE_SCOPED_KEYS: readonly string[] = [

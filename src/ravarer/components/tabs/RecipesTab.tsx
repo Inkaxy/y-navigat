@@ -9,11 +9,9 @@ interface Props {
   rm: RawMaterialRow;
 }
 
+/** Kost per oppskrift fra felles linjemotor; ukjent/uverifisert vises med forklaring, aldri som 0 kr. */
 export function RecipesTab({ rm }: Props) {
-  const { data = [], isLoading, isError, error, refetch } = useRecipesUsingRawMaterial(
-    rm.id,
-    rm.current_cost_price,
-  );
+  const { data = [], isLoading, isError, error, refetch } = useRecipesUsingRawMaterial(rm.id);
 
   return (
     <Card className="space-y-4 p-5">
@@ -35,28 +33,25 @@ export function RecipesTab({ rm }: Props) {
                 <th className="pb-2">Oppskrift</th>
                 <th className="pb-2 text-right">Mengde</th>
                 <th className="pb-2 text-right">Kost</th>
-                <th className="pb-2 text-right">Andel av råvarekost</th>
+                <th className="pb-2 text-right">Andel av oppskriftens kost</th>
               </tr>
             </thead>
             <tbody>
               {data.map((r) => (
-                <tr key={r.recipeId} className="border-t border-line-subtle">
+                <tr key={r.recipeId} className="border-t border-line-subtle align-top">
                   <td className="py-2">
-                    <Link
-                      to={`/varer/oppskrifter/${r.recipeId}`}
-                      className="font-medium text-app underline-offset-2 hover:underline"
-                    >
+                    <Link to={`/varer/oppskrifter/${r.recipeId}`} className="font-medium text-app underline-offset-2 hover:underline">
                       {r.recipeName}
                     </Link>
                   </td>
                   <td className="py-2 text-right tabular-nums">
-                    {formatNumber(r.quantity, 3)} {r.unit || rm.base_unit}
+                    {r.quantities.length === 0 ? "—" : r.quantities.map((q) => `${formatNumber(q.amount, 3)} ${q.unit}`).join(" + ")}
                   </td>
                   <td className="py-2 text-right tabular-nums">
-                    {r.lineCost != null ? formatNok(r.lineCost) : "—"}
+                    {r.lineCost != null ? formatNok(r.lineCost) : <span className="text-caption text-ink-secondary">{r.costNote ?? "Ukjent"}</span>}
                   </td>
                   <td className="py-2 text-right tabular-nums text-ink-secondary">
-                    {r.costShare != null ? `${(r.costShare * 100).toFixed(1)} %` : "—"}
+                    {r.costShare != null ? `${(r.costShare * 100).toFixed(1)} %` : <span className="text-caption">{r.shareNote}</span>}
                   </td>
                 </tr>
               ))}

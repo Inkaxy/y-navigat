@@ -32,6 +32,14 @@ export interface TimelineHistoryRow {
   unitSource?: UnitSource | null;
   packageText?: string | null;
   corrections?: readonly CorrectionSnapshot[];
+  /** Aktiv kontroll-hold (fra projeksjonen): vises «Til kontroll», aldri i graf/Δ. */
+  held?: boolean;
+  /** Samme kilde/faktura/linje/dato som en annen rad: hendelse, ikke trend. */
+  duplicateSource?: boolean;
+  /** Tidspunkt for serverkontrollen når enheten er rekonstruert (`currently_verified_line`). */
+  checkedAt?: string | null;
+  /** Grunnenheter per pakning bevist fra radens EGEN kildelinje (ikke dagens pakning). */
+  sourceBasePerPackage?: number | null;
 }
 
 /**
@@ -39,7 +47,7 @@ export interface TimelineHistoryRow {
  * Δ og CSV-prisrader; resten vises som egne hendelser.
  */
 export type HistoryKind =
-  | "gyldig" | "kreditnota" | "utgatt" | "eldre" | "annen_valuta" | "ukjent_valuta" | "annen_enhet" | "ukjent_enhet" | "ugyldig";
+  | "gyldig" | "kreditnota" | "til_kontroll" | "duplikat" | "utgatt" | "eldre" | "annen_valuta" | "ukjent_valuta" | "annen_enhet" | "ukjent_enhet" | "ugyldig";
 
 /**
  * `currentUnit` gis av alle visninger med hentet grunnlag: da er bare rader med
@@ -47,6 +55,8 @@ export type HistoryKind =
  */
 export function historyKind(h: TimelineHistoryRow, currentUnit?: string | null): HistoryKind {
   if (h.isCredit || h.isCreditNote) return "kreditnota";
+  if (h.held) return "til_kontroll";
+  if (h.duplicateSource) return "duplikat";
   if (h.supersededAt || h.supersededReason) return "utgatt";
   if (h.isLegacy) return "eldre";
   if (h.currency === null) return "ukjent_valuta";
@@ -70,6 +80,8 @@ export function compareNewestFirst(
 export const HISTORY_KIND_LABEL: Record<HistoryKind, string> = {
   gyldig: "Gyldig",
   kreditnota: "Kreditnota",
+  til_kontroll: "Til kontroll",
+  duplikat: "Duplikat av samme fakturalinje",
   utgatt: "Utgått / korrigert",
   eldre: "Eldre rad (erstattet)",
   annen_valuta: "Annen valuta",
@@ -114,6 +126,7 @@ export interface TimelineEvent {
   packageText: string | null;
   currency: string | null;
   corrections: readonly CorrectionSnapshot[];
+  checkedAt: string | null;
 }
 
 export interface TimelineLink {
@@ -121,14 +134,27 @@ export interface TimelineLink {
   agreed_price_per_base_unit: number | null;
   agreement_valid_from: string | null;
   agreement_valid_to: string | null;
+  /** Avtaleprisen er registrert med hvem/når (`agreed_price_set_at/by`). Ubekreftet gir aldri bånd/Δ. */
+  agreement_confirmed?: boolean;
 }
+
+/** Bekreftet avtale fra en koblingsrad (begge felt må finnes). */
+export function isAgreementConfirmed(l: { agreed_price_set_at?: string | null; agreed_price_set_by?: string | null }): boolean {
+  return !!l.agreed_price_set_at && !!l.agreed_price_set_by;
+}
+
+export type ConversionBasis = "none" | "documented_source_package" | "current_package_comparison";
 
 export interface TimelinePoint {
   id: string;
   /** Millisekunder — recharts bruker `type="number"` og `scale="time"`. */
   t: number;
   date: string;
+  /** Visningspris (omregnet når `conversionBasis` ≠ none). */
   price: number;
+  /** Original pris i radens egen enhet/valuta — det CSV og tooltip alltid viser. */
+  originalPrice: number;
+  conversionBasis: ConversionBasis;
   supplierKey: string;
   supplierName: string;
   source: string;
@@ -149,6 +175,7 @@ export interface TimelinePoint {
   packageText: string | null;
   currency: string | null;
   corrections: readonly CorrectionSnapshot[];
+  checkedAt: string | null;
 }
 
 export interface TimelineSeries {
@@ -187,7 +214,8 @@ function agreementForDate(
   date: string,
 ): number | null {
   if (!supplierId) return null;
-  const link = links.find((l) => l.supplier_id === supplierId);
+  // Bare bekreftet og datert avtale kan sammenlignes; udatert pris gjelder ikke bakover.
+  const link = links.find((l) => l.supplier_id === supplierId && l.agreement_confirmed === true && !!l.agreement_valid_from);
   if (!link || link.agreed_price_per_base_unit == null) return null;
   if (link.agreement_valid_from && date < link.agreement_valid_from) return null;
   if (link.agreement_valid_to && date > link.agreement_valid_to) return null;
@@ -202,6 +230,7 @@ function meta(h: TimelineHistoryRow) {
     packageText: h.packageText ?? null,
     currency: h.currency ?? null,
     corrections: h.corrections ?? [],
+    checkedAt: h.checkedAt ?? null,
   };
 }
 
@@ -210,7 +239,10 @@ export interface BuildTimelineInput {
   /** Leverandør-id → navn. */
   supplierNames: ReadonlyMap<string, string>;
   links: readonly TimelineLink[];
-  /** Multiplikator for enhetsvalget (1 = per grunnenhet, N = per pakning). */
+  /**
+   * Sammenligning mot DAGENS pakning (1 = per grunnenhet). Gjelder bare prispunkter
+   * (merket `current_package_comparison`); hendelser skaleres aldri, og CSV skriver originalprisen.
+   */
   unitFactor?: number;
   /** ISO-datoer; punkter utenfor intervallet tas bort. */
   from?: string | null;
@@ -241,7 +273,7 @@ export function buildTimeline({
     const kind = historyKind(h, currentUnit);
     if (kind === "gyldig") { valid.push(h); continue; }
     events.push({
-      id: h.id, date: h.effective_date, kind, price: Number(h.price) * unitFactor, supplierName: nameOf(h.supplier_id),
+      id: h.id, date: h.effective_date, kind, price: Number(h.price), supplierName: nameOf(h.supplier_id),
       source: h.source, invoiceId: h.invoice_id, invoiceNumber: h.invoiceNumber ?? null,
       reason: h.supersededReason ? (SUPERSEDED_REASON_LABEL[h.supersededReason] ?? "Annen årsak") : null,
       supersededAt: h.supersededAt ?? null, notes: h.notes ?? null, ...meta(h),
@@ -257,7 +289,8 @@ export function buildTimeline({
   for (const h of sorted) {
     const key = h.supplier_id ?? MANUAL_KEY;
     const name = nameOf(h.supplier_id);
-    const price = Number(h.price) * unitFactor;
+    const originalPrice = Number(h.price);
+    const price = originalPrice * unitFactor;
     const list = bySupplier.get(key) ?? [];
     const prev = list[list.length - 1] ?? null;
     const agreed = agreementForDate(links, h.supplier_id, h.effective_date);
@@ -267,6 +300,8 @@ export function buildTimeline({
       t: Date.parse(`${h.effective_date}T00:00:00Z`),
       date: h.effective_date,
       price,
+      originalPrice,
+      conversionBasis: unitFactor !== 1 ? "current_package_comparison" : "none",
       supplierKey: key,
       supplierName: name,
       source: h.source,
@@ -288,7 +323,7 @@ export function buildTimeline({
     .sort((a, b) => a.name.localeCompare(b.name, "nb"));
 
   const bands: AgreementBand[] = links
-    .filter((l) => l.agreed_price_per_base_unit != null && l.agreement_valid_from)
+    .filter((l) => l.agreed_price_per_base_unit != null && l.agreement_valid_from && l.agreement_confirmed === true)
     .map((l) => ({
       supplierKey: l.supplier_id,
       supplierName: supplierNames.get(l.supplier_id) ?? "Ukjent",
@@ -309,22 +344,25 @@ export function buildTimeline({
  * (nyeste først), deretter hendelser. Historisk enhet/pakning/valuta per rad;
  * ukjent grunnlag skrives som «Ukjent», aldri dagens enhet.
  */
-export function timelineCsv(rows: readonly TimelinePoint[], events: readonly TimelineEvent[] = []): string {
+export function timelineCsv(rows: readonly TimelinePoint[], events: readonly TimelineEvent[] = [], displayUnit: string | null = null): string {
   const clean = (v: string | null) => (v ?? "").replace(/[;\n\r]/g, " ");
   const unk = (v: string | null) => clean(v) || "Ukjent";
   const head = [
     "Type", "Dato", "Registrert", "Leverandør", "Pris", "Valuta", "Enhet (historisk)", "Enhetsgrunnlag", "Pakning (historisk)",
     "Kilde", "Faktura", "Δ forrige kr", "Δ forrige %", "Δ avtale %", "Årsak", "Utgått", "Rettelse før → etter", "Notat",
+    "Kontrollert", "Visningspris", "Visningsenhet", "Omregning",
   ];
+  const basisText = (b: ConversionBasis) => (b === "current_package_comparison" ? "Omregnet til dagens pakning" : b === "documented_source_package" ? "Kildelinjens pakning" : "Ingen");
   const corr = (c: readonly CorrectionSnapshot[]) => clean(c.map(correctionText).join(" | "));
   const lines = [head.join(";")];
   for (const r of rows) {
     lines.push([
-      "Gyldig", r.date, clean(r.createdAt), clean(r.supplierName), r.price.toFixed(4), unk(r.currency), unk(r.unit),
+      "Gyldig", r.date, clean(r.createdAt), clean(r.supplierName), r.originalPrice.toFixed(4), unk(r.currency), unk(r.unit),
       r.unitSource ? UNIT_SOURCE_LABEL[r.unitSource] : "Ukjent", unk(r.packageText), clean(priceSourceLabel(r.source)), clean(r.invoiceNumber),
       r.deltaPrevKr != null ? r.deltaPrevKr.toFixed(4) : "",
       r.deltaPrevPct != null ? r.deltaPrevPct.toFixed(1) : "",
       r.deltaAgreementPct != null ? r.deltaAgreementPct.toFixed(1) : "", "", "", corr(r.corrections), clean(r.notes),
+      clean(r.checkedAt), r.price.toFixed(4), r.conversionBasis === "none" ? unk(r.unit) : clean(displayUnit) || "pakning", basisText(r.conversionBasis),
     ].join(";"));
   }
   for (const e of events) {
@@ -332,6 +370,7 @@ export function timelineCsv(rows: readonly TimelinePoint[], events: readonly Tim
       HISTORY_KIND_LABEL[e.kind], e.date, clean(e.createdAt), clean(e.supplierName), e.price.toFixed(4), unk(e.currency), unk(e.unit),
       e.unitSource ? UNIT_SOURCE_LABEL[e.unitSource] : "Ukjent", unk(e.packageText), clean(priceSourceLabel(e.source)), clean(e.invoiceNumber),
       "", "", "", clean(e.reason), clean(e.supersededAt), corr(e.corrections), clean(e.notes),
+      clean(e.checkedAt), "", "", "Ingen",
     ].join(";"));
   }
   return lines.join("\n");
