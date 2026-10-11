@@ -17,15 +17,15 @@ const rmMap: Record<string, BakersRawMaterial> = {
     name: "Hvetemel",
     grain_classification: "wheat",
     base_unit: "kg",
-    current_cost_price: 12,
+    current_cost_price: 12, cost_basis_status: "verifisert",
   },
-  vann: { id: "vann", name: "Vann", base_unit: "kg", current_cost_price: 0, is_water: true },
+  vann: { id: "vann", name: "Vann", base_unit: "kg", current_cost_price: 0, cost_basis_status: "verifisert", is_water: true },
   // Underoppskrift: registrert som råvare produsert av en annen oppskrift.
   surdeig: {
     id: "surdeig",
     name: "Surdeig (halvfabrikat)",
     base_unit: "kg",
-    current_cost_price: 20,
+    current_cost_price: 20, cost_basis_status: "verifisert",
     produced_by_recipe_id: "recipe-surdeig",
   },
   uprisetRm: { id: "uprisetRm", name: "Smør", base_unit: "kg", current_cost_price: null },

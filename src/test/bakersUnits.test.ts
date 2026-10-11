@@ -184,8 +184,8 @@ describe("scaledSummary og scaleLines med ukjente mengder", () => {
 describe("costPerKg for halvfabrikat", () => {
   it("1 l vann + 1 kg mel gir 2 kg og riktig pris", () => {
     const lines = [
-      line({ id: "m", quantity: 1, unit: "kg", _rm: { id: "m", name: "Hvetemel", current_cost_price: 12 } }),
-      line({ id: "v", quantity: 1, unit: "l", _rm: { id: "v", name: "Vann", current_cost_price: 0 } }),
+      line({ id: "m", quantity: 1, unit: "kg", _rm: { id: "m", name: "Hvetemel", current_cost_price: 12, cost_basis_status: "verifisert" } }),
+      line({ id: "v", quantity: 1, unit: "l", _rm: { id: "v", name: "Vann", current_cost_price: 0, cost_basis_status: "verifisert" } }),
     ];
     // 12 kr fordelt på 2 kg deig
     expect(costPerKg(lines)).toBeCloseTo(6, 6);
@@ -194,8 +194,8 @@ describe("costPerKg for halvfabrikat", () => {
 
   it("1 dl olje uten tetthet gir ingen pris per kg", () => {
     const lines = [
-      line({ id: "m", quantity: 1, unit: "kg", _rm: { id: "m", name: "Hvetemel", current_cost_price: 12 } }),
-      line({ id: "o", quantity: 1, unit: "dl", _rm: { id: "o", name: "Rapsolje", current_cost_price: 30 } }),
+      line({ id: "m", quantity: 1, unit: "kg", _rm: { id: "m", name: "Hvetemel", current_cost_price: 12, cost_basis_status: "verifisert" } }),
+      line({ id: "o", quantity: 1, unit: "dl", _rm: { id: "o", name: "Rapsolje", current_cost_price: 30, cost_basis_status: "verifisert" } }),
     ];
     expect(costPerKg(lines)).toBeNull();
     expect(costPerKgBlockedReason(lines)).toContain("Rapsolje");
