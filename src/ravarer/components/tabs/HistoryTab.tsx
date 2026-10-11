@@ -117,7 +117,7 @@ export function HistoryTab({ rm }: Props) {
         detail: [
           sourceLabel(p.source),
           pv.unitSource ? `Enhet: ${UNIT_SOURCE_LABEL[pv.unitSource]}` : "Enhet ikke dokumentert",
-          row.unitSource === "currently_verified_line" ? `${RECONSTRUCTED_NOTE}${row.checkedAt ? ` (${formatDateTime(row.checkedAt)})` : ""}` : null,
+          row.unitSource === "currently_verified_line" ? `${RECONSTRUCTED_NOTE}${row.checkedAt ? ` (${formatDate(row.checkedAt)})` : ""}` : null,
           row.held ? "Holdt til kontroll — ikke prisreferanse" : null,
           row.duplicateSource ? "Duplikat — ikke prisreferanse" : null,
           pv.packageText ? `Pakning ${pv.packageText}` : null,
@@ -158,6 +158,11 @@ export function HistoryTab({ rm }: Props) {
         </Select>
       </div>
 
+      {projectionError && (
+        <p role="status" className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-caption text-warning">
+          Serverkontrollen av fakturalinjer kunne ikke hentes. Lagret historikk vises uendret; ingen rader er merket som kontrollert.
+        </p>
+      )}
       <QueryState
         isLoading={isLoading}
         isError={isError}
