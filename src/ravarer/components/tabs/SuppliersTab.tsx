@@ -117,7 +117,7 @@ export function SuppliersTab({ rm }: Props) {
       />
       )}
 
-      <RecentInvoiceLinesCard rawMaterialId={rm.id} baseUnit={rm.base_unit} />
+      <RecentInvoiceLinesCard rawMaterialId={rm.id} baseUnit={rm.base_unit} eligibleLineIds={historyQuery.eligibleLineIds} />
       <PurchaseStatsCard rawMaterialId={rm.id} baseUnit={rm.base_unit} />
 
       <NewSupplierDialog open={supplierOpen} onOpenChange={setSupplierOpen} />

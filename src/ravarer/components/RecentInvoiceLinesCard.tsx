@@ -9,6 +9,8 @@ import { paths } from "@/ravarer/lib/paths";
 interface Props {
   rawMaterialId: string;
   baseUnit: string;
+  /** Linjer som er gyldig kostgrunnlag nå (serverens utvalg). null = ukjent; aldri gjettet. */
+  eligibleLineIds?: ReadonlySet<string> | null;
 }
 
 interface Row {
@@ -28,7 +30,7 @@ interface Row {
 }
 
 /** Viser de fem siste fakturalinjene som er koblet til råvaren. */
-export function RecentInvoiceLinesCard({ rawMaterialId, baseUnit }: Props) {
+export function RecentInvoiceLinesCard({ rawMaterialId, baseUnit, eligibleLineIds = null }: Props) {
   const query = useQuery({
     queryKey: ["rm-recent-invoice-lines", rawMaterialId],
     queryFn: async (): Promise<Row[]> => {
@@ -76,6 +78,7 @@ export function RecentInvoiceLinesCard({ rawMaterialId, baseUnit }: Props) {
                 <th className="pb-2 text-right">Mengde</th>
                 <th className="pb-2 text-right">Pris per {baseUnit}</th>
                 <th className="pb-2 text-right">Beløp</th>
+                <th className="pb-2">Kostgrunnlag nå</th>
               </tr>
             </thead>
             <tbody>
@@ -114,6 +117,11 @@ export function RecentInvoiceLinesCard({ rawMaterialId, baseUnit }: Props) {
                     {r.total_amount == null
                       ? "—"
                       : formatNok(Number(r.total_amount))}
+                  </td>
+                  <td className="py-2 text-caption">
+                    {eligibleLineIds == null ? <span className="text-ink-secondary">Ukjent</span>
+                      : eligibleLineIds.has(r.id) ? <span className="text-success">Gyldig</span>
+                      : <span className="text-warning">Ikke gyldig nå — lagret historikk</span>}
                   </td>
                 </tr>
               ))}
