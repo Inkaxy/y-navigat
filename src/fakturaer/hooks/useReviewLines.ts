@@ -126,11 +126,6 @@ export function useReviewLines(filters: Filters) {
         let q = supabase
           .from("invoice_lines")
           .select(SELECT)
-          .not(
-            "invoice.status",
-            "in",
-            `(${(filters.onlyReady ? HIDDEN_INVOICE_STATUSES.filter((status) => status !== "ready") : HIDDEN_INVOICE_STATUSES).join(",")})`,
-          )
           // Nyeste faktura først — sorteringen MÅ skje i databasen. Med et tak
           // på f.eks. 200 linjer ville en klientsortering bare sortert de
           // vilkårlige 200 første radene.
@@ -145,7 +140,17 @@ export function useReviewLines(filters: Filters) {
 
         // Matchede linjer uten avtalepris er med — de utgjør arbeidslisten
         // «Uten avtalepris», selv om de ikke er merket for gjennomgang.
-        if (!(filters.includeResolved && filters.invoiceId)) q = q.or(REVIEW_FILTER);
+        // Eksakt fakturavisning (lesing) viser alle linjer også på avstemt/klar/flagget faktura.
+        // Den globale arbeidskøen utelater fortsatt ferdige fakturaer. Skrivelåser er uendret.
+        const exactInvoice = !!(filters.includeResolved && filters.invoiceId);
+        if (!exactInvoice) {
+          q = q.not(
+            "invoice.status",
+            "in",
+            `(${(filters.onlyReady ? HIDDEN_INVOICE_STATUSES.filter((status) => status !== "ready") : HIDDEN_INVOICE_STATUSES).join(",")})`,
+          );
+          q = q.or(REVIEW_FILTER);
+        }
         if (filters.legalEntityId) q = q.eq("invoice.legal_entity_id", filters.legalEntityId);
         if (filters.supplierId) q = q.eq("invoice.supplier_id", filters.supplierId);
         if (filters.invoiceId) q = q.eq("invoice_id", filters.invoiceId);
@@ -225,16 +230,21 @@ export function useReviewLineCounts(filters: Omit<Filters, "limit">) {
              expected_price_per_base_unit, price_variance_pct, base_quantity,
              invoice:invoices!inner(id, supplier_id, currency, lines_sum_status, extraction_confidence)`,
           )
-          .not(
-            "invoice.status",
-            "in",
-            `(${(filters.onlyReady ? HIDDEN_INVOICE_STATUSES.filter((status) => status !== "ready") : HIDDEN_INVOICE_STATUSES).join(",")})`,
-          )
           .order("invoice_id")
           // Unik sekundærsortering: paginering uten den kan hoppe over rader.
           .order("id")
           .range(from, to);
-        if (!(filters.includeResolved && filters.invoiceId)) q = q.or(REVIEW_FILTER);
+        // Eksakt fakturavisning (lesing) viser alle linjer også på avstemt/klar/flagget faktura.
+        // Den globale arbeidskøen utelater fortsatt ferdige fakturaer. Skrivelåser er uendret.
+        const exactInvoice = !!(filters.includeResolved && filters.invoiceId);
+        if (!exactInvoice) {
+          q = q.not(
+            "invoice.status",
+            "in",
+            `(${(filters.onlyReady ? HIDDEN_INVOICE_STATUSES.filter((status) => status !== "ready") : HIDDEN_INVOICE_STATUSES).join(",")})`,
+          );
+          q = q.or(REVIEW_FILTER);
+        }
         if (filters.legalEntityId) q = q.eq("invoice.legal_entity_id", filters.legalEntityId);
         if (filters.supplierId) q = q.eq("invoice.supplier_id", filters.supplierId);
         if (filters.invoiceId) q = q.eq("invoice_id", filters.invoiceId);
