@@ -147,10 +147,10 @@ describe("grunnlaget er endret → kontroller på nytt", () => {
     expect(result.current.state.plan).toBeNull();
   });
   it("dialog: utdatert eller feilet kontroll kan ikke sendes", () => {
-    const { rerender } = wrap(<ClaimCreditDialog open defaultTitle="T" kind="price_inquiry" amount={0} observed={8886} lineCount={1} busy={false} error={null} onSubmit={() => undefined} stale onRecheck={() => undefined} />);
+    const { rerender } = wrap(<ClaimCreditDialog open onOpenChange={() => undefined} defaultTitle="T" kind="price_inquiry" amount={0} observed={8886} lineCount={1} busy={false} error={null} onSubmit={() => undefined} stale onRecheck={() => undefined} />);
     expect(screen.getByText(/Grunnlaget er endret. Kontroller på nytt/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Opprett prisforespørsel/ })).toBeDisabled();
-    rerender(<QueryClientProvider client={new QueryClient()}><MemoryRouter><ClaimCreditDialog open defaultTitle="T" kind="price_inquiry" amount={0} observed={7405} lineCount={1} busy={false} error={null} onSubmit={() => undefined} changes={["Observert prisforskjell endret"]} /></MemoryRouter></QueryClientProvider>);
+    rerender(<QueryClientProvider client={new QueryClient()}><MemoryRouter><ClaimCreditDialog open onOpenChange={() => undefined} defaultTitle="T" kind="price_inquiry" amount={0} observed={7405} lineCount={1} busy={false} error={null} onSubmit={() => undefined} changes={["Observert prisforskjell endret"]} /></MemoryRouter></QueryClientProvider>);
     expect(screen.getByText(/gjennomgå før du oppretter/)).toBeInTheDocument();
   });
   it("planChanges merker basisendring selv med lik pris", () => {
