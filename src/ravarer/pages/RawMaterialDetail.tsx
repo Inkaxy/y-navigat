@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
 import { useGuardedNavigate } from "@/providers/UnsavedGuardProvider";
 import { QueryState } from "@/components/common/QueryState";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -25,14 +24,11 @@ import { ShortcutHelp } from "@/ravarer/ui/ShortcutHelp";
 import { useRenameRawMaterial } from "@/ravarer/hooks/useRawMaterials";
 import { useRawMaterialPage } from "@/ravarer/hooks/useRawMaterialPage";
 import { useRawMaterialPurchaseStats } from "@/ravarer/hooks/usePurchaseStats";
-import { useVarelisteItems } from "@/ravarer/hooks/useVarelisteItems";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
-import { useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
-import {
-  DEFAULT_DEVIATION_TOLERANCE,
-  filterAndSortItems,
-  parseListQuery,
-} from "@/ravarer/lib/rawMaterialViews";
+import { useWorklistNav } from "@/ravarer/pages/varer/useWorklistNav";
+import { useSaveOwner } from "@/ravarer/lib/saveOwner";
+import { costSummary } from "@/ravarer/lib/costSummary";
+import type { NavEntry } from "@/ravarer/pages/varer/modeLogic";
 import { RawMaterialKpiStrip } from "@/ravarer/components/RawMaterialKpiStrip";
 import { OverviewTab } from "@/ravarer/components/tabs/OverviewTab";
 import { NutritionTab } from "@/ravarer/components/tabs/NutritionTab";
@@ -57,12 +53,11 @@ export default function RawMaterialDetail() {
   const page = useRawMaterialPage(id);
   const rm = page.rm;
   const rename = useRenameRawMaterial();
-  const { legalEntityId, canWrite } = useRavarer();
+  const { canWrite } = useRavarer();
   const { data: stats } = useRawMaterialPurchaseStats(id);
 
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
-  const saveRef = useRef<(() => void) | null>(null);
 
   /** Listerekkefølgen fra varelisten — filtrene ligger i URL-en. */
   const listSearch = useMemo(() => listContext(searchParams), [searchParams]);
@@ -73,56 +68,35 @@ export default function RawMaterialDetail() {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- nøkkel er URL-strengen, ikke objektet
   }, [normalized?.toString(), !!page.rm]);
 
-  // Hele varelisten hentes KUN for «forrige/neste». Kom brukeren hit uten
-  // listekontekst (direktelenke, søk) OG uten at varelisten allerede er
-  // hentet i cache, er navigasjonen uaktuell og de tunge spørringene skal
-  // ikke kjøre. Fra standardlisten er querystringen tom (Vareliste.tsx
-  // strippper alle standardparametre), så uten cache-sjekken ville
-  // forrige/neste og [ ]-hurtigtastene vært døde derfra.
-  const qc = useQueryClient();
-  const wantsListNav =
-    listSearch.length > 0 ||
-    qc.getQueryState(["raw_materials", legalEntityId])?.data != null;
-  const { items } = useVarelisteItems({ enabled: wantsListNav });
-  const tolerances = useMatchTolerances(legalEntityId);
-  const tolerance = tolerances.defaultPct ?? DEFAULT_DEVIATION_TOLERANCE;
-
-  const ordered = useMemo(
-    () =>
-      wantsListNav
-        ? filterAndSortItems(
-            items,
-            parseListQuery(new URLSearchParams(listSearch)),
-            // Samme avviks-toleranse som varelisten, ellers kan «Avvik»-
-            // visningen inneholde andre rader enn listen brukeren kom fra.
-            tolerance,
-          )
-        : [],
-    [items, listSearch, tolerance, wantsListNav],
-  );
-
-  const index = ordered.findIndex((i) => i.id === id);
-  const prev = index > 0 ? ordered[index - 1] : null;
-  const next =
-    index >= 0 && index < ordered.length - 1 ? ordered[index + 1] : null;
+  // Forrige/neste følger NØYAKTIG arbeidslisten brukeren kom fra (samme hooks og ordning som listen).
+  const nav = useWorklistNav(listSearch, id, searchParams.get("endring"));
+  const prev = nav.prev;
+  const next = nav.next;
 
   const goTo = useCallback(
-    (targetId: string) =>
-      navigate(
-        `${paths.raavare(targetId)}${listSearch ? `?${listSearch}` : ""}`,
-      ),
+    (entry: NavEntry) => {
+      const n = new URLSearchParams(listSearch);
+      if (n.has("valgt")) n.set("valgt", entry.materialId);
+      if (entry.eventId) n.set("endring", entry.eventId);
+      const q = n.toString();
+      navigate(`${paths.raavare(entry.materialId)}${q ? `?${q}` : ""}`);
+    },
     [navigate, listSearch],
   );
+
+  // Cmd/Ctrl-S eies av seksjonen som er montert NÅ (nøkkel = råvare + seksjon). Bytte som blokkeres
+  // av ulagret-vakten beholder eieren; en avmontert seksjons lagring kan aldri kalles.
+  const owner = useSaveOwner(`${id ?? ""}:${section}`);
 
   const [helpOpen, setHelpOpen] = useState(false);
   const hotkeys = useMemo<HotkeyBinding[]>(
     () => [
-      { keys: ["["], description: "Forrige råvare", handler: () => { if (prev) goTo(prev.id); } },
-      { keys: ["]"], description: "Neste råvare", handler: () => { if (next) goTo(next.id); } },
-      { keys: ["s"], mod: true, description: "Lagre", handler: () => saveRef.current?.() },
+      { keys: ["["], description: "Forrige råvare", handler: () => { if (prev) goTo(prev); } },
+      { keys: ["]"], description: "Neste råvare", handler: () => { if (next) goTo(next); } },
+      { keys: ["s"], mod: true, description: "Lagre", handler: () => owner.save() },
       { keys: ["?"], description: "Vis hurtigtaster", handler: () => setHelpOpen(true) },
     ],
-    [prev, next, goTo],
+    [prev, next, goTo, owner],
   );
   useHotkeys(hotkeys);
 
@@ -166,6 +140,7 @@ export default function RawMaterialDetail() {
   const sections = sectionsFor(rm.is_packaging);
   const sectionHref = (sid: SectionId) => `${paths.raavare(rm.id)}${sectionSearch(searchParams, sid)}`;
   const openCount = checklist.filter((c) => c.status !== "ok").length;
+  const cost = costSummary(rm);
 
   return (
     <div className="space-y-5">
@@ -173,6 +148,14 @@ export default function RawMaterialDetail() {
         eyebrow={`Råvarer · ${ITEM_TYPE_LABEL[rm.item_type] ?? rm.item_type}${rm.is_active ? "" : " · Inaktiv"}`}
         title={rm.name}
         subtitle={`SKU ${rm.sku} · ${rm.base_unit}`}
+        meta={
+          <Link to={sectionHref("pris")} className="inline-flex flex-wrap items-baseline gap-x-2 rounded-md text-sm hover:underline" aria-label={`Kostpris ${cost.value} per ${rm.base_unit}, ${cost.status}`} data-testid="header-cost">
+            <span className="font-semibold tabular-nums">{cost.value}{cost.precise ? ` / ${rm.base_unit}` : ""}</span>
+            <span className={cost.verified ? "text-success" : "text-warning"}>{cost.status}</span>
+            {cost.precise && <span className="tabular-nums text-ink-secondary">{cost.precise}</span>}
+            {cost.source && <span className="text-ink-secondary">{cost.source}</span>}
+          </Link>
+        }
         crumbs={[
           { label: "Råvarer", to: paths.varer() },
           { label: "Varer", to: `${paths.varer()}${listSearch ? `?${listSearch}` : ""}` },
@@ -183,10 +166,10 @@ export default function RawMaterialDetail() {
             <Button variant="ghost" size="sm" onClick={() => navigate(`${paths.varer()}${listSearch ? `?${listSearch}` : ""}`)}>
               <ArrowLeft className="mr-1.5 h-4 w-4" /> Tilbake
             </Button>
-            <Button variant="outline" size="icon" aria-label="Forrige råvare" title="Forrige råvare ( [ )" disabled={!prev} onClick={() => prev && goTo(prev.id)}>
+            <Button variant="outline" size="icon" aria-label="Forrige råvare" title="Forrige råvare ( [ )" disabled={!prev} onClick={() => prev && goTo(prev)}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon" aria-label="Neste råvare" title="Neste råvare ( ] )" disabled={!next} onClick={() => next && goTo(next.id)}>
+            <Button variant="outline" size="icon" aria-label="Neste råvare" title="Neste råvare ( ] )" disabled={!next} onClick={() => next && goTo(next)}>
               <ChevronRight className="h-4 w-4" />
             </Button>
             {!editingName && canWrite && (
@@ -231,7 +214,6 @@ export default function RawMaterialDetail() {
                   to={sectionHref(sid)}
                   replace
                   aria-current={section === sid ? "page" : undefined}
-                  onClick={() => { saveRef.current = null; }}
                   className={cn(
                     "flex min-h-10 items-center justify-between rounded-md px-3 text-sm transition-colors",
                     section === sid ? "bg-muted font-semibold text-foreground" : "text-ink-secondary hover:bg-muted/60",
@@ -245,7 +227,7 @@ export default function RawMaterialDetail() {
           </ul>
         </nav>
         <div className="lg:hidden">
-          <Select value={section} onValueChange={(v) => { saveRef.current = null; navigate(sectionHref(v as SectionId), { replace: true }); }}>
+          <Select value={section} onValueChange={(v) => navigate(sectionHref(v as SectionId), { replace: true })}>
             <SelectTrigger className="h-11" aria-label="Velg seksjon"><SelectValue /></SelectTrigger>
             <SelectContent>
               {sections.map((sid) => <SelectItem key={sid} value={sid}>{SECTION_LABEL[sid]}</SelectItem>)}
@@ -264,10 +246,10 @@ export default function RawMaterialDetail() {
           {section === "pris" && <SuppliersTab rm={rm} part="pris" />}
           {section === "leverandorer" && <SuppliersTab rm={rm} part="leverandorer" />}
           {section === "naering" && !rm.is_packaging && (
-            <NutritionTab rawMaterialId={rm.id} part="naering" registerSave={(fn) => { saveRef.current = fn; }} />
+            <NutritionTab rawMaterialId={rm.id} part="naering" registerSave={owner.register} />
           )}
           {section === "deklarasjon" && !rm.is_packaging && (
-            <NutritionTab rawMaterialId={rm.id} part="deklarasjon" registerSave={(fn) => { saveRef.current = fn; }} />
+            <NutritionTab rawMaterialId={rm.id} part="deklarasjon" registerSave={owner.register} />
           )}
           {section === "bruk" && (
             <>
@@ -277,7 +259,7 @@ export default function RawMaterialDetail() {
           )}
           {section === "lager" && <StockTab rm={rm} hideSellsAs />}
           {section === "grunndata" && (
-            <OverviewTab rm={rm} registerSave={(fn) => { saveRef.current = fn; }} onEditLink={() => navigate(sectionHref("leverandorer"), { replace: true })} />
+            <OverviewTab rm={rm} registerSave={owner.register} onEditLink={() => navigate(sectionHref("leverandorer"), { replace: true })} />
           )}
           {section === "historikk" && <HistoryTab rm={rm} />}
         </section>
