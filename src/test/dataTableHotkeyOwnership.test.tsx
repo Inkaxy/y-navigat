@@ -2,6 +2,8 @@
 /** Fokusert mobilkort: Enter gir ÉN handling (kortets egen), ikke i tillegg global «åpne». */
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { DataTable } from "@/ravarer/ui/DataTable";
 import { shouldIgnoreShortcut } from "@/ravarer/ui/hotkeys";
 
@@ -12,11 +14,11 @@ function setup() {
   const onActiveChange = vi.fn();
   const onEnter = vi.fn();
   render(
-    <DataTable<Row>
+    <MemoryRouter><TooltipProvider><DataTable<Row>
       ariaLabel="t" rows={rows} getId={(r) => r.id} columns={[{ id: "name", header: "Navn", cell: (r) => r.name }]}
       activeId="a" onActiveChange={onActiveChange} onEnter={onEnter} hotkeys
       renderMobileCard={(r) => <span>{r.name} kort</span>}
-    />,
+    /></TooltipProvider></MemoryRouter>,
   );
   return { onActiveChange, onEnter };
 }
