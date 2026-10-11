@@ -27,6 +27,24 @@ describe("prisberegning", () => {
   });
   it("krav gjelder bare dyrere linjer", () => expect(claimAmount(lines)).toBeCloseTo(827, 0));
   it("uten grunnlag → null", () => expect(priceChange([])).toBeNull());
+  it("MELIS: tre ulike tall, full presisjon", () => {
+    const c = priceChange([
+      { id: "085d68a6", price_per_base_unit: 28.81, expected_price_per_base_unit: 14, base_quantity: 600 },
+      { id: "d4738b98", price_per_base_unit: 14.5, expected_price_per_base_unit: 25.76, base_quantity: 600 },
+    ])!;
+    expect(c.expected).toBeCloseTo(19.88, 9);
+    expect(c.actual).toBeCloseTo(21.655, 9);
+    expect(c.impactNok).toBeCloseTo(2130, 6);
+    expect(c.absoluteNok).toBeCloseTo(15642, 6);
+    expect(c.positiveNok).toBeCloseTo(8886, 6);
+    expect(c.positiveIds).toEqual(["085d68a6"]);
+    expect(c.pct).toBeCloseTo(8.92857, 4);
+  });
+  it("ulik mengde vektes; manglende/null/negativ mengde er ukjent", () => {
+    const c = priceChange([{ id: "a", price_per_base_unit: 20, expected_price_per_base_unit: 10, base_quantity: 300 }, { id: "b", price_per_base_unit: 10, expected_price_per_base_unit: 10, base_quantity: 100 }])!;
+    expect(c.actual).toBeCloseTo(17.5, 9);
+    for (const q of [null, 0, -5]) expect(priceChange([{ id: "a", price_per_base_unit: 20, expected_price_per_base_unit: 10, base_quantity: q }])).toBeNull();
+  });
 });
 
 describe("valgt-nøkkel", () => {
