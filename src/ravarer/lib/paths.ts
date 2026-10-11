@@ -55,7 +55,7 @@ export const paths = {
   alleVarekort: (q?: Q) => withQuery(`${RAVARER_ROOT}/priskontroll/varekort`, q),
   varekort: (supplierId: Id, itemKey: Id) => `${RAVARER_ROOT}/priskontroll/varekort/${enc(supplierId)}/${enc(itemKey)}`,
   godkjenning: () => withQuery(`${RAVARER_ROOT}/priskontroll`, { fane: "godkjenning" }),
-  saker: () => withQuery(`${RAVARER_ROOT}/priskontroll`, { fane: "saker" }),
+  saker: (q?: { leverandor?: string } & Q) => withQuery(`${RAVARER_ROOT}/priskontroll`, { fane: "saker", ...q }),
   faktura: (id: Id, q?: Q) => withQuery(`${RAVARER_ROOT}/priskontroll/faktura/${enc(id)}`, q),
   /** «Les originalen på nytt»; `kjoring` gjenopptar en lagret lesing. */
   lesPaNytt: (id: Id, q?: { kjoring?: string } & Q) => withQuery(`${RAVARER_ROOT}/priskontroll/faktura/${enc(id)}/les-pa-nytt`, q),
