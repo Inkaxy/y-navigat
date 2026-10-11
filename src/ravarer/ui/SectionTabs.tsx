@@ -60,7 +60,7 @@ export function SectionTabs({ tabs, param = "fane", defaultTab, clearParams, ari
   };
 
   return (
-    <nav aria-label={ariaLabel} className="-mx-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <nav aria-label={ariaLabel} className="max-w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <div role="tablist" className="flex min-w-max gap-1 border-b border-border px-1">
         {visible.map((t) => {
           const on = t.id === active;
