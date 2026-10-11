@@ -185,7 +185,7 @@ export function DataTable<T>(p: Props<T>) {
                 data-active={p.getId(r) === p.activeId || undefined}
                 className={cn("w-full min-w-0 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", clickable && "cursor-pointer", p.getId(r) === p.activeId && "ring-2 ring-primary/40")}
                 onClick={(e) => { if (!clickable || fromControl(e.target, e.currentTarget)) return; activate(r); }}
-                onKeyDown={(e) => { if (clickable && e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); activate(r); } }}
+                onKeyDown={(e) => { if (clickable && e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); e.stopPropagation(); activate(r); } }}
               >
                 {p.renderMobileCard?.(r)}
               </div>

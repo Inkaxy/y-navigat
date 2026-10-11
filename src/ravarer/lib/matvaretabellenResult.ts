@@ -6,7 +6,8 @@ export interface ApplyMatvaretabellenResult {
   skipped: string[];
   water_content_set: boolean;
   water_g_skipped: boolean;
-  declaration_name_set: string | null;
+  /** Live-SQL returnerer BOOLEAN (`v_set_name`): om deklarasjonsnavnet ble satt — ikke selve navnet. */
+  declaration_name_set: boolean;
   forced: boolean;
 }
 
