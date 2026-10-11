@@ -1,12 +1,15 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGuardedNavigate } from "@/providers/UnsavedGuardProvider";
 import { QueryState } from "@/components/common/QueryState";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { SellsAsSection } from "@/ravarer/components/stock/SellsAsSection";
+import { CompletenessStrip, ChecklistCard } from "@/ravarer/components/detail/Completeness";
+import { completenessChecklist, listContext, readSection, sectionSearch, sectionsFor, SECTION_LABEL, type SectionId } from "@/ravarer/lib/rawMaterialSections";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   ArrowLeft,
@@ -50,7 +53,6 @@ export default function RawMaterialDetail() {
   const { id } = useParams();
   const navigate = useGuardedNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const tab = searchParams.get("tab") ?? "overview";
 
   const page = useRawMaterialPage(id);
   const rm = page.rm;
@@ -63,11 +65,12 @@ export default function RawMaterialDetail() {
   const saveRef = useRef<(() => void) | null>(null);
 
   /** Listerekkefølgen fra varelisten — filtrene ligger i URL-en. */
-  const listSearch = useMemo(() => {
-    const next = new URLSearchParams(searchParams);
-    next.delete("tab");
-    return next.toString();
-  }, [searchParams]);
+  const listSearch = useMemo(() => listContext(searchParams), [searchParams]);
+  const { section, normalized } = readSection(searchParams, !!page.rm?.is_packaging);
+  // Kjent gammel `tab` (eller ugyldig seksjon) skrives om én gang; øvrige parametre beholdes.
+  useEffect(() => {
+    if (normalized && page.rm) setSearchParams(normalized, { replace: true });
+  }, [normalized, page.rm, setSearchParams]);
 
   // Hele varelisten hentes KUN for «forrige/neste». Kom brukeren hit uten
   // listekontekst (direktelenke, søk) OG uten at varelisten allerede er
@@ -158,81 +161,31 @@ export default function RawMaterialDetail() {
     setEditingName(false);
   };
 
-  const chips: Array<{ label: string; tone: "ok" | "warn" | "muted" }> = [
-    {
-      label: rm.is_active ? "Aktiv" : "Inaktiv",
-      tone: rm.is_active ? "ok" : "warn",
-    },
-    { label: ITEM_TYPE_LABEL[rm.item_type] ?? rm.item_type, tone: "muted" },
-    ...(rm.categories ?? []).map((c) => ({ label: c, tone: "muted" as const })),
-    {
-      label: rm.declaration_name
-        ? "Deklarasjonsnavn"
-        : "Mangler deklarasjonsnavn",
-      tone: rm.declaration_name ? "ok" : "warn",
-    },
-    {
-      label: page.hasDatasheet ? "Datablad" : "Mangler datablad",
-      tone: page.hasDatasheet ? "ok" : "warn",
-    },
-    {
-      label:
-        page.allergenCount > 0
-          ? `${page.allergenCount} allergener`
-          : "Ingen allergener",
-      tone: page.allergenCount > 0 ? "ok" : "muted",
-    },
-    {
-      label: page.hasNutrition ? "Næring" : "Mangler næring",
-      tone: page.hasNutrition ? "ok" : "warn",
-    },
-  ];
+  const checklist = completenessChecklist({ rm, linkCount: page.links.length, nutrition: page.nutrition, hasDatasheet: page.hasDatasheet });
+  const sections = sectionsFor(rm.is_packaging);
+  const sectionHref = (sid: SectionId) => `${paths.raavare(rm.id)}${sectionSearch(searchParams, sid)}`;
+  const openCount = checklist.filter((c) => c.status !== "ok").length;
 
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Råvarer"
+        eyebrow={`Råvarer · ${ITEM_TYPE_LABEL[rm.item_type] ?? rm.item_type}${rm.is_active ? "" : " · Inaktiv"}`}
         title={rm.name}
         subtitle={`SKU ${rm.sku} · ${rm.base_unit}`}
         crumbs={[
           { label: "Råvarer", to: paths.varer() },
-          {
-            label: "Vareliste",
-            to: `${paths.varer()}${listSearch ? `?${listSearch}` : ""}`,
-          },
+          { label: "Varer", to: `${paths.varer()}${listSearch ? `?${listSearch}` : ""}` },
           { label: rm.name },
         ]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                navigate(
-                  `${paths.varer()}${listSearch ? `?${listSearch}` : ""}`,
-                )
-              }
-            >
+            <Button variant="ghost" size="sm" onClick={() => navigate(`${paths.varer()}${listSearch ? `?${listSearch}` : ""}`)}>
               <ArrowLeft className="mr-1.5 h-4 w-4" /> Tilbake
             </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Forrige råvare"
-              title="Forrige råvare ( [ )"
-              disabled={!prev}
-              onClick={() => prev && goTo(prev.id)}
-            >
+            <Button variant="outline" size="icon" aria-label="Forrige råvare" title="Forrige råvare ( [ )" disabled={!prev} onClick={() => prev && goTo(prev.id)}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Neste råvare"
-              title="Neste råvare ( ] )"
-              disabled={!next}
-              onClick={() => next && goTo(next.id)}
-            >
+            <Button variant="outline" size="icon" aria-label="Neste råvare" title="Neste råvare ( ] )" disabled={!next} onClick={() => next && goTo(next.id)}>
               <ChevronRight className="h-4 w-4" />
             </Button>
             {!editingName && canWrite && (
@@ -255,112 +208,79 @@ export default function RawMaterialDetail() {
             }}
             autoFocus
             className="h-11 max-w-xl text-2xl font-semibold tracking-tight"
-            style={{ letterSpacing: "-0.02em" }}
             aria-label="Nytt navn"
           />
-          <Button
-            size="icon"
-            variant="ghost"
-            aria-label="Lagre navn"
-            onClick={() => void saveName()}
-            disabled={rename.isPending}
-          >
+          <Button size="icon" variant="ghost" aria-label="Lagre navn" onClick={() => void saveName()} disabled={rename.isPending}>
             <Check className="h-4 w-4" />
           </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            aria-label="Avbryt"
-            onClick={() => setEditingName(false)}
-          >
+          <Button size="icon" variant="ghost" aria-label="Avbryt" onClick={() => setEditingName(false)}>
             <X className="h-4 w-4" />
           </Button>
         </div>
       )}
 
-      <div className="flex flex-wrap gap-1.5">
-        {chips.map((c) => (
-          <Badge
-            key={c.label}
-            variant="outline"
-            className={
-              c.tone === "warn"
-                ? "border-warning/50 text-warning"
-                : c.tone === "ok"
-                  ? "border-success/50 text-success"
-                  : undefined
-            }
-          >
-            {c.label}
-          </Badge>
-        ))}
-      </div>
+      <CompletenessStrip items={checklist} hrefFor={sectionHref} />
 
-      <RawMaterialKpiStrip
-        rm={rm}
-        links={page.links}
-        recipeCount={page.recipeCount}
-        spend12m={stats?.cost_12m ?? null}
-      />
+      <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <nav aria-label="Seksjoner på råvarekortet" className="hidden lg:block">
+          <ul className="sticky top-4 space-y-0.5">
+            {sections.map((sid) => (
+              <li key={sid}>
+                <Link
+                  to={sectionHref(sid)}
+                  replace
+                  aria-current={section === sid ? "page" : undefined}
+                  onClick={() => { saveRef.current = null; }}
+                  className={cn(
+                    "flex min-h-10 items-center justify-between rounded-md px-3 text-sm transition-colors",
+                    section === sid ? "bg-muted font-semibold text-foreground" : "text-ink-secondary hover:bg-muted/60",
+                  )}
+                >
+                  {SECTION_LABEL[sid]}
+                  {sid === "sammendrag" && openCount > 0 && <span className="text-caption tabular-nums text-warning">{openCount}</span>}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        <div className="lg:hidden">
+          <Select value={section} onValueChange={(v) => { saveRef.current = null; navigate(sectionHref(v as SectionId), { replace: true }); }}>
+            <SelectTrigger className="h-11" aria-label="Velg seksjon"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {sections.map((sid) => <SelectItem key={sid} value={sid}>{SECTION_LABEL[sid]}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
 
-      <Tabs
-        value={tab}
-        onValueChange={(v) => {
-          // Fanen som forlates eier ikke lagringen lenger.
-          saveRef.current = null;
-          const next2 = new URLSearchParams(searchParams);
-          if (v === "overview") next2.delete("tab");
-          else next2.set("tab", v);
-          setSearchParams(next2, { replace: true });
-        }}
-      >
-        <TabsList className="flex-wrap">
-          <TabsTrigger value="overview">Oversikt</TabsTrigger>
-          <TabsTrigger value="suppliers">Priser & leverandører</TabsTrigger>
-          {!rm.is_packaging && (
-            <TabsTrigger value="nutrition">Næring & deklarasjon</TabsTrigger>
+        <section aria-labelledby="rm-section-title" className="min-w-0 space-y-4">
+          <h2 id="rm-section-title" className="font-display text-title">{SECTION_LABEL[section]}</h2>
+          {section === "sammendrag" && (
+            <>
+              <RawMaterialKpiStrip rm={rm} links={page.links} recipeCount={page.recipeCount} spend12m={stats?.cost_12m ?? null} />
+              <ChecklistCard items={checklist} hrefFor={sectionHref} />
+            </>
           )}
-          <TabsTrigger value="recipes">Brukt i oppskrifter</TabsTrigger>
-          <TabsTrigger value="stock">Lager</TabsTrigger>
-          <TabsTrigger value="history">Historikk</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="mt-5">
-          <OverviewTab
-            rm={rm}
-            registerSave={(fn) => {
-              if (tab === "overview") saveRef.current = fn;
-            }}
-            onEditLink={() => {
-              const n = new URLSearchParams(searchParams);
-              n.set("tab", "suppliers");
-              setSearchParams(n, { replace: true });
-            }}
-          />
-        </TabsContent>
-        <TabsContent value="suppliers" className="mt-5">
-          <SuppliersTab rm={rm} />
-        </TabsContent>
-        {!rm.is_packaging && (
-          <TabsContent value="nutrition" className="mt-5">
-            <NutritionTab
-              rawMaterialId={rm.id}
-              registerSave={(fn) => {
-                if (tab === "nutrition") saveRef.current = fn;
-              }}
-            />
-          </TabsContent>
-        )}
-        <TabsContent value="recipes" className="mt-5">
-          <RecipesTab rm={rm} />
-        </TabsContent>
-        <TabsContent value="stock" className="mt-5">
-          <StockTab rm={rm} />
-        </TabsContent>
-        <TabsContent value="history" className="mt-5">
-          <HistoryTab rm={rm} />
-        </TabsContent>
-      </Tabs>
+          {section === "pris" && <SuppliersTab rm={rm} part="pris" />}
+          {section === "leverandorer" && <SuppliersTab rm={rm} part="leverandorer" />}
+          {section === "naering" && !rm.is_packaging && (
+            <NutritionTab rawMaterialId={rm.id} part="naering" registerSave={(fn) => { saveRef.current = fn; }} />
+          )}
+          {section === "deklarasjon" && !rm.is_packaging && (
+            <NutritionTab rawMaterialId={rm.id} part="deklarasjon" registerSave={(fn) => { saveRef.current = fn; }} />
+          )}
+          {section === "bruk" && (
+            <>
+              <RecipesTab rm={rm} />
+              {rm.is_resale_item && <SellsAsSection rm={rm} />}
+            </>
+          )}
+          {section === "lager" && <StockTab rm={rm} hideSellsAs />}
+          {section === "grunndata" && (
+            <OverviewTab rm={rm} registerSave={(fn) => { saveRef.current = fn; }} onEditLink={() => navigate(sectionHref("leverandorer"), { replace: true })} />
+          )}
+          {section === "historikk" && <HistoryTab rm={rm} />}
+        </section>
+      </div>
       <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} bindings={hotkeys} />
     </div>
   );
