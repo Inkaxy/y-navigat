@@ -119,7 +119,6 @@ describe("kildeparitet", () => {
   });
 });
 
-import { toInvoiceLineRows } from "../../supabase/functions/tripletex-import-invoice-lines/rows";
 import { describe as d2, it as i2, expect as e2 } from "vitest";
 import { computeConfidence as cc2, sanitizeLines as sl2 } from "../../supabase/functions/_shared/invoiceExtraction";
 
