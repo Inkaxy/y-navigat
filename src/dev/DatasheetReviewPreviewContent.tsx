@@ -15,14 +15,14 @@ const target: ReviewTarget = {
     nutrition: { energy_kj: 1450, energy_kcal: 343, fat_g: 1.6, saturated_fat_g: 0.3, carbs_g: 69, sugars_g: 1.2, fiber_g: 3.4, protein_g: 11.5, salt_g: 0.01 },
     e_numbers: ["E300"],
     country_of_origin: "Norge",
-    allergens: [{ allergen: "gluten", presence: "contains" }, { allergen: "soy", presence: "may_contain" }],
+    allergens: [{ allergen: "gluten_wheat", presence: "contains" }, { allergen: "soy", presence: "may_contain" }],
     ingredient_declaration: "HVETEMEL, askorbinsyre (E300)",
     grain_classification_hint: "fint",
   },
 };
 const current: ReviewCurrent = {
   nutrition: { energy_kj: 1420, energy_kcal: 336, fat_g: 1.4, saturated_fat_g: 0.3, carbs_g: 70, sugars_g: 1.0, fiber_g: 3.0, protein_g: 11.0, salt_g: 0.01, ingredient_declaration: "HVETEMEL", e_numbers: null, country_of_origin: null },
-  allergens: [{ allergen: "gluten", presence: "contains" }],
+  allergens: [{ allergen: "gluten_wheat", presence: "contains" }],
   grain: null,
 };
 
