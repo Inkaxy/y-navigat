@@ -123,23 +123,33 @@ export class CountOutcomeUnknownError extends Error {
   }
 }
 
+const fin = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x);
+const nonNegInt = (x: unknown): x is number => typeof x === "number" && Number.isInteger(x) && x >= 0;
+
+/** Normal resultatrad: før/talt/differanse er påkrevd og endelige. */
 function parseRow(v: unknown): CountResultRow | null {
   if (!v || typeof v !== "object" || Array.isArray(v)) return null;
   const o = v as Record<string, unknown>;
-  if (typeof o.raw_material_id !== "string") return null;
-  const num = (x: unknown) => (x == null ? null : typeof x === "number" && Number.isFinite(x) ? x : Number.NaN);
-  const before = num(o.before);
-  const counted = num(o.counted);
-  const diff = num(o.diff);
-  if ([before, counted, diff].some(n => n != null && Number.isNaN(n))) return null;
-  return { raw_material_id: o.raw_material_id, name: typeof o.name === "string" ? o.name : null, before, counted, diff };
+  if (typeof o.raw_material_id !== "string" || !o.raw_material_id) return null;
+  if (!fin(o.before) || !fin(o.counted) || !fin(o.diff)) return null;
+  return { raw_material_id: o.raw_material_id, name: typeof o.name === "string" ? o.name : null, before: o.before, counted: o.counted, diff: o.diff };
 }
+
+const EPS = 1e-6;
 
 /**
  * Leser svaret fra `rm_stock_count_apply_v2` strengt. Et uventet svar betyr
  * UKJENT utfall — aldri «ingenting er bokført».
+ *
+ * Komplett resultat: riktig op_id, ikke-negative heltall, nøyaktig én rad per sendt vare,
+ * og talt mengde/differanse stemmer med den frosne innsendingen.
+ * Eneste reserve: `{ok:true, already_applied:true}` uten op_id/rader/tellere (lagret resultat
+ * var null). Serveren har da kontrollert samme ID + innhold; detaljer mangler.
  */
-export function parseCountResult(data: unknown, sent: { opId: string; materialIds: string[] }): CountResult {
+export function parseCountResult(
+  data: unknown,
+  sent: { opId: string; materialIds: string[]; countedById?: Record<string, number> },
+): CountResult {
   if (!data || typeof data !== "object" || Array.isArray(data)) throw new CountOutcomeUnknownError();
   const o = data as Record<string, unknown>;
   if (o.ok === false) {
@@ -147,37 +157,28 @@ export function parseCountResult(data: unknown, sent: { opId: string; materialId
   }
   if (o.ok !== true) throw new CountOutcomeUnknownError();
   const alreadyApplied = o.already_applied === true;
-  if (o.op_id != null && o.op_id !== sent.opId) throw new CountOutcomeUnknownError();
-  const adjusted = o.adjusted;
-  const unchanged = o.unchanged;
-  const rowsRaw = o.rows;
-  const countsOk = typeof adjusted === "number" && Number.isInteger(adjusted) && typeof unchanged === "number" && Number.isInteger(unchanged);
-  const rows = Array.isArray(rowsRaw) ? rowsRaw.map(parseRow) : null;
-  const rowsOk = !!rows && rows.every((r): r is CountResultRow => r != null);
-  const sentSet = new Set(sent.materialIds);
-  const identityOk =
-    rowsOk &&
-    o.op_id === sent.opId &&
-    (rows as CountResultRow[]).length === sent.materialIds.length &&
-    (rows as CountResultRow[]).every(r => sentSet.has(r.raw_material_id)) &&
-    countsOk &&
-    (adjusted as number) + (unchanged as number) === sent.materialIds.length;
-  if (identityOk) {
-    return {
-      ok: true,
-      adjusted: adjusted as number,
-      unchanged: unchanged as number,
-      rows: rows as CountResultRow[],
-      alreadyApplied,
-      detailsUnavailable: false,
-      opId: sent.opId,
-    };
-  }
-  // Bevist bokført (lagret resultat for samme ID og innhold), men detaljene er ufullstendige.
-  if (alreadyApplied) {
+
+  const bareFallback = alreadyApplied && o.op_id == null && o.rows == null && o.adjusted == null && o.unchanged == null;
+  if (bareFallback) {
     return { ok: true, adjusted: 0, unchanged: 0, rows: [], alreadyApplied: true, detailsUnavailable: true, opId: sent.opId };
   }
-  throw new CountOutcomeUnknownError();
+  if (o.op_id !== sent.opId) throw new CountOutcomeUnknownError();
+  if (!nonNegInt(o.adjusted) || !nonNegInt(o.unchanged) || !Array.isArray(o.rows)) throw new CountOutcomeUnknownError();
+  if (o.adjusted + o.unchanged !== sent.materialIds.length) throw new CountOutcomeUnknownError();
+  const want = new Set(sent.materialIds);
+  if (want.size !== sent.materialIds.length || o.rows.length !== want.size) throw new CountOutcomeUnknownError();
+  const seen = new Set<string>();
+  const rows: CountResultRow[] = [];
+  for (const raw of o.rows) {
+    const r = parseRow(raw);
+    if (!r || !want.has(r.raw_material_id) || seen.has(r.raw_material_id)) throw new CountOutcomeUnknownError();
+    seen.add(r.raw_material_id);
+    if (Math.abs((r.counted as number) - (r.before as number) - (r.diff as number)) > EPS) throw new CountOutcomeUnknownError();
+    const frozen = sent.countedById?.[r.raw_material_id];
+    if (frozen != null && Math.abs(frozen - (r.counted as number)) > EPS) throw new CountOutcomeUnknownError();
+    rows.push(r);
+  }
+  return { ok: true, adjusted: o.adjusted, unchanged: o.unchanged, rows, alreadyApplied, detailsUnavailable: false, opId: sent.opId };
 }
 
 /** Klassifiserer en feil fra RPC-kallet. Bare kjente serverkoder er bevist avvisning. */

@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
-import { fetchAllRows } from "@/lib/supabasePaging";
+import { fetchAllRowsExact } from "@/lib/countedPaging";
 import {
   parseReceiveResult,
   ReceiveOutcomeUnknownError,
@@ -50,7 +50,7 @@ interface InvoiceFilters {
   supplierId?: string | null;
 }
 
-type PageResult<T> = PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
+type PageResult<T> = PromiseLike<{ data: T[] | null; error: { message: string } | null; count?: number | null }>;
 
 /** Henter mottak for linjene; feil gir `null` (ukjent), aldri tomt. */
 async function fetchReceipts(lineIds: string[]): Promise<Map<string, ReceiptRecord> | null> {
@@ -58,13 +58,14 @@ async function fetchReceipts(lineIds: string[]): Promise<Map<string, ReceiptReco
   try {
     for (let i = 0; i < lineIds.length; i += 300) {
       const chunk = lineIds.slice(i, i + 300);
-      type Row = { invoice_line_id: string; quantity_base: number; received_at: string; lot_id: string | null };
-      const rows = await fetchAllRows<Row>((from, to) =>
+      type Row = { id: string; invoice_line_id: string; quantity_base: number; received_at: string; lot_id: string | null };
+      const rows = await fetchAllRowsExact<Row>((from, to) =>
         supabase
           .from("rm_goods_receipts")
-          .select("invoice_line_id, quantity_base, received_at, lot_id")
+          .select("id, invoice_line_id, quantity_base, received_at, lot_id", { count: "exact" })
           .in("invoice_line_id", chunk)
           .order("invoice_line_id")
+          .order("id")
           .range(from, to) as PageResult<Row>,
       );
       rows.forEach(r => out.set(r.invoice_line_id, { quantity_base: Number(r.quantity_base), received_at: r.received_at, lot_id: r.lot_id }));
@@ -82,15 +83,16 @@ async function fetchMovements(lineIds: string[]): Promise<Map<string, MovementEv
   try {
     for (let i = 0; i < lineIds.length; i += 300) {
       const chunk = lineIds.slice(i, i + 300);
-      type Row = { source_id: string | null; quantity_base: number | null; movement_type: string };
-      const rows = await fetchAllRows<Row>((from, to) =>
+      type Row = { id: string; source_id: string | null; quantity_base: number | null; movement_type: string };
+      const rows = await fetchAllRowsExact<Row>((from, to) =>
         supabase
           .from("stock_movements")
-          .select("source_id, quantity_base, movement_type")
+          .select("id, source_id, quantity_base, movement_type", { count: "exact" })
           .eq("source_table", "invoice_lines")
           .in("movement_type", ["purchase", "return"])
           .in("source_id", chunk)
           .order("source_id")
+          .order("id")
           .range(from, to) as PageResult<Row>,
       );
       for (const m of rows) {
@@ -119,10 +121,10 @@ export function useReceiptInvoices(filters: InvoiceFilters) {
         id: string; invoice_number: string; invoice_date: string; status: string; is_credit_note: boolean | null;
         supplier_id: string | null; total_amount: number | null; suppliers: { name: string } | null;
       };
-      const invoices = await fetchAllRows<Inv>((from, to) => {
+      const invoices = await fetchAllRowsExact<Inv>((from, to) => {
         let q = supabase
           .from("invoices")
-          .select("id, invoice_number, invoice_date, status, is_credit_note, supplier_id, total_amount, suppliers(name)")
+          .select("id, invoice_number, invoice_date, status, is_credit_note, supplier_id, total_amount, suppliers(name)", { count: "exact" })
           .eq("legal_entity_id", legalEntityId as string)
           .in("status", ["ready", "reconciled"])
           .gte("invoice_date", filters.fromDate)
@@ -137,10 +139,10 @@ export function useReceiptInvoices(filters: InvoiceFilters) {
       const lines: CountLine[] = [];
       for (let i = 0; i < ids.length; i += 200) {
         const chunk = ids.slice(i, i + 200);
-        const part = await fetchAllRows<CountLine>((from, to) =>
+        const part = await fetchAllRowsExact<CountLine>((from, to) =>
           supabase
             .from("invoice_lines")
-            .select("id, invoice_id, raw_materials(stock_tracking)")
+            .select("id, invoice_id, raw_materials(stock_tracking)", { count: "exact" })
             .in("invoice_id", chunk)
             .order("id")
             .range(from, to) as PageResult<CountLine>,
@@ -205,10 +207,10 @@ export function useReceiptLines(invoiceId: string | undefined) {
         base_quantity: number | null; total_amount: number | null; raw_material_id: string | null; requires_review: boolean | null;
         match_confidence: string | null; raw_materials: { id: string; name: string; base_unit: string; stock_tracking: boolean } | null;
       };
-      const rows = await fetchAllRows<RawLine>((from, to) =>
+      const rows = await fetchAllRowsExact<RawLine>((from, to) =>
         supabase
           .from("invoice_lines")
-          .select("id, line_number, description, quantity, unit, base_quantity, total_amount, raw_material_id, requires_review, match_confidence, raw_materials(id, name, base_unit, stock_tracking)")
+          .select("id, line_number, description, quantity, unit, base_quantity, total_amount, raw_material_id, requires_review, match_confidence, raw_materials(id, name, base_unit, stock_tracking)", { count: "exact" })
           .eq("invoice_id", invoiceId as string)
           .order("line_number")
           .order("id")
@@ -310,16 +312,21 @@ export function useReceiveInvoiceLine() {
         throw new ReceiveOutcomeUnknownError();
       }
       if (res.error) {
-        if (!res.error.code) throw new ReceiveOutcomeUnknownError();
+        // Bare kjente databasekoder beviser avvist (rullet tilbake) transaksjon; transport/gateway er ukjent.
+        if (!res.error.code || !/^(P0|22|23|42|28)/.test(res.error.code)) throw new ReceiveOutcomeUnknownError();
         throw new Error(res.error.message || "Mottaket ble avvist.");
       }
       return parseReceiveResult(res.data);
     },
-    onSettled: (_res, _err, vars) => {
-      // Etter hvert forsøk (også ukjent) leses autoritativ mottaksstatus på nytt.
+    onSettled: async (_res, _err, vars) => {
+      // Etter hvert forsøk (også ukjent) leses autoritativ mottaksstatus på nytt. Panelet holder
+      // ukjent utfall frosset til en vellykket lesing etter forsøket — avventing alene frigjør ikke.
       invalidateRawMaterial(qc, vars.raw_material_id);
-      void qc.invalidateQueries({ queryKey: ["receipt-lines", vars.invoice_id] });
-      void qc.invalidateQueries({ queryKey: ["receipt-invoices"] });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["receipt-lines", vars.invoice_id] }),
+        qc.invalidateQueries({ queryKey: ["receipt-invoices"] }),
+        qc.invalidateQueries({ queryKey: ["priskontroll-mengde-diagnostikk"] }),
+      ]);
     },
     onSuccess: res => {
       if (res.kind === "not_stock") toast.info("Varen er ikke lagerført — ingenting ble ført på lager.");

@@ -75,7 +75,11 @@ export function useApplyRmStockCount() {
         throw new CountOutcomeUnknownError();
       }
       if (res.error) throw classifyCountError(res.error);
-      return parseCountResult(res.data, { opId: input.opId, materialIds: input.lines.map(l => l.raw_material_id) });
+      return parseCountResult(res.data, {
+        opId: input.opId,
+        materialIds: input.lines.map(l => l.raw_material_id),
+        countedById: Object.fromEntries(input.lines.map(l => [l.raw_material_id, l.counted_base])),
+      });
     },
     onSuccess: res => {
       invalidateRawMaterial(qc);
@@ -91,6 +95,9 @@ export function useApplyRmStockCount() {
       toast.success(`Telling bokført: ${res.adjusted} justert, ${res.unchanged} uendret`);
     },
     onError: (e: unknown) => {
+      // Bevist konflikt: hent dagens beholdning, så «Bruk ny beholdning» viser fersk verdi.
+      // Det frosne utgangspunktet endres ikke før brukeren velger det.
+      if (isCountConflict(e)) void qc.refetchQueries({ queryKey: ["raw-material-stock-status"] });
       if (e instanceof CountOutcomeUnknownError) {
         toast.error(e.message);
         return;

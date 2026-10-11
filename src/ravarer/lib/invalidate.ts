@@ -58,6 +58,8 @@ const RAW_MATERIAL_GLOBAL_KEYS: readonly string[] = [
   "stock-has-movements",
   "stock-tracked-raw-materials",
   "raw-material-products",
+  // Skrivebeskyttet diagnostikk «Linjer uten mengde i baseenhet» (Priskontroll › Å gjøre).
+  "priskontroll-mengde-diagnostikk",
   "receipt-invoices",
   "receipt-lines",
   "rm-search",
@@ -134,6 +136,7 @@ const INVOICE_GLOBAL_KEYS: readonly string[] = [
   "raw-material-list-price-evidence",
   "fakturaer-review-lines",
   "fakturaer-review-count",
+  "priskontroll-mengde-diagnostikk",
   "fakturaer-inbox",
   "fakturaer-liste",
   "invoice-delivery-status",

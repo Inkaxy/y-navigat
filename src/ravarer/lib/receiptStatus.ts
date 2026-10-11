@@ -136,11 +136,13 @@ export function parseReceiveResult(data: unknown): ReceiveOutcome {
   if (o.skipped === "ikke_lagerfort") return { kind: "not_stock" };
   if (o.skipped != null) throw new ReceiveOutcomeUnknownError();
   if (o.already_received === true) {
-    if (!finite(o.quantity_base) || !optId(o.lot_id) || !(o.received_at == null || typeof o.received_at === "string")) throw new ReceiveOutcomeUnknownError();
+    // Gyldig variant har alltid mottakstidspunkt, lot_id-nøkkel (null tillatt) og mengde ≠ 0.
+    if (!finite(o.quantity_base) || o.quantity_base === 0 || !("lot_id" in o) || !optId(o.lot_id) || typeof o.received_at !== "string" || !o.received_at) throw new ReceiveOutcomeUnknownError();
     return { kind: "already", quantity_base: o.quantity_base, received_at: (o.received_at as string | null | undefined) ?? null, lot_id: (o.lot_id as string | null | undefined) ?? null };
   }
   if (o.already_received === false) {
-    if (!finite(o.quantity_base) || typeof o.movement_id !== "string" || !o.movement_id || !optId(o.lot_id)) throw new ReceiveOutcomeUnknownError();
+    // Kreditnota: negativ mengde og lot_id null er gyldig; mengde 0 og manglende nøkkel er ikke.
+    if (!finite(o.quantity_base) || o.quantity_base === 0 || typeof o.movement_id !== "string" || !o.movement_id || !("lot_id" in o) || !optId(o.lot_id)) throw new ReceiveOutcomeUnknownError();
     return { kind: "received", quantity_base: o.quantity_base, lot_id: (o.lot_id as string | null | undefined) ?? null, movement_id: o.movement_id };
   }
   throw new ReceiveOutcomeUnknownError();

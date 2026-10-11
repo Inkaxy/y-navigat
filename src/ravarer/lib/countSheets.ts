@@ -33,6 +33,11 @@ type LooseClient = {
     select: (cols: string) => {
       eq: (c: string, v: unknown) => {
         eq: (c: string, v: unknown) => {
+          eq: (c: string, v: unknown) => {
+            order: (c: string, o: { ascending: boolean }) => {
+              limit: (n: number) => Promise<{ data: unknown; error: { message: string } | null }>;
+            };
+          };
           order: (c: string, o: { ascending: boolean }) => {
             limit: (n: number) => Promise<{ data: unknown; error: { message: string } | null }>;
           };
@@ -66,38 +71,80 @@ function toPayload(value: unknown): CountSheetPayload {
   };
 }
 
-/** Henter et åpent telleark for dagen, eller null. */
-export async function fetchOpenCountSheet(
-  legalEntityId: string,
-  dateISO: string,
-): Promise<CountSheetRow | null> {
+export type OpenSheetResult =
+  | { kind: "absent" }
+  | { kind: "draft"; row: CountSheetRow }
+  /** Kunne ikke lese — aldri det samme som «ingen serverutkast». */
+  | { kind: "error" };
+
+/** Henter dagens nyeste åpne telleark. Feil skilles fra fravær. */
+export async function fetchOpenCountSheetResult(legalEntityId: string, dateISO: string): Promise<OpenSheetResult> {
   try {
     const { data, error } = await client()
       .from("rm_stock_count_sheets")
       .select("id, op_id, status, note, payload, updated_at")
       .eq("legal_entity_id", legalEntityId)
       .eq("count_date", dateISO)
+      // Filtrer på utkast i basen før grensen, så et eldre åpent utkast ikke skjules av bokførte ark.
+      .eq("status", "draft")
       .order("updated_at", { ascending: false })
-      .limit(5);
-    if (error) {
-      if (isMissingTable(error.message)) return null;
-      throw new Error(error.message);
-    }
+      .limit(1);
+    if (error) return isMissingTable(error.message) ? { kind: "absent" } : { kind: "error" };
     const rows = (Array.isArray(data) ? data : []) as Array<Record<string, unknown>>;
     const open = rows.find(r => r.status === "draft");
-    if (!open) return null;
+    if (!open) return { kind: "absent" };
     return {
-      id: String(open.id),
-      op_id: String(open.op_id),
-      status: "draft",
-      note: typeof open.note === "string" ? open.note : null,
-      payload: toPayload(open.payload),
-      updated_at: String(open.updated_at ?? ""),
+      kind: "draft",
+      row: {
+        id: String(open.id),
+        op_id: String(open.op_id),
+        status: "draft",
+        note: typeof open.note === "string" ? open.note : null,
+        payload: toPayload(open.payload),
+        updated_at: String(open.updated_at ?? ""),
+      },
     };
   } catch (e) {
-    // Et utilgjengelig telleark skal aldri hindre at tellesiden åpner.
-    if (e instanceof Error && isMissingTable(e.message)) return null;
-    return null;
+    console.warn("[varetelling] kunne ikke hente serverutkast", e);
+    return { kind: "error" };
+  }
+}
+
+/** Bakoverkompatibel: åpent telleark eller null (feil gir også null). Bruk `fetchOpenCountSheetResult`. */
+export async function fetchOpenCountSheet(legalEntityId: string, dateISO: string): Promise<CountSheetRow | null> {
+  const r = await fetchOpenCountSheetResult(legalEntityId, dateISO);
+  return r.kind === "draft" ? r.row : null;
+}
+
+export type SheetStatusResult =
+  | { kind: "found"; status: CountSheetRow["status"] }
+  | { kind: "absent" }
+  | { kind: "error" };
+
+/**
+ * Autoritativ status for ÉN operasjons-ID (brukes før en 23505-konflikt frigjøres).
+ * `applied` = den opprinnelige tellingen er bokført; `absent` = ingen bokføring med denne ID-en.
+ */
+export async function fetchCountSheetStatus(legalEntityId: string, opId: string): Promise<SheetStatusResult> {
+  try {
+    const { data, error } = await (supabase as unknown as {
+      from: (t: string) => { select: (c: string) => { eq: (c: string, v: unknown) => { eq: (c: string, v: unknown) => { limit: (n: number) => Promise<{ data: unknown; error: { message: string } | null }> } } } };
+    })
+      .from("rm_stock_count_sheets")
+      .select("op_id, status")
+      .eq("legal_entity_id", legalEntityId)
+      .eq("op_id", opId)
+      .limit(2);
+    if (error) return { kind: "error" };
+    const rows = (Array.isArray(data) ? data : []) as Array<Record<string, unknown>>;
+    if (rows.length === 0) return { kind: "absent" };
+    if (rows.length !== 1 || rows[0].op_id !== opId) return { kind: "error" };
+    const st = rows[0].status;
+    if (st === "draft" || st === "applying" || st === "applied" || st === "discarded") return { kind: "found", status: st };
+    return { kind: "error" };
+  } catch (e) {
+    console.warn("[varetelling] kunne ikke lese tellearkets status", e);
+    return { kind: "error" };
   }
 }
 

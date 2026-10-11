@@ -12,13 +12,19 @@ export function CountSubmissionBanner({
   state,
   onRetry,
   onRelease,
+  onReconcile,
   canWrite,
+  stockRefreshFailed = false,
+  stockRefreshing = false,
 }: {
   pending: PendingCountSubmission | null;
   state: SubmissionState;
   onRetry: () => void;
   onRelease: () => void;
+  onReconcile?: () => void;
   canWrite: boolean;
+  stockRefreshFailed?: boolean;
+  stockRefreshing?: boolean;
 }) {
   if (state.kind === "idle" || (state.kind === "sending" && !pending)) return null;
   if (state.kind === "sending") {
@@ -55,16 +61,30 @@ export function CountSubmissionBanner({
     err.kind === "conflict"
       ? "Ingenting ble bokført. Utkastet er beholdt. Varer der beholdningen har endret seg er merket — kontroller dem og velg utgangspunkt før du sender på nytt."
       : err.kind === "content"
-        ? "Denne operasjons-ID-en er allerede brukt for en annen telling. Ingenting ble ført på nytt. Kontroller Bevegelser før du eventuelt sender som ny telling."
+        ? "Denne innsendingen ble ikke ført. Operasjons-ID-en er brukt med annet innhold, og den opprinnelige tellingen kan allerede være bokført. Sjekk den opprinnelige tellingen før du starter en ny."
         : "Ingenting ble bokført. Utkastet er beholdt.";
+  const rec = state.reconciliation;
+  const recText =
+    rec === "checking" ? "Sjekker den opprinnelige tellingen …"
+      : rec === "applied" ? "Den opprinnelige tellingen er bokført. Kontroller Bevegelser før du eventuelt teller på nytt."
+        : rec === "not_applied" ? "Den opprinnelige tellingen er ikke bokført. Du kan starte en ny telling med ny ID."
+          : rec === "error" ? "Kunne ikke avklare den opprinnelige tellingen. Tellingen forblir låst — prøv igjen."
+            : null;
+  const canRelease = canWrite && (err.kind !== "content" || rec === "applied" || rec === "not_applied");
   return (
     <Card role="alert" className="space-y-3 border-destructive/50 p-4">
       <div className="space-y-1 text-sm">
         <p className="font-medium">{title}</p>
         <p className="text-ink-secondary">{err.message}</p>
         <p className="text-ink-secondary">{help}</p>
+        {err.kind === "conflict" && (stockRefreshing ? <p className="text-ink-secondary">Henter dagens beholdning …</p>
+          : stockRefreshFailed ? <p className="text-destructive">Dagens beholdning er ukjent — kunne ikke hentes. Utgangspunktet er ikke endret.</p> : null)}
+        {recText && <p role="status" className="text-ink-secondary">{recText}</p>}
       </div>
-      <Button variant="outline" className="min-h-[44px] w-full sm:w-auto" onClick={onRelease}>
+      {err.kind === "content" && rec !== "applied" && rec !== "not_applied" && onReconcile && (
+        <Button className="min-h-[44px] w-full sm:w-auto" disabled={rec === "checking"} onClick={onReconcile}>Sjekk den opprinnelige tellingen</Button>
+      )}
+      <Button variant="outline" className="min-h-[44px] w-full sm:w-auto" disabled={!canRelease} onClick={onRelease}>
         {err.kind === "content" ? "Lås opp og send som ny telling" : "Lås opp og rediger tellingen"}
       </Button>
     </Card>
@@ -115,8 +135,12 @@ export function CountResultDialog({ result, onClose }: { result: CountResult | n
 export type ServerSaveState = "idle" | "saving" | "saved" | "failed";
 
 /** Skiller lokal lagring fra bekreftet serverlagring. */
-export function DraftSaveStatus({ hasDraft, server }: { hasDraft: boolean; server: ServerSaveState }) {
+export function DraftSaveStatus({ hasDraft, server, localFailed = false }: { hasDraft: boolean; server: ServerSaveState; localFailed?: boolean }) {
   if (!hasDraft) return null;
+  if (localFailed) {
+    const srv = server === "saved" ? "Lagret på serveren, men ikke på denne enheten" : "Utkastet kunne ikke lagres på denne enheten";
+    return <p role="alert" className="text-xs text-destructive">{srv}{server === "failed" ? " — serverlagring feilet også" : ""}.</p>;
+  }
   const text =
     server === "saved"
       ? "Utkast lagret på denne enheten og på serveren"

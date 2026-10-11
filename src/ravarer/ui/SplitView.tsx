@@ -54,7 +54,7 @@ export function PeekPanel({ title, fullHref, onClose, footer, children, emptyTex
         <div className="min-w-0 truncate font-medium text-foreground">{title}</div>
         <div className="flex shrink-0 items-center gap-1">
           {fullHref && (
-            <Button asChild variant="ghost" size="sm" className="gap-1.5">
+            <Button asChild variant="ghost" size="sm" className="min-h-[44px] gap-1.5 xl:min-h-0">
               <Link to={fullHref}><Maximize2 className="h-3.5 w-3.5" aria-hidden />Åpne fullt</Link>
             </Button>
           )}

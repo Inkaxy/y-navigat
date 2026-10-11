@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Copy, Download, PackagePlus, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
+import { QueryState } from "@/components/common/QueryState";
 import { formatNumber } from "@/ravarer/lib/constants";
 import {
   reorderGroupToCsv,
@@ -16,8 +17,9 @@ const kr = (n: number | null) =>
   n == null ? "—" : new Intl.NumberFormat("nb-NO", { style: "currency", currency: "NOK", maximumFractionDigits: 0 }).format(n);
 
 /** «Bør bestilles» — forslag gruppert per primærleverandør. */
-export function ReorderSuggestions() {
-  const { data: groups = [], isLoading } = useReorderSuggestions();
+export function ReorderSuggestions({ standalone = false }: { standalone?: boolean } = {}) {
+  const query = useReorderSuggestions();
+  const { data: groups = [], isLoading } = query;
   const [open, setOpen] = useState<string | null>(null);
 
   const totals = useMemo(
@@ -29,8 +31,13 @@ export function ReorderSuggestions() {
   );
 
   const copy = async (text: string) => {
-    await navigator.clipboard.writeText(text);
-    toast.success("Kopiert til utklippstavlen");
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Kopiert til utklippstavlen");
+    } catch (e) {
+      console.warn("[bestilling] kopiering feilet", e);
+      toast.error("Kunne ikke kopiere. Last ned CSV i stedet.");
+    }
   };
 
   const downloadCsv = (group: ReorderGroup) => {
@@ -44,6 +51,25 @@ export function ReorderSuggestions() {
     URL.revokeObjectURL(url);
   };
 
+  // Som egen fane: lasting, feil og tomt vises eksplisitt. Som valgfri widget: skjult.
+  if (standalone && (isLoading || query.isError || groups.length === 0)) {
+    return (
+      <Card className="p-6">
+        <QueryState
+          scope="ravarer:bestilling"
+          isLoading={isLoading}
+          isError={query.isError}
+          error={query.error}
+          onRetry={() => void query.refetch()}
+          isEmpty={groups.length === 0}
+          emptyTitle="Ingen varer trenger bestilling nå"
+          emptyDescription="Ingen lagerførte varer er under minimum eller har under 10 dager igjen."
+        >
+          {null}
+        </QueryState>
+      </Card>
+    );
+  }
   if (isLoading || groups.length === 0) return null;
 
   return (
