@@ -13,7 +13,8 @@ import type { BulkRowReport } from "@/fakturaer/lib/bulkLink";
 import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
 import { NOT_A_PRODUCT_REASONS } from "@/ravarer/lib/notAProductReasons";
 import type { WorkItem } from "@/ravarer/lib/workRpcTypes";
-import { CONFIRM_ABOVE_LINES, eligible, runBulk, totalLines, type BulkAction } from "./bulkGjore";
+import { CONFIRM_ABOVE_LINES, eligible, previewLines, runBulk, type BulkAction } from "./bulkGjore";
+import { loadPreviews, type CardPreview } from "./bulkPreview";
 
 type Props = { selected: WorkItem[]; onClear: () => void };
 
@@ -29,26 +30,41 @@ export function GjoreBulkBar({ selected, onClear }: Props) {
   const [confirmed, setConfirmed] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [report, setReport] = useState<BulkRowReport[] | null>(null);
+  // Fryst forhåndsvisning (bare lesing): nøyaktige linje-ID-er og forslag per varekort.
+  const [previews, setPreviews] = useState<Map<string, CardPreview> | null>(null);
+  const [choices, setChoices] = useState<Map<string, string>>(new Map());
   if (selected.length === 0 && !report) return null;
 
   const scope = kind ? eligible(selected, kind) : { ok: [], skipped: [] };
-  const lines = totalLines(scope.ok);
+  const lines = previews ? previewLines(scope.ok, previews) : 0;
+  const godtaCount = kind === "godta" ? scope.ok.filter((it) => choices.has(it.key)).length : 0;
   const needsConfirm = lines > CONFIRM_ABOVE_LINES;
-  const ready = !!company && canWrite && scope.ok.length > 0 && (!needsConfirm || confirmed) && (kind !== "opprett" || (!!category && !!baseUnit)) && !progress;
+  const ready = !!company && canWrite && !!previews && lines > 0 && (!needsConfirm || confirmed)
+    && (kind !== "opprett" || (!!category && !!baseUnit)) && (kind !== "godta" || godtaCount > 0) && !progress;
 
-  const open = (k: BulkAction["kind"]) => { setKind(k); setConfirmed(false); setReport(null); };
+  const open = (k: BulkAction["kind"]) => {
+    setKind(k); setConfirmed(false); setReport(null); setPreviews(null); setChoices(new Map());
+    if (!company) return;
+    const items = eligible(selected, k).ok;
+    void loadPreviews(items, company.id, k === "godta").then((pv) => {
+      setPreviews(pv);
+      const m = new Map<string, string>();
+      for (const it of items) { const u = pv.get(it.key)?.unambiguous; if (u) m.set(it.key, u.id); }
+      setChoices(m);
+    });
+  };
   const run = async () => {
-    if (!company || !kind) return;
-    const action: BulkAction = kind === "ikke_vare" ? { kind, reason } : { kind, category, baseUnit };
+    if (!company || !kind || !previews) return;
+    const action: BulkAction = kind === "ikke_vare" ? { kind, reason } : kind === "godta" ? { kind, choices } : { kind, category, baseUnit };
     setProgress({ done: 0, total: scope.ok.length });
-    const r = await runBulk(scope.ok, action, company.id, linkSupplierItem, (done, total) => setProgress({ done, total }));
+    const r = await runBulk(scope.ok, action, company.id, linkSupplierItem, (done, total) => setProgress({ done, total }), previews);
     setProgress(null);
     setReport(r);
     invalidateAfterLink(qc);
     void qc.invalidateQueries({ queryKey: ["ravarer", "work-items"] });
     void qc.invalidateQueries({ queryKey: ["ravarer", "work-summary"] });
   };
-  const close = () => { setKind(null); if (report) { setReport(null); onClear(); } };
+  const close = () => { setKind(null); setPreviews(null); if (report) { setReport(null); onClear(); } };
 
   return (
     <>
@@ -57,14 +73,17 @@ export function GjoreBulkBar({ selected, onClear }: Props) {
           <span className="font-medium">{selected.length} valgt</span>
           <Button size="sm" variant="outline" disabled={!canWrite} onClick={() => open("ikke_vare")}>Ikke vare …</Button>
           <Button size="sm" variant="outline" disabled={!canWrite} onClick={() => open("opprett")}>Opprett råvarer …</Button>
+          <Button size="sm" variant="outline" disabled={!canWrite} onClick={() => open("godta")}>Godta forslag …</Button>
           <Button size="sm" variant="ghost" onClick={onClear}>Fjern utvalg</Button>
         </div>
       )}
       <Dialog open={kind !== null} onOpenChange={(v) => { if (!v && !progress) close(); }}>
         <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{kind === "opprett" ? "Opprett råvarer fra valgte varekort" : "Merk valgte varekort som ikke vare"}</DialogTitle>
-            <DialogDescription>Gjelder {scope.ok.length} varekort med {lines} åpne {lines === 1 ? "linje" : "linjer"} på tvers av fakturaer. Kjøres ett og ett med samme regler som enkeltvis.</DialogDescription>
+            <DialogTitle>{kind === "opprett" ? "Opprett råvarer fra valgte varekort" : kind === "godta" ? "Godta forslag for valgte varekort" : "Merk valgte varekort som ikke vare"}</DialogTitle>
+            <DialogDescription>{previews
+              ? `Gjelder ${scope.ok.length} varekort med ${lines} åpne ${lines === 1 ? "linje" : "linjer"} slik de ser ut nå. Bare disse linjene endres; linjer som kommer til senere røres ikke. Kjøres ett og ett med samme regler som enkeltvis.`
+              : "Henter linjene som vises nå …"}</DialogDescription>
           </DialogHeader>
           {report ? (
             <ul className="space-y-1 text-sm" aria-label="Resultat per varekort">
@@ -73,9 +92,24 @@ export function GjoreBulkBar({ selected, onClear }: Props) {
           ) : (
             <div className="space-y-3 text-sm">
               <ul className="max-h-48 space-y-0.5 overflow-y-auto rounded-md border border-border p-2">
-                {scope.ok.map((it) => <li key={it.key} className="truncate">{it.title} <span className="text-ink-secondary">· {it.supplier_name ?? "Ukjent"} · {it.open_lines} linjer</span></li>)}
+                {scope.ok.map((it) => {
+                  const pv = previews?.get(it.key);
+                  return (
+                    <li key={it.key} className="space-y-1 py-0.5">
+                      <div className="truncate">{it.title} <span className="text-ink-secondary">· {it.supplier_name ?? "Ukjent"} · {pv ? `${pv.lineIds.length} linjer` : "…"}</span></div>
+                      {kind === "godta" && pv && (pv.candidates.length === 0
+                        ? <p className="text-caption text-ink-secondary">Ingen forslag – hoppes over.</p>
+                        : pv.unambiguous
+                          ? <p className="text-caption">Forslag: <span className="font-medium">{pv.unambiguous.name}</span>{pv.unambiguous.why ? ` – ${pv.unambiguous.why}` : ""}</p>
+                          : <Select value={choices.get(it.key) ?? ""} onValueChange={(v) => setChoices((m) => new Map(m).set(it.key, v))}>
+                              <SelectTrigger className="h-8" aria-label={`Velg råvare for ${it.title}`}><SelectValue placeholder="Flere forslag – velg én" /></SelectTrigger>
+                              <SelectContent>{pv.candidates.map((c) => <SelectItem key={c.id} value={c.id}>{c.name} ({c.lines} {c.lines === 1 ? "linje" : "linjer"}){c.why ? ` – ${c.why}` : ""}</SelectItem>)}</SelectContent>
+                            </Select>)}
+                    </li>
+                  );
+                })}
               </ul>
-              {scope.skipped.length > 0 && <p className="text-caption text-ink-secondary">{scope.skipped.length} valgte hoppes over ({kind === "opprett" ? "bare ukoblede varekort kan få ny råvare" : "fakturasaker kan ikke merkes"}).</p>}
+              {scope.skipped.length > 0 && <p className="text-caption text-ink-secondary">{scope.skipped.length} valgte hoppes over ({kind === "opprett" || kind === "godta" ? "gjelder bare ukoblede varekort" : "fakturasaker kan ikke merkes"}).</p>}
               {kind === "ikke_vare" && (
                 <div><Label className="mb-1 block">Årsak</Label>
                   <Select value={reason} onValueChange={setReason}><SelectTrigger><SelectValue /></SelectTrigger>
@@ -103,7 +137,7 @@ export function GjoreBulkBar({ selected, onClear }: Props) {
             {report ? <Button onClick={close}>Lukk</Button> : (
               <>
                 <Button variant="outline" disabled={!!progress} onClick={close}>Avbryt</Button>
-                <Button disabled={!ready} onClick={() => void run()}>{kind === "opprett" ? `Opprett (${scope.ok.length})` : `Merk (${scope.ok.length})`}</Button>
+                <Button disabled={!ready} onClick={() => void run()}>{kind === "opprett" ? `Opprett (${scope.ok.length})` : kind === "godta" ? `Godta (${godtaCount})` : `Merk (${scope.ok.length})`}</Button>
               </>
             )}
           </DialogFooter>
