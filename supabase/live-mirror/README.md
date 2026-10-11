@@ -51,3 +51,12 @@ innledende kommentar «ALREADY APPLIED». ALDRI kjør på nytt. Ikke kontrollert
 |---|---|
 | live-mirror/rm_invoice_line_price_safety_v2.sql | 41078fc5c368b8d4903f1d7becd9bfd391c6c58e7e3dcbe80f388087104094e6 |
 | live-mirror/rm_invoice_document_version.sql | d570a82948ea74738538dbc63e72d0dc61b4cbfeb1072158b3f0a065133d3720 |
+
+## Prisprojeksjon fra kontrollerte fakturalinjer (root, 2026-10-11)
+
+20261011163018_material_price_verified_line_projection er ALLEREDE anvendt av root direkte mot live og uavhengig testet. Filen er et
+byte-identisk speil av SQL-teksten root leverte i oppdraget (uten tilført kommentar). ALDRI kjør på nytt. Kostprisvelgeren er ikke endret.
+
+| Fil | sha256 |
+|---|---|
+| live-mirror/20261011163018_material_price_verified_line_projection.sql | c57923724011a9ac1d291291136da5facac8d153fee29216b9976b35fae8f7ed |
