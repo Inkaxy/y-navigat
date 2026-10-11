@@ -17359,6 +17359,24 @@ export type Database = {
         }
         Returns: Json
       }
+      rm_audit_history: {
+        Args: {
+          p_entity_id: string
+          p_entity_type: string
+          p_legal_entity_id: string
+          p_limit?: number
+        }
+        Returns: {
+          action: string
+          actor: string
+          changes: Json
+          entity_display_reference: string
+          id: string
+          is_system: boolean
+          occurred_at: string
+          reason: string
+        }[]
+      }
       rm_auto_reconcile_invoice: {
         Args: { p_invoice_id: string }
         Returns: Json
@@ -17737,6 +17755,14 @@ export type Database = {
       rm_unlink_matvaretabellen: {
         Args: { p_raw_material_id: string }
         Returns: undefined
+      }
+      rm_user_names: {
+        Args: { p_legal_entity_id: string; p_user_ids: string[] }
+        Returns: {
+          active: boolean
+          id: string
+          name: string
+        }[]
       }
       rm_work_items: {
         Args: {
