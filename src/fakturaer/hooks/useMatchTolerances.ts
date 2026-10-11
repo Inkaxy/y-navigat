@@ -33,6 +33,13 @@ export interface MatchTolerances {
   byCategory: Record<string, number>;
   settings: MatchSettings | null;
   isLoading: boolean;
+  /** Lesingen feilet: `settings=null` betyr da UKJENT, ikke «ingen lagrede innstillinger». */
+  isError: boolean;
+  error: unknown;
+  /** True bare etter vellykket lesing; da betyr `settings=null` at selskapet ikke har lagret noe. */
+  isLoaded: boolean;
+  isFetching: boolean;
+  refetch: () => Promise<unknown>;
   /**
    * Toleranse i prosent for en kategori: kategori-override → selskapets default → 3 (FALLBACK_TOLERANCE_PCT).
    * Merk: databasens kolonnestandard for `default_price_tolerance_pct` er 2 %, men selskapet har 3 % lagret;
@@ -107,7 +114,7 @@ async function fetchTolerances(legalEntityId: string): Promise<ToleranceData> {
  * vurderer avvik skal bruke denne — aldri hardkodede prosenter.
  */
 export function useMatchTolerances(legalEntityId: string | null | undefined): MatchTolerances {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, isSuccess, isFetching, refetch } = useQuery({
     queryKey: ["invoice-match-tolerances", legalEntityId ?? "all"],
     enabled: !!legalEntityId,
     staleTime: 5 * 60 * 1000,
@@ -122,6 +129,11 @@ export function useMatchTolerances(legalEntityId: string | null | undefined): Ma
     byCategory,
     settings: data?.settings ?? null,
     isLoading,
+    isError,
+    error,
+    isLoaded: isSuccess && !!data,
+    isFetching,
+    refetch,
     toleranceFor: (category?: string | null) => resolveTolerance(category, defaultPct, byCategory),
   };
 }
