@@ -54,6 +54,7 @@ interface RowData {
 
 export default function KobleMatvaretabellen() {
   const { canWrite } = useRavarer();
+  const embedded = useIsEmbedded();
   const coverage = useNutritionCoverage();
   const foods = useMatvaretabellenFoods();
 
