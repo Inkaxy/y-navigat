@@ -12,8 +12,8 @@ const state = {
   foods: { data: undefined as FoodRow[] | undefined, isLoading: false, isError: false, error: null as unknown },
   coverage: { data: undefined as unknown, isLoading: false, isError: false },
 };
-type ApplyRes = { result: { written: string[]; skipped: string[]; water_content_set: boolean; water_g_skipped: boolean; declaration_name_set: string | null; forced: boolean } | null };
-const confirmed: ApplyRes = { result: { written: ["fat_g"], skipped: [], water_content_set: false, water_g_skipped: false, declaration_name_set: null, forced: false } };
+type ApplyRes = { result: { written: string[]; skipped: string[]; water_content_set: boolean; water_g_skipped: boolean; declaration_name_set: boolean; forced: boolean } | null };
+const confirmed: ApplyRes = { result: { written: ["fat_g"], skipped: [], water_content_set: false, water_g_skipped: false, declaration_name_set: false, forced: false } };
 const apply = vi.fn(async (_i: { rawMaterialId: string; foodId: string; force?: boolean }): Promise<ApplyRes> => confirmed);
 const refetchFoods = vi.fn();
 const refetchCoverage = vi.fn();
@@ -144,7 +144,7 @@ describe("serverresultater", () => {
   });
   it("koblingsresultat viser skrevet/beholdt/overskrevet og krever full form + identitet", () => {
     const req = { rawMaterialId: "rm1", foodId: "f1", force: false };
-    const ok = { raw_material_id: "rm1", food_id: "f1", forced: false, written: ["fat_g"], skipped: ["salt_g", "protein_g"], water_content_set: false, water_g_skipped: false, declaration_name_set: null };
+    const ok = { raw_material_id: "rm1", food_id: "f1", forced: false, written: ["fat_g"], skipped: ["salt_g", "protein_g"], water_content_set: false, water_g_skipped: false, declaration_name_set: false };
     expect(applyResultMessage(parseApplyResult(ok, req))).toEqual({ tone: "warning", text: "1 felt hentet fra Matvaretabellen · 2 beholdt fra datablad/manuell kilde" });
     expect(applyResultMessage(parseApplyResult({ ...ok, forced: true, skipped: [] }, { ...req, force: true })).text).toContain("(overskrevet)");
     expect(parseApplyResult({}, req)).toBeNull();
@@ -155,6 +155,14 @@ describe("serverresultater", () => {
     expect(parseApplyResult({ ...ok, forced: true }, req)).toBeNull();
     const { water_g_skipped: _w, ...missing } = ok;
     expect(parseApplyResult(missing, req)).toBeNull();
+    // Live-kontrakt: declaration_name_set er BOOLEAN (v_set_name). Begge verdier er gyldige; alt annet ukjent.
+    expect(parseApplyResult({ ...ok, declaration_name_set: true }, req)?.declaration_name_set).toBe(true);
+    expect(applyResultMessage(parseApplyResult({ ...ok, declaration_name_set: true }, req)).text).toContain("deklarasjonsnavn satt");
+    expect(parseApplyResult(ok, req)?.declaration_name_set).toBe(false);
+    expect(parseApplyResult({ ...ok, declaration_name_set: null }, req)).toBeNull();
+    expect(parseApplyResult({ ...ok, declaration_name_set: "Hvetemel" }, req)).toBeNull();
+    const { declaration_name_set: _d, ...noDecl } = ok;
+    expect(parseApplyResult(noDecl, req)).toBeNull();
     const unknown = applyResultMessage(null);
     expect(unknown.tone).toBe("warning");
     expect(unknown.text).not.toMatch(/^Koblet/);
