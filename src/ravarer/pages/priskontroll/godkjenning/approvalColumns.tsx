@@ -37,7 +37,7 @@ export function RowMenu({ r, onHistory, fra }: { r: OverviewRow; onHistory: (r: 
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-        <DropdownMenuItem asChild><Link to={`${paths.faktura(r.invoice_id)}?fra=${encodeURIComponent(fra)}`}>Åpne faktura</Link></DropdownMenuItem>
+        <DropdownMenuItem asChild><Link to={`${paths.faktura(r.invoice_id)}?retur=${encodeURIComponent(fra)}`}>Åpne faktura</Link></DropdownMenuItem>
         <DropdownMenuItem onSelect={() => onHistory(r)}>Historikk og tilbaketrekking</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

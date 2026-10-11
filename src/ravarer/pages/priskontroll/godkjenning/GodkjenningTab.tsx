@@ -162,7 +162,7 @@ export function GodkjenningTab() {
         selectable
         selected={selected}
         onSelectedChange={setSelected}
-        rowHref={(r) => `${paths.faktura(r.invoice_id)}?fra=${encodeURIComponent(fra)}`}
+        rowHref={(r) => `${paths.faktura(r.invoice_id)}?retur=${encodeURIComponent(fra)}`}
         renderMobileCard={(r) => (
           <div className="space-y-1.5 rounded-lg border border-border bg-card p-3">
             <div className="flex items-start justify-between gap-2">
