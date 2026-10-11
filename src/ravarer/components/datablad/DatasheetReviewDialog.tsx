@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { isObj, str, type Obj } from "@/fakturaer/lib/parseRpcJson";
-import { useAllergens, useNutrition } from "@/ravarer/hooks/useNutrition";
+import { useAllergens, useNutrition, type NutritionRow } from "@/ravarer/hooks/useNutrition";
 import { useRawMaterial } from "@/ravarer/hooks/useRawMaterials";
 import { NUTRITION_NUMBER_FIELDS } from "@/ravarer/lib/nutritionSource";
 import { NUTRITION_LABELS, changePct } from "@/ravarer/lib/nutritionLabels";
@@ -62,7 +62,7 @@ export function DatasheetReviewDialog(props: Props) {
 }
 
 export interface ReviewCurrent {
-  nutrition: (Record<string, unknown> & { ingredient_declaration?: string | null; e_numbers?: string[] | null; country_of_origin?: string | null }) | null;
+  nutrition: Partial<NutritionRow> | null;
   allergens: { allergen: string; presence: string }[];
   grain: string | null;
 }
