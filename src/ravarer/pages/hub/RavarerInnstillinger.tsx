@@ -1,4 +1,5 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
+import { lazyWithReload as lazy } from "@/lib/lazyWithReload";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { QueryEmptyState, QueryLoadingState } from "@/components/common/QueryState";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";

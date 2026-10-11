@@ -106,7 +106,8 @@ export function SupplierDialog({ open, onOpenChange, onCreated, supplier = null 
       if (error) throw error;
       return data;
     },
-    onSuccess: (data) => { invalidateRavarerCounts(qc);
+    onSuccess: (data) => {
+      invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["suppliers"] });
       qc.invalidateQueries({ queryKey: ["supplier", data.id] });
       toast.success(isEdit ? "Leverandør lagret" : "Leverandør opprettet");

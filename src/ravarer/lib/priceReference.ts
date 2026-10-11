@@ -1,13 +1,9 @@
+import { PRICE_REFERENCE_LABEL } from "@/ravarer/lib/labels";
 import { formatDate } from "@/fakturaer/lib/constants";
 import type { PriceRefSource, PriceReference } from "@/fakturaer/lib/parseRpcJson";
 
-export const PRICE_REFERENCE_LABEL: Record<PriceRefSource, string> = {
-  agreement: "Avtalepris",
-  start_price: "Startpris",
-  last_purchase: "Siste kjøp",
-  conflict: "To likestilte avtaler — konflikt",
-  none: "Ingen prisgrunnlag",
-};
+// Kilde: `@/ravarer/lib/labels` (ett statusspråk). Re-eksportert for bakoverkompatibilitet.
+export { PRICE_REFERENCE_LABEL } from "@/ravarer/lib/labels";
 
 export const priceReferenceLabel = (s: PriceRefSource) => PRICE_REFERENCE_LABEL[s];
 

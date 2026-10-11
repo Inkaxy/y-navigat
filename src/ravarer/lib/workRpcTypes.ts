@@ -54,11 +54,15 @@ export type WorkItemsResult = { total: number; counts: WorkItemsCounts; items: W
 export const ACTIVITY_KINDS = [
   "faktura_avstemt_auto", "faktura_avstemt", "faktura_gjenapnet", "mva_rettet", "kostpris_fort",
   "pakning_bekreftet_auto", "priser_karantene", "pris_godtatt", "kobling_bekreftet", "ikke_vare",
-  "forste_pris", "gjentatt_pris",
+  "forste_pris", "gjentatt_pris", "annet",
 ] as const;
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
+/** Ukjente hendelsestyper fra serveren vises som «annet» med nøytral etikett. */
+export function toActivityKind(v: string | null | undefined): ActivityKind {
+  return (ACTIVITY_KINDS as readonly string[]).includes(v ?? "") ? (v as ActivityKind) : "annet";
+}
 export type ActivityItem = {
-  id: string; at: string; kind: ActivityKind | string; actor: "system" | "bruker"; user_name: string | null;
+  id: string; at: string; kind: ActivityKind; actor: "system" | "bruker"; user_name: string | null;
   title: string; subject: string | null; detail: string | null; invoice_id: string | null;
   raw_material_id: string | null; count: number;
 };

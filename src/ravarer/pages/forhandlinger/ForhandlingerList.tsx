@@ -1,3 +1,6 @@
+import type { NegotiationRow } from "@/ravarer/hooks/useNegotiations";
+import { cn } from "@/lib/utils";
+import { useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
@@ -20,11 +23,12 @@ const STATUS_META: Record<NegotiationStatus, { label: string; cls: string }> = {
 };
 
 export default function ForhandlingerList() {
+  const embedded = useIsEmbedded();
   const navigate = useNavigate();
   const [pickerOpen, setPickerOpen] = useState(false);
   const { data: rows = [], isLoading } = useNegotiations();
 
-  function openNegotiation(n: any) {
+  function openNegotiation(n: Pick<NegotiationRow, "id" | "status" | "negotiation_mode">) {
     if (n.negotiation_mode === "live" && n.status !== "concluded" && n.status !== "cancelled") {
       navigate(paths.liveForhandling(n.id));
     } else {
@@ -33,7 +37,7 @@ export default function ForhandlingerList() {
   }
 
   return (
-    <div className="mx-auto max-w-[1280px] space-y-6 p-6">
+    <div className={cn("space-y-6", !embedded && "mx-auto max-w-[1280px] p-6")}>
       <RavarerHeaderBanner
         title="Forhandlinger"
         subtitle="Forbered, send og sammenlign tilbud fra leverandører"

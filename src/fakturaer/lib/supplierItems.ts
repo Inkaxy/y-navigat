@@ -1,17 +1,12 @@
+import { LINE_KIND_LABEL } from "@/ravarer/lib/labels";
 import { REASON_LABELS, type ReasonCode } from "@/fakturaer/lib/reviewReasons";
 import type { StatusTone } from "@/fakturaer/lib/lineStatus";
 
 export const SUPPLIER_ITEM_STATUSES = ["ukoblet", "mangler_pakning", "prisavvik", "kontroll", "koblet", "ikke_vare"] as const;
 export type SupplierItemStatus = (typeof SUPPLIER_ITEM_STATUSES)[number];
 
-export const SUPPLIER_ITEM_STATUS_META: Record<SupplierItemStatus, { label: string; tone: StatusTone }> = {
-  ukoblet: { label: "Ukoblet", tone: "danger" },
-  mangler_pakning: { label: "Mangler pakning", tone: "warning" },
-  prisavvik: { label: "Prisavvik", tone: "warning" },
-  kontroll: { label: "Kontroll", tone: "warning" },
-  koblet: { label: "Koblet", tone: "success" },
-  ikke_vare: { label: "Ikke vare", tone: "muted" },
-};
+// Kilde: `@/ravarer/lib/labels` (ett statusspråk). Re-eksportert for bakoverkompatibilitet.
+export { SUPPLIER_ITEM_STATUS_META } from "@/ravarer/lib/labels";
 
 export function isSupplierItemStatus(v: string | null | undefined): v is SupplierItemStatus {
   return !!v && (SUPPLIER_ITEM_STATUSES as readonly string[]).includes(v);
@@ -178,16 +173,8 @@ export function reasonSummary(raw: string | null | undefined, max = 2): string[]
   return all.length > max ? [...all.slice(0, max), `+${all.length - max}`] : all;
 }
 
-export const LINE_KIND_LABEL: Record<string, string> = {
-  vare: "Vare",
-  pant: "Pant",
-  frakt: "Frakt",
-  gebyr: "Gebyr",
-  rabatt: "Rabatt",
-  avrunding: "Avrunding",
-  mva: "Mva",
-  annet: "Annet",
-};
+// Kilde: `@/ravarer/lib/labels` (ett statusspråk). Re-eksportert for bakoverkompatibilitet.
+export { LINE_KIND_LABEL } from "@/ravarer/lib/labels";
 export const lineKindLabel = (k: string | null | undefined) => (k ? LINE_KIND_LABEL[k] ?? "Annet" : null);
 
 export function pctChange(last: number | null, prev: number | null): number | null {

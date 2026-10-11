@@ -1,3 +1,4 @@
+import { useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -28,6 +29,7 @@ const TABS: Array<{ key: ApprovalBucket; label: string }> = [
 ];
 
 export default function InvoiceOverview() {
+  const embedded = useIsEmbedded();
   const { data: company } = useCompany();
   const qc = useQueryClient();
   const [sp, setSp] = useSearchParams();
@@ -110,11 +112,11 @@ export default function InvoiceOverview() {
   }
 
   return (
-    <div className="px-page py-6 space-y-5">
+    <div className={cn("space-y-5", !embedded && "px-page py-6")}>
       <DecisionNav />
       <header className="space-y-1">
-        <h1 className="font-display text-3xl font-semibold">Fakturaer</h1>
-        <p className="text-sm text-ink-secondary">Intern godkjenning i NBhub. Den betaler ikke og sendes ikke til Tripletex. Råvarevalg sperrer ikke godkjenning; manglende beløp, mva, valuta eller leverandør, ukontrollert eller avvikende linjesum, duplikat, mengdefeil og uavklart prisavvik gjør det.</p>
+        {!embedded && <h1 className="font-display text-3xl font-semibold">Fakturaer</h1>}
+        <p className={embedded ? "text-caption text-ink-secondary" : "text-sm text-ink-secondary"}>Intern godkjenning i NBhub. Den betaler ikke og sendes ikke til Tripletex. Råvarevalg sperrer ikke godkjenning; manglende beløp, mva, valuta eller leverandør, ukontrollert eller avvikende linjesum, duplikat, mengdefeil og uavklart prisavvik gjør det.</p>
       </header>
       <div role="tablist" aria-label="Status" className="flex gap-1 border-b border-line-subtle">
         {TABS.map((t) => (

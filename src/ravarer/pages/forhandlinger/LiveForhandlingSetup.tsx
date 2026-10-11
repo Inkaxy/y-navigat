@@ -1,3 +1,4 @@
+import { showError } from "@/lib/userError";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
@@ -108,8 +109,8 @@ export default function LiveForhandlingSetup() {
       });
 
       navigate(paths.liveForhandling(neg.id));
-    } catch (e: any) {
-      toast.error(`Kunne ikke starte: ${e.message ?? e}`);
+    } catch (e: unknown) {
+      showError("live-forhandling:start", e, "Kunne ikke starte forhandlingen. Prøv igjen.");
     } finally {
       setSubmitting(false);
     }

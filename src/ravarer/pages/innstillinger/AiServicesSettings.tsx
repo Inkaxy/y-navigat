@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+import { useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
 import { useEffect, useState } from "react";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { isObj } from "@/fakturaer/lib/parseRpcJson";
@@ -59,6 +61,7 @@ const MODELS: Record<Provider, { value: string; label: string; recommended?: boo
 };
 
 export default function AiServicesSettings() {
+  const embedded = useIsEmbedded();
   const qc = useQueryClient();
 
   const configs = useQuery({
@@ -82,12 +85,14 @@ export default function AiServicesSettings() {
   const invoiceConfig = configs.data?.find((c) => c.purpose === "invoice_extraction" && c.is_active);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-6">
+    <div className={cn("space-y-6", !embedded && "mx-auto max-w-4xl p-6")}>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight" style={{ letterSpacing: "-0.02em" }}>
-          AI-tjenester
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        {!embedded && (
+          <h1 className="text-2xl font-semibold tracking-tight" style={{ letterSpacing: "-0.02em" }}>
+            AI-tjenester
+          </h1>
+        )}
+        <p className={embedded ? "text-caption text-muted-foreground" : "text-sm text-muted-foreground mt-1"}>
           Koble til ekstern AI-leverandør for fakturaekstraksjon og andre AI-funksjoner.
         </p>
       </div>

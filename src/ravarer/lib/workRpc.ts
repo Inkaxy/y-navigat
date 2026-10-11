@@ -1,7 +1,7 @@
 import type { Json } from "@/integrations/supabase/types";
 import { bool, isObj, num, str, type Obj } from "@/fakturaer/lib/parseRpcJson";
 import {
-  ACCEPT_SKIP_REASONS, WORK_GROUPS, WORK_KINDS,
+  ACCEPT_SKIP_REASONS, WORK_GROUPS, WORK_KINDS, toActivityKind,
   type AcceptPriceResult, type AcceptSkipReason, type ActivityFeed, type ActivityItem, type DataQualityCounts,
   type InvoiceCounts, type PriceMover, type PriceMovers, type SupplierItemCounts, type WorkItem, type WorkItemGroup,
   type WorkItemKind, type WorkItemsCounts, type WorkItemsResult, type WorkSummary,
@@ -92,7 +92,7 @@ function parseActivity(o: Obj): ActivityItem | null {
   const at = str(o, "at");
   if (!id || !at) return null;
   return {
-    id, at, kind: str(o, "kind") ?? "", actor: str(o, "actor") === "bruker" ? "bruker" : "system",
+    id, at, kind: toActivityKind(str(o, "kind")), actor: str(o, "actor") === "bruker" ? "bruker" : "system",
     user_name: str(o, "user_name"), title: str(o, "title") ?? "", subject: str(o, "subject"), detail: str(o, "detail"),
     invoice_id: str(o, "invoice_id"), raw_material_id: str(o, "raw_material_id"), count: num(o, "count") ?? 1,
   };

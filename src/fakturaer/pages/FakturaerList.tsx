@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { resetParamsKeeping } from "@/lib/resetParamsKeeping";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -106,7 +107,7 @@ export default function FakturaerListPage() {
 
   function resetFilters() {
     setSearchInput("");
-    setParams(new URLSearchParams(), { replace: true });
+    setParams(resetParamsKeeping(params), { replace: true });
   }
 
   function toggleSort(key: InvoiceSortKey) {

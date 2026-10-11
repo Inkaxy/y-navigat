@@ -1,3 +1,5 @@
+import { buildRavarerActions } from "@/components/layout/commandPaletteActions";
+import { rawMaterialSubtitle } from "@/lib/entitySearch";
 import { describe, expect, it } from "vitest";
 import {
   buildIlikeOr,
@@ -122,5 +124,19 @@ describe("råvaresøk i ⌘K", () => {
     expect(mergeRawMaterialHits([a], [b, c]).map((h) => h.id)).toEqual(["r1", "r2"]);
     expect(entityRoute(a)).toBe("/ravarer/varer/r1");
     expect(entityRoute({ kind: "supplier", id: "s1", title: "Bama" })).toBe("/ravarer/leverandorer/s1");
+  });
+});
+
+
+describe("Råvarer i ⌘K", () => {
+  it("fakturahandlinger krever fakturatilgang, ny råvare krever skrivetilgang", () => {
+    const labels = (x: Parameters<typeof buildRavarerActions>[0]) => buildRavarerActions(x).map((a) => a.label);
+    expect(labels({ canRead: true, canWrite: false, hasInvoiceAccess: false })).toEqual(["Åpne vareliste"]);
+    expect(labels({ canRead: true, canWrite: true, hasInvoiceAccess: true })).toEqual(["Ny råvare", "Importer faktura", "Åpne priskontroll", "Åpne vareliste"]);
+    expect(labels({ canRead: false, canWrite: true, hasInvoiceAccess: true })).toEqual([]);
+  });
+  it("undertittel med kategori, kostpris per grunnenhet og inaktiv", () => {
+    expect(rawMaterialSubtitle({ category: "Mel", current_cost_price: 7.5, base_unit: "kg", is_active: false })).toBe("Råvare · Mel · 7,50 kr/kg · Inaktiv");
+    expect(rawMaterialSubtitle({ category: null, current_cost_price: null, base_unit: null, is_active: true })).toBe("Råvare");
   });
 });

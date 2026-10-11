@@ -3,7 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
 import { useRavarerAccessLevel } from "@/ravarer/hooks/useRavarerAccessLevel";
 import {
-  MAX_HITS_PER_GROUP,
+  MAX_RAW_MATERIAL_HITS,
+  MAX_SUPPLIER_HITS,
+  rawMaterialSubtitle,
   MIN_SEARCH_LENGTH,
   buildIlikeOr,
   mergeRawMaterialHits,
@@ -33,26 +35,26 @@ export function useRavarerEntitySearch(rawTerm: string) {
       const [direct, alias] = await Promise.all([
         supabase
           .from("raw_materials")
-          .select("id, name, sku, is_active")
+          .select("id, name, sku, is_active, category, current_cost_price, base_unit")
           .eq("legal_entity_id", entityId ?? "")
           .or(buildIlikeOr(["name", "sku"], term))
           .order("is_active", { ascending: false })
           .order("name")
-          .limit(MAX_HITS_PER_GROUP),
+          .limit(MAX_RAW_MATERIAL_HITS),
         supabase
           .from("raw_material_supplier_aliases")
           .select("alias_value, raw_material_suppliers!inner(raw_material_id, raw_materials!inner(id, name, sku, legal_entity_id))")
           .eq("status", "confirmed")
           .eq("raw_material_suppliers.raw_materials.legal_entity_id", entityId ?? "")
           .ilike("alias_value", `%${term}%`)
-          .limit(MAX_HITS_PER_GROUP),
+          .limit(MAX_RAW_MATERIAL_HITS),
       ]);
       if (direct.error) throw direct.error;
       const directHits: EntityHit[] = (direct.data ?? []).map((r) => ({
         kind: "raw_material",
         id: r.id,
         title: r.name,
-        subtitle: [r.sku, r.is_active ? null : "Inaktiv"].filter(Boolean).join(" · ") || undefined,
+        subtitle: rawMaterialSubtitle(r),
       }));
       // Aliasoppslaget er et tillegg: feiler det, viser vi likevel navnetreffene.
       const aliasHits: EntityHit[] = alias.error
@@ -61,7 +63,7 @@ export function useRavarerEntitySearch(rawTerm: string) {
             const rm = a.raw_material_suppliers.raw_materials;
             return { kind: "raw_material", id: rm.id, title: rm.name, subtitle: `Leverandørnavn: ${a.alias_value}` };
           });
-      return mergeRawMaterialHits(directHits, aliasHits);
+      return mergeRawMaterialHits(directHits, aliasHits).slice(0, MAX_RAW_MATERIAL_HITS);
     },
   });
 
@@ -76,13 +78,13 @@ export function useRavarerEntitySearch(rawTerm: string) {
         .eq("legal_entity_id", entityId ?? "")
         .or(buildIlikeOr(["name", "org_number", "tripletex_supplier_number"], term))
         .order("name")
-        .limit(MAX_HITS_PER_GROUP);
+        .limit(MAX_SUPPLIER_HITS);
       if (error) throw error;
       return (data ?? []).map((s) => ({
         kind: "supplier",
         id: s.id,
         title: s.name,
-        subtitle: s.org_number ?? undefined,
+        subtitle: ["Leverandør", s.org_number].filter(Boolean).join(" · "),
       }));
     },
   });

@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+import { useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
 import { useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,6 +32,7 @@ interface FileRow {
 }
 
 export default function DatabladBulk() {
+  const embedded = useIsEmbedded();
   const { canWrite, legalEntityId } = useRavarer();
   const [rows, setRows] = useState<FileRow[]>([]);
   const [batchId, setBatchId] = useState<string | null>(null);
@@ -258,8 +261,8 @@ export default function DatabladBulk() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight" style={{ letterSpacing: "-0.02em" }}>Bulk-opplasting datablad</h1>
-        <p className="text-sm text-ink-secondary">Last opp inntil 100 datablad. AI matcher hver fil mot eksisterende råvarer.</p>
+        {!embedded && <h1 className="text-2xl font-semibold tracking-tight" style={{ letterSpacing: "-0.02em" }}>Bulk-opplasting datablad</h1>}
+        <p className={embedded ? "text-caption text-ink-secondary" : "text-sm text-ink-secondary"}>Last opp inntil 100 datablad. AI matcher hver fil mot eksisterende råvarer.</p>
       </div>
 
       {rows.length === 0 && canWrite && (

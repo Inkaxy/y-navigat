@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+import { useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,6 +37,7 @@ function formatPlainValue(value: unknown): string {
 }
 
 export default function DatabladEndringer() {
+  const embedded = useIsEmbedded();
   const navigate = useNavigate();
   const { canWrite } = useRavarer();
   const [filter, setFilter] = useState<"unacked" | "all">("unacked");
@@ -66,8 +69,8 @@ export default function DatabladEndringer() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight" style={{ letterSpacing: "-0.02em" }}>Datablad-endringer</h1>
-        <p className="text-sm text-ink-secondary">Gjennomgå og bekreft endringer fra leverandørenes datablad</p>
+        {!embedded && <h1 className="text-2xl font-semibold tracking-tight" style={{ letterSpacing: "-0.02em" }}>Datablad-endringer</h1>}
+        <p className={embedded ? "text-caption text-ink-secondary" : "text-sm text-ink-secondary"}>Gjennomgå og bekreft endringer fra leverandørenes datablad</p>
       </div>
 
       <Card className="p-4 flex items-center gap-3">

@@ -1,5 +1,7 @@
-import { lazy, type ComponentType, type ReactNode } from "react";
-import { Route, useSearchParams } from "react-router-dom";
+import type { ComponentType, ReactNode } from "react";
+import { lazyWithReload as lazy } from "@/lib/lazyWithReload";
+import { Navigate, Route, useSearchParams } from "react-router-dom";
+import { paths } from "@/ravarer/lib/paths";
 import { AppAccessGuard } from "@/components/auth/AppAccessGuard";
 import { RavarerProvider } from "@/ravarer/context/RavarerContext";
 import { FakturaerProvider } from "@/fakturaer/context/FakturaerContext";
@@ -69,12 +71,18 @@ export function ravarerRoutes(Shell: ShellType) {
     <Route key="pk-besl" path="/ravarer/priskontroll/beslutninger" element={inv(<QueueByScope />)} />,
     <Route key="pk-besl-d" path="/ravarer/priskontroll/beslutninger/:key" element={inv(<DecisionDetail />)} />,
     <Route key="pk-reb" path="/ravarer/priskontroll/verktoy/reberegn" element={rv(<InvoiceAccessGuard><ReberegnKostpriser /></InvoiceAccessGuard>)} />,
+    <Route key="pk-saker-root" path="/ravarer/priskontroll/saker" element={<Navigate to={paths.saker()} replace />} />,
+    <Route key="pk-fak-root" path="/ravarer/priskontroll/faktura" element={<Navigate to={paths.alleFakturaer()} replace />} />,
     <Route key="pk-sak" path="/ravarer/priskontroll/saker/:id" element={inv(<SupplierCase />)} />,
     <Route key="pk-reg" path="/ravarer/priskontroll/faktura/:id/registrer-linjer" element={inv(<RegistrerLinjer />)} />,
     <Route key="pk-fak" path="/ravarer/priskontroll/faktura/:id" element={inv(<InvoiceDetail />)} />,
 
     // Leverandører (statiske stier før /:id)
     <Route key="lev" path="/ravarer/leverandorer" element={rv(<LeverandorerHub />)} />,
+    // Statiske segmenter uten id må ikke falle inn i :id-rutene.
+    <Route key="f-root" path="/ravarer/leverandorer/forhandlinger" element={<Navigate to={paths.forhandlinger()} replace />} />,
+    <Route key="f-live-root" path="/ravarer/leverandorer/forhandlinger/live" element={<Navigate to={paths.forhandlinger()} replace />} />,
+    <Route key="lev-avt" path="/ravarer/leverandorer/avtaler" element={<Navigate to={paths.avtaler()} replace />} />,
     <Route key="f-ny" path="/ravarer/leverandorer/forhandlinger/ny" element={invOnly(<ForhandlingWizard />)} />,
     <Route key="f-live-ny" path="/ravarer/leverandorer/forhandlinger/live/ny" element={invOnly(<LiveSetup />)} />,
     <Route key="f-live" path="/ravarer/leverandorer/forhandlinger/live/:id" element={invOnly(<LiveWorkspace />)} />,

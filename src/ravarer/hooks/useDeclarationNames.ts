@@ -63,7 +63,8 @@ export function useSaveDeclarationName() {
       if (error) throw error;
       return { ...input, value };
     },
-    onSuccess: (res) => { invalidateRavarerCounts(qc);
+    onSuccess: (res) => {
+      invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["declaration-worklist"] });
       qc.invalidateQueries({ queryKey: ["raw_materials"] });
       qc.invalidateQueries({ queryKey: ["raw_material", res.rawMaterialId] });

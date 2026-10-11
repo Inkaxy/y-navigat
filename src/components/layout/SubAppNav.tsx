@@ -402,7 +402,7 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
     return pathname === path || pathname.startsWith(path + "/");
   };
   const isItemActive = (item: SimpleItem) => {
-    if (item.exact) return pathname === item.to;
+    if (item.exact) return pathname.replace(/\/+$/, "") === item.to.replace(/\/+$/, "");
     if (item.matches) return item.matches.some((p) => pathname === p || pathname.startsWith(p + "/"));
     return isLinkActive(item.to);
   };
@@ -454,7 +454,7 @@ function NavBar({ appSlug, items }: { appSlug: string; items: NavItem[] }) {
           if (item.kind === "link") {
             const active = isItemActive(item);
             return (
-              <li key={item.to} className={cn("shrink-0", item.iconOnly && "md:ml-4")}>
+              <li key={item.to} className={cn("shrink-0", item.iconOnly && "md:ml-auto")}>
                 <NavLink
                   to={item.to}
                   className={cn(itemClass(active), item.iconOnly && "min-w-[44px]")}
@@ -629,7 +629,12 @@ function CountBadge({ value, tone }: { value: number; tone?: "warning" }) {
     <span
       className={cn(
         "rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
-        tone === "warning" || value <= 10 ? "bg-brand-bronze text-brand-cream" : "bg-destructive text-destructive-foreground",
+        // Varseltone: mettet varselfarge med mørk tekst (≈5:1 mot oransje, synlig på mørk meny i begge tema).
+        tone === "warning"
+          ? "bg-warning text-brand-ink"
+          : value <= 10
+            ? "bg-warning/20 text-warning"
+            : "bg-destructive text-destructive-foreground",
       )}
     >
       {value}

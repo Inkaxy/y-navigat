@@ -97,7 +97,8 @@ export function useUpsertRawMaterialUnit() {
       });
       if (error) throw error;
     },
-    onSuccess: (_d, vars) => { invalidateRavarerCounts(qc);
+    onSuccess: (_d, vars) => {
+      invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["raw-material-units", vars.raw_material_id] });
       qc.invalidateQueries({ queryKey: ["raw-material-units-bulk"] });
       toast.success("Enhet lagret");
@@ -113,7 +114,8 @@ export function useDeleteRawMaterialUnit() {
       const { error } = await supabase.from("raw_material_units").delete().eq("id", input.id);
       if (error) throw error;
     },
-    onSuccess: (_d, vars) => { invalidateRavarerCounts(qc);
+    onSuccess: (_d, vars) => {
+      invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["raw-material-units", vars.raw_material_id] });
       qc.invalidateQueries({ queryKey: ["raw-material-units-bulk"] });
       toast.success("Enhet slettet");

@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+import { useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
@@ -127,6 +129,7 @@ function SuggestionCell({ navn, referanse }: { navn: number | null; referanse: n
 
 
 export default function PackageSizesPage() {
+  const embedded = useIsEmbedded();
   const { canWrite } = useRavarer();
   const { data: rows = [], isLoading } = usePackageWorklist();
   const { data: suspicious = [] } = useSuspiciousPackages();
@@ -235,8 +238,8 @@ export default function PackageSizesPage() {
       <RavarerHeaderBanner />
 
       <div>
-        <h1 className="text-2xl font-semibold">Pakninger</h1>
-        <p className="mt-1 text-sm text-ink-secondary">
+        {!embedded && <h1 className="text-2xl font-semibold">Pakninger</h1>}
+        <p className={embedded ? "text-caption text-ink-secondary" : "mt-1 text-sm text-ink-secondary"}>
           Hvor mange baseenheter det er i én pakning. Uten dette blir kostprisen feil.
         </p>
       </div>

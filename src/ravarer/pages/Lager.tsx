@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { AlertTriangle, ClipboardCheck, Info, Loader2, Package, Search, Trash } from "lucide-react";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { useWorkSummary } from "@/ravarer/hooks/useWorkData";
 import { useMissingBaseQuantityLines } from "@/ravarer/hooks/useStock";
 import { availabilityRank, useResaleStockStatus, type ResaleStockRow } from "@/ravarer/hooks/useResaleStock";
 import { StockAdjustDialog, type AdjustMode } from "@/ravarer/components/stock/StockAdjustDialog";
@@ -27,6 +28,9 @@ const kr = (n: number | null) =>
 
 export default function LagerPage() {
   const { canWrite } = useRavarer();
+  // Samme tall som Lager-merket i menyen og Beholdning-fanen (alle lagerførte, beholdning < min).
+  const { data: summary } = useWorkSummary({ includeApproval: false });
+  const belowMinAll = summary?.other.stock_below_min ?? null;
   const { data: items = [], isLoading } = useResaleStockStatus();
   const { data: missingLines = [] } = useMissingBaseQuantityLines();
   const [q, setQ] = useState("");
@@ -70,13 +74,17 @@ export default function LagerPage() {
       <div className="space-y-5">
         <RavarerHeaderBanner />
 
-        <div className="grid gap-4 sm:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <Card className="p-4">
             <p className="text-xs uppercase tracking-wider text-ink-secondary">Handelsvarer med lager</p>
             <p className="mt-1 text-2xl font-semibold tabular-nums">{items.length}</p>
           </Card>
+          <Card className={`p-4 ${belowMinAll ? "border-warning/50" : ""}`}>
+            <p className="text-xs uppercase tracking-wider text-ink-secondary">Under minimum (alle lagerførte)</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums">{belowMinAll ?? "–"}</p>
+          </Card>
           <Card className={`p-4 ${belowMin > 0 ? "border-warning/50" : ""}`}>
-            <p className="text-xs uppercase tracking-wider text-ink-secondary">Under minimum</p>
+            <p className="text-xs uppercase tracking-wider text-ink-secondary">Videresalg: disponibelt under minimum</p>
             <p className="mt-1 text-2xl font-semibold tabular-nums">{belowMin}</p>
           </Card>
           <Card className={`p-4 ${negatives > 0 ? "border-destructive/50" : ""}`}>

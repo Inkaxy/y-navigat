@@ -1,3 +1,4 @@
+import { useRavarerAccessLevel } from "@/ravarer/hooks/useRavarerAccessLevel";
 import { Link } from "react-router-dom";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
 import { useQuery } from "@tanstack/react-query";
@@ -9,6 +10,9 @@ import { Settings2, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react"
 import { paths } from "@/ravarer/lib/paths";
 
 export function TripletexStatusCard() {
+  // Innstillinger kan bare åpnes av approve/admin — ikke vis en lenke som ender i «ingen tilgang».
+  const { data: accessLevel = "none" } = useRavarerAccessLevel();
+  const canManage = accessLevel === "admin" || accessLevel === "approve";
   const { data: entities = [] } = useFakturaerLegalEntities();
   const { data: creds = [] } = useQuery({
     queryKey: ["tripletex-creds-overview", entities.map((e) => e.id).join(",")],
@@ -64,12 +68,14 @@ export function TripletexStatusCard() {
             </p>
           </div>
         </div>
-        <Button asChild variant="outline" size="sm" className="gap-2">
-          <Link to={paths.innstillinger({ seksjon: "tripletex" })}>
-            <RefreshCw className="h-4 w-4" />
-            {configured === 0 ? "Konfigurer Tripletex" : "Administrer"}
-          </Link>
-        </Button>
+        {canManage && (
+          <Button asChild variant="outline" size="sm" className="gap-2">
+            <Link to={paths.innstillinger({ seksjon: "tripletex" })}>
+              <RefreshCw className="h-4 w-4" />
+              {configured === 0 ? "Konfigurer Tripletex" : "Administrer"}
+            </Link>
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

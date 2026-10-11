@@ -1,17 +1,12 @@
+import { NEGOTIATION_STATUS_LABEL } from "@/ravarer/lib/labels";
 import { toBaseFactor } from "@/fakturaer/lib/units";
 
 /**
  * Norske etiketter for statusene i forhandlingsmodulen. Rå enum-verdier skal
  * aldri vises i grensesnittet.
  */
-export const NEGOTIATION_STATUS_LABEL: Record<string, string> = {
-  draft: "Utkast",
-  invited: "Invitert",
-  in_progress: "Pågår",
-  awaiting_confirmation: "Venter på bekreftelse",
-  concluded: "Avsluttet",
-  cancelled: "Avbrutt",
-};
+// Kilde: `@/ravarer/lib/labels` (ett statusspråk). Re-eksportert for bakoverkompatibilitet.
+export { NEGOTIATION_STATUS_LABEL } from "@/ravarer/lib/labels";
 
 export const RECIPIENT_STATUS_LABEL: Record<string, string> = {
   invited: "Invitert",

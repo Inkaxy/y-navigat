@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+import { useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -11,6 +13,7 @@ import { paths } from "@/ravarer/lib/paths";
 const STATUS: Record<string, string> = { open: "Åpen", resolved: "Løst", cancelled: "Avbrutt" };
 
 export default function SupplierCases() {
+  const embedded = useIsEmbedded();
   const { data: company } = useCompany();
   const q = useQuery({
     queryKey: ["supplier-cases", company?.id],
@@ -27,9 +30,9 @@ export default function SupplierCases() {
     },
   });
   return (
-    <div className="px-page py-6 space-y-6">
+    <div className={cn("space-y-6", !embedded && "px-page py-6")}>
       <DecisionNav />
-      <h1 className="font-display text-3xl font-semibold">Leverandørsaker</h1>
+      {!embedded && <h1 className="font-display text-3xl font-semibold">Leverandørsaker</h1>}
       <QueryState isLoading={q.isLoading || !company} isError={q.isError} error={q.error} scope="fakturaer:leverandorsaker" onRetry={() => q.refetch()}
         isEmpty={(q.data ?? []).length === 0} emptyTitle="Ingen leverandørsaker" emptyDescription="Saker opprettes fra et prisavvik under I dag.">
         <ul className="divide-y divide-line-subtle rounded-xl border border-line-subtle bg-card">

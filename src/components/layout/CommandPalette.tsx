@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useGuardedNavigate } from "@/providers/UnsavedGuardProvider";
 import { Command } from "cmdk";
-import { Sun, Moon, Monitor, ExternalLink, Users, ShoppingCart, Package, Inbox, Wheat, Truck, Plus, ScanSearch } from "lucide-react";
+import { Sun, Moon, Monitor, ExternalLink, Users, ShoppingCart, Package, Inbox, Wheat, Truck } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTheme, type ThemeMode } from "@/providers/ThemeProvider";
@@ -10,7 +10,8 @@ import { getAppInternalRoute } from "@/lib/appRoutes";
 import { useDebouncedValue } from "@/kunder/hooks/useDebouncedValue";
 import { useEntitySearch } from "@/hooks/useEntitySearch";
 import { useRavarerEntitySearch } from "@/hooks/useRavarerEntitySearch";
-import { paths } from "@/ravarer/lib/paths";
+import { useInvoiceAccess } from "@/ravarer/hooks/useInvoiceAccess";
+import { buildRavarerActions } from "@/components/layout/commandPaletteActions";
 import { entityRoute, groupEntityHits, type EntityKind } from "@/lib/entitySearch";
 import { Home, User, Bell, HelpCircle, type LucideIcon } from "lucide-react";
 
@@ -52,13 +53,8 @@ export function CommandPalette({ open, onOpenChange }: Props) {
   const isSettled = base.isSettled && rm.isSettled;
   const enabled = base.enabled;
   const groups = groupEntityHits(hits);
-  const ravarerActions = rm.canRead
-    ? [
-        ...(rm.canWrite ? [{ to: paths.varer({ ny: "1" }), label: "Ny råvare", icon: Plus }] : []),
-        { to: paths.priskontroll(), label: "Gå til priskontroll", icon: ScanSearch },
-        { to: paths.varer(), label: "Gå til råvarer", icon: Wheat },
-      ]
-    : [];
+  const { data: hasInvoiceAccess = false } = useInvoiceAccess();
+  const ravarerActions = buildRavarerActions({ canRead: rm.canRead, canWrite: rm.canWrite, hasInvoiceAccess });
 
   // Global ⌘K / Ctrl+K toggle
   useEffect(() => {
@@ -161,11 +157,28 @@ export function CommandPalette({ open, onOpenChange }: Props) {
             })}
 
 
+            {ravarerActions.length > 0 && (
+              <Command.Group
+                heading="Råvarer"
+                className="[&_[cmdk-group-heading]]:eyebrow [&_[cmdk-group-heading]]:px-[18px] [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-2.5"
+              >
+                {ravarerActions.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <PaletteItem key={item.to} onSelect={() => handleNav(item.to)} value={`råvarer ${item.label} ${item.to}`}>
+                      <Icon className="h-4 w-4 opacity-70" />
+                      <span>{item.label}</span>
+                    </PaletteItem>
+                  );
+                })}
+              </Command.Group>
+            )}
+
             <Command.Group
               heading="Naviger"
               className="[&_[cmdk-group-heading]]:eyebrow [&_[cmdk-group-heading]]:px-[18px] [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-2.5"
             >
-              {[...ravarerActions, ...NAV_ITEMS].map((item) => {
+              {NAV_ITEMS.map((item) => {
                 const Icon = item.icon;
                 return (
                   <PaletteItem

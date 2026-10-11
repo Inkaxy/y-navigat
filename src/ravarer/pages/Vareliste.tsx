@@ -100,7 +100,7 @@ function csvCell(value: string): string {
 }
 
 export default function VarelistePage() {
-  const { canWrite, legalEntityId } = useRavarer();
+  const { canWrite, legalEntityId, loading: accessLoading } = useRavarer();
   const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
@@ -126,11 +126,13 @@ export default function VarelistePage() {
   // «Ny råvare» fra ⌘K: `?ny=1` åpner dialogen og fjernes fra adressen.
   useEffect(() => {
     if (params.get("ny") !== "1") return;
+    // Vent til tilgangen er kjent, ellers slettes ?ny=1 før panelet kan åpnes.
+    if (accessLoading) return;
     if (canWrite) setNewOpen(true);
     const next = new URLSearchParams(params);
     next.delete("ny");
     setParams(next, { replace: true });
-  }, [params, setParams, canWrite]);
+  }, [params, setParams, canWrite, accessLoading]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [focusedId, setFocusedId] = useState<string | null>(null);

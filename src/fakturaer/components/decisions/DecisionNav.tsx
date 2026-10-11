@@ -4,18 +4,17 @@ import { useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
 import { paths } from "@/ravarer/lib/paths";
 
 const ITEMS = [
-  { to: paths.priskontroll(), label: "I dag" },
-  { to: paths.godkjenning(), label: "Fakturaer" },
-  { to: paths.beslutninger({ omfang: "ravarer" }), label: "Råvarer" },
-  { to: paths.varekoblinger(), label: "Varekoblinger" },
+  { to: paths.priskontroll({ fane: "gjore" }), label: "Å gjøre" },
+  { to: paths.alleFakturaer(), label: "Fakturaer" },
+  { to: paths.godkjenning(), label: "Godkjenning" },
   { to: paths.saker(), label: "Leverandørsaker" },
 ];
 
-/** Inngangen til fakturabehandlingen: I dag · Fakturaer · Råvarer. */
+/** Snarveier til Priskontroll-fanene (samme navn som fanene), for frittstående beslutningssider. */
 export function DecisionNav() {
   if (useIsEmbedded()) return null;
   return (
-    <nav aria-label="Fakturabehandling" className="flex gap-1 overflow-x-auto">
+    <nav aria-label="Priskontroll" className="flex gap-1 overflow-x-auto">
       {ITEMS.map((i) => (
         <NavLink
           key={i.label}

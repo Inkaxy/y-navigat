@@ -1,4 +1,5 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
+import { lazyWithReload as lazy } from "@/lib/lazyWithReload";
 import { Link, useSearchParams } from "react-router-dom";
 import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";

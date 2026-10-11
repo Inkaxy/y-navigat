@@ -1,6 +1,7 @@
 import { AlertTriangle, CheckCircle2, ClipboardList, FileWarning, TrendingUp, Warehouse } from "lucide-react";
 import { OrderDeskKpi } from "@/ordre/components/dashboard/OrderDeskKpi";
 import { paths } from "@/ravarer/lib/paths";
+import { Skeleton } from "@/components/ui/skeleton";
 import { autoReconciledPct, dataRydding } from "./logic";
 import type { PriceMovers, WorkSummary } from "@/ravarer/lib/workRpcTypes";
 
@@ -29,6 +30,16 @@ export function KpiRowView({ summary, movers, loading }: KpiRowViewProps) {
   const down = movers?.summary.down ?? 0;
   const expiring30 = summary?.other.agreements_expiring_30d ?? 0;
   const expiring90 = summary?.other.agreements_expiring_90d ?? 0;
+
+  const gridCls = "-mx-page grid grid-flow-col auto-cols-[minmax(78%,1fr)] gap-3 overflow-x-auto px-page pb-1 sm:mx-0 sm:grid-flow-row sm:auto-cols-auto sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-3 2xl:grid-cols-6";
+  // Til fakturatilgangen er kjent vises nøytrale skjelett — aldri fliser/tall brukeren kanskje ikke skal se.
+  if (!summary) {
+    return (
+      <div className={gridCls} aria-busy="true" aria-label="Laster nøkkeltall">
+        {Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-[92px] rounded-xl" />)}
+      </div>
+    );
+  }
 
   return (
     <div className="-mx-page grid grid-flow-col auto-cols-[minmax(78%,1fr)] gap-3 overflow-x-auto px-page pb-1 sm:mx-0 sm:grid-flow-row sm:auto-cols-auto sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-3 2xl:grid-cols-6">

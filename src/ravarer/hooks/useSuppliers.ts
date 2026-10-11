@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
+import { showError } from "@/lib/userError";
 import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
 
 export interface SupplierRow {
@@ -21,6 +22,17 @@ export interface SupplierRow {
   invoice_count: number | null;
 }
 
+const SUPPLIER_COLUMNS = "id, legal_entity_id, name, org_number, contact_email, contact_phone, is_active, notes, track_invoice_lines, tripletex_is_inactive, tripletex_supplier_number, tripletex_synced_at, last_invoice_date, invoice_count";
+
+/** Edge-svar kan bære en feilmelding i kroppen selv når kallet lykkes. */
+function edgeBodyError(data: unknown): string | null {
+  if (data && typeof data === "object" && "error" in data) {
+    const e = (data as { error: unknown }).error;
+    if (typeof e === "string" && e) return e;
+  }
+  return null;
+}
+
 export function useSuppliers() {
   const { legalEntityId } = useRavarer();
   return useQuery({
@@ -28,11 +40,12 @@ export function useSuppliers() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("suppliers")
-        .select("*")
+        .select(SUPPLIER_COLUMNS)
         .eq("legal_entity_id", legalEntityId)
         .order("name");
       if (error) throw error;
-      return (data ?? []) as unknown as SupplierRow[];
+      const rows: SupplierRow[] = data ?? [];
+      return rows;
     },
   });
 }
@@ -45,16 +58,18 @@ export function useCreateSupplier() {
       const { data, error } = await supabase
         .from("suppliers")
         .insert({ ...input, legal_entity_id: legalEntityId })
-        .select()
+        .select(SUPPLIER_COLUMNS)
         .single();
       if (error) throw error;
-      return data as unknown as SupplierRow;
+      const row: SupplierRow = data;
+      return row;
     },
-    onSuccess: () => { invalidateRavarerCounts(qc);
+    onSuccess: () => {
+      invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["suppliers"] });
       toast.success("Leverandør opprettet");
     },
-    onError: (e: any) => toast.error(`Kunne ikke opprette: ${e.message ?? e}`),
+    onError: (e: unknown) => showError("leverandor:opprett", e, "Kunne ikke opprette leverandøren."),
   });
 }
 
@@ -75,10 +90,11 @@ export function useSetTrackInvoiceLines() {
       if (error) throw error;
       return value;
     },
-    onSuccess: () => { invalidateRavarerCounts(qc);
+    onSuccess: () => {
+      invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["suppliers"] });
     },
-    onError: (e: any) => toast.error(`Kunne ikke lagre: ${e.message ?? e}`),
+    onError: (e: unknown) => showError("leverandor:sporing", e, "Kunne ikke lagre."),
   });
 }
 
@@ -92,16 +108,18 @@ export function useBackfillSupplierInvoices() {
         body: { legal_entity_id: legalEntityId, supplier_id: supplierId, backfill_months: months },
       });
       if (error) throw error;
-      if ((data as any)?.error) throw new Error((data as any).error);
+      const bodyError = edgeBodyError(data);
+      if (bodyError) throw new Error(bodyError);
       return data as { imported?: number; skipped?: number; fetched?: number; reason?: string };
     },
-    onSuccess: (r) => { invalidateRavarerCounts(qc);
+    onSuccess: (r) => {
+      invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["suppliers"] });
       qc.invalidateQueries({ queryKey: ["fakturaer"] });
       if (r?.reason) toast.info(r.reason);
       else toast.success(`Hentet ${r?.imported ?? 0} nye fakturaer (${r?.fetched ?? 0} funnet)`);
     },
-    onError: (e: any) => toast.error(`Etterhenting feilet: ${e.message ?? e}`),
+    onError: (e: unknown) => showError("leverandor:etterhent", e, "Etterhenting feilet. Prøv igjen."),
   });
 }
 
@@ -115,7 +133,8 @@ export function useSyncSuppliersFromTripletex() {
         body: { legal_entity_id: legalEntityId },
       });
       if (error) throw error;
-      if ((data as any)?.error) throw new Error((data as any).error);
+      const bodyError = edgeBodyError(data);
+      if (bodyError) throw new Error(bodyError);
       return data as {
         hentet: number;
         opprettet: number;
@@ -125,7 +144,8 @@ export function useSyncSuppliersFromTripletex() {
         hoppet_navn?: { navn: string; grunn: string }[];
       };
     },
-    onSuccess: (r) => { invalidateRavarerCounts(qc);
+    onSuccess: (r) => {
+      invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["suppliers"] });
       const skipped = r.hoppet ?? 0;
       toast.success(
@@ -135,6 +155,6 @@ export function useSyncSuppliersFromTripletex() {
         toast.info(`Hoppet over: ${r.hoppet_navn.map((h) => h.navn).join(", ")}`);
       }
     },
-    onError: (e: any) => toast.error(`Synk feilet: ${e.message ?? e}`),
+    onError: (e: unknown) => showError("leverandor:synk", e, "Synk med Tripletex feilet. Prøv igjen."),
   });
 }

@@ -1,3 +1,4 @@
+import { REASON_LABELS } from "@/ravarer/lib/labels";
 import { normalizeMatchKey } from "@/fakturaer/lib/matchNormalize";
 
 /**
@@ -37,28 +38,8 @@ export type DerivedReasonCode = (typeof DERIVED_REASON_CODES)[number];
 
 export type ReasonCode = LineReasonCode | DerivedReasonCode;
 
-export const REASON_LABELS: Record<ReasonCode, string> = {
-  unmatched: "Umatchet",
-  low_confidence: "Lav tillit",
-  price_variance: "Prisavvik",
-  price_increase: "Prisøkning",
-  price_drop: "Prisfall",
-  uncertain_cost: "Usikker kostpris",
-  unknown_package_size: "Ukjent pakningsstørrelse",
-  package_conflict: "Flere pakninger hos leverandøren",
-  sku_collision: "Konflikt",
-  unsupported_currency: "Valuta ikke støttet",
-  agreement_conflict: "To likestilte avtaler",
-  price_reference_error: "Prisgrunnlag kunne ikke hentes",
-  recalculation_pending: "Må beregnes på nytt",
-  extraction_unresolved: "Beløp mangler i dokumentet",
-  missing_base_unit: "Varen mangler grunnenhet",
-  start_price_manual_check: "Startpris må kontrolleres manuelt",
-  no_automatic_basis: "Uten gyldig prisgrunnlag",
-  no_baseline: "Uten prisgrunnlag",
-  extraction_issue: "Uttrekk eller sum stemmer ikke",
-  zero_quantity: "Mengde mangler eller er null",
-};
+// Kilde: `@/ravarer/lib/labels` (ett statusspråk). Re-eksportert for bakoverkompatibilitet.
+export { REASON_LABELS } from "@/ravarer/lib/labels";
 
 /** Arbeidsbøttene i køen. `other` er den ærlige fallbacken. */
 export const REVIEW_GROUPS = [
