@@ -177,7 +177,9 @@ export function buildProposal(resp: unknown, snapshot: { invoice: SnapshotInvoic
 }
 
 export async function sha256Hex(data: Uint8Array): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", data);
+  const copy = new Uint8Array(data.byteLength);
+  copy.set(data);
+  const buf = await crypto.subtle.digest("SHA-256", copy.buffer);
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 

@@ -132,9 +132,9 @@ describe("lesing på nytt – flyt", () => {
     expect((await runPreview(d, USER, RUN)).body.code).toBe("snapshot_endret");
   });
   it("sender lagret signert snapshot og eksisterende varenavn til leseren", async () => {
-    const extract = vi.fn(async () => ({ ok: true, status: 200, json: resp }));
+    let body: Record<string, unknown> = {};
+    const extract = vi.fn(async (b: Record<string, unknown>) => { body = b; return { ok: true, status: 200, json: resp }; });
     await runPreview(deps({ extract }), USER, RUN);
-    const body = extract.mock.calls[0][0] as Record<string, unknown>;
     expect(body.known_items).toEqual([{ sku: "A1", name: "Mel" }]);
     expect(body.supplier_id).toBe(OTHER);
     expect(typeof body.pdf_base64).toBe("string");
