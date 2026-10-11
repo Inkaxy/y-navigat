@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
@@ -14,6 +13,7 @@ import {
   type DeclarationWorklistRow,
 } from "@/ravarer/hooks/useDeclarationNames";
 import { paths } from "@/ravarer/lib/paths";
+import { DeclarationNameField } from "@/ravarer/editors/DeclarationNameField";
 
 function initialFor(r: DeclarationWorklistRow) {
   return (r.matvaretabellen_name ?? r.suggested_name ?? "").trim().toLowerCase();
