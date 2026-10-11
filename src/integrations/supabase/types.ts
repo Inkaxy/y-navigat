@@ -17421,6 +17421,10 @@ export type Database = {
         Args: { p_recipe_id: string }
         Returns: number
       }
+      recipe_cost_line_grams: {
+        Args: { d: number; q: number; qg: number; u: string; w: number }
+        Returns: number
+      }
       recipe_declaration_ready: {
         Args: { p_recipe_id: string }
         Returns: {
