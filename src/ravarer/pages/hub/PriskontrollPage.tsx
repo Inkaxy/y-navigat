@@ -12,6 +12,8 @@ import { FakturaerTab } from "@/ravarer/pages/priskontroll/fakturaer/FakturaerTa
 import { normalizePriskontrollSearch } from "@/ravarer/pages/priskontroll/fakturaer/visning";
 import { ImportSheet } from "@/ravarer/pages/priskontroll/import/ImportSheet";
 import { GjoreWorkspace } from "@/ravarer/pages/priskontroll/gjore/GjoreWorkspace";
+import { MengdeDiagnostikk } from "@/ravarer/pages/priskontroll/gjore/mengde/MengdeDiagnostikk";
+import { Link } from "react-router-dom";
 import { PriskontrollToolsMenu } from "./PriskontrollToolsMenu";
 import { PRISKONTROLL_TAB_PARAMS, PRISKONTROLL_TABS, priskontrollTabs, RAVARER_EYEBROW } from "./hubTabs";
 
@@ -44,8 +46,16 @@ export default function PriskontrollPage() {
       tabs={<SectionTabs ariaLabel="Priskontroll" tabs={priskontrollTabs(summary)} defaultTab="gjore" clearParams={PRISKONTROLL_TAB_PARAMS} />}
     >
       <Suspense fallback={<QueryLoadingState rows={6} />}>
-        {tab === "gjore" && (
-          <GjoreWorkspace />
+        {tab === "gjore" && sp.get("visning") === "mengde" && <MengdeDiagnostikk />}
+        {tab === "gjore" && sp.get("visning") !== "mengde" && (
+          <>
+            <GjoreWorkspace />
+            <div className="px-page pb-4">
+              <Link to="?fane=gjore&visning=mengde" className="inline-flex min-h-[44px] items-center text-sm text-ink-secondary underline-offset-2 hover:underline">
+                Diagnostikk: linjer uten mengde i baseenhet
+              </Link>
+            </div>
+          </>
         )}
         {tab === "fakturaer" && <FakturaerTab />}
         {tab === "godkjenning" && <Godkjenning />}

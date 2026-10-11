@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { QueryState } from "@/components/common/QueryState";
 import { formatDate, formatNumber } from "@/ravarer/lib/constants";
 import { paths } from "@/ravarer/lib/paths";
-import { invoiceStatusLabel } from "./labels";
+import { invoiceStatusLabel } from "@/ravarer/lib/labels";
 import { useMissingQuantityDiagnostic, type MovementStatus } from "./useMissingQuantityDiagnostic";
 
 export const MENGDE_RETURN = "fane=gjore&visning=mengde";
@@ -21,7 +21,7 @@ export function MengdeDiagnostikk() {
   return (
     <div className="space-y-4 px-page py-4">
       <div className="space-y-1">
-        <Link to={paths.priskontroll ? `/ravarer/priskontroll?fane=gjore` : "/ravarer/priskontroll"} className="inline-flex min-h-[44px] items-center text-sm text-primary hover:underline">
+        <Link to={paths.priskontroll({ fane: "gjore" })} className="inline-flex min-h-[44px] items-center text-sm text-primary hover:underline">
           ← Tilbake til Å gjøre
         </Link>
         <h2 className="text-title font-semibold">Mengde i baseenhet</h2>
@@ -51,7 +51,7 @@ export function MengdeDiagnostikk() {
                       <span className="block text-xs text-ink-secondary">{l.raw_material_name}</span>
                     </span>
                     <span className="tabular-nums">{formatNumber(l.quantity, 2)} {l.unit ?? ""}</span>
-                    <span>{invoiceStatusLabel(l.invoice_status)}</span>
+                    <span>{invoiceStatusLabel(l.invoice_status).label}</span>
                     <span className={l.movement.status === "unknown" ? "text-warning" : "text-ink-secondary"}>Lager: {movementText(l.movement)}</span>
                   </Link>
                 </li>
