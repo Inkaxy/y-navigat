@@ -23,7 +23,7 @@ export type PriskontrollTabId = (typeof PRISKONTROLL_TABS)[number];
 
 /** Parametre som tilhører en enkelt Priskontroll-fane og fjernes ved fanebytte. */
 export const PRISKONTROLL_TAB_PARAMS = [
-  "visning", "modus", "innboks", "faktura", "filter", "kilde", "kreditnota", "lav", "status", "leverandor", "q", "selskap", "fra", "til", "avvik", "betalt", "sort", "dir", "side",
+  "visning", "modus", "innboks", "faktura", "filter", "kilde", "kreditnota", "lav", "status", "leverandor", "q", "selskap", "fra", "til", "avvik", "betalt", "sort", "dir", "side", "sak",
 ];
 
 export function priskontrollTabs(s: WorkSummary | undefined): SectionTab[] {

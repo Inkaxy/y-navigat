@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useUiPreference } from "@/hooks/useUiPreference";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -63,7 +64,7 @@ export default function FakturaWorkspace() {
   const [dialog, setDialog] = useState<DialogState>(null);
   const [lineDialog, setLineDialog] = useState<LineDialog>(null);
   const [multi, setMulti] = useState(false);
-  const [tableView, setTableView] = useState(false);
+  const { value: tableView, setValue: setTableView } = useUiPreference<boolean>("ravarer.faktura.tabellvisning", false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [lastLinked, setLastLinked] = useState<{ rmsId: string; name: string } | null>(null);
@@ -157,10 +158,10 @@ export default function FakturaWorkspace() {
   const linesZone = (
     <div className="min-w-0 space-y-3">
       <InvoiceFactsSection data={data} canWrite={s.canWrite} fetchingLines={fetchLines.isPending} onFetchLines={doFetch} onChanged={() => void detail.refetch()} openSignal={factsSignal} />
-      {s.result && <ResultBox title={s.result.title} items={s.result.items} onNext={() => s.setResult(null)} nextLabel="Lukk" />}
+      {s.result && <ResultBox title={s.result.title} items={s.result.items} onUndo={s.result.undoable && q.undoEntry ? () => { s.setResult(null); void q.undo(); } : undefined} onNext={() => s.setResult(null)} nextLabel="Lukk" />}
       {lastLinked && <SimilarLinesHint rmsId={lastLinked.rmsId} name={lastLinked.name} onOpen={() => q.setBulkLink(lastLinked)} onDismiss={() => setLastLinked(null)} />}
       <div className="flex justify-end">
-        <Button variant="ghost" size="sm" aria-pressed={tableView} onClick={() => setTableView((v) => !v)}>{tableView ? "Vis arbeidsliste" : "Vis som tabell"}</Button>
+        <Button variant="ghost" size="sm" aria-pressed={tableView} onClick={() => setTableView(!tableView)}>{tableView ? "Vis arbeidsliste" : "Vis som tabell"}</Button>
       </div>
       {tableView ? (
         <InvoiceLinesTable
@@ -272,7 +273,8 @@ export default function FakturaWorkspace() {
       </Sheet>
       <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} bindings={HELP} />
       <FakturaerDialogs state={dialog} onClose={() => setDialog(null)} onDone={(k) => { if (k !== "flag") setDialog(null); void detail.refetch(); }} />
-      <LineDialogs dialog={lineDialog} onClose={() => setLineDialog(null)} q={q} canWrite={s.canWrite} invoice={data} onEditMaterial={editMaterial} />
+      <LineDialogs dialog={lineDialog} onClose={() => setLineDialog(null)} q={q} canWrite={s.canWrite} invoice={data} onEditMaterial={editMaterial}
+        onNotItemDone={(l) => { q.remember(l, `Ikke vare: ${l.description ?? "linje"}`); q.refresh(); s.setResult({ title: "Linjen er merket som ikke vare", items: [l.description ?? ""].filter(Boolean), undoable: true }); }} />
     </div>
   );
 }

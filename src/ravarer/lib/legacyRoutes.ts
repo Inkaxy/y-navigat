@@ -26,6 +26,9 @@ function merge(search: string, extra: [string, string][], rename: Record<string,
 type Entry = { to: string; extra?: [string, string][]; rename?: Record<string, string | null>; /** Import-sidepanel: standardfane når ingen er oppgitt. */ importer?: boolean };
 const IMP = { to: `${R}/priskontroll`, rename: { tab: "importer" }, importer: true } as const;
 
+/** Gammel beslutningsvisning → Å gjøre; søk og leverandør følger med. */
+const GJORE: Entry = { to: `${R}/priskontroll`, extra: [["fane", "gjore"]], rename: { omfang: null, fra: null, side: null, type: null, fane: null } };
+
 const STATIC: Record<string, Entry> = {
   "/ravarer/vareliste": { to: `${R}/varer` },
   "/ravarer/pakninger": { to: `${R}/varer/pakninger`, extra: [["filter", "ubekreftet"]] },
@@ -40,8 +43,10 @@ const STATIC: Record<string, Entry> = {
     to: `${R}/priskontroll`, extra: [["fane", "fakturaer"], ["visning", "innboks"]], rename: { fane: "innboks" },
   },
   "/ravarer/fakturaer/i-dag": { to: `${R}/priskontroll`, extra: [["fane", "gjore"]] },
-  "/ravarer/fakturaer/beslutninger": { to: `${R}/priskontroll/beslutninger` },
-  "/ravarer/fakturaer/ravarer": { to: `${R}/priskontroll/beslutninger`, extra: [["omfang", "ravarer"]] },
+  "/ravarer/fakturaer/beslutninger": GJORE,
+  "/ravarer/fakturaer/ravarer": GJORE,
+  // Beslutninger per gruppe er dekket av Å gjøre (fase 3c).
+  "/ravarer/priskontroll/beslutninger": GJORE,
   "/ravarer/fakturaer/varekoblinger": { to: `${R}/priskontroll/varekort` },
   "/ravarer/fakturaer/vareminne": { to: `${R}/priskontroll/varekort` },
   "/ravarer/fakturaer/oversikt": { to: `${R}/priskontroll`, extra: [["fane", "godkjenning"]], rename: { fane: "status" } },
@@ -68,9 +73,10 @@ const STATIC: Record<string, Entry> = {
   "/fakturaer/import-pdf": { ...IMP, extra: [["importer", "pdf"]] },
 };
 
-const DYNAMIC: { re: RegExp; to: (m: RegExpMatchArray) => string }[] = [
+const DYNAMIC: { re: RegExp; to: (m: RegExpMatchArray) => string; dropQuery?: boolean }[] = [
   { re: /^\/ravarer\/vareliste\/([^/]+)$/, to: (m) => `${R}/varer/${m[1]}` },
-  { re: /^\/ravarer\/fakturaer\/i-dag\/([^/]+)$/, to: (m) => `${R}/priskontroll/beslutninger/${m[1]}` },
+  { re: /^\/ravarer\/fakturaer\/i-dag\/[^/]+$/, to: () => `${R}/priskontroll?fane=gjore`, dropQuery: true },
+  { re: /^\/ravarer\/priskontroll\/beslutninger\/[^/]+$/, to: () => `${R}/priskontroll?fane=gjore`, dropQuery: true },
   { re: /^\/ravarer\/fakturaer\/saker\/([^/]+)$/, to: (m) => `${R}/priskontroll/saker/${m[1]}` },
   { re: /^\/ravarer\/fakturaer\/([^/]+)\/registrer-linjer$/, to: (m) => `${R}/priskontroll/faktura/${m[1]}/registrer-linjer` },
   { re: /^\/ravarer\/fakturaer\/([^/]+)$/, to: (m) => `${R}/priskontroll/faktura/${m[1]}` },
@@ -83,6 +89,7 @@ export const LEGACY_RAVARER_PATHS: string[] = [
   ...Object.keys(STATIC),
   "/ravarer/vareliste/:id",
   "/ravarer/fakturaer/i-dag/:key",
+  "/ravarer/priskontroll/beslutninger/:key",
   "/ravarer/fakturaer/saker/:id",
   "/ravarer/fakturaer/:id/registrer-linjer",
   "/ravarer/fakturaer/:id",
@@ -100,7 +107,7 @@ export function resolveLegacyRavarerUrl(pathname: string, search: string): strin
   }
   for (const d of DYNAMIC) {
     const m = p.match(d.re);
-    if (m) return d.to(m) + merge(search, []);
+    if (m) return d.dropQuery ? d.to(m) : d.to(m) + merge(search, []);
   }
   return null;
 }

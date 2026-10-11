@@ -15,8 +15,8 @@ import { GjoreWorkspace } from "@/ravarer/pages/priskontroll/gjore/GjoreWorkspac
 import { PriskontrollToolsMenu } from "./PriskontrollToolsMenu";
 import { PRISKONTROLL_TAB_PARAMS, PRISKONTROLL_TABS, priskontrollTabs, RAVARER_EYEBROW } from "./hubTabs";
 
-const Godkjenning = lazy(() => import("@/fakturaer/pages/InvoiceOverview"));
-const Saker = lazy(() => import("@/fakturaer/pages/SupplierCases"));
+const Godkjenning = lazy(() => import("@/ravarer/pages/priskontroll/godkjenning/GodkjenningTab").then((m) => ({ default: m.GodkjenningTab })));
+const Saker = lazy(() => import("@/ravarer/pages/priskontroll/saker/SakerTab").then((m) => ({ default: m.SakerTab })));
 
 /** Priskontroll: Å gjøre · Fakturaer · Godkjenning · Leverandørsaker. */
 export default function PriskontrollPage() {
@@ -24,7 +24,7 @@ export default function PriskontrollPage() {
   const { search } = useLocation();
   const redirect = normalizePriskontrollSearch(search);
   const tab = activeTabFrom(sp, "fane", [...PRISKONTROLL_TABS], "gjore");
-  const { data: summary } = useWorkSummary({ includeApproval: tab === "godkjenning" });
+  const { data: summary } = useWorkSummary({ includeApproval: true });
   if (redirect) return <Navigate to={redirect} replace />;
   const openImport = () => setSp((prev) => { const p = new URLSearchParams(prev); p.set("importer", "ehf"); return p; });
 

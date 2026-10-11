@@ -15,26 +15,36 @@ const ACTION_LABEL: Record<string, string> = {
   "supplier_item.credit_claimed": "Kreditt krevd",
   "invoice_line.price_variance_accepted": "Pris godtatt",
   "prices.quarantined": "Priser satt i karantene",
+  "supplier_case.created": "Sak opprettet",
+  "supplier_case.status": "Status endret",
+  "supplier_case.credit_allocated": "Kreditt fordelt",
 };
+
+const CASE_STATUS: Record<string, string> = { open: "Åpen", resolved: "Løst", cancelled: "Avbrutt" };
 
 interface Row { id: string; occurred_at: string; action: string; reason: string | null; user_display_name: string | null; changes: unknown }
 
 function detail(r: Row): string | null {
   const c = (r.changes ?? {}) as Record<string, unknown>;
   if (r.action === "supplier_link.changed") return `${String(c.from_name ?? "?")} → ${String(c.to_name ?? "?")}${Array.isArray(c.changed_line_ids) ? `, ${c.changed_line_ids.length} åpne linjer flyttet` : ""}${c.locked_lines ? `, ${String(c.locked_lines)} førte linjer urørt` : ""}`;
+  if (r.action === "supplier_case.status") return `${CASE_STATUS[String(c.from ?? "")] ?? "?"} → ${CASE_STATUS[String(c.to ?? "")] ?? "?"}`;
+  if (r.action === "supplier_case.credit_allocated" && c.amount_excl_vat != null) return `${Number(c.amount_excl_vat).toLocaleString("nb-NO", { style: "currency", currency: "NOK" })} ekskl. mva.`;
+  if (r.action === "supplier_case.created" && c.lines != null) return `${String(c.lines)} linjer`;
   if (r.action === "invoice_line_match_confirmed") return c.package_confirmed ? "Pakning bekreftet" : null;
   return null;
 }
 
 /** Endringslogg fra revisjonsloggen for en faktura eller en leverandørkobling. */
-export function AuditHistory({ entityId, kind }: { entityId: string; kind: "invoice" | "supplier_link" }) {
+export function AuditHistory({ entityId, kind }: { entityId: string; kind: "invoice" | "supplier_link" | "supplier_case" }) {
   const q = useQuery({
     queryKey: ["audit-history", kind, entityId],
     queryFn: async () => {
       let req = supabase.from("audit_log").select("id, occurred_at, action, reason, user_display_name, changes").order("occurred_at", { ascending: false }).limit(50);
       req = kind === "invoice"
         ? req.eq("entity_id", entityId).in("action", ["invoice.internal_approved", "invoice.internal_approval_revoked", "invoice.safe_costs_posted"])
-        : req.or(`entity_id.eq.${entityId},changes->>raw_material_supplier_id.eq.${entityId}`);
+        : kind === "supplier_case"
+          ? req.eq("entity_id", entityId).eq("entity_type", "supplier_deviation_case")
+          : req.or(`entity_id.eq.${entityId},changes->>raw_material_supplier_id.eq.${entityId}`);
       const { data, error } = await req;
       if (error) throw new Error("Kunne ikke hente historikken");
       return (data ?? []) as Row[];

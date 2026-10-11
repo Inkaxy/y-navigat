@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { APPROVAL_BLOCKER_LABEL } from "@/ravarer/lib/labels";
 
 /**
  * Intern fakturagodkjenning (attestasjon i NBhub). Den utløser IKKE betaling
@@ -24,23 +25,8 @@ export interface OverviewRow {
 
 export type ApprovalBucket = "ready" | "waiting" | "done";
 
-export const BLOCKER_LABEL: Record<string, string> = {
-  flagget: "Fakturaen er flagget",
-  kansellert: "Fakturaen er kansellert",
-  sumavvik: "Linjesummen stemmer ikke med fakturabeløpet",
-  mangler_linjer: "Fakturaen har ingen linjer",
-  duplikat: "Samme fakturanummer finnes fra før hos leverandøren",
-  mengde: "Mengde eller uttrekk på en linje må kontrolleres",
-  prisavvik: "Prisavvik er ikke avklart",
-  leverandorsak: "Holdes igjen av en åpen leverandørsak",
-  finnes_ikke: "Fakturaen finnes ikke",
-  leverandor_mangler: "Leverandør mangler",
-  belop_mangler: "Fakturabeløpet mangler",
-  mva_ukjent: "Mva-beløpet er ukjent",
-  valuta_mangler: "Valuta mangler",
-  sum_ukontrollert: "Linjesummen er ikke kontrollert mot fakturabeløpet",
-  lavt_uttrekk: "Fakturaen er tolket med lav sikkerhet — kontroller registreringen",
-};
+/** Etikettene bor i den felles etikettkilden (labels.ts). */
+export const BLOCKER_LABEL = APPROVAL_BLOCKER_LABEL;
 
 export function blockerLabel(code: string): string {
   return BLOCKER_LABEL[code] ?? "Kan ikke godkjennes ennå";
@@ -78,10 +64,26 @@ export async function revokeInvoiceApproval(invoiceId: string, reason: string): 
   if (error) throw new Error(/forbidden/.test(error.message) ? "Mangler godkjennerrolle" : /begrunnelse/.test(error.message) ? "Skriv en begrunnelse" : "Kunne ikke trekke tilbake godkjenningen");
 }
 
-/** Godkjenner valgte fakturaer én og én og rapporterer nøyaktig resultat per faktura. */
-export async function approveMany(ids: readonly string[], note: string | null, approve = approveInvoiceInternal): Promise<ApproveResult[]> {
+/**
+ * Godkjenner valgte fakturaer én og én (sekvensielt) og rapporterer nøyaktig
+ * resultat per faktura. En feil stopper aldri resten.
+ */
+export async function approveMany(
+  ids: readonly string[],
+  note: string | null,
+  approve = approveInvoiceInternal,
+  onProgress?: (done: number, total: number) => void,
+): Promise<ApproveResult[]> {
   const out: ApproveResult[] = [];
-  for (const id of ids) out.push(await approve(id, note));
+  for (const id of ids) {
+    try {
+      out.push(await approve(id, note));
+    } catch (e) {
+      console.error("[godkjenn-mange]", e);
+      out.push({ invoiceId: id, ok: false, already: false, message: "Kunne ikke godkjenne" });
+    }
+    onProgress?.(out.length, ids.length);
+  }
   return out;
 }
 

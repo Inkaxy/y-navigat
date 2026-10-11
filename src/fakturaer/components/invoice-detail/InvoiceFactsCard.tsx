@@ -34,15 +34,36 @@ const Row = ({ k, children }: { k: string; children: React.ReactNode }) => (
   <div className="flex items-baseline justify-between gap-3 py-1"><dt className="text-ink-secondary">{k}</dt><dd className="text-right tabular-nums">{children}</dd></div>
 );
 
+/** Fakturahode-felt som ellers sto i «Detaljer» — vises én gang, i faktakortet. */
+export interface InvoiceHeaderFacts {
+  supplierName: string | null;
+  orgNumber: string | null;
+  invoiceDate: string | null;
+  dueDate: string | null;
+  sourceLabel: string | null;
+}
+
 /** Ren visning av «Tripletex mot faktura». */
-export function InvoiceFactsView({ invoice: d, actions }: { invoice: InvoiceFacts; actions?: React.ReactNode }) {
+export function InvoiceFactsView({ invoice: d, actions, details }: { invoice: InvoiceFacts; actions?: React.ReactNode; details?: InvoiceHeaderFacts }) {
   const net = d.total_amount != null ? d.total_amount - (d.total_vat ?? 0) : null;
   const chk = sumCheck(d.lines_sum_variance_pct);
   const conf = d.extraction_confidence;
   return (
     <Card className="space-y-3 p-5">
       <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-secondary">Tripletex mot faktura</h3>
-      <div className="grid gap-5 md:grid-cols-2">
+      <div className={cn("grid gap-5 md:grid-cols-2", details && "xl:grid-cols-3")}>
+        {details && (
+          <section>
+            <h4 className="mb-1 text-caption font-semibold">Faktura</h4>
+            <dl className="divide-y divide-line-subtle text-sm">
+              <Row k="Leverandør">{details.supplierName ?? "—"}</Row>
+              <Row k="Org.nr">{details.orgNumber ?? "—"}</Row>
+              <Row k="Fakturadato">{formatDate(details.invoiceDate)}</Row>
+              <Row k="Forfall">{formatDate(details.dueDate)}</Row>
+              <Row k="Kilde">{details.sourceLabel ?? "—"}</Row>
+            </dl>
+          </section>
+        )}
         <section>
           <h4 className="mb-1 text-caption font-semibold">Fra Tripletex</h4>
           <dl className="divide-y divide-line-subtle text-sm">
@@ -72,7 +93,7 @@ export function InvoiceFactsView({ invoice: d, actions }: { invoice: InvoiceFact
   );
 }
 
-export function InvoiceFactsCard({ invoice, canWrite, fetchingLines, onFetchLines }: { invoice: InvoiceFacts; canWrite: boolean; fetchingLines: boolean; onFetchLines: () => void }) {
+export function InvoiceFactsCard({ invoice, canWrite, fetchingLines, onFetchLines, details }: { invoice: InvoiceFacts; canWrite: boolean; fetchingLines: boolean; onFetchLines: () => void; details?: InvoiceHeaderFacts }) {
   const qc = useQueryClient();
   const [repairMsg, setRepairMsg] = useState<string | null>(null);
   const timers = useRef<number[]>([]);
@@ -121,5 +142,5 @@ export function InvoiceFactsCard({ invoice, canWrite, fetchingLines, onFetchLine
       {repairMsg && <p role="status" className="w-full text-sm text-ink-secondary">{repairMsg}</p>}
     </>
   ) : null;
-  return <InvoiceFactsView invoice={invoice} actions={actions} />;
+  return <InvoiceFactsView invoice={invoice} actions={actions} details={details} />;
 }

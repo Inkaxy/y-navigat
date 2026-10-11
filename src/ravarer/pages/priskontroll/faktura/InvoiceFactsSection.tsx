@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { InvoiceFactsCard } from "@/fakturaer/components/invoice-detail/InvoiceFactsCard";
-import { InvoiceDetailsCard } from "@/fakturaer/components/invoice-detail/InvoiceDocumentLayout";
+import { INVOICE_SOURCES } from "@/fakturaer/lib/constants";
 import type { InvoiceDetailData } from "@/fakturaer/components/invoice-detail/fetchInvoiceDetail";
 import { LinesSumMismatchAlert } from "@/fakturaer/components/LinesSumMismatchAlert";
 import { confidenceLabel, linesSourceLabel } from "@/fakturaer/lib/invoiceFacts";
@@ -25,6 +25,17 @@ export function factsSummary(d: Pick<InvoiceDetailData, "lines_sum_status" | "li
   const parts = [sum, linesSourceLabel(d.lines_source).toLowerCase()];
   if (d.extraction_confidence != null) parts.push(`${confidenceLabel(Number(d.extraction_confidence)).toLowerCase()} sikkerhet`);
   return parts.join(" · ");
+}
+
+/** Feltene som tidligere sto i «Detaljer» — nå del av faktakortet, så hvert felt vises én gang. */
+export function headerFacts(d: InvoiceDetailData) {
+  return {
+    supplierName: d.suppliers?.name ?? null,
+    orgNumber: d.suppliers?.org_number ?? null,
+    invoiceDate: d.invoice_date,
+    dueDate: d.due_date,
+    sourceLabel: INVOICE_SOURCES.find((s) => s.value === d.source)?.label ?? d.source ?? null,
+  };
 }
 
 /** «Tripletex mot faktura» — fakta vist ÉN gang, øverst i linjesonen. */
@@ -68,10 +79,7 @@ export function InvoiceFactsSection({ data, canWrite, fetchingLines, onFetchLine
             onOverridden={onChanged}
           />
         )}
-        <div className="grid gap-3 xl:grid-cols-[1fr_280px]">
-          <InvoiceFactsCard invoice={data} canWrite={canWrite} fetchingLines={fetchingLines} onFetchLines={onFetchLines} />
-          <InvoiceDetailsCard data={data} />
-        </div>
+        <InvoiceFactsCard invoice={data} canWrite={canWrite} fetchingLines={fetchingLines} onFetchLines={onFetchLines} details={headerFacts(data)} />
       </CollapsibleContent>
     </Collapsible>
   );

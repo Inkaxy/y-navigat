@@ -10,7 +10,7 @@ import { useInvoiceDeliveryStatus, extrasFor } from "@/ravarer/hooks/useInvoiceD
 import { deliverySteps, nextInvoiceStep } from "./invoiceSteps";
 import { invalidateInvoiceWork } from "./useInvoiceActions";
 
-export type StepResult = { title: string; items: string[]; error?: boolean } | null;
+export type StepResult = { title: string; items: string[]; error?: boolean; undoable?: boolean } | null;
 
 function toInboxLines(d: InvoiceDetailData): InboxLine[] {
   return (d.invoice_lines ?? []).map((l) => ({

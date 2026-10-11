@@ -14,7 +14,7 @@ import { NOT_A_PRODUCT_REASONS } from "@/ravarer/lib/notAProductReasons";
 
 
 
-export function NotARawMaterialDialog({ open, onOpenChange, line }: { open: boolean; onOpenChange: (v: boolean) => void; line: ReviewLineRow | null }) {
+export function NotARawMaterialDialog({ open, onOpenChange, line, onDone }: { open: boolean; onOpenChange: (v: boolean) => void; line: ReviewLineRow | null; /** Kalles etter vellykket lagring (f.eks. for angring). */ onDone?: (line: ReviewLineRow) => void }) {
   const qc = useQueryClient();
   const [reason, setReason] = useState("Frakt");
   const [other, setOther] = useState("");
@@ -57,6 +57,7 @@ export function NotARawMaterialDialog({ open, onOpenChange, line }: { open: bool
       toast.success("Markert som ikke vare");
       qc.invalidateQueries({ queryKey: ["fakturaer-review-lines"] });
       qc.invalidateQueries({ queryKey: ["fakturaer-review-count"] });
+      onDone?.(line);
       onOpenChange(false);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Feil");

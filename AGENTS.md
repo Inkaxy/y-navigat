@@ -2,3 +2,4 @@
 - Bekreftede leverandørpakninger lagres som varianter i `raw_material_supplier_packages` (trigger på `raw_material_suppliers`); matchemotoren gjenbruker en variant bare ved entydig lik dokumentert pakning. Why: én rad per råvare/leverandør overskrev tidligere bekreftelser.
 - Intern fakturagodkjenning krever approve/admin (`has_ravarer_invoice_approve`); skrive-RPC-er bruker `has_ravarer_invoice_access(...,'write')`. Why: attestasjon skal ikke følge av vanlig skrivetilgang.
 - Linjer med aktiv `invoice_line_cost_postings` er låst for ny matching og koblingsendring. Why: ført kostpris/historikk skal ikke endres stille.
+- «Beregn alle åpne på nytt» har én implementasjon (`RematchAllDialog`), brukt fra Priskontroll › Verktøy og Innstillinger. Why: to kopier av køkallet drev fra hverandre.
