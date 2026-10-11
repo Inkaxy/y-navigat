@@ -199,6 +199,8 @@ export function QueueWorkspace(p: QueueWorkspaceProps) {
           </span>
         </Card>
       )}
+      {/* Tomt filterresultat skal fortsatt tilby «Vis alle»/filtervalg — aldri en blindvei. */}
+      {!p.loading && !p.error && p.lines.length === 0 && (!p.showAll || p.reason !== "all") && toolbar}
       <QueryState
         scope="fakturaer:innboks-linjer"
         isLoading={p.loading}

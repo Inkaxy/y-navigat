@@ -70,7 +70,7 @@ export default function FakturaWorkspace() {
   const threeZones = useIsWide(1680);
   const detail = useQuery({ queryKey: ["invoice", id], enabled: !!id, queryFn: () => fetchInvoiceDetail(id as string) });
   const data = detail.data;
-  const q = useInvoiceLineQueue(id ?? null, data?.legal_entity_id ?? null, data?.supplier_id ?? null);
+  const q = useInvoiceLineQueue(id ?? null, data?.legal_entity_id ?? null, data?.supplier_id ?? null, data?.status ?? null);
   const s = useInvoiceSteps(data);
   const tolerances = useMatchTolerances(data?.legal_entity_id ?? null);
   // Serverens prisstatus; ukjent mens noe lagres eller detaljene hentes på nytt.
@@ -297,7 +297,7 @@ export default function FakturaWorkspace() {
           loading={q.linesQuery.isLoading}
           error={q.linesQuery.isError ? q.linesQuery.error : null}
           onRetry={() => void q.linesQuery.refetch()}
-          emptyTitle={q.showOnlyOpen ? "Ingen linjer må avklares" : "Fakturaen har ingen linjer"}
+          emptyTitle={q.showOnlyOpen || q.reason !== "all" ? (q.total > 0 ? "Ingen linjer passer filteret" : "Ingen linjer må avklares") : "Fakturaen har ingen linjer"}
           activeLine={active}
           onSelect={(l) => { q.dispatch({ type: "focus", id: l.id }); setInspectorOpen(true); }}
           onPrev={() => q.dispatch({ type: "prev" })}

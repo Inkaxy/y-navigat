@@ -19,7 +19,7 @@ export type ReasonFilter = "all" | ReviewGroup;
  * Linjekøen for ÉN faktura (det innboksens fokusvisning gjorde): filtrering,
  * aktiv linje, godta forslag, angre, masse-handlinger og «neste som trenger hjelp».
  */
-export function useInvoiceLineQueue(invoiceId: string | null, legalEntityId: string | null, supplierId: string | null) {
+export function useInvoiceLineQueue(invoiceId: string | null, legalEntityId: string | null, supplierId: string | null, invoiceStatus: string | null = null) {
   const qc = useQueryClient();
   const filters = { legalEntityId, supplierId: null, invoiceId, onlyReady: false, includeResolved: true };
   const linesQuery = useReviewLines({ ...filters, limit: null });
@@ -45,7 +45,9 @@ export function useInvoiceLineQueue(invoiceId: string | null, legalEntityId: str
   const repeats = useMemo(() => repeatCounts(countRows), [countRows]);
   const needs = useMemo(() => countRows.filter((l) => statusOf(l).bucket === "needs").length, [countRows, statusOf]);
   // «Bare åpne linjer» er standard når det finnes åpne linjer.
-  const showOnlyOpen = onlyOpen ?? needs > 0;
+  // Ferdige fakturaer (klar/avstemt/flagget) åpnes til lesing med alle linjer.
+  const finalized = invoiceStatus === "ready" || invoiceStatus === "reconciled" || invoiceStatus === "flagged";
+  const showOnlyOpen = onlyOpen ?? (!finalized && needs > 0);
 
   const visible = useMemo(() => {
     const f = lines.filter((l) => matchesGroup(l, reason) && (!showOnlyOpen || statusOf(l).bucket === "needs"));
