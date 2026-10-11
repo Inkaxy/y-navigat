@@ -204,3 +204,37 @@ export const toneStyle = (tokenVar: string) => ({
   backgroundColor: `hsl(var(${tokenVar}) / 0.1)`,
   boxShadow: `inset 0 0 0 1px hsl(var(${tokenVar}) / 0.45)`,
 });
+
+/**
+ * Alle koder `invoice_approval_blockers` kan returnere (lest fra live-definisjonen).
+ * Testen vokter at hver kode har en norsk etikett.
+ */
+export const APPROVAL_BLOCKER_CODES = [
+  "finnes_ikke", "flagget", "kansellert", "leverandor_mangler", "belop_mangler", "mva_ukjent", "valuta_mangler",
+  "mangler_linjer", "sumavvik", "sum_ukontrollert", "lavt_uttrekk", "duplikat", "mengde", "prisavvik", "leverandorsak",
+] as const;
+export type ApprovalBlockerCode = (typeof APPROVAL_BLOCKER_CODES)[number];
+
+export const APPROVAL_BLOCKER_LABEL: Record<string, string> = {
+  flagget: "Fakturaen er flagget",
+  kansellert: "Fakturaen er kansellert",
+  sumavvik: "Linjesummen stemmer ikke med fakturabeløpet",
+  mangler_linjer: "Fakturaen har ingen linjer",
+  duplikat: "Samme fakturanummer finnes fra før hos leverandøren",
+  mengde: "Mengde eller uttrekk på en linje må kontrolleres",
+  prisavvik: "Prisavvik er ikke avklart",
+  leverandorsak: "Holdes igjen av en åpen leverandørsak",
+  finnes_ikke: "Fakturaen finnes ikke",
+  leverandor_mangler: "Leverandør mangler",
+  belop_mangler: "Fakturabeløpet mangler",
+  mva_ukjent: "Mva-beløpet er ukjent",
+  valuta_mangler: "Valuta mangler",
+  sum_ukontrollert: "Linjesummen er ikke kontrollert mot fakturabeløpet",
+  lavt_uttrekk: "Fakturaen er tolket med lav sikkerhet — kontroller registreringen",
+};
+
+export const SUPPLIER_CASE_STATUS_LABELS: LabelMap = {
+  open: { label: "Åpen", tokenVar: "--state-warning" },
+  resolved: { label: "Løst", tokenVar: "--state-success" },
+  cancelled: { label: "Avbrutt", tokenVar: "--state-neutral" },
+};

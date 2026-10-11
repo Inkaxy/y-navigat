@@ -1,6 +1,6 @@
 import type { ComponentType, ReactNode } from "react";
 import { lazyWithReload as lazy } from "@/lib/lazyWithReload";
-import { Navigate, Route, useSearchParams } from "react-router-dom";
+import { Navigate, Route } from "react-router-dom";
 import { paths } from "@/ravarer/lib/paths";
 import { AppAccessGuard } from "@/components/auth/AppAccessGuard";
 import { RavarerProvider } from "@/ravarer/context/RavarerContext";
@@ -30,8 +30,6 @@ const RegistrerLinjer = lazy(() => import("@/fakturaer/pages/RegistrerLinjer"));
 const SupplierCase = lazy(() => import("@/fakturaer/pages/SupplierCase"));
 const AlleVarekort = lazy(() => import("./pages/priskontroll/AlleVarekort"));
 const VarekortPage = lazy(() => import("./pages/priskontroll/VarekortPage"));
-const RavarerQueue = lazy(() => import("@/fakturaer/pages/RavarerQueue"));
-const DecisionDetail = lazy(() => import("@/fakturaer/pages/DecisionDetail"));
 const ReberegnKostpriser = lazy(() => import("@/ravarer/pages/ReberegnKostpriser"));
 
 const LeverandorDetail = lazy(() => import("@/ravarer/pages/LeverandorDetail"));
@@ -70,8 +68,6 @@ export function ravarerRoutes(Shell: ShellType) {
     <Route key="pk" path="/ravarer/priskontroll" element={inv(<Priskontroll />)} />,
     <Route key="pk-vk" path="/ravarer/priskontroll/varekort" element={inv(<AlleVarekort />)} />,
     <Route key="pk-vk-d" path="/ravarer/priskontroll/varekort/:supplierId/:itemKey" element={inv(<VarekortPage />)} />,
-    <Route key="pk-besl" path="/ravarer/priskontroll/beslutninger" element={inv(<QueueByScope />)} />,
-    <Route key="pk-besl-d" path="/ravarer/priskontroll/beslutninger/:key" element={inv(<DecisionDetail />)} />,
     <Route key="pk-reb" path="/ravarer/priskontroll/verktoy/reberegn" element={rv(<InvoiceAccessGuard><ReberegnKostpriser /></InvoiceAccessGuard>)} />,
     <Route key="pk-saker-root" path="/ravarer/priskontroll/saker" element={<Navigate to={paths.saker()} replace />} />,
     <Route key="pk-fak-root" path="/ravarer/priskontroll/faktura" element={<Navigate to={paths.alleFakturaer()} replace />} />,
@@ -101,7 +97,3 @@ export function ravarerRoutes(Shell: ShellType) {
   ];
 }
 
-function QueueByScope() {
-  const [sp] = useSearchParams();
-  return <RavarerQueue scope={sp.get("omfang") === "ravarer" ? "ravarer" : "alle"} />;
-}

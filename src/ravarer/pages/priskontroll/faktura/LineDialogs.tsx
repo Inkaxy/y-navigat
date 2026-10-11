@@ -20,10 +20,12 @@ type Props = {
   invoice: { id: string; legal_entity_id: string; supplier_id: string };
   /** «Endre råvare» i inspektøren (fra konfliktdialogen). */
   onEditMaterial: () => void;
+  /** «Ikke vare» lagret på én linje. */
+  onNotItemDone?: (line: ReviewLineRow) => void;
 };
 
 /** Dialogene inspektøren og masse-handlingene åpner. MatchDrawer brukes ikke her. */
-export function LineDialogs({ dialog, onClose, q, canWrite, invoice, onEditMaterial }: Props) {
+export function LineDialogs({ dialog, onClose, q, canWrite, invoice, onEditMaterial, onNotItemDone }: Props) {
   const qc = useQueryClient();
   const line = dialog?.line ?? null;
   const is = (k: LineDialogKind) => dialog?.kind === k;
@@ -32,7 +34,7 @@ export function LineDialogs({ dialog, onClose, q, canWrite, invoice, onEditMater
   return (
     <>
       <CreateRawMaterialFromLine open={is("create")} onOpenChange={close} line={line} />
-      <NotARawMaterialDialog open={is("not_rm")} onOpenChange={close} line={line} />
+      <NotARawMaterialDialog open={is("not_rm")} onOpenChange={close} line={line} onDone={onNotItemDone} />
       <SkuConflictDialog open={is("conflict")} onOpenChange={close} line={line} onOpenMatchDrawer={() => { onClose(); onEditMaterial(); }} />
       <StartPriceDialog
         open={is("start_price")}
