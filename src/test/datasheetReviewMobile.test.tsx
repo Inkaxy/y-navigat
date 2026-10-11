@@ -15,7 +15,7 @@ describe("DatasheetReviewView", () => {
     render(<DatasheetReviewPreviewContent />);
     const targets = screen.getAllByTestId("nutrient-target");
     expect(targets.length).toBeGreaterThan(5);
-    for (const t of targets) expect(t.className).toMatch(/\bmin-h-11\b.*\bmin-w-11\b/);
+    for (const t of targets) expect(t.className).toMatch(/min-h-\[44px\].*min-w-\[44px\]/);
     const cb = within(targets[0]).getByRole("checkbox");
     const before = cb.getAttribute("aria-checked");
     fireEvent.click(targets[0]);
@@ -28,6 +28,6 @@ describe("DatasheetReviewView", () => {
     expect(footer.className).toMatch(/shrink-0/);
     expect(within(footer).getByRole("button", { name: /Anvend valgte/ })).toBeTruthy();
     const close = screen.getByRole("button", { name: "Lukk" });
-    expect(close.className).toMatch(/\bh-11\b.*\bw-11\b/);
+    expect(close.className).toMatch(/h-\[44px\].*w-\[44px\]/);
   });
 });

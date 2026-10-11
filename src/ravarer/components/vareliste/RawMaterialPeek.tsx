@@ -4,14 +4,14 @@ import { Button } from "@/components/ui/button";
 import { QueryState } from "@/components/common/QueryState";
 import { useRawMaterialPage } from "@/ravarer/hooks/useRawMaterialPage";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
-import { formatDate, formatNok, priceSourceLabel } from "@/ravarer/lib/constants";
+import { formatNok } from "@/ravarer/lib/constants";
 import { paths } from "@/ravarer/lib/paths";
 import { completenessChecklist, sectionSearch, type SectionId } from "@/ravarer/lib/rawMaterialSections";
 import { agreementStatusLabel, derivedPackagePrice, packageLabel } from "@/ravarer/lib/supplierPackagePrice";
 import { ChecklistCard } from "@/ravarer/components/detail/Completeness";
+import { useMaterialPriceEvidence } from "@/ravarer/hooks/useMaterialPriceEvidence";
+import { costSummary } from "@/ravarer/lib/costSummary";
 
-const STATUS: Record<string, string> = { verifisert: "Verifisert", uverifisert: "Uverifisert — ingen gyldig kilde", mangler: "Mangler gyldig kostpris" };
-const fullPrice = (n: number) => n.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 6 });
 
 /**
  * Peek for valgt råvare i varearbeidsflaten: panelet ved siden av listen fra 1280 px,
@@ -38,6 +38,8 @@ function PeekBody({ id, listSearch }: { id: string; listSearch: string }) {
   const rm = page.rm;
   const sp = new URLSearchParams(listSearch);
   const href = (s: SectionId) => `${paths.raavare(id)}${sectionSearch(sp, s)}`;
+  // Peekens ene eier av prisbevis (samme delte hook/cache som råvarekortet).
+  const priceEvidence = useMaterialPriceEvidence(rm ?? null);
   if (page.isLoading || page.isError || !rm) {
     return (
       <QueryState isLoading={page.isLoading} isError={page.isError} error={page.error} onRetry={() => page.refetch()} scope="Råvaren" isEmpty={!rm} emptyTitle="Råvaren ble ikke funnet">
@@ -46,8 +48,8 @@ function PeekBody({ id, listSearch }: { id: string; listSearch: string }) {
     );
   }
   const nameOf = new Map(suppliers.map((s) => [s.id, s.name]));
-  const checklist = completenessChecklist({ rm, linkCount: page.links.length, nutrition: page.nutrition, hasDatasheet: page.hasDatasheet });
-  const verified = rm.cost_basis_status === "verifisert";
+  const checklist = completenessChecklist({ rm, linkCount: page.links.length, nutrition: page.nutrition, hasDatasheet: page.hasDatasheet, costEvidence: priceEvidence.cost });
+  const cost = costSummary(rm, priceEvidence.cost);
   return (
     <div className="space-y-5">
       <p className="text-caption text-ink-secondary">SKU {rm.sku} · {rm.base_unit}{rm.is_active ? "" : " · Inaktiv"}</p>
@@ -58,10 +60,10 @@ function PeekBody({ id, listSearch }: { id: string; listSearch: string }) {
 
       <section className="rounded-lg border border-line-subtle p-4">
         <div className="text-caption text-ink-secondary">Kostpris per {rm.base_unit}</div>
-        <div className="text-2xl font-semibold tabular-nums">{rm.current_cost_price != null ? formatNok(rm.current_cost_price) : "Ukjent"}</div>
-        <div className={verified ? "text-caption text-success" : "text-caption text-warning"}>{STATUS[rm.cost_basis_status ?? ""] ?? "Prisstatus ukjent"}</div>
+        <div className="text-2xl font-semibold tabular-nums">{cost.value}</div>
+        <div className={cost.verified ? "text-caption text-success" : "text-caption text-warning"} data-testid="peek-cost-status">{cost.status}</div>
         <div className="text-caption text-ink-secondary">
-          {rm.current_cost_price != null && `${fullPrice(rm.current_cost_price)} · `}{rm.price_source ? priceSourceLabel(rm.price_source) : "Ingen kilde"}{rm.price_updated_at ? ` · ${formatDate(rm.price_updated_at)}` : ""}
+          {cost.precise && `${cost.precise} · `}{cost.source ?? "Ingen kilde"}
         </div>
       </section>
 

@@ -1,3 +1,4 @@
+import type { CostEvidence } from "@/ravarer/lib/listPriceEvidence";
 /**
  * Råvarekortets seksjoner (fase 4B): URL-kontrakt, oversetting av gamle `tab`-verdier
  * og komplett-sjekklisten. Rene funksjoner — testes uten React.
@@ -106,19 +107,21 @@ export interface CheckInput {
   linkCount: number;
   nutrition: (NutritionValues & { verified_at?: string | null; is_complete?: boolean | null }) | null;
   hasDatasheet: boolean;
+  /** Gjeldende kostprisbeslutning fra bundet serverbevis (`costEvidenceFor`). Påkrevd: lagret status alene sertifiserer aldri. */
+  costEvidence: CostEvidence;
 }
 
 /** Komplett-sjekklisten. Kalles bare når alle delspørringer er lastet uten feil. */
 export function completenessChecklist(i: CheckInput): CheckItem[] {
   const { rm } = i;
-  const cost = rm.cost_basis_status;
+  const ce = i.costEvidence;
   const items: CheckItem[] = [
     confirmedFactor(rm) != null
       ? { id: "pakning", label: "Pakning", status: "ok", detail: "Bekreftet pakningsinnhold", section: "grunndata" }
       : { id: "pakning", label: "Pakning", status: rm.base_units_per_package != null ? "partial" : "missing", detail: rm.base_units_per_package != null ? "Pakningsinnhold ikke bekreftet" : "Pakningsinnhold mangler", section: "grunndata" },
     { id: "leverandor", label: "Leverandør", status: i.linkCount > 0 ? "ok" : "missing", detail: i.linkCount > 0 ? `${i.linkCount} koblet` : "Ingen leverandør koblet", section: "leverandorer" },
-    { id: "prisgrunnlag", label: "Prisgrunnlag", status: cost === "verifisert" ? "ok" : cost === "uverifisert" ? "partial" : "missing",
-      detail: cost === "verifisert" ? "Verifisert kostpris" : cost === "uverifisert" ? "Uverifisert — ingen gyldig kilde" : cost === "mangler" ? "Mangler gyldig kostpris" : "Prisstatus ukjent", section: "pris" },
+    { id: "prisgrunnlag", label: "Prisgrunnlag", status: ce.status === "verifisert" ? "ok" : ce.status === "mangler" ? "missing" : "partial",
+      detail: ce.status === "verifisert" ? "Verifisert kostpris" : ce.reason ?? (ce.status === "uverifisert" ? "Uverifisert — ingen gyldig kilde" : ce.status === "mangler" ? "Mangler gyldig kostpris" : "Prisstatus ukjent"), section: "pris" },
     { id: "kategori", label: "Kategori", status: rm.category || (rm.categories?.length ?? 0) > 0 ? "ok" : "missing", detail: rm.category ?? rm.categories?.[0] ?? "Ingen kategori", section: "grunndata" },
   ];
   if (!rm.is_packaging) {
