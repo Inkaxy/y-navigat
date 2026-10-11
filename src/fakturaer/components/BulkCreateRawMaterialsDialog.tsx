@@ -9,11 +9,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { showError } from "@/lib/userError";
-import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { supplierItemKey } from "@/fakturaer/lib/supplierItemKey";
-import { useLinkSupplierItem } from "@/fakturaer/hooks/useSupplierItems";
+import { invalidateAfterLink, linkSupplierItem } from "@/fakturaer/hooks/useSupplierItems";
+import { dedupeBySupplierItem, failedRow, reportLinkRow, type BulkRowReport } from "@/fakturaer/lib/bulkLink";
 import {
   CANONICAL_BASE_UNITS,
   CANONICAL_PACKAGE_UNITS,
@@ -99,7 +99,6 @@ export function BulkCreateRawMaterialsDialog({ open, onOpenChange, lines, onDone
   const [sharedCategory, setSharedCategory] = useState("");
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const link = useLinkSupplierItem();
 
   const lineIds = useMemo(() => lines.map((l) => l.id).join(","), [lines]);
 
