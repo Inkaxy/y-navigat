@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, ClipboardList, FileWarning, TrendingUp } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardList, FileWarning, PackageMinus, TrendingUp } from "lucide-react";
 import { OrderDeskKpi } from "@/ordre/components/dashboard/OrderDeskKpi";
 import { paths } from "@/ravarer/lib/paths";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -30,19 +30,20 @@ export function KpiRowView({ summary, movers, loading }: KpiRowViewProps) {
   const down = movers?.summary.down ?? 0;
   const expiring30 = summary?.other.agreements_expiring_30d ?? 0;
   const expiring90 = summary?.other.agreements_expiring_90d ?? 0;
+  const belowMin = summary?.other.stock_below_min ?? 0;
 
-  const gridCls = "-mx-page grid grid-flow-col auto-cols-[40%] gap-3 overflow-x-auto px-page pb-1 sm:mx-0 sm:grid-flow-row sm:auto-cols-auto sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-3 2xl:grid-cols-6";
+  const gridCls = "-mx-page grid grid-flow-col auto-cols-[40%] gap-3 overflow-x-auto px-page pb-1 sm:mx-0 sm:grid-flow-row sm:auto-cols-auto sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-3 2xl:grid-cols-7";
   // Til fakturatilgangen er kjent vises nøytrale skjelett — aldri fliser/tall brukeren kanskje ikke skal se.
   if (!summary) {
     return (
       <div className={gridCls} aria-busy="true" aria-label="Laster nøkkeltall">
-        {Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-[92px] rounded-xl" />)}
+        {Array.from({ length: 7 }, (_, i) => <Skeleton key={i} className="h-[92px] rounded-xl" />)}
       </div>
     );
   }
 
   return (
-    <div className="-mx-page grid grid-flow-col auto-cols-[40%] gap-3 overflow-x-auto px-page pb-1 sm:mx-0 sm:grid-flow-row sm:auto-cols-auto sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-3 2xl:grid-cols-6">
+    <div className="-mx-page grid grid-flow-col auto-cols-[40%] gap-3 overflow-x-auto px-page pb-1 sm:mx-0 sm:grid-flow-row sm:auto-cols-auto sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-3 2xl:grid-cols-7">
       {hasInvoice && (
         <>
           <OrderDeskKpi
@@ -77,6 +78,11 @@ export function KpiRowView({ summary, movers, loading }: KpiRowViewProps) {
         sub={expiring90 > 0 ? `${expiring90} innen 90 dager` : undefined}
         tone={expiring30 > 0 ? "warning" : "default"} loading={loading}
         icon={AlertTriangle} to={paths.avtaler()}
+      />
+      <OrderDeskKpi
+        label="Under minimumslager" value={belowMin}
+        tone={belowMin > 0 ? "warning" : "ok"} loading={loading}
+        icon={PackageMinus} to={paths.lager({ fane: "beholdning" })}
       />
     </div>
   );
