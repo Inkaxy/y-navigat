@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { QueryState } from "@/components/common/QueryState";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate, formatNok, PRICE_SOURCES } from "@/ravarer/lib/constants";
-import { usePriceHistory } from "@/ravarer/hooks/useRmSuppliers";
+import { usePriceHistory, toTimelineRow } from "@/ravarer/hooks/useRmSuppliers";
+import { historyKind, HISTORY_KIND_LABEL } from "@/ravarer/lib/priceTimeline";
 import { PriceComparisonCard } from "@/ravarer/components/PriceComparisonCard";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 import { paths } from "@/ravarer/lib/paths";
@@ -102,11 +103,12 @@ export function HistoryTab({ rm }: Props) {
       });
     }
     for (const p of prices.data ?? []) {
+      const hk = historyKind(toTimelineRow(p));
       list.push({
         id: `p-${p.id}`,
         kind: "pris",
         at: p.effective_date,
-        title: `${formatNok(p.price)} per ${rm.base_unit}`,
+        title: `${hk === "gyldig" ? "" : `${HISTORY_KIND_LABEL[hk]}: `}${formatNok(p.price)} per ${rm.base_unit}`,
         detail: [
           sourceLabel(p.source),
           p.is_legacy ? "Gammel pakningslogikk" : null,
