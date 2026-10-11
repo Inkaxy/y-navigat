@@ -10,7 +10,7 @@ import type { Json } from "@/integrations/supabase/types";
 import { claimSubmitError } from "@/ravarer/lib/supplierClaim";
 
 /** Valgt linje med nøyaktig serverkontrollert grunnlag fra rm_supplier_claim_preview. */
-type LineRef = { id: string; price_per_base_unit: number; basis: Json };
+type LineRef = { id: string; price_per_base_unit: Json; basis: Json };
 
 function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
   invalidateInvoice(qc);

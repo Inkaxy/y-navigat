@@ -58,7 +58,7 @@ export function parseClaimPreview(data: Json, requested: readonly string[]): Cla
 }
 
 export type ClaimPlan =
-  | { ok: true; kind: CaseKind; lines: { id: string; price_per_base_unit: number; basis: Json }[]; amount: number; observed: number | null }
+  | { ok: true; kind: CaseKind; lines: { id: string; price_per_base_unit: Json; basis: Json }[]; amount: number; observed: number | null }
   | { ok: false; code: "none" | "ineligible" | "mixed"; message: string; reasons: string[] };
 
 export function planClaim(preview: ClaimPreviewLine[]): ClaimPlan {
@@ -73,7 +73,8 @@ export function planClaim(preview: ClaimPreviewLine[]): ClaimPlan {
   return {
     ok: true, kind, observed,
     amount: Math.round(good.reduce((a, g) => a + g.basis.amount_excl_vat, 0) * 100) / 100,
-    lines: good.map((g) => ({ id: g.line_id, price_per_base_unit: g.basis.price_per_base_unit, basis: g.basis.raw })),
+    // Prisen sendes som serverens egen JSON-verdi (ingen avrunding via tall i nettleseren).
+    lines: good.map((g) => ({ id: g.line_id, price_per_base_unit: (isRec(g.basis.raw) ? (g.basis.raw.price_per_base_unit as Json) : null) ?? g.basis.price_per_base_unit, basis: g.basis.raw })),
   };
 }
 
