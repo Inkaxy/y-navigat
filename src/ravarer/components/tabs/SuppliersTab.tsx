@@ -19,6 +19,7 @@ import { CostPriceEditor } from "@/ravarer/editors/CostPriceEditor";
 import { SupplierLinksTable, BASE_UNIT_KEY } from "./suppliers/SupplierLinksTable";
 import { PriceBasisNowCard } from "./suppliers/PriceBasisNowCard";
 import { SupplierItemsForMaterialCard } from "./suppliers/SupplierItemsForMaterialCard";
+import { QueryErrorState, QueryLoadingState } from "@/components/common/QueryState";
 
 interface Props {
   rm: RawMaterialRow;
@@ -28,7 +29,8 @@ export function SuppliersTab({ rm }: Props) {
   const { canWrite } = useRavarer();
   const { data: allSuppliers = [] } = useSuppliers();
   const { data: links = [], isLoading } = useRawMaterialSuppliers(rm.id);
-  const { data: history = [] } = usePriceHistory(rm.id);
+  const historyQuery = usePriceHistory(rm.id);
+  const history = useMemo(() => historyQuery.data ?? [], [historyQuery.data]);
 
   const [linkOpen, setLinkOpen] = useState<{
     open: boolean;
@@ -94,6 +96,11 @@ export function SuppliersTab({ rm }: Props) {
         onLink={(existingId) => setLinkOpen({ open: true, existingId })}
       />
 
+      {historyQuery.isError ? (
+        <QueryErrorState error={historyQuery.error} scope="ravarer:pristidslinje" title="Kunne ikke hente prishistorikken" onRetry={() => void historyQuery.refetch()} />
+      ) : historyQuery.isLoading ? (
+        <QueryLoadingState />
+      ) : (
       <PriceTimeline
         history={timelineHistory}
         supplierNames={supplierNames}
@@ -110,6 +117,7 @@ export function SuppliersTab({ rm }: Props) {
           ) : null
         }
       />
+      )}
 
       <RecentInvoiceLinesCard rawMaterialId={rm.id} baseUnit={rm.base_unit} />
       <PurchaseStatsCard rawMaterialId={rm.id} baseUnit={rm.base_unit} />
