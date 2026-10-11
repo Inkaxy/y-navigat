@@ -14,6 +14,7 @@ export function stepsOf(inv: InboxInvoice, extras: DeliveryExtrasMap | undefined
       status: inv.status, received_at: inv.received_at, line_count: inv.line_count, lines_source: inv.lines_source,
       line_extraction_status: inv.line_extraction_status, open_count: inv.assessment.openCount,
       lines_sum_status: inv.lines_sum_status, reconciled_mode: inv.reconciled_mode,
+      is_credit_note: !!inv.is_credit_note,
     },
     extrasFor(extras, inv.id),
   );
