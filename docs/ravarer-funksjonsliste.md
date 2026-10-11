@@ -13,7 +13,7 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 | R4 | Mobilmeny som bunnark | RavarerNav mobil-bunnark (5 innganger + Innstillinger) | 1 | Flyttet |
 | R5 | Sidetitler i nettleserfanen | `pageLabels.ts` komplett for alle nye ruter | 1 | Flyttet |
 | R6, F1 | Omdirigeringer: /ravarer, /pakninger, /innstillinger, fakturaer /ny, /import-ehf, /import-pdf, /vareminne, /fakturaer/* | Omdirigeringskart i App.tsx: alle gamle stier peker til nye, og query videreføres. /ravarer blir Oversikt | 1 | Flyttet |
-| F108 | Nivådelt forklaring av prisavvik (speiler `rm_price_deviation_eval`) i alle prisvisninger | Felles PriceDeviationNote: varekort-panel › Prisblokk, linjeinspektør, råvarekort ?seksjon=pris | 3 | Gammel plass |
+| F108 | Nivådelt forklaring av prisavvik (speiler `rm_price_deviation_eval`) i alle prisvisninger | Felles PriceDeviationNote: varekort-panel › Prisblokk, linjeinspektør, råvarekort ?seksjon=pris | 3 | Flyttet |
 | F109 | Oversatte etiketter for årsakskoder, matchtype og linjetype | `src/ravarer/lib/labels.ts` (én kilde) + StatusPill | 1 | Flyttet |
 
 ## Vareliste
@@ -310,10 +310,10 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| R27 | «Ny råvare» (SKU, kategori, varetype, flere kategorier, navn, basisenhet, pakning, kostpris, beskrivelse, emballasje; åpner råvaren) | RawMaterialCreateSheet fra /varer header, tasten `n` og ⌘K | 1 | Gammel plass |
-| F50 | Opprett råvare fra linje (varetype, navn, foreslått SKU, lev.-SKU, kategori/ny, grunnenhet, pakning, bekreft pakning, live kostpris) | RawMaterialCreateSheet i fakturakontekst via `link-supplier-item` (regner om linjene) | 1 | Gammel plass |
-| F51 | Masseopprettelse av råvarer fra valgte linjer (felles kategori) | /priskontroll?fane=gjore › masseutvalg › «Opprett råvarer» | 3 | Gammel plass |
-| F52 | Masseimport av umatchede linjer som nye råvarer, med AI-forslag | /priskontroll/faktura/:id › linjer › masseutvalg «Importer som nye råvarer» | 3 | Gammel plass |
+| R27 | «Ny råvare» (SKU, kategori, varetype, flere kategorier, navn, basisenhet, pakning, kostpris, beskrivelse, emballasje; åpner råvaren) | RawMaterialCreateSheet fra /varer header, tasten `n` og ⌘K | 1 | Flyttet |
+| F50 | Opprett råvare fra linje (varetype, navn, foreslått SKU, lev.-SKU, kategori/ny, grunnenhet, pakning, bekreft pakning, live kostpris) | RawMaterialCreateSheet i fakturakontekst via `link-supplier-item` (regner om linjene) | 1 | Flyttet |
+| F51 | Masseopprettelse av råvarer fra valgte linjer (felles kategori) | /priskontroll?fane=gjore › masseutvalg › «Opprett råvarer» | 3 | Flyttet |
+| F52 | Masseimport av umatchede linjer som nye råvarer, med AI-forslag | /priskontroll/faktura/:id › linjer › masseutvalg «Importer som nye råvarer» | 3 | Flyttet |
 
 ## Fakturaer: I dag / Beslutninger / Råvarespørsmål
 
@@ -321,8 +321,8 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 |---|---|---|---|---|
 | F5 | Prioritert topp-5 over beslutninger på tvers av fakturaer | /ravarer › «Til deg» (topp 7) + /priskontroll?fane=gjore sortert etter kronevirkning | 2 | Flyttet |
 | F6 | Tellere «N åpne beslutninger på M fakturaer» og «gjentatte linjer slått sammen» | /ravarer › header-setning + Å gjøre-køtall | 2 | Flyttet |
-| F7 | Kort for varekort som venter, med lenke | /ravarer › KPI «Å gjøre i priskontroll» → ?fane=gjore | 2 | Gammel plass |
-| F8 | Kort med fakturaer klare til intern godkjenning | /ravarer › KPI → /priskontroll?fane=godkjenning | 2 | Gammel plass |
+| F7 | Kort for varekort som venter, med lenke | /ravarer › KPI «Å gjøre i priskontroll» → ?fane=gjore | 2 | Flyttet |
+| F8 | Kort med fakturaer klare til intern godkjenning | /ravarer › KPI → /priskontroll?fane=godkjenning | 2 | Flyttet |
 | F9 | Beslutningsliste: søk, leverandørfilter, typefilter, paging, «alle» eller «bare råvarer» | ?fane=gjore › venstre: køer, søk, leverandørfilter | 3 | Flyttet |
 | F10 | Material: velg forslag, søk i hele registeret, bruk på alle like linjer og husk (alias) | Varekort-panel › Råvare-blokk | 3 | Flyttet |
 | F11 | Material: opprett ny råvare og koble resten av gruppen | Varekort-panel › «Opprett ny råvare» | 3 | Flyttet |
@@ -468,7 +468,7 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| R196 | RawMaterialAutocomplete: velg og hurtigopprett i oppskrifter og produkter | Varer (uendret sted) → RawMaterialCreateSheet | 1 | Gammel plass |
+| R196 | RawMaterialAutocomplete: velg og hurtigopprett i oppskrifter og produkter | Varer (uendret sted) → RawMaterialCreateSheet | 1 | Flyttet |
 | R197 | Lagre oppskrift som råvare (halvfabrikat) og koble til eksisterende | Varer › oppskrift (uendret); vises i /varer/:id?seksjon=bruk | 4 | Gammel plass |
 | R198 | Rettinger fra oppskriftsetikett (allergener vurdert, vann %, kornklasse, koble fritekstlinje) | Varer › etikett (uendret), felles skrivehooks | 4 | Gammel plass |
 | R199 | Rettinger av deklarasjonsnavn fra oppskriftsetikett | Varer › etikett (felles `useSaveDeclarationName`) | 4 | Gammel plass |
