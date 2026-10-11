@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaging";
 import { deriveLabelingStatusFromDb, type LabelingStatus } from "@/varer/lib/labelStaleness";
 import { latestApprovalByRecipe } from "@/varer/lib/labelWorkspace";
-import { computeTotalsForRecipe, type BakersLine, type BakersRawMaterial } from "@/varer/lib/bakers";
+import { computeTotalsForRecipe, type BakersLine } from "@/varer/lib/bakers";
 
 /** Rå rad fra listespørringen — modulen bruker ikke de genererte Supabase-typene. */
 type RecipeLineRow = BakersLine & { id: string; raw_material_id: string | null };

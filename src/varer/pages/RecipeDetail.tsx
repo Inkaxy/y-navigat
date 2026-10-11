@@ -44,7 +44,6 @@ import { PrintRecipeCardDialog } from "@/varer/components/recipes/PrintRecipeCar
 import { ShareRecipeDialog } from "@/varer/components/recipes/ShareRecipeDialog";
 import {
   RECIPE_STATUS_OPTIONS, computePartSummary, computeTotalsForRecipe, lineToGrams, roundBakerGrams, scaleLines, scaledSummary,
-  type BakersRawMaterial,
 } from "@/varer/lib/bakers";
 import { computeRecipeCost } from "@/varer/lib/recipeCost";
 import { BAKERS_RM_KEY, fetchBakersRawMaterials } from "@/varer/lib/bakersRawMaterials";
@@ -73,7 +72,6 @@ import { SaveAsRawMaterialDialog, type CompositeRawMaterial } from "@/varer/comp
 import { RecipeImageUpload } from "@/varer/components/recipes/RecipeImageUpload";
 import { BASE_RECIPE_CATEGORY, costPerKg, costPerKgBlockedReason } from "@/varer/lib/halvfabrikat";
 import { copyRecipe } from "@/varer/lib/copyRecipe";
-import { fetchAllRows } from "@/lib/supabasePaging";
 import { useProductMargins } from "@/varer/hooks/useProductCalc";
 import { makeSku } from "@/varer/lib/halvfabrikat";
 import { buildRestoreInput, type RecipeVersionRow } from "@/varer/lib/recipeVersions";
