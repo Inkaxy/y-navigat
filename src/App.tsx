@@ -61,6 +61,7 @@ const AdminIndex = lazy(() => import("./pages/admin/AdminIndex"));
 const PriceCalcPreviewContent = lazy(() => import("./dev/PriceCalcPreviewContent"));
 const PdfImportPreviewContent = lazy(() => import("./dev/PdfImportPreviewContent"));
 const HeaderPreviewContent = lazy(() => import("./dev/HeaderPreviewContent"));
+const DatasheetReviewPreviewContent = lazy(() => import("./dev/DatasheetReviewPreviewContent"));
 const Integrasjoner = lazy(() => import("./pages/admin/Integrasjoner"));
 const IntegrasjonDetalj = lazy(() => import("./pages/admin/IntegrasjonDetalj"));
 const TripletexIntegrasjon = lazy(() => import("./pages/admin/TripletexIntegrasjon"));
@@ -283,6 +284,7 @@ const App = () => (
               <Route path="/price-calc-preview.html" element={<PriceCalcPreviewContent />} />
               <Route path="/forhandsvisning/pdf-import" element={<PdfImportPreviewContent />} />
               <Route path="/forhandsvisning/sidehode" element={<HeaderPreviewContent />} />
+              <Route path="/forhandsvisning/datablad-gjennomgang" element={<DatasheetReviewPreviewContent />} />
               <Route path="/glemt-passord" element={<ForgotPassword />} />
               <Route path="/velg-passord" element={<SetPortalPassword />} />
               <Route path="/tilbakestill-passord" element={<TilbakestillPassordRoute />} />
