@@ -74,8 +74,9 @@ export default function DatabladBulk() {
   const ctxNow = (): OpCtx | null => (legalEntityId && canWrite ? { gen: gen.current, entity: legalEntityId } : null);
 
   useEffect(() => {
-    live.current.mounted = true;
-    return () => { live.current.mounted = false; gen.current += 1; };
+    const l = live.current;
+    l.mounted = true;
+    return () => { l.mounted = false; gen.current += 1; };
   }, []);
 
   // Nytt selskap: ny generasjon, lukk alle dialoger; usikre utfall fra forrige selskap forblir synlige.

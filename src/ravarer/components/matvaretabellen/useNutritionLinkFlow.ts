@@ -62,7 +62,6 @@ export function useNutritionLinkFlow(foodId: string | null, active: boolean, onL
       // Hooken viser feilmeldingen; her logges den bare.
       console.error("[matvaretabellen:koble]", e);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `live` leser bare refs
   }, [apply, onLinked]);
 
   const choose = useCallback(async (rawMaterialId: string, name: string) => {
@@ -96,7 +95,6 @@ export function useNutritionLinkFlow(foodId: string | null, active: boolean, onL
     } finally {
       if (s === session.current) setCheckingId(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `live` leser bare refs
   }, [canWrite, foodId, link, onLinked]);
 
   const confirmOverwrite = useCallback(async () => {
@@ -104,7 +102,6 @@ export function useNutritionLinkFlow(foodId: string | null, active: boolean, onL
     setPending(null);
     if (!p || !live(p.session, p.foodId)) return;
     await link(p.rawMaterialId, p.foodId, true, p.session);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `live` leser bare refs
   }, [pending, link]);
 
   const cancelOverwrite = useCallback(() => setPending(null), []);
