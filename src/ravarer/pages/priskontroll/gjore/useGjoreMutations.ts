@@ -1,9 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
-import { invalidateInvoice, invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
+import { invalidateInvoice, invalidateRavarerCounts, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { parseRematchQueued } from "@/fakturaer/lib/parseRpcJson";
-import { changeLinkErrorMessage } from "./logic";
+import { changeLinkErrorMessage, claimErrorMessage } from "./logic";
 import { parseChangeLink, parseClaimCredit, type ChangeLinkResult, type ClaimCreditResult } from "./rpc";
 
 type LineRef = { id: string; price_per_base_unit: number };
@@ -36,15 +36,20 @@ export function useClaimCredit() {
       });
       if (error) {
         console.error("[claim-credit]", error);
-        throw new Error(/skrivetilgang/i.test(error.message) ? "Du mangler skrivetilgang" : "Kravet kunne ikke opprettes. Prøv igjen.");
+        throw new Error(claimErrorMessage(error.message));
       }
-      return parseClaimCredit(data);
+      const r = parseClaimCredit(data);
+      if (!r.ok || !r.caseId) return r;
+      // Serveren returnerer bare antall linjer — hent beløpet fra saken (faller tilbake til «ca.» i UI).
+      const { data: cl, error: clErr } = await supabase.from("supplier_deviation_case_lines").select("amount_excl_vat").eq("case_id", r.caseId).limit(500);
+      if (clErr) { console.error("[claim-credit] beløp", clErr); return r; }
+      return { ...r, amount: (cl ?? []).reduce((s, x) => s + (Number(x.amount_excl_vat) || 0), 0) };
     },
     onSuccess: (r) => { if (r.ok) invalidateAll(qc); },
   });
 }
 
-export type ChangeLinkInput = { rmsId: string; newRawMaterialId: string; reason: string; lineIds: string[] | null };
+export type ChangeLinkInput = { rmsId: string; oldRawMaterialId: string | null; newRawMaterialId: string; reason: string; lineIds: string[] | null };
 
 /** Flytter leverandørkoblingen (og åpne, ikke-førte linjer) til en annen råvare. */
 export function useChangeSupplierLink() {
@@ -61,7 +66,11 @@ export function useChangeSupplierLink() {
       }
       return parseChangeLink(data);
     },
-    onSuccess: () => invalidateAll(qc),
+    onSuccess: (_r, i) => {
+      invalidateAll(qc);
+      if (i.oldRawMaterialId) invalidateRawMaterial(qc, i.oldRawMaterialId);
+      invalidateRawMaterial(qc, i.newRawMaterialId);
+    },
   });
 }
 

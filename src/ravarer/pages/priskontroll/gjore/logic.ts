@@ -124,9 +124,13 @@ export const SKIP_REASON_LABEL: Record<AcceptSkipReason, string> = {
   feil: "Linjen kunne ikke godtas",
 };
 
-/** Serverens egen melding brukes når den finnes; ellers vår norske etikett for koden. */
+/** Norsk etikett for en overhoppet linje. Ved «feil» kan serverens melding være en kode — bruk vår etikett. */
+function skipWhy(l: { reason: AcceptSkipReason; message: string }): string {
+  return l.reason === "feil" ? SKIP_REASON_LABEL.feil : l.message.trim() || SKIP_REASON_LABEL[l.reason];
+}
+
 export function skipLineText(l: { invoice_number: string | null; reason: AcceptSkipReason; message: string }): string {
-  const why = l.message.trim() || SKIP_REASON_LABEL[l.reason];
+  const why = skipWhy(l);
   return l.invoice_number ? `Faktura ${l.invoice_number}: ${why}` : why;
 }
 
@@ -136,8 +140,25 @@ export const CHANGE_LINK_ERRORS: Record<string, string> = {
   ugyldig_raavare: "Velg en aktiv råvare i samme selskap",
   samme_raavare: "Det er allerede denne råvaren",
   kobling_finnes: "Leverandøren er allerede koblet til den råvaren — bruk den koblingen",
+  kobling_uten_varenummer: "Koblingen har ikke varenummer — bruk Koble på nytt i varekortet",
+  varenummer_stemmer_ikke: "Linjene har et annet varenummer enn koblingen — bruk Koble på nytt i varekortet",
   forbidden: "Du mangler skrivetilgang",
 };
+
+/** Feil fra `rm_supplier_item_claim_credit` / `create_supplier_deviation_case` → norsk. */
+export const CLAIM_ERRORS: [RegExp, string][] = [
+  [/skrivetilgang|forbidden/i, "Du mangler skrivetilgang"],
+  [/linje_allerede_i_aapen_sak/, "En av linjene er allerede med i en åpen leverandørsak"],
+  [/prisgrunnlag_mangler/, "En av linjene mangler prisgrunnlag eller mengde — kravet kan ikke beregnes"],
+  [/ingen_merkostnad/, "Ingen av linjene er dyrere enn forventet — ingenting å kreve"],
+  [/Saken må ha en tittel|tittel_mangler/, "Saken må ha en tittel"],
+  [/Velg linjene kravet gjelder|ingen_linjer/, "Velg linjene kravet gjelder"],
+  [/linjene_maa_ha_samme_selskap_og_leverandor/, "Linjene må være fra samme leverandør"],
+];
+export function claimErrorMessage(raw: string | null | undefined): string {
+  const hit = CLAIM_ERRORS.find(([re]) => re.test(raw ?? ""));
+  return hit ? hit[1] : "Kravet kunne ikke opprettes. Prøv igjen.";
+}
 
 /** Exception-meldingen fra `rm_change_supplier_link` → norsk. Lengste kode først (kobling_finnes_ikke før kobling_finnes). */
 export function changeLinkErrorMessage(raw: string | null | undefined): string {
@@ -154,13 +175,16 @@ export function lockedLinesText(n: number): string | null {
 export type ClaimFailure = "ingen_merkostnad" | "ingen_godtatt";
 export function claimFailureMessage(reason: ClaimFailure, skipped: { invoice_number: string | null; reason: AcceptSkipReason; message: string }[] = []): string {
   if (reason === "ingen_merkostnad") return "Ingen av linjene er dyrere enn forventet — ingenting å kreve";
-  const grunner = [...new Set(skipped.map((s) => s.message.trim() || SKIP_REASON_LABEL[s.reason]))];
+  const grunner = [...new Set(skipped.map(skipWhy))];
   return `Ingen linjer kunne godtas: ${grunner.length ? grunner.join("; ") : "ukjent årsak"}`;
 }
 
 export function acceptResultTitle(accepted: number, invoices: number): string {
   return `${accepted} ${accepted === 1 ? "linje" : "linjer"} godtatt · ${invoices} ${invoices === 1 ? "faktura regnes" : "fakturaer regnes"} om`;
 }
+
+/** «Forsøk n/3» — aldri over 3. */
+export const attemptsText = (n: number | null | undefined) => `Forsøk ${Math.min(3, Math.max(0, n ?? 0))}/3.`;
 
 export const kr = (n: number) => `${n.toLocaleString("nb-NO", { maximumFractionDigits: 0 })} kr`;
 export const signedKr = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${kr(Math.abs(n))}`;
