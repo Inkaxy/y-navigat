@@ -6,7 +6,7 @@
 export type ReadIssueCode =
   | "linjesum_mangler" | "ugyldig_tall" | "mengde_null" | "mulig_rabatt" | "regnestykke"
   | "mengde_eller_pris_mangler" | "fortegn" | "prisgrunnlag_uavklart"
-  | "sumavvik_mva_forhold" | "tomt_resultat";
+  | "sumavvik_mva_forhold" | "tomt_resultat" | "tvetydig_tall";
 
 export interface ReadIssue { code: ReadIssueCode | string; message: string }
 
@@ -26,9 +26,13 @@ export function parseNorwegianNumber(input: unknown): number | null {
     s = lastComma > lastDot ? s.replace(/\./g, "").replace(",", ".") : s.replace(/,/g, "");
   } else if (lastComma >= 0) {
     s = (s.match(/,/g) ?? []).length > 1 ? s.replace(/,/g, "") : s.replace(",", ".");
-  } else if ((s.match(/\./g) ?? []).length > 1 || /^\d{1,3}(\.\d{3})+$/.test(s.replace(/^[-+]/, ""))) {
-    // «1.234.567» eller «1.234» (tusenskille) — norsk tusenskille med punktum.
+  } else if ((s.match(/\./g) ?? []).length > 1) {
+    // «1.234.567» — flere punktum kan bare være tusenskille.
+    if (!/^\d{1,3}(\.\d{3})+$/.test(s.replace(/^[-+]/, ""))) return null;
     s = s.replace(/\./g, "");
+  } else if (/^\d{1,3}\.\d{3}$/.test(s.replace(/^[-+]/, ""))) {
+    // «10.000» er tvetydig (10 eller 10 000) — tolkes aldri blindt. Se numberTokens.ts for feltbevisst avgjørelse.
+    return null;
   }
   const n = Number(s);
   return Number.isFinite(n) ? n : null;

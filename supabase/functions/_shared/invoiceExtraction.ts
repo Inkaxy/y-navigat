@@ -14,11 +14,14 @@ import {
   clampConfidence, lineReadIssues, overallConfidence, parseNorwegianNumber, shouldRetryExtraction, vatRatioIssue,
   type ReadIssue,
 } from "./invoiceReadCheck.ts";
+import { resolveLineNumbers, type NumberEvidence } from "./numberTokens.ts";
 
 export const LINE_KINDS = ["vare", "pant", "frakt", "gebyr", "rabatt", "avrunding", "mva", "annet"] as const;
 export type LineKind = (typeof LINE_KINDS)[number];
 /** Prisgrunnlag slik databasen lagrer det (invoice_lines.unit_price_basis). */
 export type DbPriceBasis = "mengdeenhet" | "pakning" | "stk" | "kg" | "g" | "l" | "ml";
+
+const FIELD_LABEL = { quantity: "mengde", unit_price: "enhetspris", total_amount: "linjesum" } as const;
 
 export const num = (v: unknown): number | null => parseNorwegianNumber(v);
 
@@ -100,12 +103,13 @@ export function sanitizeLines(raw: unknown, isCredit = false): ExtractedLine[] {
     if (sku !== null && /^\d{1,2}$/.test(sku)) sku = null;
     const unit = normalizeUnit(l.unit);
     const package_unit = normalizeUnit(l.package_unit);
-    const quantity = num(l.quantity);
-    const unit_price = num(l.unit_price);
-    const total_amount = num(l.total_amount);
     const discount_pct = num(l.discount_pct);
     const package_size = num(l.package_size);
     const count_per_package = num(l.count_per_package);
+    // Mengde/pris/sum tolkes feltbevisst fra trykt råtekst; tvetydige tokens avgjøres bare av regnestykket.
+    const factor = unit_price_basis === "per_base" && package_size != null ? package_size * (count_per_package ?? 1) : 1;
+    const nums = resolveLineNumbers(l, factor);
+    const { quantity, unit_price, total_amount } = nums;
     const price_basis = toDbPriceBasis(unit_price_basis, unit, package_unit);
     const discount_amount = discountAmountFrom(discount_pct, total_amount);
     const out: ExtractedLine = {
@@ -116,11 +120,15 @@ export function sanitizeLines(raw: unknown, isCredit = false): ExtractedLine[] {
       vat_rate: num(l.vat_rate), package_size, package_unit, count_per_package,
       confidence: clampConfidence(l.confidence),
       read_issues: [],
+      number_evidence: nums.evidence,
     };
-    out.read_issues = lineReadIssues({
+    out.read_issues = [
+      ...nums.unresolved.map((f) => ({ code: "tvetydig_tall", message: `Tvetydig tall i ${FIELD_LABEL[f]} («${nums.evidence.find((e) => e.field === f)?.raw ?? ""}»): kan ikke avgjøres sikkert. Kontroller mot dokumentet.` })),
+      ...lineReadIssues({
       quantity, unit, unit_price, total_amount, package_size, package_unit, count_per_package,
       unit_price_basis: price_basis, discount_amount, line_kind, is_credit: isCredit,
-    });
+    }),
+    ];
     return out;
   });
 }
