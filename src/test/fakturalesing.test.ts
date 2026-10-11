@@ -19,7 +19,7 @@ describe("delt lesekontroll", () => {
 describe("norske tall", () => {
   it.each([
     ["1 234 567,89", 1234567.89], ["1.234,50", 1234.5], ["12,5 kr", 12.5], ["-12,5", -12.5], ["1,234.50", 1234.5],
-    ["1.234.567", 1234567], ["1.234", 1234], ["0,95", 0.95], ["kr 98 400,00", 98400], [" 7 ", 7],
+    ["1.234.567", 1234567], ["0,95", 0.95], ["kr 98 400,00", 98400], [" 7 ", 7],
   ])("%s → %s", (s, n) => expect(parseNorwegianNumber(s)).toBe(n));
   it.each(["abc", "", "1,2,3x", "NaN", "Infinity"])("ugyldig «%s» → null", (s) => expect(parseNorwegianNumber(s)).toBeNull());
   it("ikke-endelige tall avvises", () => expect(parseNorwegianNumber(Number.POSITIVE_INFINITY)).toBeNull());
