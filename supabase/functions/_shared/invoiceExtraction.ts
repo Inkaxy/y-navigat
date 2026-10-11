@@ -54,6 +54,8 @@ export interface ExtractedLine {
   count_per_package: number | null;
   confidence: number | null;
   read_issues: ReadIssue[];
+  /** Råtekst → verdi per tallfelt (hvordan mengde/pris/sum ble tolket). */
+  number_evidence?: NumberEvidence[];
 }
 
 const UNIT_ALIASES: Record<string, string> = {
