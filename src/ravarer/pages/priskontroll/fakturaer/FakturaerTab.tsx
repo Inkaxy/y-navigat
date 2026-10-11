@@ -22,7 +22,8 @@ import { FakturaRowActions, type RowAction } from "./FakturaRowActions";
 import { FakturaerDialogs, type DialogState } from "./FakturaerDialogs";
 import { VisningChips } from "./VisningChips";
 import { fakturaColumns, isOverdue, stepsOf } from "./fakturaColumns";
-import { FILTER_KEYS, parseFilters, toCsv } from "./fakturaListLogic";
+import { FILTER_KEYS, parseFilters, parseSort, SERVER_SORT_COLUMNS, toCsv, type FakturaSort } from "./fakturaListLogic";
+import { isFlaggable } from "@/fakturaer/lib/flagging";
 import { FAKTURA_PAGE_SIZE, useFakturaListe } from "./useFakturaListe";
 import { parseVisning, RETURN_PARAM } from "./visning";
 
@@ -37,7 +38,9 @@ export function FakturaerTab() {
   const { visning, modus } = parseVisning(sp);
   const filters = useMemo(() => parseFilters(sp), [sp]);
   const page = Math.max(1, Number(sp.get("side") ?? "1") || 1);
-  const liste = useFakturaListe({ legalEntityId, visning, modus, filters, page });
+  const sort = useMemo(() => parseSort(sp), [sp]);
+  const serverMode = visning === "avstemt" || visning === "alle";
+  const liste = useFakturaListe({ legalEntityId, visning, modus, filters, page, sort });
   const { data: summary } = useWorkSummary();
   const extras = useInvoiceDeliveryStatus(liste.rows.map((r) => r.id));
   const rematch = useRematchInvoices();
@@ -59,6 +62,7 @@ export function FakturaerTab() {
     }, { replace: true });
     setSelected(new Set());
   };
+  const setSort = (next: FakturaSort) => update({ sort: next?.id ?? null, dir: next ? next.dir : null });
   const reset = () => update(Object.fromEntries(FILTER_KEYS.map((k) => [k, null])));
   const open = (inv: InboxInvoice) => navigate(paths.faktura(inv.id, { [RETURN_PARAM]: location.search }));
 
@@ -81,7 +85,7 @@ export function FakturaerTab() {
     else if (a === "fetch_lines") {
       setBusyId(inv.id);
       fetchLines.mutate(inv, {
-        onSuccess: () => toast.success("Linjer hentet"),
+        onSuccess: (r) => (r.behandlet === 0 ? toast.info("Ingenting å hente — linjene er allerede lest") : toast.success("Linjer hentet")),
         onError: (e: Error) => toast.error(e.message),
         onSettled: () => setBusyId(null),
       });
@@ -89,8 +93,17 @@ export function FakturaerTab() {
   };
 
   const selectedRows = liste.rows.filter((r) => selected.has(r.id));
-  const exportCsv = () => {
-    const rows = selectedRows.length > 0 ? selectedRows : liste.rows;
+  const flaggableIds = selectedRows.filter((r) => isFlaggable(r.status)).map((r) => r.id);
+  const [exporting, setExporting] = useState(false);
+  const exportCsv = async () => {
+    let rows = selectedRows;
+    if (rows.length === 0) {
+      // Uten valg: hele utvalget (alle sider), ikke bare siden som vises.
+      setExporting(true);
+      try { rows = await liste.fetchAll(); }
+      catch (e) { console.error("[fakturaer-csv]", e); toast.error("Kunne ikke hente fakturaene til eksport. Prøv igjen."); return; }
+      finally { setExporting(false); }
+    }
     const blob = new Blob([`\uFEFF${toCsv(rows)}`], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -99,9 +112,11 @@ export function FakturaerTab() {
     URL.revokeObjectURL(a.href);
   };
 
-  const columns = fakturaColumns(extras.data, (inv) => (
-    <FakturaRowActions inv={inv} canWrite={canWrite} canReconcile={canReconcile} busy={busyId === inv.id} onAction={onAction} />
-  ));
+  const columns = fakturaColumns(
+    extras.data,
+    (inv) => <FakturaRowActions inv={inv} canWrite={canWrite} canReconcile={canReconcile} busy={busyId === inv.id} onAction={onAction} />,
+    (id) => (serverMode ? id in SERVER_SORT_COLUMNS : true),
+  );
   const totalPages = Math.max(1, Math.ceil(liste.total / FAKTURA_PAGE_SIZE));
   const queue = rematchStatus.data;
   const targets = liste.openInSelection.map((i) => i.id);
@@ -126,8 +141,14 @@ export function FakturaerTab() {
         <Card className="flex flex-wrap items-center gap-2 border-primary/30 bg-primary/5 p-3">
           <span className="text-sm font-medium">{selected.size} valgt</span>
           {canWrite && <Button size="sm" variant="outline" className="gap-1.5" onClick={() => queueRematch([...selected])}><RotateCw className="h-3.5 w-3.5" aria-hidden />Beregn valgte på nytt</Button>}
-          {canWrite && <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setDialog({ kind: "flag", ids: [...selected] })}><Flag className="h-3.5 w-3.5" aria-hidden />Flagg valgte …</Button>}
-          <Button size="sm" variant="outline" className="gap-1.5" onClick={exportCsv}><Download className="h-3.5 w-3.5" aria-hidden />Eksporter CSV</Button>
+          {canWrite && visning !== "avstemt" && (
+            <Button size="sm" variant="outline" className="gap-1.5" disabled={flaggableIds.length === 0} onClick={() => {
+              const skipped = selected.size - flaggableIds.length;
+              if (skipped > 0) toast.info(`${skipped} ${skipped === 1 ? "faktura" : "fakturaer"} hoppes over (avstemt eller allerede flagget)`);
+              setDialog({ kind: "flag", ids: flaggableIds });
+            }}><Flag className="h-3.5 w-3.5" aria-hidden />Flagg valgte ({flaggableIds.length}) …</Button>
+          )}
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => void exportCsv()}><Download className="h-3.5 w-3.5" aria-hidden />Eksporter CSV</Button>
           <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Nullstill</Button>
         </Card>
       )}
@@ -145,6 +166,8 @@ export function FakturaerTab() {
         selected={selected}
         onSelectedChange={setSelected}
         onRowClick={open}
+        sort={sort}
+        onSortChange={setSort}
         renderMobileCard={(r) => (
           <Card className="space-y-1.5 p-3">
             <div className="flex items-baseline justify-between gap-2">
@@ -162,7 +185,7 @@ export function FakturaerTab() {
           <div className="mt-2 flex items-center justify-between text-caption text-ink-secondary">
             <span>{liste.total} {liste.total === 1 ? "faktura" : "fakturaer"}</span>
             <span className="flex items-center gap-2">
-              <Button size="sm" variant="outline" className="gap-1" onClick={exportCsv}><Download className="h-3.5 w-3.5" aria-hidden />CSV</Button>
+              <Button size="sm" variant="outline" className="gap-1" disabled={exporting} onClick={() => void exportCsv()}>{exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Download className="h-3.5 w-3.5" aria-hidden />}CSV</Button>
               <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => update({ side: String(page - 1) }, false)}>Forrige</Button>
               <span className="tabular-nums">Side {page} av {totalPages}</span>
               <Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => update({ side: String(page + 1) }, false)}>Neste</Button>
