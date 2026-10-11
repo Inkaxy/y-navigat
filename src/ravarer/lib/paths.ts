@@ -45,7 +45,9 @@ export const paths = {
     withQuery(`${RAVARER_ROOT}/priskontroll`, { fane: "fakturaer", visning: "innboks", ...q }),
   alleFakturaer: (q?: Q) => withQuery(`${RAVARER_ROOT}/priskontroll`, { fane: "fakturaer", visning: "alle", ...q }),
   varekoblinger: (q?: { leverandor?: string; status?: string; q?: string } & Q) =>
-    withQuery(`${RAVARER_ROOT}/priskontroll`, { fane: "gjore", ...q }),
+    withQuery(`${RAVARER_ROOT}/priskontroll/varekort`, q),
+  alleVarekort: (q?: Q) => withQuery(`${RAVARER_ROOT}/priskontroll/varekort`, q),
+  varekort: (supplierId: Id, itemKey: Id) => `${RAVARER_ROOT}/priskontroll/varekort/${enc(supplierId)}/${enc(itemKey)}`,
   godkjenning: () => withQuery(`${RAVARER_ROOT}/priskontroll`, { fane: "godkjenning" }),
   saker: () => withQuery(`${RAVARER_ROOT}/priskontroll`, { fane: "saker" }),
   faktura: (id: Id, q?: Q) => withQuery(`${RAVARER_ROOT}/priskontroll/faktura/${enc(id)}`, q),
