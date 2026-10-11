@@ -33,7 +33,6 @@ export function RereadInspector({ candidate: c, lines, suggestion, selection, al
     <div className="space-y-4 text-sm">
       <div className="space-y-1">
         <h2 className="font-medium">{c.values.description ?? "Uten beskrivelse"}</h2>
-        <RawScore value={c.evidence.confidence} />
       </div>
       <IssueList title="Lesevarsler i ny lesing" issues={c.issues} />
 
@@ -93,8 +92,12 @@ export function RereadInspector({ candidate: c, lines, suggestion, selection, al
 
       <div className="rounded-md border border-border px-3 py-2 text-caption text-ink-secondary">
         Bare til kontroll (rettes ikke her): EAN {c.evidence.ean ?? "–"} · mva-sats {c.evidence.vat_rate ?? "–"} · rabatt % {c.evidence.discount_pct ?? "–"}.
-        Må noe av dette endres, bruk vanlig retting av linjen etterpå.
+        Disse feltene kan ikke endres med vanlig linjeretting i dag og krever egen håndtering.
       </div>
+      <details className="text-caption text-ink-secondary">
+        <summary className="cursor-pointer">Lesedetaljer</summary>
+        <p className="mt-1">Leserens egen vurdering, ikke målt korrekthet: <RawScore value={c.evidence.confidence} /></p>
+      </details>
 
       {target && <IssueList title="Lesevarsler på dagens linje (blir stående)" issues={target.issues} />}
       {target && target.issues.length > 0 && <p className="text-caption text-ink-secondary">Gamle varsler lukkes bare ved egen kontroll i «Rett linjer mot originalen».</p>}
