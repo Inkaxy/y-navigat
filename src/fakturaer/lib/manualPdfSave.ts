@@ -94,17 +94,9 @@ export function manualReading(input: { confidence: unknown; linesSumStatus: stri
 }
 
 export type ManualSaveResult =
-  | { ok: true; invoiceId: string; supplierId: string; replayed: boolean; status: string; lines: number }
-  | { ok: false; code: string; invoiceId: string | null };
-
-export function parseManualSaveResult(data: unknown): ManualSaveResult {
-  if (!isRec(data)) return { ok: false, code: "ukjent_svar", invoiceId: null };
-  if (data.ok === true && typeof data.invoice_id === "string" && typeof data.supplier_id === "string") {
-    return { ok: true, invoiceId: data.invoice_id, supplierId: data.supplier_id, replayed: data.replayed === true,
-      status: typeof data.status === "string" ? data.status : "imported", lines: numOrNull(data.lines) ?? 0 };
-  }
-  return { ok: false, code: typeof data.code === "string" ? data.code : "ukjent_svar", invoiceId: typeof data.invoice_id === "string" ? data.invoice_id : null };
-}
+  | { ok: true; invoiceId: string; supplierId: string; replayed: boolean; status: string; lines: number; matchQueued: boolean }
+  /** `definite` = serveren svarte eksplisitt ok:false med kjent avvisningskode → ingenting ble lagret. */
+  | { ok: false; code: string; invoiceId: string | null; definite: boolean };
 
 const SAVE_ERRORS: Record<string, string> = {
   duplikat: "Fakturanummeret finnes allerede for denne leverandøren. Ingenting ble lagret.",
@@ -114,6 +106,50 @@ const SAVE_ERRORS: Record<string, string> = {
   ugyldig_dokument: "PDF-en hører ikke til dette selskapet.",
   ugyldige_linjer: "Linjene kunne ikke leses. Ingenting ble lagret.",
 };
+
+export function parseManualSaveResult(data: unknown): ManualSaveResult {
+  if (!isRec(data)) return { ok: false, code: "ukjent_svar", invoiceId: null, definite: false };
+  if (data.ok === true && typeof data.invoice_id === "string" && typeof data.supplier_id === "string") {
+    return { ok: true, invoiceId: data.invoice_id, supplierId: data.supplier_id, replayed: data.replayed === true,
+      status: typeof data.status === "string" ? data.status : "imported", lines: numOrNull(data.lines) ?? 0,
+      matchQueued: data.match_queued === true };
+  }
+  const code = typeof data.code === "string" ? data.code : "ukjent_svar";
+  const definite = data.ok === false && Object.prototype.hasOwnProperty.call(SAVE_ERRORS, code);
+  return { ok: false, code: definite ? code : "ukjent_svar", invoiceId: typeof data.invoice_id === "string" ? data.invoice_id : null, definite };
+}
+
+export const UNKNOWN_SAVE_OUTCOME =
+  "Vi vet ikke om fakturaen ble lagret. PDF-en er beholdt – trykk «Lagre» igjen; samme faktura blir ikke lagret to ganger.";
+
 export function manualSaveErrorMessage(code: string): string {
+  if (code === "ukjent_svar") return UNKNOWN_SAVE_OUTCOME;
   return SAVE_ERRORS[code] ?? "Lagringen feilet. Ingenting ble lagret – prøv igjen.";
+}
+
+export type SettleOutcome =
+  | { kind: "committed"; result: Extract<ManualSaveResult, { ok: true }> }
+  | { kind: "rejected"; code: string; removedUpload: boolean }
+  | { kind: "unknown" };
+
+/**
+ * Avgjør utfallet av lagringskallet. Opplastet PDF slettes KUN ved eksplisitt,
+ * kjent avvisning fra serveren; nettverksfeil, null og ugyldige svar beholder PDF + sti.
+ */
+export async function settleManualSave(
+  call: () => Promise<{ data: unknown; error: unknown }>,
+  uploadedNow: string | null,
+  removeUpload: (path: string) => Promise<void>,
+): Promise<SettleOutcome> {
+  let resp: { data: unknown; error: unknown };
+  try { resp = await call(); } catch (e: unknown) {
+    console.warn("Lagring av PDF-faktura: ukjent utfall", e);
+    return { kind: "unknown" };
+  }
+  if (resp.error) return { kind: "unknown" };
+  const res = parseManualSaveResult(resp.data);
+  if (res.ok) return { kind: "committed", result: res };
+  if (!res.definite) return { kind: "unknown" };
+  if (uploadedNow) { await removeUpload(uploadedNow); return { kind: "rejected", code: res.code, removedUpload: true }; }
+  return { kind: "rejected", code: res.code, removedUpload: false };
 }
