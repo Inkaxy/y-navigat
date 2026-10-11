@@ -18,7 +18,7 @@ export function validateCostPrice(d: CostPriceDraft): { ok: true; price: number 
   const errors: CostPriceErrors = {};
   const price = parseDecimal(d.price);
   if (price == null) errors.price = "Skriv inn en pris";
-  else if (price < 0) errors.price = "Prisen kan ikke være negativ";
+  else if (price <= 0) errors.price = "Prisen må være større enn 0";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date)) errors.date = "Velg en dato";
   if (d.reason.trim().length < 3) errors.reason = "Skriv en begrunnelse (minst 3 tegn)";
   if (Object.keys(errors).length > 0 || price == null) return { ok: false, errors };
