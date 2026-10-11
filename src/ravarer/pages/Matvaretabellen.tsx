@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ExternalLink, Loader2, MoreHorizontal, RefreshCw, Search } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -106,8 +106,12 @@ export default function Matvaretabellen() {
   const existingFlow = useNutritionLinkFlow(existing?.food.food_id ?? null, !!existing, () => setExisting(null));
   const { choose: chooseExisting } = existingFlow;
   // Kjøres etter at flyten har startet ny økt for denne matvaren (effektrekkefølge), så sjekken tilhører økten.
+  const handledExisting = useRef<typeof existing>(null);
   useEffect(() => {
-    if (existing) void chooseExisting(existing.rawMaterialId, "valgt råvare");
+    // Nøyaktig én kildesjekk per «Bruk eksisterende»-valg (ikke på nytt ved ny render).
+    if (!existing || handledExisting.current === existing) return;
+    handledExisting.current = existing;
+    void chooseExisting(existing.rawMaterialId, "valgt råvare");
   }, [existing, chooseExisting]);
   /** Ny råvare er opprettet, men koblingen feilet: prøv koblingen igjen uten å opprette på nytt. */
   const [createdUnlinked, setCreatedUnlinked] = useState<{ rawMaterialId: string; food: FoodRow } | null>(null);
