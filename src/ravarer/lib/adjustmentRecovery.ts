@@ -73,6 +73,6 @@ export function resetPendingAdjustmentsForTest() { store.clear(); emit(); }
 /** Bare en SQLSTATE fra databasen (avslag på data/tilgang) beviser at ingenting ble skrevet. Alt annet er uklart. */
 export function isKnownRejection(e: unknown): boolean {
   if (typeof e !== "object" || e === null || !("code" in e)) return false;
-  const code = (e as { code: unknown }).code;
+  const code = e.code;
   return typeof code === "string" && /^(22|23|28|42|P0)[0-9A-Z]{3}$/.test(code);
 }
