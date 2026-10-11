@@ -254,7 +254,7 @@ export default function FakturaWorkspace() {
           onCorrect={lineWrite ? (id) => setCorrectFor(id) : undefined}
           invoice={gateInvoice}
           heldFor={holds.heldFor}
-          compact={isMobile}
+          compact={isMobile || (showDocZone && !threeZones)}
         />
       ) : (
         <QueueWorkspace
