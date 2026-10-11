@@ -22,7 +22,7 @@ export async function fetchBakersRawMaterials(
     let q = supabase.from("raw_materials").select(BAKERS_RM_SELECT);
     if (legalEntityId) q = q.eq("legal_entity_id", legalEntityId);
     if (opts.activeOnly) q = q.eq("is_active", true);
-    return q.order("id").range(from, to) as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null }>;
+    return q.order("id").range(from, to);
   });
   const map: Record<string, BakersRawMaterial> = {};
   for (const r of rows) map[r.id] = r;
