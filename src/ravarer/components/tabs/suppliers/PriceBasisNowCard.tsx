@@ -66,8 +66,8 @@ export function PriceBasisNowCard({ rawMaterialId, category, baseUnit, links, su
     queries: links.map((l) => ({
       queryKey: ["rm-price-reference", rawMaterialId, l.supplier_id, today],
       queryFn: async () => {
-        const { data, error } = await supabase.rpc("rm_price_reference", {
-          p_raw_material_id: rawMaterialId, p_supplier_id: l.supplier_id, p_invoice_date: today,
+        const { data, error } = await supabase.rpc("rm_price_reference_now", {
+          p_raw_material_id: rawMaterialId, p_supplier_id: l.supplier_id, p_date: today,
         });
         if (error) throw error;
         return parsePriceReference(data);
