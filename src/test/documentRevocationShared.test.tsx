@@ -118,7 +118,7 @@ describe("delt tilbakekalling av dokumentverifisering (panel + Les på nytt)", (
   it("dokument fjernet (available:false) i kontrollen før nedlasting sperrer bruk", async () => {
     sequence([meta("v1"), { data: { available: false, invoice_id: "i1", reason: "document_missing" }, error: null }], () => meta("v1"));
     setup();
-    await waitFor(() => expect(screen.getAllByText(/kunne ikke kontrolleres/).length).toBeGreaterThan(0));
+    await screen.findByText(/Ingenting fra den gamle versjonen vises/);
     expect(canApply()).toBe("false");
     expect(fetchMock).not.toHaveBeenCalled();
   });
