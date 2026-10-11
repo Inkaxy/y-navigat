@@ -185,7 +185,7 @@ describe("costPerKg for halvfabrikat", () => {
   it("1 l vann + 1 kg mel gir 2 kg og riktig pris", () => {
     const lines = [
       line({ id: "m", quantity: 1, unit: "kg", _rm: { id: "m", name: "Hvetemel", current_cost_price: 12, cost_basis_status: "verifisert", base_unit: "kg" } }),
-      line({ id: "v", quantity: 1, unit: "l", _rm: { id: "v", name: "Vann", current_cost_price: 0, cost_basis_status: "verifisert" } }),
+      line({ id: "v", quantity: 1, unit: "l", _rm: { id: "v", name: "Vann", current_cost_price: 0, cost_basis_status: "verifisert", base_unit: "l" } }),
     ];
     // 12 kr fordelt på 2 kg deig
     expect(costPerKg(lines)).toBeCloseTo(6, 6);
