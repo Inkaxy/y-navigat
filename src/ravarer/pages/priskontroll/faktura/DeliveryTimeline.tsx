@@ -14,8 +14,8 @@ type Props = {
 
 /** Liten horisontal stegindikator: Mottatt → Linjer lest → Kontrollert → Avstemt → Godkjent → Kostpris ført. */
 export function DeliveryTimeline({ steps, flagged, creditNote, showLabel, className }: Props) {
-  const last = [...steps].reverse().find((s) => s.done);
-  const summary = steps.map((s) => `${s.label}: ${s.done ? "ja" : "nei"}`).join(", ");
+  const last = [...steps].reverse().find((s) => s.done && !s.na);
+  const summary = steps.map((s) => `${s.label}: ${s.na ? "ikke relevant" : s.done ? "ja" : "nei"}`).join(", ");
   return (
     <div className={cn("flex items-center gap-2", className)}>
       <ol className="flex items-center" aria-label={`Leveransestatus. ${summary}`}>
@@ -29,7 +29,7 @@ export function DeliveryTimeline({ steps, flagged, creditNote, showLabel, classN
                   aria-label={`${s.label}: ${s.detail}`}
                   className={cn(
                     "block h-2.5 w-2.5 rounded-full border",
-                    s.done ? "border-success bg-success" : "border-border bg-background",
+                    s.na ? "border-dashed border-ink-secondary bg-background" : s.done ? "border-success bg-success" : "border-border bg-background",
                   )}
                 />
               </TooltipTrigger>

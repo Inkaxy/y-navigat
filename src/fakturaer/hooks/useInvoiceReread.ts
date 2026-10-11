@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { invalidateInvoice, invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
-import { clearPending, parseRun, savePending, type Operation, type RereadRun } from "@/fakturaer/lib/reread";
+import { applyResponseValid, clearPending, parseRun, persistedApply, savePending, type PendingApply, type RereadRun } from "@/fakturaer/lib/reread";
+import { classifyDbError } from "@/fakturaer/lib/sqlstate";
 
 const COLS = "id, invoice_id, legal_entity_id, created_by, status, error_code, created_at, expires_at, document_path, snapshot, proposal, extractor, result, applied_operations, apply_reason";
 export const rereadKey = (runId: string | null) => ["invoice-reread-run", runId] as const;
@@ -52,9 +53,14 @@ export function useInvokeRereadPreview() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (runId: string) => {
-      const { data, error } = await supabase.functions.invoke("reread-invoice-preview", { body: { run_id: runId } });
-      const code = data && typeof data === "object" && "code" in data && typeof data.code === "string" ? data.code : null;
-      return { code: error ? code ?? "ukjent_utfall" : code };
+      try {
+        const { data, error } = await supabase.functions.invoke("reread-invoice-preview", { body: { run_id: runId } });
+        const code = data && typeof data === "object" && "code" in data && typeof data.code === "string" ? data.code : null;
+        return { code: error ? code ?? "ukjent_utfall" : code };
+      } catch (e) {
+        console.error("[reread-invoke]", e);
+        return { code: "ukjent_utfall" };
+      }
     },
     onSettled: (_d, _e, runId) => { void qc.invalidateQueries({ queryKey: rereadKey(runId) }); },
   });
@@ -71,29 +77,59 @@ export function useCancelReread() {
   });
 }
 
-export type ApplyOutcome = { kind: "applied" } | { kind: "rejected"; message: string } | { kind: "unknown" };
+export type ApplyOutcome =
+  | { kind: "applied" }
+  | { kind: "rejected"; message: string }
+  | { kind: "unknown" }
+  /** Kjøringen er allerede tatt i bruk med andre valg; denne forespørselen er IKKE lagret (bevares som bevis). */
+  | { kind: "already_used" };
+
+export type ApplyCall = { data: unknown; error: { code?: string | null; message?: string } | null } | { thrown: unknown };
 
 /**
- * Ta i bruk: lagrer nøyaktig forespørsel FØR kallet. Ved ukjent utfall leses kjøringen; bare samme
- * forespørsel kan sendes igjen. Ingen ny kjøring startes automatisk, ingen matching/kostpris fra klienten.
+ * Avgjør utfallet. Suksess krever gyldig svar for nøyaktig denne forespørselen OG lagret kjøring med samme
+ * operasjoner og begrunnelse. Kjent avvisning tømmer ventende valg først når kjøringen ikke er tatt i bruk.
+ * Alt annet er ukjent: ventende valg beholdes.
+ */
+export async function decideApply(
+  call: ApplyCall, req: PendingApply, invoiceId: string,
+  fetchRun: (runId: string) => Promise<RereadRun | null>,
+  store: { clear: (runId: string) => void },
+): Promise<ApplyOutcome> {
+  let persisted: RereadRun | null | "unavailable";
+  try { persisted = await fetchRun(req.runId); } catch (e) { console.error("[reread-apply-status]", e); persisted = "unavailable"; }
+  const state = persisted === "unavailable" ? null : persistedApply(persisted, req);
+  // Lagret kjøring med nøyaktig samme operasjoner og begrunnelse er bevis — uansett hva svaret var.
+  if (state === "match") { store.clear(req.runId); return { kind: "applied" }; }
+  if (state === "differs") return { kind: "already_used" };
+  if (!("thrown" in call) && call.error && classifyDbError(call.error.code) === "rejected" && state === "not_applied") {
+    store.clear(req.runId);
+    return { kind: "rejected", message: call.error.message ?? "" };
+  }
+  // Gyldig svar uten bekreftet lagret kjøring (statuslesing utilgjengelig): fortsatt ukjent, valgene beholdes.
+  if (!("thrown" in call) && !call.error && applyResponseValid(call.data, req, invoiceId)) console.warn("[reread-apply] svar ok, lagret status ikke bekreftet");
+  return { kind: "unknown" };
+}
+
+/**
+ * Ta i bruk: lagrer nøyaktig forespørsel FØR kallet. Bare samme forespørsel kan sendes igjen.
+ * Ingen ny kjøring startes automatisk, ingen matching/kostpris fra klienten.
  */
 export function useApplyReread(invoiceId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (a: { runId: string; operations: Operation[]; reason: string }): Promise<ApplyOutcome> => {
+    mutationFn: async (a: PendingApply): Promise<ApplyOutcome> => {
       savePending(a);
       const ops: Json = JSON.parse(JSON.stringify(a.operations));
+      let call: ApplyCall;
       try {
-        const { error } = await supabase.rpc("rm_apply_invoice_reread", { p_run_id: a.runId, p_operations: ops, p_reason: a.reason });
-        if (!error) { clearPending(a.runId); return { kind: "applied" }; }
-        // Databasefeil med kode = kjent avvisning; ingenting er lagret (én transaksjon).
-        if (error.code && /^[0-9A-Z]{5}$/.test(error.code)) { clearPending(a.runId); return { kind: "rejected", message: error.message }; }
+        const { data, error } = await supabase.rpc("rm_apply_invoice_reread", { p_run_id: a.runId, p_operations: ops, p_reason: a.reason });
+        call = { data, error };
       } catch (e) {
         console.error("[reread-apply]", e);
+        call = { thrown: e };
       }
-      const run = await fetchRereadRun(a.runId).catch(() => null);
-      if (run?.status === "applied") { clearPending(a.runId); return { kind: "applied" }; }
-      return { kind: "unknown" };
+      return decideApply(call, a, invoiceId, fetchRereadRun, { clear: clearPending });
     },
     onSettled: (_d, _e, a) => {
       void qc.invalidateQueries({ queryKey: rereadKey(a.runId) });

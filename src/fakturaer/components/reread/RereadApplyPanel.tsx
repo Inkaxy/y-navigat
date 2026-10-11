@@ -5,8 +5,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { REREAD_FIELD_LABEL, type Candidate, type OldLine, type Operation, type PendingApply } from "@/fakturaer/lib/reread";
 import { showValue } from "./RereadParts";
+import { RereadSumSummary } from "./RereadSumSummary";
+import type { RereadSums } from "@/fakturaer/lib/reread";
 
 type Props = {
+  sums: RereadSums;
+  currency: string | null;
   operations: Operation[];
   candidates: Candidate[];
   lines: OldLine[];
@@ -20,14 +24,15 @@ type Props = {
 };
 
 /** Samlet «ta i bruk»: antall, valgte endringer, begrunnelse. Ved ukjent utfall: bare samme forespørsel på nytt. */
-export function RereadApplyPanel({ operations, candidates, lines, unresolved, pending, saving, canApply, message, onApply, onRetryPending }: Props) {
+export function RereadApplyPanel({ sums, currency, operations, candidates, lines, unresolved, pending, saving, canApply, message, onApply, onRetryPending }: Props) {
   const [reason, setReason] = useState("");
   if (pending) {
     return (
       <div className="space-y-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm" role="alert">
         <p className="font-medium">Vi vet ikke om forrige lagring kom fram</p>
         <p>Valgene ({pending.operations.length}) og begrunnelsen er tatt vare på. Prøv igjen med nøyaktig de samme valgene — det lagres aldri to ganger.</p>
-        <Button size="sm" disabled={saving} onClick={onRetryPending}>{saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden />}Prøv igjen med samme valg</Button>
+        {!canApply && <p className="text-caption">Du kan ikke ta i bruk denne lesingen.</p>}
+        <Button size="sm" disabled={saving || !canApply} onClick={onRetryPending}>{saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden />}Prøv igjen med samme valg</Button>
       </div>
     );
   }
@@ -52,6 +57,7 @@ export function RereadApplyPanel({ operations, candidates, lines, unresolved, pe
           })}
         </ul>
       )}
+      <RereadSumSummary sums={sums} currency={currency} compact />
       <div>
         <Label htmlFor="reread-reason" className="mb-1 block">Begrunnelse</Label>
         <Textarea id="reread-reason" value={reason} disabled={saving || !canApply} onChange={(e) => setReason(e.target.value)} placeholder="F.eks. «Linjene var lest feil første gang, kontrollert mot originalen»" />

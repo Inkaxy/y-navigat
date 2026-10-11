@@ -76,18 +76,38 @@ export function stepKey(items: Pick<WorkItem, "key">[], key: string | null, dir:
 // ---------- Pris-blokken ----------
 export type PriceLine = { id: string; price_per_base_unit: number; expected_price_per_base_unit: number; base_quantity: number | null };
 
-export type PriceChange = { expected: number; actual: number; pct: number; impactNok: number };
+export type PriceChange = {
+  /** Mengdevektet snitt av forventet og fakturert pris for de valgte linjene (ikke en ny enhetspris). */
+  expected: number; actual: number; pct: number;
+  /** Netto prisendring (signert sum); lavere pris på én faktura motregner ikke et krav. */
+  impactNok: number;
+  /** Absolutt avvik til gjennomgang (sum av |endring|). */
+  absoluteNok: number;
+  /** Bare dyrere linjer — grunnlag for mulig leverandørsak. */
+  positiveNok: number;
+  positiveIds: string[];
+};
 
-/** Mengdevektet sammenligning for valgte linjer. Null når grunnlag mangler. */
+/**
+ * Mengdevektet sammendrag. Krever kjent, positiv mengde på HVER linje — ellers ukjent (aldri vekt 1 eller 0 kr).
+ * Full presisjon; avrunding bare ved visning.
+ */
 export function priceChange(lines: PriceLine[]): PriceChange | null {
-  const usable = lines.filter((l) => l.expected_price_per_base_unit > 0);
-  if (usable.length === 0) return null;
-  const w = (l: PriceLine) => (l.base_quantity != null && l.base_quantity > 0 ? l.base_quantity : 1);
-  const tw = usable.reduce((s, l) => s + w(l), 0);
-  const expected = usable.reduce((s, l) => s + l.expected_price_per_base_unit * w(l), 0) / tw;
-  const actual = usable.reduce((s, l) => s + l.price_per_base_unit * w(l), 0) / tw;
-  const impactNok = usable.reduce((s, l) => s + (l.price_per_base_unit - l.expected_price_per_base_unit) * (l.base_quantity ?? 0), 0);
-  return { expected, actual, pct: ((actual - expected) / expected) * 100, impactNok };
+  if (lines.length === 0) return null;
+  if (lines.some((l) => !(l.expected_price_per_base_unit > 0) || !Number.isFinite(l.price_per_base_unit) || l.base_quantity == null || !(l.base_quantity > 0))) return null;
+  const q = (l: PriceLine) => l.base_quantity as number;
+  const tw = lines.reduce((s, l) => s + q(l), 0);
+  const expected = lines.reduce((s, l) => s + l.expected_price_per_base_unit * q(l), 0) / tw;
+  const actual = lines.reduce((s, l) => s + l.price_per_base_unit * q(l), 0) / tw;
+  const d = (l: PriceLine) => (l.price_per_base_unit - l.expected_price_per_base_unit) * q(l);
+  const pos = lines.filter((l) => d(l) > 0);
+  return {
+    expected, actual, pct: ((actual - expected) / expected) * 100,
+    impactNok: lines.reduce((s, l) => s + d(l), 0),
+    absoluteNok: lines.reduce((s, l) => s + Math.abs(d(l)), 0),
+    positiveNok: pos.reduce((s, l) => s + d(l), 0),
+    positiveIds: pos.map((l) => l.id),
+  };
 }
 
 /** Merkostnaden et kreditkrav gjelder: bare linjer som er dyrere enn forventet. */

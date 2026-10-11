@@ -67,6 +67,10 @@ Felter som skal hentes:
 REGLER FOR BELØP (viktigst):
 1. Linjebeløp (unit_price, total_amount) på norske leverandørfakturaer er nesten alltid EKSKLUSIVE mva. Regn ALDRI om et
    linjebeløp (ikke del på 1,15 eller 1,25) med mindre fakturaen uttrykkelig sier at linjene er inkl. mva.
+   Når linjesummene står under «Totalt linjebeløp før MVA», og de samme beløpene brukes som «MVA grunnlag», er linjene
+   allerede eksklusive mva. Mva-kolonnen er satsinformasjon og skal ikke trekkes fra linjene. Behandle hver trykte sats
+   separat; bruk aldri én fakturasats for blandet 15 % og 25 %. En kreditnota kan ha positive beløp: behold dokumentets
+   fortegn og merk kreditnota separat. Kontroller også at netto + mva = totalt å betale/kreditere.
 2. Kontroller deg selv: summen av lines[].total_amount skal bli lik «Sum eks. mva» / «Netto» / «Grunnlag» på fakturaen.
    Hvis den ikke gjør det: let etter linjer du har oversett (frakt, pant, gebyr, rabatt, tillegg), eller en kolonne du har
    lest feil (rabattkolonne, antall vs. mengde). Rett opp før du svarer.

@@ -13,7 +13,7 @@ import { useInvoiceDocumentUrl } from "@/fakturaer/hooks/useInvoiceDocument";
 import { PdfDocumentViewer } from "@/fakturaer/components/PdfDocumentViewer";
 import { RereadView, ReadingState } from "@/fakturaer/components/reread/RereadView";
 import { useApplyReread, useBeginReread, useCancelReread, useInvokeRereadPreview, useRereadRun } from "@/fakturaer/hooks/useInvoiceReread";
-import { loadPending, rereadErrorText, type Operation } from "@/fakturaer/lib/reread";
+import { loadPending, persistedApply, rereadErrorText, type Operation } from "@/fakturaer/lib/reread";
 import { paths } from "@/ravarer/lib/paths";
 
 const when = (iso: string) => format(new Date(iso), "EEE d. MMM yyyy, HH:mm", { locale: nb });
@@ -122,7 +122,9 @@ export default function LesPaNytt() {
         <QueryState scope="reread-kjoring" isLoading={run.isLoading} isError={run.isError} error={run.error} onRetry={() => void run.refetch()} isEmpty={!r} emptyTitle="Fant ikke lesingen." emptyDescription="Den kan tilhøre et annet selskap, eller adressen er feil.">
           {r && r.invoice_id !== id && <p role="alert" className="text-destructive">Lesingen gjelder en annen faktura.</p>}
           {r && r.invoice_id === id && r.status === "reading" && (
-            <ReadingState invoked={invoke.isPending || sessionStorage.getItem(invokedKey(r.id)) === "1"} busy={cancel.isPending || !isOwner} onInvoke={runInvoke} onCancel={() => cancel.mutate(r.id)} />
+            <ReadingState startedAt={r.created_at} invoked={sessionStorage.getItem(invokedKey(r.id)) === "1"} invoking={invoke.isPending}
+              invokeCode={invoke.data?.code ?? null} canAct={isOwner && canWrite} busy={cancel.isPending}
+              onInvoke={runInvoke} onRefresh={() => void run.refetch()} onCancel={() => cancel.mutate(r.id)} />
           )}
           {r && r.invoice_id === id && (r.status === "failed" || r.status === "cancelled") && (
             <div className="mx-auto max-w-xl space-y-3 rounded-lg border border-border p-5 text-sm" role="status">
@@ -135,6 +137,9 @@ export default function LesPaNytt() {
           {r && r.invoice_id === id && r.status === "applied" && (
             <div className="mx-auto max-w-xl space-y-2 rounded-lg border border-border p-5 text-sm" role="status">
               <p className="font-medium">Tatt i bruk: {r.result?.applied_count ?? 0} valg</p>
+              {pending && persistedApply(r, pending) === "differs" && (
+                <p role="alert" className="text-warning">Forslaget var allerede tatt i bruk med andre valg. Dine {pending.operations.length} valg ble ikke lagret; de er tatt vare på i denne økten.</p>
+              )}
               <p>{r.result?.operations.filter((o) => o.kind === "update").length ?? 0} linjer rettet, {r.result?.operations.filter((o) => o.kind === "add").length ?? 0} lagt til. Kobling og prisvurdering beregnes på nytt i kø.</p>
               {r.result?.lines_sum_status === "mismatch" && <p className="text-warning">Summen stemmer fortsatt ikke med fakturaen.</p>}
               <p className="text-ink-secondary">Eventuelle gamle lesevarsler står igjen til de kontrolleres.</p>
@@ -144,7 +149,7 @@ export default function LesPaNytt() {
           {r && r.invoice_id === id && r.status === "ready" && (
             <RereadView run={r} document={document} canApply={isOwner && canWrite} pending={pending} saving={apply.isPending}
               readOnlyReason={!isOwner ? "Lesingen ble startet av en annen bruker. Du kan se den, men ikke ta den i bruk." : !canWrite ? "Du har ikke skrivetilgang." : null}
-              applyMessage={applyMsg ?? (apply.data?.kind === "unknown" ? "Vi vet ikke om lagringen kom fram." : null)} onApply={doApply} onRetryPending={retryPending} />
+              applyMessage={applyMsg ?? (apply.data?.kind === "unknown" ? "Vi vet ikke om lagringen kom fram." : apply.data?.kind === "already_used" ? rereadErrorText("allerede_brukt_med_andre_valg") : null)} onApply={doApply} onRetryPending={retryPending} />
           )}
         </QueryState>
       )}

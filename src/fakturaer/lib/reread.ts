@@ -36,12 +36,16 @@ export type RereadRun = {
   candidates: Candidate[];
   invoiceIssues: Issue[];
   header: HeaderCompare;
+  /** Bare leserens EKSPLISITTE kreditnotavurdering (`header.read.is_credit_note`); ellers null = ikke oppgitt. */
   readCredit: boolean | null;
-  extractor: { method: string | null; confidence: number | null; warningCount: number };
+  /** Fortegn på lest total, bare som observasjon (positive kreditbeløp er ikke bevis for ikke-kreditnota). */
+  readTotalSign: "positiv" | "negativ" | "null" | null;
+  extractor: { method: string | null; confidence: number | null; warningCount: number; sumCheck: ReportedSumCheck | null };
   result: ApplyResult | null;
   appliedOperations: Json | null;
   applyReason: string | null;
 };
+export type ReportedSumCheck = { lines_sum: number | null; expected_excl_vat: number | null; deviation_pct: number | null; missing_amount: number | null; arithmetic_issue_lines: number | null };
 export type ApplyResult = { ok: boolean; applied_count: number; lines_sum_status: string | null; replayed: boolean; operations: { kind: string; candidate_id: string; line_id: string | null }[] };
 
 type Rec = Record<string, unknown>;
@@ -99,14 +103,20 @@ export function parseRun(row: RunRowInput): RereadRun {
   const ex = isRec(row.extractor) ? row.extractor : {};
   const res = isRec(row.result) ? row.result : null;
   const readTotal = numOrNull(read.total_amount);
+  const sc = isRec(ex.sum_check) ? ex.sum_check : null;
   return {
     id: row.id, invoice_id: row.invoice_id, legal_entity_id: row.legal_entity_id, created_by: row.created_by,
     status: (STATUSES as string[]).includes(row.status) ? (row.status as RunStatus) : "failed",
     error_code: row.error_code, created_at: row.created_at, expires_at: row.expires_at, document_path: row.document_path,
     invoice: { invoice_number: strOrNull(inv.invoice_number), is_credit_note: inv.is_credit_note === true, total_amount: numOrNull(inv.total_amount), total_vat: numOrNull(inv.total_vat), currency: strOrNull(inv.currency), issues: parseIssues(inv.extraction_issues) },
     oldLines, candidates, invoiceIssues: parseIssues(prop.invoice_issues), header,
-    readCredit: readTotal == null ? null : readTotal < 0,
-    extractor: { method: strOrNull(ex.extraction_method), confidence: numOrNull(ex.confidence), warningCount: numOrNull(ex.warning_count) ?? 0 },
+    // Forslagets header.is_credit_note er kopiert fra fakturaen i dag og er IKKE en vurdering fra leseren.
+    readCredit: typeof read.is_credit_note === "boolean" ? read.is_credit_note : null,
+    readTotalSign: readTotal == null ? null : readTotal > 0 ? "positiv" : readTotal < 0 ? "negativ" : "null",
+    extractor: {
+      method: strOrNull(ex.extraction_method), confidence: numOrNull(ex.confidence), warningCount: numOrNull(ex.warning_count) ?? 0,
+      sumCheck: sc ? { lines_sum: numOrNull(sc.lines_sum), expected_excl_vat: numOrNull(sc.expected_excl_vat), deviation_pct: numOrNull(sc.deviation_pct), missing_amount: numOrNull(sc.missing_amount), arithmetic_issue_lines: numOrNull(sc.arithmetic_issue_lines) } : null,
+    },
     result: res ? {
       ok: res.ok === true, applied_count: numOrNull(res.applied_count) ?? 0, lines_sum_status: strOrNull(res.lines_sum_status), replayed: res.replayed === true,
       operations: recs(res.operations).map((o) => ({ kind: String(o.kind), candidate_id: String(o.candidate_id), line_id: strOrNull(o.line_id) })),
@@ -220,6 +230,11 @@ const ERR: Record<string, string> = {
   dokumentsti_avvist: "Originaldokumentet ligger ikke der det skal for selskapet, og ble ikke lest.",
   ikke_pdf: "Originalen er ikke en PDF som kan leses på nytt.",
   leser_feilet: "Fakturaleseren svarte ikke. Prøv en ny lesing.",
+  leser_transportfeil: "Kontakten med fakturaleseren brøt. Fakturaen er ikke endret.",
+  dokument_transportfeil: "Originalen kunne ikke hentes. Fakturaen er ikke endret.",
+  status_cancelled: "Lesingen er avbrutt.",
+  status_ready: "Lesingen er allerede ferdig.",
+  intern_feil: "Leseren feilet uventet. Oppdater status før du prøver igjen.",
   leser_ugyldig_svar: "Fakturaleseren ga et ugyldig svar. Ingenting er endret.",
   leser_ingen_linjer: "Leseren fant ingen linjer i originalen. Ingenting kan tas i bruk.",
   for_mange_linjer: "Leseren fant flere enn 500 linjer. Ingenting kan tas i bruk.",
@@ -256,3 +271,80 @@ function isOperation(x: unknown): x is Operation {
   return isRec(x) && typeof x.candidate_id === "string" && isRec(x.changes) && (x.kind === "add" ? x.confirmed_addition === true : x.kind === "update" && typeof x.line_id === "string" && x.confirmed_mapping === true);
 }
 export function clearPending(runId: string, store: Pick<Storage, "removeItem"> = sessionStorage) { store.removeItem(pendingKey(runId)); }
+
+// ---- Summer: hele forslaget og valgt resultat ------------------------------------------------------------
+
+/** Beløp med fullstendighet: mangler ett nødvendig linjebeløp, er summen ukjent (aldri 0). */
+export type SumValue = { amount: number | null; complete: boolean; reason?: string };
+const fin = (v: Value): v is number => typeof v === "number" && Number.isFinite(v);
+function sumOf(vals: Value[]): SumValue {
+  let s = 0;
+  for (const v of vals) { if (!fin(v)) return { amount: null, complete: false, reason: "Mangler linjebeløp" }; s += v; }
+  return { amount: s, complete: true };
+}
+/** Sum som avviker mindre enn dette (kroner) regnes som lik — samme toleranse som visningen av øre. */
+export const SUM_EPS = 0.005;
+
+export type RereadSums = {
+  /** (1) Alle eksisterende linjer i dag. */
+  oldSum: SumValue;
+  /** (2) Alle linjer i ny lesing. */
+  candidateSum: SumValue;
+  /** (3) Fakturaens netto = total − mva, bare når begge er kjent (ukjent mva er aldri 0). */
+  expectedNet: number | null;
+  /** (4) Dagens linjer med bare valgte linjesum-erstatninger + valgte nye linjer. */
+  selectedSum: SumValue;
+  /** Leserens egen rapporterte linjesum, og om den avviker fra lokalt utregnet sum. */
+  reportedSum: number | null;
+  reportedDiffers: boolean;
+};
+
+export const diffTo = (s: SumValue, net: number | null): number | null => (s.amount != null && net != null ? s.amount - net : null);
+
+export function rereadSums(run: Pick<RereadRun, "oldLines" | "candidates" | "invoice" | "extractor">, sel: Record<string, Selection>): RereadSums {
+  const oldSum = sumOf(run.oldLines.map((l) => l.total_amount));
+  const candidateSum = sumOf(run.candidates.map((c) => c.values.total_amount));
+  const t = run.invoice.total_amount, v = run.invoice.total_vat;
+  const expectedNet = t != null && v != null && Number.isFinite(t) && Number.isFinite(v) ? t - v : null;
+  const totals = new Map<string, Value>(run.oldLines.map((l) => [l.id, l.total_amount]));
+  const adds: Value[] = [];
+  let invalid: string | null = null;
+  const seen = new Set<string>();
+  for (const c of run.candidates) {
+    const s = sel[c.candidate_id];
+    if (!s || s.target === null) continue;
+    if (selectionProblem(c, s, run.oldLines, sel)) { invalid = "Uavklart valg"; continue; }
+    if (s.target === "add") { adds.push(c.values.total_amount); continue; }
+    if (seen.has(s.target)) { invalid = "Samme linje valgt to ganger"; continue; }
+    seen.add(s.target);
+    if (s.fields.includes("total_amount")) totals.set(s.target, c.values.total_amount);
+  }
+  const base = sumOf([...totals.values(), ...adds]);
+  const selectedSum: SumValue = invalid ? { amount: null, complete: false, reason: invalid } : base;
+  const reportedSum = run.extractor.sumCheck?.lines_sum ?? null;
+  const reportedDiffers = reportedSum != null && candidateSum.amount != null && Math.abs(reportedSum - candidateSum.amount) >= SUM_EPS;
+  return { oldSum, candidateSum, expectedNet, selectedSum, reportedSum, reportedDiffers };
+}
+
+// ---- Bekreftet utfall av «ta i bruk» ---------------------------------------------------------------------
+
+/** Stabil JSON (sorterte nøkler) — jsonb lagrer nøkler i egen rekkefølge. */
+export function stableJson(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(stableJson).join(",")}]`;
+  if (isRec(v)) return `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${stableJson(v[k])}`).join(",")}}`;
+  return JSON.stringify(v ?? null);
+}
+
+/** Svar fra rm_apply_invoice_reread er bare suksess når det beskriver nøyaktig denne forespørselen. */
+export function applyResponseValid(data: unknown, req: PendingApply, invoiceId: string): boolean {
+  if (!isRec(data) || data.ok !== true || data.run_id !== req.runId || data.invoice_id !== invoiceId) return false;
+  if (typeof data.applied_count !== "number" || !Number.isInteger(data.applied_count) || data.applied_count !== req.operations.length) return false;
+  if (!Array.isArray(data.operations) || data.operations.length !== req.operations.length) return false;
+  return data.operations.every((o: unknown) => isRec(o) && typeof o.kind === "string" && typeof o.candidate_id === "string");
+}
+
+/** Lagret kjøring mot innsendt forespørsel. */
+export function persistedApply(run: Pick<RereadRun, "status" | "appliedOperations" | "applyReason"> | null, req: PendingApply): "match" | "differs" | "not_applied" {
+  if (!run || run.status !== "applied") return "not_applied";
+  return stableJson(run.appliedOperations) === stableJson(req.operations) && run.applyReason === req.reason.trim() ? "match" : "differs";
+}
