@@ -39,13 +39,6 @@ import { StockTab } from "@/ravarer/components/tabs/StockTab";
 import { HistoryTab } from "@/ravarer/components/tabs/HistoryTab";
 import { paths } from "@/ravarer/lib/paths";
 
-const ITEM_TYPE_LABEL: Record<string, string> = {
-  ravare: "Råvare",
-  emballasje: "Emballasje",
-  forbruksvare: "Forbruksvare",
-  videresalg: "Videresalg",
-};
-
 export default function RawMaterialDetail() {
   const { id } = useParams();
   const navigate = useGuardedNavigate();
