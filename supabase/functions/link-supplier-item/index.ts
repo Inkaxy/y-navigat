@@ -68,6 +68,27 @@ Deno.serve(async (req) => {
       requestedLineIds = Array.from(new Set(body.line_ids as string[]));
     }
 
+    // Fryst utvalg: linjer som er løst siden forhåndsvisningen (eller tilhører et annet selskap/leverandør)
+    // hoppes over og rapporteres — de skal ikke overskrives av en utdatert beslutning.
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+    let staleLineIds: string[] = [];
+    if (requestedLineIds) {
+      const { data: cur, error: curErr } = await admin.from("invoice_lines")
+        .select("id, requires_review, invoices!inner(legal_entity_id, supplier_id)")
+        .in("id", requestedLineIds);
+      if (curErr) return json({ error: "Kunne ikke kontrollere linjeutvalget" }, 500);
+      const stillOpen = new Set(((cur ?? []) as AnyRec[]).filter((l) => {
+        const inv = (l.invoices ?? {}) as AnyRec;
+        return l.requires_review === true && String(inv.legal_entity_id) === legalEntityId && String(inv.supplier_id) === supplierId;
+      }).map((l) => String(l.id)));
+      staleLineIds = requestedLineIds.filter((id) => !stillOpen.has(id));
+      requestedLineIds = requestedLineIds.filter((id) => stillOpen.has(id));
+      if (requestedLineIds.length === 0) {
+        return json({ ok: true, mode: body.not_raw_material === true ? "ikke_vare" : "koblet", raw_material_id: null, raw_material_supplier_id: null,
+          created_raw_material: false, lines_updated: 0, invoices: [], still_open_lines: 0, failures: [], skipped_line_ids: staleLineIds });
+      }
+    }
+
     const { data: linkRes, error: linkErr } = await userClient.rpc("rm_link_supplier_item", {
       p_legal_entity_id: legalEntityId,
       p_supplier_id: supplierId,
@@ -100,7 +121,6 @@ Deno.serve(async (req) => {
     // Regn om hver berørt faktura med motoren (tjenestekall). Feil her gjør ikke
     // koblingen ugyldig — linjene står som «må beregnes på nytt» til neste kjøring.
     const invoiceIds = Array.isArray(link.invoice_ids) ? (link.invoice_ids as string[]) : [];
-    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     // Ved fryst utvalg regnes bare de faktisk endrede linjene om — nye linjer som kom etter
     // forhåndsvisningen røres ikke av denne operasjonen (de får den lagrede koblingen ved sin egen matching).
     const changedIds = Array.isArray(link.line_ids) ? (link.line_ids as string[]) : [];
@@ -165,7 +185,7 @@ Deno.serve(async (req) => {
       still_open_lines: stillOpen,
       failures: link.failures ?? [],
       // Linjer i det frysta utvalget som ikke ble endret (løst, låst, ført eller på avstemt/flagget faktura).
-      skipped_line_ids: requestedLineIds ? requestedLineIds.filter((id) => !changedIds.includes(id)) : [],
+      skipped_line_ids: requestedLineIds ? [...staleLineIds, ...requestedLineIds.filter((id) => !changedIds.includes(id))] : [],
     });
   } catch (e) {
     console.error("link-supplier-item error", e);
