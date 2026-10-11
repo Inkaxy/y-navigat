@@ -75,7 +75,7 @@ export function SectionTabs({ tabs, param = "fane", defaultTab, clearParams, ari
               tabIndex={on ? 0 : -1}
               onKeyDown={onKey}
               className={cn(
-                "-mb-px inline-flex h-9 items-center whitespace-nowrap border-b-2 px-3 text-sm transition-colors",
+                "-mb-px inline-flex min-h-[44px] items-center md:min-h-0 md:h-9 whitespace-nowrap border-b-2 px-3 text-sm transition-colors",
                 on ? "border-primary font-medium text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
               )}
             >

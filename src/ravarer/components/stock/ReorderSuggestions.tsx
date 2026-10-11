@@ -102,13 +102,13 @@ export function ReorderSuggestions({ standalone = false }: { standalone?: boolea
                     {g.lines.length} varer · {kr(g.total_value)}
                   </p>
                 </button>
-                <Button size="sm" variant="outline" onClick={() => copy(reorderGroupToText(g))}>
+                <Button size="sm" variant="outline" className="min-h-[44px] md:min-h-9" onClick={() => copy(reorderGroupToText(g))}>
                   <Copy className="mr-1.5 h-3.5 w-3.5" /> Kopier liste
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => downloadCsv(g)}>
+                <Button size="sm" variant="outline" className="min-h-[44px] md:min-h-9" onClick={() => downloadCsv(g)}>
                   <Download className="mr-1.5 h-3.5 w-3.5" /> CSV
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => setOpen(isOpen ? null : key)}>
+                <Button size="sm" variant="ghost" className="min-h-[44px] md:min-h-9" onClick={() => setOpen(isOpen ? null : key)}>
                   {isOpen ? "Skjul" : "Vis varer"}
                 </Button>
               </div>

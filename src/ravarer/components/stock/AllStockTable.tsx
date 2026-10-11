@@ -117,7 +117,7 @@ export function AllStockTable() {
                       <td className="px-4 py-3 text-ink-secondary">{formatDate(r.last_out)}</td>
                       <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
                         {canWrite && (
-                          <Button size="sm" variant="outline" onClick={() => { setSelected(r); setCountOpen(true); }}>
+                          <Button size="sm" variant="outline" className="min-h-[44px] md:min-h-9" onClick={() => { setSelected(r); setCountOpen(true); }}>
                             <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" /> Telling
                           </Button>
                         )}
