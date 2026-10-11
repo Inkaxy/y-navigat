@@ -30,9 +30,9 @@ export function TripletexStatusCard() {
   if (entities.length === 0) return null;
 
   const configured = creds.length;
-  const errors = creds.filter((c: any) => c.last_sync_status === "error");
+  const errors = creds.filter((c) => c.last_sync_status === "error");
   const lastSync = creds
-    .map((c: any) => c.last_synced_at)
+    .map((c) => c.last_synced_at)
     .filter(Boolean)
     .sort()
     .reverse()[0];
