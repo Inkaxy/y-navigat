@@ -245,7 +245,7 @@ describe("PALS526301 — mengde med punktum, beløp med komma", () => {
       expect(lines[i]).toMatchObject({ quantity: r.eq, unit_price: r.ep, total_amount: r.et });
       expect(lines[i].read_issues).toEqual([]);
     });
-    expect(checkSumReal(lines, 25784.74, 29652.45, 3867.71).sumDeviationPct ?? 0).toBeCloseTo(0, 2);
+    expect(checkSumReal(lines, 25784.74, 29652.45, 3867.71).deviation_pct ?? 0).toBeCloseTo(0, 2);
     const rows = toRowsReal(palsModel, "inv", null);
     PALS.forEach((r, i) => expect(rows[i]).toMatchObject({ quantity: r.eq, unit_price: r.ep, total_amount: r.et }));
     // Allerede tolkede linjer fra leseren (tall) går uendret gjennom importen.
