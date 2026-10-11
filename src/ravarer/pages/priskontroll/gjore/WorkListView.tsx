@@ -14,7 +14,7 @@ import { NEXT_ACTION, causeText } from "./groupCopy";
 function MobileEffect({ it }: { it: WorkItem }) {
   const e = workEffect(it);
   return (
-    <p className={cn("text-caption sm:hidden", e.kind === "read" ? "text-warning" : "text-ink-secondary")}>
+    <p className={cn("text-xs sm:hidden", e.kind === "read" ? "text-warning" : "text-ink-secondary")}>
       {e.label}{e.kind === "verified" ? `: ${signedKr(e.value)}` : ""}
     </p>
   );
@@ -28,7 +28,7 @@ export function EffectCell({ it }: { it: WorkItem }) {
       <div className="text-caption text-ink-secondary">{e.label}</div>
       {e.kind === "verified"
         ? <div className="text-sm font-medium tabular-nums">{signedKr(e.value)}</div>
-        : <div className={cn("text-caption", e.kind === "read" ? "text-warning" : "text-ink-secondary")}>{e.kind === "read" ? "Lesing ukontrollert" : "—"}</div>}
+        : <div className={cn("text-xs", e.kind === "read" ? "text-warning" : "text-ink-secondary")}>{e.kind === "read" ? "Lesing ukontrollert" : "—"}</div>}
     </div>
   );
 }

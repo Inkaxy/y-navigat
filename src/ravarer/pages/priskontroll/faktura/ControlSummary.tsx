@@ -67,7 +67,7 @@ export function ControlSummary({ data, openCount, totalCount, canWrite, locked, 
           <Figure label="Gjenstår" value={totalCount === 0 ? "—" : openCount === 0 ? "Alle avklart" : `${openCount} av ${totalCount} linjer`} tone={openCount > 0 ? "warning" : undefined} />
         </dl>
         <div className="flex items-center justify-between gap-2">
-          <p className={cn("min-w-0 text-caption", readNote ? "text-warning" : "text-ink-secondary")}>
+          <p className={cn("min-w-0 text-xs", readNote ? "text-warning" : "text-ink-secondary")}>
             {readNote ?? (checked ? "Linjesummen er kontrollert mot fakturaen." : "Linjesummen er ikke kontrollert mot fakturaen ennå.")}
           </p>
           {!expanded && (
