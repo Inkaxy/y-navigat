@@ -76,6 +76,8 @@ export interface RawMaterialListItem {
   costPrice: number | null;
   /** Serverens kostprisstatus; bare «verifisert» er brukbar kost. */
   costStatus: CostStatus;
+  /** Hvorfor kostprisen ikke er bekreftet nå (fra bundet serverbevis), ellers null. */
+  costReason?: string | null;
   costSource: string | null;
   costUpdatedAt: string | null;
   agreedPrice: number | null;
@@ -87,7 +89,9 @@ export interface RawMaterialListItem {
 
   /** Treff i søket som kom fra leverandørnummer/alias (vises som chip). */
   matchedAlias: string | null;
+  /** Siste fakturas pris per grunnenhet, bare når serverens fakturabevis er godkjent. */
   lastInvoicePrice: number | null;
+  /** Dato for siste fakturaobservasjon fra bundet serverbevis (null = ikke kontrollert). */
   lastInvoiceDate: string | null;
   /** Siste faktura mot gjeldende kostpris, bevist av serveren. Kun `eligible` gir et tall. */
   comparison: ListComparison;

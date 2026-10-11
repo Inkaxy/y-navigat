@@ -23,6 +23,7 @@ import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useWorklistNav } from "@/ravarer/pages/varer/useWorklistNav";
 import { useSaveOwner } from "@/ravarer/lib/saveOwner";
 import { costSummary } from "@/ravarer/lib/costSummary";
+import { useMaterialPriceEvidence } from "@/ravarer/hooks/useMaterialPriceEvidence";
 import type { NavEntry } from "@/ravarer/pages/varer/modeLogic";
 import { RawMaterialDetailHeader } from "@/ravarer/components/detail/RawMaterialDetailHeader";
 import { RawMaterialKpiStrip } from "@/ravarer/components/RawMaterialKpiStrip";
@@ -88,6 +89,8 @@ export default function RawMaterialDetail() {
     [prev, next, goTo, owner],
   );
   useHotkeys(hotkeys);
+  // Én bundet tolkning av kost/siste faktura for topptekst, KPI og pakningskost.
+  const priceEvidence = useMaterialPriceEvidence(rm ?? null);
 
   if (page.isLoading || page.isError || !rm) {
     return (
@@ -129,7 +132,7 @@ export default function RawMaterialDetail() {
   const sections = sectionsFor(rm.is_packaging);
   const sectionHref = (sid: SectionId) => `${paths.raavare(rm.id)}${sectionSearch(searchParams, sid)}`;
   const openCount = checklist.filter((c) => c.status !== "ok").length;
-  const cost = costSummary(rm);
+  const cost = costSummary(rm, priceEvidence.cost);
 
   return (
     <div className="space-y-5">
@@ -221,7 +224,7 @@ export default function RawMaterialDetail() {
           <h2 id="rm-section-title" className="font-display text-title">{SECTION_LABEL[section]}</h2>
           {section === "sammendrag" && (
             <>
-              <RawMaterialKpiStrip rm={rm} links={page.links} recipeCount={page.recipeCount} spend12m={stats?.cost_12m ?? null} />
+              <RawMaterialKpiStrip rm={rm} evidence={priceEvidence} links={page.links} recipeCount={page.recipeCount} spend12m={stats?.cost_12m ?? null} />
               <ChecklistCard items={checklist} hrefFor={sectionHref} />
             </>
           )}

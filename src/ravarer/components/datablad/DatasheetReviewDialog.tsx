@@ -9,8 +9,7 @@ import { isObj, str, type Obj } from "@/fakturaer/lib/parseRpcJson";
 import { useAllergens, useNutrition, type NutritionRow } from "@/ravarer/hooks/useNutrition";
 import { useRawMaterial } from "@/ravarer/hooks/useRawMaterials";
 import { NUTRITION_NUMBER_FIELDS } from "@/ravarer/lib/nutritionSource";
-import { NUTRITION_LABELS, changePct } from "@/ravarer/lib/nutritionLabels";
-import { formatNumber } from "@/ravarer/lib/constants";
+import { NUTRITION_LABELS, formatNutrientValue, nutrientChange } from "@/ravarer/lib/nutritionLabels";
 import { FIELD_LABEL, coupledNutritionMeta, presentFields, type BulkField } from "@/ravarer/lib/datasheetBulk";
 import { AllergenPreview, BeforeAfter } from "./DatasheetDiff";
 
@@ -97,13 +96,15 @@ export function DatasheetReviewView({ target, canWrite, busy, onClose, onConfirm
 
   return (
     <Dialog open={!!target} onOpenChange={(v) => { if (!v && !busy) onClose(); }}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[calc(100dvh-1.5rem)] max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:p-0" closeClassName="flex h-11 w-11 items-center justify-center right-1 top-1">
+        <DialogHeader className="shrink-0 border-b border-line-subtle p-4 pr-12 sm:p-6 sm:pr-12">
           <DialogTitle className="[overflow-wrap:anywhere]">Gjennomgå {target?.fileName}</DialogTitle>
           <DialogDescription>
             Mot <span className="font-medium text-foreground">{target?.targetName}</span>. Valgte felt overskriver dagens verdier. Allergener legges bare til — fjerning, pakning og sammensetning gjøres ikke herfra.
           </DialogDescription>
         </DialogHeader>
+        {/* Bare innholdet ruller; handlingene står fast nederst og dekker ikke felt. */}
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-6" data-testid="review-body">
         <Button variant="outline" size="sm" className="min-h-[44px] w-fit md:min-h-0" onClick={onOpenDocument}>
           <ExternalLink className="mr-1.5 h-3.5 w-3.5" aria-hidden />Åpne originalen
         </Button>
@@ -127,11 +128,15 @@ export function DatasheetReviewView({ target, canWrite, busy, onClose, onConfirm
                         const newV = numberOf(nutrition[k]) as number;
                         return (
                           <tr key={k} className="border-t border-line-subtle/60">
-                            <td className="py-1"><Checkbox aria-label={`Bruk ${NUTRITION_LABELS[k] ?? k} fra databladet`} checked={nutSel.has(k)} disabled={!fields.has("nutrition")} onCheckedChange={() => toggleNut(k)} /></td>
+                            <td className="p-0">
+                              <label className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center md:min-h-8 md:min-w-8" data-testid="nutrient-target">
+                                <Checkbox aria-label={`Bruk ${NUTRITION_LABELS[k] ?? k} fra databladet`} checked={nutSel.has(k)} disabled={!fields.has("nutrition")} onCheckedChange={() => toggleNut(k)} />
+                              </label>
+                            </td>
                             <td className="py-1">{NUTRITION_LABELS[k] ?? k}</td>
-                            <td className="py-1 text-right tabular-nums">{oldV == null ? "—" : formatNumber(oldV, 1)}</td>
-                            <td className="py-1 text-right font-medium tabular-nums">{formatNumber(newV, 1)}</td>
-                            <td className="py-1 text-right tabular-nums">{changePct(oldV, newV)}</td>
+                            <td className="py-1 text-right tabular-nums">{oldV == null ? "—" : formatNutrientValue(oldV)}</td>
+                            <td className="py-1 text-right font-medium tabular-nums">{formatNutrientValue(newV)}</td>
+                            <td className="py-1 text-right tabular-nums">{nutrientChange(oldV, newV)}</td>
                           </tr>
                         );
                       })}
@@ -153,7 +158,8 @@ export function DatasheetReviewView({ target, canWrite, busy, onClose, onConfirm
             ))}
           </div>
         )}
-        <DialogFooter className="gap-2">
+        </div>
+        <DialogFooter className="shrink-0 gap-2 border-t border-line-subtle bg-background p-4 sm:p-4" data-testid="review-footer">
           <Button variant="outline" className="min-h-[44px] md:min-h-0" disabled={busy} onClick={onClose}>Avbryt</Button>
           <Button variant="outline" className="min-h-[44px] md:min-h-0" disabled={disabled} onClick={() => submit("mark")}>Merk som gjennomgått</Button>
           <Button className="min-h-[44px] md:min-h-0" disabled={disabled} onClick={() => submit("apply")}>Anvend valgte ({chosen.length})</Button>

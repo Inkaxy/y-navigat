@@ -41,6 +41,7 @@ vi.mock("@/ravarer/components/tabs/HistoryTab", () => ({ HistoryTab: () => <div 
 vi.mock("@/components/layout/PageHeader", () => ({ PageHeader: ({ title, actions }: { title: React.ReactNode; actions?: React.ReactNode }) => <header>{title}{actions}</header> }));
 vi.mock("@/ravarer/components/stock/SellsAsSection", () => ({ SellsAsSection: () => null }));
 vi.mock("@/ravarer/components/RawMaterialKpiStrip", () => ({ RawMaterialKpiStrip: () => null }));
+vi.mock("@/ravarer/hooks/useMaterialPriceEvidence", () => ({ useMaterialPriceEvidence: () => ({ bound: null, cost: { status: "verifisert", reason: null }, loading: false, isError: false, checkedAt: null, refetch: () => undefined }) }));
 vi.mock("@/ravarer/hooks/usePurchaseStats", () => ({ useRawMaterialPurchaseStats: () => ({ data: null }) }));
 vi.mock("@/ravarer/hooks/useRawMaterials", () => ({ useRenameRawMaterial: () => ({ mutateAsync: vi.fn(), isPending: false }) }));
 vi.mock("@/ravarer/context/RavarerContext", () => ({ useRavarer: () => ({ canWrite: true, legalEntityId: "le" }) }));
