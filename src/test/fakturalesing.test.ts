@@ -4,7 +4,7 @@ import {
   clampConfidence, lineReadIssues, overallConfidence, parseNorwegianNumber, shouldRetryExtraction, vatRatioIssue, type ReadLine,
 } from "@/fakturaer/lib/invoiceReadCheck";
 import { buildChanges, correctionErrorMessage, correctionLockReason, draftFrom, parseCorrectionResult, parseReadIssues, type CorrectionValues } from "@/fakturaer/lib/lineCorrection";
-import { buildSupplierCaseDraft, outboxState } from "@/fakturaer/lib/supplierCaseDraft";
+import { buildSupplierCaseDraft, caseKindOf, outboxState } from "@/fakturaer/lib/supplierCaseDraft";
 import { costProgress, deliverySteps, extrasFromCounts, nextInvoiceStep, type NextStepInput } from "@/ravarer/pages/priskontroll/faktura/invoiceSteps";
 import { canPostCosts } from "@/ravarer/pages/priskontroll/godkjenning/approvalLogic";
 
@@ -124,7 +124,7 @@ describe("Rett fakturalinje", () => {
 
 describe("e-postkladd for leverandørsak", () => {
   const input = {
-    supplier_name: "Mølleriet AS", case_title: "Prisøkning mel", credited: 100,
+    supplier_name: "Mølleriet AS", case_title: "Prisøkning mel", credited: 100, kind: "documented_claim" as const,
     lines: [
       { invoice_number: "4711", invoice_date: "2026-09-03", item: "Hvetemel", quantity: 250, unit: "kg", expected: 8.2, invoiced: 9, amount_excl_vat: 200 },
       { invoice_number: "4712", invoice_date: null, item: "Rugmel <b>", quantity: null, unit: "kg", expected: null, invoiced: 11, amount_excl_vat: 50 },
@@ -135,7 +135,7 @@ describe("e-postkladd for leverandørsak", () => {
     expect(d.subject).toContain("4711, 4712");
     expect(d.body).toContain("Hei Mølleriet AS,");
     expect(d.body).toContain("03.09.2026");
-    expect(d.body).toMatch(/forventet 8,20 kr\/kg, fakturert 9,00 kr\/kg/);
+    expect(d.body).toMatch(/8,20 kr\/kg, fakturert 9,00 kr\/kg/);
     expect(d.body).toContain("Samlet avvik: 250,00 kr eks. mva.");
     expect(d.body).toContain("Allerede kreditert: 100,00");
     expect(d.body).toContain("Gjenstår: 150,00");
@@ -144,7 +144,20 @@ describe("e-postkladd for leverandørsak", () => {
     const d = buildSupplierCaseDraft(input);
     expect(d.missingBasis).toBe(true);
     expect(d.body).toMatch(/ikke dokumentert avtalt pris/);
-    expect(d.body).toContain("forventet pris ikke dokumentert");
+    expect(d.body).toContain("ikke dokumentert");
+  });
+  it("prisforespørsel krever ikke penger og nevner ikke kreditnota", () => {
+    const d = buildSupplierCaseDraft({ ...input, kind: "price_inquiry", credited: 0, lines: input.lines.map((l) => ({ ...l, amount_excl_vat: 0, observed_excl_vat: 20, reference_source: "last_purchase" })) });
+    expect(d.body).not.toMatch(/kreditnota|krav om|Gjenstår/i);
+    expect(d.body).toContain("Dette er ikke et krav");
+    expect(d.body).toContain("pris ved tidligere kjøp");
+    expect(d.subject).toMatch(/Spørsmål om pris/);
+  });
+  it("eldre/blandet sak uten kontrollert grunnlag er låst", () => {
+    expect(buildSupplierCaseDraft({ ...input, kind: null })).toMatchObject({ blocked: true, body: "" });
+    expect(caseKindOf(["documented_claim", "price_inquiry"])).toBeNull();
+    expect(caseKindOf([null])).toBeNull();
+    expect(caseKindOf(["price_inquiry", "price_inquiry"])).toBe("price_inquiry");
   });
   it("teksten er ren tekst (serveren escaper ved utsending)", () => expect(buildSupplierCaseDraft(input).body).toContain("Rugmel <b>"));
   it("utsendingsstatus: i kø vs sendt vs feilet", () => {

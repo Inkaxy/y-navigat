@@ -18,6 +18,7 @@ import { paths } from "@/ravarer/lib/paths";
 import { useUserNames } from "@/ravarer/hooks/useUserNames";
 import { CaseCreditForm } from "./CaseCreditForm";
 import { CaseEmailDraft } from "./CaseEmailDraft";
+import { caseKindOf } from "@/fakturaer/lib/supplierCaseDraft";
 import { useInvoiceRights } from "@/fakturaer/hooks/useInvoiceRights";
 import { useSupplierCaseDetail } from "./useSupplierCaseDetail";
 
@@ -55,6 +56,8 @@ export function SupplierCaseDetail({ id }: { id: string }) {
   const invoices: [string, string][] = [...new Map(d.lines.map((l) => [l.invoice_id, l.invoice?.invoice_number ?? "Faktura"])).entries()];
   const krav = Math.round(d.lines.reduce((s, l) => s + l.amount_excl_vat, 0) * 100) / 100;
   const kreditert = Math.round(d.credits.reduce((s, c) => s + c.amount_excl_vat, 0) * 100) / 100;
+  const kind = caseKindOf(d.lines.map((l) => l.basis.case_kind));
+  const observed = d.lines.every((l) => l.basis.observed_effect_excl_vat != null) ? Math.round(d.lines.reduce((s, l) => s + (l.basis.observed_effect_excl_vat ?? 0), 0) * 100) / 100 : null;
   const meta = labelFor(SUPPLIER_CASE_STATUS_LABELS, d.c.status, "Ukjent status");
   const responsible = d.c.responsible_user_id ? names.data?.get(d.c.responsible_user_id) ?? "Ukjent bruker" : null;
 
@@ -70,11 +73,19 @@ export function SupplierCaseDetail({ id }: { id: string }) {
         <p className="text-caption text-ink-secondary">
           Opprettet {formatDate(d.c.created_at)}{responsible && ` · ansvarlig ${responsible}`}{d.c.follow_up_on && ` · oppfølging ${formatDate(d.c.follow_up_on)}`}
         </p>
+        <p className="text-sm font-medium">{kind === "documented_claim" ? "Dokumentert krav (avtalepris)" : kind === "price_inquiry" ? "Prisforespørsel — ingen penger kreves" : "Eldre sak uten kontrollert grunnlag"}</p>
+        {kind === "price_inquiry" ? (
+          <div className="grid grid-cols-2 gap-2">
+            <Stat k="Observert prisforskjell" v={observed != null ? kr(observed) : "–"} />
+            <Stat k="Kreditert" v={kr(kreditert)} />
+          </div>
+        ) : (
         <div className="grid grid-cols-3 gap-2">
-          <Stat k="Krav" v={kr(krav)} />
+          <Stat k={kind === "documented_claim" ? "Krav" : "Registrert beløp"} v={kr(krav)} />
           <Stat k="Kreditert" v={kr(kreditert)} />
           <Stat k="Gjenstår" v={kr(Math.round((krav - kreditert) * 100) / 100)} tone={krav - kreditert > 0.005 ? "text-warning" : "text-success"} />
         </div>
+        )}
         <p className="text-caption text-ink-secondary">Ingen e-post sendes automatisk. Avtaleprisen endres ikke av saken.</p>
       </header>
 
@@ -145,7 +156,7 @@ export function SupplierCaseDetail({ id }: { id: string }) {
       </section>
 
       <CaseEmailDraft caseId={id} canWrite={rights.canWrite} input={{
-        supplier_name: d.c.supplier?.name ?? null, case_title: d.c.title, credited: kreditert,
+        supplier_name: d.c.supplier?.name ?? null, case_title: d.c.title, credited: kreditert, kind,
         lines: d.lines.map((l) => {
           const unit = l.basis.base_unit ?? l.line?.raw_material?.base_unit ?? null;
           return {
@@ -153,7 +164,8 @@ export function SupplierCaseDetail({ id }: { id: string }) {
             item: l.line?.raw_material?.name ?? l.line?.description ?? "Vare",
             quantity: l.basis.base_quantity ?? null, unit,
             expected: l.basis.expected_price_per_base_unit ?? null, invoiced: l.basis.price_per_base_unit ?? null,
-            amount_excl_vat: l.amount_excl_vat,
+            amount_excl_vat: l.amount_excl_vat, observed_excl_vat: l.basis.observed_effect_excl_vat,
+            reference_source: l.basis.price_reference_source, reference_date: l.basis.price_reference_date,
           };
         }),
       }} />

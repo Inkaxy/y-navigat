@@ -9,7 +9,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { buildSupplierCaseDraft, OUTBOX_LABEL, outboxState, type DraftInput } from "@/fakturaer/lib/supplierCaseDraft";
 
-const errText = (m: string) => (/forbidden|42501/.test(m) ? "Du mangler skrivetilgang til fakturaer." : /emne|tekst/.test(m) ? "Emne og tekst må fylles ut." : "Kunne ikke lagre. Prøv igjen.");
+const errText = (m: string) =>
+  /forbidden|42501/.test(m) ? "Du mangler skrivetilgang til fakturaer."
+  : /basis|grunnlag|legacy|claim_/.test(m) ? "Sakens prisgrunnlag er ikke lenger gyldig eller mangler. Kladden er ikke lagret eller sendt."
+  : /emne|tekst/.test(m) ? "Emne og tekst må fylles ut." : "Kunne ikke lagre. Prøv igjen.";
 
 /**
  * Redigerbar e-postkladd for saken. «Send kladd til Henrik» legger en intern
@@ -69,7 +72,8 @@ export function CaseEmailDraft({ caseId, input, canWrite }: { caseId: string; in
     <section className="space-y-3">
       <h3 className="font-semibold">E-postkladd til leverandøren</h3>
       <p className="text-caption text-ink-secondary">Kladden sendes bare internt til Henrik for gjennomgang. Han videresender selv. Saken markeres ikke som sendt til leverandøren.</p>
-      {generated.missingBasis && <p role="note" className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">Noen linjer mangler dokumentert avtalt pris. Det står ærlig i kladden.</p>}
+      {generated.blocked && <p role="alert" className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">Saken mangler kontrollert prisgrunnlag (eldre sak). Kladd kan ikke lagres eller sendes. Opprett en ny sak fra varekortet.</p>}
+      {!generated.blocked && generated.missingBasis && <p role="note" className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">Noen linjer mangler dokumentert avtalt pris. Det står ærlig i kladden.</p>}
       <div>
         <Label htmlFor="kladd-emne" className="mb-1 block">Emne</Label>
         <Input id="kladd-emne" value={s} onChange={(e) => setSubject(e.target.value)} disabled={!canWrite} maxLength={300} />
@@ -79,8 +83,8 @@ export function CaseEmailDraft({ caseId, input, canWrite }: { caseId: string; in
         <Textarea id="kladd-tekst" value={b} onChange={(e) => setBody(e.target.value)} disabled={!canWrite} rows={14} className="font-mono text-sm" />
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" disabled={!canWrite || busy || !dirty} onClick={() => saveM.mutate()}>Lagre kladd</Button>
-        <Button disabled={!canWrite || busy || !s.trim() || !b.trim()} onClick={() => { if (inFlight.current) return; inFlight.current = true; sendM.mutate(); }}>
+        <Button variant="outline" disabled={!canWrite || busy || !dirty || generated.blocked} onClick={() => saveM.mutate()}>Lagre kladd</Button>
+        <Button disabled={!canWrite || busy || generated.blocked || !s.trim() || !b.trim()} onClick={() => { if (inFlight.current) return; inFlight.current = true; sendM.mutate(); }}>
           {sendM.isPending ? "Legger i kø …" : "Send kladd til Henrik"}
         </Button>
         {(subject != null || body != null) && <Button variant="ghost" disabled={busy} onClick={() => { setSubject(null); setBody(null); }}>Lag ny fra saken</Button>}
