@@ -166,7 +166,7 @@ export default function DatasheetMode() {
         }
         panel={
           <PeekPanel title={active?.raw_materials?.name} fullHref={active ? `${paths.raavare(active.raw_material_id)}${sectionSearch(withEvent(listSearch, active.id), "naering")}` : undefined} onClose={endring ? () => setActive(null) : undefined} emptyText="Velg en endring i listen"
-            footer={active && !active.acknowledged && canWrite ? <Button className="min-h-11 w-full" onClick={() => ack.mutate(active.id)} disabled={ack.isPending}>Bekreft endring</Button> : undefined}>
+            footer={active && !active.acknowledged && canWrite ? <Button className="min-h-[44px] w-full" onClick={() => ack.mutate(active.id)} disabled={ack.isPending}>Bekreft endring</Button> : undefined}>
             {active ? (
               <div className="space-y-4">
                 <div>

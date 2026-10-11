@@ -52,8 +52,8 @@ function PeekBody({ id, listSearch }: { id: string; listSearch: string }) {
     <div className="space-y-5">
       <p className="text-caption text-ink-secondary">SKU {rm.sku} · {rm.base_unit}{rm.is_active ? "" : " · Inaktiv"}</p>
       <div className="flex flex-wrap gap-2">
-        <Button asChild size="sm" variant="outline" className="min-h-11"><Link to={href("pris")}>Pris</Link></Button>
-        <Button asChild size="sm" variant="outline" className="min-h-11"><Link to={href("leverandorer")}>Leverandører</Link></Button>
+        <Button asChild size="sm" variant="outline" className="min-h-[44px]"><Link to={href("pris")}>Pris</Link></Button>
+        <Button asChild size="sm" variant="outline" className="min-h-[44px]"><Link to={href("leverandorer")}>Leverandører</Link></Button>
       </div>
 
       <section className="rounded-lg border border-line-subtle p-4">

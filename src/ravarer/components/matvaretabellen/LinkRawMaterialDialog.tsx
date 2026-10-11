@@ -53,7 +53,7 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
   const [q, setQ] = useState(initialQuery ?? "");
   const debounced = useDebouncedValue(q, 250);
   const flow = useNutritionLinkFlow(foodId, open, onLinked);
-  const { pending, checkingId, linkedNow, choose } = flow;
+  const { pending, checkingId, linkedNow, unknownIds, choose } = flow;
 
   useEffect(() => {
     if (open) {
@@ -131,6 +131,9 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
+                      {!isLinked && unknownIds.includes(r.id) && (
+                        <Badge variant="outline" className="border-warning/40 bg-warning/10 text-warning" title="Trykk for å kontrollere og eventuelt prøve igjen">Ukjent utfall</Badge>
+                      )}
                       {isLinked && (
                         <Badge variant="outline" className="border-success/40 bg-success/10 text-success">
                           Allerede koblet

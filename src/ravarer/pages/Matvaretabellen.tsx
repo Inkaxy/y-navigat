@@ -1,3 +1,4 @@
+import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ExternalLink, Loader2, MoreHorizontal, RefreshCw, Search } from "lucide-react";
@@ -28,6 +29,7 @@ import { paths } from "@/ravarer/lib/paths";
 import { DataTable, type Column } from "@/ravarer/ui/DataTable";
 
 const PAGE_SIZE = 50;
+type CreatedState = { rawMaterialId: string; food: FoodRow; unknown: boolean };
 const g = (v: number | null) => (v == null ? "—" : formatNumber(v, 1));
 const kcal = (v: number | null) => (v == null ? "—" : formatNumber(v, 0));
 
@@ -114,7 +116,7 @@ export default function Matvaretabellen() {
     void chooseExisting(existing.rawMaterialId, "valgt råvare");
   }, [existing, chooseExisting]);
   /** Ny råvare er opprettet, men koblingen feilet: prøv koblingen igjen uten å opprette på nytt. */
-  const [createdUnlinked, setCreatedUnlinked] = useState<{ rawMaterialId: string; food: FoodRow } | null>(null);
+  const [createdUnlinked, setCreatedUnlinked] = useState<CreatedState | null>(null);
 
   const groups = useMemo(
     () => Array.from(new Set(foods.map((f) => f.food_group_name).filter((v): v is string => !!v))).sort((a, b) => a.localeCompare(b, "nb")),
@@ -139,13 +141,20 @@ export default function Matvaretabellen() {
 
   const linkedOf = (f: FoodRow) => linksQ.data?.get(f.food_id) ?? [];
 
-  const tryLinkCreated = async (rawMaterialId: string, food: FoodRow) => {
+  const tryLinkCreated = async (rawMaterialId: string, food: FoodRow, prev: CreatedState | null) => {
     try {
-      await apply.mutateAsync({ rawMaterialId, foodId: food.food_id });
-      setCreatedUnlinked(null);
+      // Etter ukjent utfall: les gjeldende kobling først, så vi ikke skriver på nytt unødig.
+      if (prev?.unknown) {
+        const { data, error } = await supabase.from("raw_material_nutrition").select("matvaretabellen_food_id").eq("raw_material_id", rawMaterialId).maybeSingle();
+        if (error) throw error;
+        if (data?.matvaretabellen_food_id === food.food_id) { setCreatedUnlinked(null); void linksQ.refetch(); return; }
+      }
+      const res = await apply.mutateAsync({ rawMaterialId, foodId: food.food_id });
+      // Ukjent svar: behold målet (råvaren opprettes aldri på nytt) og krev kontroll før nytt forsøk.
+      setCreatedUnlinked(res.result ? null : { rawMaterialId, food, unknown: true });
     } catch (e: unknown) {
       console.error("[matvaretabellen:koble-ny]", e);
-      setCreatedUnlinked({ rawMaterialId, food });
+      setCreatedUnlinked({ rawMaterialId, food, unknown: prev?.unknown ?? false });
     }
   };
 
@@ -153,14 +162,14 @@ export default function Matvaretabellen() {
     <div className="flex items-center justify-end gap-1">
       {/* Kildelenken er lesing og vises også uten skrivetilgang. */}
       {f.uri && (
-        <Button asChild variant="ghost" size="icon" className="h-11 w-11 md:h-9 md:w-9">
+        <Button asChild variant="ghost" size="icon" className="h-auto min-h-[44px] w-auto min-w-[44px] md:h-9 md:min-h-0 md:w-9 md:min-w-0">
           <a href={f.uri} target="_blank" rel="noreferrer" aria-label={`Åpne ${f.food_name} i Matvaretabellen`}><ExternalLink className="h-4 w-4" aria-hidden /></a>
         </Button>
       )}
       {canWrite && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-11 w-11 md:h-9 md:w-9" aria-label={`Handlinger for ${f.food_name}`}>
+            <Button variant="ghost" size="icon" className="h-auto min-h-[44px] w-auto min-w-[44px] md:h-9 md:min-h-0 md:w-9 md:min-w-0" aria-label={`Handlinger for ${f.food_name}`}>
               <MoreHorizontal className="h-4 w-4" aria-hidden />
             </Button>
           </DropdownMenuTrigger>
@@ -189,10 +198,10 @@ export default function Matvaretabellen() {
         <div className="flex flex-wrap items-end gap-2 md:gap-3">
           <div className="relative min-w-[200px] flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-secondary" aria-hidden />
-            <Input value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} placeholder="Søk matvare eller stikkord…" className="h-11 pl-9" aria-label="Søk i Matvaretabellen" />
+            <Input value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} placeholder="Søk matvare eller stikkord…" className="h-auto min-h-[44px] pl-9" aria-label="Søk i Matvaretabellen" />
           </div>
           <Select value={group} onValueChange={(v) => { setGroup(v); setPage(0); }}>
-            <SelectTrigger className="h-11 w-full sm:w-[240px]" aria-label="Matvaregruppe"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-auto min-h-[44px] w-full sm:w-[240px]" aria-label="Matvaregruppe"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Alle matvaregrupper</SelectItem>
               {groups.map((gr) => <SelectItem key={gr} value={gr}>{gr}</SelectItem>)}
@@ -201,7 +210,7 @@ export default function Matvaretabellen() {
           <div className="flex w-full flex-wrap items-center gap-3 sm:ml-auto sm:w-auto">
             <span className="text-xs text-ink-secondary">Sist oppdatert: {foodsQ.isLoading ? "…" : lastSynced ? formatDate(lastSynced) : "—"}</span>
             {canWrite && (
-              <Button variant="outline" className="h-11" disabled={sync.isPending} onClick={() => sync.mutate()}>
+              <Button variant="outline" className="h-auto min-h-[44px]" disabled={sync.isPending} onClick={() => sync.mutate()}>
                 {sync.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden /> : <RefreshCw className="mr-1.5 h-4 w-4" aria-hidden />}
                 Oppdater fra Matvaretabellen
               </Button>
@@ -221,8 +230,10 @@ export default function Matvaretabellen() {
 
       {createdUnlinked && (
         <div role="alert" className="flex flex-wrap items-center gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
-          Råvaren er opprettet, men koblingen til «{createdUnlinked.food.food_name}» feilet. Den blir ikke opprettet på nytt.
-          <Button size="sm" variant="outline" disabled={apply.isPending || !canWrite} onClick={() => void tryLinkCreated(createdUnlinked.rawMaterialId, createdUnlinked.food)}>Prøv koblingen igjen</Button>
+          {createdUnlinked.unknown
+            ? <>Råvaren er opprettet, men utfallet av koblingen til «{createdUnlinked.food.food_name}» er ukjent. Den blir ikke opprettet på nytt; koblingen kontrolleres før nytt forsøk.</>
+            : <>Råvaren er opprettet, men koblingen til «{createdUnlinked.food.food_name}» feilet. Den blir ikke opprettet på nytt.</>}
+          <Button size="sm" variant="outline" disabled={apply.isPending || !canWrite} onClick={() => void tryLinkCreated(createdUnlinked.rawMaterialId, createdUnlinked.food, createdUnlinked)}>{createdUnlinked.unknown ? "Kontroller og prøv igjen" : "Prøv koblingen igjen"}</Button>
           <Button size="sm" variant="ghost" onClick={() => setCreatedUnlinked(null)}>Lukk</Button>
         </div>
       )}
@@ -257,8 +268,8 @@ export default function Matvaretabellen() {
             <div className="mt-2 flex items-center justify-between text-sm">
               <span className="text-ink-secondary">{filtered.length} matvarer · side {safePage + 1} av {pageCount}</span>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="h-11 md:h-9" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>Forrige</Button>
-                <Button variant="outline" size="sm" className="h-11 md:h-9" disabled={safePage >= pageCount - 1} onClick={() => setPage(safePage + 1)}>Neste</Button>
+                <Button variant="outline" size="sm" className="h-auto min-h-[44px] md:h-9 md:min-h-0" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>Forrige</Button>
+                <Button variant="outline" size="sm" className="h-auto min-h-[44px] md:h-9 md:min-h-0" disabled={safePage >= pageCount - 1} onClick={() => setPage(safePage + 1)}>Neste</Button>
               </div>
             </div>
           }
@@ -280,7 +291,7 @@ export default function Matvaretabellen() {
             const food = createFood;
             setCreateFood(null);
             // Ny råvare har ingen næringskilde: vanlig kobling (force=false). Feil → «Prøv igjen», ikke ny råvare.
-            if (id) void tryLinkCreated(id, food);
+            if (id) void tryLinkCreated(id, food, null);
           }}
           onUseExisting={(id) => {
             const food = createFood;

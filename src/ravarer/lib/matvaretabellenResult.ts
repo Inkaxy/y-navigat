@@ -12,29 +12,34 @@ export interface ApplyMatvaretabellenResult {
 
 const strings = (o: Obj, k: string): string[] | null => {
   const v = o[k];
-  if (v == null) return [];
   if (!Array.isArray(v) || !v.every((x) => typeof x === "string")) return null;
   return v as string[];
 };
 
-/** Typet lesing; ugyldig form → null (kalleren viser «ukjent resultat», ikke suksess med 0). */
-export function parseApplyResult(data: unknown): ApplyMatvaretabellenResult | null {
+export interface ApplyRequest { rawMaterialId: string; foodId: string; force: boolean }
+
+/**
+ * Streng lesing av `rm_apply_matvaretabellen(uuid,text,boolean)`: alle felt må finnes med riktig type,
+ * og svaret må gjelde nøyaktig forespurt råvare/matvare/force. Alt annet → null = ukjent utfall
+ * (aldri «koblet», aldri «0 felt skrevet»).
+ */
+export function parseApplyResult(data: unknown, req: ApplyRequest): ApplyMatvaretabellenResult | null {
   if (!isObj(data)) return null;
+  if (data.raw_material_id !== req.rawMaterialId || data.food_id !== req.foodId || data.forced !== req.force) return null;
   const written = strings(data, "written");
   const skipped = strings(data, "skipped");
   if (!written || !skipped) return null;
-  return {
-    written, skipped,
-    water_content_set: bool(data, "water_content_set") ?? false,
-    water_g_skipped: bool(data, "water_g_skipped") ?? false,
-    declaration_name_set: str(data, "declaration_name_set"),
-    forced: bool(data, "forced") ?? false,
-  };
+  const water = bool(data, "water_content_set");
+  const waterSkip = bool(data, "water_g_skipped");
+  if (water == null || waterSkip == null) return null;
+  const decl = data.declaration_name_set;
+  if (decl != null && typeof decl !== "string") return null;
+  return { written, skipped, water_content_set: water, water_g_skipped: waterSkip, declaration_name_set: decl ?? null, forced: req.force };
 }
 
 /** Én setning om hva som faktisk ble skrevet — aldri ubetinget «næringsverdier hentet». */
 export function applyResultMessage(r: ApplyMatvaretabellenResult | null): { tone: "success" | "warning"; text: string } {
-  if (!r) return { tone: "warning", text: "Koblet, men serveren returnerte ukjent resultat — kontroller næringsdata på råvaren" };
+  if (!r) return { tone: "warning", text: "Utfallet er ukjent — kontroller næringsdata på råvaren før du prøver igjen" };
   const parts: string[] = [];
   parts.push(r.written.length > 0 ? `${r.written.length} felt hentet fra Matvaretabellen${r.forced ? " (overskrevet)" : ""}` : "Ingen felt ble skrevet");
   if (r.skipped.length > 0) parts.push(`${r.skipped.length} beholdt fra datablad/manuell kilde`);

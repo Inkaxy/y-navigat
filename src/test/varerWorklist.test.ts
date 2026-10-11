@@ -39,3 +39,15 @@ describe("varearbeidsflate — liste i URL", () => {
     expect(r).toContain("q=x");
   });
 });
+
+describe("liste/view-prioritet (samme regel som varelisten)", () => {
+  const q = (s: string) => parseListQuery(new URLSearchParams(s)).view;
+  it("liste styrer når den finnes; view ignoreres", () => {
+    expect(q("liste=prisavvik&view=all")).toBe("deviation");
+    expect(q("liste=alle&view=missing_package")).toBe("all");
+    expect(q("liste=ukjent&view=inactive")).toBe("all");
+  });
+  it("gammel view uten liste brukes fortsatt", () => {
+    expect(q("view=inactive")).toBe("inactive");
+  });
+});

@@ -11,6 +11,8 @@ interface Props {
   baseUnit: string;
   /** Linjer som er gyldig kostgrunnlag nå (serverens utvalg). null = ukjent; aldri gjettet. */
   eligibleLineIds?: ReadonlySet<string> | null;
+  /** Serveren sier gyldig, men linjeidentiteten er ikke bevist → «Ukjent». */
+  unknownLineIds?: ReadonlySet<string> | null;
 }
 
 interface Row {
@@ -30,7 +32,7 @@ interface Row {
 }
 
 /** Viser de fem siste fakturalinjene som er koblet til råvaren. */
-export function RecentInvoiceLinesCard({ rawMaterialId, baseUnit, eligibleLineIds = null }: Props) {
+export function RecentInvoiceLinesCard({ rawMaterialId, baseUnit, eligibleLineIds = null, unknownLineIds = null }: Props) {
   const query = useQuery({
     queryKey: ["rm-recent-invoice-lines", rawMaterialId],
     queryFn: async (): Promise<Row[]> => {
@@ -119,7 +121,7 @@ export function RecentInvoiceLinesCard({ rawMaterialId, baseUnit, eligibleLineId
                       : formatNok(Number(r.total_amount))}
                   </td>
                   <td className="py-2 text-caption">
-                    {eligibleLineIds == null ? <span className="text-ink-secondary">Ukjent</span>
+                    {eligibleLineIds == null || unknownLineIds?.has(r.id) ? <span className="text-ink-secondary" title="Linjeidentiteten er ikke bekreftet av gjeldende kontroll">Ukjent</span>
                       : eligibleLineIds.has(r.id) ? <span className="text-success">Gyldig</span>
                       : <span className="text-warning">Ikke gyldig nå — lagret historikk</span>}
                   </td>

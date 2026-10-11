@@ -39,7 +39,7 @@ export function PeekPanel({ title, fullHref, onClose, footer, children, emptyTex
       <div className="flex h-full flex-col rounded-lg border border-dashed border-border bg-card">
         {onClose && (
           <div className="flex justify-end p-1">
-            <Button variant="ghost" size="icon" className="h-11 w-11 xl:h-8 xl:w-8" onClick={onClose} aria-label="Lukk panelet">
+            <Button variant="ghost" size="icon" className="h-auto min-h-[44px] w-auto min-w-[44px] xl:h-8 xl:min-h-0 xl:w-8 xl:min-w-0" onClick={onClose} aria-label="Lukk panelet">
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -59,7 +59,7 @@ export function PeekPanel({ title, fullHref, onClose, footer, children, emptyTex
             </Button>
           )}
           {onClose && (
-            <Button variant="ghost" size="icon" className="h-11 w-11 xl:h-8 xl:w-8" onClick={onClose} aria-label="Lukk panelet">
+            <Button variant="ghost" size="icon" className="h-auto min-h-[44px] w-auto min-w-[44px] xl:h-8 xl:min-h-0 xl:w-8 xl:min-w-0" onClick={onClose} aria-label="Lukk panelet">
               <X className="h-4 w-4" />
             </Button>
           )}

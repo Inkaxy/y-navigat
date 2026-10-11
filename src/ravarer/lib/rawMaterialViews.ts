@@ -252,9 +252,15 @@ const SORT_KEYS: ListSortKey[] = [
 
 /** `liste` → innebygd visning. Modelister uten egen varelisterekkefølge bruker nærmeste mangelvisning. */
 const LISTE_VIEW: Record<string, string> = {
-  prisavvik: "deviation", "uten-leverandor": "no_supplier", "ikke-kjopt": "not_purchased", inaktive: "inactive",
+  alle: "all", prisavvik: "deviation", "uten-leverandor": "no_supplier", "ikke-kjopt": "not_purchased", inaktive: "inactive",
   pakning: "missing_package", deklarasjon: "missing_declaration", naering: "missing_nutrition",
 };
+
+function listeView(params: URLSearchParams): string {
+  const liste = params.get("liste");
+  if (liste) return LISTE_VIEW[liste] ?? "all";
+  return params.get("view") ?? "all";
+}
 
 export function parseListQuery(params: URLSearchParams): ListQuery {
   const [rawKey, rawDir] = (params.get("sort") ?? "name:asc").split(":");
@@ -263,8 +269,9 @@ export function parseListQuery(params: URLSearchParams): ListQuery {
     kat: params.get("kat") ?? "all",
     type: params.get("type") ?? "all",
     status: params.get("status") ?? "active",
-    // Arbeidslisten (`liste`) i varearbeidsflaten styrer visningen når `view` mangler — samme rekkefølge i detaljens forrige/neste.
-    view: params.get("view") ?? LISTE_VIEW[params.get("liste") ?? ""] ?? "all",
+    // Samme prioritet som varelisten: finnes `liste`, styrer den (ukjent liste = alle) og `view` ignoreres;
+    // bare uten `liste` brukes gammel `view`. Ellers kunne lenken vise én liste og bla i en annen.
+    view: listeView(params),
     sortKey: SORT_KEYS.includes(rawKey as ListSortKey) ? (rawKey as ListSortKey) : "name",
     sortDir: rawDir === "desc" ? "desc" : "asc",
   };

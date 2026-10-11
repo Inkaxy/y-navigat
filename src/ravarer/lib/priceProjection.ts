@@ -112,19 +112,32 @@ const PRICE_EPS = 1e-9;
  * som hendelser med originalverdi, men tas ut av graf/Δ (`controlUnknown`). Andre rader er urørt.
  */
 /**
- * Fakturalinjer som er gyldig kostgrunnlag NÅ. Bruker de FLETTEDE radene, så samme identitetsbeslutning
- * gjelder graf og «Gyldig»: kun serverens eligible-ID med eksakt verifisert linjeidentitet, ikke holdt,
- * ikke duplikat, ikke kontroll-ukjent. Uten gjeldende projeksjon: null (ukjent), aldri «gyldig».
+ * Fakturalinjers kostgrunnlag NÅ, tredelt. Bruker de FLETTEDE radene, så graf og «Gyldig» deler identitetsbeslutning.
+ * - `eligible`: serverens eligible-ID med eksakt verifisert linjeidentitet (projeksjon), ikke holdt/duplikat.
+ * - `unknown`: serveren sier eligible, men linjeidentiteten er ikke bevist — f.eks. låste opptakssnapshots,
+ *   som kontrakten bevisst utelater fra projeksjonene, eller identitetsavvik. Vises «Ukjent», aldri «Ikke gyldig».
+ * - alt annet: ikke gyldig nå. Uten gjeldende projeksjon: null (alt ukjent), aldri «gyldig».
+ * ID-snarvei fra rå historikk brukes aldri for `eligible`.
  */
-export function eligibleLineIdsFrom(merged: readonly TimelineHistoryRow[], proj: MaterialPriceProjection | null): Set<string> | null {
+export type LineEligibility = { eligible: Set<string>; unknown: Set<string> };
+export function lineEligibilityFrom(merged: readonly TimelineHistoryRow[], proj: MaterialPriceProjection | null): LineEligibility | null {
   if (!proj) return null;
-  const eligible = new Set(proj.eligible_history_ids);
-  const out = new Set<string>();
+  const ids = new Set(proj.eligible_history_ids);
+  const eligible = new Set<string>();
+  const unknown = new Set<string>();
   for (const r of merged) {
-    if (!eligible.has(r.id) || r.source !== "invoice" || !r.identityVerified || r.held || r.duplicateSource || r.controlUnknown) continue;
-    if (r.invoice_line_id) out.add(r.invoice_line_id);
+    if (!ids.has(r.id) || r.source !== "invoice" || !r.invoice_line_id || r.held || r.duplicateSource) continue;
+    if (r.identityVerified && !r.controlUnknown) eligible.add(r.invoice_line_id);
+    else unknown.add(r.invoice_line_id);
   }
-  return out;
+  // En linje med både bevist og ubevist observasjon er ikke entydig gyldig.
+  for (const id of unknown) eligible.delete(id);
+  return { eligible, unknown };
+}
+
+/** Bare beviste linjer (bakoverkompatibel). */
+export function eligibleLineIdsFrom(merged: readonly TimelineHistoryRow[], proj: MaterialPriceProjection | null): Set<string> | null {
+  return lineEligibilityFrom(merged, proj)?.eligible ?? null;
 }
 
 export function mergeProjection(

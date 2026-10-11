@@ -25,27 +25,44 @@ export function useNutritionLinkFlow(foodId: string | null, active: boolean, onL
   const [pending, setPending] = useState<PendingOverwrite | null>(null);
   const [checkingId, setCheckingId] = useState<string | null>(null);
   const [linkedNow, setLinkedNow] = useState<string[]>([]);
+  /** Råvarer der koblingen har ukjent utfall: ikke vist som koblet, må kontrolleres før nytt forsøk. */
+  const [unknownIds, setUnknownIds] = useState<string[]>([]);
+  // Gjeldende kontekst leses synkront rett før hver skriving (ikke fra en gammel closure).
+  const unknownRef = useRef<string[]>([]);
+  unknownRef.current = unknownIds;
+  const ctx = useRef({ foodId, active, canWrite, legalEntityId });
+  ctx.current = { foodId, active, canWrite, legalEntityId };
 
-  // Ny økt ved åpning, ny matvare eller nytt selskap: tilstanden fra forrige økt gjelder ikke.
+  // Ny økt ved åpning, ny matvare eller nytt selskap; avmontering avslutter økten.
   useEffect(() => {
     session.current += 1;
     setPending(null);
     setCheckingId(null);
     setLinkedNow([]);
+    setUnknownIds([]);
+    return () => { session.current += 1; };
   }, [foodId, active, legalEntityId]);
 
+  /** Økten må fortsatt gjelde: samme økt, åpen, samme matvare, skrivetilgang. */
+  const live = (s: number, fid: string) => s === session.current && ctx.current.active && ctx.current.foodId === fid && ctx.current.canWrite;
+
   const link = useCallback(async (rawMaterialId: string, fid: string, force: boolean, s: number) => {
-    if (!canWrite) return;
+    if (!live(s, fid)) return;
     try {
-      await apply.mutateAsync({ rawMaterialId, foodId: fid, force });
+      const res = await apply.mutateAsync({ rawMaterialId, foodId: fid, force });
       if (s !== session.current) return;
+      if (!res.result) {
+        setUnknownIds((prev) => (prev.includes(rawMaterialId) ? prev : [...prev, rawMaterialId]));
+        return;
+      }
+      setUnknownIds((prev) => prev.filter((x) => x !== rawMaterialId));
       setLinkedNow((prev) => (prev.includes(rawMaterialId) ? prev : [...prev, rawMaterialId]));
       onLinked?.(rawMaterialId);
     } catch (e: unknown) {
       // Hooken viser feilmeldingen; her logges den bare.
       console.error("[matvaretabellen:koble]", e);
     }
-  }, [apply, canWrite, onLinked]);
+  }, [apply, onLinked]);
 
   const choose = useCallback(async (rawMaterialId: string, name: string) => {
     if (!canWrite || !foodId) return;
@@ -59,7 +76,14 @@ export function useNutritionLinkFlow(foodId: string | null, active: boolean, onL
         .eq("raw_material_id", rawMaterialId)
         .maybeSingle();
       if (error) throw error;
-      if (s !== session.current) return; // sent svar etter lukk/bytte
+      if (!live(s, fid)) return; // sent svar etter lukk/bytte/avmontering/tapt tilgang
+      // Ukjent utfall: les tilstanden på nytt; er koblingen allerede der, skrives ingenting igjen.
+      if (unknownRef.current.includes(rawMaterialId) && data && data.matvaretabellen_food_id === fid) {
+        setUnknownIds((prev) => prev.filter((x) => x !== rawMaterialId));
+        setLinkedNow((prev) => (prev.includes(rawMaterialId) ? prev : [...prev, rawMaterialId]));
+        onLinked?.(rawMaterialId);
+        return;
+      }
       if (data && (data.matvaretabellen_food_id ?? null) !== fid) {
         setPending({ session: s, rawMaterialId, name, foodId: fid, source: data.source || "ukjent" });
         return;
@@ -71,16 +95,16 @@ export function useNutritionLinkFlow(foodId: string | null, active: boolean, onL
     } finally {
       if (s === session.current) setCheckingId(null);
     }
-  }, [canWrite, foodId, link]);
+  }, [canWrite, foodId, link, onLinked]);
 
   const confirmOverwrite = useCallback(async () => {
     const p = pending;
     setPending(null);
-    if (!p || p.session !== session.current || p.foodId !== foodId) return;
+    if (!p || !live(p.session, p.foodId)) return;
     await link(p.rawMaterialId, p.foodId, true, p.session);
-  }, [pending, foodId, link]);
+  }, [pending, link]);
 
   const cancelOverwrite = useCallback(() => setPending(null), []);
 
-  return { pending, checkingId, linkedNow, choose, confirmOverwrite, cancelOverwrite, isApplying: apply.isPending, canWrite };
+  return { pending, checkingId, linkedNow, unknownIds, choose, confirmOverwrite, cancelOverwrite, isApplying: apply.isPending, canWrite };
 }

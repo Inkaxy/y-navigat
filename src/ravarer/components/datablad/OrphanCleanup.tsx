@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ExternalLink, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
@@ -10,7 +10,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useDeleteDatasheets, useOrphanDatasheets } from "@/ravarer/hooks/useDatasheets";
 import { formatDate } from "@/ravarer/lib/constants";
 
-interface Frozen { ids: string[]; names: string[] }
+/** Frosset utvalg, bundet til selskapet det ble valgt i. */
+interface Frozen { ids: string[]; names: string[]; entity: string }
+const TARGET = "min-h-[44px] md:min-h-0";
 
 /** R153–R154: foreldreløse datablad. Åpne før sletting; sletting krever eksplisitt bekreftelse av et frosset utvalg. */
 export function OrphanCleanup({ legalEntityId, canWrite }: { legalEntityId: string | null; canWrite: boolean }) {
@@ -18,6 +20,13 @@ export function OrphanCleanup({ legalEntityId, canWrite }: { legalEntityId: stri
   const del = useDeleteDatasheets();
   const [confirm, setConfirm] = useState<Frozen | null>(null);
   const rows = orphans.data ?? [];
+  /** Synkron lås: to trykk før React har tegnet på nytt sender bare én sletting. */
+  const sending = useRef(false);
+  // Nytt selskap eller tapt skrivetilgang: en åpen bekreftelse gjelder ikke lenger (pågående sletting fullføres med frosset selskap).
+  useEffect(() => {
+    setConfirm((c) => (c && !sending.current && (c.entity !== legalEntityId || !canWrite) ? null : c));
+  }, [legalEntityId, canWrite]);
+  const ask = (ids: string[], names: string[]) => { if (canWrite && legalEntityId && !sending.current) setConfirm({ ids, names, entity: legalEntityId }); };
 
   const open = async (path: string | null) => {
     if (!path) { toast.error("Filen mangler lagringssti"); return; }
@@ -44,7 +53,7 @@ export function OrphanCleanup({ legalEntityId, canWrite }: { legalEntityId: stri
           <p className="text-sm text-ink-secondary">{rows.length} datablad er aldri knyttet til en råvare. Åpne for å kontrollere, og slett bare det du er sikker på.</p>
         </div>
         {canWrite && legalEntityId && (
-          <Button variant="outline" size="sm" className="h-11 md:h-9" disabled={del.isPending} onClick={() => setConfirm({ ids: rows.map((o) => o.id), names: rows.map((o) => o.file_name ?? "uten navn") })}>
+          <Button variant="outline" size="sm" className={`${TARGET} md:h-9`} disabled={del.isPending} onClick={() => ask(rows.map((o) => o.id), rows.map((o) => o.file_name ?? "uten navn"))}>
             Slett alle ({rows.length})
           </Button>
         )}
@@ -55,11 +64,11 @@ export function OrphanCleanup({ legalEntityId, canWrite }: { legalEntityId: stri
             <FileText className="h-3.5 w-3.5 shrink-0 text-ink-secondary" aria-hidden />
             <span className="min-w-0 flex-1 truncate" title={o.file_name ?? undefined}>{o.file_name}</span>
             <span className="text-xs text-ink-secondary">{o.supplier_name ?? "—"} · {formatDate(o.uploaded_at)}</span>
-            <Button variant="ghost" size="sm" className="h-11 md:h-8" aria-label={`Åpne ${o.file_name}`} onClick={() => void open(o.file_path)}>
+            <Button variant="ghost" size="sm" className={`${TARGET} md:h-8`} aria-label={`Åpne ${o.file_name}`} onClick={() => void open(o.file_path)}>
               <ExternalLink className="mr-1 h-3.5 w-3.5" aria-hidden />Åpne
             </Button>
             {canWrite && legalEntityId && (
-              <Button variant="ghost" size="sm" className="h-11 md:h-8" aria-label={`Slett ${o.file_name}`} disabled={del.isPending} onClick={() => setConfirm({ ids: [o.id], names: [o.file_name ?? "uten navn"] })}>
+              <Button variant="ghost" size="sm" className={`${TARGET} md:h-8`} aria-label={`Slett ${o.file_name}`} disabled={del.isPending} onClick={() => ask([o.id], [o.file_name ?? "uten navn"])}>
                 Slett
               </Button>
             )}
@@ -81,12 +90,14 @@ export function OrphanCleanup({ legalEntityId, canWrite }: { legalEntityId: stri
           <AlertDialogFooter>
             <AlertDialogCancel disabled={del.isPending}>Avbryt</AlertDialogCancel>
             <AlertDialogAction
-              disabled={del.isPending || !legalEntityId}
+              disabled={del.isPending || !canWrite || !confirm || confirm.entity !== legalEntityId}
               onClick={(e) => {
                 e.preventDefault();
                 const c = confirm;
-                if (!c || !legalEntityId) return;
-                del.mutate({ ids: c.ids, legalEntityId }, { onSettled: () => setConfirm(null) });
+                // Gjeldende tilgang og selskap må fortsatt være det utvalget ble frosset i.
+                if (!c || sending.current || !canWrite || c.entity !== legalEntityId) return;
+                sending.current = true;
+                del.mutate({ ids: c.ids, legalEntityId: c.entity }, { onSettled: () => { sending.current = false; setConfirm(null); } });
               }}
             >
               {del.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />}Slett
