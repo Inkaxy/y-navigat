@@ -38,11 +38,38 @@ const numberOf = (v: unknown): number | null => (typeof v === "number" && Number
  * Gjennomgang av ÉN fil mot valgt råvare: dagens verdier ved siden av databladets, med felt- og næringsvalg.
  * Ingenting skrives herfra; kalleren fryser valget og sender nøyaktig det.
  */
-export function DatasheetReviewDialog({ target, canWrite, busy, onClose, onConfirm }: Props) {
-  const rmId = target?.rmId;
+export function DatasheetReviewDialog(props: Props) {
+  const rmId = props.target?.rmId;
   const nut = useNutrition(rmId);
   const all = useAllergens(rmId);
   const rm = useRawMaterial(rmId);
+  const openDoc = async () => {
+    const path = props.target?.storagePath;
+    if (!path) { toast.error("Filen mangler lagringssti"); return; }
+    const { data, error } = await supabase.storage.from("raw-material-datasheets").createSignedUrl(path, 300);
+    if (error || !data?.signedUrl) { toast.error("Kunne ikke åpne filen"); return; }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  };
+  return (
+    <DatasheetReviewView
+      {...props}
+      current={{ nutrition: nut.data ?? null, allergens: all.data ?? [], grain: rm.data?.grain_classification ?? null }}
+      loading={nut.isLoading || all.isLoading || rm.isLoading}
+      failed={nut.isError || all.isError || rm.isError}
+      onOpenDocument={() => void openDoc()}
+    />
+  );
+}
+
+export interface ReviewCurrent {
+  nutrition: (Record<string, unknown> & { ingredient_declaration?: string | null; e_numbers?: string[] | null; country_of_origin?: string | null }) | null;
+  allergens: { allergen: string; presence: string }[];
+  grain: string | null;
+}
+
+/** Ren visning (ingen henting/skriving) — brukes av dialogen og den skrivebeskyttede forhåndsvisningen. */
+export function DatasheetReviewView({ target, canWrite, busy, onClose, onConfirm, current, loading, failed, onOpenDocument }: Props & { current: ReviewCurrent; loading: boolean; failed: boolean; onOpenDocument: () => void }) {
+  const rmId = target?.rmId;
   const ai = target?.ai ?? {};
   const nutrition: Obj = isObj(ai.nutrition) ? ai.nutrition : {};
   const allergens = Array.isArray(ai.allergens) ? ai.allergens.filter(isObj) : [];
@@ -59,21 +86,13 @@ export function DatasheetReviewDialog({ target, canWrite, busy, onClose, onConfi
     // eslint-disable-next-line react-hooks/exhaustive-deps -- nullstilles per fil + mål
   }, [target?.key, rmId]);
 
-  const loading = nut.isLoading || all.isLoading || rm.isLoading;
-  const failed = nut.isError || all.isError || rm.isError;
-  const before = nut.data ?? null;
+  const before = current.nutrition;
   const toggle = (f: BulkField) => setFields((s) => { const n = new Set(s); if (n.has(f)) n.delete(f); else n.add(f); return n; });
   const toggleNut = (f: string) => setNutSel((s) => { const n = new Set(s); if (n.has(f)) n.delete(f); else n.add(f); return n; });
   const chosen = present.filter((f) => fields.has(f));
   const invalid = chosen.length === 0 || (fields.has("nutrition") && nutSel.size === 0);
   const disabled = !canWrite || busy || loading || failed || invalid;
 
-  const openDoc = async () => {
-    if (!target?.storagePath) { toast.error("Filen mangler lagringssti"); return; }
-    const { data, error } = await supabase.storage.from("raw-material-datasheets").createSignedUrl(target.storagePath, 300);
-    if (error || !data?.signedUrl) { toast.error("Kunne ikke åpne filen"); return; }
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
-  };
   const submit = (mode: "apply" | "mark") => onConfirm(chosen, fields.has("nutrition") ? nutFields.filter((f) => nutSel.has(f)) : [], mode);
 
   return (
@@ -85,7 +104,7 @@ export function DatasheetReviewDialog({ target, canWrite, busy, onClose, onConfi
             Mot <span className="font-medium text-foreground">{target?.targetName}</span>. Valgte felt overskriver dagens verdier. Allergener legges bare til — fjerning, pakning og sammensetning gjøres ikke herfra.
           </DialogDescription>
         </DialogHeader>
-        <Button variant="outline" size="sm" className="min-h-[44px] w-fit md:min-h-0" onClick={() => void openDoc()}>
+        <Button variant="outline" size="sm" className="min-h-[44px] w-fit md:min-h-0" onClick={onOpenDocument}>
           <ExternalLink className="mr-1.5 h-3.5 w-3.5" aria-hidden />Åpne originalen
         </Button>
         {loading && <p className="flex items-center gap-2 text-sm text-ink-secondary"><Loader2 className="h-4 w-4 animate-spin" aria-hidden />Henter dagens verdier…</p>}
@@ -127,9 +146,9 @@ export function DatasheetReviewDialog({ target, canWrite, busy, onClose, onConfi
                     {coupled.countryOfOrigin && <BeforeAfter label="Opprinnelsesland" before={before?.country_of_origin ?? null} after={coupled.countryOfOrigin} />}
                   </div>
                 )}
-                {f === "allergens" && <AllergenPreview current={all.data ?? []} incoming={allergens} />}
+                {f === "allergens" && <AllergenPreview current={current.allergens} incoming={allergens} />}
                 {f === "ingredient_declaration" && <BeforeAfter before={before?.ingredient_declaration ?? null} after={str(ai, "ingredient_declaration")} />}
-                {f === "grain" && <BeforeAfter before={rm.data?.grain_classification ?? null} after={str(ai, "grain_classification_hint")} />}
+                {f === "grain" && <BeforeAfter before={current.grain} after={str(ai, "grain_classification_hint")} />}
               </div>
             ))}
           </div>
