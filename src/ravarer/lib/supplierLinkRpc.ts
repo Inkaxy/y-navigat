@@ -70,9 +70,17 @@ export function parseChangeLinkRematch(data: Json | null | undefined): ChangeLin
   };
 }
 
-/** Eneste skrivevei for primærleverandør. `null` fjerner primær. */
+/**
+ * Eneste skrivevei for primærleverandør. `null` fjerner primær.
+ * Generert type-signatur mangler `null`-varianten; vi omtyper RPC-kallet
+ * (ikke `as any`/`as unknown as`) så kontrakten mot serveren bevares.
+ */
+type SetPrimaryArgs = { p_raw_material_id: string; p_supplier_id: string | null };
+type RpcSetPrimary = (fn: "rm_set_primary_supplier", args: SetPrimaryArgs) => ReturnType<typeof supabase.rpc<"rm_set_primary_supplier">>;
+
 export async function setPrimarySupplier(rawMaterialId: string, supplierId: string | null): Promise<SetPrimarySupplierResult> {
-  const { data, error } = await supabase.rpc("rm_set_primary_supplier", {
+  const rpc = supabase.rpc as unknown as RpcSetPrimary;
+  const { data, error } = await rpc("rm_set_primary_supplier", {
     p_raw_material_id: rawMaterialId,
     p_supplier_id: supplierId,
   });
