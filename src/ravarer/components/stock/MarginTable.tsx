@@ -33,7 +33,7 @@ export function MarginTable() {
       <Card className="p-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-secondary" />
-          <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Søk vare eller solgt vare…" className="pl-9" />
+          <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Søk vare eller solgt vare…" aria-label="Søk i fortjeneste" className="h-[44px] pl-9 md:h-10" />
         </div>
       </Card>
 

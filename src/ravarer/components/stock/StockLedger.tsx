@@ -159,16 +159,16 @@ export function StockLedger() {
         <div className="flex flex-wrap items-end gap-3">
           <div>
             <Label className="text-xs">Fra dato</Label>
-            <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="w-[160px]" />
+            <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="h-[44px] w-full sm:w-[160px] md:h-10" />
           </div>
           <div>
             <Label className="text-xs">Til dato</Label>
-            <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="w-[160px]" />
+            <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="h-[44px] w-full sm:w-[160px] md:h-10" />
           </div>
           <div>
             <Label className="text-xs">Type</Label>
             <Select value={type} onValueChange={setType}>
-              <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-[44px] w-full sm:w-[200px] md:h-10"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Alle typer</SelectItem>
                 {MOVEMENT_TYPES.map(t => (
@@ -180,7 +180,7 @@ export function StockLedger() {
           <div>
             <Label className="text-xs">Årsak</Label>
             <Select value={reasonFilter} onValueChange={setReasonFilter}>
-              <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-[44px] w-full sm:w-[200px] md:h-10"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Alle årsaker</SelectItem>
                 {reasons.map(r => (
@@ -191,9 +191,9 @@ export function StockLedger() {
           </div>
           <div className="relative min-w-[200px] flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-secondary" />
-            <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Søk vare eller årsak…" className="pl-9" />
+            <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Søk vare eller årsak…" aria-label="Søk i bevegelser" className="h-[44px] pl-9 md:h-10" />
           </div>
-          <Button variant="outline" onClick={downloadCsv} disabled={rows.length === 0}>
+          <Button variant="outline" className="min-h-[44px] md:min-h-10" onClick={downloadCsv} disabled={rows.length === 0}>
             <Download className="mr-1.5 h-4 w-4" /> CSV
           </Button>
         </div>
