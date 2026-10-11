@@ -57,7 +57,12 @@ export function lineCostStatus(line: BakersLine): { ok: boolean; reason?: string
  * linjen er i vekt eller kan regnes om). Mangler grunnlaget, returneres null med
  * forklaring i stedet for 0 kr.
  */
-export function lineCost(line: BakersLine, grams: number, ctx: CostContext = {}): LineCostResult {
+export function lineCost(
+  line: BakersLine,
+  grams: number,
+  ctx: CostContext = {},
+  wasteFactor = 1,
+): LineCostResult {
   const subId = line.sub_product_id ?? null;
   const rawPrice = subId ? ctx.subProductCostPerKg?.[subId] : line._rm?.current_cost_price;
   const price = rawPrice == null ? NaN : Number(rawPrice);
@@ -74,7 +79,7 @@ export function lineCost(line: BakersLine, grams: number, ctx: CostContext = {})
     status.ok ? { cost } : { cost, reason: status.reason, kind: status.kind, unverified: true };
 
   if (base === "stk") {
-    if (unit === "stk") return finish(qty * price);
+    if (unit === "stk") return finish(qty * wasteFactor * price);
     const w = Number(line._rm?.unit_weight_grams) || 0;
     if (w > 0 && grams > 0) return finish((grams / w) * price);
     return { cost: null, reason: "Prisen er per stk, men vekt per stykk mangler", kind: "enhet" };
@@ -89,9 +94,6 @@ export function lineCost(line: BakersLine, grams: number, ctx: CostContext = {})
   const perMl = price / ML_PER_UNIT[base];
   const litres = unit && unit !== "stk" && !(unit in GRAMS_PER_MASS) ? toLitres(qty, line.unit) : null;
   if (litres != null) {
-    // Svinn følger vekten; i volum regnes det på samme måte.
-    const raw = lineToGrams(line);
-    const wasteFactor = raw.exact && raw.grams > 0 && grams > 0 ? grams / raw.grams : 1;
     return finish(litres * 1000 * wasteFactor * perMl);
   }
   if (grams > 0) {
@@ -160,7 +162,7 @@ export function computeRecipeCost(
     const waste = Number((l as { waste_percent?: number | string | null }).waste_percent) || 0;
     const grams = g.grams * (1 + waste / 100);
     totalGrams += g.grams;
-    const c = lineCost(l, g.exact ? grams : 0, opts);
+    const c = lineCost(l, g.exact ? grams : 0, opts, 1 + waste / 100);
     if (!g.exact && c.cost == null) {
       missing.push({ name: displayName(l), reason: g.reason ?? "Vekten kan ikke beregnes", kind: "vekt" });
       continue;
