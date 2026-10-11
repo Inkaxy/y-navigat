@@ -31,7 +31,7 @@ const ITEM: SupplierItem = {
   supplier_id: "s", supplier_name: "Diplom-Is AS", item_key: "sku:40213", supplier_sku: "40213", description: "SOFTISMIKS UHT 5L DIPLOM-IS",
   line_count: 12, invoice_count: 12, first_seen: "2025-01-10", last_seen: "2026-10-08", open_lines: 3, last_line_id: null, last_open_line_id: null,
   last_invoice_id: null, last_invoice_date: "2026-10-08", linked_rm_id: "rm", rm_id: "rm", rm_name: "Softismiks", rm_sku: null, rm_base_unit: "l",
-  rm_category: "Meieri", rm_cost: 70.13, rms_id: "rms", rms_notes: null, package_size: 5, package_unit: "kanne", base_units_per_package: 5,
+  rm_category: "Meieri", rm_cost: 70.13, rms_id: "rms", rms_notes: null, rms_supplier_sku: null, rms_sku_matches: true, package_size: 5, package_unit: "kanne", base_units_per_package: 5,
   package_confirmed_at: "2025-02-01", agreed_price_per_base_unit: 70.13, is_primary: true, variants: 1, last_ppbu: 78.4, prev_ppbu: 70.13,
   last_conf: "high", reasons_raw: "price_variance", status: "prisavvik",
 };

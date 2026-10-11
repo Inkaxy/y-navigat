@@ -84,6 +84,7 @@ export function CreateSheetFields({ draft, set, suppliers, ai, baseUnitHint, sho
         <p className="mb-2 text-sm font-medium">{packageRequired ? "Pakning *" : "Pakning (valgfritt)"}<AiTag level={ai?.package} /></p>
         <PackageFields
           baseUnit={draft.baseUnit}
+          decimalText
           units={draft.units}
           onUnitsChange={(v) => set({ units: v })}
           packageUnit={draft.packageUnit}

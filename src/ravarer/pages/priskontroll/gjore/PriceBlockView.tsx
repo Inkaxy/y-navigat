@@ -99,8 +99,8 @@ export function PriceBlockView(p: PriceBlockViewProps) {
       {p.error && <p role="alert" className="text-sm text-destructive">{p.error}</p>}
 
       <div className="flex flex-wrap gap-2">
-        <Button data-action="accept-price" variant={primary === "accept" ? "default" : "outline"} disabled={disabled} onClick={p.onAccept}>Godta ny pris</Button>
-        <Button data-action="claim-credit" variant={primary === "claim" ? "default" : "outline"} disabled={disabled || !ch || ch.pct <= 0} onClick={p.onClaim}>
+        <Button data-action="accept-price" data-primary-action={primary === "accept" ? "" : undefined} variant={primary === "accept" ? "default" : "outline"} disabled={disabled} onClick={p.onAccept}>Godta ny pris</Button>
+        <Button data-action="claim-credit" data-primary-action={primary === "claim" ? "" : undefined} variant={primary === "claim" ? "default" : "outline"} disabled={disabled || !ch || ch.pct <= 0} onClick={p.onClaim}>
           Krev kreditt fra leverandøren{ch && ch.impactNok > 0 ? ` (${kr(ch.impactNok)})` : ""}
         </Button>
         <Button variant="ghost" disabled={!p.canWrite} onClick={p.onFixAgreement}>Rett avtalepris</Button>

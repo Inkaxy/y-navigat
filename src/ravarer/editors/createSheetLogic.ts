@@ -1,6 +1,7 @@
 import type { ItemType } from "@/ravarer/lib/itemTypes";
 import type { LinkSupplierItemBody } from "@/fakturaer/lib/supplierItems";
 import { parseDecimal } from "@/ravarer/lib/packageMath";
+import { isPackageUnit, normalizeUnit } from "@/fakturaer/lib/units";
 
 export const CREATE_BASE_UNITS = ["kg", "l", "stk"] as const;
 export type CreateBaseUnit = (typeof CREATE_BASE_UNITS)[number];
@@ -181,8 +182,9 @@ export function applyInference(
   if (isCreateBaseUnit(inf.base_unit)) next.baseUnit = inf.base_unit;
   if (!inf.direct && inf.suggested_bupp != null && inf.suggested_bupp > 0) {
     next.units = String(inf.suggested_bupp).replace(".", ",");
-    const u = (lineUnit ?? inf.line_unit ?? "").trim().toLowerCase();
-    if (u) next.packageUnit = u;
+    // Kanonisk pakningsenhet (krt → eske, sk → sekk) så velgeren viser riktig og serveren får standardverdien.
+    const u = normalizeUnit(lineUnit ?? inf.line_unit);
+    if (u && isPackageUnit(u)) next.packageUnit = u;
     next.confirmPackage = inf.auto_confirmable || inf.agrees;
   }
   return next;

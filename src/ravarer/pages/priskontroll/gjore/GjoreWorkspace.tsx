@@ -20,7 +20,21 @@ import { FakturasakPanel } from "./FakturasakPanel";
 
 const PAGE = 50;
 const AUTO_NEXT_MS = 1200;
-const isWide = () => typeof window !== "undefined" && window.matchMedia("(min-width: 1280px)").matches;
+const WIDE_QUERY = "(min-width: 1280px)";
+const isWide = () => typeof window !== "undefined" && window.matchMedia(WIDE_QUERY).matches;
+/** Tastetrykket Enter teller bare for auto-neste når handlingen fullføres innen denne tiden. */
+const KEYBOARD_WINDOW_MS = 15000;
+
+function useIsWide(): boolean {
+  const [wide, setWide] = useState(isWide);
+  useEffect(() => {
+    const mq = window.matchMedia(WIDE_QUERY);
+    const on = () => setWide(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  return wide;
+}
 const panelEl = (sel: string) => document.querySelector<HTMLElement>(`[data-gjore-panel] ${sel}`);
 
 /** Priskontroll › Å gjøre: én prioritert liste til venstre, valgt varekort/fakturasak til høyre. */
@@ -36,15 +50,24 @@ export function GjoreWorkspace() {
   const [limit, setLimit] = useState(PAGE);
   const [help, setHelp] = useState(false);
   const [nextKey, setNextKey] = useState<string | null>(null);
-  const viaKeyboard = useRef(false);
+  /** Tidspunkt for Enter som utløste en handling; null når ingen tastaturhandling pågår. */
+  const viaKeyboard = useRef<number | null>(null);
+  const timer = useRef<number | null>(null);
+  const nextRef = useRef<string | null>(null);
+  const wide = useIsWide();
   const searchRef = useRef<HTMLInputElement>(null);
   const { data: suppliers = [] } = useSuppliers();
 
+  // Funksjonell oppdatering: en forsinket skriving bruker alltid gjeldende query.
   const set = (patch: Record<string, string | null>) => {
-    const n = new URLSearchParams(sp);
-    for (const [k, v] of Object.entries(patch)) { if (v) n.set(k, v); else n.delete(k); }
-    setSp(n, { replace: true });
+    setSp((prev) => {
+      const n = new URLSearchParams(prev);
+      for (const [k, v] of Object.entries(patch)) { if (v) n.set(k, v); else n.delete(k); }
+      return n;
+    }, { replace: true });
   };
+  const clearTimer = () => { if (timer.current != null) { window.clearTimeout(timer.current); timer.current = null; } };
+  useEffect(() => clearTimer, []);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- synk bare ved nytt søk
   useEffect(() => { if ((sp.get("q") ?? "") !== q) set({ q: q || null }); }, [q]);
   useEffect(() => setLimit(PAGE), [gruppe, sort, leverandor, q]);
@@ -53,33 +76,66 @@ export function GjoreWorkspace() {
   const items = useMemo(() => work.data?.items ?? [], [work.data]);
   const sel = parseValgt(valgt);
   const selItem = items.find((i) => i.key === valgt) ?? null;
+  // Husk neste mens det valgte fortsatt står i listen — etter en handling kan listen være hentet på nytt uten det.
+  useEffect(() => { if (selItem) nextRef.current = pickNext(items, valgt); }, [items, valgt, selItem]);
 
+  // Smal skjerm: panelet vises ikke — send dyplenker (valgt=…) til fullsiden.
+  useEffect(() => {
+    if (wide || !sel) return;
+    navigate(fullPage(sel), { replace: true });
+  }, [wide, sel?.type, valgt]); // eslint-disable-line react-hooks/exhaustive-deps -- sel avledes av valgt
+
+  /** Fullside for et element; varekortet får med listetilstanden så «Tilbake» lander samme sted. */
+  const fullPage = (v: NonNullable<ReturnType<typeof parseValgt>>) => {
+    if (v.type === "faktura") return paths.faktura(v.invoiceId);
+    const back = new URLSearchParams();
+    for (const k of ["gruppe", "sort", "q", "leverandor"]) { const x = sp.get(k); if (x) back.set(k, x); }
+    const qs = back.toString();
+    return `${paths.varekort(v.supplierId, v.itemKey)}${qs ? `?${qs}` : ""}`;
+  };
   const select = (key: string | null) => {
+    clearTimer();
+    viaKeyboard.current = null;
     setNextKey(null);
     const v = parseValgt(key);
     if (v && !isWide()) {
-      navigate(v.type === "varekort" ? paths.varekort(v.supplierId, v.itemKey) : paths.faktura(v.invoiceId));
+      navigate(fullPage(v));
       return;
     }
     set({ valgt: key });
   };
   const onDone = () => {
-    const nk = pickNext(items, valgt);
+    const nk = items.some((i) => i.key === valgt) ? pickNext(items, valgt) : nextRef.current;
     setNextKey(nk);
-    if (viaKeyboard.current) { viaKeyboard.current = false; window.setTimeout(() => select(nk), AUTO_NEXT_MS); }
+    const kb = viaKeyboard.current;
+    viaKeyboard.current = null;
+    if (kb != null && Date.now() - kb < KEYBOARD_WINDOW_MS) {
+      clearTimer();
+      timer.current = window.setTimeout(() => { timer.current = null; select(nk); }, AUTO_NEXT_MS);
+    }
   };
+  const pressPrimary = () => {
+    const b = panelEl("[data-action='next']") ?? panelEl("[data-primary-action]");
+    if (!b || (b instanceof HTMLButtonElement && b.disabled)) { viaKeyboard.current = null; return; }
+    viaKeyboard.current = Date.now();
+    b.click();
+    // Åpnet knappen bare en dialog, er ikke handlingen fullført.
+    window.setTimeout(() => { if (document.querySelector("[role='dialog'], [role='alertdialog']")) viaKeyboard.current = null; }, 0);
+  };
+  const focusPanel = () => window.requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-gjore-panel]")?.focus());
   const goNext = () => select(nextKey ?? pickNext(items, valgt));
 
+  const panelKey = (fn: () => void) => () => { if (wide && sel) fn(); };
   const bindings: HotkeyBinding[] = [
     { keys: ["j", "ArrowDown"], description: "Neste i listen", handler: () => select(stepKey(items, valgt, 1)) },
     { keys: ["k", "ArrowUp"], description: "Forrige i listen", handler: () => select(stepKey(items, valgt, -1)) },
-    { keys: ["Enter"], description: "Hovedhandling", handler: () => { const b = panelEl("[data-action='next']") ?? panelEl("[data-primary-action]"); if (b) { viaKeyboard.current = true; b.click(); } } },
-    { keys: ["l"], description: "Søk etter råvare", handler: () => panelEl("[data-action='material-search']")?.focus() },
-    { keys: ["p"], description: "Pakning", handler: () => panelEl("[data-action='check-package']")?.click() },
-    { keys: ["g"], description: "Godta ny pris", handler: () => panelEl("[data-action='accept-price']")?.click() },
-    { keys: ["c"], description: "Krev kreditt", handler: () => panelEl("[data-action='claim-credit']")?.click() },
-    { keys: ["x"], description: "Ikke vare", handler: () => panelEl("[data-action='not-item']")?.click() },
-    { keys: ["u"], description: "Angre siste (der mulig)", handler: () => panelEl("[data-action='undo']")?.click() },
+    { keys: ["Enter"], description: "Hovedhandling", handler: panelKey(pressPrimary) },
+    { keys: ["l"], description: "Søk etter råvare", handler: panelKey(() => panelEl("[data-action='material-search']")?.focus()) },
+    { keys: ["p"], description: "Pakning", handler: panelKey(() => panelEl("[data-action='check-package']")?.click()) },
+    { keys: ["g"], description: "Godta ny pris", handler: panelKey(() => panelEl("[data-action='accept-price']")?.click()) },
+    { keys: ["c"], description: "Krev kreditt", handler: panelKey(() => panelEl("[data-action='claim-credit']")?.click()) },
+    { keys: ["x"], description: "Ikke vare", handler: panelKey(() => panelEl("[data-action='not-item']")?.click()) },
+    { keys: ["u"], description: "Angre siste (der mulig)", handler: panelKey(() => panelEl("[data-action='undo']")?.click()) },
     { keys: ["/"], description: "Søk i listen", handler: (e) => { e.preventDefault(); searchRef.current?.focus(); } },
     { keys: ["Escape"], description: "Lukk panelet", handler: () => select(null) },
     { keys: ["?"], description: "Vis hurtigtaster", handler: () => setHelp(true) },
@@ -111,13 +167,13 @@ export function GjoreWorkspace() {
       </div>
       <QueryState isLoading={false} isError={work.isError} error={work.error} scope="ravarer:gjore" onRetry={() => void work.refetch()}>
         <WorkListView items={items} total={work.data?.total ?? 0} selectedKey={valgt} loading={work.isLoading} fetchingMore={work.isFetching && limit > items.length}
-          onSelect={(it: WorkItem) => select(it.key)} onMore={() => setLimit((n) => n + PAGE)} />
+          onSelect={(it: WorkItem) => { select(it.key); focusPanel(); }} onMore={() => setLimit((n) => n + PAGE)} />
       </QueryState>
     </div>
   );
 
   const panelBody = sel ? (
-    <div data-gjore-panel key={valgt ?? ""}>
+    <div data-gjore-panel tabIndex={-1} className="outline-none" key={valgt ?? ""} onPointerDown={() => { viaKeyboard.current = null; }}>
       {sel.type === "varekort"
         ? <VarekortPanel supplierId={sel.supplierId} itemKey={sel.itemKey} onDone={onDone} onNext={goNext} onSkip={() => select(stepKey(items, valgt, 1))} onClose={() => select(null)} />
         : <FakturasakPanel invoiceId={sel.invoiceId} kind={selItem?.kind ?? null} onDone={onDone} onNext={goNext} onSkip={() => select(stepKey(items, valgt, 1))} />}

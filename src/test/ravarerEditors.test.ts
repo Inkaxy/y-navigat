@@ -94,6 +94,14 @@ describe("1b-rettelser", () => {
       { base_unit: "kg", suggested_bupp: 25, auto_confirmable: true, agrees: true, direct: false, line_unit: "sekk" }, "SEKK");
     expect(d).toMatchObject({ baseUnit: "kg", units: "25", packageUnit: "sekk", confirmPackage: true });
   });
+  it("pakningsforslag normaliserer enheten og skriver desimal med komma", async () => {
+    const { applyInference, initialDraft } = await import("@/ravarer/editors/createSheetLogic");
+    const base = initialDraft({ kind: "supplier_item", supplierId: "s", itemKey: "sku:1" });
+    const inf = { base_unit: "kg", suggested_bupp: 0.5, auto_confirmable: false, agrees: false, direct: false, line_unit: null };
+    expect(applyInference(base, inf, "KRT")).toMatchObject({ units: "0,5", packageUnit: "eske" });
+    expect(applyInference(base, inf, "sk").packageUnit).toBe("sekk");
+    expect(applyInference(base, inf, "tullball").packageUnit).toBe("");
+  });
   it("pakning er påkrevd når validering ber om det", async () => {
     const { validateCreate, initialDraft } = await import("@/ravarer/editors/createSheetLogic");
     const d = { ...initialDraft({ kind: "standalone" }), name: "Mel" };

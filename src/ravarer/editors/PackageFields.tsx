@@ -23,12 +23,14 @@ export interface PackageFieldsProps {
   inputId?: string;
   /** Egen etikett på mengdefeltet. */
   unitsLabel?: string;
+  /** Tekstfelt med desimaltastatur (godtar «0,5»). Leses med felles desimalparser. */
+  decimalText?: boolean;
   invalid?: boolean;
 }
 
 /** Felles visuelle pakningsfelt: mengde per pakning + pakningsenhet. */
 export function PackageFields({
-  baseUnit, units, onUnitsChange: setUnits, packageUnit, onPackageUnitChange: setPackageUnit, fillNote, row, autoFocus = false, lockedUnit, inputId, unitsLabel, invalid,
+  baseUnit, units, onUnitsChange: setUnits, packageUnit, onPackageUnitChange: setPackageUnit, fillNote, row, autoFocus = false, lockedUnit, inputId, unitsLabel, invalid, decimalText = false,
 }: PackageFieldsProps) {
   const locked = lockedUnit != null;
   const isBulk = !locked && packageUnit === "bulk";
@@ -38,7 +40,7 @@ export function PackageFields({
                 <Label htmlFor={inputId}>{unitsLabel ?? `Antall ${baseUnit} per ${locked ? lockedUnit || "pakning" : "pakning"}`} {isBulk || locked ? "" : "*"}</Label>
                 <Input
                   id={inputId}
-                  {...(locked ? { inputMode: "decimal" as const } : { type: "number", step: "0.001", min: "0" })}
+                  {...(locked || decimalText ? { inputMode: "decimal" as const } : { type: "number", step: "0.001", min: "0" })}
                   aria-invalid={invalid}
                   value={isBulk ? "" : units}
                   onChange={e => setUnits(e.target.value)}

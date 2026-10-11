@@ -23,7 +23,7 @@ function rematchQueued(o: Obj): number {
 }
 
 export type ClaimCreditResult =
-  | { ok: true; caseId: string | null; caseLines: number; accepted: number; skipped: Skipped[]; rematchQueued: number }
+  | { ok: true; caseId: string | null; caseLines: number; accepted: number; skipped: Skipped[]; rematchQueued: number; /** Sum av saklinjene, når den er hentet. */ amount?: number }
   | { ok: false; reason: ClaimFailure; skipped: Skipped[] };
 
 export function parseClaimCredit(data: Json | null | undefined): ClaimCreditResult {

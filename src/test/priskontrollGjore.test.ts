@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  CHANGE_LINK_ERRORS, SKIP_REASON_LABEL, changeLinkErrorMessage, claimAmount, claimFailureMessage, lockedLinesText,
+  CHANGE_LINK_ERRORS, SKIP_REASON_LABEL, attemptsText, claimErrorMessage, changeLinkErrorMessage, claimAmount, claimFailureMessage, lockedLinesText,
   parseValgt, pickNext, pricePrimaryAction, priceChange, skipLineText, stepKey, varekortKey,
 } from "@/ravarer/pages/priskontroll/gjore/logic";
 import { parseChangeLink, parseClaimCredit } from "@/ravarer/pages/priskontroll/gjore/rpc";
@@ -66,10 +66,19 @@ describe("feilkoder til norsk", () => {
   it("alle skipped_lines-grunner har norsk tekst", () => {
     for (const r of ACCEPT_SKIP_REASONS) expect(SKIP_REASON_LABEL[r]).toMatch(/\S/);
     expect(skipLineText({ invoice_number: "12", reason: "faktura_last", message: "" })).toBe("Faktura 12: Fakturaen er låst (avstemt eller flagget)");
+    expect(skipLineText({ invoice_number: null, reason: "feil", message: "P0001 boom" })).toBe("Linjen kunne ikke godtas");
   });
   it("kravfeil", () => {
     expect(claimFailureMessage("ingen_merkostnad")).toBe("Ingen av linjene er dyrere enn forventet — ingenting å kreve");
     expect(claimFailureMessage("ingen_godtatt", [{ invoice_number: null, reason: "endret", message: "" }])).toMatch(/^Ingen linjer kunne godtas: Linjen er endret/);
+  });
+  it("kravfeil fra serveren", () => {
+    expect(claimErrorMessage("linje_allerede_i_aapen_sak")).toMatch(/åpen leverandørsak/);
+    expect(claimErrorMessage("prisgrunnlag_mangler")).toMatch(/prisgrunnlag/);
+    expect(claimErrorMessage("ingen_merkostnad")).toMatch(/ingenting å kreve/);
+    expect(claimErrorMessage("Saken må ha en tittel")).toBe("Saken må ha en tittel");
+    expect(claimErrorMessage("Velg linjene kravet gjelder")).toBe("Velg linjene kravet gjelder");
+    expect(attemptsText(7)).toBe("Forsøk 3/3.");
   });
   it("låste linjer", () => {
     expect(lockedLinesText(0)).toBeNull();
@@ -92,8 +101,9 @@ describe("RPC-parsing", () => {
 });
 
 describe("Endre kobling — omfang", () => {
-  const l = (id: string, status: string, cost_posted: boolean) => ({ id, invoice_status: status, cost_posted });
-  it("avstemte utelates, førte telles som låst", () => {
-    expect(changeLinkScope([l("a", "pending_review", false), l("b", "reconciled", false), l("c", "pending_review", true)])).toEqual({ lineIds: ["a"], locked: 1 });
+  const l = (id: string, status: string, cost_posted: boolean, rm = "old") => ({ id, invoice_status: status, cost_posted, raw_material_id: rm });
+  it("avstemte og andre råvarer utelates, førte sendes og telles som låst", () => {
+    expect(changeLinkScope([l("a", "pending_review", false), l("b", "reconciled", false), l("c", "pending_review", true), l("d", "pending_review", false, "x")], "old"))
+      .toEqual({ lineIds: ["a", "c"], movable: 1, locked: 1 });
   });
 });

@@ -75,6 +75,7 @@ export function RawMaterialCreateSheet({ open, onOpenChange, context, onDone, on
 
   const finish = (o: CreateOutcome) => {
     if (o.kind === "linked") { setLinked(o); return; }
+    if (o.warning) toast.warning(o.warning);
     onDone?.(o.rawMaterialId, o);
     onOpenChange(false);
     if (draft.openAfterSave) navigate(paths.raavare(o.rawMaterialId));

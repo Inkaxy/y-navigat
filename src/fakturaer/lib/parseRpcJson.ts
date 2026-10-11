@@ -38,7 +38,7 @@ function parseItem(o: Obj): SupplierItem | null {
     last_invoice_id: str(o, "last_invoice_id"), last_invoice_date: str(o, "last_invoice_date"),
     linked_rm_id: str(o, "linked_rm_id"), rm_id: str(o, "rm_id"), rm_name: str(o, "rm_name"), rm_sku: str(o, "rm_sku"),
     rm_base_unit: str(o, "rm_base_unit"), rm_category: str(o, "rm_category"), rm_cost: num(o, "rm_cost"),
-    rms_id: str(o, "rms_id"), rms_notes: str(o, "rms_notes"), package_size: num(o, "package_size"), package_unit: str(o, "package_unit"),
+    rms_id: str(o, "rms_id"), rms_notes: str(o, "rms_notes"), rms_supplier_sku: str(o, "rms_supplier_sku"), rms_sku_matches: bool(o, "rms_sku_matches") === true, package_size: num(o, "package_size"), package_unit: str(o, "package_unit"),
     base_units_per_package: num(o, "base_units_per_package"), package_confirmed_at: str(o, "package_confirmed_at"),
     agreed_price_per_base_unit: num(o, "agreed_price_per_base_unit"), is_primary: bool(o, "is_primary"), variants: num(o, "variants"),
     last_ppbu: num(o, "last_ppbu"), prev_ppbu: num(o, "prev_ppbu"), last_conf: str(o, "last_conf"), reasons_raw: str(o, "reasons_raw"),

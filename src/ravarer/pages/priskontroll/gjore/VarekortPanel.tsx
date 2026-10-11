@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -16,6 +17,7 @@ import { RawMaterialCreateSheet } from "@/ravarer/editors/RawMaterialCreateSheet
 import { NOT_A_PRODUCT_REASONS } from "@/ravarer/lib/notAProductReasons";
 import { setPrimarySupplier } from "@/ravarer/lib/supplierLinkRpc";
 import { paths } from "@/ravarer/lib/paths";
+import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { ResultBox } from "@/ravarer/ui/ResultBox";
 import { VarekortHeaderView, VBlock } from "./VarekortHeaderView";
 import { PriceBlock, hasPriceWork } from "./PriceBlock";
@@ -69,7 +71,11 @@ function VarekortBody({ item, lines, canWrite, onDone, onNext, onSkip, onClose }
   const link = useLinkSupplierItem();
   const linked = !!item.rm_id && item.status !== "ukoblet";
   const pkgOk = linked && item.status !== "mangler_pakning";
-  const [editForm, setEditForm] = useState(!pkgOk);
+  // «kontroll» (sku-kollisjon, uavklart, uleselig) løses ved å koble på nytt.
+  const [editForm, setEditForm] = useState(!pkgOk || item.status === "kontroll");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [primarySaving, setPrimarySaving] = useState(false);
+  const qc = useQueryClient();
   const [editPkg, setEditPkg] = useState(false);
   const [changeOpen, setChangeOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -77,7 +83,8 @@ function VarekortBody({ item, lines, canWrite, onDone, onNext, onSkip, onClose }
   const [error, setError] = useState<string | null>(null);
   const scope = openScope(lines);
   const priceWork = hasPriceWork(item, lines);
-  const skuKey = item.item_key.startsWith("sku:") && !!item.rms_id;
+  // Bare når koblingens varenummer er varekortets — ellers kan rms_id være en annen leverandørvare.
+  const canMoveLink = item.rms_sku_matches === true && !!item.rms_id;
 
   const onLinkDone = (r: Parameters<NonNullable<React.ComponentProps<typeof SupplierItemLinkForm>["onDone"]>>[0]) => {
     onDone({ title: "Varekortet er oppdatert", items: linkResultSummary(r) });
@@ -92,12 +99,24 @@ function VarekortBody({ item, lines, canWrite, onDone, onNext, onSkip, onClose }
       setError(e instanceof Error ? e.message : "Kunne ikke lagre.");
     }
   };
+  const savePrimary = async (): Promise<boolean> => {
+    if (!primary || !item.rm_id) return true;
+    setPrimarySaving(true);
+    try {
+      await setPrimarySupplier(item.rm_id, item.supplier_id);
+      invalidateRawMaterial(qc, item.rm_id);
+      void qc.invalidateQueries({ queryKey: ["supplier-items"] });
+      setPrimary(false);
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Kunne ikke sette primær leverandør.");
+      return false;
+    } finally { setPrimarySaving(false); }
+  };
   const finish = async () => {
     setError(null);
-    if (primary && item.rm_id) {
-      try { await setPrimarySupplier(item.rm_id, item.supplier_id); } catch (e) { setError(e instanceof Error ? e.message : "Kunne ikke sette primær leverandør."); return; }
-    }
-    onNext?.();
+    if (!(await savePrimary())) return;
+    if (onNext) onNext(); else onClose();
   };
 
   return (
@@ -112,7 +131,7 @@ function VarekortBody({ item, lines, canWrite, onDone, onNext, onSkip, onClose }
           <VBlock n={1} title="Råvare" done summary={
             <span className="flex flex-wrap items-center gap-2">
               <Link className="font-medium underline underline-offset-2" to={paths.raavare(item.rm_id)}>{item.rm_name ?? "Råvare"}</Link>
-              <Button size="sm" variant="ghost" disabled={!canWrite} onClick={() => (skuKey ? setChangeOpen(true) : setEditForm(true))}>Endre kobling</Button>
+              <Button size="sm" variant="ghost" disabled={!canWrite} onClick={() => (canMoveLink ? setChangeOpen(true) : setEditForm(true))}>Endre kobling</Button>
             </span>
           } />
           <VBlock n={2} title="Pakning" done summary={
@@ -136,6 +155,9 @@ function VarekortBody({ item, lines, canWrite, onDone, onNext, onSkip, onClose }
           {!item.is_primary && (
             <label className="flex items-center gap-2 text-sm"><Checkbox checked={primary} onCheckedChange={(v) => setPrimary(v === true)} disabled={!canWrite} />Sett som primær leverandør for råvaren</label>
           )}
+          {!item.is_primary && priceWork && primary && (
+            <Button size="sm" variant="outline" disabled={!canWrite || primarySaving} onClick={() => { setError(null); void savePrimary(); }}>Lagre primær leverandør</Button>
+          )}
         </VBlock>
       )}
 
@@ -144,9 +166,11 @@ function VarekortBody({ item, lines, canWrite, onDone, onNext, onSkip, onClose }
 
       {!editForm && (
         <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-line-subtle bg-card px-4 py-3">
-          {!priceWork && <Button data-primary-action disabled={!canWrite && primary} onClick={() => void finish()}>Ferdig — neste</Button>}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild><Button data-action="not-item" variant="ghost" disabled={!canWrite || link.isPending}>Ikke vare …</Button></DropdownMenuTrigger>
+          {!priceWork && <Button data-primary-action disabled={(!canWrite && primary) || primarySaving} onClick={() => void finish()}>Ferdig — neste</Button>}
+          {/* Hurtigtast X: Radix åpner ikke på .click(), så menyen styres direkte. */}
+          <button type="button" hidden data-action="not-item" disabled={!canWrite || link.isPending} onClick={() => setMenuOpen(true)} />
+          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+            <DropdownMenuTrigger asChild><Button variant="ghost" disabled={!canWrite || link.isPending}>Ikke vare …</Button></DropdownMenuTrigger>
             <DropdownMenuContent>
               {NOT_A_PRODUCT_REASONS.map((r) => <DropdownMenuItem key={r} onSelect={() => void notItem(r)}>{r}</DropdownMenuItem>)}
             </DropdownMenuContent>

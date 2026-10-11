@@ -112,6 +112,8 @@ export function useAcceptSupplierItemPrice() {
       invalidateInvoice(qc);
       invalidateRavarerCounts(qc);
       void qc.invalidateQueries({ queryKey: ["supplier-items"] });
+      void qc.invalidateQueries({ queryKey: ["supplier-item-lines"] });
+      void qc.invalidateQueries({ queryKey: ["rematch-status"] });
     },
   });
 }
