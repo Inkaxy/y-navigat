@@ -30,6 +30,8 @@ import type { QueryClient } from "@tanstack/react-query";
 /** Nøkler som ikke er knyttet til én bestemt råvare. */
 const RAW_MATERIAL_GLOBAL_KEYS: readonly string[] = [
   "raw_materials",
+  // Listens prisgrunnlag (rm_list_price_evidence): kost, pakning, enhet og råvarer.
+  "raw-material-list-price-evidence",
   "raw_materials_autocomplete",
   "raw_material_search_index",
   "raw-material-datasheets",
@@ -128,6 +130,8 @@ const RAW_MATERIAL_SCOPED_KEYS: readonly string[] = [
 
 const INVOICE_GLOBAL_KEYS: readonly string[] = [
   "fakturaer",
+  // Fakturaendringer (lesing, kobling, hold, rematch) endrer listens prisgrunnlag.
+  "raw-material-list-price-evidence",
   "fakturaer-review-lines",
   "fakturaer-review-count",
   "fakturaer-inbox",

@@ -1,6 +1,9 @@
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { formatDateTime } from "@/ravarer/lib/constants";
+import { format } from "date-fns";
+import { nb } from "date-fns/locale";
+
+const stamp = (iso: string) => format(new Date(iso), "EEE d. MMM yyyy, HH:mm", { locale: nb });
 
 interface State { loading: boolean; isError: boolean; checkedAt: string | null; refetch: () => void }
 
@@ -13,7 +16,7 @@ export function PriceEvidenceStatus({ state, controlCount, onShowControl }: { st
       ) : state.isError ? (
         <span className="text-warning">Prisgrunnlag kunne ikke kontrolleres — avvik vises ikke</span>
       ) : state.checkedAt ? (
-        <span>Prisgrunnlag kontrollert {formatDateTime(state.checkedAt)}</span>
+        <span>Prisgrunnlag kontrollert {stamp(state.checkedAt)}</span>
       ) : (
         <span>Prisgrunnlag ikke kontrollert</span>
       )}
