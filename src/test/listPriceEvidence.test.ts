@@ -131,7 +131,7 @@ describe("felles modell: filter, sortering, CSV", () => {
     expect(applyView(items, "price_control", rule).map((i) => i.id)).toEqual(["ali"]);
   });
   it("sortering på avvik legger ukjent nederst og beholder fortegn/0", () => {
-    const sorted = filterAndSortItems(items, { q: "", kat: "", type: "", status: "all", view: "all", sortKey: "deviation", sortDir: "desc" }, rule).map((i) => i.id);
+    const sorted = filterAndSortItems(items, { q: "", kat: "all", type: "all", status: "all", view: "all", sortKey: "deviation", sortDir: "desc" }, rule).map((i) => i.id);
     expect(sorted.slice(0, 3)).toEqual(["big", "neg", "combi"]);
     expect(sorted.slice(3).sort()).toEqual(["ali", "pend"]);
   });
