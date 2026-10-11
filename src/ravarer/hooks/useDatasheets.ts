@@ -21,9 +21,10 @@ export interface ChangelogRow {
   raw_materials?: { name: string; sku: string };
 }
 
-export function useChangelog(opts?: { onlyUnacked?: boolean; rawMaterialId?: string }) {
+export function useChangelog(opts?: { onlyUnacked?: boolean; rawMaterialId?: string }, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["raw-material-changelog", opts],
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       let q = supabase
         .from("raw_material_changelog")

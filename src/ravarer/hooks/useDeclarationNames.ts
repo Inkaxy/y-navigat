@@ -23,10 +23,10 @@ export async function suggestDeclarationName(name: string): Promise<string> {
 }
 
 /** Arbeidsliste: aktive råvarer i bruk som mangler deklarasjonsnavn. */
-export function useDeclarationWorklist(legalEntityId: string | undefined) {
+export function useDeclarationWorklist(legalEntityId: string | undefined, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["declaration-worklist", legalEntityId],
-    enabled: !!legalEntityId,
+    enabled: !!legalEntityId && (options?.enabled ?? true),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("raw_material_declaration_worklist")
