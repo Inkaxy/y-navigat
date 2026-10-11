@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import type { RawMaterialSearchIndex } from "@/ravarer/hooks/useRawMaterialSearchIndex";
 import type { TimelineHistoryRow } from "@/ravarer/lib/priceTimeline";
+import { mergeProjection, parseMaterialPriceProjection, type MaterialPriceProjection } from "@/ravarer/lib/priceProjection";
+import { useMemo } from "react";
 import { documentedPriceError, documentedPriceMessage, parseDocumentedPrice, type DocumentedPriceResult } from "@/ravarer/lib/costPriceSource";
 
 
@@ -181,6 +183,49 @@ export function usePriceHistory(rawMaterialId: string | undefined) {
     enabled: !!rawMaterialId,
     queryFn: () => fetchPriceHistory(rawMaterialId as string),
   });
+}
+
+/** Skrivebeskyttet kontroll nå av historikkens kildelinjer (`rm_material_price_projection`). */
+export function useMaterialPriceProjection(rawMaterialId: string | undefined) {
+  return useQuery({
+    queryKey: ["material-price-projection", rawMaterialId],
+    enabled: !!rawMaterialId,
+    staleTime: 0,
+    queryFn: async (): Promise<MaterialPriceProjection> => {
+      const { data, error } = await supabase.rpc("rm_material_price_projection", { p_raw_material_id: rawMaterialId as string });
+      if (error) throw error;
+      const parsed = parseMaterialPriceProjection(data, rawMaterialId as string);
+      if (!parsed) throw new Error("ugyldig_prisprojeksjon");
+      return parsed;
+    },
+  });
+}
+
+/**
+ * Felles tidslinjegrunnlag for ALLE visninger (pris-seksjon, leverandørside, historikk):
+ * original historikk + projeksjon flettet på eksakt id. Feil i projeksjonen gjør aldri
+ * historikken tom: radene vises uendret (ukjent enhet forblir ukjent) med `projectionError`.
+ * Data fra en annen råvare enn `rawMaterialId` brukes aldri.
+ */
+export function useTimelineHistory(rawMaterialId: string | undefined) {
+  const history = usePriceHistory(rawMaterialId);
+  const projection = useMaterialPriceProjection(rawMaterialId);
+  const proj = projection.data && projection.data.raw_material_id === rawMaterialId && !projection.isError ? projection.data : null;
+  const rows = useMemo<TimelineHistoryRow[]>(
+    () => mergeProjection((history.data ?? []).filter((h) => h.raw_material_id === rawMaterialId).map(toTimelineRow), proj),
+    [history.data, proj, rawMaterialId],
+  );
+  return {
+    rows,
+    raw: history.data ?? [],
+    isLoading: history.isLoading,
+    isError: history.isError,
+    error: history.error,
+    projectionLoading: projection.isLoading,
+    projectionError: projection.isError,
+    checkedAt: proj?.checked_at ?? null,
+    refetch: () => { void history.refetch(); void projection.refetch(); },
+  };
 }
 
 /** @deprecated bruk usePriceHistory */
