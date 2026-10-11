@@ -4,29 +4,22 @@
  * grunnlag er enheten ukjent (null), og raden er ikke sammenlignbar i graf/Δ.
  */
 
-/** Enhetsvakten (`_rm_base_unit_cutoff`) ble satt i drift her; senere enhetsbytter er revidert. */
-export const BASE_UNIT_GUARD_SINCE = "2026-10-11T13:19:49Z";
-
-export type UnitSource = "enhetsbytte" | "fakturalinje" | "etter_enhetsvakt";
+export type UnitSource = "ved_registrering" | "revidert_enhetsbytte";
 
 export const UNIT_SOURCE_LABEL: Record<UnitSource, string> = {
-  enhetsbytte: "Revidert enhetsbytte",
-  fakturalinje: "Fakturalinjens pris per grunnenhet",
-  etter_enhetsvakt: "Registrert etter enhetsvakt",
+  ved_registrering: "Låst ved registrering",
+  revidert_enhetsbytte: "Revidert enhetsbytte",
 };
 
-export interface UnitChange {
-  at: string;
-  old: string | null;
-  new: string | null;
-}
-
-export interface ProvenanceLine {
-  unit: string | null;
+/** Pakning slik den var på fakturalinjen da prisen ble registrert (`snapshot_package`). */
+export interface PackageSnapshot {
+  line_unit: string | null;
   package_size: number | null;
   package_unit: string | null;
   count_per_package: number | null;
-  price_per_base_unit: number | null;
+  base_units_per_package: number | null;
+  line_version: string | null;
+  correction_id: string | null;
 }
 
 export interface CorrectionField {
@@ -36,6 +29,7 @@ export interface CorrectionField {
 }
 
 export interface CorrectionSnapshot {
+  id?: string | null;
   at: string;
   reason: string | null;
   fields: CorrectionField[];
@@ -45,23 +39,26 @@ export interface PriceProvenance {
   /** Grunnenheten prisen gjaldt for, eller null når den ikke er dokumentert. */
   unit: string | null;
   unitSource: UnitSource | null;
-  /** Pakning fra fakturalinjen, f.eks. «25 kg» / «10 × 1 kg». Null = ukjent. */
+  /** Pakning ved registrering, f.eks. «25 kg» / «10 × 1 kg». Null = ukjent. */
   packageText: string | null;
-  /** Valuta fra raden (eller fakturaen). Null = ukjent. */
+  /** Valuta ved registrering. Null = ukjent. */
   currency: string | null;
-  corrections: CorrectionSnapshot[];
+  /** Rettelser av kildelinjen; `afterSnapshot` = gjort etter at prisen ble låst. */
+  corrections: (CorrectionSnapshot & { afterSnapshot: boolean })[];
 }
 
+/**
+ * Bare lagret grunnlag teller. Dagens råvareenhet, dagens fakturalinje, prislikhet eller
+ * et tidspunkt er ikke bevis for hvilken enhet en gammel pris gjaldt.
+ */
 export interface ProvenanceInput {
-  price: number;
-  createdAt: string | null;
+  snapshotUnit: string | null;
+  snapshotPackage: unknown;
+  snapshotCurrency: string | null;
+  snapshotSource: string | null;
+  snapshotAt: string | null;
+  /** Radens egen lagrede valuta (skrevet sammen med prisen). */
   currency: string | null | undefined;
-  isLegacy: boolean;
-  supersededReason: string | null | undefined;
-  line: ProvenanceLine | null;
-  invoiceCurrency: string | null;
-  currentUnit: string | null;
-  unitChanges: readonly UnitChange[];
   corrections?: readonly CorrectionSnapshot[];
 }
 
@@ -69,41 +66,43 @@ function fmtNum(n: number): string {
   return n.toLocaleString("nb-NO", { maximumFractionDigits: 4 });
 }
 
-export function packageText(line: ProvenanceLine | null): string | null {
-  if (!line || line.package_size == null || !(Number(line.package_size) > 0) || !line.package_unit) return null;
-  const size = `${fmtNum(Number(line.package_size))} ${line.package_unit}`;
-  const count = Number(line.count_per_package);
+const rec = (v: unknown): Record<string, unknown> | null => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
+const n = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)) ? Number(v) : null);
+const t = (v: unknown): string | null => (typeof v === "string" && v.trim() !== "" ? v : null);
+
+export function parsePackageSnapshot(v: unknown): PackageSnapshot | null {
+  const o = rec(v);
+  if (!o) return null;
+  return {
+    line_unit: t(o.line_unit), package_size: n(o.package_size), package_unit: t(o.package_unit),
+    count_per_package: n(o.count_per_package), base_units_per_package: n(o.base_units_per_package),
+    line_version: t(o.line_version), correction_id: t(o.correction_id),
+  };
+}
+
+export function packageText(p: PackageSnapshot | null): string | null {
+  if (!p || p.package_size == null || !(p.package_size > 0) || !p.package_unit) return null;
+  const size = `${fmtNum(p.package_size)} ${p.package_unit}`;
+  const count = Number(p.count_per_package);
   return count > 1 ? `${fmtNum(count)} × ${size}` : size;
 }
 
-export function resolveUnit(i: ProvenanceInput): { unit: string | null; source: UnitSource | null } {
-  const changes = [...i.unitChanges].sort((a, b) => a.at.localeCompare(b.at));
-  if (changes.length > 0 && i.createdAt) {
-    const after = changes.find((c) => c.at > (i.createdAt as string));
-    if (after) return { unit: after.old, source: after.old ? "enhetsbytte" : null };
-    const last = changes[changes.length - 1];
-    return { unit: last.new, source: last.new ? "enhetsbytte" : null };
-  }
-  if (i.supersededReason === "enhet_endret" || i.isLegacy) return { unit: null, source: null };
-  const pp = Number(i.line?.price_per_base_unit);
-  if (i.currentUnit && Number.isFinite(pp) && pp > 0 && i.price > 0 && Math.abs(pp - i.price) / i.price <= 0.005) {
-    return { unit: i.currentUnit, source: "fakturalinje" };
-  }
-  if (i.currentUnit && i.createdAt && i.createdAt >= BASE_UNIT_GUARD_SINCE) {
-    return { unit: i.currentUnit, source: "etter_enhetsvakt" };
-  }
-  return { unit: null, source: null };
+function unitSource(s: string | null): UnitSource | null {
+  return s === "ved_registrering" || s === "revidert_enhetsbytte" ? s : null;
 }
 
 export function resolveProvenance(i: ProvenanceInput): PriceProvenance {
-  const u = resolveUnit(i);
-  const cur = (i.currency ?? i.invoiceCurrency ?? "").trim().toUpperCase();
+  const src = unitSource(i.snapshotSource);
+  const unit = src && i.snapshotUnit ? i.snapshotUnit : null;
+  const cur = (i.snapshotCurrency ?? i.currency ?? "").trim().toUpperCase();
   return {
-    unit: u.unit,
-    unitSource: u.source,
-    packageText: packageText(i.line),
+    unit,
+    unitSource: unit ? src : null,
+    packageText: src === "ved_registrering" ? packageText(parsePackageSnapshot(i.snapshotPackage)) : null,
     currency: cur || null,
-    corrections: [...(i.corrections ?? [])].sort((a, b) => a.at.localeCompare(b.at)),
+    corrections: [...(i.corrections ?? [])]
+      .sort((a, b) => a.at.localeCompare(b.at))
+      .map((c) => ({ ...c, afterSnapshot: !!i.snapshotAt && c.at > i.snapshotAt })),
   };
 }
 
@@ -133,6 +132,7 @@ function scalar(v: unknown): string {
 
 /** Leser `invoice_line_corrections` (original/corrected/changed_fields) til før/etter-par. */
 export function parseCorrection(row: {
+  id?: string | null;
   corrected_at: string;
   reason: string | null;
   changed_fields: string[] | null;
@@ -142,7 +142,7 @@ export function parseCorrection(row: {
   const o = row.original && typeof row.original === "object" && !Array.isArray(row.original) ? (row.original as Record<string, unknown>) : {};
   const c = row.corrected && typeof row.corrected === "object" && !Array.isArray(row.corrected) ? (row.corrected as Record<string, unknown>) : {};
   const fields = (row.changed_fields ?? []).map((f) => ({ field: correctionFieldLabel(f), before: scalar(o[f]), after: scalar(c[f]) }));
-  return { at: row.corrected_at, reason: row.reason, fields };
+  return { id: row.id ?? null, at: row.corrected_at, reason: row.reason, fields };
 }
 
 export function correctionText(c: CorrectionSnapshot): string {
