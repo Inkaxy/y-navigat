@@ -6,6 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import {
   useDeclarationWorklist,
@@ -27,6 +30,10 @@ export default function Deklarasjonsnavn() {
   // Utkast per rad, løftet hit så «Lagre alle» lagrer det brukeren faktisk ser.
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const draftFor = (r: DeclarationWorklistRow) => drafts[r.raw_material_id] ?? initialFor(r);
+  const embedded = useIsEmbedded();
+  // Ulagrede utkast (endret fra forslaget) beskyttes ved bytte av arbeidsliste, lenker, tilbake og lukking.
+  const dirty = rows.some((r) => drafts[r.raw_material_id] != null && drafts[r.raw_material_id].trim() !== initialFor(r) && !r.is_composite);
+  const guard = useUnsavedChangesGuard(dirty && canWrite);
 
   const simple = useMemo(() => rows.filter((r) => !r.is_composite), [rows]);
   const composite = useMemo(() => rows.filter((r) => r.is_composite), [rows]);
@@ -56,10 +63,11 @@ export default function Deklarasjonsnavn() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="Deklarasjonsnavn"
-        subtitle="Råvarer i bruk som mangler lovlig ingrediensnavn. Tyngst brukt først."
-      />
+      {embedded ? (
+        <p className="text-sm text-ink-secondary">Råvarer i bruk som mangler lovlig ingrediensnavn. Tyngst brukt først.</p>
+      ) : (
+        <PageHeader title="Deklarasjonsnavn" subtitle="Råvarer i bruk som mangler lovlig ingrediensnavn. Tyngst brukt først." />
+      )}
 
       <Card className="p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -121,6 +129,7 @@ export default function Deklarasjonsnavn() {
           </div>
         </Card>
       )}
+      <UnsavedChangesDialog {...guard.dialogProps} />
     </div>
   );
 }
