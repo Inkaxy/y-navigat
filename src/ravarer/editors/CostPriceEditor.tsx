@@ -4,9 +4,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useAddPriceHistory } from "@/ravarer/hooks/useRmSuppliers";
+import { CostSourceInfo } from "@/ravarer/components/CostSourceInfo";
 import { PRICE_SOURCES } from "@/ravarer/lib/constants";
 import { osloTodayISO } from "@/lib/osloDate";
 import { DEFAULT_COST_SOURCE, toPriceHistoryInput, validateCostPrice, type CostPriceDraft, type CostPriceErrors, type CostPriceSource } from "./costPriceLogic";
@@ -57,7 +57,7 @@ export function CostPriceEditor({
       await add.mutateAsync(toPriceHistoryInput(rawMaterialId, draft, v.price));
     } catch (e) {
       console.error("[kostpris:lagre]", e);
-      setSaveError("Kostprisen ble ikke lagret. Prøv igjen.");
+      setSaveError(e instanceof Error && e.message ? e.message : "Kostprisen ble ikke lagret. Prøv igjen.");
       return;
     }
     onSaved?.();
@@ -112,10 +112,10 @@ export function CostPriceEditor({
               onChange={(e) => setDraft((d) => ({ ...d, reason: e.target.value }))} placeholder="F.eks. ny prisliste fra leverandør" />
             {errors.reason && <p className="mt-1 text-caption text-destructive">{errors.reason}</p>}
           </div>
-          <label className="flex items-center justify-between gap-2 text-sm">
-            Sett som gjeldende kostpris
-            <Switch checked={draft.setAsCurrent} onCheckedChange={(v) => setDraft((d) => ({ ...d, setAsCurrent: v }))} />
-          </label>
+          <p className="text-caption text-ink-secondary">
+            Nyeste gyldige pris etter dato blir gjeldende kostpris. En eldre dato endrer ikke en nyere pris, og en fremtidig dato blir gjeldende fra den dagen.
+          </p>
+          <CostSourceInfo rawMaterialId={rawMaterialId} />
           {saveError && <p role="alert" className="text-sm text-destructive">{saveError}</p>}
         </div>
         <DialogFooter>

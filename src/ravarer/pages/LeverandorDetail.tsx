@@ -37,7 +37,7 @@ import {
   useSupplierPriceIndex,
   type SupplierItemRow,
 } from "@/ravarer/hooks/useSupplierDetail";
-import { usePriceHistory } from "@/ravarer/hooks/useRmSuppliers";
+import { usePriceHistory, toTimelineRow } from "@/ravarer/hooks/useRmSuppliers";
 import { SupplierDialog } from "@/ravarer/components/NewSupplierDialog";
 import { AgreementDocumentLink } from "@/ravarer/components/AgreementDocumentLink";
 import { getAgreementStatus } from "@/ravarer/lib/agreementStatus";
@@ -588,17 +588,7 @@ function SupplierPriceTimeline({
     () =>
       history
         .filter((h) => h.supplier_id === supplierId)
-        .map((h) => ({
-          id: h.id,
-          effective_date: h.effective_date,
-          price: Number(h.price),
-          supplier_id: h.supplier_id,
-          source: h.source ?? "manual",
-          invoice_id: h.invoice_id,
-          invoiceNumber: h.invoices?.invoice_number ?? null,
-          isCreditNote: h.invoices?.is_credit_note ?? false,
-          notes: h.notes ?? null,
-        })),
+        .map(toTimelineRow),
     [history, supplierId],
   );
 

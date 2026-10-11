@@ -32,3 +32,13 @@
 - Nye tabeller: bare `SELECT` for innloggede (RLS), skriving via RPC-er.
 - Godkjenningstelleren: `rm_work_summary.approval.ready_to_approve` = samme regel som listens «Klare».
 - Gamle beslutningslenker beholder leverandør, varenummer (søk) og gruppe.
+
+## Kostpris: nyeste gyldige pris (2026-10-11)
+- Én velger: `_rm_cost_candidates(rm, dato)` (intern). Nyeste `effective_date <= rm_oslo_today()`, deretter `created_at`, `id`. På tvers av leverandører (primær styrer bare innkjøp). Gyldig: samme selskap, NOK, pris > 0, ikke kreditnota/legacy/utgått; fakturalinje fortsatt koblet, bekreftet match, ikke til gjennomgang, sikker mengde, faktura klar/avstemt/kostprisført/tiltrodd, uten sumavvik (unntatt avstemt) og uten lesevarsler; eller dokumentert manuell/avtale/prisliste-rad med bruker og begrunnelse. `recalc`-rader teller ikke lenger.
+- `rm_apply_derived_cost_price`: ingen datovakt, ingen permanent manuell frys; faller tilbake ved ugyldiggjøring (avkobling, gjennomgang, flagg, revokering). Uten gyldig kilde beholdes prisen (status «uverifisert»), aldri null. Eldre manuell pris uten dokumentert historikk vinner bare når den er nyere.
+- `rm_set_documented_cost_price` (atomisk, rettighet + selskap, historikk + revisjon), `rm_cost_price_source`, `rm_cost_price_deviations`, `rm_refresh_cost_prices` (bare på brukerens valg), `rm_activate_due_cost_prices` (cron hver time).
+- `recalc_raw_material_cost`: ingen 25 %-regel; førte linjer endres aldri; historisk pakning = linjens egen dokumenterte pakning, ellers entydig variant; flere varianter → endres ikke. Kostpris settes av felles velger.
+- `recipe_line_base_qty`: vekt regnes ikke om til volum uten tetthet (som appen).
+- Grunnenhetsbytte setter eksisterende observasjoner som utgått (`enhet_endret`).
+- Testet i rullet-tilbake SQL-fixture: eldste → sekundær +30 % → gammel importert etter → avkoblet nyeste faller tilbake → samme dato (senest opprettet) → manuell gammel påvirker ikke → manuell fremtidig planlagt → manuell i dag gjeldende → pris 0 avvist → kreditnota teller ikke → ingen kilde = uverifisert → 36x90g = 30 kr/kg, 5/10 kg = 20/18 kr/kg → gram→liter = null → enhetsbytte fjerner kandidater.
+- Begrensninger: avviksoversikten er ikke kjørt innlogget mot live (tallene 34/35 er fra kontrollen); avvikene rettes først når noen trykker «Oppdater valgte» eller en faktura endres. Utgåtte hendelser viser årsak og dato, men ikke «etter»-verdien side om side. Oppskrifter merker manglende pris, men ikke «uverifisert». Åpne kalkyler hentes på nytt ved fokus og hvert 2. minutt (ikke sanntid).

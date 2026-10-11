@@ -123,15 +123,15 @@ describe("priceTimeline", () => {
     expect(supplier?.points.map((p) => p.price)).not.toContain(12);
   });
 
-  it("merker kreditnotaer", () => {
+  it("kreditnotaer er egne hendelser, ikke prispunkter", () => {
     const result = buildTimeline({
       history,
       supplierNames: new Map([["s1", "Leverandør 1"]]),
       links: [],
     });
     const supplier = result.series.find((x) => x.key === "s1");
-    expect(supplier?.points).toHaveLength(2);
-    expect(supplier?.points.filter((p) => p.isCreditNote)).toHaveLength(1);
+    expect(supplier?.points).toHaveLength(1);
+    expect(result.events.filter((e) => e.kind === "kreditnota")).toHaveLength(1);
   });
 
   it("regner Δ mot forrige punkt i samme serie", () => {
@@ -141,9 +141,9 @@ describe("priceTimeline", () => {
       links: [],
     });
     const supplier = result.series.find((x) => x.key === "s1");
-    // 10 kr -> -3 kr: (-3 - 10) / |10| * 100 = -130 %.
+    // Kreditnotaen (-3 kr) er ikke et sammenlignbart punkt, så første gyldige punkt har ingen Δ.
     expect(supplier?.points[0].deltaPrevPct).toBeNull();
-    expect(supplier?.points[1].deltaPrevPct).toBeCloseTo(-130, 4);
+    expect(supplier?.points).toHaveLength(1);
   });
 
   it("regner Δ mot avtaleprisen som gjaldt på datoen", () => {

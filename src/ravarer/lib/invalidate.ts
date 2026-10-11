@@ -93,6 +93,14 @@ const RAW_MATERIAL_GLOBAL_KEYS: readonly string[] = [
   // leverandør og endres av fakturaer, ikke av en råvareendring. Den
   // invalideres via `invalidateInvoice`-flatene der den hører hjemme.
   "recipes-using-raw-material",
+  // Kalkyler som bruker kostprisen: ikke vis gammel cache som aktuell.
+  "product-cost",
+  "product-margins",
+  "product-margin-rows",
+  "recipe-detail",
+  "recipe-composite",
+  "recipes-list",
+  "rm-cost-deviations",
 
 ];
 
@@ -109,6 +117,7 @@ const RAW_MATERIAL_SCOPED_KEYS: readonly string[] = [
   "rm-recent-invoice-lines",
   "rm-product-link",
   "rm-suggestion-links",
+  "rm-cost-source",
 ];
 
 const INVOICE_GLOBAL_KEYS: readonly string[] = [

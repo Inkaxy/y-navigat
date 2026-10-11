@@ -15735,6 +15735,20 @@ export type Database = {
         }
         Returns: Json
       }
+      _rm_cost_candidates: {
+        Args: { p_as_of: string; p_raw_material_id: string }
+        Returns: {
+          created_at: string
+          effective_date: string
+          history_id: string
+          invoice_id: string
+          invoice_line_id: string
+          invoice_number: string
+          price: number
+          source: string
+          supplier_id: string
+        }[]
+      }
       _rm_reconcile_core: {
         Args: { p_invoice_id: string; p_mode: string; p_uid: string }
         Returns: Json
@@ -17540,6 +17554,7 @@ export type Database = {
         Args: { p_invoice_id: string; p_reason: string }
         Returns: Json
       }
+      rm_activate_due_cost_prices: { Args: never; Returns: number }
       rm_activity_feed: {
         Args: { p_legal_entity_id: string; p_limit?: number; p_since?: string }
         Returns: Json
@@ -17674,6 +17689,27 @@ export type Database = {
         }
         Returns: Json
       }
+      rm_cost_price_deviations: {
+        Args: { p_legal_entity_id: string }
+        Returns: {
+          base_unit: string
+          current_price: number
+          invoice_id: string
+          invoice_number: string
+          name: string
+          price_source: string
+          raw_material_id: string
+          source_date: string
+          source_kind: string
+          source_price: number
+          status: string
+          supplier_name: string
+        }[]
+      }
+      rm_cost_price_source: {
+        Args: { p_raw_material_id: string }
+        Returns: Json
+      }
       rm_effective_agreement: {
         Args: { p_on_date?: string; p_raw_material_id: string }
         Returns: {
@@ -17783,6 +17819,7 @@ export type Database = {
         }
         Returns: Json
       }
+      rm_oslo_today: { Args: never; Returns: string }
       rm_package_factor: {
         Args: { p_raw_material_id: string; p_supplier_id: string }
         Returns: {
@@ -17857,6 +17894,10 @@ export type Database = {
         Returns: Json
       }
       rm_reconcile_invoice: { Args: { p_invoice_id: string }; Returns: Json }
+      rm_refresh_cost_prices: {
+        Args: { p_raw_material_ids: string[] }
+        Returns: Json
+      }
       rm_rematch_invoices: {
         Args: {
           p_invoice_ids?: string[]
@@ -17884,6 +17925,17 @@ export type Database = {
           status: string
           supplier_name: string
         }[]
+      }
+      rm_set_documented_cost_price: {
+        Args: {
+          p_effective_date: string
+          p_price: number
+          p_raw_material_id: string
+          p_reason: string
+          p_source?: string
+          p_supplier_id?: string
+        }
+        Returns: Json
       }
       rm_set_extraction_example_active: {
         Args: { p_active: boolean; p_example_id: string; p_reason?: string }

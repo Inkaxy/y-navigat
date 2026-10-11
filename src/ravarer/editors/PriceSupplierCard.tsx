@@ -1,3 +1,4 @@
+import { CostSourceInfo } from "@/ravarer/components/CostSourceInfo";
 import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -47,6 +48,7 @@ export function PriceSupplierCard({ rm, canWrite, onEditLink }: Props) {
           <p className="text-caption text-muted-foreground">
             {sourceLabel(rm.price_source)} · {formatDate(rm.price_updated_at)}
           </p>
+          <div className="mt-2"><CostSourceInfo rawMaterialId={rm.id} /></div>
           {canWrite && (
             <Button variant="outline" size="sm" className="mt-2" onClick={() => setCostOpen(true)}>Endre</Button>
           )}

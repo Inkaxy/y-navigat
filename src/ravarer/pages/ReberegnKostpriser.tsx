@@ -24,6 +24,7 @@ import { BUCKETS, RECALC_COLUMNS, kr } from "@/ravarer/pages/reberegn/reberegnCo
 import { useCostRecalc, type RecalcBucket, type RecalcRow } from "@/fakturaer/hooks/useCostRecalc";
 import { fmtNum } from "@/fakturaer/lib/units";
 import { paths } from "@/ravarer/lib/paths";
+import { CostDeviationsCard } from "@/ravarer/components/CostDeviationsCard";
 
 export default function ReberegnKostpriser() {
   const { rows, progress, receipt, items, batchIds, error, scan, apply, undoAll, cancel, reset } = useCostRecalc();
@@ -91,6 +92,7 @@ export default function ReberegnKostpriser() {
       actions={<Button asChild variant="ghost" size="sm" className="gap-1"><Link to={paths.priskontroll({ fane: "gjore" })}><ArrowLeft className="h-3.5 w-3.5" aria-hidden />Priskontroll</Link></Button>}
     >
     <div className="space-y-5 px-page pb-6">
+      <CostDeviationsCard />
 
       <Card className="p-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -100,7 +102,8 @@ export default function ReberegnKostpriser() {
               Motoren leser alle fakturalinjer som er koblet til en råvare på fakturaer med status «klar» eller
               «avstemt», og regner kostpris som <strong>beløp ÷ mengde omregnet til varens basisenhet</strong>.
               Historikken brukes bevisst ikke som fasit her — det er nettopp de registrerte prisene vi kontrollerer.
-              Avtalepriser røres ikke.
+              Avtalepriser røres ikke. Linjer med ført kostpris endres aldri, gamle linjer bruker sin egen dokumenterte
+              pakning, og gjeldende kostpris settes etterpå av samme regel som ellers: nyeste gyldige pris etter dato.
             </p>
           </div>
           <div className="flex items-center gap-2">

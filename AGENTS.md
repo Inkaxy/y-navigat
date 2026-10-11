@@ -9,3 +9,4 @@
 - Kostprisføring vurderes som ført/totalt varelinjer; delvis føring er ikke ferdig. Why: `rm_post_safe_line_costs` fører restlinjer senere.
 - E-postkøen tas ut atomisk via `claim_email_outbox_*` (bare pending) og `process-email-outbox` krever cron-secret/service. Why: ingen replay eller duplikat ved samtidige kjøringer.
 - Mva-kontroll (`rm_repair_invoice_vat`) foreslår bare; beløp endres aldri automatisk. Why: et mva-lignende forhold kan være en manglende linje.
+- Gjeldende kostpris settes bare av `rm_apply_derived_cost_price` via `_rm_cost_candidates` (nyeste gyldige etter dato); manuell pris via `rm_set_documented_cost_price`. Why: én prisvelger for alle skriveveier, ingen klient-UPDATE av kostpris.
