@@ -196,14 +196,15 @@ function cellFor(id: string, ctx: VarelisteCellContext): (item: RawMaterialListI
   const detailUrl = (item: RawMaterialListItem) => `${paths.raavare(item.id)}${ctx.listSearch ? `?${ctx.listSearch}` : ""}`;
   switch (id) {
     case "sku":
-      return (item) => <Link to={detailUrl(item)} className="font-mono text-xs text-muted-foreground hover:underline">{item.sku}</Link>;
+      return (item) => <Link to={detailUrl(item)} className="whitespace-nowrap font-mono text-xs text-muted-foreground hover:underline">{item.sku}</Link>;
     case "name":
       return (item) => (
-        <>
-          <Link to={detailUrl(item)} className="block font-medium text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{item.name}</Link>
-          {item.declarationName && <span className="text-xs text-muted-foreground">{item.declarationName}</span>}
-          {item.matchedAlias && <Badge variant="outline" className="ml-1 text-[11px] font-normal">lev.nr {item.matchedAlias}</Badge>}
-        </>
+        <div className="min-w-[12rem] max-w-[22rem]">
+          {/* Navnet holdes lesbart: én linje med hele navnet i title; deklarasjonsnavn som én linje under. */}
+          <Link to={detailUrl(item)} title={item.name} className="block truncate font-medium text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{item.name}</Link>
+          {item.declarationName && <span className="block truncate text-xs text-muted-foreground" title={item.declarationName}>{item.declarationName}</span>}
+          {item.matchedAlias && <Badge variant="outline" className="text-[11px] font-normal">lev.nr {item.matchedAlias}</Badge>}
+        </div>
       );
     case "category":
       return (item) => editingField(ctx, item.id) === "category" ? (

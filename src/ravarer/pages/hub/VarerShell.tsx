@@ -15,6 +15,7 @@ export function VarerShell({ active, title = "Varer", children }: { active?: Var
   const [sp] = useSearchParams();
   return (
     <ModulePage
+      compact
       eyebrow={RAVARER_EYEBROW}
       title={title}
       crumbs={active ? undefined : [{ label: "Varer", to: paths.varer() }, { label: title }]}

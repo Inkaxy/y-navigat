@@ -66,6 +66,8 @@ type Props<T> = {
   scrollClassName?: string;
   minTableWidth?: string;
   emptyDescription?: string;
+  /** Tette rader: celler brytes ikke (kolonner styrer egen bredde/avkorting); tabellen ruller vannrett. */
+  dense?: boolean;
 };
 
 const ALIGN = { left: "text-left", right: "text-right", center: "text-center" } as const;
@@ -205,7 +207,7 @@ export function DataTable<T>(p: Props<T>) {
                 </th>
               )}
               {cols.map((c) => (
-                <th key={c.id} style={{ width: c.width }} className={cn("px-3 font-medium", ALIGN[c.align ?? "left"])} aria-sort={sort?.id === c.id ? (sort.dir === "asc" ? "ascending" : "descending") : undefined}>
+                <th key={c.id} style={{ width: c.width }} className={cn("px-3 font-medium", p.dense && "whitespace-nowrap", ALIGN[c.align ?? "left"])} aria-sort={sort?.id === c.id ? (sort.dir === "asc" ? "ascending" : "descending") : undefined}>
                   {c.sortKey ? (
                     <button type="button" onClick={() => toggleSort(c)} className="inline-flex items-center gap-1 hover:text-foreground">
                       {c.header}
@@ -241,7 +243,7 @@ export function DataTable<T>(p: Props<T>) {
                     </td>
                   )}
                   {cols.map((c) => (
-                    <td key={c.id} className={cn("px-3", ALIGN[c.align ?? "left"])}>{c.cell(r)}</td>
+                    <td key={c.id} className={cn("px-3", p.dense && "whitespace-nowrap py-1", ALIGN[c.align ?? "left"])}>{c.cell(r)}</td>
                   ))}
                 </tr>
               );
