@@ -36,7 +36,7 @@ function setup(warm: { version?: string } = {}) {
     const old = Date.now() - 60_000;
     qc.setQueryData([DOC_VERSION_KEY, "i1", "c1", "u1"], meta(warm.version).data, { updatedAt: old });
     qc.setQueryData(["invoice-doc-url", PATH, warm.version, "u1|c1"], "https://signed/old");
-    qc.setQueryData(["invoice-document-render", PATH, warm.version, "u1|c1"], { kind: "pdf", bytes: pdfBytes(), type: "application/pdf", fingerprint: "old" });
+    qc.setQueryData(["invoice-document-render", PATH, warm.version, "u1|c1", 1], { kind: "pdf", bytes: pdfBytes(), type: "application/pdf", fingerprint: "old" });
   }
   const ui = (): ReactNode => (
     <QueryClientProvider client={qc}>

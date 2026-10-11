@@ -50,7 +50,9 @@ interface Props {
    * Leser gjeldende identitet på nytt ETTER nedlasting. Stemmer den ikke med `cacheKey|version`,
    * forkastes bytene (lagres aldri som gyldige) og «Originalen er endret» vises.
    */
-  verifyIdentity?: (expected: string) => Promise<string | null>;
+  verifyIdentity?: (expected: string, generation?: number) => Promise<string | null>;
+  /** Delt verifiseringsgenerasjon; begge kontroller bindes til generasjonen hentingen startet i. */
+  generation?: number;
   /** Bruker+selskap; bytecache deles aldri på tvers av tilgangskontekst. */
   accessScope?: string | null;
   /** Hent ny identitet (etter «Originalen er endret»). */
@@ -62,16 +64,16 @@ export class DocumentChangedError extends Error {
 }
 
 /** Originaldokumentet tegnet med PDF.js i appen: sider, zoom, lasting, feil og «Prøv igjen». */
-export function PdfDocumentViewer({ url, cacheKey, version, title, fallback, className, verifyIdentity, onIdentityChanged, accessScope }: Props) {
+export function PdfDocumentViewer({ url, cacheKey, version, title, fallback, className, verifyIdentity, onIdentityChanged, accessScope, generation }: Props) {
   const q = useQuery({
-    queryKey: ["invoice-document-render", cacheKey, version ?? null, accessScope ?? null],
+    queryKey: ["invoice-document-render", cacheKey, version ?? null, accessScope ?? null, generation ?? null],
     queryFn: async () => {
       const expected = `${cacheKey}|${version ?? ""}`;
       // Før nedlasting: forventet identitet må fortsatt gjelde.
-      if (verifyIdentity && (await verifyIdentity(expected)) !== expected) throw new DocumentChangedError();
+      if (verifyIdentity && (await verifyIdentity(expected, generation)) !== expected) throw new DocumentChangedError();
       const bytes = await loadDocumentBytes(url);
       // Kontrollen fullføres før bytene publiseres; ved avvik caches de aldri som gyldige.
-      if (verifyIdentity && (await verifyIdentity(expected)) !== expected) throw new DocumentChangedError();
+      if (verifyIdentity && (await verifyIdentity(expected, generation)) !== expected) throw new DocumentChangedError();
       return bytes;
     },
     staleTime: 10 * 60_000, gcTime: 10 * 60_000,
