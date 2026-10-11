@@ -136,7 +136,7 @@ export const BUILTIN_VIEWS: ViewDefinition[] = [
   { id: "missing_nutrition", label: "Mangler næring", predicate: (i) => !i.hasNutrition },
   {
     id: "deviation",
-    label: "Avvik > toleranse",
+    label: "Fakturaavvik > toleranse",
     predicate: (i, isLarge) => isLarge(i),
   },
   { id: "not_purchased", label: "Ikke kjøpt 12 mnd", predicate: (i) => i.volume12m <= 0 },

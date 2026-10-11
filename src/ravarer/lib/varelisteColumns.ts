@@ -16,7 +16,7 @@ export const LIST_COLUMNS: ListColumn[] = [
   { id: "supplier", label: "Leverandør", sortKey: "supplier" },
   { id: "cost", label: "Kostpris", sortKey: "cost", numeric: true },
   { id: "agreed", label: "Avtalepris", sortKey: "agreed", numeric: true },
-  { id: "deviation", label: "Avvik", sortKey: "deviation", numeric: true },
+  { id: "deviation", label: "Avvik faktura/kost", sortKey: "deviation", numeric: true },
   { id: "package", label: "Pakning", sortKey: "package" },
   { id: "volume_12m", label: "Volum 12 mnd", sortKey: "volume_12m", numeric: true },
   { id: "last_invoice", label: "Siste faktura", sortKey: "last_invoice" },
