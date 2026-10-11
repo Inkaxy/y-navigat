@@ -8,12 +8,15 @@
  */
 import { isAgreementConfirmed } from "./priceTimeline";
 
-export interface SupplierPackageInput {
+export interface PackageFields {
   package_size: number | null;
   package_unit: string | null;
   base_units_per_package: number | null;
   package_confirmed_at: string | null;
   package_confirmed_by: string | null;
+}
+
+export interface SupplierPackageInput extends PackageFields {
   agreed_price_per_base_unit: number | null;
   agreed_price_set_at: string | null;
   agreed_price_set_by: string | null;
@@ -21,20 +24,22 @@ export interface SupplierPackageInput {
 
 const fmt = (n: number) => n.toLocaleString("nb-NO", { maximumFractionDigits: 4 });
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+/** Måleenheter: bare da betyr `package_size` innhold. «20 sekk» er aldri 20 beholdere. */
+const MEASURE = new Set(["g", "kg", "ml", "cl", "dl", "l", "stk"]);
 
 /** Bekreftet, endelig positiv faktor — ellers null. */
-export function confirmedFactor(l: SupplierPackageInput): number | null {
+export function confirmedFactor(l: PackageFields): number | null {
   const f = Number(l.base_units_per_package);
   if (l.base_units_per_package == null || !Number.isFinite(f) || !(f > 0)) return null;
   return l.package_confirmed_at && l.package_confirmed_by ? f : null;
 }
 
 /** «Sekk · 20 kg per pakning», «25 kg», eller null når ingenting er dokumentert. */
-export function packageLabel(l: SupplierPackageInput, baseUnit: string): { label: string | null; confirmed: boolean } {
+export function packageLabel(l: PackageFields, baseUnit: string): { label: string | null; confirmed: boolean } {
   const f = confirmedFactor(l);
   const unit = l.package_unit?.trim() || null;
   const size = l.package_size != null && l.package_size > 0 ? l.package_size : null;
-  const head = size != null && unit ? `${fmt(size)} ${unit}` : unit ? cap(unit) : null;
+  const head = size != null && unit && MEASURE.has(unit.toLowerCase()) ? `${fmt(size)} ${unit}` : unit ? cap(unit) : null;
   if (f != null) return { label: `${head ? `${head} · ` : ""}${fmt(f)} ${baseUnit} per pakning`, confirmed: true };
   return { label: head, confirmed: false };
 }
