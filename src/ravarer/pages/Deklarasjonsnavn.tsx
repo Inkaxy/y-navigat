@@ -23,40 +23,21 @@ export default function Deklarasjonsnavn() {
   const { legalEntityId, canWrite } = useRavarer();
   const { data: rows = [], isLoading } = useDeclarationWorklist(legalEntityId);
   const save = useSaveDeclarationName();
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState<string | null>(null);
   const [savingAll, setSavingAll] = useState(false);
-
-  useEffect(() => {
-    setValues((prev) => {
-      const next = { ...prev };
-      for (const r of rows) if (next[r.raw_material_id] === undefined) next[r.raw_material_id] = initialFor(r);
-      return next;
-    });
-  }, [rows]);
 
   const simple = useMemo(() => rows.filter((r) => !r.is_composite), [rows]);
   const composite = useMemo(() => rows.filter((r) => r.is_composite), [rows]);
-  const filledCount = simple.filter((r) => (values[r.raw_material_id] ?? "").trim()).length;
-
-  async function saveOne(id: string) {
-    setBusy(id);
-    try {
-      await save.mutateAsync({ rawMaterialId: id, declarationName: values[id] ?? "" });
-    } catch {
-      /* toast i hooken */
-    } finally {
-      setBusy(null);
-    }
-  }
+  const prefilled = useMemo(
+    () => simple.filter((r) => initialFor(r).length > 0),
+    [simple],
+  );
 
   async function saveAll() {
     setSavingAll(true);
     let ok = 0;
     let failed = 0;
-    for (const r of simple) {
-      const v = (values[r.raw_material_id] ?? "").trim();
-      if (!v) continue;
+    for (const r of prefilled) {
+      const v = initialFor(r);
       try {
         await save.mutateAsync({ rawMaterialId: r.raw_material_id, declarationName: v, silent: true });
         ok++;
@@ -81,10 +62,10 @@ export default function Deklarasjonsnavn() {
           <div className="text-sm text-ink-secondary">
             {isLoading ? "Laster …" : `${simple.length} råvarer mangler navn`}
           </div>
-          {canWrite && simple.length > 0 && (
-            <Button size="sm" onClick={saveAll} disabled={savingAll || filledCount === 0}>
+          {canWrite && prefilled.length > 0 && (
+            <Button size="sm" onClick={saveAll} disabled={savingAll}>
               {savingAll ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
-              Lagre alle utfylte ({filledCount})
+              Lagre alle utfylte ({prefilled.length})
             </Button>
           )}
         </div>
@@ -104,26 +85,14 @@ export default function Deklarasjonsnavn() {
                   Brukes i {r.recipes_using} oppskrift{r.recipes_using === 1 ? "" : "er"}
                 </div>
               </div>
-              <Input
-                value={values[r.raw_material_id] ?? ""}
-                onChange={(e) => setValues((v) => ({ ...v, [r.raw_material_id]: e.target.value }))}
-                placeholder="f.eks. hvetemel"
+              <DeclarationNameField
+                rawMaterialId={r.raw_material_id}
+                value={initialFor(r)}
+                rawMaterialName={r.name}
+                matvaretabellenName={r.matvaretabellen_name}
                 disabled={!canWrite}
-                className="h-9 w-64"
+                compact
               />
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={!canWrite || busy === r.raw_material_id || !(values[r.raw_material_id] ?? "").trim()}
-                onClick={() => saveOne(r.raw_material_id)}
-              >
-                {busy === r.raw_material_id ? (
-                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="mr-1.5 h-4 w-4" />
-                )}
-                Lagre
-              </Button>
             </div>
           ))}
         </div>
