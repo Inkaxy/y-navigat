@@ -71,13 +71,30 @@ export function hasLinesRead(inv: Pick<DeliveryInvoice, "line_count" | "lines_so
  * «Hent linjer» gjør bare noe når linjene ikke allerede er lest
  * (`rm_claim_invoice_line_extraction` tar bare `line_extraction_status <> 'done'`).
  */
-export function canFetchLines(inv: { source: string | null; line_extraction_status?: string | null }): boolean {
+export function canFetchLines(inv: { source: string | null; line_extraction_status?: string | null; line_count?: number | null }): boolean {
+  // Første innlesing bare når fakturaen er tom — eksisterende linjer leses aldri over her.
+  if (inv.line_count != null && inv.line_count > 0) return false;
   return inv.source === "tripletex" && inv.line_extraction_status !== "done";
 }
 
-/** Summen er kontrollert når den er ok eller overstyrt — ikke ved avvik eller ukontrollert. */
-export function sumOk(status: string | null): boolean {
-  return status != null && status !== "mismatch";
+/** Serverstatusene som betyr at summen faktisk er kontrollert. */
+export const SUM_CHECKED_STATUSES = ["ok", "overridden"] as const;
+
+/** Summen er kontrollert bare ved eksplisitt gyldig status — aldri ved no_lines/no_total/not_checked/null/ukjent. */
+export function sumOk(status: string | null | undefined): boolean {
+  return (SUM_CHECKED_STATUSES as readonly string[]).includes(status ?? "");
+}
+
+/** Norsk etikett for serverens sumstatus. */
+export function sumStatusLabel(status: string | null | undefined): string {
+  switch (status) {
+    case "ok": return "Sum stemmer";
+    case "overridden": return "Sum overstyrt";
+    case "mismatch": return "Sum stemmer ikke";
+    case "no_lines": return "Ingen linjer å kontrollere";
+    case "no_total": return "Fakturabeløp mangler";
+    default: return "Sum ikke kontrollert";
+  }
 }
 
 export function deliverySteps(inv: DeliveryInvoice, extras: DeliveryExtras): DeliveryStep[] {
@@ -97,6 +114,8 @@ export function deliverySteps(inv: DeliveryInvoice, extras: DeliveryExtras): Del
         ? "Alle linjer avklart og summen stemmer"
         : inv.lines_sum_status === "mismatch"
           ? "Summen av linjene stemmer ikke med fakturabeløpet"
+          : !sumOk(inv.lines_sum_status) && inv.open_count === 0
+            ? sumStatusLabel(inv.lines_sum_status)
           : inv.open_count > 0
             ? `${inv.open_count} ${inv.open_count === 1 ? "linje" : "linjer"} må avklares`
             : "Ikke kontrollert ennå",
@@ -146,7 +165,7 @@ export function nextInvoiceStep(i: NextStepInput): NextStep {
     return { key: "koble_kreditnota", label: "Koble kreditnota", enabled: i.canWrite, hint: "Kreditnotaen er ikke koblet til den opprinnelige fakturaen." };
   }
   if (!hasLinesRead(i) || i.line_count === 0) {
-    return canFetchLines(i)
+    return canFetchLines({ ...i, line_count: i.line_count })
       ? { key: "hent_linjer", label: "Hent linjer", enabled: i.canWrite, hint: "Linjene er ikke hentet fra Tripletex ennå." }
       : { key: "registrer_linjer", label: "Registrer linjer", enabled: i.canWrite, hint: "Linjene må registreres manuelt." };
   }

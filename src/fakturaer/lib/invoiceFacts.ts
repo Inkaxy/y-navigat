@@ -26,8 +26,10 @@ export function readingReliability(i: {
   const mismatch = i.linesSumStatus === "mismatch" || (i.variancePct != null && Number.isFinite(i.variancePct) && Math.abs(i.variancePct) > 2);
   const issues = (i.readIssueCount ?? 0) > 0;
   if (mismatch || issues) return { label: mismatch ? "Ikke bekreftet – sum avviker" : "Ikke bekreftet – lesevarsler", validated: false, rawScore: raw };
-  if (raw == null) return { label: "—", validated: false, rawScore: null };
-  return { label: `${confidenceLabel(i.confidence)} sikkerhet`, validated: i.linesSumStatus != null, rawScore: raw };
+  // Validert betyr at linjesummen faktisk er kontrollert mot fakturaen — ikke at AI-en er sikker.
+  const checked = i.linesSumStatus === "ok" || i.linesSumStatus === "overridden";
+  if (!checked) return { label: "Ikke kontrollert mot fakturasum", validated: false, rawScore: raw };
+  return { label: i.linesSumStatus === "overridden" ? "Kontrollert (sum overstyrt)" : "Kontrollert mot fakturasum", validated: true, rawScore: raw };
 }
 
 export function linesSourceLabel(s: string | null | undefined): string {
