@@ -46,8 +46,8 @@ const item = (rm: string | null): WorkItem => ({
   key: "k", grp: "pris", type: "varekort", kind: "prisavvik", supplier_id: "s", supplier_name: "S", item_key: "sku:1", invoice_id: null,
   invoice_number: null, title: "Mel", sku: null, rm_id: rm, rm_name: "Mel", open_lines: 1, open_invoices: 1, invoice_count: 1, amount: 0,
   impact_nok: null, last_date: null, last_open_line_id: "l1", reasons: [], effect_status: "unknown", effect_label: null,
-  read_integrity: "ok", read_integrity_flags: [], unknown_effect_lines: null, amount_kind: null,
-} as unknown as WorkItem);
+  read_integrity: "checked", read_integrity_flags: [], unknown_effect_lines: null, amount_kind: null, action_required: null,
+});
 
 const tree = (it: WorkItem) => <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><WorkRowPrice it={it} /></QueryClientProvider>;
 
