@@ -39,10 +39,10 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 | R23 | Masse: kø for å bekrefte pakning (hopper over bekreftede) | Massehandlingsrad → PackageEditor i kø | 4 | Flyttet — Vareliste massehandlingsrad → PackageEditor-kø (kilde/komponenttest; ikke nettleserverifisert) |
 | R24 | Masse: CSV med valgte rader × synlige kolonner (`;`, BOM) | Massehandlingsrad «Eksporter CSV» (norske verdier) | 4 | Flyttet — Vareliste `tableCsv` valgte × synlige kolonner (kolonnerekkefølge-test; ikke nettleserverifisert) |
 | R25 | Tøm valg | Massehandlingsrad | 4 | Flyttet — Vareliste massehandlingsrad (kilde; ikke nettleserverifisert) |
-| R26 | Hurtigtaster `/`, ↑, ↓, Enter, `e`, `n`, Esc | useHotkeys + J/K og `?`-liste | 4 | Gammel plass |
-| R28 | Banner om leverandørvarer som venter, lenke til Varekoblinger | Hint i header «N varekort venter» → /priskontroll?fane=gjore | 4 | Gammel plass |
+| R26 | Hurtigtaster `/`, ↑, ↓, Enter, `e`, `n`, Esc | useHotkeys + J/K og `?`-liste | 4 | Flyttet — Vareliste i arbeidsflaten (kilde; ikke nettleserverifisert) |
+| R28 | Banner om leverandørvarer som venter, lenke til Varekoblinger | Hint i header «N varekort venter» → /priskontroll?fane=gjore | 4 | Flyttet — Vareliste i arbeidsflaten (kilde; ikke nettleserverifisert) |
 | R29 | Mobil kortliste med merkene Avvik, Mangler deklarasjon og Inaktiv | DataTable mobilkort på /varer | 6 | Gammel plass |
-| R30 | Teller «{filtrert} av {totalt}» og tom/laster/feil-tilstander | Tabellfot + QueryState | 4 | Gammel plass |
+| R30 | Teller «{filtrert} av {totalt}» og tom/laster/feil-tilstander | Tabellfot + QueryState | 4 | Flyttet — Vareliste i arbeidsflaten (kilde; ikke nettleserverifisert) |
 
 ## Råvarekort – header og navigasjon
 
