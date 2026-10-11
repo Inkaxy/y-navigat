@@ -4,7 +4,8 @@ import { OrderDeskKpi } from "@/ordre/components/dashboard/OrderDeskKpi";
 import { formatDate, formatNok, formatNumber } from "@/ravarer/lib/constants";
 import { getAgreementStatus } from "@/ravarer/lib/agreementStatus";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
-import { useSupplierItems, useSupplierPriceIndex, useSupplierSpend, useTotalSpend } from "@/ravarer/hooks/useSupplierDetail";
+import { useSupplierItems, useSupplierSpend, useTotalSpend } from "@/ravarer/hooks/useSupplierDetail";
+import { spendShare, type SupplierSpendSummary } from "@/ravarer/lib/supplierSpend";
 import type { SupplierRow } from "@/ravarer/hooks/useSuppliers";
 import { SupplierStatusBadge, TrackInvoiceToggle, TRACK_HELP_SHORT } from "./TrackInvoiceToggle";
 
@@ -18,9 +19,8 @@ function kpi<T>(q: { isLoading: boolean; isError: boolean; data: T | undefined }
 export function SupplierOverviewSection({ supplier }: { supplier: SupplierRow }) {
   const { canWrite, legalEntityId } = useRavarer();
   const items = useSupplierItems(supplier.id);
-  const spend = useSupplierSpend(supplier.id);
+  const spend = useSupplierSpend(supplier.id, legalEntityId);
   const total = useTotalSpend(legalEntityId);
-  const index = useSupplierPriceIndex(supplier.id);
 
   const expiring = useMemo(
     () => (items.data ?? []).filter((i) => {
@@ -29,10 +29,13 @@ export function SupplierOverviewSection({ supplier }: { supplier: SupplierRow })
     }).length,
     [items.data],
   );
-  const share = spend.data && total.data && total.data.nok > 0 && spend.data.otherCurrencyCount === 0 && total.data.otherCurrencyCount === 0
-    ? (spend.data.nok / total.data.nok) * 100 : null;
+  // Feil eller henting gir aldri en bufret prosent.
+  const shareUsable = !spend.isError && !total.isError && !spend.isFetching && !total.isFetching;
+  const share = shareUsable ? spendShare(spend.data, total.data) : null;
   const shareSub = spend.isError || total.isError ? "Kunne ikke beregnes"
-    : (spend.data?.otherCurrencyCount ?? 0) > 0 || (total.data?.otherCurrencyCount ?? 0) > 0 ? "Ikke beregnet: fakturaer i annen/ukjent valuta" : "Andel av alt innkjøp siste 12 mnd (NOK)";
+    : (spend.data?.otherCurrencyCount ?? 0) > 0 || (total.data?.otherCurrencyCount ?? 0) > 0 ? "Ikke beregnet: fakturaer i annen/ukjent valuta"
+    : spend.data?.netNok == null || total.data?.netNok == null ? "Ikke beregnet: ufullstendig grunnlag"
+    : "Andel av alt innkjøp siste 12 mnd (NOK)";
 
   return (
     <div className="space-y-4">
@@ -61,13 +64,23 @@ export function SupplierOverviewSection({ supplier }: { supplier: SupplierRow })
         <OrderDeskKpi icon={FileText} label="Fakturaer" value={supplier.invoice_count != null ? formatNumber(supplier.invoice_count, 0) : "—"} sub="Registrert i NBhub" />
         <OrderDeskKpi icon={CalendarDays} label="Siste faktura" value={formatDate(supplier.last_invoice_date)} />
         <OrderDeskKpi icon={Boxes} label="Varer koblet" value={kpi(items, (d) => String(d.length))} />
-        <OrderDeskKpi icon={Wallet} label="Kjøpt 12 mnd (eks. mva)" value={kpi(spend, (d) => formatNok(d.nok))}
-          sub={spend.data && spend.data.otherCurrencyCount > 0 ? `NOK-fakturaer. ${spend.data.otherCurrencyCount} i annen/ukjent valuta er ikke med` : "NOK, kreditnotaer trukket fra"} />
+        <OrderDeskKpi icon={Wallet} label="Kjøpt 12 mnd (eks. mva)" value={kpi(spend, (d) => (d.netNok == null ? "Ukjent" : formatNok(d.netNok)))}
+          sub={spend.isError ? "Kunne ikke hentes" : spend.data ? spendSub(spend.data) : undefined} />
         <OrderDeskKpi icon={PieChart} label="Andel av innkjøp" value={spend.isLoading || total.isLoading ? "…" : share == null ? "—" : `${formatNumber(share, 1)} %`} sub={shareSub} />
         <OrderDeskKpi icon={CalendarClock} tone={expiring > 0 ? "warning" : "default"} label="Avtaler som utløper ≤ 90 d" value={kpi(items, () => String(expiring))} sub="Sluttdato innen 90 dager" />
-        <OrderDeskKpi icon={TrendingUp} label="Prisindeks" value={kpi(index, (d) => (d.indexPct == null ? "—" : formatNumber(d.indexPct, 0)))}
-          sub={index.data?.indexPct == null ? "For få fakturalinjer" : `Siste pris mot 12 mnd snitt, ${index.data.materials} varer (100 = uendret)`} />
+        {/* Prisindeksen holdes tilbake til kontrollert sammenlignbar historikk finnes; prisutvikling per vare ligger på råvarekortet. */}
+        <OrderDeskKpi icon={TrendingUp} label="Prisindeks" value="Ukjent" sub="Ikke beregnet: fakturapriser er ikke kontrollert som sammenlignbare. Se prisutvikling per vare." />
       </div>
     </div>
   );
+}
+
+function spendSub(d: SupplierSpendSummary): string {
+  const parts: string[] = [`${d.periodStart} – ${d.periodEnd}, NOK, kreditnotaer trukket fra`];
+  if (d.missingVatCount > 0) parts.push(`${d.missingVatCount} uten mva`);
+  if (d.missingAmountCount + d.invalidAmountCount > 0) parts.push(`${d.missingAmountCount + d.invalidAmountCount} med ukjent beløp`);
+  if (d.netNok == null) parts.push(`kjent delsum ${formatNok(d.knownNetNokSubtotal)}`);
+  if (d.otherCurrencyCount > 0) parts.push(`${d.otherCurrencyCount} i annen/ukjent valuta ikke med`);
+  if (d.excludedCancelledCount > 0) parts.push(`${d.excludedCancelledCount} kansellerte ikke med`);
+  return parts.join(" · ");
 }
