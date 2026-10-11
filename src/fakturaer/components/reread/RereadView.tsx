@@ -8,7 +8,7 @@ import { RereadSumSummary } from "./RereadSumSummary";
 import { RereadComparisonList } from "./RereadComparisonList";
 import { RereadInspector } from "./RereadInspector";
 import { RereadApplyPanel } from "./RereadApplyPanel";
-import { IssueList, showValue } from "./RereadParts";
+import { IssueList, showDate, showValue } from "./RereadParts";
 
 export type RereadViewProps = {
   run: RereadRun;
@@ -47,7 +47,7 @@ function RereadViewInner({ run, document, canApply, readOnlyReason, pending, sav
         <thead className="text-caption text-ink-secondary"><tr><th className="text-left font-medium">Felt</th><th className="text-left font-medium">I dag (endres ikke)</th><th className="text-left font-medium">Ny lesing</th></tr></thead>
         <tbody>
           {run.header.map((h) => (
-            <tr key={h.label} className="border-t border-border"><td className="py-1 pr-2">{h.label}</td><td className="py-1 pr-2 tabular-nums">{showValue(h.old)}</td><td className="py-1 tabular-nums">{showValue(h.next)}</td></tr>
+            <tr key={h.label} className="border-t border-border"><td className="py-1 pr-2">{h.label}</td><td className="py-1 pr-2 tabular-nums">{h.label === "Fakturadato" ? showDate(h.old) : showValue(h.old)}</td><td className="py-1 tabular-nums">{h.label === "Fakturadato" ? showDate(h.next) : showValue(h.next)}</td></tr>
           ))}
           <tr className="border-t border-border"><td className="py-1 pr-2">Kreditnota</td><td className="py-1 pr-2">{run.invoice.is_credit_note ? "Ja" : "Nei"}</td><td className="py-1">{run.readCredit == null ? "Ikke oppgitt" : run.readCredit ? "Ja" : "Nei"}</td></tr>
           {run.readTotalSign && <tr className="border-t border-border"><td className="py-1 pr-2">Fortegn på lest total</td><td className="py-1 pr-2">–</td><td className="py-1">{run.readTotalSign === "positiv" ? "Positiv (som trykt)" : run.readTotalSign === "negativ" ? "Negativ (som trykt)" : "0"}</td></tr>}

@@ -26,3 +26,12 @@ export function IssueList({ title, issues, className }: { title: string; issues:
 export function RawScore({ value }: { value: number | null }) {
   return <span className="text-caption text-ink-secondary">[leserens egen score: {value == null ? "ukjent" : `${Math.round(value * 100)} %`}]</span>;
 }
+
+/** ISO-dato (ÅÅÅÅ-MM-DD…) vist som norsk dato; verdien beholdes uendret internt. */
+export function showDate(v: Value): string {
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v)) {
+    const d = new Date(`${v.slice(0, 10)}T12:00:00`);
+    if (!Number.isNaN(d.getTime())) return d.toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric" });
+  }
+  return showValue(v);
+}
