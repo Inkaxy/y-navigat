@@ -39,6 +39,14 @@ export function hasLinesRead(inv: Pick<DeliveryInvoice, "line_count" | "lines_so
   return inv.line_count > 0 && !EXTRACTION_PENDING.includes(inv.line_extraction_status ?? "");
 }
 
+/**
+ * «Hent linjer» gjør bare noe når linjene ikke allerede er lest
+ * (`rm_claim_invoice_line_extraction` tar bare `line_extraction_status <> 'done'`).
+ */
+export function canFetchLines(inv: { source: string | null; line_extraction_status?: string | null }): boolean {
+  return inv.source === "tripletex" && inv.line_extraction_status !== "done";
+}
+
 /** Summen er kontrollert når den er ok eller overstyrt — ikke ved avvik eller ukontrollert. */
 export function sumOk(status: string | null): boolean {
   return status != null && status !== "mismatch";
@@ -110,7 +118,7 @@ export function nextInvoiceStep(i: NextStepInput): NextStep {
     return { key: "koble_kreditnota", label: "Koble kreditnota", enabled: i.canWrite, hint: "Kreditnotaen er ikke koblet til den opprinnelige fakturaen." };
   }
   if (!hasLinesRead(i) || i.line_count === 0) {
-    return i.source === "tripletex"
+    return canFetchLines(i)
       ? { key: "hent_linjer", label: "Hent linjer", enabled: i.canWrite, hint: "Linjene er ikke hentet fra Tripletex ennå." }
       : { key: "registrer_linjer", label: "Registrer linjer", enabled: i.canWrite, hint: "Linjene må registreres manuelt." };
   }
