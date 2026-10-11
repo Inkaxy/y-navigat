@@ -7,14 +7,15 @@ import { normalizePriskontrollSearch } from "@/ravarer/pages/priskontroll/faktur
 
 const R = "/ravarer";
 
-function merge(search: string, extra: [string, string][], rename: Record<string, string | null> = {}): string {
+function merge(search: string, extra: [string, string][], rename: Record<string, string | null> = {}, values: Record<string, Record<string, string>> = {}): string {
   const src = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const out = new URLSearchParams();
   for (const [k, v] of extra) out.set(k, v);
   src.forEach((v, k) => {
     if (k in rename) {
       const to = rename[k];
-      if (to && !out.has(to)) out.set(to, v);
+      const mapped = values[k] ? values[k][v] : v;
+      if (to && mapped && !out.has(to)) out.set(to, mapped);
       return;
     }
     if (!out.has(k)) out.set(k, v);
@@ -23,11 +24,18 @@ function merge(search: string, extra: [string, string][], rename: Record<string,
   return s ? `?${s}` : "";
 }
 
-type Entry = { to: string; extra?: [string, string][]; rename?: Record<string, string | null>; /** Import-sidepanel: standardfane når ingen er oppgitt. */ importer?: boolean };
+type Entry = { to: string; extra?: [string, string][]; rename?: Record<string, string | null>; /** Verdioversetting for omdøpte parametre (ukjente verdier droppes). */ values?: Record<string, Record<string, string>>; /** Import-sidepanel: standardfane når ingen er oppgitt. */ importer?: boolean };
 const IMP = { to: `${R}/priskontroll`, rename: { tab: "importer" }, importer: true } as const;
 
-/** Gammel beslutningsvisning → Å gjøre; søk og leverandør følger med. */
-const GJORE: Entry = { to: `${R}/priskontroll`, extra: [["fane", "gjore"]], rename: { omfang: null, fra: null, side: null, type: null, fane: null } };
+/** Gamle beslutningstyper → gruppe i Å gjøre. */
+export const LEGACY_TYPE_TO_GRUPPE: Record<string, string> = { material: "kobling", package: "pakning", price: "pris" };
+
+/** Gammel beslutningsvisning → Å gjøre; søk, leverandør og type (som gruppe) følger med. */
+const GJORE: Entry = {
+  to: `${R}/priskontroll`, extra: [["fane", "gjore"]],
+  rename: { omfang: "gruppe", type: "gruppe", fra: null, side: null, fane: null },
+  values: { omfang: LEGACY_TYPE_TO_GRUPPE, type: LEGACY_TYPE_TO_GRUPPE },
+};
 
 const STATIC: Record<string, Entry> = {
   "/ravarer/vareliste": { to: `${R}/varer` },
@@ -101,7 +109,7 @@ export function resolveLegacyRavarerUrl(pathname: string, search: string): strin
   const p = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
   const st = STATIC[p];
   if (st) {
-    let q = merge(search, st.extra ?? [], st.rename);
+    let q = merge(search, st.extra ?? [], st.rename, st.values);
     if (st.importer && !new URLSearchParams(q.slice(1)).has("importer")) q = q ? `${q}&importer=ehf` : "?importer=ehf";
     return (st.to === `${R}/priskontroll` && normalizePriskontrollSearch(q)) || st.to + q;
   }
