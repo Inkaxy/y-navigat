@@ -274,6 +274,7 @@ describe("AI-tjenester", () => {
     setup();
     render(<AiServicesSettings />, { wrapper: Wrap });
     fireEvent.change(await screen.findByLabelText("API-nøkkel"), { target: { value: "syntetisk-nokkel" } });
+    fireEvent.change(screen.getByLabelText("Max tokens"), { target: { value: "2000" } });
     fireEvent.click(screen.getByRole("button", { name: "Erstatt konfigurasjon" }));
     expect(await screen.findByText(/ukjent eller delvis/)).toBeTruthy();
     expect((screen.getByLabelText("API-nøkkel") as HTMLInputElement).value).toBe("syntetisk-nokkel");
