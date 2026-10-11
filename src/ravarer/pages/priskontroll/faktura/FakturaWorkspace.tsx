@@ -206,6 +206,7 @@ export default function FakturaWorkspace() {
           onRegister={() => navigate(paths.registrerLinjer(data.id))}
           tolerancePct={tolerances.defaultPct}
           settings={tolerances.settings}
+          onCorrect={lineWrite ? (id) => setCorrectFor(id) : undefined}
         />
       ) : (
         <QueueWorkspace

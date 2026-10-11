@@ -25,9 +25,11 @@ interface Props {
   onRegister: () => void;
   tolerancePct: number;
   settings: MatchSettings | null;
+  /** «Rett fakturalinje» — samme dialog og server-RPC som i arbeidslisten. */
+  onCorrect?: (lineId: string) => void;
 }
 
-export function InvoiceLinesTable({ lines, supplierId, canBulkImport, canMatch, selected, onSelect, showLedgerAccount, onShowLedgerAccount, onMatch, onRegister, tolerancePct, settings }: Props) {
+export function InvoiceLinesTable({ lines, supplierId, canBulkImport, canMatch, selected, onSelect, showLedgerAccount, onShowLedgerAccount, onMatch, onRegister, tolerancePct, settings, onCorrect }: Props) {
   return (
         <Card className="overflow-hidden lg:col-span-2">
           <div className="flex items-center justify-between border-b border-line-subtle p-4">
@@ -118,6 +120,11 @@ export function InvoiceLinesTable({ lines, supplierId, canBulkImport, canMatch, 
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <OpenSupplierItemButton supplierId={supplierId} line={l} variant="ghost" iconOnly />
+                            {onCorrect && (
+                              <Button variant="ghost" size="icon" title="Rett fakturalinje" aria-label={`Rett fakturalinje ${l.line_number ?? ""}`} onClick={() => onCorrect(l.id)}>
+                                <FilePenLine className="h-4 w-4" />
+                              </Button>
+                            )}
                             {canMatch && (
                               <Button
                                 variant="ghost"
