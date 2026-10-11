@@ -32,6 +32,9 @@ interface ExtractedLine {
   package_size: number | null;
   package_unit: string | null;
   count_per_package: number | null;
+  line_kind?: string | null;
+  price_basis?: string | null;
+  discount_amount?: number | null;
 }
 
 interface ExtractedData {
@@ -165,6 +168,9 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
         package_size: l.package_size ?? null,
         package_unit: l.package_unit ?? null,
         count_per_package: l.count_per_package ?? null,
+        line_kind: l.line_kind ?? null,
+        price_basis: l.price_basis ?? null,
+        discount_amount: l.discount_amount ?? null,
       })));
 
       const match = result.matched_supplier ?? result.name_matched_supplier;
@@ -321,6 +327,9 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
           package_size: l.package_size,
           package_unit: l.package_unit,
           count_per_package: l.count_per_package,
+          line_kind: l.line_kind ?? null,
+          unit_price_basis: l.price_basis ?? null,
+          discount_amount: l.discount_amount ?? null,
         }));
         const { error: linesErr } = await supabase.from("invoice_lines").insert(linesPayload);
         if (linesErr) throw linesErr;

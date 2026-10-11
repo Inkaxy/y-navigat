@@ -50,3 +50,10 @@
 - Fortegn kontrolleres med fortegn: motsatt fortegn på vanlig faktura → `fortegn`; kreditnota godtar begge.
 - Rettelse med godtatte avvik lager læringseksempel som er AV og merket `accepted_issues`; må slås på manuelt. Eksempler gjør aldri linjer trygge — kontrollen kjøres alltid.
 - Begrensning: live-uttrekkene (PDF v139, Tripletex v67) kunne ikke hentes; de fyller ennå ikke `unit_price_basis`/`discount_amount`. Inntil da blir pakning-/vektprisede linjer «prisgrunnlag uavklart» ved import og må avklares i «Rett fakturalinje».
+
+## Utrullingsparitet leser/import (2026-10-11)
+- Repo bygget fra verifisert live-baseline (leser v139, import v67) + rettelser; deretter deployet KUN `extract-invoice-from-pdf` og `tripletex-import-invoice-lines`.
+- Kilde-SHA256 ved deploy: leser 85165b681f4cb2ef33189d73ad83f508f84701876b9879eff177e07ba47892ac, import 917e07913159dab950bcba5913068651f45aadcc5af69c453a47d02f0dc02da3.
+- Logikk i `_shared/invoiceExtraction.ts` og `tripletex-import-invoice-lines/rows.ts` (vitest: `src/test/fakturaleserParitet.test.ts`).
+- Fjernet: `fixVatScaledLines`. Lagt til: retry ved tomt/ugyldig svar, norske tall, linje-confidence, sikkerhet fra regnestykke + alle linjer, læringseksempler (selskap+leverandør, som data), prisgrunnlag og rabatt helt til `invoice_lines`.
+- Manuell PDF-import har ikke leverandør før lesing og får derfor ikke læringseksempler.

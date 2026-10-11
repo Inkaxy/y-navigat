@@ -11,3 +11,4 @@
 - Mva-kontroll (`rm_repair_invoice_vat`) foreslår bare; beløp endres aldri automatisk. Why: et mva-lignende forhold kan være en manglende linje.
 - Gjeldende kostpris settes bare av `rm_apply_derived_cost_price` via `_rm_cost_candidates` (nyeste gyldige etter dato); manuell pris via `rm_set_documented_cost_price`. Why: én prisvelger for alle skriveveier, ingen klient-UPDATE av kostpris.
 - Lesekontroll av fakturalinjer kjøres av `rm_line_read_issues_v2` med eksplisitt prisgrunnlag, rabatt, linjetype og kreditnota (speilet byte-identisk i `invoiceReadCheck.ts`). Why: ukjent grunnlag eller fjernet fortegn ga falske grønne linjer.
+- Fakturaleser og Tripletex-import har logikken i `_shared/invoiceExtraction.ts` og `tripletex-import-invoice-lines/rows.ts`; repoet er kilden for live-utrulling. Why: automatisk utrulling av eldre repokode overskrev nyere live-leser.
