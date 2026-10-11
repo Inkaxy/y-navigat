@@ -38,7 +38,12 @@ export interface PackageEditorProps {
    */
   suggestion?: PackageFillSuggestion | null;
   /** Forhåndsvelg leverandørkoblingen, f.eks. fra en mistenkelig pakning som skal bekreftes. */
-  initialSupplier?: { supplierId: string; supplierUnits: number } | null;
+  initialSupplier?: { supplierId: string; supplierUnits: number | null } | null;
+  /**
+   * Leverandørmodus: endrer BARE leverandørkoblingens pakning. Råvarens egen
+   * pakning sendes som null og røres ikke.
+   */
+  supplierOnly?: boolean;
   /**
    * Vis leverandørseksjonen selv om råvaren bare har én leverandør. Brukes når
    * hele poenget er å rette nettopp den ene koblingen.
@@ -55,6 +60,7 @@ export function PackageEditor({
   suggestion,
   initialSupplier,
   forceSupplierSection = false,
+  supplierOnly = false,
   onApplied,
 }: PackageEditorProps) {
   const [step, setStep] = useState<1 | 2>(1);
@@ -95,7 +101,7 @@ export function PackageEditor({
   useEffect(() => {
     if (!open || !initialSupplier) return;
     setSupplierId(initialSupplier.supplierId);
-    setSupplierUnits(String(initialSupplier.supplierUnits));
+    setSupplierUnits(initialSupplier.supplierUnits != null && initialSupplier.supplierUnits > 0 ? String(initialSupplier.supplierUnits).replace(".", ",") : "");
     setSupplierOpen(true);
   }, [open, initialSupplier]);
 
@@ -130,13 +136,17 @@ export function PackageEditor({
 
   const isBulk = packageUnit === "bulk";
   const unitsNum = isBulk ? 1 : Number(units.replace(",", "."));
-  const validUnits = isBulk || (units !== "" && !Number.isNaN(unitsNum) && unitsNum > 0);
+  const supplierNum = supplierUnits ? Number(supplierUnits.replace(",", ".")) : null;
+  const validSupplier = !!supplierId && supplierNum != null && !Number.isNaN(supplierNum) && supplierNum > 0;
+  const validUnits = supplierOnly
+    ? validSupplier
+    : isBulk || (units !== "" && !Number.isNaN(unitsNum) && unitsNum > 0);
 
   const baseArgs = () => ({
     p_raw_material_id: row!.id,
-    p_base_units_per_package: unitsNum,
+    p_base_units_per_package: supplierOnly ? null : unitsNum,
     p_supplier_id: supplierId || null,
-    p_supplier_base_units: supplierUnits ? Number(supplierUnits.replace(",", ".")) : null,
+    p_supplier_base_units: supplierNum,
     p_package_unit: packageUnit || null,
     p_reason: reason.trim() || null,
   });
@@ -187,7 +197,10 @@ export function PackageEditor({
 
         {step === 1 ? (
           <div className="space-y-4">
-            <PackageFields
+            {supplierOnly && (
+              <p className="text-caption text-muted-foreground">Endrer bare pakningen for denne leverandøren. Råvarens egen pakning beholdes.</p>
+            )}
+            {!supplierOnly && <PackageFields
               baseUnit={baseUnit}
               units={units}
               onUnitsChange={setUnits}
@@ -196,10 +209,10 @@ export function PackageEditor({
               fillNote={fillNote}
               row={row}
               autoFocus
-            />
+            />}
 
             {(forceSupplierSection || (row.antall_leverandorer ?? 0) > 1) && (
-              <Collapsible open={supplierOpen} onOpenChange={setSupplierOpen}>
+              <Collapsible open={supplierOnly || supplierOpen} onOpenChange={setSupplierOpen}>
                 <CollapsibleTrigger asChild>
                   <Button variant="outline" size="sm" className="w-full justify-between">
                     Egen pakning for en leverandør
@@ -222,7 +235,7 @@ export function PackageEditor({
                   </div>
                   <div>
                     <Label>Antall {baseUnit} per pakning</Label>
-                    <Input type="number" step="0.001" min="0" value={supplierUnits} onChange={e => setSupplierUnits(e.target.value)} />
+                    <Input inputMode="decimal" value={supplierUnits} onChange={e => setSupplierUnits(e.target.value)} aria-label={`Antall ${baseUnit} per pakning hos leverandøren`} />
                   </div>
                 </CollapsibleContent>
               </Collapsible>
