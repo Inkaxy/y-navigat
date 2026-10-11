@@ -450,15 +450,15 @@ export default function VarelistePage({ liste, onActiveChange, activeId = null }
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="space-y-5">
+      <div className={liste ? "space-y-3" : "space-y-5"}>
         <RavarerHeaderBanner
           actions={canWrite && <NewRawMaterialButton onClick={() => setNewOpen(true)} />}
         />
         <SupplierItemsBanner />
 
-        <Card className="p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative min-w-[220px] flex-1">
+        <Card className={liste ? "p-3" : "p-4"}>
+          <div className="flex flex-wrap items-center gap-2 md:gap-3">
+            <div className="relative min-w-[200px] flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 ref={searchRef}
@@ -520,8 +520,9 @@ export default function VarelistePage({ liste, onActiveChange, activeId = null }
             </span>
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            {BUILTIN_VIEWS.map((v) => (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {/* I arbeidsflaten er de innebygde visningene allerede arbeidslistefanene — vis dem bare én gang. */}
+            {!liste && BUILTIN_VIEWS.map((v) => (
               <Button
                 key={v.id}
                 size="sm"
@@ -572,7 +573,7 @@ export default function VarelistePage({ liste, onActiveChange, activeId = null }
 
           </div>
 
-          <p className="mt-2 text-xs text-muted-foreground">
+          <p className="mt-2 hidden text-xs text-muted-foreground md:block">
             Hurtigtaster: <kbd>/</kbd> søk · <kbd>↑</kbd>/<kbd>↓</kbd> velg rad · <kbd>Enter</kbd>{" "}
             åpne · <kbd>e</kbd> rediger kostpris · <kbd>n</kbd> ny vare · <kbd>Esc</kbd> tøm
           </p>
@@ -604,6 +605,7 @@ export default function VarelistePage({ liste, onActiveChange, activeId = null }
               onHiddenChange={hiddenColumnsPref.setValue}
               columnMenu={false}
               scrollClassName="max-h-[70vh]"
+              dense
               minTableWidth={activeId ? "720px" : "900px"}
               renderMobileCard={(item) => (
                 <div className="rounded-lg border border-border p-3">

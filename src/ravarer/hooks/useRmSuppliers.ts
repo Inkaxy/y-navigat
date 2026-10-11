@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import type { RawMaterialSearchIndex } from "@/ravarer/hooks/useRawMaterialSearchIndex";
 import type { TimelineHistoryRow } from "@/ravarer/lib/priceTimeline";
-import { mergeProjection, parseMaterialPriceProjection, type MaterialPriceProjection } from "@/ravarer/lib/priceProjection";
+import { eligibleLineIdsFrom, mergeProjection, parseMaterialPriceProjection, type MaterialPriceProjection } from "@/ravarer/lib/priceProjection";
 import { useMemo } from "react";
 import { documentedPriceError, documentedPriceMessage, parseDocumentedPrice, type DocumentedPriceResult } from "@/ravarer/lib/costPriceSource";
 
@@ -214,18 +214,17 @@ export function useTimelineHistory(rawMaterialId: string | undefined) {
   // Feil ELLER pågående første henting: gjeldende kontroll er ukjent. Fakturarader beholdes som
   // hendelser, men er ikke sammenlignbare før kontrollen er kjent (en feilet oppfrisking kan derfor
   // aldri «frigjøre» en rad som var holdt).
-  const proj = projection.data && projection.data.raw_material_id === rawMaterialId && !projection.isError ? projection.data : null;
+  // Også under OPPFRISKING (isFetching) er bufret kontroll ikke gjeldende: et nytt hold/en korreksjon
+  // kan være på vei. Graf/«Gyldig» gjenopprettes først etter et vellykket ferskt svar.
+  const current = !projection.isError && !projection.isFetching;
+  const proj = current && projection.data && projection.data.raw_material_id === rawMaterialId ? projection.data : null;
   const unknownReason = projection.isError ? "feil" : "laster";
   const rows = useMemo<TimelineHistoryRow[]>(
     () => mergeProjection((history.data ?? []).filter((h) => h.raw_material_id === rawMaterialId).map(toTimelineRow), proj, unknownReason),
     [history.data, proj, rawMaterialId, unknownReason],
   );
   // Fakturalinjer som er gyldig kostgrunnlag NÅ (serverens utvalg); null = ukjent (laster/feil).
-  const eligibleLineIds = useMemo(() => {
-    if (!proj) return null;
-    const ids = new Set(proj.eligible_history_ids);
-    return new Set((history.data ?? []).filter((h) => ids.has(h.id) && h.invoice_line_id).map((h) => h.invoice_line_id as string));
-  }, [proj, history.data]);
+  const eligibleLineIds = useMemo(() => eligibleLineIdsFrom(rows, proj), [rows, proj]);
   return {
     rows,
     eligibleLineIds,
@@ -235,6 +234,8 @@ export function useTimelineHistory(rawMaterialId: string | undefined) {
     error: history.error,
     projectionLoading: projection.isLoading,
     projectionError: projection.isError,
+    projectionFetching: projection.isFetching,
+    retryProjection: () => { void projection.refetch(); },
     checkedAt: proj?.checked_at ?? null,
     refetch: () => { void history.refetch(); void projection.refetch(); },
   };

@@ -110,6 +110,7 @@ export function SuppliersTab({ rm, part }: Props) {
         title="Pristidslinje"
         exportName={`priser-${rm.sku}`}
         projectionError={historyQuery.projectionError}
+        onRetryProjection={historyQuery.retryProjection}
         actions={
           canWrite ? (
             <Button size="sm" onClick={() => setPriceOpen(true)}>

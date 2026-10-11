@@ -15,17 +15,19 @@ type Props = {
   fullBleed?: boolean;
   /** Innholdet er en eksisterende side med egen overskrift som skal skjules. */
   embedsPage?: boolean;
+  /** Kompakt hode og tettere avstand (arbeidsflater). */
+  compact?: boolean;
   children: ReactNode;
 };
 
 /** Ramme for alle Råvarer-sider: én overskrift, valgfri fanerad, innhold. */
-export function ModulePage({ eyebrow, title, subtitle, icon, crumbs, actions, tabs, fullBleed, embedsPage = true, children }: Props) {
+export function ModulePage({ eyebrow, title, subtitle, icon, crumbs, actions, tabs, fullBleed, embedsPage = true, compact = false, children }: Props) {
   return (
-    <div className={cn("space-y-6", !fullBleed && "mx-auto w-full")}>
-      <PageHeader eyebrow={eyebrow} title={title} subtitle={subtitle} icon={icon} crumbs={crumbs} actions={actions} />
+    <div className={cn(compact ? "space-y-3" : "space-y-6", !fullBleed && "mx-auto w-full")}>
+      <PageHeader eyebrow={eyebrow} title={title} subtitle={subtitle} icon={icon} crumbs={crumbs} actions={actions} compact={compact} />
       {tabs}
       <EmbeddedProvider embedded={embedsPage}>
-        <div className="space-y-6">{children}</div>
+        <div className={compact ? "space-y-3" : "space-y-6"}>{children}</div>
       </EmbeddedProvider>
     </div>
   );

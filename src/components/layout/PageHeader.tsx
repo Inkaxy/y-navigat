@@ -26,6 +26,8 @@ export interface PageHeaderProps {
   actions?: ReactNode;
   /** Subtil monogram-watermark i bakgrunnen. */
   watermark?: boolean;
+  /** Kompakt arbeidsflatehode (mindre luft og tittel, uten watermark). */
+  compact?: boolean;
   className?: string;
 }
 
@@ -45,6 +47,7 @@ export function PageHeader({
   crumbs,
   actions,
   watermark = true,
+  compact = false,
   className,
 }: PageHeaderProps) {
   const embedded = useIsEmbedded();
@@ -61,7 +64,7 @@ export function PageHeader({
         boxShadow: "var(--shadow-xs)",
       }}
     >
-      {watermark && (
+      {watermark && !compact && (
         <div
           aria-hidden
           className="pointer-events-none absolute -right-6 -top-8 hidden text-brand-bronze opacity-[0.06] md:block"
@@ -70,8 +73,9 @@ export function PageHeader({
         </div>
       )}
 
-      <div className="relative flex items-start justify-between gap-4 px-5 py-5 md:px-6 md:py-6">
-        <div className="flex min-w-0 items-start gap-3.5">
+      {/* Mobil: tittel/brødsmuler i full bredde, handlinger på egen rad under. Fra md: side om side. */}
+      <div className={cn("relative flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4", compact ? "px-4 py-3 md:px-5 md:py-3.5" : "px-4 py-4 md:px-6 md:py-6")}>
+        <div className="flex w-full min-w-0 items-start gap-3.5 md:w-auto md:flex-1">
           {Icon && (
             <span
               aria-hidden
@@ -84,12 +88,12 @@ export function PageHeader({
             {crumbs && crumbs.length > 0 && (
               <nav
                 aria-label="Brødsmuler"
-                className="mb-1 flex items-center gap-1 text-xs text-muted-foreground"
+                className="mb-1 flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-xs text-muted-foreground"
               >
                 {crumbs.map((c, i) => {
                   const last = i === crumbs.length - 1;
                   return (
-                    <span key={i} className="flex items-center gap-1">
+                    <span key={i} className="flex min-w-0 max-w-full items-center gap-1 break-words">
                       {c.to && !last ? (
                         <Link
                           to={c.to}
@@ -112,7 +116,10 @@ export function PageHeader({
               </div>
             )}
             <h1
-              className="mt-1 font-display text-[1.6rem] font-semibold leading-tight tracking-tight text-foreground md:text-[1.85rem]"
+              className={cn(
+                "mt-1 font-display font-semibold leading-tight tracking-tight text-foreground [overflow-wrap:anywhere]",
+                compact ? "text-[1.3rem] md:text-[1.45rem]" : "text-[1.45rem] md:text-[1.85rem]",
+              )}
               style={{ letterSpacing: "-0.02em", fontVariationSettings: "'opsz' 144" }}
             >
               {title}
@@ -123,7 +130,8 @@ export function PageHeader({
           </div>
         </div>
         {actions && (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+          // Under md: egen rad, bryter linje, og knapper/lenker får minst 44 CSS-px trefflate (px, ikke rem).
+          <div className="flex w-full flex-wrap items-center gap-2 max-md:[&_a]:min-h-[44px] max-md:[&_button]:min-h-[44px] max-md:[&_button]:min-w-[44px] md:w-auto md:shrink-0 md:justify-end">{actions}</div>
         )}
       </div>
     </header>

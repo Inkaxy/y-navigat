@@ -620,6 +620,7 @@ function SupplierPriceTimeline({
       title={`Prisutvikling — ${selected.raw_material?.name ?? "vare"}`}
       exportName={`prisutvikling-${supplierName}`}
       projectionError={historyQuery.projectionError}
+      onRetryProjection={historyQuery.retryProjection}
       actions={
         <Select value={selected.raw_material_id} onValueChange={setRawMaterialId}>
           <SelectTrigger className="h-9 w-[240px]" aria-label="Velg vare">

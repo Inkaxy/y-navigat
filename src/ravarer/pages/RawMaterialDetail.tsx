@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useGuardedNavigate } from "@/providers/UnsavedGuardProvider";
 import { QueryState } from "@/components/common/QueryState";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { SellsAsSection } from "@/ravarer/components/stock/SellsAsSection";
@@ -11,12 +10,8 @@ import { completenessChecklist, listContext, readSection, sectionSearch, section
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  ArrowLeft,
   Check,
-  ChevronLeft,
-  ChevronRight,
   Loader2,
-  Pencil,
   X,
 } from "lucide-react";
 import { useHotkeys, type HotkeyBinding } from "@/ravarer/ui/hotkeys";
@@ -29,6 +24,7 @@ import { useWorklistNav } from "@/ravarer/pages/varer/useWorklistNav";
 import { useSaveOwner } from "@/ravarer/lib/saveOwner";
 import { costSummary } from "@/ravarer/lib/costSummary";
 import type { NavEntry } from "@/ravarer/pages/varer/modeLogic";
+import { RawMaterialDetailHeader } from "@/ravarer/components/detail/RawMaterialDetailHeader";
 import { RawMaterialKpiStrip } from "@/ravarer/components/RawMaterialKpiStrip";
 import { OverviewTab } from "@/ravarer/components/tabs/OverviewTab";
 import { NutritionTab } from "@/ravarer/components/tabs/NutritionTab";
@@ -37,13 +33,6 @@ import { RecipesTab } from "@/ravarer/components/tabs/RecipesTab";
 import { StockTab } from "@/ravarer/components/tabs/StockTab";
 import { HistoryTab } from "@/ravarer/components/tabs/HistoryTab";
 import { paths } from "@/ravarer/lib/paths";
-
-const ITEM_TYPE_LABEL: Record<string, string> = {
-  ravare: "Råvare",
-  emballasje: "Emballasje",
-  forbruksvare: "Forbruksvare",
-  videresalg: "Videresalg",
-};
 
 export default function RawMaterialDetail() {
   const { id } = useParams();
@@ -144,33 +133,16 @@ export default function RawMaterialDetail() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        eyebrow={`Råvarer · ${ITEM_TYPE_LABEL[rm.item_type] ?? rm.item_type}${rm.is_active ? "" : " · Inaktiv"}`}
-        title={rm.name}
-        subtitle={`SKU ${rm.sku} · ${rm.base_unit}`}
-        crumbs={[
-          { label: "Råvarer", to: paths.varer() },
-          { label: "Varer", to: `${paths.varer()}${listSearch ? `?${listSearch}` : ""}` },
-          { label: rm.name },
-        ]}
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => navigate(`${paths.varer()}${listSearch ? `?${listSearch}` : ""}`)}>
-              <ArrowLeft className="mr-1.5 h-4 w-4" /> Tilbake
-            </Button>
-            <Button variant="outline" size="icon" aria-label="Forrige råvare" title="Forrige råvare ( [ )" disabled={!prev} onClick={() => prev && goTo(prev)}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon" aria-label="Neste råvare" title="Neste råvare ( ] )" disabled={!next} onClick={() => next && goTo(next)}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            {!editingName && canWrite && (
-              <Button variant="outline" size="sm" onClick={startEdit}>
-                <Pencil className="mr-1.5 h-3.5 w-3.5" /> Endre navn
-              </Button>
-            )}
-          </div>
-        }
+      <RawMaterialDetailHeader
+        rm={rm}
+        listSearch={listSearch}
+        canPrev={!!prev}
+        canNext={!!next}
+        showRename={!editingName && canWrite}
+        onBack={() => navigate(`${paths.varer()}${listSearch ? `?${listSearch}` : ""}`)}
+        onPrev={() => prev && goTo(prev)}
+        onNext={() => next && goTo(next)}
+        onRename={startEdit}
       />
 
       {/* Gjeldende kostpris holdes synlig mens man jobber i andre seksjoner (samme tolkning som prisvisningen). */}

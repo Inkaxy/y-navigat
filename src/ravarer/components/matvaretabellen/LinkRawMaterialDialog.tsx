@@ -21,12 +21,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Loader2, Search } from "lucide-react";
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { useNutritionLinkFlow } from "./useNutritionLinkFlow";
 import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { useDebouncedValue } from "@/ordre/hooks/useDebouncedValue";
-import { useApplyMatvaretabellen, useMatvaretabellenLinks } from "@/ravarer/hooks/useMatvaretabellen";
+import { useMatvaretabellenLinks } from "@/ravarer/hooks/useMatvaretabellen";
 import { rankBySearch } from "@/lib/textSimilarity";
 import { nutritionSourceLabel } from "@/ravarer/lib/nutritionSource";
 
@@ -44,7 +43,6 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
   const { data: rows = [], isLoading } = useRawMaterials();
   const { data: suppliers = [] } = useSuppliers();
   const { data: links, isLoading: linksLoading, isError: linksError } = useMatvaretabellenLinks();
-  const apply = useApplyMatvaretabellen();
   const linksUnknown = linksLoading || linksError || !links;
   const alreadyLinked = useMemo(
     () => new Set((links?.get(foodId) ?? []).map((l) => l.raw_material_id)),
@@ -54,14 +52,12 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
 
   const [q, setQ] = useState(initialQuery ?? "");
   const debounced = useDebouncedValue(q, 250);
-  const [pending, setPending] = useState<{ id: string; name: string; source: string } | null>(null);
-  const [checkingId, setCheckingId] = useState<string | null>(null);
-  const [linkedNow, setLinkedNow] = useState<string[]>([]);
+  const flow = useNutritionLinkFlow(foodId, open, onLinked);
+  const { pending, checkingId, linkedNow, choose } = flow;
 
   useEffect(() => {
     if (open) {
       setQ(initialQuery ?? "");
-      setLinkedNow([]);
     }
   }, [open, initialQuery]);
 
@@ -72,39 +68,6 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
     // Samme rangering som ellers i NBhub: navn først, deretter SKU og kategori.
     return rankBySearch(active, debounced.trim(), (r) => [r.name, r.sku ?? "", r.category ?? ""]).slice(0, 100);
   }, [rows, debounced]);
-
-  const link = async (rawMaterialId: string) => {
-    try {
-      await apply.mutateAsync({ rawMaterialId, foodId });
-      setLinkedNow((prev) => (prev.includes(rawMaterialId) ? prev : [...prev, rawMaterialId]));
-      onLinked?.(rawMaterialId);
-      // Dialogen holdes åpen slik at flere råvarer kan kobles til samme matvare.
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Kunne ikke hente næringsverdier");
-    }
-  };
-
-  const choose = async (rawMaterialId: string, name: string) => {
-    setCheckingId(rawMaterialId);
-    try {
-      const { data, error } = await supabase
-        .from("raw_material_nutrition")
-        .select("source, matvaretabellen_food_id")
-        .eq("raw_material_id", rawMaterialId)
-        .maybeSingle();
-      if (error) throw error;
-      const existingFoodId = data?.matvaretabellen_food_id ?? null;
-      if (data && existingFoodId !== foodId) {
-        setPending({ id: rawMaterialId, name, source: data.source || "ukjent" });
-        return;
-      }
-      await link(rawMaterialId);
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Kunne ikke sjekke eksisterende næringsdata");
-    } finally {
-      setCheckingId(null);
-    }
-  };
 
   return (
     <>
@@ -152,7 +115,7 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
                       if (isLinked) return;
                       void choose(r.id, r.name);
                     }}
-                    disabled={isLinked || !!checkingId || apply.isPending}
+                    disabled={isLinked || !!checkingId || flow.isApplying || !flow.canWrite}
                     className={`flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition hover:bg-muted disabled:cursor-default disabled:opacity-70 ${
                       i % 2 === 1 ? "bg-muted/30" : ""
                     }`}
@@ -193,24 +156,18 @@ export function LinkRawMaterialDialog({ open, onOpenChange, foodId, foodName, in
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!pending} onOpenChange={(v) => !v && setPending(null)}>
+      <AlertDialog open={!!pending} onOpenChange={(v) => !v && flow.cancelOverwrite()}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Overskrive næringsdata?</AlertDialogTitle>
             <AlertDialogDescription>
-              «{pending?.name}» har allerede næringsdata (kilde: {nutritionSourceLabel(pending?.source ?? null)}). Verdiene overskrives med tall fra
-              Matvaretabellen.
+              «{pending?.name}» har allerede næringsdata (kilde: {nutritionSourceLabel(pending?.source ?? null)}). Med «Overskriv» erstattes også beskyttede felt med tall fra
+              Matvaretabellen. Avbryt endrer ingenting.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Avbryt</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={async () => {
-                const id = pending?.id;
-                setPending(null);
-                if (id) await link(id);
-              }}
-            >
+            <AlertDialogAction onClick={() => void flow.confirmOverwrite()}>
               Overskriv
             </AlertDialogAction>
           </AlertDialogFooter>
