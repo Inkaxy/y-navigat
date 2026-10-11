@@ -520,7 +520,7 @@ export default function VarelistePage({ liste, onActiveChange, activeId = null }
             </span>
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
             {/* I arbeidsflaten er de innebygde visningene allerede arbeidslistefanene — vis dem bare én gang. */}
             {!liste && BUILTIN_VIEWS.map((v) => (
               <Button
