@@ -10,7 +10,6 @@ import { useAllergens, useNutrition, type NutritionRow } from "@/ravarer/hooks/u
 import { useRawMaterial } from "@/ravarer/hooks/useRawMaterials";
 import { NUTRITION_NUMBER_FIELDS } from "@/ravarer/lib/nutritionSource";
 import { NUTRITION_LABELS, formatNutrientValue, nutrientChange } from "@/ravarer/lib/nutritionLabels";
-import { formatNumber } from "@/ravarer/lib/constants";
 import { FIELD_LABEL, coupledNutritionMeta, presentFields, type BulkField } from "@/ravarer/lib/datasheetBulk";
 import { AllergenPreview, BeforeAfter } from "./DatasheetDiff";
 
