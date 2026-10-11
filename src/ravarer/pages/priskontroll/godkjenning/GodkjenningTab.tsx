@@ -14,7 +14,6 @@ import { approveMany, type OverviewRow } from "@/fakturaer/lib/approval";
 import { postSafeCosts } from "@/fakturaer/lib/costPosting";
 import { formatMoney } from "@/fakturaer/lib/constants";
 import { paginate, sumByCurrency } from "@/fakturaer/lib/ravarerQueueFilter";
-import { useWorkSummary } from "@/ravarer/hooks/useWorkData";
 import { useUserNames } from "@/ravarer/hooks/useUserNames";
 import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
 import { paths } from "@/ravarer/lib/paths";
@@ -24,8 +23,9 @@ import { ResultBox } from "@/ravarer/ui/ResultBox";
 import { DeliveryTimeline } from "@/ravarer/pages/priskontroll/faktura/DeliveryTimeline";
 import { blockerLabel } from "@/fakturaer/lib/approval";
 import { ApprovalHistorySheet } from "./ApprovalHistorySheet";
+import { ConfirmInvoiceList } from "./ConfirmInvoiceList";
 import { ApprovedBy, approvalColumns, RowMenu } from "./approvalColumns";
-import { bulkActionGate, approvalReport, countByStatus, filterApprovalRows, GODKJENNING_LABEL, GODKJENNING_STATUSER, parseGodkjenningStatus, type GodkjenningStatus } from "./approvalLogic";
+import { bulkActionGate, approvalReport, canPostCosts, costReport, countByStatus, filterApprovalRows, GODKJENNING_LABEL, GODKJENNING_STATUSER, parseGodkjenningStatus, type GodkjenningStatus } from "./approvalLogic";
 import { approvalSteps, useApprovalDelivery, useApprovalOverview } from "./useGodkjenning";
 
 const PAGE = 25;
@@ -46,7 +46,6 @@ export function GodkjenningTab() {
   const [q, setQ] = useState(sp.get("q") ?? "");
   const debounced = useDebouncedValue(q, 300);
   const overview = useApprovalOverview(company?.id ?? null);
-  const { data: summary } = useWorkSummary({ includeApproval: true });
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirm, setConfirm] = useState<"approve" | "costs" | null>(null);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -77,14 +76,15 @@ export function GodkjenningTab() {
   const names = useUserNames(pg.items.map((r) => r.approved_by));
   const chosenRows = pg.items.filter((r) => selected.has(r.invoice_id));
   const approvable = chosenRows.filter((r) => !r.approved_at && r.blockers.length === 0);
-  const postable = chosenRows.filter((r) => !!r.approved_at);
+  const postable = chosenRows.filter(canPostCosts);
   const sums = sumByCurrency(chosenRows);
   const fra = `${location.pathname}${location.search}`;
   const numberOf = (id: string) => rows.find((r) => r.invoice_id === id)?.invoice_number ?? "Faktura";
 
   const chips = GODKJENNING_STATUSER.map((s) => ({
     id: s, label: GODKJENNING_LABEL[s],
-    count: s === "klare" ? summary?.approval?.ready_to_approve ?? counts.klare : s === "godkjent" ? summary?.approval?.approved_total ?? counts.godkjent : counts[s],
+    // Alle tall fra listens egen telling — samme som fanetelleren.
+    count: overview.data ? counts[s] : null,
   }));
 
   const refresh = () => {
@@ -98,28 +98,31 @@ export function GodkjenningTab() {
   async function runApprove() {
     const list = approvable.map((r) => r.invoice_id);
     setProgress({ done: 0, total: list.length });
-    const res = await approveMany(list, null, undefined, (done, total) => setProgress({ done, total }));
-    setProgress(null);
-    const rep = approvalReport(res, numberOf);
-    setResult({ title: rep.title, items: rep.items, error: rep.failed > 0 });
-    setSelected(new Set());
-    refresh();
+    try {
+      const res = await approveMany(list, null, undefined, (done, total) => setProgress({ done, total }));
+      const rep = approvalReport(res, numberOf);
+      setResult({ title: rep.title, items: rep.items, error: rep.failed > 0 });
+    } finally {
+      setProgress(null);
+      setSelected(new Set());
+      refresh();
+    }
   }
   async function runCosts() {
     const list = postable.map((r) => r.invoice_id);
     setProgress({ done: 0, total: list.length });
-    const res = await postSafeCosts(list);
-    setProgress(null);
-    const posted = res.reduce((a, r) => a + r.posted, 0);
-    const skipped = res.reduce((a, r) => a + r.skipped, 0);
-    const failed = res.filter((r) => r.error);
-    setResult({
-      title: `Kostpris ført på ${posted} trygge linjer`,
-      items: [`${skipped} linjer venter på avklaring`, ...failed.map((f) => `${numberOf(f.invoiceId)}: ${f.error}`)],
-      error: failed.length > 0,
-    });
-    setSelected(new Set());
-    refresh();
+    try {
+      const res = await postSafeCosts(list, undefined, (done, total) => setProgress({ done, total }));
+      const rep = costReport(res, numberOf);
+      setResult({ title: rep.title, items: rep.items, error: rep.failed > 0 });
+    } catch (e) {
+      console.error("[for-kostpris-mange]", e);
+      setResult({ title: "Kostpris ble ikke ført", items: ["Prøv igjen."], error: true });
+    } finally {
+      setProgress(null);
+      setSelected(new Set());
+      refresh();
+    }
   }
 
   return (
@@ -203,6 +206,7 @@ export function GodkjenningTab() {
                 : "Bare trygge linjer føres. Usikre linjer hoppes over og venter på avklaring."}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <ConfirmInvoiceList rows={confirm === "approve" ? approvable : postable} />
           <AlertDialogFooter>
             <AlertDialogCancel>Avbryt</AlertDialogCancel>
             <AlertDialogAction onClick={() => { const c = confirm; setConfirm(null); if (c === "approve") void runApprove(); else void runCosts(); }}>

@@ -2,13 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { creditNetExclVat, remainingByInvoice } from "@/fakturaer/lib/supplierCases";
 
-type Basis = { price_per_base_unit?: number | null; expected_price_per_base_unit?: number | null; base_quantity?: number | null };
+type Basis = { price_per_base_unit?: number | null; expected_price_per_base_unit?: number | null; base_quantity?: number | null; base_unit?: string | null };
 
 function parseBasis(v: unknown): Basis {
   if (!v || typeof v !== "object" || Array.isArray(v)) return {};
   const o = v as Record<string, unknown>;
   const n = (x: unknown) => (x == null || x === "" || !Number.isFinite(Number(x)) ? null : Number(x));
-  return { price_per_base_unit: n(o.price_per_base_unit), expected_price_per_base_unit: n(o.expected_price_per_base_unit), base_quantity: n(o.base_quantity) };
+  return { price_per_base_unit: n(o.price_per_base_unit), expected_price_per_base_unit: n(o.expected_price_per_base_unit), base_quantity: n(o.base_quantity), base_unit: typeof o.base_unit === "string" ? o.base_unit : null };
 }
 
 /** Én sak med linjer, fordelinger og leverandørens kreditnotaer. */
@@ -26,7 +26,7 @@ export function useSupplierCaseDetail(id: string | null) {
       if (!c) return null;
       const [lines, credits, notes] = await Promise.all([
         supabase.from("supplier_deviation_case_lines")
-          .select("id, invoice_id, invoice_line_id, amount_excl_vat, basis, invoice:invoices(invoice_number), line:invoice_lines(description, supplier_sku, quantity, unit, unit_price, raw_material:raw_materials(name))")
+          .select("id, invoice_id, invoice_line_id, amount_excl_vat, basis, invoice:invoices(invoice_number), line:invoice_lines(description, supplier_sku, quantity, unit, unit_price, raw_material:raw_materials(name, base_unit))")
           .eq("case_id", c.id).limit(500),
         supabase.from("supplier_deviation_credits")
           .select("id, invoice_id, credit_invoice_id, amount_excl_vat, note, created_at, credit:invoices!supplier_deviation_credits_credit_invoice_id_fkey(invoice_number)")

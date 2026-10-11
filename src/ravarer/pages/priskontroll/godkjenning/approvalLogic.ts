@@ -2,6 +2,7 @@
  * Godkjenning-fanen: hurtigfiltre og filtrering. Rene funksjoner (testes).
  */
 import { approvalBucket, type OverviewRow } from "@/fakturaer/lib/approval";
+import { costPostingAllowed } from "@/ravarer/pages/priskontroll/faktura/invoiceSteps";
 
 export const GODKJENNING_STATUSER = ["klare", "avventer", "godkjent", "kostpris"] as const;
 export type GodkjenningStatus = (typeof GODKJENNING_STATUSER)[number];
@@ -23,11 +24,12 @@ export function parseGodkjenningStatus(v: string | null): GodkjenningStatus {
 }
 
 /**
- * «Kostpris kan føres»: godkjent, og ingen kostpris er ført ennå. Hvilke linjer
- * som er trygge avgjør serveren (`rm_post_safe_line_costs`) ved føring.
+ * «Kostpris kan føres»: samme regel som `rm_post_safe_line_costs` — åpen status
+ * (imported/needs_review/ready), ikke kreditnota, og ingen kostpris ført ennå.
+ * Godkjenning kreves IKKE. Hvilke linjer som er trygge avgjør serveren.
  */
-export function canPostCosts(r: Pick<OverviewRow, "approved_at" | "cost_posted_lines">): boolean {
-  return !!r.approved_at && r.cost_posted_lines === 0;
+export function canPostCosts(r: Pick<OverviewRow, "status" | "is_credit_note" | "cost_posted_lines">): boolean {
+  return costPostingAllowed(r) && r.cost_posted_lines === 0;
 }
 
 export function matchesStatus(r: OverviewRow, s: GodkjenningStatus): boolean {
@@ -66,6 +68,27 @@ export function approvalReport(
     "Intern godkjenning. Utløser ikke betaling og sendes ikke til Tripletex.",
   ];
   return { ok, failed, title, items };
+}
+
+/** Samlet resultat etter kostprisføring, med feil per faktura. */
+export function costReport(
+  results: readonly { invoiceId: string; posted: number; skipped: number; error: string | null }[],
+  numberOf: (id: string) => string,
+): BulkReport {
+  const posted = results.reduce((a, r) => a + r.posted, 0);
+  const skipped = results.reduce((a, r) => a + r.skipped, 0);
+  const failedRows = results.filter((r) => r.error);
+  const ok = results.length - failedRows.length;
+  return {
+    ok, failed: failedRows.length,
+    title: failedRows.length === 0
+      ? `Kostpris ført på ${posted} trygge linjer (${ok} av ${results.length} fakturaer)`
+      : `Kostpris ført på ${posted} trygge linjer, ${failedRows.length} av ${results.length} fakturaer feilet`,
+    items: [
+      ...(skipped ? [`${skipped} linjer venter på avklaring`] : []),
+      ...failedRows.map((f) => `${numberOf(f.invoiceId)}: ${f.error}`),
+    ],
+  };
 }
 
 export const APPROVER_ROLE_TEXT = "Intern godkjenning krever godkjenner- eller admin-rolle";

@@ -21,7 +21,7 @@ type Props = {
   /** «Endre råvare» i inspektøren (fra konfliktdialogen). */
   onEditMaterial: () => void;
   /** «Ikke vare» lagret på én linje. */
-  onNotItemDone?: (line: ReviewLineRow) => void;
+  onNotItemDone?: (line: ReviewLineRow, info: { patternId: string | null }) => void;
 };
 
 /** Dialogene inspektøren og masse-handlingene åpner. MatchDrawer brukes ikke her. */

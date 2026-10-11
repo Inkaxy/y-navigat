@@ -22,6 +22,7 @@ import type { EditMaterialSignal } from "@/fakturaer/lib/editMaterialSignal";
 import { FakturaerDialogs, type DialogState } from "@/ravarer/pages/priskontroll/fakturaer/FakturaerDialogs";
 import { fakturaBackHref, readReturnParam } from "@/ravarer/pages/priskontroll/fakturaer/visning";
 import { InvoiceFactsSection } from "./InvoiceFactsSection";
+import { notItemResultItems } from "./notItemResult";
 import { LineDialogs, type LineDialog } from "./LineDialogs";
 import { SupplierItemScopeNote } from "./SupplierItemScopeNote";
 import { WorkspaceHeader, type HeaderMenuAction } from "./WorkspaceHeader";
@@ -300,7 +301,7 @@ export default function FakturaWorkspace() {
       <FakturaerDialogs state={dialog} onClose={() => setDialog(null)} onDone={(k) => { if (k !== "flag") setDialog(null); void detail.refetch(); }} />
       {confirmMany.dialog}
       <LineDialogs dialog={lineDialog} onClose={() => setLineDialog(null)} q={q} canWrite={lineWrite} invoice={data} onEditMaterial={() => editMaterial()}
-        onNotItemDone={(l) => { q.remember(l, `Ikke vare: ${l.description ?? "linje"}`); q.refresh(); s.setResult({ title: "Linjen er merket som ikke vare", items: [l.description ?? ""].filter(Boolean), undoable: true }); }} />
+        onNotItemDone={(l, info) => { q.remember(l, `Ikke vare: ${l.description ?? "linje"}`); q.refresh(); s.setResult({ title: "Linjen er merket som ikke vare", items: notItemResultItems(l.description, info.patternId), undoable: true }); }} />
     </div>
   );
 }

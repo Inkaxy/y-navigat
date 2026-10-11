@@ -44,7 +44,8 @@ export function SakerTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debounced]);
 
-  const rows = useMemo(() => list.data ?? [], [list.data]);
+  const rows = useMemo(() => list.data?.rows ?? [], [list.data]);
+  const total = list.data?.total ?? 0;
   const counts = useMemo(() => countSaker(rows, today), [rows, today]);
   const suppliers = useMemo(() => [...new Map(rows.map((r) => [r.supplier_id, r.supplier_name ?? "Ukjent"])).entries()].sort((a, b) => a[1].localeCompare(b[1], "nb")), [rows]);
   const s = (sp.get("q") ?? "").trim().toLowerCase();
@@ -104,6 +105,7 @@ export function SakerTab() {
           );
         }}
       />
+      {total > rows.length && <p role="status" className="text-caption text-warning">Viser de {rows.length} nyeste av {total} saker. Tall og filtre gjelder de viste sakene.</p>}
       {rows.length > 0 && <p className="text-caption text-ink-secondary">{SAKER_EMPTY_TEXT}</p>}
     </div>
   );

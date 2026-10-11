@@ -69,6 +69,7 @@ export function DataTable<T>(p: Props<T>) {
     return sortRows(p.rows ?? [], col?.sortKey, sort?.dir ?? "asc");
   }, [p.rows, p.columns, sort, controlled]);
   const ids = sorted.map(p.getId);
+  const clickable = !!p.onRowClick || !!p.rowHref;
 
   const open = (row: T) => {
     if (p.onRowClick) p.onRowClick(row);
@@ -135,14 +136,19 @@ export function DataTable<T>(p: Props<T>) {
       {p.renderMobileCard && (
         <ul className="space-y-2 md:hidden">
           {sorted.map((r) => (
-            <li key={p.getId(r)}>
+            <li key={p.getId(r)} className={cn(p.selectable && "flex items-start gap-2")}>
+              {p.selectable && (
+                <span className="pt-3" onClick={(e) => onCheck(p.getId(r), e)}>
+                  <Checkbox checked={p.selected?.has(p.getId(r)) ?? false} aria-label="Velg rad" />
+                </span>
+              )}
               {/* Ikke <button>: kortet kan ha egne knapper (ingen nøstede knapper). Knappene stopper klikket selv. */}
               <div
-                role="link"
-                tabIndex={0}
-                className="w-full cursor-pointer rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                role={clickable ? "link" : undefined}
+                tabIndex={clickable ? 0 : undefined}
+                className={cn("w-full min-w-0 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", clickable && "cursor-pointer")}
                 onClick={() => open(r)}
-                onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(r); } }}
+                onKeyDown={(e) => { if (clickable && e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(r); } }}
               >
                 {p.renderMobileCard?.(r)}
               </div>
@@ -185,7 +191,7 @@ export function DataTable<T>(p: Props<T>) {
                   aria-selected={active}
                   onClick={() => { p.onActiveChange?.(id); open(r); }}
                   className={cn(
-                    "h-9 cursor-pointer hover:bg-muted/40",
+                    "h-9", (clickable || p.onActiveChange) && "cursor-pointer hover:bg-muted/40",
                     active && "bg-primary/5 shadow-[inset_2px_0_0_0_hsl(var(--primary))]",
                   )}
                 >

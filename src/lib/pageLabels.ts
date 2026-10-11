@@ -66,7 +66,6 @@ const RULES: PageRule[] = [
   { test: (p) => p.startsWith("/ravarer/priskontroll/faktura/"), label: "Faktura" },
   { test: (p) => p.startsWith("/ravarer/priskontroll/saker/"), label: "Leverandørsak" },
   { test: (p) => p.startsWith("/ravarer/priskontroll/import"), label: "Importer faktura" },
-  { test: (p) => p.startsWith("/ravarer/priskontroll/beslutninger"), label: "Beslutninger" },
   { test: (p) => p.startsWith("/ravarer/priskontroll/verktoy/reberegn"), label: "Reberegn kostpriser" },
   { test: (p) => p.startsWith("/ravarer/priskontroll"), label: "Priskontroll" },
   { test: (p) => p.startsWith("/ravarer/leverandorer/forhandlinger"), label: "Forhandling" },

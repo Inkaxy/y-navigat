@@ -55,6 +55,7 @@ export function approvalSteps(r: OverviewRow, d: ApprovalDelivery | undefined): 
       status: r.status ?? "", received_at: d?.received_at ?? null, line_count: d?.line_count ?? 0, lines_source: d?.lines_source ?? null,
       line_extraction_status: d?.line_extraction_status ?? null, open_count: r.open_material_lines,
       lines_sum_status: d?.lines_sum_status ?? null, reconciled_mode: d?.reconciled_mode ?? null,
+      is_credit_note: r.is_credit_note,
     },
     { approved: !!r.approved_at, costPosted: r.cost_posted_lines > 0 },
   );

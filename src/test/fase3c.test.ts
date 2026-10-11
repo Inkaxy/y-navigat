@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { APPROVAL_BLOCKER_CODES, APPROVAL_BLOCKER_LABEL } from "@/ravarer/lib/labels";
 import { approveMany, blockerLabel, type ApproveResult, type OverviewRow } from "@/fakturaer/lib/approval";
-import { approvalReport, countByStatus, filterApprovalRows, parseGodkjenningStatus } from "@/ravarer/pages/priskontroll/godkjenning/approvalLogic";
+import { approvalReport, canPostCosts, countByStatus, filterApprovalRows, parseGodkjenningStatus } from "@/ravarer/pages/priskontroll/godkjenning/approvalLogic";
 import { caseSums, countSaker, isFollowUpDue, matchesSakFilter, parseSakFilter } from "@/ravarer/pages/priskontroll/saker/caseLogic";
 
 const row = (p: Partial<OverviewRow>): OverviewRow => ({
@@ -25,7 +25,14 @@ describe("godkjenning — hurtigfiltre", () => {
     row({ invoice_id: "c", blockers: ["sumavvik"] }), row({ invoice_id: "d", blockers: ["prisavvik"] }),
     row({ invoice_id: "e", approved_at: "2026-10-01T10:00:00Z" }),
   ];
-  it("teller klare/avventer/godkjent/kostpris", () => expect(countByStatus(rows)).toEqual({ klare: 2, avventer: 2, godkjent: 1, kostpris: 1 }));
+  it("teller klare/avventer/godkjent/kostpris", () => expect(countByStatus(rows)).toEqual({ klare: 2, avventer: 2, godkjent: 1, kostpris: 0 }));
+  it("kostpris kan føres: åpen status, ikke kreditnota, ikke ført — godkjenning kreves ikke", () => {
+    expect(canPostCosts(row({ status: "ready" }))).toBe(true);
+    expect(canPostCosts(row({ status: "needs_review", approved_at: null }))).toBe(true);
+    expect(canPostCosts(row({ status: "reconciled", approved_at: "2026-10-01T10:00:00Z" }))).toBe(false);
+    expect(canPostCosts(row({ status: "ready", is_credit_note: true }))).toBe(false);
+    expect(canPostCosts(row({ status: "ready", cost_posted_lines: 2 }))).toBe(false);
+  });
   it("mapper gamle statusverdier", () => {
     expect(parseGodkjenningStatus("waiting")).toBe("avventer");
     expect(parseGodkjenningStatus("done")).toBe("godkjent");

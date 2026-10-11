@@ -26,11 +26,12 @@ export const PRISKONTROLL_TAB_PARAMS = [
   "visning", "modus", "innboks", "faktura", "filter", "kilde", "kreditnota", "lav", "status", "leverandor", "q", "selskap", "fra", "til", "avvik", "betalt", "sort", "dir", "side", "sak",
 ];
 
-export function priskontrollTabs(s: WorkSummary | undefined): SectionTab[] {
+/** `approvalReady`: «Klare» fra Godkjenning-listens egen telling, så fanen og chipen viser samme tall. */
+export function priskontrollTabs(s: WorkSummary | undefined, approvalReady?: number | null): SectionTab[] {
   return [
     { id: "gjore", label: "Å gjøre", count: s?.todo_total },
     { id: "fakturaer", label: "Fakturaer", count: s?.invoices?.open_total },
-    { id: "godkjenning", label: "Godkjenning", count: s?.approval?.ready_to_approve },
+    { id: "godkjenning", label: "Godkjenning", count: approvalReady },
     { id: "saker", label: "Leverandørsaker", count: s?.other.cases_open },
   ];
 }
