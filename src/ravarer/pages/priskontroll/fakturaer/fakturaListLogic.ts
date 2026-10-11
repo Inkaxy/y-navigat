@@ -2,6 +2,7 @@
 import type { InboxInvoice } from "@/fakturaer/hooks/useInboxInvoices";
 import { INVOICE_SOURCES, INVOICE_STATUSES, LOW_EXTRACTION_CONFIDENCE } from "@/fakturaer/lib/constants";
 import { getPaidBadgeInfo } from "@/fakturaer/lib/paidStatus";
+import { sortRows, type SortDir, type SortValue } from "@/ravarer/ui/dataTableLogic";
 
 export interface FakturaFilters {
   q: string;
@@ -87,4 +88,43 @@ export function toCsv(rows: readonly InboxInvoice[]): string {
     ].map(csvCell).join(";"),
   );
   return [head.join(";"), ...lines].join("\n");
+}
+
+export type FakturaSort = { id: string; dir: SortDir } | null;
+
+/** Sortering i adressen (`sort`, `dir`), som gamle FakturaerList. */
+export function parseSort(sp: URLSearchParams): FakturaSort {
+  const id = sp.get("sort");
+  if (!id) return null;
+  return { id, dir: sp.get("dir") === "desc" ? "desc" : "asc" };
+}
+
+/** Kolonner serveren kan sortere på («Avstemt» og «Alle»), med databasekolonnen. */
+export const SERVER_SORT_COLUMNS: Readonly<Record<string, string>> = {
+  nr: "invoice_number",
+  dato: "invoice_date",
+  mottatt: "imported_at",
+  forfall: "due_date",
+  belop: "total_amount",
+  status: "status",
+  bilag: "tripletex_voucher_number",
+};
+
+/** Sorteringsverdier for klientlisten («Trenger meg», «Klare»). */
+export const CLIENT_SORT: Readonly<Record<string, (r: InboxInvoice) => SortValue>> = {
+  leverandor: (r) => r.supplier_name,
+  nr: (r) => r.invoice_number,
+  dato: (r) => r.invoice_date,
+  mottatt: (r) => r.received_at,
+  forfall: (r) => r.due_date,
+  belop: (r) => r.total_amount,
+  linjer: (r) => r.assessment.openCount,
+  status: (r) => r.status,
+  bilag: (r) => r.tripletex_voucher_number,
+};
+
+/** Sorterer HELE klientlisten før den deles i sider. */
+export function sortInvoices(rows: readonly InboxInvoice[], sort: FakturaSort): InboxInvoice[] {
+  const get = sort ? CLIENT_SORT[sort.id] : undefined;
+  return get && sort ? sortRows([...rows], get, sort.dir) : [...rows];
 }

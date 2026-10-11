@@ -1,12 +1,12 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useInboxInvoices, INBOX_INVOICE_SELECT, toInboxInvoice, type InboxInvoice, type RawInboxInvoice } from "@/fakturaer/hooks/useInboxInvoices";
-import { LOW_CONFIDENCE, matchesFilters, type FakturaFilters } from "./fakturaListLogic";
+import { LOW_CONFIDENCE, matchesFilters, SERVER_SORT_COLUMNS, sortInvoices, type FakturaFilters, type FakturaSort } from "./fakturaListLogic";
 import type { AvstemtModus, FakturaVisning } from "./visning";
 
 export const FAKTURA_PAGE_SIZE = 50;
 
-type Args = { legalEntityId: string | null; visning: FakturaVisning; modus: AvstemtModus | null; filters: FakturaFilters; page: number };
+type Args = { legalEntityId: string | null; visning: FakturaVisning; modus: AvstemtModus | null; filters: FakturaFilters; page: number; sort: FakturaSort };
 
 export type FakturaListe = {
   rows: InboxInvoice[];
@@ -18,6 +18,8 @@ export type FakturaListe = {
   openCounts: { trenger: number; klar: number } | null;
   /** Åpne fakturaer i utvalget — mål for «Oppdater matching». */
   openInSelection: InboxInvoice[];
+  /** Hele utvalget (alle sider) — for CSV uten valg. */
+  fetchAll: () => Promise<InboxInvoice[]>;
 };
 
 /**
@@ -28,16 +30,16 @@ export function useFakturaListe(a: Args): FakturaListe {
   const open = useInboxInvoices({ legalEntityId: a.legalEntityId, supplierId: null });
   const server = a.visning === "avstemt" || a.visning === "alle";
   const remote = useQuery({
-    queryKey: ["fakturaer-liste", a.legalEntityId, a.visning, a.modus, a.filters, a.page],
+    queryKey: ["fakturaer-liste", a.legalEntityId, a.visning, a.modus, a.filters, a.page, a.sort],
     enabled: server && !!a.legalEntityId,
     placeholderData: keepPreviousData,
-    queryFn: () => fetchServerPage(a),
+    queryFn: () => fetchServerRows(a, (a.page - 1) * FAKTURA_PAGE_SIZE, FAKTURA_PAGE_SIZE),
   });
 
   const all = open.data ?? [];
   const filtered = all.filter((i) => matchesFilters(i, a.filters));
-  const trenger = filtered.filter((i) => i.tab === "open");
-  const klar = filtered.filter((i) => i.tab === "ready");
+  const trenger = sortInvoices(filtered.filter((i) => i.tab === "open"), a.sort);
+  const klar = sortInvoices(filtered.filter((i) => i.tab === "ready"), a.sort);
   const openCounts = open.data ? { trenger: all.filter((i) => i.tab === "open").length, klar: all.filter((i) => i.tab === "ready").length } : null;
 
   if (server) {
@@ -49,6 +51,7 @@ export function useFakturaListe(a: Args): FakturaListe {
       refetch: () => void remote.refetch(),
       openCounts,
       openInSelection: a.visning === "alle" ? filtered.filter((i) => i.status !== "flagged" && i.line_count > 0) : [],
+      fetchAll: () => fetchAllServerRows(a),
     };
   }
   const list = a.visning === "klar" ? klar : trenger;
@@ -61,12 +64,26 @@ export function useFakturaListe(a: Args): FakturaListe {
     refetch: () => void open.refetch(),
     openCounts,
     openInSelection: list.filter((i) => i.status !== "flagged" && i.line_count > 0),
+    fetchAll: async () => list,
   };
 }
 
-async function fetchServerPage(a: Args): Promise<{ rows: InboxInvoice[]; total: number }> {
+const EXPORT_PAGE = 500;
+const EXPORT_MAX = 20_000;
+
+/** Alle rader i utvalget, side for side (PostgREST gir maks 1000 per kall). */
+async function fetchAllServerRows(a: Args): Promise<InboxInvoice[]> {
+  const out: InboxInvoice[] = [];
+  for (let from = 0; from < EXPORT_MAX; from += EXPORT_PAGE) {
+    const { rows } = await fetchServerRows(a, from, EXPORT_PAGE);
+    out.push(...rows);
+    if (rows.length < EXPORT_PAGE) break;
+  }
+  return out;
+}
+
+async function fetchServerRows(a: Args, from: number, size: number): Promise<{ rows: InboxInvoice[]; total: number }> {
   const f = a.filters;
-  const from = (a.page - 1) * FAKTURA_PAGE_SIZE;
   let q = supabase.from("invoices").select(INBOX_INVOICE_SELECT, { count: "exact" });
   if (a.legalEntityId) q = q.eq("legal_entity_id", a.legalEntityId);
   if (a.visning === "avstemt") {
@@ -92,7 +109,10 @@ async function fetchServerPage(a: Args): Promise<{ rows: InboxInvoice[]; total: 
     if (ids.length) ors.push(`supplier_id.in.(${ids.join(",")})`);
     q = q.or(ors.join(","));
   }
-  q = q.order("invoice_date", { ascending: false }).order("id").range(from, from + FAKTURA_PAGE_SIZE - 1);
+  const col = a.sort ? SERVER_SORT_COLUMNS[a.sort.id] : undefined;
+  if (col && a.sort) q = q.order(col, { ascending: a.sort.dir === "asc", nullsFirst: false });
+  else q = q.order("invoice_date", { ascending: false });
+  q = q.order("id").range(from, from + size - 1);
   const { data, error, count } = await q.returns<RawInboxInvoice[]>();
   if (error) throw error;
   return { rows: (data ?? []).map(toInboxInvoice), total: count ?? 0 };
