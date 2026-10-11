@@ -54,7 +54,7 @@ export function CostDeviationsCard({ canWrite }: { canWrite: boolean }) {
           </Button>
         )}
       </div>
-      <QueryState isLoading={q.isLoading} isError={q.isError} error={q.error} scope="ravarer:kostpris-avvik" onRetry={() => q.refetch()} isEmpty={rows.length === 0} emptyMessage="Ingen avvik — alle kostpriser er nyeste gyldige pris.">
+      <QueryState isLoading={q.isLoading} isError={q.isError} error={q.error} scope="ravarer:kostpris-avvik" onRetry={() => q.refetch()} isEmpty={rows.length === 0} emptyTitle="Ingen avvik" emptyDescription="Alle kostpriser er nyeste gyldige pris.">
         <div className="max-h-96 overflow-auto">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-card text-left text-xs uppercase text-ink-secondary">
@@ -76,7 +76,7 @@ export function CostDeviationsCard({ canWrite }: { canWrite: boolean }) {
                         onCheckedChange={(v) => setChecked((prev) => { const n = new Set(prev); if (v === true) n.add(r.rawMaterialId); else n.delete(r.rawMaterialId); return n; })} />
                     )}
                   </td>
-                  <td className="py-2"><Link className="hover:underline" to={paths.ravare(r.rawMaterialId)}>{r.name}</Link></td>
+                  <td className="py-2"><Link className="hover:underline" to={paths.raavare(r.rawMaterialId)}>{r.name}</Link></td>
                   <td className="py-2"><Badge variant="outline">{r.status === "avviker" ? "Avviker" : "Uverifisert"}</Badge></td>
                   <td className="py-2 text-right tabular-nums">{r.currentPrice != null ? `${formatNok(r.currentPrice)}/${r.baseUnit ?? ""}` : "—"}</td>
                   <td className="py-2 text-right tabular-nums">{r.sourcePrice != null ? `${formatNok(r.sourcePrice)}/${r.baseUnit ?? ""}` : "—"}</td>
