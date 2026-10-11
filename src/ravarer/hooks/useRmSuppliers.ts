@@ -215,8 +215,15 @@ export function useTimelineHistory(rawMaterialId: string | undefined) {
     () => mergeProjection((history.data ?? []).filter((h) => h.raw_material_id === rawMaterialId).map(toTimelineRow), proj),
     [history.data, proj, rawMaterialId],
   );
+  // Fakturalinjer som er gyldig kostgrunnlag NÅ (serverens utvalg); null = ukjent (laster/feil).
+  const eligibleLineIds = useMemo(() => {
+    if (!proj) return null;
+    const ids = new Set(proj.eligible_history_ids);
+    return new Set((history.data ?? []).filter((h) => ids.has(h.id) && h.invoice_line_id).map((h) => h.invoice_line_id as string));
+  }, [proj, history.data]);
   return {
     rows,
+    eligibleLineIds,
     raw: history.data ?? [],
     isLoading: history.isLoading,
     isError: history.isError,
