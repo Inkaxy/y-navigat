@@ -17,7 +17,9 @@ import { paths } from "@/ravarer/lib/paths";
  * Bare «avviker» kan oppdateres, og bare når brukeren velger det. Uverifiserte priser beholdes til
  * noen dokumenterer en pris — de nullstilles aldri.
  */
-export function CostDeviationsCard({ canWrite }: { canWrite: boolean }) {
+export function CostDeviationsCard() {
+  const access = useRavarerAccessLevel(true);
+  const canWrite = ["write", "approve", "admin"].includes(access.data ?? "none");
   const { data: company } = useCompany();
   const q = useCostDeviations(company?.id);
   const refresh = useRefreshCostPrices();

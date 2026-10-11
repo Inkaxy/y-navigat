@@ -21,6 +21,8 @@ interface Props {
 const sourceLabel = (s: string | null) => PRICE_SOURCES.find((p) => p.value === s)?.label ?? s ?? "ukjent kilde";
 
 /** «Pris og leverandør» på råvarekortet — kun lesing + felles redigerere. */
+import { CostSourceInfo } from "@/ravarer/components/CostSourceInfo";
+
 export function PriceSupplierCard({ rm, canWrite, onEditLink }: Props) {
   const { data: links = [] } = useRawMaterialSuppliers(rm.id);
   const { data: all = [] } = useSuppliers();
@@ -47,6 +49,7 @@ export function PriceSupplierCard({ rm, canWrite, onEditLink }: Props) {
           <p className="text-caption text-muted-foreground">
             {sourceLabel(rm.price_source)} · {formatDate(rm.price_updated_at)}
           </p>
+          <div className="mt-2"><CostSourceInfo rawMaterialId={rm.id} /></div>
           {canWrite && (
             <Button variant="outline" size="sm" className="mt-2" onClick={() => setCostOpen(true)}>Endre</Button>
           )}
