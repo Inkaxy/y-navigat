@@ -34,10 +34,11 @@ const REPAIR_REASON: Record<string, string> = {
 };
 
 export function repairVatMessage(r: RepairVatResult): string {
-  if (r.ok) {
-    return r.mode === "linjer_skalert"
-      ? `Linjesummene var delt på mva én gang for mye — rettet, ${r.lines} ${r.lines === 1 ? "linje regnes" : "linjer regnes"} om`
-      : "Mva-beløp manglet fra Tripletex — utledet fra linjesummen";
+  if (r.kind === "forslag") {
+    const f = r.factor != null ? String(r.factor).replace(".", ",") : "mva-satsen";
+    return r.suggestion === "linjer_skalert"
+      ? `Linjesummen avviker med samme forhold som mva (×${f}). Det kan være feil lesing — eller en manglende linje. Ingen beløp er endret: kontroller mot originalen og rett linjene med «Rett fakturalinje».`
+      : `Mva mangler fra Tripletex, og linjesummen passer med mva ×${f}. Mva er ikke utledet automatisk: kontroller mot originalen.`;
   }
-  return REPAIR_REASON[r.reason] ?? "Mva-avviket kunne ikke rettes";
+  return REPAIR_REASON[r.reason] ?? "Avviket kunne ikke kontrolleres";
 }

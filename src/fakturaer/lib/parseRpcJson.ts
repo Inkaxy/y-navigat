@@ -157,13 +157,16 @@ export function parsePriceReference(data: Json | null | undefined): PriceReferen
   };
 }
 
+/** Mva-kontrollen endrer aldri beløp; den gir bare forslag (`kontroll_trengs`) eller en grunn. */
 export type RepairVatResult =
-  | { ok: true; mode: "linjer_skalert" | "mva_utledet"; lines: number }
-  | { ok: false; reason: string };
+  | { kind: "forslag"; suggestion: "linjer_skalert" | "mva_utledet"; factor: number | null; ratio: number | null }
+  | { kind: "ingen"; reason: string };
 export function parseRepairVat(data: Json | null | undefined): RepairVatResult {
   const o = isObj(data) ? data : {};
-  if (bool(o, "ok") === true) return { ok: true, mode: str(o, "mode") === "mva_utledet" ? "mva_utledet" : "linjer_skalert", lines: num(o, "lines") ?? 0 };
-  return { ok: false, reason: str(o, "reason") ?? "ukjent" };
+  if (str(o, "reason") === "kontroll_trengs") {
+    return { kind: "forslag", suggestion: str(o, "suggestion") === "mva_utledet" ? "mva_utledet" : "linjer_skalert", factor: num(o, "factor"), ratio: num(o, "ratio") };
+  }
+  return { kind: "ingen", reason: str(o, "reason") ?? "ukjent" };
 }
 
 export function parseRematchQueued(data: Json | null | undefined): { queued: number; already_queued: number } {

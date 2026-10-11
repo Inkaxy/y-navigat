@@ -106,8 +106,8 @@ export function InvoiceFactsCard({ invoice, canWrite, fetchingLines, onFetchLine
       if (error) throw error;
       return parseRepairVat(data);
     },
-    onSuccess: (r) => { setRepairMsg(repairVatMessage(r)); if (r.ok) invalidateInvoice(qc, invoice.id); },
-    onError: (e) => showError("faktura-rett-mva", e, "Kunne ikke rette mva-avviket"),
+    onSuccess: (r) => setRepairMsg(repairVatMessage(r)),
+    onError: (e) => showError("faktura-rett-mva", e, "Kunne ikke kontrollere mva-avviket"),
   });
   const rematch = useMutation({
     mutationFn: async () => {
@@ -133,7 +133,7 @@ export function InvoiceFactsCard({ invoice, canWrite, fetchingLines, onFetchLine
       </Button>
       {invoice.lines_sum_status === "mismatch" && (
         <Button size="sm" variant="outline" disabled={repair.isPending} onClick={() => repair.mutate()}>
-          {repair.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden /> : <Wrench className="mr-1.5 h-4 w-4" aria-hidden />}Rett mva-avvik
+          {repair.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden /> : <Wrench className="mr-1.5 h-4 w-4" aria-hidden />}Kontroller mva-avvik
         </Button>
       )}
       <Button size="sm" variant="outline" disabled={locked || rematch.isPending} onClick={() => rematch.mutate()}>
