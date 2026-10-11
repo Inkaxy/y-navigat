@@ -17,7 +17,7 @@ import { FoodPickerDialog } from "@/ravarer/components/matvaretabellen/FoodPicke
 import { formatNumber } from "@/ravarer/lib/constants";
 import { paths } from "@/ravarer/lib/paths";
 import { sectionSearch } from "@/ravarer/lib/rawMaterialSections";
-import { NUTRITION_REQUIRED_FIELDS, missingNutritionFields } from "@/ravarer/lib/nutritionCompleteness";
+import { missingNutritionFields } from "@/ravarer/lib/nutritionCompleteness";
 import { DataTable, type Column } from "@/ravarer/ui/DataTable";
 import { PeekPanel, SplitView } from "@/ravarer/ui/SplitView";
 import { orderNutritionRows } from "./modeLogic";
@@ -67,7 +67,7 @@ export default function NutritionMode() {
     queryKey: ["nutrition-missing-fields", reviewIds],
     enabled: reviewIds.length > 0,
     queryFn: async (): Promise<Map<string, number>> => {
-      const { data, error } = await supabase.from("raw_material_nutrition").select(`raw_material_id, ${NUTRITION_REQUIRED_FIELDS.join(", ")}, fiber_g`).in("raw_material_id", reviewIds);
+      const { data, error } = await supabase.from("raw_material_nutrition").select("raw_material_id, energy_kj, energy_kcal, fat_g, saturated_fat_g, carbs_g, sugars_g, protein_g, salt_g").in("raw_material_id", reviewIds);
       if (error) throw error;
       const map = new Map<string, number>();
       for (const row of data ?? []) map.set(row.raw_material_id, missingNutritionFields(row).length);
