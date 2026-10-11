@@ -1,4 +1,4 @@
-import { toBaseFactor } from "@/fakturaer/lib/units";
+import { isBaseUnit, normalizeUnit, toBaseFactor } from "@/fakturaer/lib/units";
 import { parseDecimal } from "@/ravarer/lib/packageMath";
 
 /**
@@ -22,5 +22,11 @@ export function agreementBaseUnitsPerPackage(
   if (size == null || size <= 0) return null;
 
   const factor = toBaseFactor(packageUnit, baseUnit);
-  return factor == null ? size : size * factor;
+  if (factor != null) return size * factor;
+  // To kjente grunnenheter uten felles dimensjon (kg→l, stk→kg) har ingen gyldig
+  // omregning. Da kreves eksplisitt innhold per pakning — aldri pakningstallet.
+  const pu = normalizeUnit(packageUnit);
+  const bu = normalizeUnit(baseUnit);
+  if (pu && bu && isBaseUnit(pu) && isBaseUnit(bu)) return null;
+  return size;
 }
