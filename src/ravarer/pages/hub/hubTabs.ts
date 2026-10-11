@@ -64,6 +64,4 @@ export const LAGER_TABS = ["beholdning", "varemottak", "telling", "bevegelser", 
 export type LagerTab = (typeof LAGER_TABS)[number];
 /** Fanespesifikke adresseparametere som fjernes ved fanebytte. */
 export const LAGER_TAB_PARAMS = ["valgt", "fra", "til", "leverandor", "filter"];
-export function _lagerTabsEnd() {
-  return null;
-}
+
