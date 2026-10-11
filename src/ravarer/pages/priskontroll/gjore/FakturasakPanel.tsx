@@ -96,6 +96,7 @@ export function FakturasakPanel({ invoiceId, kind, onDone, onNext, onSkip }: Pro
               <h2 className="font-display text-xl">Faktura {d.invoice_number} · <span className="tabular-nums">{formatNok(d.total_amount)}</span></h2>
               <div className="flex flex-wrap items-center gap-3 text-sm">
                 <Link className="underline underline-offset-2" to={paths.faktura(d.id)}>Åpne faktura</Link>
+                {canWrite && !isFinal && d.invoice_lines.length > 0 && d.source_document_url && <Link className="underline underline-offset-2" to={paths.lesPaNytt(d.id)}>Les originalen på nytt</Link>}
                 {d.source_document_url && (doc.url
                   ? <a className="inline-flex items-center gap-1 underline underline-offset-2" href={doc.url} target="_blank" rel="noreferrer"><FileText className="h-3.5 w-3.5" aria-hidden />Originalfaktura</a>
                   : <span className="inline-flex items-center gap-1 text-ink-secondary"><FileText className="h-3.5 w-3.5" aria-hidden />{doc.isLoading ? "Henter originalfaktura …" : "Originalfaktura ikke tilgjengelig"}</span>)}

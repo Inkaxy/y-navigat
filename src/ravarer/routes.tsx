@@ -26,6 +26,7 @@ const Matvaretabellen = lazy(() => import("@/ravarer/pages/Matvaretabellen"));
 const DatabladBulk = lazy(() => import("@/ravarer/pages/DatabladBulk"));
 
 const FakturaWorkspace = lazy(() => import("./pages/priskontroll/faktura/FakturaWorkspace"));
+const LesPaNytt = lazy(() => import("./pages/priskontroll/faktura/LesPaNytt"));
 const RegistrerLinjer = lazy(() => import("@/fakturaer/pages/RegistrerLinjer"));
 const SupplierCase = lazy(() => import("@/fakturaer/pages/SupplierCase"));
 const AlleVarekort = lazy(() => import("./pages/priskontroll/AlleVarekort"));
@@ -73,6 +74,7 @@ export function ravarerRoutes(Shell: ShellType) {
     <Route key="pk-fak-root" path="/ravarer/priskontroll/faktura" element={<Navigate to={paths.alleFakturaer()} replace />} />,
     <Route key="pk-sak" path="/ravarer/priskontroll/saker/:id" element={inv(<SupplierCase />)} />,
     <Route key="pk-reg" path="/ravarer/priskontroll/faktura/:id/registrer-linjer" element={inv(<RegistrerLinjer />)} />,
+    <Route key="pk-reread" path="/ravarer/priskontroll/faktura/:id/les-pa-nytt" element={inv(<LesPaNytt />)} />,
     <Route key="pk-fak" path="/ravarer/priskontroll/faktura/:id" element={inv(<FakturaWorkspace />)} />,
 
     // Leverandører (statiske stier før /:id)

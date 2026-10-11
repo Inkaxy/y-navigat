@@ -157,6 +157,7 @@ export default function FakturaWorkspace() {
     else if (a === "rematch") doRematch();
     else if (a === "fetch") doFetch();
     else if (a === "register") navigate(paths.registrerLinjer(data.id));
+    else if (a === "reread") navigate(paths.lesPaNytt(data.id));
     else if (a === "credit") setDialog({ kind: "credit", inv: data });
     else if (a === "correct") {
       const lines = data.invoice_lines ?? [];

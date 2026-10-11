@@ -107,7 +107,7 @@ export default function LesPaNytt() {
       </header>
 
       {!runId && (
-        <QueryState query={inv} empty={!inv.data} emptyText="Fant ikke fakturaen.">
+        <QueryState scope="reread-faktura" isLoading={inv.isLoading} isError={inv.isError} error={inv.error} onRetry={() => void inv.refetch()} isEmpty={!inv.data} emptyTitle="Fant ikke fakturaen.">
           <div className="mx-auto max-w-xl space-y-3 rounded-lg border border-border p-5 text-sm">
             <p>Leser den lagrede originalen på nytt og viser gammel og ny verdi linje for linje. Ingenting endres før du velger linjer, bekrefter og tar dem i bruk. Fakturahode, kreditnota og mva endres aldri her.</p>
             {open.data && <p>Du har en påbegynt lesing fra {when(open.data.created_at)}. <button type="button" className="underline" onClick={() => setRun(open.data!.id)}>Fortsett den</button></p>}
@@ -119,7 +119,7 @@ export default function LesPaNytt() {
       )}
 
       {runId && (
-        <QueryState query={run} empty={!r} emptyText="Fant ikke lesingen. Den kan tilhøre et annet selskap.">
+        <QueryState scope="reread-kjoring" isLoading={run.isLoading} isError={run.isError} error={run.error} onRetry={() => void run.refetch()} isEmpty={!r} emptyTitle="Fant ikke lesingen." emptyDescription="Den kan tilhøre et annet selskap, eller adressen er feil.">
           {r && r.invoice_id !== id && <p role="alert" className="text-destructive">Lesingen gjelder en annen faktura.</p>}
           {r && r.invoice_id === id && r.status === "reading" && (
             <ReadingState invoked={invoke.isPending || sessionStorage.getItem(invokedKey(r.id)) === "1"} busy={cancel.isPending || !isOwner} onInvoke={runInvoke} onCancel={() => cancel.mutate(r.id)} />
