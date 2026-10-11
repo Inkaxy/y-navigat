@@ -15,27 +15,13 @@ import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBan
 import { useFakturaer } from "@/fakturaer/context/FakturaerContext";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
 import { useSuppliersFor } from "@/fakturaer/hooks/useSuppliersFor";
-import { todayIso, LOW_EXTRACTION_CONFIDENCE } from "@/fakturaer/lib/constants";
+import { todayIso } from "@/fakturaer/lib/constants";
 import { computeLinesSum } from "@/fakturaer/lib/linesSum";
 import { cn } from "@/lib/utils";
 import { runAutoMatchAfterImport } from "@/fakturaer/lib/queueActions";
 import { paths } from "@/ravarer/lib/paths";
-
-interface ExtractedLine {
-  description: string | null;
-  sku: string | null;
-  quantity: number | null;
-  unit: string | null;
-  unit_price: number | null;
-  total_amount: number | null;
-  vat_rate: number | null;
-  package_size: number | null;
-  package_unit: string | null;
-  count_per_package: number | null;
-  line_kind?: string | null;
-  price_basis?: string | null;
-  discount_amount?: number | null;
-}
+import { PdfLineCards } from "@/fakturaer/components/import-pdf/PdfLineCards";
+import { lineFromExtraction, manualReading, manualSaveErrorMessage, parseManualSaveResult, parseReadIssues, rowPayload, validConfidence, type PdfLine } from "@/fakturaer/lib/manualPdfSave";
 
 interface ExtractedData {
   supplier_name: string | null;
@@ -48,7 +34,7 @@ interface ExtractedData {
   currency: string | null;
   kid_number: string | null;
   account_number: string | null;
-  lines: ExtractedLine[];
+  lines: unknown[];
   field_confidence?: Record<string, number>;
 }
 
@@ -59,11 +45,10 @@ interface ParseResult {
   extracted: ExtractedData;
   matched_supplier: { id: string; name: string; org_number: string | null } | null;
   name_matched_supplier: { id: string; name: string; org_number: string | null } | null;
+  sum_check?: { issues?: unknown };
 }
 
 const LOW_CONF = 0.8;
-/** Under denne lesesikkerheten må fakturaen gjennomgås manuelt. */
-const LOW_EXTRACTION_CONF = LOW_EXTRACTION_CONFIDENCE;
 
 
 async function fileToBase64(file: File): Promise<string> {
@@ -107,8 +92,10 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
   const [currency, setCurrency] = useState("NOK");
   const [kid, setKid] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
-  const [lines, setLines] = useState<ExtractedLine[]>([]);
+  const [lines, setLines] = useState<PdfLine[]>([]);
   const [busy, setBusy] = useState(false);
+  // Fast dokumentsti per fil: et nytt forsøk etter nettverksfeil gir samme faktura, ikke et duplikat.
+  const [docPath, setDocPath] = useState<string | null>(null);
 
   useEffect(() => {
     if (entities.length === 1 && !legalEntityId) setLegalEntityId(entities[0].id);
@@ -161,21 +148,7 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
       if (e.currency) setCurrency(e.currency);
       if (e.kid_number) setKid(e.kid_number);
       if (e.account_number) setAccountNumber(e.account_number);
-      setLines((e.lines ?? []).map((l) => ({
-        description: l.description ?? null,
-        sku: l.sku ?? null,
-        quantity: l.quantity ?? null,
-        unit: l.unit ?? null,
-        unit_price: l.unit_price ?? null,
-        total_amount: l.total_amount ?? null,
-        vat_rate: l.vat_rate ?? null,
-        package_size: l.package_size ?? null,
-        package_unit: l.package_unit ?? null,
-        count_per_package: l.count_per_package ?? null,
-        line_kind: l.line_kind ?? null,
-        price_basis: l.price_basis ?? null,
-        discount_amount: l.discount_amount ?? null,
-      })));
+      setLines((e.lines ?? []).map(lineFromExtraction));
 
       const match = sid ? null : result.matched_supplier ?? result.name_matched_supplier;
       if (sid) {
@@ -200,7 +173,7 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
     }
   };
 
-  const updateLine = (idx: number, patch: Partial<ExtractedLine>) => {
+  const updateLine = (idx: number, patch: Partial<PdfLine>) => {
     setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
   };
   const removeLine = (idx: number) => setLines((prev) => prev.filter((_, i) => i !== idx));
@@ -224,130 +197,76 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
     setKid("");
     setAccountNumber("");
     setLines([]);
+    setDocPath(null);
   };
 
+  const sumNow = () => computeLinesSum({
+    lineTotals: lines.map((l) => l.total_amount),
+    totalAmount: totalAmount ? Number(totalAmount) : null,
+    totalVat: totalVat ? Number(totalVat) : null,
+  });
+
   const submit = async () => {
-    if (!file || !legalEntityId || !invoiceNumber || !invoiceDate) {
+    if (!file || !legalEntityId || !invoiceNumber.trim() || !invoiceDate) {
       toast.error("Fyll inn fakturanr og fakturadato");
       return;
     }
+    if (supplierMode === "create" ? !newSupplierName.trim() : !supplierId) {
+      toast.error(supplierMode === "create" ? "Leverandørnavn er påkrevd" : "Velg eller opprett leverandør");
+      return;
+    }
     setBusy(true);
+    let uploadedNow: string | null = null;
     try {
-      // 1. Resolve supplier
-      let resolvedSupplierId = supplierId;
-      if (supplierMode === "create") {
-        if (!newSupplierName.trim()) {
-          toast.error("Leverandørnavn er påkrevd");
-          setBusy(false);
-          return;
-        }
-        const { data: newSup, error: supErr } = await supabase
-          .from("suppliers")
-          .insert({
-            legal_entity_id: legalEntityId,
-            name: newSupplierName.trim(),
-            org_number: newSupplierOrgNr.trim() || null,
-            is_active: true,
-            notes: "Opprettet fra PDF-import",
-          })
-          .select("id").single();
-        if (supErr) throw supErr;
-        resolvedSupplierId = newSup.id;
-        await refetchSuppliers();
-      }
-      if (!resolvedSupplierId) {
-        toast.error("Velg eller opprett leverandør");
-        setBusy(false);
-        return;
+      // 1. PDF lagres under selskapets mappe; samme sti gjenbrukes ved nytt forsøk.
+      let path = docPath;
+      if (!path) {
+        path = `${legalEntityId}/${crypto.randomUUID()}_${file.name.replace(/[^\w.\-]+/g, "_")}`;
+        const { error: upErr } = await supabase.storage.from("invoice-pdfs").upload(path, file, { upsert: true });
+        if (upErr) throw upErr;
+        uploadedNow = path;
+        setDocPath(path);
       }
 
-      // 1b. Duplicate-check: same supplier + invoice_number already exists?
-      const { data: dup } = await supabase
-        .from("invoices")
-        .select("id, invoice_date")
-        .eq("legal_entity_id", legalEntityId)
-        .eq("supplier_id", resolvedSupplierId)
-        .eq("invoice_number", invoiceNumber.trim())
-        .maybeSingle();
-      if (dup) {
-        toast.error(`Fakturanr ${invoiceNumber} finnes allerede for denne leverandøren`);
-        setBusy(false);
-        return;
-      }
-
-      // 2. Upload PDF to storage
-      const path = `${legalEntityId}/${Date.now()}_${file.name}`;
-      const { error: upErr } = await supabase.storage.from("invoice-pdfs").upload(path, file);
-      if (upErr) throw upErr;
-
-      // 3. Insert invoice
-      const extractionConfidence = typeof parseResult?.confidence === "number" ? parseResult.confidence : null;
-      const lowConfidence = extractionConfidence != null && extractionConfidence < LOW_EXTRACTION_CONF;
-      const sumCheck = computeLinesSum({
-        lineTotals: lines.map((l) => l.total_amount),
-        totalAmount: totalAmount ? Number(totalAmount) : null,
-        totalVat: totalVat ? Number(totalVat) : null,
+      // 2. Leverandør + faktura + linjer i én transaksjon på serveren (alt eller ingenting).
+      const conf = validConfidence(parseResult?.confidence);
+      const sumCheck = sumNow();
+      const noteParts = [kid && `KID: ${kid}`, accountNumber && `Konto: ${accountNumber}`].filter(Boolean) as string[];
+      const { data, error } = await supabase.rpc("rm_save_manual_pdf_invoice", {
+        p_legal_entity_id: legalEntityId,
+        p_supplier: supplierMode === "create"
+          ? { name: newSupplierName.trim(), org_number: newSupplierOrgNr.trim() || null }
+          : { id: supplierId },
+        p_invoice: {
+          invoice_number: invoiceNumber.trim(), invoice_date: invoiceDate, due_date: dueDate || null,
+          total_amount: totalAmount ? Number(totalAmount) : null, total_vat: totalVat ? Number(totalVat) : null,
+          currency: currency || "NOK", source_document_url: path, extraction_confidence: conf,
+          lines_sum_excl_vat: sumCheck.lines_sum_excl_vat, lines_sum_variance_pct: sumCheck.lines_sum_variance_pct,
+          lines_sum_status: sumCheck.lines_sum_status, notes: noteParts.length > 0 ? noteParts.join(" · ") : null,
+          issues: parseReadIssues(parseResult?.sum_check?.issues),
+        },
+        p_rows: lines.map(rowPayload),
       });
-      const noteParts = [
-        kid && `KID: ${kid}`,
-        accountNumber && `Konto: ${accountNumber}`,
-        lowConfidence && `Lav lesesikkerhet (${Math.round(extractionConfidence! * 100)} %) — krever gjennomgang`,
-      ].filter(Boolean) as string[];
-
-      const { data: invoice, error: invErr } = await supabase
-        .from("invoices")
-        .insert({
-          legal_entity_id: legalEntityId,
-          supplier_id: resolvedSupplierId,
-          invoice_number: invoiceNumber,
-          invoice_date: invoiceDate,
-          due_date: dueDate || null,
-          total_amount: totalAmount ? Number(totalAmount) : null,
-          total_vat: totalVat ? Number(totalVat) : null,
-          currency: currency || "NOK",
-          source: "pdf_upload",
-          lines_source: lines.length > 0 ? "pdf_extracted" : "pending_manual",
-          source_document_url: path,
-          status: lowConfidence ? "needs_review" : "imported",
-          extraction_confidence: extractionConfidence,
-          lines_sum_excl_vat: sumCheck.lines_sum_excl_vat,
-          lines_sum_variance_pct: sumCheck.lines_sum_variance_pct,
-          lines_sum_status: sumCheck.lines_sum_status,
-          notes: noteParts.length > 0 ? noteParts.join(" · ") : null,
-        })
-        .select("id").single();
-      if (invErr) throw invErr;
-
-
-      // 4. Insert lines
-      if (lines.length > 0) {
-        const linesPayload = lines.map((l, idx) => ({
-          invoice_id: invoice.id,
-          line_number: idx + 1,
-          description: l.description ?? `Linje ${idx + 1}`,
-          supplier_sku: l.sku,
-          quantity: l.quantity,
-          unit: l.unit,
-          unit_price: l.unit_price,
-          total_amount: l.total_amount,
-          vat_rate: l.vat_rate,
-          package_size: l.package_size,
-          package_unit: l.package_unit,
-          count_per_package: l.count_per_package,
-          line_kind: l.line_kind ?? null,
-          unit_price_basis: l.price_basis ?? null,
-          discount_amount: l.discount_amount ?? null,
-        }));
-        const { error: linesErr } = await supabase.from("invoice_lines").insert(linesPayload);
-        if (linesErr) throw linesErr;
+      if (error) throw error;
+      const res = parseManualSaveResult(data);
+      if (!res.ok) {
+        // Ingenting ble lagret: fjern PDF-en vi lastet opp i dette forsøket.
+        if (uploadedNow) {
+          const { error: rmErr } = await supabase.storage.from("invoice-pdfs").remove([uploadedNow]);
+          if (rmErr) console.warn("Kunne ikke rydde opplastet PDF", rmErr.message);
+          setDocPath(null);
+        }
+        toast.error(manualSaveErrorMessage(res.code));
+        return;
       }
+      if (supplierMode === "create") await refetchSuppliers();
 
-      const newSavedIds = [...savedIds, invoice.id];
+      const newSavedIds = [...savedIds, res.invoiceId];
       setSavedIds(newSavedIds);
       const hasMore = queueIndex < queue.length - 1;
 
       // Auto-match rett etter import — samme kall som ved manuell registrering.
-      if (lines.length > 0) await runAutoMatchAfterImport(invoice.id);
+      if (res.lines > 0 && !res.replayed) await runAutoMatchAfterImport(res.invoiceId);
 
       if (hasMore) {
         toast.success(`Faktura ${queueIndex + 1} av ${queue.length} lagret — neste fil`);
@@ -357,16 +276,17 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
         toast.success(`Alle ${queue.length} fakturaer lagret og matchet`);
         if (onImported) onImported(null);
         else navigate(paths.alleFakturaer());
-      } else if (lines.length === 0) {
+      } else if (res.lines === 0) {
         toast.success("Faktura opprettet — registrer linjer");
-        navigate(paths.registrerLinjer(invoice.id));
+        navigate(paths.registrerLinjer(res.invoiceId));
       } else {
-        toast.success("Faktura opprettet og matchet");
-        if (onImported) onImported(invoice.id);
-        else navigate(paths.faktura(invoice.id));
+        toast.success(res.status === "needs_review" ? "Faktura lagret — trenger gjennomgang" : "Faktura opprettet og matchet");
+        if (onImported) onImported(res.invoiceId);
+        else navigate(paths.faktura(res.invoiceId));
       }
     } catch (e: unknown) {
-      showError("pdf-import", e, "Opplastingen feilet");
+      // Ukjent utfall (f.eks. nettverk): PDF-stien beholdes slik at «Lagre» på nytt ikke lager duplikat.
+      showError("pdf-import", e, "Lagringen feilet. Prøv igjen – fakturaen blir ikke lagret to ganger.");
     } finally {
       setBusy(false);
     }
@@ -447,7 +367,11 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
 
   // ============ STEP 2: confirm ============
   const matched = parseResult.matched_supplier ?? parseResult.name_matched_supplier;
-  const overallLow = parseResult.confidence < LOW_CONF;
+  const reading = manualReading({
+    confidence: parseResult.confidence, linesSumStatus: sumNow().lines_sum_status, lines,
+    invoiceIssues: parseReadIssues(parseResult.sum_check?.issues).length,
+  });
+  const methodLabel = parseResult.extraction_method === "regex" ? "tekstmønster" : parseResult.extraction_method === "hybrid" ? "AI + tekstmønster" : "AI";
 
   return (
     <div className="space-y-5">
@@ -475,10 +399,11 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
 
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="outline" className="gap-1">
-          <Sparkles className="h-3 w-3" /> Metode: {parseResult.extraction_method}
+          <Sparkles className="h-3 w-3" aria-hidden /> Lest med {methodLabel}
         </Badge>
-        <Badge variant={overallLow ? "destructive" : "secondary"}>
-          Sikkerhet: {(parseResult.confidence * 100).toFixed(0)}%
+        <Badge variant={reading.confirmed ? "secondary" : "outline"} className={cn(!reading.confirmed && "border-warning/40 text-warning")}>
+          Lesesikkerhet: {reading.label}
+          {reading.rawScore && <span className="ml-1 font-normal text-ink-secondary">(rå AI-score {reading.rawScore}{reading.confirmed ? "" : ", ikke validert"})</span>}
         </Badge>
         {supplierMode === "existing" && supplierId && parsedWithSupplier !== supplierId && (
           <Button size="sm" variant="outline" disabled={parsing} onClick={() => void runParse(supplierId)}>
@@ -493,13 +418,13 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+      <div className={cn("grid grid-cols-1 gap-5", !embedded && "xl:grid-cols-2")}>
         {/* PDF preview */}
         <Card className="overflow-hidden p-0">
           {pdfPreviewUrl ? (
-            <iframe src={pdfPreviewUrl} className="h-[70vh] w-full" title="PDF preview" />
+            <iframe src={pdfPreviewUrl} className={cn("w-full", embedded ? "h-[55vh]" : "h-[70vh]")} title="Forhåndsvisning av PDF" />
           ) : (
-            <div className="flex h-[70vh] items-center justify-center text-ink-secondary">Ingen PDF-preview</div>
+            <div className="flex h-40 items-center justify-center text-ink-secondary">Ingen forhåndsvisning</div>
           )}
         </Card>
 
@@ -542,7 +467,7 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
                   </div>
                   <div>
                     <Label className={cn("text-xs", isLow("supplier_org_number") && "text-warning")}>
-                      Org.nr {isLow("supplier_org_number") && "⚠️"}
+                      Org.nr {isLow("supplier_org_number") && <AlertTriangle className="inline h-3 w-3" aria-label="Lav lesesikkerhet" />}
                     </Label>
                     <Input value={newSupplierOrgNr} onChange={(e) => setNewSupplierOrgNr(e.target.value)} />
                   </div>
@@ -555,7 +480,7 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
           </div>
 
           {/* Invoice header */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
             <Field label="Fakturanr *" lowConf={isLow("invoice_number")}>
               <Input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} />
             </Field>
@@ -586,7 +511,7 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
 
       {/* Lines */}
       <Card className="p-5">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
           <div>
             <h3 className="font-medium">Linjer ({lines.length})</h3>
             <p className="text-xs text-ink-secondary">
@@ -619,51 +544,10 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
           );
         })()}
 
-        {lines.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs text-ink-secondary">
-                  <th className="p-2">Beskrivelse</th>
-                  <th className="p-2">SKU</th>
-                  <th className="p-2 w-20">Antall</th>
-                  <th className="p-2 w-16">Enhet</th>
-                  <th className="p-2 w-24">Stk.pris</th>
-                  <th className="p-2 w-24">Sum</th>
-                  <th className="p-2 w-16">Mva%</th>
-                  <th className="p-2 w-20" title="Pakningsstørrelse per sub-enhet">Pk.str</th>
-                  <th className="p-2 w-16" title="Base-enhet for pakningsstørrelsen">Pk.enhet</th>
-                  <th className="p-2 w-16" title="Antall sub-enheter per pakke (36 for 36X90G)">Ant./pk</th>
-                  <th className="p-2 w-8"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {lines.map((l, i) => (
-                  <tr key={i} className="border-b">
-                    <td className="p-1"><Input value={l.description ?? ""} onChange={(e) => updateLine(i, { description: e.target.value })} className="h-8" /></td>
-                    <td className="p-1"><Input value={l.sku ?? ""} onChange={(e) => updateLine(i, { sku: e.target.value || null })} className="h-8" /></td>
-                    <td className="p-1"><Input type="number" step="0.001" value={l.quantity ?? ""} onChange={(e) => updateLine(i, { quantity: e.target.value ? Number(e.target.value) : null })} className="h-8" /></td>
-                    <td className="p-1"><Input value={l.unit ?? ""} onChange={(e) => updateLine(i, { unit: e.target.value || null })} className="h-8" /></td>
-                    <td className="p-1"><Input type="number" step="0.01" value={l.unit_price ?? ""} onChange={(e) => updateLine(i, { unit_price: e.target.value ? Number(e.target.value) : null })} className="h-8" /></td>
-                    <td className="p-1"><Input type="number" step="0.01" value={l.total_amount ?? ""} onChange={(e) => updateLine(i, { total_amount: e.target.value ? Number(e.target.value) : null })} className="h-8" /></td>
-                    <td className="p-1"><Input type="number" step="0.1" value={l.vat_rate ?? ""} onChange={(e) => updateLine(i, { vat_rate: e.target.value ? Number(e.target.value) : null })} className="h-8" /></td>
-                    <td className="p-1"><Input type="number" step="0.001" value={l.package_size ?? ""} onChange={(e) => updateLine(i, { package_size: e.target.value ? Number(e.target.value) : null })} className="h-8" /></td>
-                    <td className="p-1"><Input value={l.package_unit ?? ""} onChange={(e) => updateLine(i, { package_unit: e.target.value || null })} className="h-8" /></td>
-                    <td className="p-1"><Input type="number" step="1" value={l.count_per_package ?? ""} onChange={(e) => updateLine(i, { count_per_package: e.target.value ? Number(e.target.value) : null })} className="h-8" /></td>
-                    <td className="p-1 text-center">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeLine(i)}>
-                        <Trash2 className="h-3 w-3 text-destructive" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {lines.length > 0 && <PdfLineCards lines={lines} onChange={updateLine} onRemove={removeLine} />}
       </Card>
 
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
         <Button variant="outline" onClick={() => navigate(paths.alleFakturaer())} disabled={busy}>Avbryt</Button>
         <Button onClick={submit} disabled={busy} className="gap-2">
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
@@ -678,7 +562,7 @@ function Field({ label, lowConf, children }: { label: string; lowConf: boolean; 
   return (
     <div>
       <Label className={cn("text-xs", lowConf && "text-warning")}>
-        {label} {lowConf && "⚠️"}
+        {label} {lowConf && <AlertTriangle className="inline h-3 w-3" aria-label="Lav lesesikkerhet" />}
       </Label>
       {children}
     </div>
