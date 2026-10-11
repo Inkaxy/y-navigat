@@ -4,9 +4,10 @@ import { diffAllergens, normalizeAllergenCode } from "@/ravarer/lib/allergenDiff
 const ALLERGEN_LABEL_BY_CODE: Record<string, string> = Object.fromEntries(ALLERGENS.map((a) => [a.value, a.label]));
 
 /** Felles før/etter-visning for datablad (råvarekortet og masseopplastingen). */
-export function BeforeAfter({ before, after }: { before: string | null; after: string | null | undefined }) {
+export function BeforeAfter({ before, after, label }: { before: string | null; after: string | null | undefined; label?: string }) {
   return (
     <div className="mt-2 grid gap-2 text-xs md:grid-cols-2">
+      {label && <div className="font-medium md:col-span-2">{label}</div>}
       <div>
         <div className="text-ink-secondary">I dag</div>
         <div className="rounded bg-muted px-2 py-1">{before || "—"}</div>
