@@ -1,421 +1,320 @@
-import { cn } from "@/lib/utils";
-import { useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Loader2, Upload } from "lucide-react";
+import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Upload, Loader2, FileText, Check, RefreshCw, AlertCircle, Plus } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
 import { RawMaterialCreateSheet } from "@/ravarer/editors/RawMaterialCreateSheet";
-import type { DatasheetAiFields as DatasheetExtract } from "@/ravarer/editors/createSheetLogic";
-import { useDeleteDatasheets, useOrphanDatasheets } from "@/ravarer/hooks/useDatasheets";
-import { formatDate } from "@/ravarer/lib/constants";
 import { PackageEditor } from "@/ravarer/editors/PackageEditor";
 import type { PackageWorklistRow } from "@/ravarer/hooks/usePackageSizes";
-import type { PackageFillSuggestion } from "@/ravarer/lib/packageMath";
+import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
+import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
+import { recomputeRecipesForRawMaterial } from "@/varer/lib/recomputeFanout";
+import { BulkFileRow, type BulkRow, type MaterialOption } from "@/ravarer/components/datablad/BulkFileRow";
+import { OrphanCleanup } from "@/ravarer/components/datablad/OrphanCleanup";
+import {
+  BULK_FIELDS, MAX_BULK_FILES, PRESELECT_SCORE, parseApplyOutcome, parseCandidates, retryStage, safeForBulk, summarizeExtract,
+} from "@/ravarer/lib/datasheetBulk";
 
-interface FileRow {
-  file: File;
-  status: "pending" | "uploading" | "extracting" | "matching" | "ready" | "error";
-  stage?: "upload" | "extract" | "match" | "apply";
-  storage_path?: string;
-  datasheet_id?: string;
-  extracted?: DatasheetExtract;
-  candidates?: { id: string; name: string; sku: string; score: number }[];
-  selectedRm?: string;
-  error?: string;
-  applied?: boolean;
-  /** Pakning databladet foreslår — aldri lagret, må bekreftes i dialogen. */
-  packageSuggestion?: PackageFillSuggestion | null;
-}
+const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+/**
+ * Verktøy: datablad-opplasting (R147–R154). Inntil 100 filer → opplasting, AI-uttrekk, matching og
+ * GJENNOMGANG per fil. Ingen skriving skjer før brukeren anvender en fil eller bekrefter et frosset utvalg.
+ */
 export default function DatabladBulk() {
   const embedded = useIsEmbedded();
+  const qc = useQueryClient();
   const { canWrite, legalEntityId } = useRavarer();
-  const [rows, setRows] = useState<FileRow[]>([]);
+  const { data: rmRows = [] } = useRawMaterials();
+  const materials = useMemo<MaterialOption[]>(() => rmRows.filter((r) => r.is_active).map((r) => ({ id: r.id, name: r.name, sku: r.sku ?? null })), [rmRows]);
+
+  const [rows, setRows] = useState<BulkRow[]>([]);
   const [batchId, setBatchId] = useState<string | null>(null);
-  const [createDialogIdx, setCreateDialogIdx] = useState<number | null>(null);
-  const { data: orphans = [] } = useOrphanDatasheets(legalEntityId ?? undefined);
-  const deleteDatasheets = useDeleteDatasheets();
-  const [applyingAll, setApplyingAll] = useState(false);
-  const [applyProgress, setApplyProgress] = useState({ done: 0, total: 0 });
-  const [packageTarget, setPackageTarget] = useState<
-    { row: PackageWorklistRow; suggestion: PackageFillSuggestion | null } | null
-  >(null);
-  const rowsRef = useRef<FileRow[]>([]);
+  const [createKey, setCreateKey] = useState<string | null>(null);
+  const [applyBusy, setApplyBusy] = useState(false);
+  const [bulkConfirm, setBulkConfirm] = useState<{ key: string; file: string; target: string; rmId: string }[] | null>(null);
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [packageTarget, setPackageTarget] = useState<{ row: PackageWorklistRow; suggestion: { size: number | null; contentUnit: string | null } | null } | null>(null);
+  const rowsRef = useRef<BulkRow[]>([]);
   rowsRef.current = rows;
+  /** Ny generasjon ved ny opplasting eller annet selskap: sene svar fra forrige gjelder ikke. */
+  const gen = useRef(0);
+  useEffect(() => { gen.current += 1; setRows([]); setBatchId(null); }, [legalEntityId]);
+
+  const processing = rows.some((r) => r.status === "pending" || r.status === "uploading" || r.status === "extracting" || r.status === "matching");
+  const unapplied = rows.some((r) => r.status === "ready" && r.applyState !== "applied" && !!r.selectedRm);
+  const guard = useUnsavedChangesGuard(processing || unapplied || applyBusy);
+
+  const update = (g: number, key: string, patch: Partial<BulkRow>) => {
+    if (g !== gen.current) return;
+    setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  };
+
+  const syncBatch = async (id: string | null, g: number, status?: "completed") => {
+    if (!id || g !== gen.current) return;
+    const cur = rowsRef.current;
+    const { error } = await supabase.from("datasheet_upload_batches").update({
+      processed: cur.filter((r) => r.status === "ready").length,
+      failed: cur.filter((r) => r.status === "error").length,
+      status: status ?? "processing",
+      ...(status === "completed" ? { completed_at: new Date().toISOString() } : {}),
+    }).eq("id", id);
+    if (error) console.error("[datablad:batch-status]", error);
+  };
+
+  const matchStage = async (g: number, row: BulkRow, datasheetId: string) => {
+    update(g, row.key, { status: "matching", stage: "match", datasheet_id: datasheetId, error: undefined });
+    const { data: ds, error: dsErr } = await supabase.from("raw_material_datasheets").select("ai_extracted").eq("id", datasheetId).maybeSingle();
+    if (dsErr) throw new Error("Kunne ikke lese AI-uttrekket");
+    const { data: match, error: matchErr } = await supabase.functions.invoke("match-datasheet-to-raw-material", { body: { datasheet_id: datasheetId } });
+    if (matchErr) throw new Error(`Matching feilet: ${matchErr.message}`);
+    const candidates = parseCandidates(match);
+    const top = candidates[0];
+    update(g, row.key, {
+      status: "ready", stage: undefined, summary: summarizeExtract(ds?.ai_extracted ?? null), candidates,
+      // Forhåndsvalg ved høy score — autoriserer ikke skriving.
+      selectedRm: top && top.score >= PRESELECT_SCORE ? top.id : null, manualTarget: false, error: undefined,
+    });
+  };
+
+  const processRow = async (g: number, row: BulkRow, batch: string | null, from: "upload" | "extract" | "match") => {
+    let path = row.storage_path;
+    try {
+      if (!legalEntityId) throw new Error("Mangler selskap");
+      if (from === "upload" || !path) {
+        update(g, row.key, { status: "uploading", stage: "upload", error: undefined });
+        path = `${legalEntityId}/bulk/${batch}/${Date.now()}-${row.file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+        const { error } = await supabase.storage.from("raw-material-datasheets").upload(path, row.file);
+        if (error) throw new Error(`Opplasting feilet: ${error.message}`);
+        update(g, row.key, { storage_path: path });
+      }
+      let dsId = row.datasheet_id;
+      if (from !== "match" || !dsId) {
+        update(g, row.key, { status: "extracting", stage: "extract", error: undefined });
+        const { data: ext, error } = await supabase.functions.invoke("extract-datasheet", { body: { file_path: path, batch_id: batch } });
+        if (error) throw new Error(`AI-uttrekk feilet: ${error.message}`);
+        const id = ext && typeof ext === "object" && "datasheet_id" in ext && typeof ext.datasheet_id === "string" ? ext.datasheet_id : null;
+        if (!id) throw new Error("AI-uttrekk: serveren returnerte ikke datablad");
+        dsId = id;
+      }
+      await matchStage(g, { ...row, storage_path: path }, dsId);
+    } catch (e: unknown) {
+      console.error(`[datablad] ${row.file.name}:`, e);
+      update(g, row.key, { status: "error", error: errText(e) });
+    }
+  };
 
   const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []).slice(0, 100);
-    if (files.length === 0) return;
-    const newRows: FileRow[] = files.map(f => ({ file: f, status: "pending" }));
-    setRows(newRows);
-
-    const { data: batch, error: batchErr } = await supabase.from("datasheet_upload_batches").insert({
-      legal_entity_id: legalEntityId,
-      total_files: files.length,
-    }).select("id").single();
-    if (batchErr || !batch?.id) {
-      // Uten en batch finnes det ingen sporbarhet for filene — da skal vi ikke
-      // laste opp noe i det hele tatt.
-      toast.error(`Kunne ikke starte opplastingen: ${batchErr?.message ?? "ukjent feil"}`);
-      setRows([]);
-      e.target.value = "";
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (files.length === 0 || !canWrite || !legalEntityId) return;
+    if (files.length > MAX_BULK_FILES) {
+      toast.error(`Du valgte ${files.length} filer. Maks ${MAX_BULK_FILES} per opplasting — velg færre.`);
+      return;
+    }
+    const g = ++gen.current;
+    const fresh: BulkRow[] = files.map((file, i) => ({
+      key: `${g}-${i}`, file, status: "pending", candidates: [], selectedRm: null, manualTarget: false, applyState: "idle", followUps: [], packageSuggestion: null,
+    }));
+    setRows(fresh);
+    const { data: batch, error } = await supabase.from("datasheet_upload_batches").insert({ legal_entity_id: legalEntityId, total_files: files.length }).select("id").single();
+    if (error || !batch?.id) {
+      toast.error("Kunne ikke starte opplastingen. Ingen filer er lastet opp.");
+      if (g === gen.current) setRows([]);
       return;
     }
     setBatchId(batch.id);
-
-    for (let i = 0; i < newRows.length; i++) {
-      await processRow(i, newRows[i], batch.id);
-      await syncBatch(batch.id);
+    for (const r of fresh) {
+      if (g !== gen.current) return;
+      await processRow(g, r, batch.id, "upload");
+      await syncBatch(batch.id, g);
     }
-    await syncBatch(batch.id, "completed");
+    await syncBatch(batch.id, g, "completed");
   };
 
-  /** Holder datasheet_upload_batches i takt med hva som faktisk er behandlet. */
-  const syncBatch = async (id: string | null, status?: "completed") => {
-    if (!id) return;
-    const current = rowsRef.current;
-    const failed = current.filter((r) => r.status === "error").length;
-    const processed = current.filter((r) => r.status === "ready" || r.applied).length;
-    const { error: syncErr } = await supabase
-      .from("datasheet_upload_batches")
-      .update({
-        processed,
-        failed,
-        status: status ?? "processing",
-        ...(status === "completed" ? { completed_at: new Date().toISOString() } : {}),
-      })
-      .eq("id", id);
-    if (syncErr) toast.error(`Kunne ikke oppdatere status for opplastingen: ${syncErr.message}`);
+  const retry = async (key: string) => {
+    const r = rowsRef.current.find((x) => x.key === key);
+    if (!r || !canWrite) return;
+    const g = gen.current;
+    await processRow(g, r, batchId, retryStage(r));
+    await syncBatch(batchId, g);
   };
 
-  const updateRow = (i: number, patch: Partial<FileRow>) => {
-    setRows(prev => prev.map((r, idx) => idx === i ? { ...r, ...patch } : r));
-  };
-
-  const processRow = async (i: number, row: FileRow, batch_id?: string) => {
-    let storage_path = row.storage_path;
+  /** Knytter + anvender én fil med et FROSSET mål. Returnerer om alt ble lagret. */
+  const applyOne = async (g: number, key: string, rmId: string): Promise<boolean> => {
+    const r = rowsRef.current.find((x) => x.key === key);
+    if (!r?.datasheet_id || !canWrite) return false;
+    update(g, key, { applyState: "applying", applyError: undefined });
     try {
-      if (!storage_path) {
-        updateRow(i, { status: "uploading", stage: "upload", error: undefined });
-        if (!legalEntityId) throw new Error("Mangler legal_entity_id");
-        const safeName = row.file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-        storage_path = `${legalEntityId}/bulk/${batch_id}/${Date.now()}-${safeName}`;
-        const { error: upErr } = await supabase.storage.from("raw-material-datasheets").upload(storage_path, row.file);
-        if (upErr) throw new Error(`Opplasting feilet: ${upErr.message}`);
-        updateRow(i, { storage_path });
-      }
-
-      updateRow(i, { status: "extracting", stage: "extract", error: undefined });
-      const { data: ext, error: extErr } = await supabase.functions.invoke("extract-datasheet", {
-        body: { file_path: storage_path, batch_id },
-      });
-      if (extErr) throw new Error(`AI-ekstrahering feilet: ${extErr.message}`);
-      if (!ext) throw new Error("AI-ekstrahering: ingen respons fra serveren");
-      if (ext.error) throw new Error(`AI-ekstrahering: ${ext.error}`);
-
-      updateRow(i, { status: "matching", stage: "match", datasheet_id: ext.datasheet_id });
-
-      // Hent ai_extracted slik at vi kan forhåndsutfylle "Opprett ny råvare" hvis ingen match
-      const { data: dsRow } = await supabase
-        .from("raw_material_datasheets")
-        .select("ai_extracted, file_name")
-        .eq("id", ext.datasheet_id)
-        .maybeSingle();
-      const extracted = (dsRow?.ai_extracted ?? {}) as DatasheetExtract;
-
-      const { data: match, error: matchErr } = await supabase.functions.invoke("match-datasheet-to-raw-material", {
-        body: { datasheet_id: ext.datasheet_id },
-      });
-      if (matchErr) throw new Error(`Matching feilet: ${matchErr.message}`);
-      if (match?.error) throw new Error(`Matching: ${match.error}`);
-
-      updateRow(i, {
-        status: "ready",
-        stage: undefined,
-        extracted,
-        candidates: match?.candidates ?? [],
-        selectedRm: match?.candidates?.[0]?.score >= 0.7 ? match.candidates[0].id : undefined,
-        error: undefined,
-      });
-    } catch (e: unknown) {
-      console.error(`[DatabladBulk] ${row.file.name}:`, e);
-      updateRow(i, { status: "error", error: e instanceof Error ? e.message : String(e) });
-    }
-  };
-
-  const retryRow = async (i: number) => {
-    const r = rows[i];
-    if (!r) return;
-    await processRow(i, r, batchId ?? undefined);
-    await syncBatch(batchId);
-  };
-
-  const applyRow = async (i: number, silent = false): Promise<boolean> => {
-    const r = rowsRef.current[i] ?? rows[i];
-    if (!r?.datasheet_id || !r.selectedRm) return false;
-    try {
+      const { error: linkErr } = await supabase.from("raw_material_datasheets").update({ raw_material_id: rmId }).eq("id", r.datasheet_id);
+      if (linkErr) throw new Error("Kunne ikke knytte databladet til råvaren");
       const { data, error } = await supabase.functions.invoke("apply-datasheet-update", {
-        body: {
-          datasheet_id: r.datasheet_id,
-          raw_material_id: r.selectedRm,
-          // «composite» er bevisst IKKE med som standard: AI-komponenter er ren tekst,
-          // og ville ellers overstyrt råvarens egen næring og allergener.
-          // «package» er bevisst IKKE med: pakningsstørrelse skal bekreftes i
-          // pakningsdialogen, ikke skrives i en bulkjobb.
-          accepted_fields: ["nutrition", "allergens", "ingredient_declaration", "grain"],
-        },
+        body: { datasheet_id: r.datasheet_id, raw_material_id: rmId, accepted_fields: [...BULK_FIELDS] },
       });
       if (error) throw new Error(error.message);
-      if (!data) throw new Error("Ingen respons fra apply-datasheet-update");
-      if (data.error) throw new Error(data.error);
-      if (Array.isArray(data.failures) && data.failures.length > 0) {
-        throw new Error(`Noe ble ikke lagret: ${data.failures.join(" · ")}`);
+      const out = parseApplyOutcome(data);
+      const followUps = out.allergenRemovalsSkipped.length > 0 ? [`allergenfjerning ikke utført (${out.allergenRemovalsSkipped.join(", ")}) — vurder på råvaren`] : [];
+      invalidateRawMaterial(qc, rmId);
+      void qc.invalidateQueries({ queryKey: ["nutrition-coverage"] });
+      void qc.invalidateQueries({ queryKey: ["raw-material-changelog"] });
+      void qc.invalidateQueries({ queryKey: ["orphan-datasheets"] });
+      void recomputeRecipesForRawMaterial(rmId, qc, { silent: true });
+      if (!out.ok) {
+        update(g, key, { applyState: "failed", applyError: out.error ?? `noe ble ikke lagret: ${out.failures.join(" · ")}`, followUps, packageSuggestion: out.packageSuggestion });
+        return false;
       }
-      const pkg = data.follow_ups?.package_suggestion;
-      updateRow(i, {
-        applied: true,
-        packageSuggestion: pkg ? { size: pkg.suggested?.size ?? null, contentUnit: pkg.suggested?.unit ?? null } : null,
-      });
-      if (!silent) toast.success(`${r.file.name}: ${data.changes_logged} endringer logget`);
+      update(g, key, { applyState: "applied", followUps, packageSuggestion: out.packageSuggestion });
       return true;
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!silent) toast.error(msg);
-      else updateRow(i, { error: msg });
+      console.error("[datablad:anvend]", e);
+      update(g, key, { applyState: "failed", applyError: errText(e) });
       return false;
     }
   };
 
-  /** Knytter databladet til råvaren med én gang et treff velges. */
-  const selectRm = async (i: number, rawMaterialId: string) => {
-    updateRow(i, { selectedRm: rawMaterialId });
-    const dsId = rowsRef.current[i]?.datasheet_id;
-    if (dsId) {
-      const { error } = await supabase
-        .from("raw_material_datasheets")
-        .update({ raw_material_id: rawMaterialId })
-        .eq("id", dsId);
-      if (error) updateRow(i, { error: `Kunne ikke knytte databladet til råvaren: ${error.message}` });
-    }
+  const applySingle = async (key: string) => {
+    const r = rowsRef.current.find((x) => x.key === key);
+    if (!r?.selectedRm || applyBusy) return;
+    setApplyBusy(true);
+    try { await applyOne(gen.current, key, r.selectedRm); } finally { setApplyBusy(false); }
   };
 
-  /** Henter et minimum av råvaren og åpner pakningsdialogen med forslaget. */
-  const openPackage = async (i: number) => {
-    const r = rowsRef.current[i] ?? rows[i];
+  const openBulk = () => {
+    const nameOf = (r: BulkRow) => r.candidates.find((c) => c.id === r.selectedRm)?.name ?? "råvare";
+    const snap = rowsRef.current.filter(safeForBulk).flatMap((r) => (r.selectedRm ? [{ key: r.key, file: r.file.name, target: nameOf(r), rmId: r.selectedRm }] : []));
+    if (snap.length === 0) { toast.info("Ingen filer er trygge for samlet bekreftelse. Anvend dem enkeltvis."); return; }
+    setBulkConfirm(snap);
+  };
+
+  const runBulk = async () => {
+    const snap = bulkConfirm;
+    setBulkConfirm(null);
+    if (!snap || applyBusy || !canWrite) return;
+    const g = gen.current;
+    setApplyBusy(true);
+    setProgress({ done: 0, total: snap.length });
+    let ok = 0;
+    try {
+      for (let n = 0; n < snap.length; n++) {
+        if (await applyOne(g, snap[n].key, snap[n].rmId)) ok++;
+        setProgress({ done: n + 1, total: snap.length });
+      }
+    } finally { setApplyBusy(false); }
+    if (ok === snap.length) toast.success(`${ok} datablad anvendt`);
+    else toast.warning(`${ok} av ${snap.length} anvendt — se filene merket «Ikke anvendt»`);
+  };
+
+  const openPackage = async (key: string) => {
+    const r = rowsRef.current.find((x) => x.key === key);
     if (!r?.selectedRm) return;
-    const { data, error } = await supabase
-      .from("raw_materials")
-      .select("id, legal_entity_id, name, base_unit, category, current_cost_price")
-      .eq("id", r.selectedRm)
-      .maybeSingle();
-    if (error || !data) {
-      toast.error(error ? `Kunne ikke hente råvaren: ${error.message}` : "Fant ikke råvaren");
-      return;
-    }
+    const { data, error } = await supabase.from("raw_materials").select("id, legal_entity_id, name, base_unit, category, current_cost_price").eq("id", r.selectedRm).maybeSingle();
+    if (error || !data) { toast.error("Kunne ikke hente råvaren"); return; }
     setPackageTarget({
       row: {
-        id: data.id,
-        legal_entity_id: data.legal_entity_id,
-        name: data.name,
-        base_unit: data.base_unit,
-        category: data.category ?? null,
-        current_cost_price: data.current_cost_price ?? null,
-        pakningsfaktor: null, faktor_kilde: null, bekreftet_dato: null,
-        antall_fakturalinjer: null, antall_leverandorer: null, enheter_i_bruk: null,
-        linjer_uten_pris: null, kjopt_kr_totalt: null, siste_faktura: null,
-        pris_spredning: null, implisert_mengde: null, referansepris: null,
+        id: data.id, legal_entity_id: data.legal_entity_id, name: data.name, base_unit: data.base_unit, category: data.category ?? null, current_cost_price: data.current_cost_price ?? null,
+        pakningsfaktor: null, faktor_kilde: null, bekreftet_dato: null, antall_fakturalinjer: null, antall_leverandorer: null, enheter_i_bruk: null,
+        linjer_uten_pris: null, kjopt_kr_totalt: null, siste_faktura: null, pris_spredning: null, implisert_mengde: null, referansepris: null,
         referansekilde: null, referansedato: null, referanse_faktor: null,
       } as PackageWorklistRow,
-      suggestion: r.packageSuggestion ?? null,
+      suggestion: r.packageSuggestion ? { size: r.packageSuggestion.size, contentUnit: r.packageSuggestion.unit } : null,
     });
   };
 
-  const applyAllHigh = async () => {
-    const targets = rows
-      .map((r, i) => ({ r, i }))
-      .filter(({ r }) => r.status === "ready" && !r.applied && (r.candidates?.[0]?.score ?? 0) >= 0.7);
-    if (targets.length === 0) {
-      toast.info("Ingen datablad med høy nok tillit å bekrefte.");
-      return;
-    }
-    setApplyingAll(true);
-    setApplyProgress({ done: 0, total: targets.length });
-    let ok = 0;
-    for (let n = 0; n < targets.length; n++) {
-      const { i, r } = targets[n];
-      if (!r.selectedRm && r.candidates?.[0]?.id) await selectRm(i, r.candidates[0].id);
-      const done = await applyRow(i, true);
-      if (done) ok++;
-      setApplyProgress({ done: n + 1, total: targets.length });
-    }
-    setApplyingAll(false);
-    await syncBatch(batchId, "completed");
-    if (ok === targets.length) toast.success(`${ok} datablad anvendt`);
-    else toast.warning(`${ok} av ${targets.length} datablad anvendt — resten står igjen med feilmelding`);
+  const createRow = rows.find((r) => r.key === createKey) ?? null;
+  const counts = {
+    ready: rows.filter((r) => r.status === "ready").length,
+    applied: rows.filter((r) => r.applyState === "applied").length,
+    failed: rows.filter((r) => r.status === "error" || r.applyState === "failed").length,
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
+      {guard.dialog}
       <div>
-        {!embedded && <h1 className="text-2xl font-semibold tracking-tight" style={{ letterSpacing: "-0.02em" }}>Bulk-opplasting datablad</h1>}
-        <p className={embedded ? "text-caption text-ink-secondary" : "text-sm text-ink-secondary"}>Last opp inntil 100 datablad. AI matcher hver fil mot eksisterende råvarer.</p>
+        {!embedded && <h1 className="text-2xl font-semibold tracking-tight">Last opp datablad</h1>}
+        <p className="text-caption text-ink-secondary">Last opp inntil {MAX_BULK_FILES} datablad. AI foreslår råvare; du kontrollerer og anvender hver fil.</p>
       </div>
 
-      {rows.length === 0 && canWrite && (
-        <Card className="p-12 text-center border-2 border-dashed">
-          <Upload className="mx-auto h-10 w-10 text-ink-secondary mb-3" />
-          <input id="bulk" type="file" multiple accept="application/pdf,image/*" className="hidden" onChange={onPick} />
-          <label htmlFor="bulk">
-            <Button asChild><span className="cursor-pointer">Velg filer (maks 100)</span></Button>
-          </label>
+      {rows.length === 0 && (canWrite ? (
+        <Card className="border-2 border-dashed p-8 text-center md:p-12">
+          <Upload className="mx-auto mb-3 h-10 w-10 text-ink-secondary" aria-hidden />
+          <input id="bulk" type="file" multiple accept="application/pdf,image/*" className="sr-only" onChange={(e) => void onPick(e)} />
+          <label htmlFor="bulk"><Button asChild className="h-11"><span className="cursor-pointer">Velg filer (maks {MAX_BULK_FILES})</span></Button></label>
         </Card>
-      )}
+      ) : <p className="text-sm text-ink-secondary">Du har lesetilgang. Opplasting krever skrivetilgang.</p>)}
 
       {rows.length > 0 && (
         <>
-          <div className="flex justify-end">
-            <Button variant="outline" size="sm" onClick={applyAllHigh} disabled={applyingAll}>
-              {applyingAll
-                ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Bekrefter {applyProgress.done} av {applyProgress.total}…</>
-                : "Bekreft alle høy-konfidens"}
-            </Button>
-          </div>
-          <Card className="divide-y divide-line-subtle">
-            {rows.map((r, i) => (
-              <div key={i} className="p-4 flex items-start gap-3">
-                {r.status === "error"
-                  ? <AlertCircle className="h-4 w-4 text-destructive mt-0.5" />
-                  : <FileText className="h-4 w-4 text-ink-secondary mt-0.5" />}
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{r.file.name}</div>
-                  <div className="text-xs text-ink-secondary mt-0.5">
-                    {r.status === "uploading" && "Laster opp…"}
-                    {r.status === "extracting" && "AI analyserer…"}
-                    {r.status === "matching" && "Matcher…"}
-                    {r.status === "ready" && r.candidates && r.candidates.length > 0 && (
-                      <>Foreslått: {r.candidates[0].name} <Badge variant="outline" className="ml-1 text-xs">{Math.round(r.candidates[0].score * 100)}%</Badge></>
-                    )}
-                    {r.status === "ready" && (!r.candidates || r.candidates.length === 0) && (
-                      <span>Ingen match funnet{r.extracted?.name ? <> · AI leste: <span className="font-medium">{r.extracted.name}</span></> : null}</span>
-                    )}
-                    {r.applied && <span className="text-success ml-2">✓ Anvendt</span>}
-                  </div>
-                  {r.packageSuggestion && canWrite && (
-                    <div className="mt-1.5 flex items-center gap-2 text-xs text-ink-secondary">
-                      <span>
-                        Pakning: {r.packageSuggestion.size ?? "—"} {r.packageSuggestion.contentUnit ?? ""} foreslått —
-                        ikke lagret
-                      </span>
-                      <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => void openPackage(i)}>
-                        Åpne
-                      </Button>
-                    </div>
-                  )}
-                  {r.status === "error" && (
-                    <div className="mt-1.5 rounded-lg bg-destructive/10 border border-destructive/20 px-2.5 py-1.5">
-                      <div className="text-xs text-destructive font-medium break-words">{r.error}</div>
-                    </div>
-                  )}
-                </div>
-                {(r.status === "uploading" || r.status === "extracting" || r.status === "matching") && <Loader2 className="h-4 w-4 animate-spin mt-0.5" />}
-                {r.status === "ready" && !r.applied && r.selectedRm && (
-                  <Button size="sm" onClick={() => applyRow(i)}><Check className="mr-1 h-3.5 w-3.5" /> Anvend</Button>
-                )}
-                {r.status === "ready" && !r.applied && !r.selectedRm && r.datasheet_id && canWrite && (
-                  <Button size="sm" variant="outline" onClick={() => setCreateDialogIdx(i)}>
-                    <Plus className="mr-1 h-3.5 w-3.5" /> Opprett ny råvare
-                  </Button>
-                )}
-                {r.status === "error" && (
-                  <Button size="sm" variant="outline" onClick={() => void retryRow(i)}>
-                    <RefreshCw className="mr-1 h-3.5 w-3.5" /> Prøv igjen
-                  </Button>
-                )}
-              </div>
-            ))}
-          </Card>
-        </>
-      )}
-
-      {orphans.length > 0 && (
-        <Card className="p-5 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-base font-semibold">Rydd opp</h2>
-              <p className="text-sm text-ink-secondary">
-                {orphans.length} datablad er aldri knyttet til en råvare. Slett dem, eller last dem opp på nytt fra
-                råvarekortet.
-              </p>
-            </div>
+            <p className="text-sm text-ink-secondary" role="status">
+              {rows.length} filer · {counts.ready} lest · {counts.applied} anvendt · {counts.failed} med feil{processing ? " · behandler…" : ""}
+            </p>
             {canWrite && (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={deleteDatasheets.isPending}
-                onClick={() => deleteDatasheets.mutate(orphans.map((o) => o.id))}
-              >
-                Slett alle ({orphans.length})
+              <Button variant="outline" size="sm" className="h-11 md:h-9" onClick={openBulk} disabled={applyBusy || processing}>
+                {applyBusy && progress.total > 0 ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden />Anvender {progress.done} av {progress.total}…</> : "Bekreft alle trygge treff…"}
               </Button>
             )}
           </div>
-          <div className="max-h-64 overflow-y-auto divide-y divide-line-subtle rounded-lg border border-line-subtle">
-            {orphans.map((o) => (
-              <div key={o.id} className="flex items-center gap-3 px-3 py-2 text-sm">
-                <FileText className="h-3.5 w-3.5 shrink-0 text-ink-secondary" />
-                <span className="min-w-0 flex-1 truncate">{o.file_name}</span>
-                <span className="shrink-0 text-xs text-ink-secondary">{o.supplier_name ?? "—"}</span>
-                <span className="shrink-0 text-xs text-ink-secondary">{formatDate(o.uploaded_at)}</span>
-                {canWrite && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    aria-label={`Slett ${o.file_name}`}
-                    disabled={deleteDatasheets.isPending}
-                    onClick={() => deleteDatasheets.mutate([o.id])}
-                  >
-                    Slett
-                  </Button>
-                )}
-              </div>
+          <Card><ul className="divide-y divide-line-subtle">
+            {rows.map((r) => (
+              <BulkFileRow
+                key={r.key} row={r} canWrite={canWrite} locked={applyBusy} materials={materials}
+                onSelect={(id, manual) => { if (!applyBusy) update(gen.current, r.key, { selectedRm: id, manualTarget: manual, applyError: undefined, applyState: r.applyState === "failed" ? "idle" : r.applyState }); }}
+                onApply={() => void applySingle(r.key)}
+                onRetry={() => void retry(r.key)}
+                onCreate={() => setCreateKey(r.key)}
+                onOpenPackage={() => void openPackage(r.key)}
+              />
             ))}
-          </div>
-        </Card>
+          </ul></Card>
+        </>
       )}
 
-      <PackageEditor
-        row={packageTarget?.row ?? null}
-        open={packageTarget !== null}
-        onOpenChange={(v) => { if (!v) setPackageTarget(null); }}
-        suggestion={packageTarget?.suggestion ?? null}
-      />
+      <OrphanCleanup legalEntityId={legalEntityId ?? null} canWrite={canWrite} />
 
-      {createDialogIdx !== null && rows[createDialogIdx]?.datasheet_id && (
+      <AlertDialog open={!!bulkConfirm} onOpenChange={(v) => { if (!v) setBulkConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Anvende {bulkConfirm?.length} datablad?</AlertDialogTitle>
+            <AlertDialogDescription>Bare filer der valgt mål er toppkandidaten med høy tillit. Næring, allergener (bare tillegg), deklarasjon og korn skrives. Pakning skrives ikke.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <ul className="max-h-48 overflow-y-auto text-sm" aria-label="Filer som anvendes">
+            {bulkConfirm?.map((b) => <li key={b.key} className="truncate">{b.file} → <span className="font-medium">{b.target}</span></li>)}
+          </ul>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void runBulk()}>Anvend</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <PackageEditor row={packageTarget?.row ?? null} open={packageTarget !== null} onOpenChange={(v) => { if (!v) setPackageTarget(null); }} suggestion={packageTarget?.suggestion ?? null} />
+
+      {createRow?.datasheet_id && (
         <RawMaterialCreateSheet
-          open={createDialogIdx !== null}
-          onOpenChange={(v) => { if (!v) setCreateDialogIdx(null); }}
-          context={{
-            kind: "datasheet",
-            datasheetId: rows[createDialogIdx].datasheet_id ?? "",
-            fileName: rows[createDialogIdx].file.name,
-            aiFields: rows[createDialogIdx].extracted ?? {},
-          }}
+          open
+          onOpenChange={(v) => { if (!v) setCreateKey(null); }}
+          context={{ kind: "datasheet", datasheetId: createRow.datasheet_id, fileName: createRow.file.name, aiFields: { name: createRow.summary?.name ?? undefined, supplier_name: createRow.summary?.supplier ?? undefined } }}
           onDone={(rmId) => {
-            const idx = createDialogIdx;
+            const key = createRow.key;
+            setCreateKey(null);
             if (!rmId) return;
-            updateRow(idx, { candidates: [{ id: rmId, name: rows[idx].extracted?.name ?? "Ny råvare", sku: rows[idx].extracted?.sku ?? "", score: 1 }] });
-            // Auto-anvend datablad-felter på den nye råvaren
-            void selectRm(idx, rmId).then(() => applyRow(idx));
+            // Ny råvare er opprettet: målet låses til den. Feiler anvend, prøves anvend igjen — ingen ny råvare.
+            update(gen.current, key, { candidates: [{ id: rmId, name: createRow.summary?.name ?? "Ny råvare", sku: "", score: 1 }], selectedRm: rmId, manualTarget: true });
+            void (async () => { setApplyBusy(true); try { await applyOne(gen.current, key, rmId); } finally { setApplyBusy(false); } })();
           }}
           onUseExisting={(rmId) => {
-            const idx = createDialogIdx;
-            setCreateDialogIdx(null);
-            const known = rows[idx].candidates?.find((c) => c.id === rmId);
-            updateRow(idx, { candidates: [known ?? { id: rmId, name: "Valgt råvare", sku: "", score: 1 }, ...(rows[idx].candidates ?? []).filter((c) => c.id !== rmId)] });
-            void selectRm(idx, rmId);
+            const key = createRow.key;
+            setCreateKey(null);
+            update(gen.current, key, { selectedRm: rmId, manualTarget: true });
           }}
         />
       )}
