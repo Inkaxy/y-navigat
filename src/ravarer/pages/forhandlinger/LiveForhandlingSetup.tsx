@@ -83,6 +83,8 @@ export default function LiveForhandlingSetup() {
       });
 
       // Insert single recipient (this supplier)
+      // access_token settes av databasen ved innsetting; generert type krever den likevel.
+      // @ts-expect-error generert Insert-type mangler standardverdi for access_token
       await supabase.from("negotiation_recipients").insert({
         negotiation_id: neg.id,
         supplier_id: supplierId,

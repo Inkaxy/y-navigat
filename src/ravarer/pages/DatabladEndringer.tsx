@@ -74,7 +74,7 @@ export default function DatabladEndringer() {
       </div>
 
       <Card className="p-4 flex items-center gap-3">
-        <Select value={filter} onValueChange={(v: any) => setFilter(v)}>
+        <Select value={filter} onValueChange={(v) => setFilter(v === "all" ? "all" : "unacked")}>
           <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="unacked">Uavklarte</SelectItem>
