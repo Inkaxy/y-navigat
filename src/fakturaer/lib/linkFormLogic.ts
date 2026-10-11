@@ -9,9 +9,9 @@ export function isOpenLine(l: Pick<SupplierItemLine, "requires_review" | "invoic
   return !!l.requires_review && OPEN_INVOICE.has(l.invoice_status ?? "") && !l.flagged_at;
 }
 
-export function openScope(lines: SupplierItemLine[]): { lines: number; invoices: number; lastOpen: SupplierItemLine | null } {
+export function openScope(lines: SupplierItemLine[]): { lines: number; invoices: number; lastOpen: SupplierItemLine | null; lineIds: string[] } {
   const open = lines.filter(isOpenLine);
-  return { lines: open.length, invoices: new Set(open.map((l) => l.invoice_id)).size, lastOpen: open[0] ?? null };
+  return { lines: open.length, invoices: new Set(open.map((l) => l.invoice_id)).size, lastOpen: open[0] ?? null, lineIds: open.map((l) => l.id) };
 }
 
 /** Pakningsblokken trengs bare når fakturaenheten ikke kan regnes direkte til grunnenheten. */

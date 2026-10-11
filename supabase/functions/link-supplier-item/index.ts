@@ -54,6 +54,19 @@ Deno.serve(async (req) => {
     if (!legalEntityId || !supplierId || !itemKey) {
       return json({ error: "legal_entity_id, supplier_id og item_key er påkrevd" }, 400);
     }
+    // Linjeutvalg: utelatt = alle åpne linjer for varen (bakoverkompatibelt). Eksplisitt tomt avvises —
+    // et tomt fryst utvalg skal aldri bli «alle». Bare gyldige UUID-er, maks 2000.
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    let requestedLineIds: string[] | null = null;
+    if (body.line_ids !== undefined && body.line_ids !== null) {
+      if (!Array.isArray(body.line_ids) || body.line_ids.length === 0) {
+        return json({ error: "Linjeutvalget er tomt. Oppdater varekortet og prøv igjen." }, 400);
+      }
+      if (body.line_ids.length > 2000 || !body.line_ids.every((x) => typeof x === "string" && UUID.test(x))) {
+        return json({ error: "Ugyldig linjeutvalg" }, 400);
+      }
+      requestedLineIds = Array.from(new Set(body.line_ids as string[]));
+    }
 
     const { data: linkRes, error: linkErr } = await userClient.rpc("rm_link_supplier_item", {
       p_legal_entity_id: legalEntityId,
@@ -65,7 +78,7 @@ Deno.serve(async (req) => {
       p_set_primary: body.set_primary === true,
       p_not_raw_material: body.not_raw_material === true,
       p_reason: body.reason ?? null,
-      p_line_ids: Array.isArray(body.line_ids) && body.line_ids.length ? body.line_ids : null,
+      p_line_ids: requestedLineIds,
     });
     if (linkErr) {
       const status = /tilgang|forbidden/i.test(linkErr.message) ? 403 : /pålogging|innlogget/i.test(linkErr.message) ? 401 : 400;
@@ -87,13 +100,28 @@ Deno.serve(async (req) => {
     // Regn om hver berørt faktura med motoren (tjenestekall). Feil her gjør ikke
     // koblingen ugyldig — linjene står som «må beregnes på nytt» til neste kjøring.
     const invoiceIds = Array.isArray(link.invoice_ids) ? (link.invoice_ids as string[]) : [];
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+    // Ved fryst utvalg regnes bare de faktisk endrede linjene om — nye linjer som kom etter
+    // forhåndsvisningen røres ikke av denne operasjonen (de får den lagrede koblingen ved sin egen matching).
+    const changedIds = Array.isArray(link.line_ids) ? (link.line_ids as string[]) : [];
+    const linesByInvoice = new Map<string, string[]>();
+    if (requestedLineIds && changedIds.length) {
+      const { data: cl, error: clErr } = await admin.from("invoice_lines").select("id, invoice_id").in("id", changedIds);
+      if (clErr) return json({ error: "Kunne ikke lese endrede linjer" }, 500);
+      for (const l of (cl ?? []) as AnyRec[]) {
+        const k = String(l.invoice_id);
+        linesByInvoice.set(k, [...(linesByInvoice.get(k) ?? []), String(l.id)]);
+      }
+    }
     const invoices: AnyRec[] = [];
     for (const invoiceId of invoiceIds) {
       try {
+        const scoped = requestedLineIds ? linesByInvoice.get(invoiceId) ?? [] : null;
+        if (scoped && scoped.length === 0) { invoices.push({ invoice_id: invoiceId, rematched: false, skipped: "ingen_endrede_linjer" }); continue; }
         const res = await fetch(`${SUPABASE_URL}/functions/v1/match-invoice-lines`, {
           method: "POST",
           headers: { Authorization: `Bearer ${SERVICE_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ invoice_id: invoiceId }),
+          body: JSON.stringify(scoped ? { invoice_id: invoiceId, line_ids: scoped } : { invoice_id: invoiceId }),
         });
         const mj = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(String((mj as AnyRec)?.error ?? res.status));
@@ -104,7 +132,6 @@ Deno.serve(async (req) => {
     }
 
     // Tilstand etterpå: status per faktura og åpne linjer for varen.
-    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     if (invoiceIds.length) {
       const { data: invRows } = await admin
         .from("invoices")
@@ -137,6 +164,8 @@ Deno.serve(async (req) => {
       invoices,
       still_open_lines: stillOpen,
       failures: link.failures ?? [],
+      // Linjer i det frysta utvalget som ikke ble endret (løst, låst, ført eller på avstemt/flagget faktura).
+      skipped_line_ids: requestedLineIds ? requestedLineIds.filter((id) => !changedIds.includes(id)) : [],
     });
   } catch (e) {
     console.error("link-supplier-item error", e);
