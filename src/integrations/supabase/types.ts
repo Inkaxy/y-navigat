@@ -10600,6 +10600,11 @@ export type Database = {
           notes: string | null
           price: number
           raw_material_id: string
+          snapshot_at: string | null
+          snapshot_currency: string | null
+          snapshot_package: Json | null
+          snapshot_source: string | null
+          snapshot_unit: string | null
           source: string
           source_reference: string | null
           superseded_at: string | null
@@ -10621,6 +10626,11 @@ export type Database = {
           notes?: string | null
           price: number
           raw_material_id: string
+          snapshot_at?: string | null
+          snapshot_currency?: string | null
+          snapshot_package?: Json | null
+          snapshot_source?: string | null
+          snapshot_unit?: string | null
           source: string
           source_reference?: string | null
           superseded_at?: string | null
@@ -10642,6 +10652,11 @@ export type Database = {
           notes?: string | null
           price?: number
           raw_material_id?: string
+          snapshot_at?: string | null
+          snapshot_currency?: string | null
+          snapshot_package?: Json | null
+          snapshot_source?: string | null
+          snapshot_unit?: string | null
           source?: string
           source_reference?: string | null
           superseded_at?: string | null
@@ -17419,6 +17434,10 @@ export type Database = {
       }
       recipe_breadscale_effective: {
         Args: { p_recipe_id: string }
+        Returns: number
+      }
+      recipe_cost_line_grams: {
+        Args: { d: number; q: number; qg: number; u: string; w: number }
         Returns: number
       }
       recipe_declaration_ready: {

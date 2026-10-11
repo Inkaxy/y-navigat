@@ -26,7 +26,7 @@ import { costPerKg } from "@/varer/lib/halvfabrikat";
 import { buildRecipeBasis, type LinkedRecipe } from "@/varer/hooks/useProductRecipeLink";
 import type { BakersLine, BakersRawMaterial } from "@/varer/lib/bakers";
 import { buildTimeline, timelineCsv, type TimelineHistoryRow } from "@/ravarer/lib/priceTimeline";
-import { resolveProvenance, BASE_UNIT_GUARD_SINCE } from "@/ravarer/lib/priceProvenance";
+import { resolveProvenance } from "@/ravarer/lib/priceProvenance";
 import { fetchPriceHistory } from "@/ravarer/hooks/priceHistoryFetch";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { BAKERS_RM_KEY } from "@/varer/lib/bakersRawMaterials";
@@ -119,7 +119,7 @@ describe("2) prisstatus gjør kalkylen ufullstendig", () => {
 });
 
 const row = (o: Partial<TimelineHistoryRow> & { id: string; effective_date: string; price: number }): TimelineHistoryRow =>
-  ({ supplier_id: "s1", source: "invoice", invoice_id: null, currency: "NOK", unit: "kg", unitSource: "fakturalinje", ...o });
+  ({ supplier_id: "s1", source: "invoice", invoice_id: null, currency: "NOK", unit: "kg", unitSource: "ved_registrering", ...o });
 
 describe("3) historisk grunnlag i graf og CSV", () => {
   it("samme dag med omvendt id: registreringstid styrer, både graf og CSV", () => {
@@ -148,21 +148,34 @@ describe("3) historisk grunnlag i graf og CSV", () => {
     const r = buildTimeline({ history: h, supplierNames: new Map([["s1", "A"]]), links: [], currentUnit: "kg" });
     expect(timelineCsv(r.rows, r.events).split("\n")).toEqual([
       "Type;Dato;Registrert;Leverandør;Pris;Valuta;Enhet (historisk);Enhetsgrunnlag;Pakning (historisk);Kilde;Faktura;Δ forrige kr;Δ forrige %;Δ avtale %;Årsak;Utgått;Rettelse før → etter;Notat",
-      "Gyldig;2026-05-01;2026-05-01T09:00:00Z;A;12.0000;NOK;kg;Fakturalinjens pris per grunnenhet;25 kg;Faktura;F-2;2.0000;20.0;;;;Mengde: 10 000 → 10;",
-      "Gyldig;2026-05-01;2026-05-01T08:00:00Z;A;10.0000;NOK;kg;Fakturalinjens pris per grunnenhet;Ukjent;Faktura;;;;;;;;",
+      "Gyldig;2026-05-01;2026-05-01T09:00:00Z;A;12.0000;NOK;kg;Låst ved registrering;25 kg;Faktura;F-2;2.0000;20.0;;;;Mengde: 10 000 → 10;",
+      "Gyldig;2026-05-01;2026-05-01T08:00:00Z;A;10.0000;NOK;kg;Låst ved registrering;Ukjent;Faktura;;;;;;;;",
       "Enhet ikke dokumentert;2026-04-01;;A;9.0000;NOK;Ukjent;Ukjent;Ukjent;Manuell;;;;;;;;",
     ]);
   });
-  it("proveniens: enhetsbytte, fakturalinje, etter vakt, ellers ukjent", () => {
-    const base = { price: 10, currency: "NOK", isLegacy: false, supersededReason: null, line: null, invoiceCurrency: null, currentUnit: "kg", unitChanges: [] };
-    expect(resolveProvenance({ ...base, createdAt: "2026-01-01T00:00:00Z" }).unit).toBeNull();
-    expect(resolveProvenance({ ...base, createdAt: BASE_UNIT_GUARD_SINCE }).unit).toBe("kg");
-    expect(resolveProvenance({ ...base, createdAt: "2026-01-01T00:00:00Z", line: { unit: "sekk", package_size: 25, package_unit: "kg", count_per_package: null, price_per_base_unit: 10.02 } }))
-      .toMatchObject({ unit: "kg", unitSource: "fakturalinje", packageText: "25 kg" });
-    const changes = [{ at: "2026-06-01T00:00:00Z", old: "g", new: "kg" }];
-    expect(resolveProvenance({ ...base, createdAt: "2026-05-01T00:00:00Z", unitChanges: changes }).unit).toBe("g");
-    expect(resolveProvenance({ ...base, createdAt: "2026-07-01T00:00:00Z", unitChanges: changes }).unit).toBe("kg");
-    expect(resolveProvenance({ ...base, createdAt: BASE_UNIT_GUARD_SINCE, isLegacy: true }).unit).toBeNull();
+  it("proveniens: bare låst grunnlag teller, ellers ukjent", () => {
+    const pkg = { line_unit: "sekk", package_size: 25, package_unit: "kg", count_per_package: null, base_units_per_package: 25, line_version: "2026-10-01T10:00:00Z", correction_id: null };
+    const snap = { snapshotUnit: "kg", snapshotPackage: pkg, snapshotCurrency: "NOK", snapshotSource: "ved_registrering", snapshotAt: "2026-10-01T10:00:00Z", currency: "NOK" };
+    expect(resolveProvenance(snap)).toMatchObject({ unit: "kg", unitSource: "ved_registrering", packageText: "25 kg", currency: "NOK" });
+    // Gammel rad uten grunnlag: ukjent enhet og pakning, uansett hva dagens råvare/linje sier.
+    const old = { snapshotUnit: null, snapshotPackage: null, snapshotCurrency: null, snapshotSource: null, snapshotAt: null, currency: "NOK" };
+    expect(resolveProvenance(old)).toMatchObject({ unit: null, unitSource: null, packageText: null, currency: "NOK" });
+    // Ukjent kilde regnes ikke som bevis.
+    expect(resolveProvenance({ ...snap, snapshotSource: "gjettet" }).unit).toBeNull();
+    // Revidert enhetsbytte gir enhet, men ingen pakning.
+    expect(resolveProvenance({ ...snap, snapshotSource: "revidert_enhetsbytte", snapshotPackage: null })).toMatchObject({ unit: "kg", packageText: null });
+    // Rettelse etter låsing merkes, og endrer ikke den låste pakningen.
+    const r = resolveProvenance({ ...snap, corrections: [{ at: "2026-10-05T00:00:00Z", reason: "feil pakning", fields: [{ field: "Pakningsstørrelse", before: "25", after: "10" }] }] });
+    expect(r.packageText).toBe("25 kg");
+    expect(r.corrections[0].afterSnapshot).toBe(true);
+  });
+
+  it("endret dagens enhet/pakning kan ikke skrive om gammel graf eller CSV", () => {
+    const rows = PRICE_HISTORY_FIXTURE;
+    const a = buildTimeline({ history: rows, supplierNames: new Map([["s1", "Regal"]]), links: [], currentUnit: "kg" });
+    const b = buildTimeline({ history: rows, supplierNames: new Map([["s1", "Regal"]]), links: [], currentUnit: "g" });
+    const units = (x: typeof a) => [...x.rows, ...x.events].map((p) => `${p.id}:${p.unit ?? "?"}:${p.packageText ?? "?"}`).sort();
+    expect(units(b)).toEqual(units(a));
   });
 });
 
@@ -172,11 +185,14 @@ describe("3) fetchPriceHistory: 1000+ rader og metadata", () => {
       id: `h${i}`, raw_material_id: "rm1", supplier_id: "s1", price: 10, effective_date: "2026-01-01", source: "invoice",
       source_reference: null, invoice_id: i === 0 ? "inv1" : null, invoice_line_id: i === 0 ? "il1" : null, invoice_line_ref: null, notes: null,
       created_at: "2026-01-01T00:00:00Z", superseded_at: null, superseded_reason: null, is_legacy: false, is_credit: false, currency: "NOK",
+      snapshot_unit: i === 0 ? "kg" : null, snapshot_source: i === 0 ? "ved_registrering" : null, snapshot_at: i === 0 ? "2026-01-01T00:00:00Z" : null,
+      snapshot_currency: i === 0 ? "NOK" : null,
+      snapshot_package: i === 0 ? { line_unit: "sekk", package_size: 25, package_unit: "kg", count_per_package: null } : null,
     }));
     tables.raw_materials = [{ id: "rm1", base_unit: "kg" }];
     tables.audit_log = [];
     tables.invoices = [{ id: "inv1", invoice_number: "F-1", is_credit_note: false, currency: "NOK" }];
-    tables.invoice_lines = [{ id: "il1", unit: "sekk", package_size: 25, package_unit: "kg", count_per_package: null, price_per_base_unit: 10 }];
+    tables.invoice_lines = [{ id: "il1", unit: "sekk", package_size: 10, package_unit: "kg", count_per_package: null, price_per_base_unit: 10 }];
     tables.invoice_line_corrections = [{ invoice_line_id: "il1", corrected_at: "2026-01-02T00:00:00Z", reason: "Rettet", changed_fields: ["quantity"], original: { quantity: 10000 }, corrected: { quantity: 10 } }];
   });
   it("henter alle sider og gir historisk grunnlag bare der det finnes", async () => {
@@ -187,5 +203,6 @@ describe("3) fetchPriceHistory: 1000+ rader og metadata", () => {
     const f = rows[0].provenance.corrections[0].fields[0];
     expect([f.field, f.before.replace(/\s/g, " "), f.after]).toEqual(["Mengde", "10 000", "10"]);
     expect(rows[1].provenance.unit).toBeNull();
+    expect(rows[1].provenance.packageText).toBeNull();
   });
 });

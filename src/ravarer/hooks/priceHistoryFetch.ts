@@ -10,8 +10,6 @@ import {
   resolveProvenance,
   type CorrectionSnapshot,
   type PriceProvenance,
-  type ProvenanceLine,
-  type UnitChange,
 } from "@/ravarer/lib/priceProvenance";
 
 export interface PriceHistoryDbRow {
@@ -32,6 +30,11 @@ export interface PriceHistoryDbRow {
   is_legacy: boolean | null;
   is_credit: boolean | null;
   currency: string | null;
+  snapshot_unit: string | null;
+  snapshot_package: unknown;
+  snapshot_currency: string | null;
+  snapshot_source: string | null;
+  snapshot_at: string | null;
 }
 
 export interface PriceHistoryFetched extends PriceHistoryDbRow {
@@ -47,62 +50,32 @@ function chunks<T>(xs: readonly T[]): T[][] {
   return out;
 }
 
-function changeFromAudit(occurredAt: string, changes: unknown): UnitChange | null {
-  if (!changes || typeof changes !== "object" || Array.isArray(changes)) return null;
-  const o = changes as Record<string, unknown>;
-  const str = (v: unknown) => (typeof v === "string" ? v : null);
-  return { at: occurredAt, old: str(o.old), new: str(o.new) };
-}
-
 export async function fetchPriceHistory(rawMaterialId: string): Promise<PriceHistoryFetched[]> {
   const rows = await fetchAllRows<PriceHistoryDbRow>((from, to) =>
     supabase
       .from("raw_material_price_history")
-      .select("id, raw_material_id, supplier_id, price, effective_date, source, source_reference, invoice_id, invoice_line_id, invoice_line_ref, notes, created_at, superseded_at, superseded_reason, is_legacy, is_credit, currency")
+      .select("id, raw_material_id, supplier_id, price, effective_date, source, source_reference, invoice_id, invoice_line_id, invoice_line_ref, notes, created_at, superseded_at, superseded_reason, is_legacy, is_credit, currency, snapshot_unit, snapshot_package, snapshot_currency, snapshot_source, snapshot_at")
       .eq("raw_material_id", rawMaterialId)
       .order("effective_date", { ascending: false })
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
       .range(from, to));
 
-  const [rmRes, auditRes] = await Promise.all([
-    supabase.from("raw_materials").select("base_unit").eq("id", rawMaterialId).maybeSingle(),
-    supabase
-      .from("audit_log")
-      .select("occurred_at, changes")
-      .eq("entity_type", "raw_material")
-      .eq("entity_id", rawMaterialId)
-      .eq("action", "raw_material.base_unit_changed")
-      .order("occurred_at", { ascending: true })
-      .limit(200),
-  ]);
-  if (rmRes.error) throw rmRes.error;
-  if (auditRes.error) throw auditRes.error;
-  const currentUnit = rmRes.data?.base_unit ?? null;
-  const unitChanges = (auditRes.data ?? [])
-    .map((a) => changeFromAudit(a.occurred_at, a.changes))
-    .filter((c): c is UnitChange => c !== null);
-
   const invoiceIds = [...new Set(rows.map((r) => r.invoice_id).filter((x): x is string => !!x))];
   const lineIds = [...new Set(rows.map((r) => r.invoice_line_id ?? r.invoice_line_ref).filter((x): x is string => !!x))];
 
-  const inv = new Map<string, { invoice_number: string | null; is_credit_note: boolean | null; currency: string | null }>();
+  const inv = new Map<string, { invoice_number: string | null; is_credit_note: boolean | null }>();
   for (const ids of chunks(invoiceIds)) {
-    const { data, error } = await supabase.from("invoices").select("id, invoice_number, is_credit_note, currency").in("id", ids);
+    const { data, error } = await supabase.from("invoices").select("id, invoice_number, is_credit_note").in("id", ids);
     if (error) throw error;
-    for (const d of data ?? []) inv.set(d.id, { invoice_number: d.invoice_number, is_credit_note: d.is_credit_note, currency: d.currency });
+    for (const d of data ?? []) inv.set(d.id, { invoice_number: d.invoice_number, is_credit_note: d.is_credit_note });
   }
 
-  const lines = new Map<string, ProvenanceLine>();
   const corrections = new Map<string, CorrectionSnapshot[]>();
   for (const ids of chunks(lineIds)) {
-    const [l, c] = await Promise.all([
-      supabase.from("invoice_lines").select("id, unit, package_size, package_unit, count_per_package, price_per_base_unit").in("id", ids),
-      supabase.from("invoice_line_corrections").select("invoice_line_id, corrected_at, reason, changed_fields, original, corrected").in("invoice_line_id", ids),
-    ]);
-    if (l.error) throw l.error;
+    // Dagens fakturalinje leses bevisst IKKE: den kan være rettet etter at prisen ble registrert.
+    const c = await supabase.from("invoice_line_corrections").select("id, invoice_line_id, corrected_at, reason, changed_fields, original, corrected").in("invoice_line_id", ids);
     if (c.error) throw c.error;
-    for (const d of l.data ?? []) lines.set(d.id, d);
     for (const d of c.data ?? []) {
       if (!d.invoice_line_id || !d.corrected_at) continue;
       const list = corrections.get(d.invoice_line_id) ?? [];
@@ -118,15 +91,12 @@ export async function fetchPriceHistory(rawMaterialId: string): Promise<PriceHis
       ...r,
       invoices: i ? { invoice_number: i.invoice_number, is_credit_note: i.is_credit_note } : null,
       provenance: resolveProvenance({
-        price: Number(r.price),
-        createdAt: r.created_at,
+        snapshotUnit: r.snapshot_unit,
+        snapshotPackage: r.snapshot_package,
+        snapshotCurrency: r.snapshot_currency,
+        snapshotSource: r.snapshot_source,
+        snapshotAt: r.snapshot_at,
         currency: r.currency,
-        isLegacy: !!r.is_legacy,
-        supersededReason: r.superseded_reason,
-        line: lineId ? lines.get(lineId) ?? null : null,
-        invoiceCurrency: i?.currency ?? null,
-        currentUnit,
-        unitChanges,
         corrections: lineId ? corrections.get(lineId) ?? [] : [],
       }),
     };

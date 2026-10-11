@@ -90,3 +90,13 @@ describe("F28: forhåndsvalg krever forslag for alle valgte linjer", () => {
     expect(candidatesFrom([s("l1", "mel")], []).unambiguous).toBeNull();
   });
 });
+
+describe("F28: ulike forslag", () => {
+  it("2 valgte med ulike forslag => ikke entydig, begge kandidater vises", async () => {
+    const { candidatesFrom } = await import("@/ravarer/pages/priskontroll/gjore/bulkPreview");
+    const s = (line: string, rm: string) => ({ invoice_line_id: line, raw_material_id: rm, rank: 1, match_reason: null, name: rm });
+    const r = candidatesFrom([s("l1", "mel"), s("l2", "smor")], ["l1", "l2"]);
+    expect(r.unambiguous).toBeNull();
+    expect(r.candidates.map((c) => c.id).sort()).toEqual(["mel", "smor"]);
+  });
+});

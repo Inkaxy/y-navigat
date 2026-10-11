@@ -57,6 +57,9 @@ const KunderEntityProvider = ({ children }: { children: React.ReactNode }) => {
 
 // Kodesplitting: hver app-side lastes først når ruten treffes.
 const AdminIndex = lazy(() => import("./pages/admin/AdminIndex"));
+// Skrivebeskyttede testdata-sider (faste data, ingen nettverk) for kontroll av 390/1440 px.
+const PriceCalcPreviewContent = lazy(() => import("./dev/PriceCalcPreviewContent"));
+const PdfImportPreviewContent = lazy(() => import("./dev/PdfImportPreviewContent"));
 const Integrasjoner = lazy(() => import("./pages/admin/Integrasjoner"));
 const IntegrasjonDetalj = lazy(() => import("./pages/admin/IntegrasjonDetalj"));
 const TripletexIntegrasjon = lazy(() => import("./pages/admin/TripletexIntegrasjon"));
@@ -275,6 +278,9 @@ const App = () => (
             <Suspense fallback={<div className="p-8 text-sm text-muted-foreground">Laster …</div>}>
               <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/forhandsvisning/pris" element={<PriceCalcPreviewContent />} />
+              <Route path="/price-calc-preview.html" element={<PriceCalcPreviewContent />} />
+              <Route path="/forhandsvisning/pdf-import" element={<PdfImportPreviewContent />} />
               <Route path="/glemt-passord" element={<ForgotPassword />} />
               <Route path="/velg-passord" element={<SetPortalPassword />} />
               <Route path="/tilbakestill-passord" element={<TilbakestillPassordRoute />} />
