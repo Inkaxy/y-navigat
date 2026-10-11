@@ -33,7 +33,17 @@ export interface CreatePrefill {
 
 export type CreateContext =
   | { kind: "standalone"; prefill?: CreatePrefill }
-  | { kind: "supplier_item"; supplierId: string; itemKey: string; lineIds?: string[]; invoiceId?: string; prefill?: CreatePrefill }
+  | {
+      kind: "supplier_item";
+      supplierId: string;
+      itemKey: string;
+      /** Linje brukt BARE til pakningsforslag (`rm_infer_package`) og forhåndsutfylling — alle åpne linjer kobles. */
+      inferLineId?: string | null;
+      /** Fakturalinjens enhet — brukes som pakningsenhet. */
+      lineUnit?: string | null;
+      invoiceId?: string;
+      prefill?: CreatePrefill;
+    }
   | { kind: "datasheet"; datasheetId: string; fileName: string; aiFields: DatasheetAiFields };
 
 export type WritePath = "create_raw_material" | "link_supplier_item" | "datasheet";
@@ -59,6 +69,12 @@ export interface CreateDraft {
   declarationName: string;
   primarySupplierId: string | null;
   openAfterSave: boolean;
+  /** Bekreft pakningen ved kobling (forhåndskrysset når regnestykket og varenavnet er enige). */
+  confirmPackage: boolean;
+  /** «Flere felt» (standalone). */
+  extraCategories: string[];
+  description: string;
+  startCost: string;
 }
 
 /** Lesbart varenummer fra navnet når brukeren ikke har skrevet et. */
@@ -68,9 +84,14 @@ export function suggestSku(name: string, supplierSku?: string | null): string {
   return name.trim().toUpperCase().replace(/[^A-ZÆØÅ0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32);
 }
 
-export function validateCreate(d: CreateDraft): string | null {
+export function validateCreate(d: CreateDraft, opts: { packageRequired?: boolean } = {}): string | null {
   if (!d.name.trim()) return "Skriv inn et navn";
   if (!isCreateBaseUnit(d.baseUnit)) return "Velg grunnenhet";
+  if (opts.packageRequired && !packageOf(d)) return "Fakturaenheten kan ikke regnes om direkte — fyll inn pakningen";
+  if (d.startCost.trim()) {
+    const c = parseDecimal(d.startCost);
+    if (c == null || c <= 0) return "Startkostprisen må være et positivt tall";
+  }
   if (d.units.trim() && d.packageUnit !== "bulk") {
     const n = parseDecimal(d.units);
     if (n == null || n <= 0) return "Pakningen må være et positivt tall";
@@ -104,9 +125,8 @@ export function linkCreateBody(
       ...(d.category ? { category: d.category } : {}),
       ...(d.declarationName.trim() ? { declaration_name: d.declarationName.trim().toLowerCase() } : {}),
     },
-    ...(pkg ? { package: { base_units_per_package: pkg.base_units_per_package, ...(pkg.package_unit ? { package_unit: pkg.package_unit } : {}), confirm: true } } : {}),
+    ...(pkg ? { package: { base_units_per_package: pkg.base_units_per_package, ...(pkg.package_unit ? { package_unit: pkg.package_unit } : {}), confirm: d.confirmPackage } } : {}),
     set_primary: true,
-    ...(ctx.lineIds?.length ? { line_ids: ctx.lineIds } : {}),
   };
 }
 
@@ -121,14 +141,14 @@ export function linkExistingBody(
     supplier_id: ctx.supplierId,
     item_key: ctx.itemKey,
     raw_material_id: rawMaterialId,
-    ...(ctx.lineIds?.length ? { line_ids: ctx.lineIds } : {}),
   };
 }
 
 export function initialDraft(ctx: CreateContext): CreateDraft {
   const base: CreateDraft = {
     name: "", sku: "", itemType: "ravare", category: "", baseUnit: "kg", units: "", packageUnit: "",
-    declarationName: "", primarySupplierId: null, openAfterSave: ctx.kind === "standalone" && (ctx.prefill?.openAfterSave ?? true),
+    declarationName: "", primarySupplierId: null, confirmPackage: false, extraCategories: [], description: "", startCost: "",
+    openAfterSave: ctx.kind === "standalone" && (ctx.prefill?.openAfterSave ?? true),
   };
   if (ctx.kind === "datasheet") {
     const a = ctx.aiFields;
@@ -149,4 +169,21 @@ export function initialDraft(ctx: CreateContext): CreateDraft {
     declarationName: p.declarationName ?? "",
     primarySupplierId: ctx.kind === "supplier_item" ? ctx.supplierId : (p.supplierId ?? null),
   };
+}
+
+/** Pakningsforslag fra `rm_infer_package` inn i utkastet (grunnenhet fra serveren, enhet fra fakturalinjen). */
+export function applyInference(
+  d: CreateDraft,
+  inf: { base_unit: string | null; suggested_bupp: number | null; auto_confirmable: boolean; agrees: boolean; direct: boolean; line_unit: string | null },
+  lineUnit: string | null | undefined,
+): CreateDraft {
+  const next: CreateDraft = { ...d };
+  if (isCreateBaseUnit(inf.base_unit)) next.baseUnit = inf.base_unit;
+  if (!inf.direct && inf.suggested_bupp != null && inf.suggested_bupp > 0) {
+    next.units = String(inf.suggested_bupp).replace(".", ",");
+    const u = (lineUnit ?? inf.line_unit ?? "").trim().toLowerCase();
+    if (u) next.packageUnit = u;
+    next.confirmPackage = inf.auto_confirmable || inf.agrees;
+  }
+  return next;
 }
