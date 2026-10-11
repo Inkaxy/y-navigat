@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
-import { NOT_A_PRODUCT_NOT_A_PRODUCT_REASONS } from "@/ravarer/lib/notAProductReasons";
+import { NOT_A_PRODUCT_REASONS } from "@/ravarer/lib/notAProductReasons";
 
 
 
