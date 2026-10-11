@@ -2,13 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { creditNetExclVat, remainingByInvoice } from "@/fakturaer/lib/supplierCases";
 
-type Basis = { price_per_base_unit?: number | null; expected_price_per_base_unit?: number | null; base_quantity?: number | null; base_unit?: string | null };
+type Basis = { price_per_base_unit?: number | null; expected_price_per_base_unit?: number | null; base_quantity?: number | null; base_unit?: string | null;
+  case_kind: string | null; price_reference_source: string | null; price_reference_date: string | null; observed_effect_excl_vat: number | null };
 
 function parseBasis(v: unknown): Basis {
-  if (!v || typeof v !== "object" || Array.isArray(v)) return {};
+  if (!v || typeof v !== "object" || Array.isArray(v)) return { case_kind: null, price_reference_source: null, price_reference_date: null, observed_effect_excl_vat: null };
   const o = v as Record<string, unknown>;
   const n = (x: unknown) => (x == null || x === "" || !Number.isFinite(Number(x)) ? null : Number(x));
-  return { price_per_base_unit: n(o.price_per_base_unit), expected_price_per_base_unit: n(o.expected_price_per_base_unit), base_quantity: n(o.base_quantity), base_unit: typeof o.base_unit === "string" ? o.base_unit : null };
+  return { price_per_base_unit: n(o.price_per_base_unit), expected_price_per_base_unit: n(o.expected_price_per_base_unit), base_quantity: n(o.base_quantity), base_unit: typeof o.base_unit === "string" ? o.base_unit : null,
+    case_kind: typeof o.case_kind === "string" ? o.case_kind : null, price_reference_source: typeof o.price_reference_source === "string" ? o.price_reference_source : null,
+    price_reference_date: typeof o.price_reference_date === "string" ? o.price_reference_date : null, observed_effect_excl_vat: n(o.observed_effect_excl_vat) };
 }
 
 /** Én sak med linjer, fordelinger og leverandørens kreditnotaer. */

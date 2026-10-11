@@ -28,6 +28,7 @@ export interface LineStatusInput {
     currency?: string | null;
     lines_sum_status?: string | null;
     extraction_confidence?: number | null;
+    is_credit_note?: boolean | null;
   } | null;
 }
 
@@ -125,6 +126,8 @@ export function lineStatus(line: LineStatusInput, startPriceLineIds?: ReadonlySe
   if (pkg === "action") return { ...base, key: "confirm_package", label: "Bekreft pakning", tone: "warning" };
   if (reasons.includes("recalculation_pending"))
     return { ...base, key: "recalculate", label: "Beregnes på nytt", tone: "warning" };
+  // Kreditnota er aldri en prisendring: egen veiledning i stedet for «Se over pris».
+  if (price === "action" && line.invoice?.is_credit_note) return { ...base, key: "review_price", label: "Kontroller kreditnotaen", tone: "warning" };
   if (price === "action") return { ...base, key: "review_price", label: "Se over pris", tone: "warning" };
   // Et startprisforslag er frivillig: serverens avstemming krever det ikke, så det
   // gjør aldri linjen uavklart. Forslaget tilbys fortsatt som eget valg i køen.

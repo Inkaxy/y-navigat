@@ -14,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
+import { invalidateRavarerCounts, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { osloTodayISO } from "@/lib/osloDate";
 import { parseDecimal } from "@/ravarer/lib/packageMath";
 import { agreementBaseUnitsPerPackage } from "@/ravarer/lib/agreementPricing";
@@ -138,6 +138,8 @@ export function NewAgreementDialog({ open, onOpenChange, defaultRawMaterialId, d
     },
     onSuccess: () => {
       invalidateRawMaterial(qc, rawMaterialId);
+      // Avtalepris kan endre sammenligningsgrunnlaget for andre fakturaer.
+      invalidateRavarerCounts(qc);
       toast.success("Avtale lagret");
       onOpenChange(false);
     },

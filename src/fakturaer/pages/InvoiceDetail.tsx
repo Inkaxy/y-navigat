@@ -12,6 +12,7 @@ import { showError } from "@/lib/userError";
 import { supabase } from "@/integrations/supabase/client";
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
+import { useInvoicePriceSafety } from "@/fakturaer/hooks/useInvoicePriceSafety";
 import { InvoiceLinesTable } from "@/fakturaer/components/invoice-detail/InvoiceLinesTable";
 import { InvoiceFactsCard } from "@/fakturaer/components/invoice-detail/InvoiceFactsCard";
 import { InvoiceDetailsCard, InvoiceDocumentLayout } from "@/fakturaer/components/invoice-detail/InvoiceDocumentLayout";
@@ -54,6 +55,7 @@ export default function InvoiceDetailPage() {
   });
 
   const tolerances = useMatchTolerances(data?.legal_entity_id ?? null);
+  const safety = useInvoicePriceSafety([id ?? null]);
 
   // Suggestions for currently-opened match line
   const { data: matchLineSuggestions } = useQuery({
@@ -333,6 +335,8 @@ export default function InvoiceDetailPage() {
             onRegister={() => navigate(paths.registrerLinjer(id))}
             tolerancePct={defaultTolerancePct}
             settings={tolerances.settings}
+            invoice={{ currency: data.currency }}
+            gateOf={(l) => safety.gateFor({ id: l.id, invoice_id: data.id, updated_at: l.updated_at })}
           />
         </div>
       </InvoiceDocumentLayout>

@@ -29,36 +29,35 @@ export function PriceCheck({ line, link, tolerancePct }: { line: ReviewLineRow; 
   const { settings } = useMatchTolerances(line.invoice.legal_entity_id);
   const currency = line.invoice.currency ?? "NOK";
   const unit = baseUnitOf(line, link) ?? "grunnenhet";
-  const actual = line.price_per_base_unit == null ? null : Number(line.price_per_base_unit);
-  const expected = line.expected_price_per_base_unit == null ? null : Number(line.expected_price_per_base_unit);
   const ref = referenceLabel(line);
-  const variance = line.price_variance_pct == null ? null : Number(line.price_variance_pct);
   const reasons = reasonsIn(line, "price");
   const gate = usePriceGate(line);
+  const credit = line.invoice.is_credit_note === true || (!gate.ok && gate.action === "review_credit_note");
 
   return (
     <div className="space-y-2 text-sm">
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <div className="text-caption text-ink-secondary">Denne fakturaen</div>
-          <div className="text-base font-semibold tabular-nums">
-            {actual == null ? "Kan ikke beregnes" : `${formatMoney(actual, currency)} / ${unit}`}
+      {gate.ok ? (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-caption text-ink-secondary">Kontrollert pris</div>
+              <div className="text-base font-semibold tabular-nums">{gate.safety.price_per_base_unit == null ? "—" : `${formatMoney(gate.safety.price_per_base_unit, "NOK")} / ${unit}`}</div>
+            </div>
+            <div>
+              <div className="text-caption text-ink-secondary">Sammenlignes med{ref ? ` ${ref}` : ""}</div>
+              <div className="text-base font-semibold tabular-nums">{gate.safety.expected_price_per_base_unit == null ? "—" : `${formatMoney(gate.safety.expected_price_per_base_unit, "NOK")} / ${unit}`}</div>
+            </div>
           </div>
-        </div>
-        <div>
-          <div className="text-caption text-ink-secondary">Sammenlignes med{ref ? ` ${ref}` : ""}</div>
-          <div className="text-base font-semibold tabular-nums">
-            {!gate.ok ? "Sammenlignes ikke" : expected == null ? "Mangler prisgrunnlag" : `${formatMoney(expected, currency)} / ${unit}`}
-          </div>
-        </div>
-      </div>
-      {!gate.ok ? (
+          <PriceDeviationNote actual={gate.safety.price_per_base_unit} expected={gate.safety.expected_price_per_base_unit} baseQuantity={gate.safety.base_quantity} tolerancePct={tolerancePct} settings={settings} />
+        </>
+      ) : (
         <div role="note" className="rounded-md border border-warning/30 bg-warning/10 p-2 text-caption">
-          <p className="font-medium text-warning">{gate.label}</p>
-          <p className="text-ink-secondary">{gate.detail}</p>
+          <p className="font-medium text-warning">{credit ? "Kreditnota – ikke en prisendring" : gate.label}</p>
+          <p className="text-ink-secondary">{credit ? "Beløpene vises som på dokumentet. Koble kreditnotaen til opprinnelig faktura." : gate.detail}</p>
+          <p className="mt-1 text-ink-secondary">Originalt på dokumentet: {line.quantity ?? "—"} {line.unit ?? ""} × {formatMoney(line.unit_price, currency)} = {formatMoney(line.total_amount, currency)}. Utledet pris per {unit} vises ikke før grunnlaget er kontrollert.</p>
         </div>
-      ) : <PriceDeviationNote actual={actual} expected={expected} baseQuantity={line.base_quantity == null ? null : Number(line.base_quantity)} tolerancePct={tolerancePct} settings={settings} />}
-      {reasons.length > 0 && (variance == null || actual == null || expected == null) && <p className="text-caption text-warning">Må avklares: {reasons.join(" · ")}</p>}
+      )}
+      {reasons.length > 0 && !gate.ok && !credit && <p className="text-caption text-warning">Må avklares: {reasons.join(" · ")}</p>}
       <button type="button" className="text-caption text-ink-secondary underline underline-offset-2" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
         Prisdetaljer
       </button>

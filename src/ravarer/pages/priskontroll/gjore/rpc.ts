@@ -23,13 +23,15 @@ function rematchQueued(o: Obj): number {
 }
 
 export type ClaimCreditResult =
-  | { ok: true; caseId: string | null; caseLines: number; accepted: number; skipped: Skipped[]; rematchQueued: number; /** Sum av saklinjene, når den er hentet. */ amount?: number }
+  | { ok: true; caseId: string | null; caseLines: number; accepted: number; skipped: Skipped[]; rematchQueued: number; caseKind: "documented_claim" | "price_inquiry" | null }
   | { ok: false; reason: ClaimFailure; skipped: Skipped[] };
 
 export function parseClaimCredit(data: Json | null | undefined): ClaimCreditResult {
   const d: Obj = isObj(data) ? data : {};
   if (d.ok === true) {
-    return { ok: true, caseId: str(d, "case_id"), caseLines: count(d, "case_lines"), accepted: num(d, "accepted") ?? 0, skipped: skipped(d), rematchQueued: rematchQueued(d) };
+    const k = str(d, "case_kind");
+    return { ok: true, caseId: str(d, "case_id"), caseLines: count(d, "case_lines"), accepted: num(d, "accepted") ?? 0, skipped: skipped(d), rematchQueued: rematchQueued(d),
+      caseKind: k === "documented_claim" || k === "price_inquiry" ? k : null };
   }
   const reason: ClaimFailure = str(d, "reason") === "ingen_godtatt" ? "ingen_godtatt" : "ingen_merkostnad";
   return { ok: false, reason, skipped: skipped(d) };

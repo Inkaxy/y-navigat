@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { X, AlertTriangle, RefreshCw } from "lucide-react";
 import { PdfDocumentViewer } from "@/fakturaer/components/PdfDocumentViewer";
-import { invoiceFigures, linePriceGate, type HoldState } from "@/fakturaer/lib/financialPresentation";
+import { invoiceFigures, type PriceGate } from "@/fakturaer/lib/financialPresentation";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
 import { useInvoiceDocumentUrl } from "@/fakturaer/hooks/useInvoiceDocument";
 import { formatMoney, formatDate } from "@/fakturaer/lib/constants";
@@ -54,7 +54,8 @@ interface Props {
   /** Vis sumavvik-varsel i panelet (bare der ingen egen kontrollblokk finnes). */
   showSumWarning?: boolean;
   /** Holdt-tilbake-status for valgt linjes prisobservasjon (null = ukjent). */
-  held?: HoldState;
+  /** Serverens prisstatus for valgt linje (ukjent uten). */
+  gate?: PriceGate | null;
 }
 
 function num(v: number | null | undefined): number | null {
@@ -63,14 +64,13 @@ function num(v: number | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export function InvoiceDocumentPanel({ invoice, line, onClose, className, showSumWarning, held }: Props) {
+export function InvoiceDocumentPanel({ invoice, line, onClose, className, showSumWarning, gate: gateIn }: Props) {
   const path = invoice?.source_document_url ?? null;
   const { url, isLoading, error, refetch } = useInvoiceDocumentUrl(path);
   const fig = invoiceFigures(invoice ?? {});
   const cur = fig.currency;
   const mismatch = showSumWarning && invoice?.lines_sum_status === "mismatch";
-  const gate = line && invoice ? linePriceGate(invoice, line, held) : null;
-  const variance = gate?.ok ? num(line?.price_variance_pct) : null;
+  const gate = line ? gateIn ?? null : null;
   const open = <InvoiceDocumentButton path={path} label="Åpne originalen i ny fane" variant="outline" />;
 
   return (
@@ -109,8 +109,8 @@ export function InvoiceDocumentPanel({ invoice, line, onClose, className, showSu
           </div>
           <p className={cn("mt-1 text-xs", gate?.ok ? "text-ink-secondary" : "text-warning")}>
             {gate?.ok
-              ? `Pris/grunnenhet ${formatMoney(num(line.price_per_base_unit), cur)} mot ${formatMoney(num(line.expected_price_per_base_unit), cur)}${variance == null ? "" : ` (${variance > 0 ? "+" : ""}${variance.toLocaleString("nb-NO", { maximumFractionDigits: 1 })} %)`}`
-              : gate ? `${gate.label} — prisavvik vises ikke.` : null}
+              ? `Kontrollert pris/grunnenhet ${formatMoney(gate.safety.price_per_base_unit, "NOK")} mot ${formatMoney(gate.safety.expected_price_per_base_unit, "NOK")} · beregnet prisavvik ${formatMoney(gate.safety.effect_nok, "NOK")}`
+              : `${gate?.label ?? "Prisgrunnlag ikke kontrollert"} — prisavvik vises ikke.`}
           </p>
         </div>
       )}

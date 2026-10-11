@@ -188,6 +188,8 @@ export function invalidateInvoice(qc: QueryClient, invoiceId?: string): void {
 export const RAVARER_COUNT_KEYS: readonly (readonly string[])[] = [
   ["ravarer", "work-summary"],
   ["ravarer", "work-items"],
+  // Prisstatus per fakturalinje avhenger av referanser som kan gjelde andre fakturaer: hele familien.
+  ["invoice-line-price-safety"],
 ];
 
 /** Invalider tellerne slik at meny, Oversikt og faner alltid viser samme tall. */

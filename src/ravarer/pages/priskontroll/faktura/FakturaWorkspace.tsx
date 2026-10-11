@@ -42,9 +42,8 @@ import { canFetchLines } from "./invoiceSteps";
 import { CorrectLineDialog } from "./CorrectLineDialog";
 import { correctionDocLine } from "./correctionDocLine";
 import { parseReadIssues } from "@/fakturaer/lib/lineCorrection";
-import { usePriceHolds } from "@/fakturaer/hooks/usePriceHolds";
+import { useInvoicePriceSafety } from "@/fakturaer/hooks/useInvoicePriceSafety";
 import { PriceGateProvider } from "@/fakturaer/lib/priceGateContext";
-import type { GateLine } from "@/fakturaer/lib/financialPresentation";
 
 // v2: originaldokumentet er åpent som standard; bare et eksplisitt «skjul» huskes.
 const LS_DOC = "nbhub.faktura.docpanel.v2";
@@ -73,7 +72,8 @@ export default function FakturaWorkspace() {
   const q = useInvoiceLineQueue(id ?? null, data?.legal_entity_id ?? null, data?.supplier_id ?? null);
   const s = useInvoiceSteps(data);
   const tolerances = useMatchTolerances(data?.legal_entity_id ?? null);
-  const holds = usePriceHolds(data?.legal_entity_id ?? null, data?.supplier_id ?? null);
+  // Serverens prisstatus; ukjent mens noe lagres eller detaljene hentes på nytt.
+  const safety = useInvoicePriceSafety([id ?? null], { pending: s.busy || detail.isFetching });
   const [correctFor, setCorrectFor] = useState<string | null>(null);
   const fetchLines = useFetchInvoiceLines();
   const rematch = useRematchWait(data?.legal_entity_id ?? null, () => { void detail.refetch(); q.refresh(); });
@@ -207,13 +207,14 @@ export default function FakturaWorkspace() {
   }
 
   const active = q.activeLine;
-  const gateInvoice = { is_credit_note: data.is_credit_note, currency: data.currency, lines_sum_status: data.lines_sum_status, flagged_at: data.flagged_at, extraction_issues: data.extraction_issues, status: data.status };
-  const linesById = new Map<string, GateLine>((data.invoice_lines ?? []).map((l) => [l.id, l]));
+  const linesById = new Map((data.invoice_lines ?? []).map((l) => [l.id, l]));
+  // Linjeversjonen fra lastet faktura binder statusen til linjen den gjaldt.
+  const gateFor = (line: { id: string }) => safety.gateFor({ id: line.id, invoice_id: data.id, updated_at: linesById.get(line.id)?.updated_at ?? null });
   const docFor = (line: typeof active) => (
     <InvoiceDocumentPanel
       invoice={{ invoice_number: data.invoice_number, invoice_date: data.invoice_date, supplier_name: data.suppliers?.name ?? null, source_document_url: data.source_document_url, total_amount: data.total_amount, total_vat: data.total_vat, lines_sum_status: data.lines_sum_status, lines_sum_excl_vat: data.lines_sum_excl_vat, lines_sum_variance_pct: data.lines_sum_variance_pct, extraction_confidence: data.extraction_confidence, currency: data.currency, is_credit_note: data.is_credit_note, flagged_at: data.flagged_at, extraction_issues: data.extraction_issues }}
       line={line ? { ...line, matched_name: line.matched_raw_material?.name ?? null, extraction_issues: linesById.get(line.id)?.extraction_issues } : null}
-      held={line ? holds.heldFor(line) : null}
+      gate={line ? gateFor(line) : null}
       tolerancePct={tolerances.defaultPct}
       onClose={() => toggleDoc()}
       className="h-full"
@@ -253,8 +254,8 @@ export default function FakturaWorkspace() {
           tolerancePct={tolerances.defaultPct}
           settings={tolerances.settings}
           onCorrect={lineWrite ? (id) => setCorrectFor(id) : undefined}
-          invoice={gateInvoice}
-          heldFor={holds.heldFor}
+          invoice={{ currency: data.currency }}
+          gateOf={gateFor}
           compact={isMobile || (showDocZone && !threeZones)}
         />
       ) : (
@@ -315,7 +316,7 @@ export default function FakturaWorkspace() {
   );
 
   return (
-    <PriceGateProvider invoice={gateInvoice} linesById={linesById} heldFor={holds.heldFor}>
+    <PriceGateProvider gateFor={gateFor}>
     <div className="space-y-4">
       <WorkspaceHeader
         backHref={fakturaBackHref(readReturnParam(sp))}

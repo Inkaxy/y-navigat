@@ -9,6 +9,7 @@ import { paths } from "@/ravarer/lib/paths";
 
 function lineStatus(l: SupplierItemLine): { label: string; tone: StatusTone } {
   if (l.line_kind && l.line_kind !== "vare" && !l.raw_material_id) return { label: "Ikke vare", tone: "muted" };
+  if (isOpenLine(l) && l.is_credit_note) return { label: "Kreditnota – ikke en prisendring", tone: "warning" };
   if (isOpenLine(l)) return { label: reasonLabelsOf(l.review_reason)[0] ?? "Til kontroll", tone: "warning" };
   if (!l.raw_material_id) return { label: "Ikke koblet", tone: "muted" };
   return { label: "Klar", tone: "success" };
@@ -30,7 +31,7 @@ export function SupplierItemHistory({ lines, baseUnit }: { lines: SupplierItemLi
             <span className="tabular-nums">{n(l.quantity)} {l.unit ?? ""}</span>
             <span className="tabular-nums">{formatMoney(l.total_amount, "NOK")}</span>
             <span className="tabular-nums text-ink-secondary">
-              {l.price_per_base_unit == null ? "—" : `${n(Math.round(l.price_per_base_unit * 100) / 100)} ${per}`}
+              {l.price_per_base_unit == null || l.is_credit_note ? "—" : `${n(Math.round(l.price_per_base_unit * 100) / 100)} ${per}`}
             </span>
             <LineStatusBadge status={lineStatus(l)} />
             {lineKindLabel(l.line_kind) && l.line_kind !== "vare" && (

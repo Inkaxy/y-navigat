@@ -27,3 +27,17 @@ Filer i `supabase/migrations/` er skrevet av migrasjonsverktøyet; root-filer li
 
 Sluttsjekk: 1744/1744 tester (vitest), typecheck ren, build OK. Isolert DB-test (rullet tilbake):
 `supabase/tests/manual_pdf_replay_match_regression.sql` → replay1=true replay2=false queued=1 reconciled=false matched=false.
+
+## Prisstatus og leverandørsak (root, 2026-10-11)
+
+Kjørt av root direkte mot live og registrert i `schema_migrations`. Filene er byte-identiske med live `statements[1]`
+(md5 og lengde kontrollert mot registeret). ALDRI kjør på nytt. 20261011163018 (materialprojeksjon) hører til fase 4 og er ikke speilet her.
+
+| Versjon | Fil | md5 / lengde |
+|---|---|---|
+| 20261011162824 | live-mirror/20261011162824_invoice_line_authoritative_price_safety.sql | d51135c7c83b7d55b6457181daa349df / 2638 |
+| 20261011163255 | live-mirror/20261011163255_supplier_case_verified_claim_or_inquiry.sql | f8a07664e509b0620a6c81b476880a0b / 24069 |
+
+Live ACL ved speiling: `rm_invoice_line_price_safety` og `rm_supplier_claim_preview` = postgres, authenticated;
+`_rm_claim_basis` = postgres; `rm_supplier_item_claim_credit`, `supplier_case_save_email_draft`,
+`supplier_case_queue_draft_to_henrik` = postgres, authenticated, service_role.

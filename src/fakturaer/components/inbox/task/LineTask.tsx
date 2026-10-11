@@ -112,6 +112,13 @@ export function LineTask(p: LineTaskProps) {
   const priceGate = usePriceGate(line);
   // Felles regel: kreditnota, valuta, lesing, sumkontroll og holdt pris gir aldri «Prisen er riktig».
   const priceAcceptable = canAcceptPriceVariance(line) && priceGate.ok;
+  // Prisstatus uten servergodkjenning: aldri «Prisen avviker»/«Se over pris». Kreditnota har egen veiledning.
+  const isCredit = line.invoice.is_credit_note === true || (!priceGate.ok && priceGate.action === "review_credit_note");
+  const priceBlocked = mode === "price" && status.key === "review_price" && !priceGate.ok;
+  const shownStatus = priceBlocked ? { ...status, label: isCredit ? "Kreditnota" : "Prisgrunnlag til kontroll" } : status;
+  const missingText = priceBlocked
+    ? (isCredit ? "Kreditnota – ikke en prisendring. Koble den til opprinnelig faktura; beløpene vises som på dokumentet." : `${priceGate.label}. ${priceGate.detail}`)
+    : copy.missing;
   const [acceptBusy, setAcceptBusy] = useState(false);
   async function acceptPrice() {
     setError(null);
@@ -210,7 +217,7 @@ export function LineTask(p: LineTaskProps) {
             Linje {p.position.index + 1} av {p.position.total}
           </span>
           <div className="flex items-center gap-1">
-            <LineStatusBadge status={status} />
+            <LineStatusBadge status={shownStatus} />
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={p.onPrev} disabled={p.position.index <= 0} aria-label="Forrige linje">
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -229,7 +236,7 @@ export function LineTask(p: LineTaskProps) {
             Mengde, pris og linjesum på fakturaen går ikke opp med hverandre. Regnestykket under er en foreløpig tolkning — kontroller mot originalfakturaen.
           </p>
         )}
-        {mode !== "done" && <p className="pt-1 text-sm">{copy.missing}</p>}
+        {mode !== "done" && <p className="pt-1 text-sm">{missingText}</p>}
         <OpenSupplierItemButton supplierId={line.invoice.supplier_id} line={line} variant="ghost" className="-ml-2 h-7 px-2 text-caption" />
       </header>
 

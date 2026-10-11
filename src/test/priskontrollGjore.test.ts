@@ -89,7 +89,7 @@ describe("feilkoder til norsk", () => {
 describe("RPC-parsing", () => {
   it("claim ok", () => {
     const r = parseClaimCredit({ ok: true, case_id: "c1", case_lines: [{}, {}], accepted: 2, skipped_lines: [], rematch: { queued: 1 } });
-    expect(r).toEqual({ ok: true, caseId: "c1", caseLines: 2, accepted: 2, skipped: [], rematchQueued: 1 });
+    expect(r).toEqual({ ok: true, caseId: "c1", caseLines: 2, accepted: 2, skipped: [], rematchQueued: 1, caseKind: null });
   });
   it("claim avslag med ukjent grunn mappes til feil", () => {
     const r = parseClaimCredit({ ok: false, reason: "ingen_godtatt", skipped_lines: [{ id: "l1", reason: "rar", message: "" }] });

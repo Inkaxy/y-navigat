@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
 import { toast } from "sonner";
 import { useRematchStatus } from "@/fakturaer/hooks/useRematchStatus";
 import { useRematchInvoices } from "@/ravarer/pages/priskontroll/gjore/useGjoreMutations";
@@ -10,6 +12,7 @@ const POLL_MS = 5_000;
  * (`rm_rematch_status`) og kaller `onDone` når køen er tom igjen.
  */
 export function useRematchWait(legalEntityId: string | null, onDone: () => void) {
+  const qc = useQueryClient();
   const rematch = useRematchInvoices();
   const status = useRematchStatus(legalEntityId);
   const [since, setSince] = useState<number | null>(null);
@@ -25,6 +28,8 @@ export function useRematchWait(legalEntityId: string | null, onDone: () => void)
     if (since == null || !status.data || status.dataUpdatedAt <= since) return;
     if (pending > 0) return;
     setSince(null);
+    // Ny beregning endrer prisstatus og tellere.
+    invalidateRavarerCounts(qc);
     onDone();
     toast.success("Fakturaen er beregnet på nytt");
     // onDone er en ny funksjon hver render; vi reagerer bare på køstatusen.

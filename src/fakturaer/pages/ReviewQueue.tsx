@@ -10,6 +10,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { FakturaerHeaderBanner } from "@/fakturaer/components/FakturaerHeaderBanner";
 import { QueueWorkspace } from "@/fakturaer/components/inbox/QueueWorkspace";
+import { PriceGateProvider } from "@/fakturaer/lib/priceGateContext";
+import { useInvoicePriceSafety } from "@/fakturaer/hooks/useInvoicePriceSafety";
 import { isBulkAcceptable, lineStatus } from "@/fakturaer/lib/lineStatus";
 import { useReviewLines, useReviewLineCounts, type ReviewLineRow, type ReviewLineCountRow } from "@/fakturaer/hooks/useReviewLines";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
@@ -227,6 +229,8 @@ export default function FakturaerInboxPage() {
     dispatch({ type: "sync", ids: visibleLines.map((l) => l.id) });
   }, [visibleLines]);
   const activeLine = useMemo(() => visibleLines.find((l) => l.id === queue.activeId) ?? null, [visibleLines, queue.activeId]);
+  // Serverens prisstatus for valgt linjes faktura; andre linjer er ukjente til de velges.
+  const safety = useInvoicePriceSafety([activeLine?.invoice_id]);
   const undoEntry = peekUndo(queue);
 
   // Valg for masse-handlinger
@@ -525,6 +529,7 @@ export default function FakturaerInboxPage() {
   );
 
   const queueEl = (
+    <PriceGateProvider gateFor={safety.gateFor}>
     <QueueWorkspace
       lines={visibleLines}
       statusOf={statusOf}
@@ -572,6 +577,7 @@ export default function FakturaerInboxPage() {
       onShowDocument={showDoc}
       onReconcile={() => expandedId && setReconcileId(expandedId)}
     />
+    </PriceGateProvider>
   );
 
   const docPanel = docLine ? (
