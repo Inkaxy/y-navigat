@@ -34,7 +34,8 @@ export function priceCandidates(lines: SupplierItemLine[]): SupplierItemLine[] {
 }
 
 /** Deler kandidater i serverkontrollerte prisavvik og linjer som ikke kan sammenlignes. */
-export function splitByGate(cands: SupplierItemLine[], gateOf: (l: SupplierItemLine) => PriceGate): { rows: PriceRow[]; blocked: BlockedRow[] } {
+type GateLine = Pick<SupplierItemLine, "id" | "invoice_id" | "invoice_number" | "invoice_date" | "quantity" | "unit">;
+export function splitByGate<L extends GateLine>(cands: L[], gateOf: (l: L) => PriceGate): { rows: PriceRow[]; blocked: BlockedRow[] } {
   const rows: PriceRow[] = [];
   const blocked: BlockedRow[] = [];
   for (const l of cands) {

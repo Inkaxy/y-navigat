@@ -162,7 +162,7 @@ describe("varekort: bare serverkontrollerte linjer", () => {
   it("kreditnota, ukjent status og verifisert avvik skilles; ingen lokal regel godkjenner", async () => {
     const { splitByGate } = await import("@/ravarer/pages/priskontroll/gjore/PriceBlock");
     const base = { invoice_number: "1", invoice_date: "2026-10-01", quantity: 1, unit: "kg", price_per_base_unit: 9999, expected_price_per_base_unit: 1 };
-    const lines = [{ ...base, id: "a", invoice_id: "i1" }, { ...base, id: "b", invoice_id: "i1" }, { ...base, id: "c", invoice_id: "i2" }] as unknown as Parameters<typeof splitByGate>[0];
+    const lines = [{ ...base, id: "a", invoice_id: "i1" }, { ...base, id: "b", invoice_id: "i1" }, { ...base, id: "c", invoice_id: "i2" }];
     const gates: Record<string, ReturnType<typeof gateOf>> = {
       a: gateOf(safeLine({ line_id: "l1" })),
       b: gateOf(safeLine({ can_compare: false, reason_code: "credit_note", effect_nok: null })),
@@ -176,7 +176,7 @@ describe("varekort: bare serverkontrollerte linjer", () => {
 
 describe("PDF-identitet", () => {
   it("nytt innhold under samme sti gir ny identitet (side/zoom nullstilles)", async () => {
-    const { documentIdentity } = await vi.importActual<typeof import("@/fakturaer/components/PdfDocumentViewer")>("@/fakturaer/components/PdfDocumentViewer").catch(() => ({ documentIdentity: (a: string, b: string | null | undefined, c: string) => `${a}|${b ?? ""}|${c}` }));
+    const { documentIdentity } = await import("@/fakturaer/lib/pdfIdentity");
     expect(documentIdentity("a.pdf", null, "x")).not.toBe(documentIdentity("a.pdf", null, "y"));
     expect(documentIdentity("a.pdf", "v1", "x")).not.toBe(documentIdentity("a.pdf", "v2", "x"));
   });

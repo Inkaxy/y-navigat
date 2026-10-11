@@ -7,6 +7,7 @@ import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { documentIdentity } from "@/fakturaer/lib/pdfIdentity";
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -34,8 +35,6 @@ export async function loadDocumentBytes(url: string): Promise<DocBytes> {
   return { kind: isPdf ? "pdf" : "image", bytes: new Uint8Array(buf), type: isPdf ? "application/pdf" : type, fingerprint: await fingerprintOf(buf) };
 }
 
-/** Identitet for et dokument: lagringssti + kjent versjon + innholdsavtrykk. */
-export const documentIdentity = (cacheKey: string, version: string | null | undefined, fingerprint: string) => `${cacheKey}|${version ?? ""}|${fingerprint}`;
 
 interface Props {
   /** Signert lenke. Logges aldri. */
