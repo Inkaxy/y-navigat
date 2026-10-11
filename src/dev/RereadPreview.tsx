@@ -21,7 +21,7 @@ function App() {
   return (
     <div className="space-y-4 px-page py-4">
       <h1 className="font-serif text-xl">Les originalen på nytt (faste data: {s})</h1>
-      {s === "reading" && <ReadingState invoked busy={false} onInvoke={() => undefined} onCancel={() => undefined} />}
+      {s === "reading" && <ReadingState startedAt={new Date(Date.now() - 3 * 60_000).toISOString()} invoked invoking={false} invokeCode="ukjent_utfall" canAct busy={false} onInvoke={() => undefined} onRefresh={() => undefined} onCancel={() => undefined} />}
       {s === "failed" && <p role="status" className="rounded-lg border border-border p-4 text-sm">Lesingen feilet: {rereadErrorText(run.error_code)}</p>}
       {(s === "ready" || s === "pending" || s === "other") && (
         <RereadView run={run} document={doc} canApply={s !== "other"} readOnlyReason={s === "other" ? "Lesingen ble startet av en annen bruker. Du kan se den, men ikke ta den i bruk." : null}
