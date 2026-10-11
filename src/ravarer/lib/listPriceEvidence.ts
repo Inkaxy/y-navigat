@@ -175,7 +175,8 @@ const NOT_CONTROL = new Set(["no_invoice_observation", "invoice_access_missing"]
 
 export function reasonLabel(code: string | null): string {
   if (!code) return "Prisgrunnlag må kontrolleres";
-  return LIST_REASONS[code] ?? reasonGate(code).label;
+  const g = reasonGate(code);
+  return LIST_REASONS[code] ?? (g.ok ? "Prisgrunnlag må kontrolleres" : g.label);
 }
 
 /**
