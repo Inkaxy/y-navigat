@@ -38,7 +38,7 @@ const ITEM: SupplierItem = {
 };
 const r = (id: string, inv: string, date: string, qty: number): PriceRow => ({
   id, invoice_id: inv, invoice_number: inv, invoice_date: date, quantity: qty / 5, unit: "kanne",
-  price_per_base_unit: 78.4, expected_price_per_base_unit: 70.13, base_quantity: qty,
+  price_per_base_unit: 78.4, expected_price_per_base_unit: 70.13, base_quantity: qty, effect_nok: Math.round(8.27 * qty * 100) / 100, reference_source: "agreement",
 });
 const ROWS = [r("a", "771201", "2026-09-24", 50), r("b", "771455", "2026-10-01", 50), r("c", "771702", "2026-10-08", 50)];
 const FACTS: InvoiceFacts = {
@@ -48,7 +48,7 @@ const FACTS: InvoiceFacts = {
 };
 
 function Preview() {
-  const [sel, setSel] = useState<Set<string>>(new Set(ROWS.map((x) => x.id)));
+  const [sel, setSel] = useState<Set<string>>(new Set());
   const [valgt, setValgt] = useState("v1");
   const toggle = (id: string) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   return (
@@ -61,9 +61,9 @@ function Preview() {
             <VBlock n={1} title="Råvare" done summary={<span className="font-medium underline">Softismiks</span>} />
             <VBlock n={2} title="Pakning" done summary={<span className="text-ink-secondary">5 l per kanne</span>} />
             <VBlock n={3} title="Pris">
-              <PriceBlockView rows={ROWS} selected={sel} onToggle={toggle} baseUnit="l" referenceSource="agreement" referenceDate="2026-01-01"
+              <PriceBlockView rows={ROWS} blocked={[{ id: "k", invoice_id: "8050625", invoice_number: "8050625", invoice_date: "2026-10-02", label: "Kreditnota – ikke sammenlignbar varepris", detail: "" }]} status="ready" selected={sel} onToggle={toggle} baseUnit="l" referenceDate="2026-01-01"
                 hasAgreement tolerancePct={3} hardCapPct={15} settings={null} reason="" onReason={() => undefined} canWrite busy={false}
-                onAccept={() => undefined} onClaim={() => undefined} onFixAgreement={() => undefined} onCheckPackage={() => undefined} />
+                onAccept={() => undefined} onCase={() => undefined} onFixAgreement={() => undefined} onCheckPackage={() => undefined} />
             </VBlock>
           </div>
           <div className="space-y-4 rounded-lg border border-border bg-card p-4">

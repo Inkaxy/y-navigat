@@ -4,7 +4,9 @@ vi.mock("@/fakturaer/components/PdfDocumentViewer", () => ({ PdfDocumentViewer: 
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { linePriceGate, invoiceFigures, invoiceSourceLabel, toActionRequired } from "@/fakturaer/lib/financialPresentation";
+import { invoiceFigures, invoiceSourceLabel, toActionRequired } from "@/fakturaer/lib/financialPresentation";
+import { parsePriceSafety, safetyGate, totalEffect } from "@/fakturaer/lib/priceSafety";
+import { KIND_COPY, parseClaimPreview, planClaim } from "@/ravarer/lib/supplierClaim";
 import { InvoiceLinesTable } from "@/fakturaer/components/invoice-detail/InvoiceLinesTable";
 import { InvoiceDocumentPanel } from "@/fakturaer/components/InvoiceDocumentPanel";
 import { causeText, nextActionText } from "@/ravarer/pages/priskontroll/gjore/groupCopy";
@@ -12,37 +14,66 @@ import { workEffect } from "@/ravarer/lib/workEffect";
 import { controlFigures } from "@/ravarer/pages/priskontroll/faktura/ControlSummary";
 import type { InvoiceDetailLine } from "@/fakturaer/components/invoice-detail/fetchInvoiceDetail";
 
-const okInv = { is_credit_note: false, currency: "NOK", lines_sum_status: "ok", flagged_at: null, extraction_issues: [] };
-const okLine = { raw_material_id: "rm1", total_amount: 1000, quantity: 10, base_quantity: 100, price_per_base_unit: 10, expected_price_per_base_unit: 8, extraction_issues: [] };
+const okInv = { currency: "NOK" };
+const safeLine = (over: Record<string, unknown> = {}) => ({ line_id: "l1", line_version: "2026-10-11T10:00:00Z", raw_material_id: "rm1", can_compare: true, effect_nok: 200,
+  reason_code: null, reference_source: "agreement", reference_id: "a1", expected_price_per_base_unit: 8, price_per_base_unit: 10, base_quantity: 100, ...over });
+const resp = (lines: unknown[]) => ({ invoice_id: "i1", checked_at: "2026-10-11T10:00:01Z", lines });
+const gateOf = (raw: Record<string, unknown>, fresh = true, ver: string | null = "2026-10-11T10:00:00Z") => safetyGate(parsePriceSafety(resp([raw]), "i1")?.lines.get("l1"), fresh, ver);
 
-describe("linePriceGate — felles regel", () => {
-  it("verifisert normal NOK med kjent holdstatus kan sammenlignes", () => {
-    expect(linePriceGate(okInv, okLine, false)).toEqual({ ok: true });
+describe("autoritativ prisstatus (rm_invoice_line_price_safety)", () => {
+  it("godkjent linje fra serveren kan sammenlignes; 0 er kontrollert uten avvik", () => {
+    expect(gateOf(safeLine()).ok).toBe(true);
+    const z = gateOf(safeLine({ effect_nok: 0, price_per_base_unit: 8 }));
+    expect(z.ok && z.safety.effect_nok).toBe(0);
   });
-  it("kreditnota er aldri en prisendring", () => {
-    const g = linePriceGate({ ...okInv, is_credit_note: true }, { ...okLine, total_amount: -268885, price_per_base_unit: 2246 }, false);
-    expect(g.ok).toBe(false);
-    if (!g.ok) { expect(g.action).toBe("review_credit_note"); expect(g.label).toBe("Kontroller kreditnotaen"); }
+  it.each(["credit_note", "non_nok_currency", "cancelled_invoice", "line_needs_review", "invalid_tenant_link", "package_not_confirmed", "base_quantity_conflicts", "price_observation_held", "price_reference_unverified", "invoice_sum_not_verified", "noe_nytt"])(
+    "%s gir aldri sammenligning eller virkning", (code) => {
+      const g = gateOf(safeLine({ can_compare: false, reason_code: code, effect_nok: null }));
+      expect(g.ok).toBe(false);
+    });
+  it("kreditnota-etikett sier ikke prisendring", () => {
+    const g = gateOf(safeLine({ can_compare: false, reason_code: "credit_note", effect_nok: null }));
+    expect(!g.ok && g.label).toBe("Kreditnota – ikke sammenlignbar varepris");
   });
-  it("EUR sammenlignes ikke med kronepriser", () => {
-    const g = linePriceGate({ ...okInv, currency: "EUR" }, okLine, false);
-    expect(!g.ok && g.action).toBe("review_currency");
+  it("lasting/feil/utdatert, manglende linje, feil faktura og versjonsavvik er ukjent selv med lagret godkjenning", () => {
+    expect(gateOf(safeLine(), false).ok).toBe(false);
+    expect(safetyGate(undefined, true).ok).toBe(false);
+    expect(parsePriceSafety(resp([safeLine()]), "annen")).toBeNull();
+    expect(gateOf(safeLine(), true, "2026-10-11T10:05:00Z").ok).toBe(false);
   });
-  it("holdt prisobservasjon krever bekreftet grunnlag, ukjent hold også", () => {
-    expect(!linePriceGate(okInv, okLine, true).ok && linePriceGate(okInv, okLine, true)).toMatchObject({ reason: "price_observation_held", action: "confirm_price_basis" });
-    expect(linePriceGate(okInv, okLine, null)).toMatchObject({ ok: false, reason: "hold_unknown" });
+  it("ugyldig form er ukjent: negativ/tekst-virkning, godkjent uten virkning", () => {
+    expect(gateOf(safeLine({ effect_nok: -1 })).ok).toBe(false);
+    expect(gateOf(safeLine({ effect_nok: "200" })).ok).toBe(false);
+    expect(gateOf(safeLine({ effect_nok: null })).ok).toBe(false);
+    expect(gateOf(safeLine({ can_compare: "true" })).ok).toBe(false);
   });
-  it("sumavvik / ikke kontrollert sum er kontrolloppgave", () => {
-    expect(linePriceGate({ ...okInv, lines_sum_status: "mismatch" }, okLine, false)).toMatchObject({ ok: false, action: "review_reading" });
-    expect(linePriceGate({ ...okInv, lines_sum_status: "not_checked" }, okLine, false)).toMatchObject({ ok: false, reason: "invoice_sum_not_verified" });
+  it("totalsum bare når alle linjer er godkjent", () => {
+    expect(totalEffect([gateOf(safeLine()), gateOf(safeLine({ effect_nok: 50 }))])).toBe(250);
+    expect(totalEffect([gateOf(safeLine()), gateOf(safeLine(), false)])).toBeNull();
+    expect(totalEffect([])).toBeNull();
   });
-  it("manglende pakning/grunnmengde og manglende kobling", () => {
-    expect(linePriceGate(okInv, { ...okLine, base_quantity: null }, false)).toMatchObject({ ok: false });
-    expect(linePriceGate(okInv, { ...okLine, raw_material_id: null }, false)).toMatchObject({ ok: false, action: "complete_link_or_package" });
+});
+
+describe("krav vs prisforespørsel (rm_supplier_claim_preview)", () => {
+  const claim = (id: string, kind: string, amount: number, obs: number | null = amount) => ({ line_id: id, eligible: true, basis: { case_kind: kind, amount_excl_vat: amount, observed_effect_excl_vat: obs, price_per_base_unit: 10 } });
+  it("dokumentert krav summerer serverens beløp og sender grunnlaget uendret", () => {
+    const pl = planClaim(parseClaimPreview({ lines: [claim("a", "documented_claim", 100), claim("b", "documented_claim", 50.5)] }, ["a", "b"]));
+    expect(pl).toMatchObject({ ok: true, kind: "documented_claim", amount: 150.5 });
+    expect(pl.ok && pl.lines[0].basis).toMatchObject({ case_kind: "documented_claim" });
   });
-  it("lesevarsel på linje eller faktura", () => {
-    expect(linePriceGate(okInv, { ...okLine, extraction_issues: [{ code: "x", message: "y" }] }, false)).toMatchObject({ ok: false, action: "review_reading" });
-    expect(linePriceGate({ ...okInv, extraction_issues: [{ code: "x" }] }, okLine, false)).toMatchObject({ ok: false, reason: "invoice_read_unverified" });
+  it("prisforespørsel krever null kroner", () => {
+    const pl = planClaim(parseClaimPreview({ lines: [claim("a", "price_inquiry", 0, 120)] }, ["a"]));
+    expect(pl).toMatchObject({ ok: true, kind: "price_inquiry", amount: 0, observed: 120 });
+    expect(planClaim(parseClaimPreview({ lines: [claim("a", "price_inquiry", 120)] }, ["a"])).ok).toBe(false);
+  });
+  it("blandet type må deles, manglende/ikke brukbar linje stopper alt", () => {
+    expect(planClaim(parseClaimPreview({ lines: [claim("a", "documented_claim", 1), claim("b", "price_inquiry", 0)] }, ["a", "b"]))).toMatchObject({ ok: false, code: "mixed" });
+    expect(planClaim(parseClaimPreview({ lines: [claim("a", "documented_claim", 1)] }, ["a", "b"]))).toMatchObject({ ok: false, code: "ineligible" });
+    const cr = planClaim(parseClaimPreview({ lines: [{ line_id: "a", eligible: false, reason: "claim_unverified:credit_note" }] }, ["a"]));
+    expect(!cr.ok && cr.reasons).toEqual(["Kreditnota – ikke en prisendring"]);
+  });
+  it("kopi skiller krav fra forespørsel", () => {
+    expect(KIND_COPY.price_inquiry.action).not.toMatch(/kreditt|krav/i);
   });
 });
 
@@ -93,29 +124,36 @@ const tableProps = { supplierId: "s1", canBulkImport: false, canMatch: false, se
 
 describe("faktiske komponenter", () => {
   it("tabell: kreditnota viser ingen prosent, bare kontrolloppgave og originalbeløp", () => {
-    wrap(<InvoiceLinesTable {...tableProps} lines={[line({})]} invoice={{ ...okInv, is_credit_note: true }} heldFor={() => false} />);
+    wrap(<InvoiceLinesTable {...tableProps} lines={[line({})]} invoice={okInv} gateOf={() => gateOf(safeLine({ can_compare: false, reason_code: "credit_note", effect_nok: null }))} />);
     expect(screen.queryByText(/22\s?377/)).toBeNull();
-    expect(screen.getByText("Kontroller kreditnotaen")).toBeInTheDocument();
+    expect(screen.getAllByText(/Kreditnota/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/268\s?885/).length).toBeGreaterThan(0);
   });
   it("tabell mobil (preferanse tabell=true): kort i stedet for bred tabell, EUR i riktig valuta", () => {
-    wrap(<InvoiceLinesTable {...tableProps} compact lines={[line({ total_amount: 500, unit_price: 50 })]} invoice={{ ...okInv, currency: "EUR" }} heldFor={() => false} />);
+    wrap(<InvoiceLinesTable {...tableProps} compact lines={[line({ total_amount: 500, unit_price: 50 })]} invoice={{ currency: "EUR" }} gateOf={() => gateOf(safeLine({ can_compare: false, reason_code: "non_nok_currency", effect_nok: null }))} />);
     expect(document.querySelector("table")).toBeNull();
     expect(screen.getAllByText(/€/).length).toBeGreaterThan(0);
-    expect(screen.getByText("Kontroller valuta")).toBeInTheDocument();
+    expect(screen.getAllByText(/Valuta må avklares/).length).toBeGreaterThan(0);
   });
   it("dokumentpanel: kreditnota uten prisavvik, ingen rå score-banner", () => {
     wrap(<InvoiceDocumentPanel onClose={() => undefined}
       invoice={{ invoice_number: "8050625", invoice_date: "2026-10-01", is_credit_note: true, currency: "NOK", lines_sum_status: "ok", extraction_confidence: 1, total_amount: -268885, total_vat: null }}
-      line={line({})} held={false} />);
+      line={line({})} gate={gateOf(safeLine({ can_compare: false, reason_code: "credit_note", effect_nok: null }))} />);
     expect(screen.queryByText(/22\s?377/)).toBeNull();
     expect(screen.queryByText(/100 %/)).toBeNull();
-    expect(screen.getByText(/Kontroller kreditnotaen — prisavvik vises ikke/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Kreditnota/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Prisen avviker|Se over pris/)).toBeNull();
+  });
+  it("dokumentpanel: ukjent status (lasting/feil) viser ingen prosent selv om linjen har lagret avvik", () => {
+    wrap(<InvoiceDocumentPanel onClose={() => undefined}
+      invoice={{ invoice_number: "1", invoice_date: "2026-10-01", is_credit_note: false, currency: "NOK", lines_sum_status: "ok", extraction_issues: [] }}
+      line={line({ total_amount: 1000, unit_price: 100, price_per_base_unit: 10, expected_price_per_base_unit: 8, price_variance_pct: 25 })} gate={gateOf(safeLine(), false)} />);
+    expect(screen.queryByText(/\+25 %/)).toBeNull();
   });
   it("dokumentpanel: verifisert normal NOK viser sammenligning", () => {
     wrap(<InvoiceDocumentPanel onClose={() => undefined}
       invoice={{ invoice_number: "1", invoice_date: "2026-10-01", is_credit_note: false, currency: "NOK", lines_sum_status: "ok", extraction_issues: [] }}
-      line={line({ total_amount: 1000, unit_price: 100, price_per_base_unit: 10, expected_price_per_base_unit: 8, price_variance_pct: 25 })} held={false} />);
+      line={line({ total_amount: 1000, unit_price: 100, price_per_base_unit: 10, expected_price_per_base_unit: 8, price_variance_pct: 25 })} gate={gateOf(safeLine({ effect_nok: 200, expected_price_per_base_unit: 8, price_per_base_unit: 10 }))} />);
     expect(screen.getByText(/\+25 %/)).toBeInTheDocument();
   });
 });
