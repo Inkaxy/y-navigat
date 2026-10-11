@@ -41,6 +41,7 @@ import {
 } from "@/ravarer/lib/countDraft";
 import { discardCountSheet, fetchOpenCountSheetResult, saveCountSheet, type CountSheetPayload } from "@/ravarer/lib/countSheets";
 import type { CountResult } from "@/ravarer/lib/countSubmission";
+import { CountLineCard } from "./varetelling/CountLineCard";
 import { useCountSubmission } from "./varetelling/useCountSubmission";
 import { CountResultDialog, CountSubmissionBanner, DraftSaveStatus, type ServerSaveState } from "./varetelling/CountPanels";
 
@@ -435,76 +436,31 @@ export default function Varetelling() {
             const base = frozen[r.raw_material_id];
             const drifted = base != null && base !== r.current_stock;
             return (
-              <Card key={r.raw_material_id} className="p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
-                  <div className="w-full min-w-0 sm:w-auto sm:min-w-[200px] sm:flex-1">
-                    <p className="break-words font-medium">{r.name}</p>
-                    <p className="text-xs text-ink-secondary">
-                      Bokført: {formatNumber(r.current_stock, 2)} {r.base_unit}
-                      {countUnitText(r) && <> · {countUnitText(r)}</>}
-                    </p>
-                    {drifted && (
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-warning">
-                        <span>
-                          Talt mot {formatNumber(base, 2)} {r.base_unit} — beholdningen er nå {formatNumber(r.current_stock, 2)}
-                        </span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="min-h-[44px] sm:min-h-0"
-                          onClick={() => {
-                            setDirty(true);
-                            setFrozen(prev => ({ ...prev, [r.raw_material_id]: r.current_stock }));
-                          }}
-                        >
-                          Bruk ny beholdning
-                        </Button>
-                      </div>
-                    )}
-                    <Input
-                      value={locations[r.raw_material_id] ?? ""}
-                      onChange={e => setLocationFor(r.raw_material_id, e.target.value)}
-                      placeholder="Lokasjon"
-                      aria-label={`Lokasjon for ${r.name}`}
-                      className="mt-2 h-[44px] text-sm sm:h-9"
-                    />
-                    <Input
-                      value={lineNotes[r.raw_material_id] ?? ""}
-                      onChange={e => {
-                        setDirty(true);
-                        setLineNotes(prev => ({ ...prev, [r.raw_material_id]: e.target.value }));
-                      }}
-                      placeholder="Notat"
-                      aria-label={`Notat for ${r.name}`}
-                      className="mt-2 h-[44px] text-sm sm:h-9"
-                    />
-                  </div>
-                  <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
-                    <UnitAmountRows
-                      label={`Telt mengde for ${r.name}`}
-                      rows={rowsFor(r.raw_material_id)}
-                      onChange={next => {
-                        setDirty(true);
-                        freeze(r);
-                        setEntries(prev => ({ ...prev, [r.raw_material_id]: next }));
-                      }}
-                      units={unitsFor(r.raw_material_id)}
-                      baseUnit={r.base_unit}
-                      compact
-                    />
-                    {diff != null && (
-                      <Badge
-                        variant="outline"
-                        className={"self-start sm:self-auto " + (diff < 0 ? "border-destructive/50 text-destructive" : diff > 0 ? "border-success/50 text-success" : "")}
-                      >
-                        {diff > 0 ? "+" : ""}
-                        {formatNumber(diff, 2)} {r.base_unit}
-                        {r.current_cost_price != null && <> · {formatNok(diff * r.current_cost_price)}</>}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              </Card>
+              <CountLineCard
+                key={r.raw_material_id}
+                row={r}
+                unitText={countUnitText(r)}
+                frozenBase={drifted ? base : null}
+                onUseNewStock={() => {
+                  setDirty(true);
+                  setFrozen(prev => ({ ...prev, [r.raw_material_id]: r.current_stock }));
+                }}
+                location={locations[r.raw_material_id] ?? ""}
+                onLocation={v => setLocationFor(r.raw_material_id, v)}
+                note={lineNotes[r.raw_material_id] ?? ""}
+                onNote={v => {
+                  setDirty(true);
+                  setLineNotes(prev => ({ ...prev, [r.raw_material_id]: v }));
+                }}
+                rows={rowsFor(r.raw_material_id)}
+                onRows={next => {
+                  setDirty(true);
+                  freeze(r);
+                  setEntries(prev => ({ ...prev, [r.raw_material_id]: next }));
+                }}
+                units={unitsFor(r.raw_material_id)}
+                diff={diff}
+              />
             );
           })}
         </fieldset>
