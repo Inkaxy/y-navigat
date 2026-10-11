@@ -7,7 +7,8 @@ import { workspaceKey, type WorkspaceKeys } from "@/ravarer/pages/priskontroll/f
 import { paths } from "@/ravarer/lib/paths";
 import type { InboxInvoice } from "@/fakturaer/hooks/useInboxInvoices";
 
-const base = { status: "needs_review", received_at: "2026-10-01", line_count: 3, lines_source: "pdf_extracted", line_extraction_status: "done", open_count: 0, lines_sum_status: "ok", reconciled_mode: null };
+import type { DeliveryInvoice } from "@/ravarer/pages/priskontroll/faktura/invoiceSteps";
+const base: DeliveryInvoice = { status: "needs_review", received_at: "2026-10-01", line_count: 3, lines_source: "pdf_extracted", line_extraction_status: "done", open_count: 0, lines_sum_status: "ok", reconciled_mode: null };
 const done = (inv: typeof base, ex = { approved: false, costPosted: false }) => deliverySteps(inv, ex).filter((s) => s.done).map((s) => s.key);
 
 describe("deliverySteps", () => {
@@ -83,11 +84,9 @@ describe("hurtigfiltre og gamle parametre", () => {
     expect(fakturaBackHref(null)).toBe("/ravarer/priskontroll?fane=fakturaer");
   });
   it("tall per chip", () => {
-    const inv = { ready_to_reconcile: 4, reconciled_total: 9 } as unknown;
     expect(chipCount("trenger", { trenger: 3, inv: null, alle: null })).toBe(3);
     expect(chipCount("klar", { klar: 2, inv: null, alle: null })).toBe(2);
     expect(chipCount("alle", { inv: null, alle: 12 })).toBe(12);
-    void inv;
   });
 });
 
