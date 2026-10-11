@@ -3584,6 +3584,84 @@ export type Database = {
           },
         ]
       }
+      invoice_reread_runs: {
+        Row: {
+          applied_at: string | null
+          applied_by: string | null
+          applied_operations: Json | null
+          apply_reason: string | null
+          created_at: string
+          created_by: string
+          document_path: string
+          document_sha256: string | null
+          error_code: string | null
+          expires_at: string
+          extractor: Json | null
+          id: string
+          invoice_id: string
+          legal_entity_id: string
+          proposal: Json | null
+          result: Json | null
+          snapshot: Json
+          status: string
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_by?: string | null
+          applied_operations?: Json | null
+          apply_reason?: string | null
+          created_at?: string
+          created_by: string
+          document_path: string
+          document_sha256?: string | null
+          error_code?: string | null
+          expires_at?: string
+          extractor?: Json | null
+          id?: string
+          invoice_id: string
+          legal_entity_id: string
+          proposal?: Json | null
+          result?: Json | null
+          snapshot: Json
+          status?: string
+        }
+        Update: {
+          applied_at?: string | null
+          applied_by?: string | null
+          applied_operations?: Json | null
+          apply_reason?: string | null
+          created_at?: string
+          created_by?: string
+          document_path?: string
+          document_sha256?: string | null
+          error_code?: string | null
+          expires_at?: string
+          extractor?: Json | null
+          id?: string
+          invoice_id?: string
+          legal_entity_id?: string
+          proposal?: Json | null
+          result?: Json | null
+          snapshot?: Json
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_reread_runs_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_reread_runs_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_runs: {
         Row: {
           basis_count: number
@@ -15844,6 +15922,9 @@ export type Database = {
         Args: { p_invoice_id: string; p_mode: string; p_uid: string }
         Returns: Json
       }
+      _rm_reread_blocker: { Args: { p_invoice_id: string }; Returns: string }
+      _rm_reread_snapshot: { Args: { p_invoice_id: string }; Returns: Json }
+      _rm_reread_values: { Args: { p: Json }; Returns: Json }
       _validate_and_resolve_cake_line: {
         Args: { p_legal_entity_id: string; p_merknad: Json }
         Returns: {
@@ -17672,6 +17753,10 @@ export type Database = {
         Args: { p_raw_material_id: string }
         Returns: number
       }
+      rm_apply_invoice_reread: {
+        Args: { p_operations: Json; p_reason: string; p_run_id: string }
+        Returns: Json
+      }
       rm_apply_matvaretabellen:
         | {
             Args: { p_food_id: string; p_raw_material_id: string }
@@ -17725,8 +17810,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      rm_begin_invoice_reread: { Args: { p_invoice_id: string }; Returns: Json }
       rm_can_read: { Args: { _rm_id: string }; Returns: boolean }
       rm_can_write: { Args: { _rm_id: string }; Returns: boolean }
+      rm_cancel_invoice_reread: { Args: { p_run_id: string }; Returns: Json }
       rm_change_supplier_link: {
         Args: {
           p_line_ids?: string[]
@@ -17866,6 +17953,10 @@ export type Database = {
       rm_fail_invoice_line_extraction: {
         Args: { p_invoice_id: string; p_patch: Json; p_token: string }
         Returns: boolean
+      }
+      rm_fail_invoice_reread: {
+        Args: { p_code: string; p_run_id: string }
+        Returns: undefined
       }
       rm_finalize_invoice_line_extraction: {
         Args: {
@@ -18050,6 +18141,15 @@ export type Database = {
       rm_reconcile_invoice: { Args: { p_invoice_id: string }; Returns: Json }
       rm_refresh_cost_prices: {
         Args: { p_raw_material_ids: string[] }
+        Returns: Json
+      }
+      rm_register_invoice_reread: {
+        Args: {
+          p_document_sha256: string
+          p_extractor: Json
+          p_proposal: Json
+          p_run_id: string
+        }
         Returns: Json
       }
       rm_rematch_invoices: {
