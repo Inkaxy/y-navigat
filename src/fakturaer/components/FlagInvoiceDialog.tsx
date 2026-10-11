@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { invalidateInvoice } from "@/ravarer/lib/invalidate";
 import { useQueryClient } from "@tanstack/react-query";
+import { FLAGGABLE_STATUSES, flagSummary } from "@/fakturaer/lib/flagging";
 
 interface Props {
   open: boolean;
@@ -31,7 +32,8 @@ export function FlagInvoiceDialog({ open, onOpenChange, invoiceId, invoiceIds }:
     setBusy(true);
     try {
       const { data: u } = await supabase.auth.getUser();
-      const { error } = await supabase
+      // Avstemte (og allerede flaggede) fakturaer flagges aldri — det ville regnet om prishistorikken.
+      const { data: updated, error } = await supabase
         .from("invoices")
         .update({
           status: "flagged",
@@ -40,9 +42,13 @@ export function FlagInvoiceDialog({ open, onOpenChange, invoiceId, invoiceIds }:
           flag_reason: reason.trim(),
           flag_action_type: "internal_task",
         })
-        .in("id", ids);
+        .in("id", ids)
+        .in("status", [...FLAGGABLE_STATUSES])
+        .select("id");
       if (error) throw error;
-      toast.success(ids.length > 1 ? `${ids.length} fakturaer flagget for oppfølging` : "Faktura flagget for oppfølging");
+      const sum = flagSummary(ids.length, (updated ?? []).length);
+      if (sum.flagged === 0) toast.info(sum.text);
+      else toast.success(sum.text);
       invalidateInvoice(qc, ids.length === 1 ? ids[0] : undefined);
       onOpenChange(false);
       setReason("");
