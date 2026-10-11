@@ -4,7 +4,7 @@ import { useCompany } from "@/hooks/useCompany";
 import { invalidateInvoice, invalidateRavarerCounts, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { parseRematchQueued } from "@/fakturaer/lib/parseRpcJson";
 import { changeLinkErrorMessage, claimErrorMessage } from "./logic";
-import { parseChangeLink, parseClaimCredit, type ChangeLinkResult, type ClaimCreditResult } from "./rpc";
+import { parseChangeLinkStrict, parseClaimCredit, type ChangeLinkResult, type ClaimCreditResult } from "./rpc";
 
 import type { Json } from "@/integrations/supabase/types";
 import { ClaimSubmitError, claimSubmitCode, claimSubmitError } from "@/ravarer/lib/supplierClaim";
@@ -65,7 +65,17 @@ export function useChangeSupplierLink() {
         console.error("[change-supplier-link]", error);
         throw new Error(changeLinkErrorMessage(error.message));
       }
-      return parseChangeLink(data);
+      const parsed = parseChangeLinkStrict(data, i.lineIds);
+      if (!parsed) throw new ChangeLinkUnknownError();
+      return parsed;
+    },
+    onError: (e, i) => {
+      // Ukjent utfall: koblingen kan være flyttet. Les ferske data; aldri automatisk nytt forsøk.
+      if (e instanceof ChangeLinkUnknownError) {
+        invalidateAll(qc);
+        if (i.oldRawMaterialId) invalidateRawMaterial(qc, i.oldRawMaterialId);
+        invalidateRawMaterial(qc, i.newRawMaterialId);
+      }
     },
     onSuccess: (_r, i) => {
       invalidateAll(qc);
@@ -93,4 +103,9 @@ export function useRematchInvoices() {
       void qc.invalidateQueries({ queryKey: ["rematch-status"] });
     },
   });
+}
+
+/** Svaret kunne ikke bekreftes. Koblingen kan være endret; krever ny lesing. */
+export class ChangeLinkUnknownError extends Error {
+  constructor() { super("Ukjent utfall: koblingen kan være endret. Lukk og kontroller varekortet før du prøver igjen."); }
 }

@@ -44,3 +44,35 @@ export function parseChangeLink(data: Json | null | undefined): ChangeLinkResult
   const ids = Array.isArray(d.changed_line_ids) ? (d.changed_line_ids as unknown[]).filter((x): x is string => typeof x === "string") : [];
   return { ok: d.ok === true, changedLineIds: ids, lockedLines: count(d, "locked_lines"), rematchQueued: rematchQueued(d) };
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const nonNegInt = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 0;
+
+/**
+ * Streng lesing etter live-kontrakten til `rm_change_supplier_link`. Null = ukjent utfall.
+ * Null flyttede linjer med `rematch:null` er gyldig suksess; låste linjer er et heltall.
+ * Ved eksplisitt linjeutvalg må returnerte ID-er være en delmengde av det frosne utvalget.
+ */
+export function parseChangeLinkStrict(data: unknown, requestedLineIds: string[] | null): ChangeLinkResult | null {
+  if (data === null || typeof data !== "object" || Array.isArray(data)) return null;
+  const d = data as Record<string, unknown>;
+  if (d.ok !== true || !Array.isArray(d.changed_line_ids) || !nonNegInt(d.locked_lines)) return null;
+  const ids: string[] = [];
+  for (const x of d.changed_line_ids) {
+    if (typeof x !== "string" || !UUID_RE.test(x)) return null;
+    ids.push(x);
+  }
+  if (requestedLineIds) {
+    const allowed = new Set(requestedLineIds);
+    if (ids.some((x) => !allowed.has(x))) return null;
+  }
+  let queued = 0;
+  if (d.rematch !== null) {
+    const m = d.rematch;
+    if (m === undefined || typeof m !== "object" || Array.isArray(m)) return null;
+    const r = m as Record<string, unknown>;
+    if (r.ok !== true || !nonNegInt(r.queued) || !nonNegInt(r.already_queued) || !nonNegInt(r.pending)) return null;
+    queued = r.queued;
+  }
+  return { ok: true, changedLineIds: ids, lockedLines: d.locked_lines, rematchQueued: queued };
+}
