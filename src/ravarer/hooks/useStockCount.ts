@@ -79,7 +79,7 @@ export function useApplyRmStockCount() {
     },
     onSuccess: res => {
       invalidateRawMaterial(qc);
-      void qc.invalidateQueries({ queryKey: ["all-stock-status"] });
+      void qc.invalidateQueries({ queryKey: ["raw-material-stock-status"] });
       if (res.detailsUnavailable) {
         toast.success("Tellingen er bokført. Detaljene kunne ikke vises — se Bevegelser.");
         return;
