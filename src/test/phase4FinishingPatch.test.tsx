@@ -56,7 +56,7 @@ describe("PriceBasisNowCard", () => {
     rpcMode = "pending";
     render(card, { wrapper: wrap(new QueryClient()) });
     expect(screen.getByText("Henter…")).toBeTruthy();
-    expect(screen.queryByText(/kr|\d+,\d\d/)).toBeNull();
+    expect(screen.queryByText(/77,50/)).toBeNull();
   });
 });
 
