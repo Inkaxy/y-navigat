@@ -1,6 +1,17 @@
 import { cn } from "@/lib/utils";
 import { useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { parseDecimal } from "@/fakturaer/lib/units";
+import { QueryState } from "@/components/common/QueryState";
+import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  aiDraftFrom, isAiDeleted, parseAiConfigs, parseAiSaveResult, parseAiUsage, sameAiDraft,
+  type AiConfig, type AiDraft, type AiProvider, type UsageEntry,
+} from "@/ravarer/lib/aiConfig";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { isObj } from "@/fakturaer/lib/parseRpcJson";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -14,33 +25,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Info, CheckCircle2, AlertCircle, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { SettingsSaveBar } from "./SettingsSaveBar";
 
-type Provider = "anthropic" | "openai" | "azure_openai";
-
-interface AiConfig {
-  id: string;
-  provider: Provider;
-  model: string;
-  max_tokens: number;
-  temperature: number;
-  is_active: boolean;
-  purpose: string;
-  azure_endpoint: string | null;
-  azure_deployment: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-interface UsageEntry {
-  provider: string;
-  model: string;
-  purpose: string;
-  input_tokens: number | null;
-  output_tokens: number | null;
-  estimated_cost_usd: number | null;
-  success: boolean;
-  created_at: string;
-}
+type Provider = AiProvider;
 
 const MODELS: Record<Provider, { value: string; label: string; recommended?: boolean }[]> = {
   anthropic: [
@@ -69,7 +56,7 @@ export default function AiServicesSettings() {
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("ai-config", { body: { action: "list" } });
       if (error) throw error;
-      return (data as { configs: AiConfig[] }).configs;
+      return parseAiConfigs(data);
     },
   });
 
@@ -78,7 +65,7 @@ export default function AiServicesSettings() {
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("ai-config", { body: { action: "usage_summary" } });
       if (error) throw error;
-      return (data as { entries: UsageEntry[] }).entries;
+      return parseAiUsage(data);
     },
   });
 
@@ -107,136 +94,165 @@ export default function AiServicesSettings() {
         </AlertDescription>
       </Alert>
 
-      <ExtractionConfigCard
-        existing={invoiceConfig ?? null}
-        onSaved={() => { qc.invalidateQueries({ queryKey: ["ai-configs"] }); }}
-      />
+      {configs.isSuccess ? (
+        <ExtractionConfigCard
+          existing={invoiceConfig ?? null}
+          onSaved={() => qc.invalidateQueries({ queryKey: ["ai-configs"] })}
+        />
+      ) : (
+        <QueryState scope="AI-konfigurasjon" isLoading={configs.isLoading} isError={configs.isError} error={configs.error}
+          onRetry={() => void configs.refetch()} isEmpty={false}>{null}</QueryState>
+      )}
 
-      <UsageSummaryCard entries={usage.data ?? []} loading={usage.isLoading} />
+      {usage.isError ? (
+        <QueryState scope="AI-bruk" isLoading={false} isError error={usage.error} onRetry={() => void usage.refetch()} isEmpty={false}>{null}</QueryState>
+      ) : (
+        <UsageSummaryCard entries={usage.data ?? []} loading={usage.isLoading} />
+      )}
     </div>
   );
 }
 
-function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null; onSaved: () => void }) {
+function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null; onSaved: () => Promise<unknown> }) {
   const qc = useQueryClient();
-  const [provider, setProvider] = useState<Provider>(existing?.provider ?? "anthropic");
+  // Kladd: null = følg lagret konfigurasjon. Lagret modell beholdes selv om den ikke står i listen.
+  const [draft, setDraft] = useState<{ rev: number; value: AiDraft } | null>(null);
   const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState(existing?.model ?? "claude-sonnet-4-5");
-  const [maxTokens, setMaxTokens] = useState(existing?.max_tokens ?? 2000);
-  const [temperature, setTemperature] = useState(existing?.temperature ?? 0.1);
-  const [azureEndpoint, setAzureEndpoint] = useState(existing?.azure_endpoint ?? "");
-  const [azureDeployment, setAzureDeployment] = useState(existing?.azure_deployment ?? "");
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [saveOutcome, setSaveOutcome] = useState<{ kind: "saved" | "unknown" | "rejected"; message: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const busy = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
-  useEffect(() => {
-    if (existing) {
-      setProvider(existing.provider);
-      setModel(existing.model);
-      setMaxTokens(existing.max_tokens);
-      setTemperature(Number(existing.temperature));
-      setAzureEndpoint(existing.azure_endpoint ?? "");
-      setAzureDeployment(existing.azure_deployment ?? "");
-    }
-  }, [existing?.id]);
+  const baseline = aiDraftFrom(existing);
+  const d = draft?.value ?? baseline;
+  const { provider, model, azureEndpoint, azureDeployment } = d;
+  const maxTokens = parseDecimal(d.maxTokens);
+  const temperature = parseDecimal(d.temperature);
+  const dirty = (!!draft && !sameAiDraft(draft.value, baseline)) || apiKey.trim().length > 0;
+  const guard = useUnsavedChangesGuard(dirty);
+  const set = (p: Partial<AiDraft>) => {
+    if (busy.current) return;
+    setSaveOutcome(null);
+    setDraft((cur) => ({ rev: (cur?.rev ?? 0) + 1, value: { ...(cur?.value ?? baseline), ...p } }));
+  };
+  // Eksplisitt leverandørbytte: modell som ikke passer tømmes og må velges (ingen stille erstatning).
+  const setProvider = (p: Provider) => set({ provider: p, model: MODELS[p].some((m) => m.value === d.model) || (existing?.provider === p && existing.model === d.model) ? d.model : "" });
+  const setModel = (m: string) => set({ model: m });
+  const modelOptions = [...MODELS[provider]];
+  if (model && !modelOptions.some((m) => m.value === model)) modelOptions.unshift({ value: model, label: `${model} (lagret)` });
 
-  // Reset model when provider changes (if not in list)
-  useEffect(() => {
-    const models = MODELS[provider];
-    if (!models.some((m) => m.value === model)) {
-      setModel(models[0].value);
-    }
-  }, [provider]);
+  const fieldError =
+    !model ? "Velg modell." :
+    maxTokens == null || !Number.isInteger(maxTokens) || maxTokens < 1 ? "Max tokens må være et helt tall." :
+    temperature == null || temperature < 0 || temperature > 2 ? "Temperature må være mellom 0 og 2." :
+    provider === "azure_openai" && (!azureEndpoint.trim() || !azureDeployment.trim()) ? "Azure krever endpoint og deployment." : null;
+  // Tjenesten krever alltid ny nøkkel ved lagring — også for ikke-hemmelige endringer (ingen «behold nøkkel»).
+  const keyNeeded = !apiKey.trim();
+  const saveBlock = fieldError ?? (keyNeeded ? (existing ? "Tjenesten lagrer alltid en ny konfigurasjon og krever at API-nøkkelen limes inn på nytt, også når du bare endrer modell eller grenser." : "Lim inn API-nøkkel.") : null);
+  // «Test lagret»: uten ny nøkkel kan bare den uendrede lagrede konfigurasjonen testes.
+  const storedTestOnly = keyNeeded;
+  const testBlock = storedTestOnly
+    ? !existing ? "Lim inn API-nøkkel for å teste." : draft && !sameAiDraft(d, baseline) ? "Ulagrede endringer kan bare testes med en ny API-nøkkel. Uten nøkkel testes lagret konfigurasjon — avbryt endringene først." : null
+    : fieldError;
 
   const test = async () => {
-    if (!apiKey && !existing) {
-      toast.error("Lim inn API-key først");
-      return;
-    }
+    if (testBlock) return;
     setTesting(true); setTestResult(null);
+    const tested = storedTestOnly && existing ? `${existing.provider} · ${existing.model} (lagret)` : `${provider} · ${model}`;
     try {
-      const { data, error } = await supabase.functions.invoke("ai-config-test", {
-        body: {
-          provider,
-          api_key: apiKey || undefined, // tom = test lagret nøkkel
-          model,
-          purpose: "invoice_extraction",
-          azure_endpoint: provider === "azure_openai" ? azureEndpoint : undefined,
-          azure_deployment: provider === "azure_openai" ? azureDeployment : undefined,
-        },
-      });
+      const body = storedTestOnly && existing
+        ? { provider: existing.provider, model: existing.model, purpose: "invoice_extraction",
+            azure_endpoint: existing.provider === "azure_openai" ? existing.azure_endpoint : undefined,
+            azure_deployment: existing.provider === "azure_openai" ? existing.azure_deployment : undefined }
+        : { provider, api_key: apiKey.trim(), model, purpose: "invoice_extraction",
+            azure_endpoint: provider === "azure_openai" ? azureEndpoint : undefined,
+            azure_deployment: provider === "azure_openai" ? azureDeployment : undefined };
+      const { data, error } = await supabase.functions.invoke("ai-config-test", { body });
+      if (!mounted.current) return;
       if (error) {
-        // Forsøk å hente serverfeil-detaljer
-        let detail = error instanceof Error ? error.message : String(error);
+        let detail = "Testen feilet.";
         if (error instanceof FunctionsHttpError) {
           try {
             const parsed: unknown = await error.context.json();
             if (isObj(parsed) && typeof parsed.error === "string") detail = parsed.error;
           } catch (parseErr) {
-            console.error("[ai-config-test] uleselig feilsvar", parseErr);
+            console.error("[ai-config-test] uleselig feilsvar", parseErr instanceof Error ? parseErr.name : "ukjent");
           }
         }
-        setTestResult({ ok: false, message: detail });
+        setTestResult({ ok: false, message: `${tested}: ${detail}` });
         return;
       }
-      const r = data as { ok: boolean; sample_response?: string; error?: string };
-      if (r.ok) {
-        setTestResult({ ok: true, message: `OK — modellen svarte: ${r.sample_response}` });
+      if (isObj(data) && data.ok === true) {
+        setTestResult({ ok: true, message: `${tested}: modellen svarte «${typeof data.sample_response === "string" ? data.sample_response : ""}»` });
       } else {
-        setTestResult({ ok: false, message: r.error ?? "Ukjent feil" });
+        setTestResult({ ok: false, message: `${tested}: ${isObj(data) && typeof data.error === "string" ? data.error : "Ukjent feil"}` });
       }
     } catch (e) {
-      setTestResult({ ok: false, message: e instanceof Error ? e.message : String(e) });
+      if (mounted.current) setTestResult({ ok: false, message: `${tested}: ${e instanceof Error ? e.message : "Ukjent feil"}` });
     } finally {
-      setTesting(false);
+      if (mounted.current) setTesting(false);
     }
   };
 
-  const save = useMutation({
-    mutationFn: async () => {
-      if (!apiKey) throw new Error("API-key er påkrevd");
-      const { error } = await supabase.functions.invoke("ai-config", {
+  const save = async () => {
+    if (busy.current || saveBlock || maxTokens == null || temperature == null) return;
+    busy.current = true;
+    const frozen = { rev: draft?.rev ?? 0, key: apiKey };
+    setSaveOutcome(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-config", {
         body: {
-          action: "save",
-          provider, api_key: apiKey, model, max_tokens: maxTokens, temperature,
+          action: "save", provider, api_key: frozen.key.trim(), model, max_tokens: maxTokens, temperature,
           purpose: "invoice_extraction",
           azure_endpoint: provider === "azure_openai" ? azureEndpoint : undefined,
           azure_deployment: provider === "azure_openai" ? azureDeployment : undefined,
         },
       });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("AI-konfigurasjon lagret");
-      setApiKey("");
-      onSaved();
-    },
-    onError: (e: Error) => toast.error(`Lagring feilet: ${e.message}`),
-  });
+      const status = error instanceof FunctionsHttpError ? error.context.status : null;
+      if (!mounted.current) return;
+      if (error && status === 400) {
+        setSaveOutcome({ kind: "rejected", message: "Lagringen ble avvist (ugyldige felt eller nøkkel). Ingenting er endret." });
+      } else if (error || !parseAiSaveResult(data)) {
+        // Lagring skjer i flere steg uten transaksjon: forrige konfigurasjon kan være deaktivert.
+        setSaveOutcome({ kind: "unknown", message: "Utfallet er ukjent eller delvis — forrige konfigurasjon kan være deaktivert. Gjeldende konfigurasjon er lest på nytt; kontroller den før du lagrer igjen." });
+      } else {
+        setApiKey((k) => (k === frozen.key ? "" : k));
+        setDraft((cur) => (cur && cur.rev === frozen.rev ? null : cur));
+        setSaveOutcome({ kind: "saved", message: "Konfigurasjonen er lagret." });
+      }
+    } catch (e) {
+      console.warn("[ai-config] lagring: ukjent utfall", e instanceof Error ? e.name : "ukjent");
+      if (mounted.current) setSaveOutcome({ kind: "unknown", message: "Utfallet er ukjent. Kontroller konfigurasjonen før du lagrer igjen." });
+    } finally {
+      busy.current = false;
+      await onSaved();
+      void qc.invalidateQueries({ queryKey: ["ai-usage"] });
+    }
+  };
 
   const remove = useMutation({
-    mutationFn: async () => {
-      if (!existing) return;
-      const { error } = await supabase.functions.invoke("ai-config", {
-        body: { action: "delete", id: existing.id },
-      });
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase.functions.invoke("ai-config", { body: { action: "delete", id } });
       if (error) throw error;
+      if (!isAiDeleted(data)) throw new Error("Slettingen er ikke bekreftet.");
     },
-    onSuccess: () => {
-      toast.success("Konfigurasjon slettet");
-      qc.invalidateQueries({ queryKey: ["ai-configs"] });
-    },
-    onError: (e: Error) => toast.error(`Sletting feilet: ${e.message}`),
+    onSuccess: () => { toast.success("Konfigurasjon slettet"); setConfirmDelete(false); },
+    onError: () => toast.error("Slettingen er ikke bekreftet. Konfigurasjonen er lest på nytt."),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["ai-configs"] }),
   });
+  const saving = busy.current;
 
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <CardTitle>Faktura-ekstraksjon</CardTitle>
             <CardDescription>
-              {existing ? "Aktiv konfigurasjon" : "Ikke konfigurert — PDF-import bruker tekstmønster (regex)"}
+              {existing ? "Aktiv konfigurasjon (felles for alle selskaper)" : "Ikke konfigurert — PDF-import bruker tekstmønster (regex)"}
             </CardDescription>
           </div>
           {existing && (
@@ -250,8 +266,8 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <Label>Leverandør</Label>
-            <Select value={provider} onValueChange={(v) => setProvider(v as Provider)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Select value={provider} onValueChange={(v) => { if (v === "anthropic" || v === "openai" || v === "azure_openai") setProvider(v); }}>
+              <SelectTrigger className="min-h-[44px] md:min-h-10" aria-label="Leverandør"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="anthropic">Anthropic (Claude)</SelectItem>
                 <SelectItem value="openai">OpenAI</SelectItem>
@@ -261,55 +277,53 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
           </div>
           <div>
             <Label>Modell</Label>
-            <Select value={model} onValueChange={setModel}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Select value={model || undefined} onValueChange={setModel}>
+              <SelectTrigger className="min-h-[44px] md:min-h-10" aria-label="Modell"><SelectValue placeholder="Velg modell" /></SelectTrigger>
               <SelectContent>
-                {MODELS[provider].map((m) => (
+                {modelOptions.map((m) => (
                   <SelectItem key={m.value} value={m.value}>
-                    {m.label} {m.recommended && <span className="ml-1 text-xs text-primary">★ anbefalt</span>}
+                    {m.label} {"recommended" in m && m.recommended && <span className="ml-1 text-xs text-primary">★ anbefalt</span>}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="md:col-span-2">
-            <Label>API-key</Label>
+            <Label htmlFor="ai-key">API-nøkkel</Label>
             <Input
+              id="ai-key"
               type="password"
-              placeholder={existing ? "Lim inn for å erstatte (lagret nøkkel skjult)" : "sk-... eller tilsvarende"}
+              placeholder={existing ? "Lagret nøkkel vises ikke. Lim inn for å lagre endringer." : "sk-... eller tilsvarende"}
               value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
+              onChange={(e) => { setSaveOutcome(null); setApiKey(e.target.value); }}
               autoComplete="new-password"
+              className="min-h-[44px] md:min-h-10"
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              Krypteres med AES-256 før lagring. Vises aldri tilbake.
+              Krypteres før lagring og vises aldri tilbake. Lagring krever alltid nøkkel; sletting er en egen handling.
             </p>
           </div>
 
           {provider === "azure_openai" && (
             <>
               <div>
-                <Label>Azure endpoint</Label>
-                <Input
-                  placeholder="https://din-resource.openai.azure.com"
-                  value={azureEndpoint}
-                  onChange={(e) => setAzureEndpoint(e.target.value)}
-                />
+                <Label htmlFor="ai-az-e">Azure endpoint</Label>
+                <Input id="ai-az-e" className="min-h-[44px] md:min-h-10" placeholder="https://din-resource.openai.azure.com" value={azureEndpoint} onChange={(e) => set({ azureEndpoint: e.target.value })} />
               </div>
               <div>
-                <Label>Azure deployment</Label>
-                <Input value={azureDeployment} onChange={(e) => setAzureDeployment(e.target.value)} />
+                <Label htmlFor="ai-az-d">Azure deployment</Label>
+                <Input id="ai-az-d" className="min-h-[44px] md:min-h-10" value={azureDeployment} onChange={(e) => set({ azureDeployment: e.target.value })} />
               </div>
             </>
           )}
 
           <div>
-            <Label>Max tokens</Label>
-            <Input type="number" min={500} max={8000} value={maxTokens} onChange={(e) => setMaxTokens(Number(e.target.value))} />
+            <Label htmlFor="ai-max">Max tokens</Label>
+            <Input id="ai-max" className="min-h-[44px] md:min-h-10" inputMode="numeric" value={d.maxTokens} onChange={(e) => set({ maxTokens: e.target.value })} />
           </div>
           <div>
-            <Label>Temperature</Label>
-            <Input type="number" step="0.05" min={0} max={1} value={temperature} onChange={(e) => setTemperature(Number(e.target.value))} />
+            <Label htmlFor="ai-temp">Temperature</Label>
+            <Input id="ai-temp" className="min-h-[44px] md:min-h-10" inputMode="decimal" value={d.temperature} onChange={(e) => set({ temperature: e.target.value })} />
           </div>
         </div>
 
@@ -320,24 +334,42 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
             <AlertDescription className="text-xs">{testResult.message}</AlertDescription>
           </Alert>
         )}
+        {saveOutcome && (
+          <Alert variant={saveOutcome.kind === "saved" ? "default" : "destructive"}>
+            <AlertDescription className="text-sm">{saveOutcome.message}</AlertDescription>
+          </Alert>
+        )}
+        {dirty && saveBlock && <p role="note" className="text-sm text-warning">{saveBlock}</p>}
 
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={test} disabled={testing || (!apiKey && !existing)} className="gap-2">
-              {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Info className="h-4 w-4" />}
-              {existing && !apiKey ? "Test lagret nøkkel" : "Test API-kall"}
-            </Button>
-            {existing && (
-              <Button variant="ghost" onClick={() => remove.mutate()} disabled={remove.isPending} className="gap-2 text-destructive">
-                <Trash2 className="h-4 w-4" /> Slett konfigurasjon
-              </Button>
-            )}
-          </div>
-          <Button onClick={() => save.mutate()} disabled={save.isPending || !apiKey}>
-            {save.isPending ? "Lagrer…" : existing ? "Erstatt konfigurasjon" : "Lagre konfigurasjon"}
+        <div className="flex flex-wrap items-center gap-2 pt-2">
+          <Button variant="outline" className="min-h-[44px] gap-2 md:min-h-10" onClick={() => void test()} disabled={testing || !!testBlock}>
+            {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Info className="h-4 w-4" />}
+            {storedTestOnly ? "Test lagret konfigurasjon" : "Test med ny nøkkel"}
           </Button>
+          {existing && (
+            <Button variant="ghost" className="min-h-[44px] gap-2 text-destructive md:min-h-10" onClick={() => setConfirmDelete(true)} disabled={remove.isPending}>
+              <Trash2 className="h-4 w-4" /> Slett konfigurasjon
+            </Button>
+          )}
+          {testBlock && storedTestOnly && existing && dirty && <span className="text-caption text-ink-secondary">{testBlock}</span>}
         </div>
+        <SettingsSaveBar dirty={dirty} saving={saving} canSave={dirty && !saveBlock && !saving}
+          onSave={() => void save()} onCancel={() => { if (busy.current) return; setDraft(null); setApiKey(""); setSaveOutcome(null); }}
+          saveLabel={existing ? "Erstatt konfigurasjon" : "Lagre konfigurasjon"} />
       </CardContent>
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slette AI-konfigurasjonen?</AlertDialogTitle>
+            <AlertDialogDescription>Fakturalesingen faller tilbake på tekstmønster til en ny konfigurasjon er lagret. Gjelder alle selskaper.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={() => existing && remove.mutate(existing.id)} disabled={remove.isPending}>Slett</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <UnsavedChangesDialog {...guard.dialogProps} />
     </Card>
   );
 }
