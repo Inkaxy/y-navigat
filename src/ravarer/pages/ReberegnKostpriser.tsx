@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Calculator, CheckCircle2, Package, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,15 @@ export default function ReberegnKostpriser() {
     }
     return map;
   }, [rows, q]);
+
+  // Åpne på første ikke-tomme bøtte når en ny skanning er ferdig.
+  const openedFor = useRef<RecalcRow[] | null>(null);
+  useEffect(() => {
+    if (!rows || openedFor.current === rows) return;
+    openedFor.current = rows;
+    const first = (["rettes", "bekreft", "uendret", "umulig"] as const).find((k) => rows.some((r) => r.bucket === k));
+    if (first) setTab(first);
+  }, [rows]);
 
   const selectable = useMemo(
     () => (rows ?? []).filter((r) => r.bucket === "rettes" || r.bucket === "bekreft"),
@@ -270,7 +279,6 @@ export default function ReberegnKostpriser() {
                     next.forEach((id) => out.add(id));
                     return out;
                   })}
-                  onRowClick={() => undefined}
                 />
               </div>
             );
