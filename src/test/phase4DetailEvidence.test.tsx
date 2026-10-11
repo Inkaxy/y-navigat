@@ -79,7 +79,7 @@ describe("detalj-KPI fra bundet bevis", () => {
     render(<Strip />, { wrapper });
     await screen.findByText(/1\. sep/);
     expect(screen.getByText("Siste faktura mot kostpris")).toBeTruthy();
-    expect(screen.queryByText(/0,0 %/)).toBeNull();
+    expect(screen.queryByText(/^0 %$/)).toBeNull();
     expect(screen.queryByText(/18\. aug.*Lev/)).toBeNull();
     expect(screen.getByText("Ukjent")).toBeTruthy();
     expect(screen.getByTestId("hdr").textContent).toBe("Verifisert");
@@ -92,7 +92,7 @@ describe("detalj-KPI fra bundet bevis", () => {
     client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     rowFor = safe(0, 60.6035);
     render(<Strip />, { wrapper });
-    expect(await screen.findByText("0,0 %")).toBeTruthy();
+    expect(await screen.findByText("0 %")).toBeTruthy();
   });
   it("holdt kostkilde: ingen verifisert merke og ingen pakningspris", async () => {
     rowFor = held;
