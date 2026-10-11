@@ -1,3 +1,4 @@
+import { useKeepCostFresh } from "@/varer/hooks/useKeepCostFresh";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,6 +43,7 @@ export function CostPriceTab({
   legalEntityId: string | null;
   canWrite: boolean;
 }) {
+  useKeepCostFresh();
   const qc = useQueryClient();
   const [edit, setEdit] = useState<{ id: string; value: string } | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);

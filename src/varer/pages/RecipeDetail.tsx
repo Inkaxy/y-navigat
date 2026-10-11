@@ -1,3 +1,4 @@
+import { useKeepCostFresh } from "@/varer/hooks/useKeepCostFresh";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { listReturnHref, RETURN_PARAM } from "@/varer/lib/listReturn";
@@ -87,6 +88,7 @@ export default function RecipeDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  useKeepCostFresh();
   const { canWrite, legalEntityId } = useAppContext();
   const computeLabel = useComputeRecipeLabel();
 
