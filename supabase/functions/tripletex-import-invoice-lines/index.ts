@@ -1,12 +1,20 @@
 // Henter PDF fra Tripletex for importerte leverandørfakturaer, lagrer den i storage,
 // leser ut varelinjer via extract-invoice-from-pdf og kjører match-invoice-lines.
 // Kjøres av cron (små porsjoner) eller manuelt per faktura fra fakturadetaljsiden.
+//
+// Priskontroll v2:
+//  - Uthentingen får KONTROLLFAKTA fra Tripletex (sum eks./inkl. mva, leverandør, fakturanr)
+//    og KJENTE VARER for leverandøren, slik at varenummer og beløp leses konsekvent.
+//  - Mva-beløp som mangler på fakturahodet hentes fra bilagets posteringer (konto 27xx),
+//    ellers utledes det deterministisk fra linjesummen (rm_repair_invoice_vat).
+//  - Linjetype (vare/pant/frakt/gebyr …) lagres på linjen, så motoren kan utelate det som ikke er varer.
+//  - Rettet: bilagsoppslaget manglet «/v2» og ga aldri hovedbokskonto.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getSessionToken, baseUrl, authHeader } from "../_shared/tripletex.ts";
 import { parsePackageFromDescription } from "../_shared/units.ts";
 import { computeLinesSum, needsReviewFromConfidence } from "../_shared/lines-sum.ts";
 import { planLineExtractionFailure } from "./failure-plan.ts";
-import { pickLedgerAccount } from "./ledger-account.ts";
+import { pickLedgerAccount, vatFromPostings } from "./ledger-account.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -79,6 +87,44 @@ const num = (v: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
+const LINE_KINDS = new Set(["vare", "pant", "frakt", "gebyr", "rabatt", "avrunding", "mva", "annet"]);
+
+/** Kjente varer hos leverandøren: koblingens varenummer/navn + bekreftede alias. */
+async function knownItemsForSupplier(
+  admin: ReturnType<typeof createClient>,
+  supplierId: string,
+): Promise<Array<{ sku: string | null; name: string | null }>> {
+  const { data: rms } = await admin
+    .from("raw_material_suppliers")
+    .select("id, supplier_sku, supplier_product_name, raw_materials(name)")
+    .eq("supplier_id", supplierId)
+    .limit(200);
+  const rows = (rms ?? []) as any[];
+  const ids = rows.map((r) => r.id);
+  const bySku = new Map<string, string>();
+  for (const r of rows) {
+    const sku = r.supplier_sku ? String(r.supplier_sku).trim() : null;
+    const name = r.supplier_product_name ?? r.raw_materials?.name ?? null;
+    if (sku) bySku.set(sku, name ?? "");
+  }
+  if (ids.length) {
+    const { data: aliases } = await admin
+      .from("raw_material_supplier_aliases")
+      .select("raw_material_supplier_id, alias_type, alias_value")
+      .in("raw_material_supplier_id", ids)
+      .eq("status", "confirmed")
+      .limit(400);
+    const nameByRms = new Map<string, string>();
+    for (const r of rows) nameByRms.set(r.id, r.supplier_product_name ?? r.raw_materials?.name ?? "");
+    for (const a of (aliases ?? []) as any[]) {
+      if (a.alias_type !== "supplier_sku") continue;
+      const sku = String(a.alias_value ?? "").trim();
+      if (sku && !bySku.has(sku)) bySku.set(sku, nameByRms.get(a.raw_material_supplier_id) ?? "");
+    }
+  }
+  return [...bySku.entries()].slice(0, 150).map(([sku, name]) => ({ sku, name: name || null }));
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -94,8 +140,7 @@ Deno.serve(async (req) => {
       return json({ error: "Unauthorized" }, 401);
     }
 
-    // retry_failed er en no-op nå: kø-RPC-en avgjør selv hvilke fakturaer som kan
-    // claimes (bl.a. basert på line_extraction_attempts), så flagget trengs ikke lenger.
+    // retry_failed er en no-op: kø-RPC-en avgjør selv hvilke fakturaer som kan claimes.
     const limit = Math.max(1, Math.min(50, Number(body.limit ?? 20)));
 
     const { data: invoices, error: invErr } = await admin.rpc("rm_claim_invoice_line_extraction", {
@@ -108,14 +153,27 @@ Deno.serve(async (req) => {
     let behandlet = 0;
     let vellykket = 0;
     let feilet = 0;
+    const detaljer: Array<Record<string, unknown>> = [];
 
     if ((invoices ?? []).length > 0) {
       const sessionToken = await getSessionToken(admin, legalEntityId);
+      const knownCache = new Map<string, Array<{ sku: string | null; name: string | null }>>();
 
       for (const inv of invoices ?? []) {
         behandlet++;
         const ttId = inv.tripletex_supplier_invoice_id as string;
         try {
+          // 0) Fakturahode med leverandør (kontrollfakta til uthentingen)
+          const { data: head } = await admin
+            .from("invoices")
+            .select("id, supplier_id, invoice_number, total_amount, total_vat, currency, suppliers(name)")
+            .eq("id", inv.id)
+            .maybeSingle();
+          const supplierId = (head as any)?.supplier_id as string | null;
+          const supplierName = (head as any)?.suppliers?.name ?? null;
+          let totalAmount = num((head as any)?.total_amount ?? inv.total_amount);
+          let totalVat = num((head as any)?.total_vat ?? inv.total_vat);
+
           // 1) Hent PDF
           const url = `${baseUrl()}/v2/supplierInvoice/${ttId}/pdf`;
           const res = await fetch(url, {
@@ -144,14 +202,58 @@ Deno.serve(async (req) => {
             .update({ source_document_url: path, pdf_status: "stored" })
             .eq("id", inv.id);
 
-          // 3) Ekstraher linjer via AI
+          // 2b) Bilagets posteringer: hovedbokskonto og — når mva mangler — inngående mva.
+          //     Feil her skal ikke velte fakturaen.
+          let ledgerAccount: string | null = null;
+          let vatInferred = false;
+          try {
+            const vRes = await fetch(
+              `${baseUrl()}/v2/supplierInvoice/${ttId}?fields=voucher(postings(account(number),amountGross,amount))`,
+              { headers: { Authorization: authHeader(sessionToken), Accept: "application/json" } },
+            );
+            if (vRes.ok) {
+              const vJson = await vRes.json().catch(() => null);
+              const postings = vJson?.value?.voucher?.postings;
+              ledgerAccount = pickLedgerAccount(postings);
+              if (totalVat == null) {
+                const vat = vatFromPostings(postings);
+                if (vat != null && totalAmount != null && vat < Math.abs(totalAmount)) {
+                  totalVat = vat;
+                  vatInferred = true;
+                  await admin.from("invoices").update({ total_vat: vat, vat_inferred: true }).eq("id", inv.id);
+                }
+              }
+            } else {
+              await vRes.text().catch(() => "");
+            }
+          } catch (_e) {
+            ledgerAccount = null;
+          }
+
+          // 3) Ekstraher linjer via AI, med kontrollfakta og kjente varer
+          let known: Array<{ sku: string | null; name: string | null }> = [];
+          if (supplierId) {
+            if (!knownCache.has(supplierId)) knownCache.set(supplierId, await knownItemsForSupplier(admin, supplierId));
+            known = knownCache.get(supplierId) ?? [];
+          }
+          const expectedExcl = totalAmount != null && totalVat != null ? Number((totalAmount - totalVat).toFixed(2)) : null;
           const extractRes = await fetch(`${SUPABASE_URL}/functions/v1/extract-invoice-from-pdf`, {
             method: "POST",
             headers: {
               Authorization: `Bearer ${SERVICE_KEY}`,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ legal_entity_id: legalEntityId, pdf_base64: toBase64(buf) }),
+            body: JSON.stringify({
+              legal_entity_id: legalEntityId,
+              pdf_base64: toBase64(buf),
+              expected_total_excl_vat: expectedExcl,
+              expected_total_incl_vat: totalAmount,
+              expected_vat: totalVat,
+              supplier_name: supplierName,
+              invoice_number: (head as any)?.invoice_number ?? inv.invoice_number ?? null,
+              known_items: known,
+              max_attempts: 2,
+            }),
           });
           const extractJsonBody = await extractRes.json().catch(() => ({}));
           if (!extractRes.ok) {
@@ -179,6 +281,7 @@ Deno.serve(async (req) => {
                   countPerPackage = parsed.count ?? 1;
                 }
               }
+              const kind = typeof l?.line_kind === "string" && LINE_KINDS.has(l.line_kind) ? l.line_kind : null;
               return {
                 invoice_id: inv.id,
                 line_number: i + 1,
@@ -192,6 +295,8 @@ Deno.serve(async (req) => {
                 package_size: packageSize,
                 package_unit: packageUnit,
                 count_per_package: countPerPackage,
+                line_kind: kind,
+                ledger_account: ledgerAccount,
               };
             });
 
@@ -204,11 +309,7 @@ Deno.serve(async (req) => {
               .from("invoices")
               .update({
                 extraction_confidence: confidence,
-                ...computeLinesSum({
-                  lineTotals: [],
-                  totalAmount: inv.total_amount as number | null,
-                  totalVat: inv.total_vat as number | null,
-                }),
+                ...computeLinesSum({ lineTotals: [], totalAmount, totalVat }),
                 lines_source: null,
                 line_extraction_status: "done",
                 line_extraction_at: new Date().toISOString(),
@@ -216,35 +317,18 @@ Deno.serve(async (req) => {
               })
               .eq("id", inv.id);
             vellykket++;
+            detaljer.push({ invoice_id: inv.id, lines: 0 });
             continue;
           }
-
-          // Hovedbokskonto fra bilagets posteringer — feil her skal ikke velte fakturaen.
-          let ledgerAccount: string | null = null;
-          try {
-            const vRes = await fetch(
-              `${baseUrl()}/supplierInvoice/${ttId}?fields=voucher(postings(account(number),amountGross,amount))`,
-              { headers: { Authorization: authHeader(sessionToken), Accept: "application/json" } },
-            );
-            if (vRes.ok) {
-              const vJson = await vRes.json().catch(() => null);
-              ledgerAccount = pickLedgerAccount(vJson?.value?.voucher?.postings);
-            } else {
-              await vRes.text().catch(() => "");
-            }
-          } catch (_e) {
-            ledgerAccount = null;
-          }
-          for (const r of rows) (r as { ledger_account: string | null }).ledger_account = ledgerAccount;
 
           const { error: linesErr } = await admin.from("invoice_lines").insert(rows);
           if (linesErr) throw new Error(linesErr.message);
 
           // Sumkontroll: linjene er eks. mva, fakturaens totalbeløp inkl. mva.
-          const sumCheck = computeLinesSum({
+          let sumCheck = computeLinesSum({
             lineTotals: rows.map((r: any) => r.total_amount),
-            totalAmount: inv.total_amount as number | null,
-            totalVat: inv.total_vat as number | null,
+            totalAmount,
+            totalVat,
           });
 
           await admin
@@ -260,7 +344,33 @@ Deno.serve(async (req) => {
               ...(lowConfidence && inv.status === "imported" ? { status: "needs_review" } : {}),
             })
             .eq("id", inv.id);
+
+          // 4) Mva-mønster uten mva-beløp, eller mva-skalerte linjer som uthentingen ikke fanget:
+          //    deterministisk reparasjon i basen (ingen gjetting — bare eksakte 1/1,15- og 1/1,25-forhold).
+          let repaired: unknown = null;
+          if (sumCheck.lines_sum_status === "mismatch" || (totalVat == null && sumCheck.lines_sum_status !== "no_total")) {
+            const { data: rep } = await admin.rpc("rm_repair_invoice_vat", { p_invoice_id: inv.id });
+            repaired = rep ?? null;
+            if ((rep as any)?.ok) {
+              const { data: after } = await admin
+                .from("invoices")
+                .select("lines_sum_status, lines_sum_variance_pct, lines_sum_excl_vat")
+                .eq("id", inv.id)
+                .maybeSingle();
+              if (after) sumCheck = { ...sumCheck, ...(after as any) };
+            }
+          }
           vellykket++;
+          detaljer.push({
+            invoice_id: inv.id,
+            lines: rows.length,
+            sum_status: sumCheck.lines_sum_status,
+            confidence,
+            attempts: extractJsonBody?.attempts ?? null,
+            vat_from_postings: vatInferred,
+            repaired,
+            warnings: extractJsonBody?.warnings ?? [],
+          });
 
           // 5) Matching — feil her skal ikke velte fakturaen
           try {
@@ -296,6 +406,7 @@ Deno.serve(async (req) => {
             pdfFail: !!(e as any)?.pdfFail,
           });
           await admin.from("invoices").update(patch).eq("id", inv.id);
+          detaljer.push({ invoice_id: inv.id, error: msg });
         }
       }
     }
@@ -309,8 +420,9 @@ Deno.serve(async (req) => {
       .eq("line_extraction_status", "pending")
       .lt("line_extraction_attempts", 3);
 
-    return json({ ok: true, behandlet, vellykket, feilet, gjenstaar: count ?? 0 });
+    return json({ ok: true, behandlet, vellykket, feilet, gjenstaar: count ?? 0, detaljer });
   } catch (err) {
     return json({ error: err instanceof Error ? err.message : String(err) }, 500);
   }
 });
+

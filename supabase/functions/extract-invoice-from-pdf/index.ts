@@ -117,12 +117,7 @@ function regexExtract(text: string) {
     const m = s.match(/^(\d{2})[.\/-](\d{2})[.\/-](\d{4})$/);
     return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
   };
-  const toNum = (s: string | undefined) => {
-    if (!s) return null;
-    const cleaned = s.replace(/\s/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".");
-    const n = Number(cleaned);
-    return Number.isFinite(n) ? n : null;
-  };
+  const toNum = (s: string | undefined) => (s ? num(s) : null);
 
   return {
     supplier_name: firstLine ?? null,
