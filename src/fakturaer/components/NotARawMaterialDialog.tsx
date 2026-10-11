@@ -58,8 +58,8 @@ export function NotARawMaterialDialog({ open, onOpenChange, line }: { open: bool
       qc.invalidateQueries({ queryKey: ["fakturaer-review-lines"] });
       qc.invalidateQueries({ queryKey: ["fakturaer-review-count"] });
       onOpenChange(false);
-    } catch (e: any) {
-      toast.error(e.message ?? "Feil");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Feil");
     } finally { setBusy(false); }
   }
 
