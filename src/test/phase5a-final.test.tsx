@@ -142,6 +142,7 @@ function SwitchHost({ qc }: { qc: QueryClient }) {
 describe("NewAgreementDialog — sen avstemming A etter bytte til B", () => {
   it("A avstemmes og ryddes, men B forblir åpen uten toast", async () => {
     const { toast } = await import("sonner");
+    vi.mocked(toast.success).mockClear();
     const qc = client();
     const inval = vi.spyOn(qc, "invalidateQueries");
     render(<SwitchHost qc={qc} />);
