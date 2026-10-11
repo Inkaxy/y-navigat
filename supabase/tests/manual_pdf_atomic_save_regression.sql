@@ -45,8 +45,8 @@ BEGIN
   -- 5) Ugyldig sikkerhet (100 = rå 100 %) behandles som ukjent => needs_review.
   res2 := rm_save_manual_pdf_invoice(le, jsonb_build_object('id', sup),
     jsonb_build_object('invoice_number','ZZ-3','invoice_date','2026-10-01','source_document_url',le::text||'/zz3.pdf','extraction_confidence',100), rows_ok);
-  SELECT extraction_confidence, status INTO ev, st FROM (SELECT to_jsonb(extraction_confidence) extraction_confidence, status FROM invoices WHERE id=(res2->>'invoice_id')::uuid) q;
-  ASSERT st = 'needs_review' AND ev = 'null'::jsonb, 'T5 invalid confidence';
+  SELECT to_jsonb(extraction_confidence), status INTO ev, st FROM invoices WHERE id=(res2->>'invoice_id')::uuid;
+  ASSERT st = 'needs_review' AND ev IS NULL, 'T5 invalid confidence';
 
   -- 6) Feil midt i linjene => hele lagringen rulles tilbake (ingen leverandør/faktura igjen).
   BEGIN
