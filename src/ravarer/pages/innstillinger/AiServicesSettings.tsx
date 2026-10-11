@@ -123,6 +123,7 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
   const [saveOutcome, setSaveOutcome] = useState<{ kind: "saved" | "unknown" | "rejected"; message: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const busy = useRef(false);
+  const [saving, setSaving] = useState(false);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
@@ -200,6 +201,7 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
   const save = async () => {
     if (busy.current || saveBlock || maxTokens == null || temperature == null) return;
     busy.current = true;
+    setSaving(true);
     const frozen = { rev: draft?.rev ?? 0, key: apiKey };
     setSaveOutcome(null);
     try {
@@ -228,6 +230,7 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
       if (mounted.current) setSaveOutcome({ kind: "unknown", message: "Utfallet er ukjent. Kontroller konfigurasjonen før du lagrer igjen." });
     } finally {
       busy.current = false;
+      if (mounted.current) setSaving(false);
       await onSaved();
       void qc.invalidateQueries({ queryKey: ["ai-usage"] });
     }
@@ -243,7 +246,6 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
     onError: () => toast.error("Slettingen er ikke bekreftet. Konfigurasjonen er lest på nytt."),
     onSettled: () => qc.invalidateQueries({ queryKey: ["ai-configs"] }),
   });
-  const saving = busy.current;
 
   return (
     <Card>

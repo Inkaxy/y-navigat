@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { lazyWithReload as lazy } from "@/lib/lazyWithReload";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { useGuardedNavigate } from "@/providers/UnsavedGuardProvider";
 import { QueryEmptyState, QueryLoadingState } from "@/components/common/QueryState";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
@@ -27,7 +28,7 @@ export default function RavarerInnstillinger() {
   const { accessLevel, loading } = useRavarer();
   const { data: isPlatformAdmin = false } = usePlatformAdmin();
   const [sp] = useSearchParams();
-  const navigate = useNavigate();
+  const navigate = useGuardedNavigate();
   const sections = SECTIONS.filter((s) => !s.adminOnly || isPlatformAdmin);
   const wanted = sp.get("seksjon");
   const active = sections.find((s) => s.id === wanted)?.id ?? "priskontroll";
@@ -49,7 +50,7 @@ export default function RavarerInnstillinger() {
                   to={paths.innstillinger({ seksjon: s.id })}
                   replace
                   aria-current={s.id === active ? "page" : undefined}
-                  className={cn("block rounded-md px-3 py-1.5 text-sm", s.id === active ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:bg-muted")}
+                  className={cn("block rounded-md px-3 py-2 text-sm", s.id === active ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:bg-muted")}
                 >
                   {s.label}
                 </Link>
@@ -59,7 +60,7 @@ export default function RavarerInnstillinger() {
         </nav>
         <div className="md:hidden">
           <Select value={active} onValueChange={(v) => navigate(paths.innstillinger({ seksjon: v as InnstillingSeksjon }), { replace: true })}>
-            <SelectTrigger aria-label="Velg seksjon"><SelectValue /></SelectTrigger>
+            <SelectTrigger aria-label="Velg seksjon" className="min-h-[44px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               {sections.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
             </SelectContent>
