@@ -74,3 +74,41 @@ describe("CostPriceEditor — validering", () => {
     expect(r).toEqual({ raw_material_id: "rm-1", supplier_id: "s-1", price: 7.25, effective_date: "2026-10-10", source: "manual", notes: "Faktura 123", set_as_current: true });
   });
 });
+
+describe("1b-rettelser", () => {
+  it("kostpris 0 avvises", async () => {
+    const { validateCostPrice } = await import("@/ravarer/editors/costPriceLogic");
+    const r = validateCostPrice({ price: "0", date: "2026-10-10", supplierId: null, source: "manual", reason: "Test", setAsCurrent: true });
+    expect(r.ok).toBe(false);
+  });
+  it("pakningsforslag fyller grunnenhet, pakningsenhet og forhåndskrysser bekreftelse når enige", async () => {
+    const { applyInference, initialDraft } = await import("@/ravarer/editors/createSheetLogic");
+    const d = applyInference(initialDraft({ kind: "supplier_item", supplierId: "s", itemKey: "sku:1" }),
+      { base_unit: "kg", suggested_bupp: 25, auto_confirmable: true, agrees: true, direct: false, line_unit: "sekk" }, "SEKK");
+    expect(d).toMatchObject({ baseUnit: "kg", units: "25", packageUnit: "sekk", confirmPackage: true });
+  });
+  it("pakning er påkrevd når validering ber om det", async () => {
+    const { validateCreate, initialDraft } = await import("@/ravarer/editors/createSheetLogic");
+    const d = { ...initialDraft({ kind: "standalone" }), name: "Mel" };
+    expect(validateCreate(d, { packageRequired: true })).toMatch(/pakningen/);
+    expect(validateCreate(d)).toBeNull();
+  });
+  it("masseopprettelse dedupliserer per varekort", async () => {
+    const { dedupeBySupplierItem } = await import("@/fakturaer/lib/bulkLink");
+    const rows = [{ s: "a", k: "sku:1" }, { s: "a", k: "sku:1" }, { s: "b", k: "sku:1" }, { s: "a", k: null }];
+    const r = dedupeBySupplierItem(rows, (x) => ({ supplierId: x.s, itemKey: x.k }));
+    expect(r.unique).toHaveLength(3);
+    expect(r.duplicates).toHaveLength(1);
+  });
+  it("statusfilter fra URL", async () => {
+    const { parsePackageFilter, parsePackageStatusFilter } = await import("@/ravarer/lib/packageFilter");
+    expect(parsePackageStatusFilter("ustabil_pris")).toBe("ustabil_pris");
+    expect(parsePackageFilter("ustabil_pris")).toBe("alle");
+  });
+  it("tastesekvens g p", async () => {
+    const { matchSequence } = await import("@/ravarer/ui/hotkeys");
+    const b = [{ keys: ["g p"], sequence: ["g", "p"], description: "x", handler: () => undefined }];
+    expect(matchSequence(b, "g", "p")).toBe(b[0]);
+    expect(matchSequence(b, null, "p")).toBeNull();
+  });
+});
