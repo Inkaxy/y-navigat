@@ -148,7 +148,8 @@ export default function VarelistePage() {
   const kat = params.get("kat") ?? "all";
   const type = params.get("type") ?? "all";
   const status = params.get("status") ?? "active";
-  const view = params.get("view") ?? "all";
+  // I arbeidsflaten bestemmer `liste` visningen; gammel `view` gjelder bare uten `liste`.
+  const view = (liste ? viewForListe(liste) : null) ?? params.get("view") ?? "all";
   const sort = parseSort(params.get("sort"));
 
   const setParam = useCallback(
@@ -539,7 +540,13 @@ export default function VarelistePage() {
                 size="sm"
                 variant={view === v.id ? "default" : "outline"}
                 className="h-7 rounded-full px-3 text-xs"
-                onClick={() => setParam({ view: v.id })}
+                onClick={() => {
+                  if (!liste) { setParam({ view: v.id }); return; }
+                  const target = v.id === "all" ? "alle" : VIEW_TO_LISTE[v.id];
+                  if (target && isVarelisteMode(target)) setParam({ liste: target === "alle" ? null : target, view: null, valgt: null });
+                  else if (target) navigate(listeHref(params, target));
+                  else setParam({ view: v.id });
+                }}
               >
                 {v.label}
               </Button>
