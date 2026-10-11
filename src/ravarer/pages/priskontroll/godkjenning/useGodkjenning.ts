@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchApprovalOverview, type OverviewRow } from "@/fakturaer/lib/approval";
-import { deliverySteps, type DeliveryStep } from "@/ravarer/pages/priskontroll/faktura/invoiceSteps";
+import { deliverySteps, extrasFromCounts, type DeliveryStep } from "@/ravarer/pages/priskontroll/faktura/invoiceSteps";
 
 export type ApprovalDelivery = {
   received_at: string | null;
@@ -57,6 +57,6 @@ export function approvalSteps(r: OverviewRow, d: ApprovalDelivery | undefined): 
       lines_sum_status: d?.lines_sum_status ?? null, reconciled_mode: d?.reconciled_mode ?? null,
       is_credit_note: r.is_credit_note,
     },
-    { approved: !!r.approved_at, costPosted: r.cost_posted_lines > 0 },
+    extrasFromCounts(!!r.approved_at, r.cost_posted_lines, r.cost_line_total),
   );
 }

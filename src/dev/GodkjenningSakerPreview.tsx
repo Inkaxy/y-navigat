@@ -18,7 +18,7 @@ import "@/index.css";
 /** Forhåndsvisning med faste testdata — ingen serverkall. */
 const r = (p: Partial<OverviewRow>): OverviewRow => ({
   invoice_id: "x", invoice_number: "", invoice_date: "2026-10-06", supplier_id: "s", supplier_name: "", total_amount: 0, total_vat: 0, currency: "NOK",
-  status: "reconciled", is_credit_note: false, approved_at: null, approved_by: null, blockers: [], open_material_lines: 0, cost_posted_lines: 0, ...p,
+  status: "reconciled", is_credit_note: false, approved_at: null, approved_by: null, blockers: [], open_material_lines: 0, cost_posted_lines: 0, cost_line_total: 3, ...p,
 });
 const ROWS: OverviewRow[] = [
   r({ invoice_id: "1", invoice_number: "1515620", supplier_name: "Idun Industri AS", total_amount: 33120, total_vat: 6624 }),

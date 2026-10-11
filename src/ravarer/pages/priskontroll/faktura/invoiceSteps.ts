@@ -29,7 +29,35 @@ export interface DeliveryInvoice {
 
 export interface DeliveryExtras {
   approved: boolean;
+  /** Kostpris er ført for ALLE varelinjer (delvis føring er ikke ferdig). */
   costPosted: boolean;
+  /** Varelinjer med aktiv kostprisføring. */
+  costPostedLines?: number;
+  /** Varelinjer (ikke «Ikke vare»). */
+  costTotalLines?: number;
+}
+
+export type CostProgress = { state: "ingen" | "delvis" | "fullfort"; posted: number; total: number; remaining: number };
+
+/** Ført / totalt for varelinjene. Delvis føring er ikke fullført — resten kan føres senere. */
+export function costProgress(posted: number, total: number): CostProgress {
+  const p = Math.max(0, posted);
+  const t = Math.max(0, total);
+  const state = p === 0 ? "ingen" : p >= t ? "fullfort" : "delvis";
+  return { state, posted: p, total: t, remaining: Math.max(0, t - p) };
+}
+
+export function extrasFromCounts(approved: boolean, posted: number, total: number): DeliveryExtras {
+  return { approved, costPosted: costProgress(posted, total).state === "fullfort", costPostedLines: posted, costTotalLines: total };
+}
+
+function costDetail(e: DeliveryExtras, avstemt: boolean): string {
+  const posted = e.costPostedLines ?? (e.costPosted ? 1 : 0);
+  const total = e.costTotalLines ?? posted;
+  const p = costProgress(posted, total);
+  if (e.costPosted) return e.costTotalLines != null ? `Kostpris ført for alle ${p.total} varelinjer` : "Kostpris er ført";
+  if (p.state === "delvis") return `Delvis ført: ${p.posted} av ${p.total} varelinjer${avstemt ? "" : " — resten kan føres når linjene er avklart"}`;
+  return avstemt ? "Ikke ført – kostpris føres bare før avstemming" : "Kostpris er ikke ført";
 }
 
 const EXTRACTION_PENDING = ["pending", "failed", "processing"];
@@ -75,7 +103,7 @@ export function deliverySteps(inv: DeliveryInvoice, extras: DeliveryExtras): Del
     },
     inv.is_credit_note
       ? { key: "kostpris", label: "Kostpris ført", done: true, detail: "Ikke relevant for kreditnota" }
-      : { key: "kostpris", label: "Kostpris ført", done: extras.costPosted, detail: extras.costPosted ? "Kostpris er ført" : avstemt ? "Ikke ført – kostpris føres bare før avstemming" : "Kostpris er ikke ført" },
+      : { key: "kostpris", label: "Kostpris ført", done: extras.costPosted, detail: costDetail(extras, avstemt) },
     { key: "avstemt", label: "Avstemt", done: avstemt, detail: avstemt ? `Avstemt ${mode}` : "Ikke avstemt" },
     { key: "godkjent", label: "Godkjent", done: extras.approved, detail: extras.approved ? "Internt godkjent" : "Ikke godkjent" },
   ];
@@ -133,8 +161,9 @@ export function nextInvoiceStep(i: NextStepInput): NextStep {
   // statuser og aldri kreditnota (krever ikke godkjenning).
   if (costPostingAllowed(i) && !i.costPosted && !i.noSafeLines) {
     const can = i.canPostCosts ?? i.canWrite;
+    const p = costProgress(i.costPostedLines ?? 0, i.costTotalLines ?? 0);
     return {
-      key: "kostpris", label: "Før kostpris", enabled: can,
+      key: "kostpris", label: p.state === "delvis" ? `Før kostpris for resten (${p.remaining} gjenstår)` : "Før kostpris", enabled: can,
       hint: can ? "Fører kostpris for de trygge linjene før fakturaen avstemmes." : "Føring av kostpris krever skrivetilgang til fakturaer.",
     };
   }
@@ -153,6 +182,9 @@ export function nextInvoiceStep(i: NextStepInput): NextStep {
   }
   if (i.is_credit_note) {
     return { key: "ferdig", label: "Ferdig", enabled: false, hint: "Kreditnotaen er avstemt og godkjent. Kostprisføring gjelder ikke kreditnotaer." };
+  }
+  if (!i.costPosted && (i.costPostedLines ?? 0) > 0) {
+    return { key: "ferdig", label: "Ferdig", enabled: false, hint: `Kostpris delvis ført (${i.costPostedLines} av ${i.costTotalLines ?? "?"} varelinjer).` };
   }
   if (!i.costPosted) {
     return { key: "ferdig", label: "Ferdig", enabled: false, hint: i.noSafeLines ? "Ingen trygge linjer å føre kostpris for." : "Fakturaen er avstemt og godkjent. Kostpris føres bare før avstemming." };

@@ -192,7 +192,7 @@ export default function InvoiceOverview() {
                   <p className="text-sm text-ink-secondary">
                     {r.invoice_date ?? "Uten dato"}
                     {r.open_material_lines > 0 && ` · ${r.open_material_lines} råvarevalg åpne (sperrer ikke godkjenning)`}
-                    {r.cost_posted_lines > 0 && ` · kostpris ført på ${r.cost_posted_lines} linjer`}
+                    {r.cost_posted_lines > 0 && ` · kostpris ført på ${r.cost_posted_lines} av ${r.cost_line_total} linjer`}
                     {r.approved_at && ` · internt godkjent ${new Date(r.approved_at).toLocaleString("nb-NO", { dateStyle: "medium", timeStyle: "short" })}`}
                   </p>
                   {r.blockers.length > 0 && <p className="text-sm text-warning">{r.blockers.map(blockerLabel).join(" · ")}</p>}

@@ -3,3 +3,7 @@
 - Intern fakturagodkjenning krever approve/admin (`has_ravarer_invoice_approve`); skrive-RPC-er bruker `has_ravarer_invoice_access(...,'write')`. Why: attestasjon skal ikke følge av vanlig skrivetilgang.
 - Linjer med aktiv `invoice_line_cost_postings` er låst for ny matching og koblingsendring. Why: ført kostpris/historikk skal ikke endres stille.
 - «Beregn alle åpne på nytt» har én implementasjon (`RematchAllDialog`), brukt fra Priskontroll › Verktøy og Innstillinger. Why: to kopier av køkallet drev fra hverandre.
+- Lesevarsler lagres i `extraction_issues` (faktura/linje) og settes av databasen ved innsetting; blokkere og avstemming leser dem server-side. Why: begge importveier og ny matching skal ikke kunne vaske bort et lesevarsel.
+- Fakturalinjer rettes bare via `rm_correct_invoice_line` (versjon på `updated_at`, lås, revisjon, rematch-kø); læringseksempler er per selskap + leverandør. Why: korrigering må være sporbar og ikke en klient-UPDATE.
+- Leverandørkladder køes bare via `supplier_case_queue_draft_to_henrik` med server-bestemt mottaker. Why: kladden skal aldri gå direkte til leverandøren.
+- Kostprisføring vurderes som ført/totalt varelinjer; delvis føring er ikke ferdig. Why: `rm_post_safe_line_costs` fører restlinjer senere.

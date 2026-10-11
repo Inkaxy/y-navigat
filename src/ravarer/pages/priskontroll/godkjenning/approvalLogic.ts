@@ -28,8 +28,9 @@ export function parseGodkjenningStatus(v: string | null): GodkjenningStatus {
  * (imported/needs_review/ready), ikke kreditnota, og ingen kostpris ført ennå.
  * Godkjenning kreves IKKE. Hvilke linjer som er trygge avgjør serveren.
  */
-export function canPostCosts(r: Pick<OverviewRow, "status" | "is_credit_note" | "cost_posted_lines">): boolean {
-  return costPostingAllowed(r) && r.cost_posted_lines === 0;
+export function canPostCosts(r: Pick<OverviewRow, "status" | "is_credit_note" | "cost_posted_lines" | "cost_line_total">): boolean {
+  // Delvis føring: gjenværende varelinjer kan fortsatt føres (serveren hopper over de førte).
+  return costPostingAllowed(r) && r.cost_posted_lines < r.cost_line_total;
 }
 
 export function matchesStatus(r: OverviewRow, s: GodkjenningStatus): boolean {

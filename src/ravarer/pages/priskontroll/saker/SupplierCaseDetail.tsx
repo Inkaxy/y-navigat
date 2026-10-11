@@ -17,6 +17,8 @@ import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
 import { paths } from "@/ravarer/lib/paths";
 import { useUserNames } from "@/ravarer/hooks/useUserNames";
 import { CaseCreditForm } from "./CaseCreditForm";
+import { CaseEmailDraft } from "./CaseEmailDraft";
+import { useInvoiceRights } from "@/fakturaer/hooks/useInvoiceRights";
 import { useSupplierCaseDetail } from "./useSupplierCaseDetail";
 
 const kr = (v: number | null | undefined) => (v == null ? "–" : formatMoney(v, "NOK"));
@@ -32,6 +34,7 @@ export function SupplierCaseDetail({ id }: { id: string }) {
   const q = useSupplierCaseDetail(id);
   const d = q.data;
   const names = useUserNames([d?.c.responsible_user_id]);
+  const rights = useInvoiceRights();
   const [statusNote, setStatusNote] = useState("");
   const status = useMutation({
     mutationFn: (s: "open" | "resolved" | "cancelled") => setCaseStatus(id, s, statusNote),
@@ -140,6 +143,20 @@ export function SupplierCaseDetail({ id }: { id: string }) {
         </div>
         {d.c.resolution_note && <p className="text-sm text-ink-secondary">Siste begrunnelse: {d.c.resolution_note}</p>}
       </section>
+
+      <CaseEmailDraft caseId={id} canWrite={rights.canWrite} input={{
+        supplier_name: d.c.supplier?.name ?? null, case_title: d.c.title, credited: kreditert,
+        lines: d.lines.map((l) => {
+          const unit = l.basis.base_unit ?? l.line?.raw_material?.base_unit ?? null;
+          return {
+            invoice_number: l.invoice?.invoice_number ?? null, invoice_date: l.invoice?.invoice_date ?? null,
+            item: l.line?.raw_material?.name ?? l.line?.description ?? "Vare",
+            quantity: l.basis.base_quantity ?? null, unit,
+            expected: l.basis.expected_price_per_base_unit ?? null, invoiced: l.basis.price_per_base_unit ?? null,
+            amount_excl_vat: l.amount_excl_vat,
+          };
+        }),
+      }} />
 
       <section className="space-y-2">
         <h3 className="font-semibold">Historikk</h3>

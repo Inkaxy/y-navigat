@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaging";
-import type { DeliveryExtras } from "@/ravarer/pages/priskontroll/faktura/invoiceSteps";
+import { extrasFromCounts, type DeliveryExtras } from "@/ravarer/pages/priskontroll/faktura/invoiceSteps";
 
 export type DeliveryExtrasMap = ReadonlyMap<string, DeliveryExtras>;
 
@@ -24,16 +24,25 @@ export function useInvoiceDeliveryStatus(ids: readonly string[]) {
     queryFn: async (): Promise<DeliveryExtrasMap> => {
       // Kostprisføringer er per linje og kan passere API-ets grense på 1000 rader:
       // hent side for side og dedupliser, så ingen faktura mister «Kostpris ført».
-      const [appr, cost] = await Promise.all([
+      const [appr, cost, lines] = await Promise.all([
         fetchAllRows<{ invoice_id: string }>((from, to) =>
           supabase.from("invoice_internal_approvals").select("invoice_id").in("invoice_id", sorted).eq("status", "approved").order("invoice_id").range(from, to)),
         fetchAllRows<{ invoice_id: string }>((from, to) =>
           supabase.from("invoice_line_cost_postings").select("invoice_id").in("invoice_id", sorted).is("revoked_at", null).order("invoice_id").range(from, to)),
+        fetchAllRows<{ invoice_id: string }>((from, to) =>
+          supabase.from("invoice_lines").select("invoice_id").in("invoice_id", sorted).or("match_confidence.is.null,match_confidence.neq.not_applicable").order("id").range(from, to)),
       ]);
       const approved = new Set(appr.map((r) => r.invoice_id));
-      const posted = new Set(cost.map((r) => r.invoice_id));
+      const count = (rows: { invoice_id: string }[]) => {
+        const m = new Map<string, number>();
+        for (const r of rows) m.set(r.invoice_id, (m.get(r.invoice_id) ?? 0) + 1);
+        return m;
+      };
+      const posted = count(cost);
+      const total = count(lines);
       const out = new Map<string, DeliveryExtras>();
-      for (const id of sorted) out.set(id, { approved: approved.has(id), costPosted: posted.has(id) });
+      // Delvis føring er IKKE ferdig: «Kostpris ført» krever alle varelinjer.
+      for (const id of sorted) out.set(id, extrasFromCounts(approved.has(id), posted.get(id) ?? 0, total.get(id) ?? 0));
       return out;
     },
   });
