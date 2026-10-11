@@ -6,15 +6,17 @@
 //  - Uthentingen får KONTROLLFAKTA fra Tripletex (sum eks./inkl. mva, leverandør, fakturanr)
 //    og KJENTE VARER for leverandøren, slik at varenummer og beløp leses konsekvent.
 //  - Mva-beløp som mangler på fakturahodet hentes fra bilagets posteringer (konto 27xx),
-//    ellers utledes det deterministisk fra linjesummen (rm_repair_invoice_vat).
+//    (verifiserte posteringer). Mva gjettes aldri ut fra linjesummen; rm_repair_invoice_vat gir bare forslag.
+//  - Prisgrunnlag og linjerabatt lagres (unit_price_basis, discount_amount) — se rows.ts.
+//  - Leverandør-id sendes til uthentingen, som henter bekreftede rettelser for selskap + leverandør.
 //  - Linjetype (vare/pant/frakt/gebyr …) lagres på linjen, så motoren kan utelate det som ikke er varer.
 //  - Rettet: bilagsoppslaget manglet «/v2» og ga aldri hovedbokskonto.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getSessionToken, baseUrl, authHeader } from "../_shared/tripletex.ts";
-import { parsePackageFromDescription } from "../_shared/units.ts";
 import { computeLinesSum, needsReviewFromConfidence } from "../_shared/lines-sum.ts";
 import { planLineExtractionFailure } from "./failure-plan.ts";
 import { pickLedgerAccount, vatFromPostings } from "./ledger-account.ts";
+import { toInvoiceLineRows } from "./rows.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -87,7 +89,6 @@ const num = (v: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
-const LINE_KINDS = new Set(["vare", "pant", "frakt", "gebyr", "rabatt", "avrunding", "mva", "annet"]);
 
 /** Kjente varer hos leverandøren: koblingens varenummer/navn + bekreftede alias. */
 async function knownItemsForSupplier(
@@ -166,7 +167,7 @@ Deno.serve(async (req) => {
           // 0) Fakturahode med leverandør (kontrollfakta til uthentingen)
           const { data: head } = await admin
             .from("invoices")
-            .select("id, supplier_id, invoice_number, total_amount, total_vat, currency, suppliers(name)")
+            .select("id, supplier_id, invoice_number, total_amount, total_vat, currency, is_credit_note, suppliers(name)")
             .eq("id", inv.id)
             .maybeSingle();
           const supplierId = (head as any)?.supplier_id as string | null;
@@ -252,6 +253,8 @@ Deno.serve(async (req) => {
               supplier_name: supplierName,
               invoice_number: (head as any)?.invoice_number ?? inv.invoice_number ?? null,
               known_items: known,
+              supplier_id: supplierId,
+              is_credit: (head as any)?.is_credit_note === true,
               max_attempts: 2,
             }),
           });
@@ -265,40 +268,7 @@ Deno.serve(async (req) => {
           const rawLines = Array.isArray(extractJsonBody?.extracted?.lines)
             ? extractJsonBody.extracted.lines
             : [];
-          const rows = rawLines
-            .filter((l: any) => (l?.description ?? "") !== "" || num(l?.total_amount) !== null)
-            .map((l: any, i: number) => {
-              // Pakningsfeltene kommer fra uthentingen. Mangler de, tolker vi beskrivelsen
-              // («36X90G») slik at package_size × count_per_package = total pakningsstørrelse.
-              let packageSize = num(l?.package_size);
-              let packageUnit = (l?.package_unit ?? null) as string | null;
-              let countPerPackage = num(l?.count_per_package);
-              if (packageSize == null || !packageUnit) {
-                const parsed = parsePackageFromDescription(l?.description);
-                if (parsed) {
-                  packageSize = parsed.size;
-                  packageUnit = parsed.unit;
-                  countPerPackage = parsed.count ?? 1;
-                }
-              }
-              const kind = typeof l?.line_kind === "string" && LINE_KINDS.has(l.line_kind) ? l.line_kind : null;
-              return {
-                invoice_id: inv.id,
-                line_number: i + 1,
-                supplier_sku: l?.sku ?? null,
-                description: l?.description ?? null,
-                quantity: num(l?.quantity),
-                unit: l?.unit ?? null,
-                unit_price: num(l?.unit_price),
-                total_amount: num(l?.total_amount),
-                vat_rate: num(l?.vat_rate),
-                package_size: packageSize,
-                package_unit: packageUnit,
-                count_per_package: countPerPackage,
-                line_kind: kind,
-                ledger_account: ledgerAccount,
-              };
-            });
+          const rows = toInvoiceLineRows(rawLines, inv.id, ledgerAccount);
 
           // confidence ligger på toppnivå i svaret, ikke inni `extracted`.
           const confidence = num(extractJsonBody?.confidence);
@@ -345,8 +315,8 @@ Deno.serve(async (req) => {
             })
             .eq("id", inv.id);
 
-          // 4) Mva-mønster uten mva-beløp, eller mva-skalerte linjer som uthentingen ikke fanget:
-          //    deterministisk reparasjon i basen (ingen gjetting — bare eksakte 1/1,15- og 1/1,25-forhold).
+          // 4) Sumavvik eller manglende mva: rm_repair_invoice_vat returnerer bare forslag/kontrollbehov.
+          //    Den endrer aldri beløp (et mva-lignende forhold kan være en manglende linje).
           let repaired: unknown = null;
           if (sumCheck.lines_sum_status === "mismatch" || (totalVat == null && sumCheck.lines_sum_status !== "no_total")) {
             const { data: rep } = await admin.rpc("rm_repair_invoice_vat", { p_invoice_id: inv.id });
