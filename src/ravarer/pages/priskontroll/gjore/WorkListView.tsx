@@ -13,6 +13,7 @@ import { kr } from "./logic";
 // impact_nok er absolutt størrelse fra serveren — vises uten fortegn.
 const unsignedKr = (n: number) => kr(Math.abs(n));
 import { causeText, nextActionText } from "./groupCopy";
+import { WorkRowPrice } from "./WorkRowPrice";
 
 function MobileEffect({ it }: { it: WorkItem }) {
   const e = workEffect(it);
@@ -109,6 +110,7 @@ export function WorkListView({ items, total, selectedKey, loading, fetchingMore,
                     <span aria-hidden className="text-ink-secondary">·</span>
                     <span className="font-medium text-primary">{nextActionText(it)} →</span>
                   </p>
+                  <WorkRowPrice it={it} />
                   <MobileEffect it={it} />
                 </div>
                 <EffectCell it={it} />
