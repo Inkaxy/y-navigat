@@ -3,7 +3,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -16,11 +15,8 @@ interface Props {
   invoiceId: string;
 }
 
-type ActionType = "internal_task" | "supplier_email" | "both";
-
 export function FlagInvoiceDialog({ open, onOpenChange, invoiceId }: Props) {
   const [reason, setReason] = useState("");
-  const [action, setAction] = useState<ActionType>("internal_task");
   const [busy, setBusy] = useState(false);
   const qc = useQueryClient();
 
@@ -39,7 +35,7 @@ export function FlagInvoiceDialog({ open, onOpenChange, invoiceId }: Props) {
           flagged_at: new Date().toISOString(),
           flagged_by: u.user?.id ?? null,
           flag_reason: reason.trim(),
-          flag_action_type: action,
+          flag_action_type: "internal_task",
         })
         .eq("id", invoiceId);
       if (error) throw error;
@@ -47,8 +43,9 @@ export function FlagInvoiceDialog({ open, onOpenChange, invoiceId }: Props) {
       invalidateInvoice(qc, invoiceId);
       onOpenChange(false);
       setReason("");
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (e: unknown) {
+      console.error("[flag-invoice]", e);
+      toast.error("Kunne ikke flagge fakturaen. Prøv igjen.");
     } finally {
       setBusy(false);
     }
@@ -75,32 +72,7 @@ export function FlagInvoiceDialog({ open, onOpenChange, invoiceId }: Props) {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Hva skal skje?</Label>
-            <RadioGroup value={action} onValueChange={(v) => setAction(v as ActionType)}>
-              <div className="flex items-start gap-2">
-                <RadioGroupItem value="internal_task" id="opt-task" className="mt-1" />
-                <Label htmlFor="opt-task" className="font-normal">
-                  Opprett intern oppgave
-                  <p className="text-xs text-ink-secondary">Synlig i behandlingskøen til NBhub-ansvarlig</p>
-                </Label>
-              </div>
-              <div className="flex items-start gap-2">
-                <RadioGroupItem value="supplier_email" id="opt-email" className="mt-1" />
-                <Label htmlFor="opt-email" className="font-normal">
-                  Send e-post til leverandør
-                  <p className="text-xs text-ink-secondary">Bruker forhåndsdefinert mal med prisavvik-detaljer</p>
-                </Label>
-              </div>
-              <div className="flex items-start gap-2">
-                <RadioGroupItem value="both" id="opt-both" className="mt-1" />
-                <Label htmlFor="opt-both" className="font-normal">
-                  Begge deler
-                  <p className="text-xs text-ink-secondary">Intern oppgave + e-post til leverandør</p>
-                </Label>
-              </div>
-            </RadioGroup>
-          </div>
+          <p className="text-sm text-ink-secondary">Saken følges opp i Leverandørsaker. Ingen e-post sendes automatisk.</p>
         </div>
 
         <DialogFooter>
