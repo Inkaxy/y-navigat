@@ -25,7 +25,7 @@ export function CostDeviationsCard() {
   const q = useCostDeviations(company?.id);
   const refresh = useRefreshCostPrices();
   const [checked, setChecked] = useState<Set<string>>(new Set());
-  const rows = q.data ?? [];
+  const rows = useMemo(() => q.data ?? [], [q.data]);
   const deviating = useMemo(() => rows.filter((r) => r.status === "avviker"), [rows]);
   const unverified = rows.length - deviating.length;
 

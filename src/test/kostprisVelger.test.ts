@@ -67,7 +67,7 @@ describe("historikkrader: bare gyldige punkter er priser", () => {
   it("1000+ rader: alle tas med (ingen avkutting i visningslogikken)", () => {
     const h: TimelineHistoryRow[] = [];
     for (let i = 0; i < 1500; i++) {
-      const d = new Date(Date.UTC(2020, 0, 1) + i * 86400000).toISOString().slice(0, 10);
+      const d = `${2020 + Math.floor(i / 365)}-${String(1 + Math.floor((i % 365) / 31) % 12).padStart(2, "0")}-${String(1 + (i % 28)).padStart(2, "0")}`;
       h.push(row({ id: `r${String(i).padStart(4, "0")}`, effective_date: d, price: 10 + (i % 7), supplier_id: i % 2 ? "sa" : "sb", isLegacy: i % 10 === 0 }));
     }
     const r = buildTimeline({ history: h, supplierNames: names, links: [] });
