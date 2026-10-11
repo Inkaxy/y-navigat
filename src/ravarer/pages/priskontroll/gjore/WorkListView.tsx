@@ -8,14 +8,17 @@ import { WORK_KIND_LABELS, labelFor } from "@/ravarer/lib/labels";
 import type { WorkItem } from "@/ravarer/lib/workRpcTypes";
 import { cn } from "@/lib/utils";
 import { workEffect } from "@/ravarer/lib/workEffect";
-import { signedKr } from "./logic";
+import { kr } from "./logic";
+
+// impact_nok er absolutt størrelse fra serveren — vises uten fortegn.
+const unsignedKr = (n: number) => kr(Math.abs(n));
 import { causeText, nextActionText } from "./groupCopy";
 
 function MobileEffect({ it }: { it: WorkItem }) {
   const e = workEffect(it);
   return (
     <p className={cn("text-xs sm:hidden", e.kind === "read" ? "text-warning" : "text-ink-secondary")}>
-      {e.label}{e.kind === "verified" ? `: ${signedKr(e.value)}` : ""}
+      {e.label}{e.kind === "verified" ? `: ${unsignedKr(e.value)}` : ""}
     </p>
   );
 }
@@ -27,7 +30,7 @@ export function EffectCell({ it }: { it: WorkItem }) {
     <div className="hidden w-32 shrink-0 text-right sm:block" title={e.kind === "verified" ? undefined : e.detail}>
       <div className="text-caption text-ink-secondary">{e.label}</div>
       {e.kind === "verified"
-        ? <div className="text-sm font-medium tabular-nums">{signedKr(e.value)}</div>
+        ? <div className="text-sm font-medium tabular-nums">{unsignedKr(e.value)}</div>
         : <div className={cn("text-xs", e.kind === "read" ? "text-warning" : "text-ink-secondary")}>{e.kind === "read" ? "Lesing ukontrollert" : "—"}</div>}
     </div>
   );

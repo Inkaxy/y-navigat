@@ -57,6 +57,8 @@ export const paths = {
   godkjenning: () => withQuery(`${RAVARER_ROOT}/priskontroll`, { fane: "godkjenning" }),
   saker: () => withQuery(`${RAVARER_ROOT}/priskontroll`, { fane: "saker" }),
   faktura: (id: Id, q?: Q) => withQuery(`${RAVARER_ROOT}/priskontroll/faktura/${enc(id)}`, q),
+  /** «Les originalen på nytt»; `kjoring` gjenopptar en lagret lesing. */
+  lesPaNytt: (id: Id, q?: { kjoring?: string } & Q) => withQuery(`${RAVARER_ROOT}/priskontroll/faktura/${enc(id)}/les-pa-nytt`, q),
   registrerLinjer: (id: Id) => `${RAVARER_ROOT}/priskontroll/faktura/${enc(id)}/registrer-linjer`,
   sak: (id: Id) => `${RAVARER_ROOT}/priskontroll/saker/${enc(id)}`,
   /** Import åpnes som sidepanel på Priskontroll (`?importer=`). */

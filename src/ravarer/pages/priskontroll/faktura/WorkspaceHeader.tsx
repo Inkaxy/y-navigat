@@ -9,7 +9,7 @@ import { isFlaggable } from "@/fakturaer/lib/flagging";
 import { DeliveryTimeline } from "./DeliveryTimeline";
 import type { DeliveryStep, NextStep } from "./invoiceSteps";
 
-export type HeaderMenuAction = "flag" | "unflag" | "rematch" | "fetch" | "register" | "credit" | "history" | "recheck" | "vat" | "override" | "correct";
+export type HeaderMenuAction = "flag" | "unflag" | "rematch" | "fetch" | "register" | "credit" | "history" | "recheck" | "vat" | "override" | "correct" | "reread";
 
 type Props = {
   backHref: string;
@@ -95,6 +95,7 @@ export function WorkspaceHeader(p: Props) {
               )}
               {p.canWrite && p.canFetch && <DropdownMenuItem onSelect={() => p.onMenu("fetch")}>Hent linjer</DropdownMenuItem>}
               {p.canWrite && !final && !p.canCorrect && <DropdownMenuItem onSelect={() => p.onMenu("register")}>Registrer linjer</DropdownMenuItem>}
+              {p.canWrite && !final && p.canCorrect && p.docPath && <DropdownMenuItem onSelect={() => p.onMenu("reread")}>Les originalen på nytt …</DropdownMenuItem>}
               {p.canWrite && !final && p.canCorrect && <DropdownMenuItem onSelect={() => p.onMenu("correct")}>Rett linjer mot originalen …</DropdownMenuItem>}
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => p.onMenu("recheck")}>Kontroller summen på nytt</DropdownMenuItem>

@@ -157,6 +157,7 @@ export default function FakturaWorkspace() {
     else if (a === "rematch") doRematch();
     else if (a === "fetch") doFetch();
     else if (a === "register") navigate(paths.registrerLinjer(data.id));
+    else if (a === "reread") navigate(paths.lesPaNytt(data.id));
     else if (a === "credit") setDialog({ kind: "credit", inv: data });
     else if (a === "correct") {
       const lines = data.invoice_lines ?? [];
@@ -356,10 +357,13 @@ export default function FakturaWorkspace() {
           {zone === "dokument" && data.source_document_url && <div className="h-[75vh] overflow-hidden rounded-lg border border-border bg-card">{docEl}</div>}
           {zone === "linjer" && linesZone}
           {zone === "kontroll" && control(true)}
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 py-3 backdrop-blur">
-            <p className="mb-1.5 truncate text-caption text-ink-secondary">{s.next.hint}</p>
-            <Button className="w-full" disabled={!s.next.enabled || s.busy || fetchLines.isPending} onClick={runPrimary}>{s.next.label}</Button>
-          </div>
+          {/* Én handlingsflate på mobil: når en linje er åpen eier linjens egen bunnlinje handlingene. */}
+          {!(zone === "linjer" && inspectorOpen) && (
+            <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 py-3 backdrop-blur">
+              <p className="mb-1.5 truncate text-caption text-ink-secondary">{s.next.hint}</p>
+              <Button className="w-full" disabled={!s.next.enabled || s.busy || fetchLines.isPending} onClick={runPrimary}>{s.next.label}</Button>
+            </div>
+          )}
         </div>
       ) : showDocZone ? (
         <div className={threeZones ? "grid items-start gap-4 grid-cols-[minmax(0,42%)_minmax(0,1fr)]" : "grid items-start gap-4 grid-cols-[minmax(0,50%)_minmax(0,1fr)]"}>

@@ -57,7 +57,7 @@ function App() {
       ]} />
       <InvoiceFactsView
         invoice={{ id: "i1", legal_entity_id: "le", status: "needs_review", total_amount: 14500, total_vat: 2900, vat_inferred: true, tripletex_voucher_number: "2026-4412", tripletex_is_paid: true, paid_at: "2026-10-08", lines_sum_excl_vat: 11600, lines_sum_variance_pct: 0.4, lines_sum_status: "ok", extraction_confidence: 0.91, line_extraction_attempts: 1, lines_source: "pdf_extracted" }}
-        actions={<><Button size="sm" variant="outline">Hent linjer på nytt</Button><Button size="sm" variant="outline">Beregn på nytt</Button></>}
+        actions={<><Button size="sm" variant="outline">Les originalen på nytt</Button><Button size="sm" variant="outline">Beregn på nytt</Button></>}
       />
       <SupplierItemsTable items={items} onOpen={setOpen} />
       <div className="max-w-[720px] rounded-lg border border-line-subtle bg-card p-5">
