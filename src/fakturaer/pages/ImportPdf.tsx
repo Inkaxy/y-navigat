@@ -18,7 +18,6 @@ import { useSuppliersFor } from "@/fakturaer/hooks/useSuppliersFor";
 import { todayIso } from "@/fakturaer/lib/constants";
 import { computeLinesSum } from "@/fakturaer/lib/linesSum";
 import { cn } from "@/lib/utils";
-import { runAutoMatchAfterImport } from "@/fakturaer/lib/queueActions";
 import { paths } from "@/ravarer/lib/paths";
 import { PdfLineCards } from "@/fakturaer/components/import-pdf/PdfLineCards";
 import { lineFromExtraction, manualReading, manualSaveErrorMessage, settleManualSave, UNKNOWN_SAVE_OUTCOME, parseReadIssues, rowPayload, validConfidence, type PdfLine } from "@/fakturaer/lib/manualPdfSave";

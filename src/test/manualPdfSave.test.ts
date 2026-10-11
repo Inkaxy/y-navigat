@@ -78,8 +78,8 @@ describe("manuell PDF: svar fra atomisk lagring", () => {
   it("tolker ok, nytt forsøk og duplikat", () => {
     expect(parseManualSaveResult({ ok: true, invoice_id: "a", supplier_id: "s", replayed: true, lines: 2, status: "needs_review" }))
       .toEqual({ ok: true, invoiceId: "a", supplierId: "s", replayed: true, status: "needs_review", lines: 2 });
-    expect(parseManualSaveResult({ ok: false, code: "duplikat", invoice_id: "b" })).toEqual({ ok: false, code: "duplikat", invoiceId: "b" });
-    expect(parseManualSaveResult(null)).toEqual({ ok: false, code: "ukjent_svar", invoiceId: null });
+    expect(parseManualSaveResult({ ok: false, code: "duplikat", invoice_id: "b" })).toEqual({ ok: false, code: "duplikat", invoiceId: "b", definite: true });
+    expect(parseManualSaveResult(null)).toEqual({ ok: false, code: "ukjent_svar", invoiceId: null, definite: false });
   });
   it("viser norske feiltekster, aldri rå koder", () => {
     expect(manualSaveErrorMessage("duplikat")).toMatch(/Ingenting ble lagret/);
