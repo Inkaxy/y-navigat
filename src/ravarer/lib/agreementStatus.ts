@@ -47,6 +47,9 @@ export function getAgreementStatus(
   const to = validTo ? validTo.slice(0, 10) : null;
 
   if (to && to < todayISO) return "expired";
+  // Samme regel som `rm_work_summary.agreements_expiring_30d`: sluttdato mellom i dag og +30 d,
+  // uavhengig av startdato — ellers viser siden et annet tall enn menyen.
+  if (to && daysBetween(todayISO, to) <= 30) return "expiring_30";
   if (from && from > todayISO) return "upcoming";
   if (!to) return "active";
 

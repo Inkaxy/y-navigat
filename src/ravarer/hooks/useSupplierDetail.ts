@@ -135,7 +135,8 @@ export function useUpdateSupplierNotes(supplierId: string | undefined) {
       if (error) throw error;
       return notes;
     },
-    onSuccess: () => { invalidateRavarerCounts(qc);
+    onSuccess: () => {
+      invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["supplier", supplierId] });
       qc.invalidateQueries({ queryKey: ["suppliers"] });
       toast.success("Notat lagret");

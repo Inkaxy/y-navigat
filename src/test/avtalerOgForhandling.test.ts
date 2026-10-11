@@ -34,6 +34,7 @@ describe("getAgreementStatus", () => {
 
   it("avtale som starter senere er kommende", () => {
     expect(getAgreementStatus("2026-10-01", "2027-01-01", today)).toBe("upcoming");
+    expect(getAgreementStatus("2026-10-01", "2026-10-05", today)).toBe("expiring_30");
   });
 
   it("løpende avtale uten sluttdato er aktiv", () => {
@@ -56,7 +57,8 @@ describe("getAgreementStatus", () => {
       { agreement_valid_from: "2026-01-01", agreement_valid_to: "2026-11-01" },
       { agreement_valid_from: "2026-10-01", agreement_valid_to: "2026-10-05" },
     ];
-    expect(countExpiringSoon(rows, today)).toBe(1);
+    // Samme regel som rm_work_summary.agreements_expiring_30d: sluttdato innen 30 d, uavhengig av startdato.
+    expect(countExpiringSoon(rows, today)).toBe(2);
   });
 });
 

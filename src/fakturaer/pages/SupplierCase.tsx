@@ -70,7 +70,8 @@ export default function SupplierCase() {
   const refresh = () => qc.invalidateQueries({ queryKey: ["supplier-case", id] }).then(() => qc.invalidateQueries({ queryKey: ["invoice-approval-overview"] }));
   const alloc = useMutation({
     mutationFn: () => allocateCredit({ caseId: id, creditInvoiceId: noteId, invoiceId, amountExclVat: parsed ?? 0, clientRef: ref }),
-    onSuccess: async (r) => { invalidateRavarerCounts(qc);
+    onSuccess: async (r) => {
+      invalidateRavarerCounts(qc);
       toast.success(r.already_saved ? "Fordelingen var allerede lagret" : "Kreditten er fordelt på fakturaen");
       setAmount("");
       setRef(crypto.randomUUID());

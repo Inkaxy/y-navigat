@@ -1,4 +1,5 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
+import { lazyWithReload as lazy } from "@/lib/lazyWithReload";
 import { useSearchParams } from "react-router-dom";
 import { QueryLoadingState } from "@/components/common/QueryState";
 import { useWorkSummary } from "@/ravarer/hooks/useWorkData";

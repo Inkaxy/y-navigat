@@ -58,7 +58,8 @@ export function StartPriceDialog({
       if (!invoiceLineId) throw new Error("Ingen fakturalinje er valgt");
       return confirmStartPrice(invoiceLineId, eligibilityQuery.data?.price_per_base_unit ?? null);
     },
-    onSuccess: (res) => { invalidateRavarerCounts(qc);
+    onSuccess: (res) => {
+      invalidateRavarerCounts(qc);
       if (res.created) {
         setConfirmed(true);
         setFailure(null);

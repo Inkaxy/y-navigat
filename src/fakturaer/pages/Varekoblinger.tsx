@@ -1,3 +1,4 @@
+import { useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
@@ -18,6 +19,7 @@ import { cn } from "@/lib/utils";
 const ALL = "__alle__";
 
 export default function Varekoblinger() {
+  const embedded = useIsEmbedded();
   const { data: company } = useCompany();
   const [sp, setSp] = useSearchParams();
   const statusRaw = sp.get("status");
@@ -64,11 +66,11 @@ export default function Varekoblinger() {
   };
 
   return (
-    <div className="space-y-5 px-page py-6">
+    <div className={cn("space-y-5", !embedded && "px-page py-6")}>
       <DecisionNav />
       <header className="space-y-1">
-        <h1 className="font-display text-3xl font-semibold">Varekoblinger</h1>
-        <p className="text-ink-secondary">Én beslutning per leverandørvare — gjelder alle fakturaer og huskes til neste import.</p>
+        {!embedded && <h1 className="font-display text-3xl font-semibold">Varekoblinger</h1>}
+        <p className={embedded ? "text-caption text-ink-secondary" : "text-ink-secondary"}>Én beslutning per leverandørvare — gjelder alle fakturaer og huskes til neste import.</p>
       </header>
 
       <div className="space-y-3">

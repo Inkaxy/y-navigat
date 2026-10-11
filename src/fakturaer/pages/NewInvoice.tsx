@@ -1,3 +1,4 @@
+import { showError } from "@/lib/userError";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
@@ -152,8 +153,8 @@ export default function NewInvoicePage({ embedded = false }: { embedded?: boolea
       }
 
       navigate(paths.faktura(invoice.id));
-    } catch (e: any) {
-      toast.error(`Kunne ikke lagre: ${e.message ?? e}`);
+    } catch (e: unknown) {
+      showError("faktura:ny", e, "Kunne ikke lagre fakturaen. Prøv igjen.");
     } finally {
       setSubmitting(false);
     }

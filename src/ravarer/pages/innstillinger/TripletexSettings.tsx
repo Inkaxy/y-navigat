@@ -1,3 +1,6 @@
+import { labelFor, SYNC_STATUS_LABELS } from "@/ravarer/lib/labels";
+import { cn } from "@/lib/utils";
+import { useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { useFakturaerLegalEntities } from "@/fakturaer/hooks/useFakturaerLegalEntities";
 import { useTripletexCredentials, useTripletexSyncLog } from "@/ravarer/hooks/useTripletex";
@@ -33,6 +36,7 @@ async function edgeErrorMessage(error: unknown, fallback: string): Promise<strin
 }
 
 export default function TripletexSettings() {
+  const embedded = useIsEmbedded();
   const { data: allEntities = [], isLoading: entitiesLoading } = useFakturaerLegalEntities();
   // Kun aktive selskaper — hindrer at API-nøkler lagres på inaktive placeholder-selskaper.
   const entities = useMemo(() => allEntities.filter((e) => e.status !== "inactive"), [allEntities]);
@@ -43,13 +47,15 @@ export default function TripletexSettings() {
   }, [entities, selectedEntity]);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-6">
+    <div className={cn("space-y-6", !embedded && "mx-auto max-w-4xl p-6")}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight" style={{ letterSpacing: "-0.02em" }}>
-            Tripletex-integrasjon
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          {!embedded && (
+            <h1 className="text-2xl font-semibold tracking-tight" style={{ letterSpacing: "-0.02em" }}>
+              Tripletex-integrasjon
+            </h1>
+          )}
+          <p className={embedded ? "text-caption text-muted-foreground" : "text-sm text-muted-foreground mt-1"}>
             Konfigurer automatisk import av betalte fakturaer fra Tripletex.
           </p>
         </div>
@@ -422,7 +428,7 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
                           : "outline"
                     }
                   >
-                    {cred?.last_sync_status ?? "ukjent"}
+                    {cred?.last_sync_status ? labelFor(SYNC_STATUS_LABELS, cred.last_sync_status, "Ukjent status").label : "Ikke synkronisert"}
                   </Badge>
                 </p>
               </div>
@@ -479,7 +485,7 @@ function EntityConfig({ legalEntityId }: { legalEntityId: string }) {
                       <span>hentet: {row.vouchers_fetched}</span>
                       <span>importert: {row.vouchers_imported}</span>
                       <Badge variant={row.status === "success" ? "secondary" : row.status === "error" ? "destructive" : "outline"}>
-                        {row.status}
+                        {labelFor(SYNC_STATUS_LABELS, row.status, "Ukjent status").label}
                       </Badge>
                     </div>
                   </li>

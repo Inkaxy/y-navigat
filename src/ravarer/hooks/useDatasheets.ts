@@ -64,7 +64,8 @@ export function useAcknowledgeChange() {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { invalidateRavarerCounts(qc);
+    onSuccess: () => {
+      invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["raw-material-changelog"] });
       qc.invalidateQueries({ queryKey: ["raw-material-changelog-count"] });
       toast.success("Endring bekreftet");
@@ -101,7 +102,8 @@ export function useDeleteDatasheets() {
       if (error) throw error;
       return ids.length;
     },
-    onSuccess: (n) => { invalidateRavarerCounts(qc);
+    onSuccess: (n) => {
+      invalidateRavarerCounts(qc);
       qc.invalidateQueries({ queryKey: ["orphan-datasheets"] });
       qc.invalidateQueries({ queryKey: ["raw-material-datasheets"] });
       toast.success(`${n} datablad slettet`);

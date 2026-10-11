@@ -60,7 +60,8 @@ export function StartPriceCandidatesCard({
       }
       return { created, failures };
     },
-    onSuccess: ({ created, failures }) => { invalidateRavarerCounts(qc);
+    onSuccess: ({ created, failures }) => {
+      invalidateRavarerCounts(qc);
       setRejected(failures);
       setSelected({});
       void qc.invalidateQueries({ queryKey: ["start-price-candidates"] });

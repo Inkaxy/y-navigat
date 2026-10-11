@@ -131,3 +131,21 @@ export function mergeRawMaterialHits(direct: EntityHit[], viaAlias: EntityHit[],
   }
   return out.slice(0, limit);
 }
+
+/** Grenser i ⌘K for Råvarer-gruppene. */
+export const MAX_RAW_MATERIAL_HITS = 6;
+export const MAX_SUPPLIER_HITS = 4;
+
+/** «Råvare · {kategori} · {kostpris kr/grunnenhet}» (+ «Inaktiv»). Manglende ledd utelates. */
+export function rawMaterialSubtitle(r: {
+  category: string | null;
+  current_cost_price: number | null;
+  base_unit: string | null;
+  is_active: boolean | null;
+}): string {
+  const price =
+    r.current_cost_price != null
+      ? `${new Intl.NumberFormat("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(r.current_cost_price)} kr${r.base_unit ? `/${r.base_unit}` : ""}`
+      : null;
+  return ["Råvare", r.category, price, r.is_active === false ? "Inaktiv" : null].filter(Boolean).join(" · ");
+}

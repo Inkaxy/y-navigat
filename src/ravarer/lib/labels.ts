@@ -3,14 +3,73 @@
  * en fargetoken (`--rm-*`/`--state-*`) og en kort forklaring. Ukjente koder får
  * alltid en pen fallback — rå koder skal aldri vises i grensesnittet.
  *
- * Detaljkart som allerede fantes (årsakskoder, priskilder, linjetyper,
- * forhandlingsstatus) leses herfra; de opprinnelige eksportene er beholdt for
- * bakoverkompatibilitet.
+ * Grunnkartene (årsakskoder, priskilder, linjetyper, leverandørvarestatus,
+ * forhandlingsstatus) DEFINERES her; de gamle modulene re-eksporterer dem tynt.
  */
-import { REASON_LABELS } from "@/fakturaer/lib/reviewReasons";
-import { LINE_KIND_LABEL, SUPPLIER_ITEM_STATUS_META } from "@/fakturaer/lib/supplierItems";
-import { PRICE_REFERENCE_LABEL } from "@/ravarer/lib/priceReference";
-import { NEGOTIATION_STATUS_LABEL } from "@/ravarer/lib/negotiationMatrix";
+import type { ReasonCode } from "@/fakturaer/lib/reviewReasons";
+import type { SupplierItemStatus } from "@/fakturaer/lib/supplierItems";
+import type { StatusTone } from "@/fakturaer/lib/lineStatus";
+import type { PriceRefSource } from "@/fakturaer/lib/parseRpcJson";
+
+export const SUPPLIER_ITEM_STATUS_META: Record<SupplierItemStatus, { label: string; tone: StatusTone }> = {
+  ukoblet: { label: "Ukoblet", tone: "danger" },
+  mangler_pakning: { label: "Mangler pakning", tone: "warning" },
+  prisavvik: { label: "Prisavvik", tone: "warning" },
+  kontroll: { label: "Kontroll", tone: "warning" },
+  koblet: { label: "Koblet", tone: "success" },
+  ikke_vare: { label: "Ikke vare", tone: "muted" },
+};
+
+export const LINE_KIND_LABEL: Record<string, string> = {
+  vare: "Vare",
+  pant: "Pant",
+  frakt: "Frakt",
+  gebyr: "Gebyr",
+  rabatt: "Rabatt",
+  avrunding: "Avrunding",
+  mva: "Mva",
+  annet: "Annet",
+};
+
+export const PRICE_REFERENCE_LABEL: Record<PriceRefSource, string> = {
+  agreement: "Avtalepris",
+  start_price: "Startpris",
+  last_purchase: "Siste kjøp",
+  conflict: "To likestilte avtaler — konflikt",
+  none: "Ingen prisgrunnlag",
+};
+
+export const REASON_LABELS: Record<ReasonCode, string> = {
+  unmatched: "Umatchet",
+  low_confidence: "Lav tillit",
+  price_variance: "Prisavvik",
+  price_increase: "Prisøkning",
+  price_drop: "Prisfall",
+  uncertain_cost: "Usikker kostpris",
+  unknown_package_size: "Ukjent pakningsstørrelse",
+  package_conflict: "Flere pakninger hos leverandøren",
+  sku_collision: "Konflikt",
+  unsupported_currency: "Valuta ikke støttet",
+  agreement_conflict: "To likestilte avtaler",
+  price_reference_error: "Prisgrunnlag kunne ikke hentes",
+  recalculation_pending: "Må beregnes på nytt",
+  extraction_unresolved: "Beløp mangler i dokumentet",
+  missing_base_unit: "Varen mangler grunnenhet",
+  start_price_manual_check: "Startpris må kontrolleres manuelt",
+  no_automatic_basis: "Uten gyldig prisgrunnlag",
+  no_baseline: "Uten prisgrunnlag",
+  extraction_issue: "Uttrekk eller sum stemmer ikke",
+  zero_quantity: "Mengde mangler eller er null",
+};
+
+export const NEGOTIATION_STATUS_LABEL: Record<string, string> = {
+  draft: "Utkast",
+  invited: "Invitert",
+  in_progress: "Pågår",
+  awaiting_confirmation: "Venter på bekreftelse",
+  concluded: "Avsluttet",
+  cancelled: "Avbrutt",
+};
 
 export type LabelMeta = { label: string; tokenVar: string; hint?: string };
 export type LabelMap = Record<string, LabelMeta>;
@@ -122,6 +181,21 @@ export const ACTIVITY_KIND_LABELS: LabelMap = {
   ikke_vare: { label: "Merket som ikke vare", tokenVar: "--rm-ikke-vare" },
   forste_pris: { label: "Første pris", tokenVar: "--rm-kontroll" },
   gjentatt_pris: { label: "Ny pris bekreftet", tokenVar: "--rm-godkjent" },
+  annet: { label: "Annen hendelse", tokenVar: NEUTRAL },
+};
+
+/** Status for Tripletex-synk (credentials og synk-logg). */
+export const SYNC_STATUS_LABELS: LabelMap = {
+  success: { label: "Vellykket", tokenVar: "--state-success" },
+  ok: { label: "Vellykket", tokenVar: "--state-success" },
+  imported: { label: "Importert", tokenVar: "--state-success" },
+  partial: { label: "Delvis", tokenVar: "--state-warning" },
+  error: { label: "Feilet", tokenVar: "--state-danger" },
+  failed: { label: "Feilet", tokenVar: "--state-danger" },
+  running: { label: "Pågår", tokenVar: "--state-info" },
+  pending: { label: "Venter", tokenVar: NEUTRAL },
+  skipped: { label: "Hoppet over", tokenVar: NEUTRAL },
+  none: { label: "Ingen nye", tokenVar: NEUTRAL },
 };
 
 /** CSS-farge for en token, til StatusPill (10 % fyll, 45 % ring). */

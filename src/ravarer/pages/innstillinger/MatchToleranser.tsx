@@ -102,7 +102,8 @@ export default function MatchToleranserPage() {
       );
       if (error) throw error;
     },
-    onSuccess: () => { invalidateRavarerCounts(qc);
+    onSuccess: () => {
+      invalidateRavarerCounts(qc);
       invalidate();
       toast.success("Innstillinger lagret");
     },
@@ -126,7 +127,8 @@ export default function MatchToleranserPage() {
         if (error) throw error;
       }
     },
-    onSuccess: () => { invalidateRavarerCounts(qc);
+    onSuccess: () => {
+      invalidateRavarerCounts(qc);
       invalidate();
       toast.success("Lagret");
       setNewCat("");
@@ -140,7 +142,8 @@ export default function MatchToleranserPage() {
       const { error } = await supabase.from("invoice_match_category_tolerances").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { invalidateRavarerCounts(qc);
+    onSuccess: () => {
+      invalidateRavarerCounts(qc);
       invalidate();
       setDeleteRow(null);
       toast.success("Kategorien er fjernet");

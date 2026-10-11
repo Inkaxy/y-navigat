@@ -140,7 +140,8 @@ export function BulkLinkDialog({
       const batches = groupAppliedLines(res.applied ?? [], rows);
       return { res, failed: await recalculateBatches(batches) };
     },
-    onSuccess: async ({ res, failed }) => { invalidateRavarerCounts(qc);
+    onSuccess: async ({ res, failed }) => {
+      invalidateRavarerCounts(qc);
       const applied = res.applied_count ?? res.applied?.length ?? 0;
       const skipped = res.skipped?.length ?? 0;
       setAppliedCount(applied);
@@ -162,7 +163,8 @@ export function BulkLinkDialog({
 
   const retry = useMutation({
     mutationFn: async () => await recalculateBatches(pendingBatches),
-    onSuccess: async (failed) => { invalidateRavarerCounts(qc);
+    onSuccess: async (failed) => {
+      invalidateRavarerCounts(qc);
       await invalidateQueue();
       if (failed.length > 0) {
         setPendingBatches(failed);

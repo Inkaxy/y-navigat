@@ -1,3 +1,4 @@
+import { showError } from "@/lib/userError";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
@@ -66,8 +67,8 @@ export default function LiveForhandlingSetup() {
           .eq("supplier_id", supplierId);
         if (error) throw error;
         rmIds = (data ?? [])
-          .filter((r: any) => r.raw_materials?.is_active)
-          .map((r: any) => r.raw_material_id);
+          .filter((r) => r.raw_materials?.is_active)
+          .map((r) => r.raw_material_id);
       }
 
       const neg = await createNeg.mutateAsync({
@@ -79,15 +80,17 @@ export default function LiveForhandlingSetup() {
         live_session_started_at: new Date().toISOString(),
         live_facilitator_id: user?.id ?? null,
         live_location_format: format,
-      } as any);
+      });
 
       // Insert single recipient (this supplier)
-      await supabase.from("negotiation_recipients" as any).insert({
+      // access_token settes av triggeren trg_neg_recipients_token; generert type krever den likevel.
+      // @ts-expect-error generert Insert-type mangler standardverdi for access_token
+      await supabase.from("negotiation_recipients").insert({
         negotiation_id: neg.id,
         supplier_id: supplierId,
         contact_email: supplier?.contact_email ?? null,
         contact_name: supplier?.name ?? null,
-      } as any);
+      });
 
       // Insert pre-loaded items as discussing? Per spec: "venter diskusjon" => pending
       if (rmIds.length > 0) {
@@ -97,7 +100,7 @@ export default function LiveForhandlingSetup() {
           sort_order: idx,
           live_status: "pending",
         }));
-        const { error } = await supabase.from("negotiation_items" as any).insert(rows as any);
+        const { error } = await supabase.from("negotiation_items").insert(rows);
         if (error) throw error;
       }
 
@@ -108,8 +111,8 @@ export default function LiveForhandlingSetup() {
       });
 
       navigate(paths.liveForhandling(neg.id));
-    } catch (e: any) {
-      toast.error(`Kunne ikke starte: ${e.message ?? e}`);
+    } catch (e: unknown) {
+      showError("live-forhandling:start", e, "Kunne ikke starte forhandlingen. Prøv igjen.");
     } finally {
       setSubmitting(false);
     }
@@ -177,7 +180,7 @@ fakturahistorikk, og uten den finnes verken volum eller prisgrunnlag. */}
 
         <div className="space-y-2">
           <Label>Sted/format</Label>
-          <RadioGroup value={format} onValueChange={(v: any) => setFormat(v)} className="flex gap-4">
+          <RadioGroup value={format} onValueChange={(v) => { if (v === "physical" || v === "video" || v === "phone") setFormat(v); }} className="flex gap-4">
             {[
               { v: "physical", l: "Fysisk møte" },
               { v: "video", l: "Video" },
