@@ -68,10 +68,10 @@ export function PdfDocumentViewer({ url, cacheKey, version, title, fallback, cla
     queryFn: async () => {
       const expected = `${cacheKey}|${version ?? ""}`;
       // Før nedlasting: forventet identitet må fortsatt gjelde.
-      if (verifyIdentity && (await verifyIdentity()) !== expected) throw new DocumentChangedError();
+      if (verifyIdentity && (await verifyIdentity(expected)) !== expected) throw new DocumentChangedError();
       const bytes = await loadDocumentBytes(url);
       // Kontrollen fullføres før bytene publiseres; ved avvik caches de aldri som gyldige.
-      if (verifyIdentity && (await verifyIdentity()) !== expected) throw new DocumentChangedError();
+      if (verifyIdentity && (await verifyIdentity(expected)) !== expected) throw new DocumentChangedError();
       return bytes;
     },
     staleTime: 10 * 60_000, gcTime: 10 * 60_000,
