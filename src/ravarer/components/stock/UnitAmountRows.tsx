@@ -46,10 +46,12 @@ interface Props {
   /** Skjul «Legg til delsum» når bare én rad er ønsket. */
   allowMultiple?: boolean;
   compact?: boolean;
+  /** Tilgjengelig navn, f.eks. «Telt mengde for Hvetemel»; brukes for mengdefelt og enhetsvelger. */
+  label?: string;
 }
 
 /** Mengde-input med enhetsvelger og valgfrie delsummer («4 sekker» + «12,5 kg»). */
-export function UnitAmountRows({ rows, onChange, units, baseUnit, allowMultiple = true, compact }: Props) {
+export function UnitAmountRows({ rows, onChange, units, baseUnit, allowMultiple = true, compact, label }: Props) {
   const setRow = (i: number, patch: Partial<UnitAmountRow>) =>
     onChange(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
 
@@ -63,10 +65,14 @@ export function UnitAmountRows({ rows, onChange, units, baseUnit, allowMultiple 
             className={compact ? "h-[44px] w-28 text-right tabular-nums" : "h-[44px] text-right tabular-nums"}
             value={row.amount}
             placeholder="0"
+            aria-label={`${label ?? "Mengde"}${rows.length > 1 ? `, rad ${i + 1}` : ""}`}
             onChange={e => setRow(i, { amount: e.target.value })}
           />
           <Select value={row.unitKey} onValueChange={v => setRow(i, { unitKey: v })}>
-            <SelectTrigger className="h-[44px] w-[170px]">
+            <SelectTrigger
+              className={compact ? "h-[44px] min-w-0 flex-1 sm:w-[170px] sm:flex-none" : "h-[44px] w-[170px]"}
+              aria-label={`${label ? `Enhet for ${label.charAt(0).toLowerCase()}${label.slice(1)}` : "Enhet"}${rows.length > 1 ? `, rad ${i + 1}` : ""}`}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

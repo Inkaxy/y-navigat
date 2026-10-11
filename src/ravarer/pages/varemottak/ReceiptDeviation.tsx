@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Link } from "react-router-dom";
+import { paths } from "@/ravarer/lib/paths";
+import {
+  acknowledgeAdjustment, beginAdjustment, isKnownRejection, markAdjustmentUnknown, pendingAdjustmentFor, settleAdjustment,
+  subscribePendingAdjustments, type PendingAdjustment,
+} from "@/ravarer/lib/adjustmentRecovery";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -45,11 +51,16 @@ type DeviationKind = "less" | "more" | "waste";
 
 export function DeviationDialog({
   line,
+  entityId,
+  invoiceId,
   invoiceNumber,
   onClose,
   isCurrent,
 }: {
   line: ReceiptLine | null;
+  /** Frosset opphav for gjenopprettingsmarkøren (selskap + faktura + linje + vare). */
+  entityId: string | null;
+  invoiceId: string;
   invoiceNumber: string;
   onClose: () => void;
   /** Gjeldende kontekst (montert, samme selskap/faktura, skrivetilgang) — sjekkes rett før bevegelsen skrives. */
@@ -66,11 +77,14 @@ export function DeviationDialog({
   const busy = useRef(false);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  /** Uklart svar: bevegelsen kan være skrevet. Aldri automatisk nytt forsøk fra denne dialogen. */
-  const [unknown, setUnknown] = useState(false);
+  /** Uavklart/pågående bevegelse for samme selskap/faktura/linje/vare — lever utenfor dialogen. */
+  const marker = useSyncExternalStore(subscribePendingAdjustments, () =>
+    line ? pendingAdjustmentFor(entityId, invoiceId, line.id, line.raw_material_id) : null);
+  const unknown = marker?.state === "unknown";
+  const [checked, setChecked] = useState(false);
 
   const submit = async () => {
-    if (busy.current || unknown || !line?.raw_material_id || base == null || base === 0) return;
+    if (busy.current || marker || !entityId || !line?.raw_material_id || base == null || base === 0) return;
     if (!isCurrent()) { toast.error("Konteksten er endret eller tilgangen mangler. Avviket ble ikke registrert."); onClose(); return; }
     busy.current = true;
     const amount = Math.abs(base);
@@ -84,12 +98,19 @@ export function DeviationDialog({
         ` faktura ${invoiceNumber}` +
         (note.trim() ? ` — ${note.trim()}` : ""),
     };
+    // Markøren settes før kallet: et svar som kommer etter lukking forsvinner ikke.
+    const rec: PendingAdjustment | null = beginAdjustment({ entityId, invoiceId, lineId: line.id, payload: frozen });
+    if (!rec) { busy.current = false; return; }
     try {
       await move.mutateAsync(frozen);
+      settleAdjustment(rec);
       if (mounted.current) onClose();
     } catch (e) {
-      console.warn("[varemottak] avvik: uklart utfall", e);
-      if (mounted.current) setUnknown(true);
+      if (isKnownRejection(e)) settleAdjustment(rec);
+      else {
+        console.warn("[varemottak] avvik: uklart utfall", e instanceof Error ? e.name : "ukjent");
+        markAdjustmentUnknown(rec);
+      }
     } finally {
       busy.current = false;
     }
@@ -128,14 +149,33 @@ export function DeviationDialog({
             <Textarea value={note} onChange={e => setNote(e.target.value)} rows={2} placeholder="Valgfritt" />
           </div>
         </div>
-        {unknown && (
-          <p role="alert" className="text-sm text-destructive">
-            Utfallet er ukjent — avviket kan være registrert. Kontroller lagerbevegelsene for varen før du registrerer på nytt.
-          </p>
+        {marker?.state === "pending" && (
+          <p role="status" className="text-sm text-ink-secondary">Et avvik for denne linja sendes nå. Vent på svaret.</p>
+        )}
+        {unknown && marker && (
+          <div role="alert" data-testid="adjustment-unknown" className="space-y-2 rounded-md border border-destructive/40 p-3 text-sm">
+            <p className="text-destructive">
+              Utfallet er ukjent — avviket kan være registrert: {marker.payload.quantity_base > 0 ? "+" : "−"}
+              {formatNumber(Math.abs(marker.payload.quantity_base), 2)} {line?.base_unit} ({marker.payload.kind === "waste" ? "svinn" : "justering"}), «{marker.payload.note}».
+            </p>
+            <p>Kontroller lagerbevegelsene for varen før du registrerer på nytt. Ingenting sendes automatisk.</p>
+            <Link className="inline-flex min-h-[44px] items-center text-primary underline-offset-2 hover:underline"
+              to={paths.raavare(marker.payload.raw_material_id, { seksjon: "lager" })}>
+              Åpne lagerbevegelsene for varen
+            </Link>
+            <label className="flex min-h-[44px] items-center gap-2">
+              <input type="checkbox" className="h-5 w-5" checked={checked} onChange={(e) => setChecked(e.target.checked)} />
+              Jeg har kontrollert lagerbevegelsene
+            </label>
+            <Button variant="outline" className="min-h-[44px]" disabled={!checked}
+              onClick={() => { acknowledgeAdjustment(marker); setChecked(false); }}>
+              Bekreft kontroll og lås opp
+            </Button>
+          </div>
         )}
         <DialogFooter>
           <Button variant="outline" className="min-h-[44px]" onClick={onClose}>{unknown ? "Lukk" : "Avbryt"}</Button>
-          <Button className="min-h-[44px]" onClick={() => void submit()} disabled={unknown || move.isPending || base == null || base === 0}>Registrer</Button>
+          <Button className="min-h-[44px]" onClick={() => void submit()} disabled={!!marker || move.isPending || base == null || base === 0}>Registrer</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

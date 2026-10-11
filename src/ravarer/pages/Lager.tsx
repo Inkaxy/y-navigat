@@ -17,6 +17,7 @@ import { StockPeek } from "@/ravarer/components/stock/StockPeek";
 import { DataTable, type Column } from "@/ravarer/ui/DataTable";
 import { SplitView } from "@/ravarer/ui/SplitView";
 import { Link } from "react-router-dom";
+import { MobileKpis } from "@/ravarer/components/stock/MobileKpis";
 import { paths } from "@/ravarer/lib/paths";
 import { formatDate, formatNumber } from "@/ravarer/lib/constants";
 import { AllStockTable } from "@/ravarer/components/stock/AllStockTable";
@@ -133,7 +134,7 @@ export default function LagerPage() {
       <div className="space-y-5">
         <RavarerHeaderBanner />
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="hidden gap-4 sm:grid sm:grid-cols-2 lg:grid-cols-5" data-testid="stock-kpis-desktop">
           <Card className="p-4">
             <p className="text-xs uppercase tracking-wider text-ink-secondary">Handelsvarer med lager</p>
             <p className="mt-1 text-2xl font-semibold tabular-nums">{kpi(String(items.length))}</p>
@@ -176,6 +177,27 @@ export default function LagerPage() {
           </Button>
         )}
         </div>
+
+        {filter === "videresalg" ? (
+          <MobileKpis testId="stock-kpis-mobile" secondaryLabel="Flere nøkkeltall"
+            primary={[
+              { label: "Videresalg under minimum", value: kpi(String(belowMin)), tone: ready && belowMin > 0 ? "warning" : undefined },
+              { label: "Oversolgt", value: kpi(String(negatives)), tone: ready && negatives > 0 ? "destructive" : undefined },
+            ]}
+            secondary={[
+              { label: "Handelsvarer med lager", value: kpi(String(items.length)) },
+              { label: "Lagerverdi (videresalg)", value: kpi(kr(totalValue)) },
+              { label: "Under minimum (alle lagerførte)", value: belowMinAll == null ? "–" : String(belowMinAll) },
+            ]} />
+        ) : (
+          <MobileKpis testId="stock-kpis-mobile" primary={[]} secondaryLabel="Nøkkeltall for videresalg"
+            secondary={[
+              { label: "Handelsvarer med lager", value: kpi(String(items.length)) },
+              { label: "Videresalg under minimum", value: kpi(String(belowMin)) },
+              { label: "Oversolgt", value: kpi(String(negatives)) },
+              { label: "Lagerverdi (videresalg)", value: kpi(kr(totalValue)) },
+            ]} />
+        )}
 
         {filter === "alle" ? (
           <div className="space-y-5">

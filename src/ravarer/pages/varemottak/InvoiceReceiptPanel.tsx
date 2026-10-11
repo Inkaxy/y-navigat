@@ -116,6 +116,8 @@ export function InvoiceReceiptPanel({
         <DeviationDialog
           key={`${deviationCtx.entity ?? ""}|${deviationCtx.invoiceId}|${deviationCtx.line.id}`}
           line={deviationCtx.line}
+          entityId={deviationCtx.entity}
+          invoiceId={deviationCtx.invoiceId}
           invoiceNumber={deviationCtx.invoiceNumber}
           isCurrent={() => isCurrent(deviationCtx)}
           onClose={() => setDeviationCtx(null)}

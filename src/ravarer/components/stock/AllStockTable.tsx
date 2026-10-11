@@ -1,3 +1,4 @@
+import { MobileKpis } from "./MobileKpis";
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
@@ -83,7 +84,13 @@ export function AllStockTable({ q, selectedId, onSelect }: { q: string; selected
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3" data-testid="all-stock-kpis">
+      <MobileKpis testId="all-stock-kpis-mobile" secondaryLabel="Lagerverdi"
+        primary={[
+          { label: "Lagerførte varer", value: kpi(String(rows.length)) },
+          { label: "Under minimum", value: kpi(String(belowMin)), tone: ready && belowMin > 0 ? "warning" : undefined },
+        ]}
+        secondary={[{ label: "Samlet lagerverdi", value: kpi(formatNok(totalValue)) }]} />
+      <div className="hidden gap-4 sm:grid sm:grid-cols-3" data-testid="all-stock-kpis">
         <Card className="min-w-0 p-4">
           <p className="text-xs uppercase tracking-wider text-ink-secondary">Lagerførte varer</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums">{kpi(String(rows.length))}</p>
