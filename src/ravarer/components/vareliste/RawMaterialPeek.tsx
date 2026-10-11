@@ -1,0 +1,96 @@
+import { Link } from "react-router-dom";
+import { Maximize2 } from "lucide-react";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { QueryState } from "@/components/common/QueryState";
+import { useRawMaterialPage } from "@/ravarer/hooks/useRawMaterialPage";
+import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
+import { formatDate, formatNok, priceSourceLabel } from "@/ravarer/lib/constants";
+import { paths } from "@/ravarer/lib/paths";
+import { completenessChecklist, sectionSearch, type SectionId } from "@/ravarer/lib/rawMaterialSections";
+import { agreementStatusLabel, derivedPackagePrice, packageLabel } from "@/ravarer/lib/supplierPackagePrice";
+import { ChecklistCard } from "@/ravarer/components/detail/Completeness";
+
+const STATUS: Record<string, string> = { verifisert: "Verifisert", uverifisert: "Uverifisert — ingen gyldig kilde", mangler: "Mangler gyldig kostpris" };
+const fullPrice = (n: number) => n.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+
+/**
+ * Peek for valgt råvare i varearbeidsflaten. Sidepanel (Sheet) på alle bredder — aldri et skjult
+ * panel. Data fra samme felles henting som råvarekortet; delspørringsfeil vises, aldri som «mangler».
+ */
+export function RawMaterialPeek({ id, listSearch, onClose }: { id: string | null; listSearch: string; onClose: () => void }) {
+  return (
+    <Sheet open={!!id} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
+        {id && <PeekBody id={id} listSearch={listSearch} />}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function PeekBody({ id, listSearch }: { id: string; listSearch: string }) {
+  const page = useRawMaterialPage(id);
+  const { data: suppliers = [] } = useSuppliers();
+  const rm = page.rm;
+  const sp = new URLSearchParams(listSearch);
+  const href = (s: SectionId) => `${paths.raavare(id)}${sectionSearch(sp, s)}`;
+  if (page.isLoading || page.isError || !rm) {
+    return (
+      <QueryState isLoading={page.isLoading} isError={page.isError} error={page.error} onRetry={() => page.refetch()} scope="Råvaren" isEmpty={!rm} emptyTitle="Råvaren ble ikke funnet">
+        {null}
+      </QueryState>
+    );
+  }
+  const nameOf = new Map(suppliers.map((s) => [s.id, s.name]));
+  const checklist = completenessChecklist({ rm, linkCount: page.links.length, nutrition: page.nutrition, hasDatasheet: page.hasDatasheet });
+  const verified = rm.cost_basis_status === "verifisert";
+  return (
+    <div className="space-y-5">
+      <SheetHeader>
+        <SheetTitle className="font-display text-title">{rm.name}</SheetTitle>
+        <SheetDescription>SKU {rm.sku} · {rm.base_unit}{rm.is_active ? "" : " · Inaktiv"}</SheetDescription>
+      </SheetHeader>
+      <div className="flex flex-wrap gap-2">
+        <Button asChild size="sm" className="min-h-11 gap-1.5"><Link to={href("sammendrag")}><Maximize2 className="h-3.5 w-3.5" aria-hidden />Åpne fullt</Link></Button>
+        <Button asChild size="sm" variant="outline" className="min-h-11"><Link to={href("pris")}>Pris</Link></Button>
+        <Button asChild size="sm" variant="outline" className="min-h-11"><Link to={href("leverandorer")}>Leverandører</Link></Button>
+      </div>
+
+      <section className="rounded-lg border border-line-subtle p-4">
+        <div className="text-caption text-ink-secondary">Kostpris per {rm.base_unit}</div>
+        <div className="text-2xl font-semibold tabular-nums">{rm.current_cost_price != null ? formatNok(rm.current_cost_price) : "Ukjent"}</div>
+        <div className={verified ? "text-caption text-success" : "text-caption text-warning"}>{STATUS[rm.cost_basis_status ?? ""] ?? "Prisstatus ukjent"}</div>
+        <div className="text-caption text-ink-secondary">
+          {rm.current_cost_price != null && `${fullPrice(rm.current_cost_price)} · `}{rm.price_source ? priceSourceLabel(rm.price_source) : "Ingen kilde"}{rm.price_updated_at ? ` · ${formatDate(rm.price_updated_at)}` : ""}
+        </div>
+      </section>
+
+      <ChecklistCard items={checklist} hrefFor={href} />
+
+      <section className="space-y-2">
+        <h3 className="text-base font-semibold">Leverandører</h3>
+        {page.links.length === 0 ? <p className="text-sm text-ink-secondary">Ingen leverandør koblet.</p> : (
+          <ul className="divide-y divide-line-subtle text-sm">
+            {page.links.map((l) => {
+              const d = derivedPackagePrice(l);
+              const status = agreementStatusLabel(l);
+              return (
+                <li key={l.id} className="py-2">
+                  <div className="font-medium">{nameOf.get(l.supplier_id) ?? "Ukjent leverandør"}{l.is_primary ? " · Primær" : ""}</div>
+                  <div className="text-caption text-ink-secondary">{packageLabel(l, rm.base_unit).label ?? "Pakning ukjent"}</div>
+                  {l.agreed_price_per_base_unit != null && (
+                    <div className="text-caption tabular-nums">
+                      Avtale {formatNok(l.agreed_price_per_base_unit)} / {rm.base_unit}
+                      {d.kind === "known" ? ` · ${formatNok(d.price)} per pakning (avledet)` : d.kind === "needs_confirmation" ? " · pakningsgrunnlag må bekreftes" : ""}
+                      {status && <span className="block text-warning">{status}</span>}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
