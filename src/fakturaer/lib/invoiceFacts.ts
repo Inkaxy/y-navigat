@@ -28,7 +28,7 @@ export function readingReliability(i: {
   if (mismatch || issues) return { label: mismatch ? "Ikke bekreftet – sum avviker" : "Ikke bekreftet – lesevarsler", validated: false, rawScore: raw };
   // Validert betyr at linjesummen faktisk er kontrollert mot fakturaen — ikke at AI-en er sikker.
   const checked = i.linesSumStatus === "ok" || i.linesSumStatus === "overridden";
-  if (!checked) return { label: "Ikke kontrollert mot fakturasum", validated: false, rawScore: raw };
+  if (!checked) return { label: "Ikke bekreftet – sum ikke kontrollert", validated: false, rawScore: raw };
   return { label: i.linesSumStatus === "overridden" ? "Kontrollert (sum overstyrt)" : "Kontrollert mot fakturasum", validated: true, rawScore: raw };
 }
 
