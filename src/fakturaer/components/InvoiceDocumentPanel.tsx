@@ -1,3 +1,4 @@
+import { LOW_EXTRACTION_CONFIDENCE } from "@/fakturaer/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { X, AlertTriangle, RefreshCw } from "lucide-react";
@@ -60,7 +61,7 @@ export function InvoiceDocumentPanel({ invoice, line, onClose, className, tolera
   const exclVat = total != null ? total - (vat ?? 0) : null;
   const mismatch = invoice?.lines_sum_status === "mismatch";
   const confidence = num(invoice?.extraction_confidence);
-  const lowConfidence = confidence != null && confidence < 0.7;
+  const lowConfidence = confidence != null && confidence < LOW_EXTRACTION_CONFIDENCE;
 
   const variance = num(line?.price_variance_pct);
   const varianceTone =

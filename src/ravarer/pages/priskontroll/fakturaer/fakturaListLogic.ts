@@ -1,6 +1,6 @@
 /** Filtre, klientfiltrering og CSV for Fakturaer-fanen. Rene funksjoner. */
 import type { InboxInvoice } from "@/fakturaer/hooks/useInboxInvoices";
-import { INVOICE_SOURCES, INVOICE_STATUSES } from "@/fakturaer/lib/constants";
+import { INVOICE_SOURCES, INVOICE_STATUSES, LOW_EXTRACTION_CONFIDENCE } from "@/fakturaer/lib/constants";
 import { getPaidBadgeInfo } from "@/fakturaer/lib/paidStatus";
 
 export interface FakturaFilters {
@@ -19,7 +19,7 @@ export interface FakturaFilters {
 /** URL-nøklene filtrene bruker — «Nullstill» fjerner bare disse (og side). */
 export const FILTER_KEYS = ["q", "leverandor", "status", "fra", "til", "avvik", "betalt", "kilde", "kreditnota", "lav", "side"] as const;
 
-export const LOW_CONFIDENCE = 0.7;
+export const LOW_CONFIDENCE = LOW_EXTRACTION_CONFIDENCE;
 
 export function parseFilters(sp: URLSearchParams): FakturaFilters {
   const b = sp.get("betalt");

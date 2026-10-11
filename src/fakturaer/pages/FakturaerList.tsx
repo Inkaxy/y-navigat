@@ -1,3 +1,4 @@
+import { LOW_EXTRACTION_CONFIDENCE } from "@/fakturaer/lib/constants";
 import { useState } from "react";
 import { resetParamsKeeping } from "@/lib/resetParamsKeeping";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -386,7 +387,7 @@ export default function FakturaerListPage() {
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <InvoiceStatusBadge status={r.status} reconciledMode={r.reconciled_mode} />
-                            {r.extraction_confidence != null && Number(r.extraction_confidence) < 0.7 && (
+                            {r.extraction_confidence != null && Number(r.extraction_confidence) < LOW_EXTRACTION_CONFIDENCE && (
                               <Badge
                                 variant="outline"
                                 className="gap-1 border-warning/30 bg-warning/15 text-warning"

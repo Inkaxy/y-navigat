@@ -1,3 +1,4 @@
+import { LOW_EXTRACTION_CONFIDENCE } from "@/fakturaer/lib/constants";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
@@ -60,7 +61,7 @@ interface ParseResult {
 
 const LOW_CONF = 0.8;
 /** Under denne lesesikkerheten må fakturaen gjennomgås manuelt. */
-const LOW_EXTRACTION_CONF = 0.7;
+const LOW_EXTRACTION_CONF = LOW_EXTRACTION_CONFIDENCE;
 
 
 async function fileToBase64(file: File): Promise<string> {

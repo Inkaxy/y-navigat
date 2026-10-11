@@ -1,3 +1,4 @@
+import { LOW_EXTRACTION_CONFIDENCE } from "@/fakturaer/lib/constants";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -86,7 +87,7 @@ export default function InvoiceDetailPage() {
   const reviewLineCount = lines.filter((l) => l.requires_review).length;
   const isFinal = ["reconciled", "flagged"].includes(data.status);
   const sumMismatch = data.lines_sum_status === "mismatch";
-  const lowConfidence = data.extraction_confidence != null && Number(data.extraction_confidence) < 0.7;
+  const lowConfidence = data.extraction_confidence != null && Number(data.extraction_confidence) < LOW_EXTRACTION_CONFIDENCE;
   const unmatchedLines = lines.filter((l) => !l.raw_material_id);
   const selectedIds = Object.keys(selected).filter((k) => selected[k]);
   const selectedLines = unmatchedLines.filter((l) => selected[l.id]);
