@@ -255,6 +255,21 @@ describe("ReadingState og retry-knapp", () => {
     fireEvent.click(screen.getByText("Ja, kjør på nytt"));
     expect(onInvoke).toHaveBeenCalledTimes(1);
   });
+  it("uløst kall etter 121 s: ukjent utfall, oppdater/avbryt tilgjengelig, ingen ny kjøring", () => {
+    const now = () => Date.parse("2026-10-11T10:00:00Z") + 121_000;
+    const onInvoke = vi.fn(), onRefresh = vi.fn(), onCancel = vi.fn();
+    const { container } = render(<ReadingState {...base} invoking onInvoke={onInvoke} onRefresh={onRefresh} onCancel={onCancel} startedAt="2026-10-11T10:00:00Z" now={now} />);
+    expect(screen.getByText("Lesingen er ikke bekreftet ferdig")).toBeInTheDocument();
+    expect(screen.getByText(/utfallet er ukjent/)).toBeInTheDocument();
+    expect(container.querySelector(".animate-spin")).toBeNull();
+    expect(screen.queryByText("Kjør leseren på nytt …")).toBeNull();
+    expect(screen.queryByText("Kjør leseren")).toBeNull();
+    fireEvent.click(screen.getByText("Oppdater status"));
+    fireEvent.click(screen.getByText("Avbryt lesingen"));
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onInvoke).not.toHaveBeenCalled();
+  });
   it("feilkode fra leserkallet vises", () => {
     render(<ReadingState {...base} invokeCode="ukjent_utfall" startedAt={new Date().toISOString()} />);
     expect(screen.getByText(/Svaret fra leseren kom ikke fram/)).toBeInTheDocument();
