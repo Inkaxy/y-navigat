@@ -42,7 +42,7 @@ import { canFetchLines } from "./invoiceSteps";
 import { CorrectLineDialog } from "./CorrectLineDialog";
 import { correctionDocLine } from "./correctionDocLine";
 import { parseReadIssues } from "@/fakturaer/lib/lineCorrection";
-import { useInvoicePriceSafety } from "@/fakturaer/hooks/useInvoicePriceSafety";
+import { useInvoicePriceSafety, type SafetyLineRef } from "@/fakturaer/hooks/useInvoicePriceSafety";
 import { PriceGateProvider } from "@/fakturaer/lib/priceGateContext";
 
 // v2: originaldokumentet er åpent som standard; bare et eksplisitt «skjul» huskes.
