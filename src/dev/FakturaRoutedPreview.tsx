@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import FakturaWorkspace from "@/ravarer/pages/priskontroll/faktura/FakturaWorkspace";
+import { FakturaerProvider } from "@/fakturaer/context/FakturaerContext";
 import "@/index.css";
 
 /** Lokal sjekk av den EKTE fakturaarbeidsflaten med fast faktura i cache. Linjekøen krever innlogging og viser feil her. */
@@ -18,7 +19,7 @@ qc.setQueryData(["invoice", "p1"], {
   invoice_lines: [line(1, "KARDEMOMME 1 HT", 81200), line(2, "VANILJESUKKER", 64000), line(3, "KANEL MALT", 197903.5)],
 });
 createRoot(document.getElementById("root")!).render(
-  <QueryClientProvider client={qc}><AuthProvider><TooltipProvider><MemoryRouter initialEntries={["/ravarer/priskontroll/faktura/p1?retur=fane%3Dgjore"]}>
+  <QueryClientProvider client={qc}><AuthProvider><FakturaerProvider><TooltipProvider><MemoryRouter initialEntries={["/ravarer/priskontroll/faktura/p1?retur=fane%3Dgjore"]}>
     <div className="min-h-screen bg-background px-4 py-4 md:px-8"><Routes><Route path="/ravarer/priskontroll/faktura/:id" element={<FakturaWorkspace />} /></Routes></div>
-  </MemoryRouter></TooltipProvider></AuthProvider></QueryClientProvider>,
+  </MemoryRouter></TooltipProvider></FakturaerProvider></AuthProvider></QueryClientProvider>,
 );
