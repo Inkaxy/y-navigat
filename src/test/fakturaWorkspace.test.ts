@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { deliverySteps, nextInvoiceStep, type NextStepInput } from "@/ravarer/pages/priskontroll/faktura/invoiceSteps";
 import { normalizePriskontrollSearch, parseVisning, fakturaBackHref } from "@/ravarer/pages/priskontroll/fakturaer/visning";
