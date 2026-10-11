@@ -10,15 +10,16 @@ begin
   r := r || 'replay1=' || public._rm_manual_pdf_enqueue_match(inv,true);
   r := r || ' replay2=' || public._rm_manual_pdf_enqueue_match(inv,true);
   r := r || ' queued=' || (select count(*) from rm_rematch_queue where invoice_id=inv);
-  -- 2) Godkjent faktura: aldri ny matching ved replay.
+  -- 2) Avstemt faktura: aldri ny matching ved replay.
   insert into invoices(legal_entity_id,supplier_id,invoice_number,invoice_date,source,source_document_url,status)
-    values (le,sup,'ZZ-R2',current_date,'pdf_upload',le||'/zz2.pdf','approved') returning id into inv2;
+    values (le,sup,'ZZ-R2',current_date,'pdf_upload',le||'/zz2.pdf','needs_review') returning id into inv2;
+  update invoices set reconciled_at=now() where id=inv2;
   insert into invoice_lines(invoice_id,line_number,description,quantity,unit_price,total_amount) values (inv2,1,'Mel',1,10,10);
-  r := r || ' approved=' || public._rm_manual_pdf_enqueue_match(inv2,true);
+  r := r || ' reconciled=' || public._rm_manual_pdf_enqueue_match(inv2,true);
   -- 3) Allerede matchet linje: ingen ny matching.
-  update invoices set status='needs_review' where id=inv2;
+  update invoices set reconciled_at=null where id=inv2;
   update invoice_lines set match_confidence='manual' where invoice_id=inv2;
   r := r || ' matched=' || public._rm_manual_pdf_enqueue_match(inv2,true);
   raise exception 'RESULT %', r;
 end $$;
--- Forventet: RESULT replay1=true replay2=false queued=1 approved=false matched=false
+-- Forventet: RESULT replay1=true replay2=false queued=1 reconciled=false matched=false
