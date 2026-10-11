@@ -8,6 +8,7 @@ import { useLinkSupplierItem, usePackageInference } from "@/fakturaer/hooks/useS
 import { MaterialBlock, type NewMaterialDraft } from "./MaterialBlock";
 import { PackageBlock } from "./PackageBlock";
 import { LinkResultBox } from "./LinkResultBox";
+import { useConfirmMany } from "@/ravarer/ui/useConfirmMany";
 import { AiSuggestion } from "./AiSuggestion";
 import { RawMaterialCreateSheet } from "@/ravarer/editors/RawMaterialCreateSheet";
 import { NOT_ITEM_REASONS, nameFromDescription, needsPackage, openScope, suggestedBaseUnit } from "@/fakturaer/lib/linkFormLogic";
@@ -84,9 +85,11 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
   const hasMaterial = mode === "new" ? draft.name.trim().length > 1 : !!selectedId;
   const n = scope.lines;
 
+  const many = useConfirmMany();
   if (result) return <LinkResultBox result={result} onClose={onClose} onNext={onNext} />;
 
-  const submit = async (body: Partial<LinkSupplierItemBody>) => {
+  const submit = (body: Partial<LinkSupplierItemBody>) => many.guard(n, body.not_raw_material ? "«Ikke vare»" : "Koblingen", () => void doSubmit(body));
+  const doSubmit = async (body: Partial<LinkSupplierItemBody>) => {
     if (!company) return;
     setError(null);
     try {
@@ -208,6 +211,7 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
           onDone={(_id, o) => { if (o.kind === "linked") onDone?.(o.result); }}
         />
       )}
+      {many.dialog}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { useConfirmMany } from "@/ravarer/ui/useConfirmMany";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -80,6 +81,7 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
   const toggle = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const lineRefs = chosen.map((r) => ({ id: r.id, price_per_base_unit: r.price_per_base_unit }));
 
+  const many = useConfirmMany();
   const onAccept = async () => {
     setError(null);
     try {
@@ -123,7 +125,7 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
           hasAgreement={item.agreed_price_per_base_unit != null}
           tolerancePct={tol.toleranceFor(item.rm_category)} hardCapPct={tol.settings?.price_hard_cap_pct ?? DEFAULT_HARD_CAP_PCT} settings={tol.settings}
           reason={reason} onReason={setReason} canWrite={canWrite} busy={accept.isPending || claim.isPending} error={error}
-          onAccept={() => void onAccept()} onClaim={() => setClaimOpen(true)}
+          onAccept={() => many.guard(lineRefs.length, "Godta prisen", () => void onAccept())} onClaim={() => many.guard(lineRefs.length, "Krev kreditt", () => setClaimOpen(true))}
           onFixAgreement={() => setAgreementOpen(true)} onCheckPackage={onCheckPackage}
           startPrice={startLine ? { onConfirm: () => setStartOpen(true) } : null}
         />
@@ -159,6 +161,7 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
           rawMaterialName={item.rm_name} supplierName={item.supplier_name} canWrite={canWrite}
         />
       )}
+      {many.dialog}
     </>
   );
 }

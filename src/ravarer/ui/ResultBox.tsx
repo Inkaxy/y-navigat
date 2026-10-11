@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useHotkeys } from "@/ravarer/ui/hotkeys";
 
 type Props = {
   title: string;
@@ -14,6 +15,8 @@ type Props = {
 
 /** Standard resultat etter en handling: hva skjedde, valgfri «Angre», og «Neste». */
 export function ResultBox({ title, items = [], onUndo, onNext, nextLabel = "Neste", children }: Props) {
+  // U angrer når handlingen kan angres (bare da vises knappen).
+  useHotkeys([{ keys: ["u"], description: "Angre", handler: () => onUndo?.() }], { enabled: !!onUndo });
   return (
     <div role="status" className="rounded-lg border border-success/40 bg-success/5 p-4">
       <div className="flex items-start gap-2">
@@ -30,7 +33,7 @@ export function ResultBox({ title, items = [], onUndo, onNext, nextLabel = "Nest
       </div>
       {(onUndo || onNext) && (
         <div className="mt-3 flex justify-end gap-2">
-          {onUndo && <Button variant="ghost" size="sm" onClick={onUndo}>Angre</Button>}
+          {onUndo && <Button variant="ghost" size="sm" onClick={onUndo} aria-keyshortcuts="U">Angre</Button>}
           {onNext && <Button size="sm" data-action="next" onClick={onNext}>{nextLabel}</Button>}
         </div>
       )}
