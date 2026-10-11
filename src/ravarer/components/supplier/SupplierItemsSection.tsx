@@ -8,6 +8,31 @@ import { paths } from "@/ravarer/lib/paths";
 import { useSupplierItems, type SupplierItemRow } from "@/ravarer/hooks/useSupplierDetail";
 import type { SupplierRow } from "@/ravarer/hooks/useSuppliers";
 import { SupplierPriceTimeline } from "./SupplierPriceTimeline";
+import { useMemo } from "react";
+import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { useSupplierLatestPurchase, type SupplierLatest } from "@/ravarer/hooks/useSupplierLatestPurchase";
+
+function latestCell(l: SupplierLatest, baseUnit: string | null | undefined) {
+  switch (l.kind) {
+    case "loading": return <span className="text-ink-secondary">Kontrollerer …</span>;
+    case "error": return <span className="text-destructive">Kunne ikke hentes</span>;
+    case "price":
+      return (
+        <span className="tabular-nums">
+          {formatNok(l.price)}{baseUnit ? <span className="text-caption text-ink-secondary"> /{baseUnit}</span> : null}
+          <span className="block text-caption text-ink-secondary">{formatDate(l.date)}</span>
+        </span>
+      );
+    case "control":
+      return (
+        <span>
+          <Link to={paths.faktura(l.invoiceId)} className="text-warning hover:underline">Må kontrolleres</Link>
+          <span className="block text-caption text-ink-secondary">{formatDate(l.date)}{l.reason ? ` · ${l.reason}` : ""}</span>
+        </span>
+      );
+    case "unknown": return <span className="text-caption text-ink-secondary">Ukjent · {l.reason}</span>;
+  }
+}
 
 /** Koblingens redigering skjer i råvarekortets leverandørseksjon (samme redigerere, samme RPC-er). */
 export const editLinkHref = (r: Pick<SupplierItemRow, "raw_material_id">) => paths.raavare(r.raw_material_id, { seksjon: "leverandorer" });
@@ -26,6 +51,9 @@ function agreementCell(r: SupplierItemRow) {
 
 export function SupplierItemsSection({ supplier }: { supplier: SupplierRow }) {
   const q = useSupplierItems(supplier.id);
+  const { legalEntityId } = useRavarer();
+  const materialIds = useMemo(() => (q.data ?? []).map((r) => r.raw_material_id), [q.data]);
+  const latestOf = useSupplierLatestPurchase(legalEntityId, supplier.id, materialIds);
   const columns: Column<SupplierItemRow>[] = [
     { id: "name", header: "Vare", alwaysVisible: true, sortKey: (r) => r.raw_material?.name ?? "",
       cell: (r) => (
@@ -40,6 +68,7 @@ export function SupplierItemsSection({ supplier }: { supplier: SupplierRow }) {
     { id: "sku", header: "Lev.nr", sortKey: (r) => r.supplier_sku ?? "", cell: (r) => <span className="font-mono text-xs">{r.supplier_sku ?? "—"}</span> },
     { id: "package", header: "Pakning", cell: (r) => (r.package_size != null ? `${formatNumber(r.package_size)} ${r.package_unit ?? ""}`.trim() : "—") },
     { id: "agreed", header: "Avtalepris / grunnenhet", align: "right", sortKey: (r) => r.agreed_price_per_base_unit ?? -1, cell: agreementCell },
+    { id: "latest", header: "Siste kjøpspris", align: "right", cell: (r) => latestCell(latestOf(r.raw_material_id), r.raw_material?.base_unit) },
     { id: "validity", header: "Gyldighet", cell: (r) => (r.agreement_valid_from || r.agreement_valid_to ? `${formatDate(r.agreement_valid_from)} – ${formatDate(r.agreement_valid_to)}` : "—") },
     { id: "edit", header: "", cell: (r) => <Link to={editLinkHref(r)} className="inline-flex min-h-[44px] items-center text-primary hover:underline md:min-h-0">Rediger kobling</Link> },
   ];
@@ -60,6 +89,7 @@ export function SupplierItemsSection({ supplier }: { supplier: SupplierRow }) {
             <Link to={paths.raavare(r.raw_material_id)} className="font-medium hover:underline">{r.raw_material?.name ?? "Ukjent råvare"}</Link>
             <div className="text-caption text-ink-secondary">{r.supplier_sku ? `Lev.nr ${r.supplier_sku}` : "Uten lev.nr"}</div>
             <div>{agreementCell(r)}</div>
+            <div className="text-sm"><span className="text-caption text-ink-secondary">Siste kjøp: </span>{latestCell(latestOf(r.raw_material_id), r.raw_material?.base_unit)}</div>
             <Link to={editLinkHref(r)} className="inline-flex min-h-[44px] items-center text-primary hover:underline">Rediger kobling</Link>
           </div>
         )}
