@@ -18072,6 +18072,10 @@ export type Database = {
         }
         Returns: Json
       }
+      rm_list_price_evidence: {
+        Args: { p_legal_entity_id: string; p_raw_material_ids: string[] }
+        Returns: Json
+      }
       rm_match_key: { Args: { p: string }; Returns: string }
       rm_material_price_projection: {
         Args: { p_raw_material_id: string }
