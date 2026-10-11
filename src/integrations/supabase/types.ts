@@ -2908,6 +2908,7 @@ export type Database = {
       }
       invoice_extraction_examples: {
         Row: {
+          accepted_issues: Json
           corrected: Json
           created_at: string
           created_by: string | null
@@ -2924,6 +2925,7 @@ export type Database = {
           supplier_sku_norm: string | null
         }
         Insert: {
+          accepted_issues?: Json
           corrected: Json
           created_at?: string
           created_by?: string | null
@@ -2940,6 +2942,7 @@ export type Database = {
           supplier_sku_norm?: string | null
         }
         Update: {
+          accepted_issues?: Json
           corrected?: Json
           created_at?: string
           created_by?: string | null
@@ -3311,6 +3314,7 @@ export type Database = {
           count_per_package: number | null
           created_at: string | null
           description: string | null
+          discount_amount: number | null
           expected_price_per_base_unit: number | null
           extraction_issues: Json
           id: string
@@ -3339,6 +3343,7 @@ export type Database = {
           total_amount: number | null
           unit: string | null
           unit_price: number | null
+          unit_price_basis: string | null
           updated_at: string | null
           variance_status: string | null
           vat_rate: number | null
@@ -3348,6 +3353,7 @@ export type Database = {
           count_per_package?: number | null
           created_at?: string | null
           description?: string | null
+          discount_amount?: number | null
           expected_price_per_base_unit?: number | null
           extraction_issues?: Json
           id?: string
@@ -3376,6 +3382,7 @@ export type Database = {
           total_amount?: number | null
           unit?: string | null
           unit_price?: number | null
+          unit_price_basis?: string | null
           updated_at?: string | null
           variance_status?: string | null
           vat_rate?: number | null
@@ -3385,6 +3392,7 @@ export type Database = {
           count_per_package?: number | null
           created_at?: string | null
           description?: string | null
+          discount_amount?: number | null
           expected_price_per_base_unit?: number | null
           extraction_issues?: Json
           id?: string
@@ -3413,6 +3421,7 @@ export type Database = {
           total_amount?: number | null
           unit?: string | null
           unit_price?: number | null
+          unit_price_basis?: string | null
           updated_at?: string | null
           variance_status?: string | null
           vat_rate?: number | null
@@ -17781,6 +17790,22 @@ export type Database = {
         Args: {
           p_count_per_package: number
           p_is_credit?: boolean
+          p_package_size: number
+          p_package_unit: string
+          p_quantity: number
+          p_total: number
+          p_unit: string
+          p_unit_price: number
+        }
+        Returns: Json
+      }
+      rm_line_read_issues_v2: {
+        Args: {
+          p_basis: string
+          p_count_per_package: number
+          p_discount: number
+          p_is_credit: boolean
+          p_line_kind: string
           p_package_size: number
           p_package_unit: string
           p_quantity: number
