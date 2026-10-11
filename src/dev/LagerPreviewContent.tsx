@@ -4,6 +4,9 @@ import { RavarerStaticProvider } from "@/ravarer/context/RavarerContext";
 import { InvoiceReceiptPanel } from "@/ravarer/pages/varemottak/InvoiceReceiptPanel";
 import { CountSubmissionBanner, DraftSaveStatus } from "@/ravarer/pages/varetelling/CountPanels";
 import { CountRejectedError, type PendingCountSubmission } from "@/ravarer/lib/countSubmission";
+import { CountLineCard } from "@/ravarer/pages/varetelling/CountLineCard";
+import { MobileKpis } from "@/ravarer/components/stock/MobileKpis";
+import { emptyRow, type UnitAmountRow } from "@/ravarer/components/stock/UnitAmountRows";
 import type { ReceiptLine } from "@/ravarer/hooks/useGoodsReceipt";
 
 /**
@@ -28,6 +31,10 @@ export default function LagerPreviewContent() {
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { enabled: false, retry: false } } }));
   const [open, setOpen] = useState(true);
   const [last, setLast] = useState("Ingen handling ennå.");
+  // Bare lokal visningstilstand for tellekortet; ingenting lagres.
+  const [loc, setLoc] = useState("");
+  const [lineNote, setLineNote] = useState("");
+  const [rows, setRows] = useState<UnitAmountRow[]>([emptyRow()]);
   return (
     <QueryClientProvider client={client}>
       <RavarerStaticProvider canWrite>
@@ -39,6 +46,16 @@ export default function LagerPreviewContent() {
           <CountSubmissionBanner pending={pending} state={{ kind: "unknown" }} onRetry={() => setLast("Ville sendt samme telling på nytt.")} onRelease={() => undefined} canWrite />
           <CountSubmissionBanner pending={pending} state={{ kind: "rejected", error: new CountRejectedError("content", "Operasjons-ID-en er allerede brukt med et annet innhold."), reconciliation: "none" }}
             onRetry={() => undefined} onRelease={() => setLast("Ville frigjort.")} onReconcile={() => setLast("Ville lest den opprinnelige tellingen.")} canWrite />
+          <MobileKpis testId="preview-kpis-videresalg" secondaryLabel="Flere nøkkeltall"
+            primary={[{ label: "Videresalg under minimum", value: "3", tone: "warning" }, { label: "Oversolgt", value: "1", tone: "destructive" }]}
+            secondary={[{ label: "Handelsvarer med lager", value: "42" }, { label: "Lagerverdi (videresalg)", value: "18 450,25 kr" }, { label: "Under minimum (alle lagerførte)", value: "7" }]} />
+          <MobileKpis testId="preview-kpis-alle" secondaryLabel="Lagerverdi"
+            primary={[{ label: "Lagerførte varer", value: "…" }, { label: "Under minimum", value: "–" }]}
+            secondary={[{ label: "Samlet lagerverdi", value: "–" }]} />
+          <CountLineCard
+            row={{ raw_material_id: "fx-rm-3", name: "Hvetemel siktet, spesial 25 kg sekk (eksempel)", current_stock: 112.5, base_unit: "kg", current_cost_price: 9.4 }}
+            unitText="4,50 sekk" frozenBase={100} onUseNewStock={() => setLast("Ville brukt ny beholdning.")}
+            location={loc} onLocation={setLoc} note={lineNote} onNote={setLineNote} rows={rows} onRows={setRows} units={[]} diff={-2.5} />
           <DraftSaveStatus hasDraft server="failed" localFailed />
           {!open && <button type="button" className="min-h-[44px] rounded-md border border-border px-3 text-sm" onClick={() => setOpen(true)}>Åpne mottaket igjen</button>}
           <InvoiceReceiptPanel invoiceId={open ? "fx-invoice" : null} invoiceNumber="9205352553 (eksempel)" onClose={() => setOpen(false)} canWrite fixture={{ lines, onAction: setLast }} />

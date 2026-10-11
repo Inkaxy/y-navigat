@@ -3,7 +3,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -23,7 +22,7 @@ import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useAllStockStatus, type AllStockRow } from "@/ravarer/hooks/useAllStockStatus";
 import { useRawMaterialUnitsFor, type RawMaterialUnitRow } from "@/ravarer/hooks/useRawMaterialUnits";
 import { buildCountPayload } from "@/ravarer/hooks/useStockCount";
-import { BASE_KEY, UnitAmountRows, emptyRow, rowsToBase, type UnitAmountRow } from "@/ravarer/components/stock/UnitAmountRows";
+import { BASE_KEY, emptyRow, rowsToBase, type UnitAmountRow } from "@/ravarer/components/stock/UnitAmountRows";
 import { formatNok, formatNumber } from "@/ravarer/lib/constants";
 import { QueryState } from "@/components/common/QueryState";
 import { osloTodayISO } from "@/lib/osloDate";
