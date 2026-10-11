@@ -123,7 +123,7 @@ const projection = (eligible: string[], lines: { h: string; line: string; date: 
   raw_material_id: "M", checked_at: "2026-10-11T12:00:00Z", eligible_history_ids: eligible, held_history_ids: [], duplicate_history_ids: [],
   projections: lines.map((l) => ({
     history_id: l.h, source: "invoice", provenance: "currently_verified_line", price: l.price, effective_date: l.date, created_at: "2026-10-11T12:00:00Z",
-    supplier_id: "s1", invoice_id: l.inv, invoice_line_id: l.line, invoice_number: "F", unit: "kg", currency: "NOK", base_units_per_package: 20,
+    supplier_id: "s1", invoice_id: l.inv, invoice_line_id: l.line, invoice_number: "F", unit: "kg", currency: "NOK", base_units_per_package: 20, line_unit: "sekk", quantity: 24, base_quantity: 480, total_amount: 29090,
   })),
 });
 
