@@ -1,10 +1,9 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowRight, Calculator, CheckCircle2, Package, RefreshCw, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Calculator, CheckCircle2, Package, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,74 +16,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
+import { ModulePage } from "@/ravarer/ui/ModulePage";
+import { DataTable } from "@/ravarer/ui/DataTable";
+import { FilterChips } from "@/ravarer/ui/FilterChips";
+import { RAVARER_EYEBROW } from "@/ravarer/pages/hub/hubTabs";
+import { BUCKETS, RECALC_COLUMNS, kr } from "@/ravarer/pages/reberegn/reberegnColumns";
 import { useCostRecalc, type RecalcBucket, type RecalcRow } from "@/fakturaer/hooks/useCostRecalc";
 import { fmtNum } from "@/fakturaer/lib/units";
 import { paths } from "@/ravarer/lib/paths";
-
-const BUCKETS: { key: RecalcBucket; title: string; hint: string; tone: string }[] = [
-  {
-    key: "rettes",
-    title: "Rettes",
-    hint: "Høy tillit — regnestykket går opp mot beløpet på fakturaen.",
-    tone: "border-success/40 bg-success/5",
-  },
-  {
-    key: "bekreft",
-    title: "Må bekreftes",
-    hint: "Middels tillit eller uvanlig stort avvik. Se gjennom regnestykket før du krysser av.",
-    tone: "border-warning/40 bg-warning/5",
-  },
-  {
-    key: "uendret",
-    title: "Uendret",
-    hint: "Registrert kostpris stemmer allerede med fakturaen.",
-    tone: "border-line-subtle bg-surface-sunken",
-  },
-  {
-    key: "umulig",
-    title: "Kan ikke beregnes",
-    hint: "Pakningsstørrelsen mangler. Fyll den inn, så løser resten seg av seg selv.",
-    tone: "border-destructive/40 bg-destructive/5",
-  },
-];
-
-function kr(n: number | null | undefined, digits = 4) {
-  if (n == null || !Number.isFinite(n)) return "—";
-  return `${fmtNum(n, digits)} kr`;
-}
-
-function ChangeBadge({ row }: { row: RecalcRow }) {
-  if (row.changePct == null) {
-    return <Badge variant="outline" className="border-app/40 bg-app/10 text-app">ny pris</Badge>;
-  }
-  const up = row.changePct > 0;
-  const big = Math.abs(row.changePct) >= 25;
-  const cls = !big
-    ? "border-line-subtle bg-surface-sunken text-ink-secondary"
-    : up
-      ? "border-destructive/40 bg-destructive/10 text-destructive"
-      : "border-warning/40 bg-warning/10 text-warning";
-  return (
-    <div className="flex flex-wrap items-center justify-end gap-1">
-      <Badge variant="outline" className={cls}>
-        {up ? "+" : ""}
-        {fmtNum(row.changePct, 1)} %
-      </Badge>
-      {row.packageFactor && (
-        <Badge variant="outline" className="border-destructive/40 bg-destructive/10 text-destructive">
-          ≈ {row.packageFactor}× pakning
-        </Badge>
-      )}
-    </div>
-  );
-}
 
 export default function ReberegnKostpriser() {
   const { rows, progress, receipt, items, batchIds, error, scan, apply, undoAll, cancel, reset } = useCostRecalc();
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [tab, setTab] = useState<RecalcBucket>("rettes");
 
   const byBucket = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -104,14 +50,6 @@ export default function ReberegnKostpriser() {
     () => selectable.filter((r) => checked.has(r.rawMaterialId)),
     [selectable, checked],
   );
-
-  const toggle = (id: string) =>
-    setChecked((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
 
   const toggleBucket = (bucket: RecalcBucket) => {
     const ids = byBucket[bucket].map((r) => r.rawMaterialId);
@@ -136,11 +74,14 @@ export default function ReberegnKostpriser() {
   };
 
   return (
-    <div className="space-y-5">
-      <RavarerHeaderBanner
-        title="Reberegn kostpriser"
-        subtitle="Kjør kostprismotoren på nytt over fakturalinjene som allerede ligger i basen"
-      />
+    <ModulePage
+      eyebrow={RAVARER_EYEBROW}
+      title="Reberegn kostpriser"
+      subtitle="Kjør kostprismotoren på nytt over fakturalinjene som allerede ligger i basen"
+      embedsPage={false}
+      actions={<Button asChild variant="ghost" size="sm" className="gap-1"><Link to={paths.priskontroll({ fane: "gjore" })}><ArrowLeft className="h-3.5 w-3.5" aria-hidden />Priskontroll</Link></Button>}
+    >
+    <div className="space-y-5 px-page pb-6">
 
       <Card className="p-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -295,120 +236,45 @@ export default function ReberegnKostpriser() {
             </div>
           </Card>
 
-          {BUCKETS.map((b) => {
-            const list = byBucket[b.key];
-            if (list.length === 0) return null;
+          <FilterChips
+            ariaLabel="Bøtter"
+            chips={BUCKETS.map((b) => ({ id: b.key, label: b.title, count: byBucket[b.key].length }))}
+            value={tab}
+            onChange={setTab}
+          />
+          {(() => {
+            const b = BUCKETS.find((x) => x.key === tab) ?? BUCKETS[0];
             const isSelectable = b.key === "rettes" || b.key === "bekreft";
             return (
-              <Card key={b.key} className={`overflow-hidden ${b.tone}`}>
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-subtle px-4 py-3">
-                  <div>
-                    <h3 className="text-sm font-semibold text-ink-primary">
-                      {b.title} <span className="text-ink-secondary">({list.length})</span>
-                    </h3>
-                    <p className="text-xs text-ink-secondary">{b.hint}</p>
-                  </div>
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm text-ink-secondary">{b.hint}</p>
                   {isSelectable ? (
-                    <Button variant="outline" size="sm" onClick={() => toggleBucket(b.key)}>
-                      Velg alle i bolken
-                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => toggleBucket(b.key)} disabled={byBucket[b.key].length === 0}>Velg alle i bolken</Button>
                   ) : b.key === "umulig" ? (
-                    <Button asChild variant="outline" size="sm">
-                      <Link to={paths.pakninger()}>
-                        <Package className="mr-1.5 h-3.5 w-3.5" /> Fyll inn pakningsstørrelser
-                      </Link>
-                    </Button>
+                    <Button asChild variant="outline" size="sm"><Link to={paths.pakninger()}><Package className="mr-1.5 h-3.5 w-3.5" aria-hidden />Fyll inn pakningsstørrelser</Link></Button>
                   ) : null}
                 </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-surface-sunken text-xs uppercase tracking-wide text-ink-secondary">
-                      <tr>
-                        <th className="w-10 px-3 py-2" />
-                        <th className="px-3 py-2 text-left">Vare</th>
-                        <th className="px-3 py-2 text-right">Dagens</th>
-                        <th className="px-3 py-2 text-right">Foreslått</th>
-                        <th className="px-3 py-2 text-right">Endring</th>
-                        <th className="px-3 py-2 text-left">Kilde</th>
-                        <th className="px-3 py-2 text-left">Regnestykke</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-line-subtle">
-                      {list.map((r) => (
-                        <tr key={r.rawMaterialId} className="align-top">
-                          <td className="px-3 py-2">
-                            {isSelectable && (
-                              <Checkbox
-                                checked={checked.has(r.rawMaterialId)}
-                                onCheckedChange={() => toggle(r.rawMaterialId)}
-                                aria-label={`Velg ${r.name}`}
-                              />
-                            )}
-                          </td>
-                          <td className="px-3 py-2">
-                            <div className="font-medium text-ink-primary">{r.name}</div>
-                            <div className="text-xs text-ink-secondary">
-                              {r.sku ? `${r.sku} · ` : ""}basisenhet {r.baseUnit} · {r.lineCount} fakturalinjer
-                            </div>
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-ink-secondary">
-                            {kr(r.currentPrice)}
-                          </td>
-                          <td className="px-3 py-2 text-right font-semibold tabular-nums text-ink-primary">
-                            {r.proposedPrice != null ? `${kr(r.proposedPrice)}/${r.baseUnit}` : "—"}
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            {r.bucket === "umulig" ? (
-                              <Badge variant="outline" className="border-destructive/40 bg-destructive/10 text-destructive">
-                                <AlertTriangle className="mr-1 h-3 w-3" />
-                                {r.needsInput === "package_size" ? "mangler pakning" : "mangler beløp"}
-                              </Badge>
-                            ) : (
-                              <ChangeBadge row={r} />
-                            )}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-ink-secondary">
-                            {r.invoiceId ? (
-                              <Link className="text-app hover:underline" to={paths.faktura(r.invoiceId)}>
-                                {r.invoiceNumber ?? "faktura"}
-                              </Link>
-                            ) : (
-                              "—"
-                            )}
-                            <div>{r.invoiceDate ?? ""}</div>
-                          </td>
-                          <td className="max-w-md px-3 py-2 text-xs text-ink-secondary">
-                            <div>{r.explanation}</div>
-                            <div className="mt-1 flex flex-wrap gap-1">
-                              {r.basis && (
-                                <Badge variant="outline" className="border-line-subtle">
-                                  {r.basis}
-                                </Badge>
-                              )}
-                              <Badge
-                                variant="outline"
-                                className={
-                                  r.confidenceLevel === "high"
-                                    ? "border-success/40 text-success"
-                                    : r.confidenceLevel === "medium"
-                                      ? "border-warning/40 text-warning"
-                                      : "border-destructive/40 text-destructive"
-                                }
-                              >
-                                tillit: {r.confidenceLevel === "high" ? "høy" : r.confidenceLevel === "medium" ? "middels" : "lav"}
-                              </Badge>
-                            </div>
-                            {r.reason && <div className="mt-1 italic">{r.reason}</div>}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
+                <DataTable
+                  ariaLabel={b.title}
+                  rows={byBucket[b.key]}
+                  columns={RECALC_COLUMNS}
+                  getId={(r) => r.rawMaterialId}
+                  emptyText="Ingen varer i denne bøtten"
+                  preferenceScope="ravarer.reberegn.kolonner"
+                  selectable={isSelectable}
+                  selected={checked}
+                  onSelectedChange={(next) => setChecked((prev) => {
+                    const ids = new Set(byBucket[b.key].map((r) => r.rawMaterialId));
+                    const out = new Set([...prev].filter((id) => !ids.has(id)));
+                    next.forEach((id) => out.add(id));
+                    return out;
+                  })}
+                  onRowClick={() => undefined}
+                />
+              </div>
             );
-          })}
+          })()}
         </>
       )}
 
@@ -436,5 +302,6 @@ export default function ReberegnKostpriser() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </ModulePage>
   );
 }
