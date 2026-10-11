@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useGuardedNavigate } from "@/providers/UnsavedGuardProvider";
 import { QueryState } from "@/components/common/QueryState";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { SellsAsSection } from "@/ravarer/components/stock/SellsAsSection";
@@ -11,12 +10,8 @@ import { completenessChecklist, listContext, readSection, sectionSearch, section
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  ArrowLeft,
   Check,
-  ChevronLeft,
-  ChevronRight,
   Loader2,
-  Pencil,
   X,
 } from "lucide-react";
 import { useHotkeys, type HotkeyBinding } from "@/ravarer/ui/hotkeys";
