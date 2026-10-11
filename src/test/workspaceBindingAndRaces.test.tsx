@@ -63,7 +63,8 @@ describe("kravflyt: sen duplikatoppslag", () => {
 });
 
 describe("kladdeminne avgrenset per bruker", () => {
-  const input = { kind: "documented_claim" } as unknown as DraftInput;
+  const input: DraftInput = { supplier_name: "Lev A", case_title: "Sak 1", kind: "price_inquiry", credited: 0,
+    lines: [{ invoice_number: "1", invoice_date: "2026-09-21", item: "Melis", quantity: 600, unit: "kg", expected: 14, invoiced: 28.81, amount_excl_vat: 0, observed_excl_vat: 8886, reference_source: "last_purchase", reference_date: "2026-09-01" }] };
   it("bruker-bytte tømmer ulagrede endringer", async () => {
     retainedDraftEdits.clear();
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
