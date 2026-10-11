@@ -44,18 +44,13 @@ describe("PrimarySupplierControl — RPC-argumenter", () => {
       p_supplier_id: "s1",
     });
   });
-  it("sender null for å fjerne primær", async () => {
+  it("kaller rm_clear_primary_supplier for å fjerne primær", async () => {
     const { supabase } = await import("@/integrations/supabase/client");
     const { setPrimarySupplier } = await import("@/ravarer/lib/supplierLinkRpc");
-    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify({ ok: true, supplier_id: null, previous_supplier_id: "s1", link_created: false }), { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: { ok: true, supplier_id: null, previous_supplier_id: "s1", link_created: false }, error: null } as never);
     const res = await setPrimarySupplier("rm-1", null);
-    expect(supabase.rpc).not.toHaveBeenCalled();
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(String(url)).toMatch(/\/rest\/v1\/rpc\/rm_set_primary_supplier$/);
-    expect(JSON.parse(String(init.body))).toEqual({ p_raw_material_id: "rm-1", p_supplier_id: null });
+    expect(supabase.rpc).toHaveBeenCalledWith("rm_clear_primary_supplier", { p_raw_material_id: "rm-1" });
     expect(res.supplier_id).toBeNull();
-    vi.unstubAllGlobals();
   });
 });
 
