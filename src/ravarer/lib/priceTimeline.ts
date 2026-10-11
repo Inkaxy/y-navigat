@@ -5,6 +5,8 @@
  * én serie per leverandør, avtalebånd per kobling, og Δ % både mot forrige
  * punkt i samme serie og mot avtaleprisen som gjaldt på datoen.
  */
+import { correctionText, UNIT_SOURCE_LABEL, type CorrectionSnapshot, type UnitSource } from "./priceProvenance";
+import { priceSourceLabel } from "./constants";
 
 export interface TimelineHistoryRow {
   id: string;
@@ -25,21 +27,44 @@ export interface TimelineHistoryRow {
   currency?: string | null;
   /** Registreringstidspunkt — skiller rader med samme dato (serverens rekkefølge: dato, created_at, id). */
   createdAt?: string | null;
+  /** Historisk grunnenhet (null = ikke dokumentert). Undefined = grunnlag ikke hentet. */
+  unit?: string | null;
+  unitSource?: UnitSource | null;
+  packageText?: string | null;
+  corrections?: readonly CorrectionSnapshot[];
 }
 
 /**
  * Hvilken type en historikkrad er. Bare «gyldig» er et ordinært prispunkt i graf,
  * Δ og CSV-prisrader; resten vises som egne hendelser.
  */
-export type HistoryKind = "gyldig" | "kreditnota" | "utgatt" | "eldre" | "annen_valuta" | "ugyldig";
+export type HistoryKind =
+  | "gyldig" | "kreditnota" | "utgatt" | "eldre" | "annen_valuta" | "ukjent_valuta" | "annen_enhet" | "ukjent_enhet" | "ugyldig";
 
-export function historyKind(h: TimelineHistoryRow): HistoryKind {
+/**
+ * `currentUnit` gis av alle visninger med hentet grunnlag: da er bare rader med
+ * dokumentert lik enhet og NOK sammenlignbare. Ukjent enhet/valuta gjettes aldri.
+ */
+export function historyKind(h: TimelineHistoryRow, currentUnit?: string | null): HistoryKind {
   if (h.isCredit || h.isCreditNote) return "kreditnota";
   if (h.supersededAt || h.supersededReason) return "utgatt";
   if (h.isLegacy) return "eldre";
+  if (h.currency === null) return "ukjent_valuta";
   if ((h.currency ?? "NOK").toUpperCase() !== "NOK") return "annen_valuta";
+  if (currentUnit !== undefined) {
+    if (!h.unit) return "ukjent_enhet";
+    if (currentUnit && h.unit !== currentUnit) return "annen_enhet";
+  }
   if (!Number.isFinite(Number(h.price)) || Number(h.price) <= 0) return "ugyldig";
   return "gyldig";
+}
+
+/** Felles rekkefølge for skjerm og CSV: dato, registreringstidspunkt, id — nyeste først. */
+export function compareNewestFirst(
+  a: { date: string; createdAt: string | null; id: string },
+  b: { date: string; createdAt: string | null; id: string },
+): number {
+  return b.date.localeCompare(a.date) || (b.createdAt ?? "").localeCompare(a.createdAt ?? "") || b.id.localeCompare(a.id);
 }
 
 export const HISTORY_KIND_LABEL: Record<HistoryKind, string> = {
@@ -48,6 +73,9 @@ export const HISTORY_KIND_LABEL: Record<HistoryKind, string> = {
   utgatt: "Utgått / korrigert",
   eldre: "Eldre rad (erstattet)",
   annen_valuta: "Annen valuta",
+  ukjent_valuta: "Ukjent valuta",
+  annen_enhet: "Annen enhet enn i dag",
+  ukjent_enhet: "Enhet ikke dokumentert",
   ugyldig: "Ugyldig pris",
 };
 
@@ -80,6 +108,12 @@ export interface TimelineEvent {
   reason: string | null;
   supersededAt: string | null;
   notes: string | null;
+  createdAt: string | null;
+  unit: string | null;
+  unitSource: UnitSource | null;
+  packageText: string | null;
+  currency: string | null;
+  corrections: readonly CorrectionSnapshot[];
 }
 
 export interface TimelineLink {
@@ -109,6 +143,12 @@ export interface TimelinePoint {
   deltaPrevKr: number | null;
   /** Endring mot avtaleprisen som gjaldt på datoen, i prosent. */
   deltaAgreementPct: number | null;
+  createdAt: string | null;
+  unit: string | null;
+  unitSource: UnitSource | null;
+  packageText: string | null;
+  currency: string | null;
+  corrections: readonly CorrectionSnapshot[];
 }
 
 export interface TimelineSeries {
@@ -154,6 +194,17 @@ function agreementForDate(
   return link.agreed_price_per_base_unit;
 }
 
+function meta(h: TimelineHistoryRow) {
+  return {
+    createdAt: h.createdAt ?? null,
+    unit: h.unit ?? null,
+    unitSource: h.unitSource ?? null,
+    packageText: h.packageText ?? null,
+    currency: h.currency ?? null,
+    corrections: h.corrections ?? [],
+  };
+}
+
 export interface BuildTimelineInput {
   history: readonly TimelineHistoryRow[];
   /** Leverandør-id → navn. */
@@ -164,6 +215,8 @@ export interface BuildTimelineInput {
   /** ISO-datoer; punkter utenfor intervallet tas bort. */
   from?: string | null;
   to?: string | null;
+  /** Dagens grunnenhet. Når satt, er bare rader med dokumentert lik enhet sammenlignbare. */
+  currentUnit?: string | null;
 }
 
 export function buildTimeline({
@@ -173,6 +226,7 @@ export function buildTimeline({
   unitFactor = 1,
   from = null,
   to = null,
+  currentUnit,
 }: BuildTimelineInput): TimelineResult {
   const inRange = history.filter((h) => {
     if (from && h.effective_date < from) return false;
@@ -184,16 +238,16 @@ export function buildTimeline({
   const events: TimelineEvent[] = [];
   const valid: TimelineHistoryRow[] = [];
   for (const h of inRange) {
-    const kind = historyKind(h);
+    const kind = historyKind(h, currentUnit);
     if (kind === "gyldig") { valid.push(h); continue; }
     events.push({
       id: h.id, date: h.effective_date, kind, price: Number(h.price) * unitFactor, supplierName: nameOf(h.supplier_id),
       source: h.source, invoiceId: h.invoice_id, invoiceNumber: h.invoiceNumber ?? null,
       reason: h.supersededReason ? (SUPERSEDED_REASON_LABEL[h.supersededReason] ?? "Annen årsak") : null,
-      supersededAt: h.supersededAt ?? null, notes: h.notes ?? null,
+      supersededAt: h.supersededAt ?? null, notes: h.notes ?? null, ...meta(h),
     });
   }
-  events.sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
+  events.sort(compareNewestFirst);
 
   // Stabil rekkefølge innen samme dato (id), så Δ ikke hopper mellom visninger.
   const sorted = [...valid].sort((a, b) => a.effective_date.localeCompare(b.effective_date)
@@ -224,6 +278,7 @@ export function buildTimeline({
       deltaPrevPct: prev ? pct(prev.price, price) : null,
       deltaPrevKr: prev ? Math.round((price - prev.price) * 10000) / 10000 : null,
       deltaAgreementPct: agreed != null ? pct(agreed * unitFactor, price) : null,
+      ...meta(h),
     });
     bySupplier.set(key, list);
   }
@@ -244,28 +299,39 @@ export function buildTimeline({
 
   const rows = series
     .flatMap((s) => s.points)
-    .sort((a, b) => b.date.localeCompare(a.date) || a.supplierName.localeCompare(b.supplierName, "nb"));
+    .sort(compareNewestFirst);
 
   return { series, bands, rows, events };
 }
 
-/** CSV med semikolon. Samme regler som skjermen: gyldige prispunkter, deretter hendelser med type. */
+/**
+ * CSV med semikolon. Samme regler og rekkefølge som skjermen: gyldige prispunkter
+ * (nyeste først), deretter hendelser. Historisk enhet/pakning/valuta per rad;
+ * ukjent grunnlag skrives som «Ukjent», aldri dagens enhet.
+ */
 export function timelineCsv(rows: readonly TimelinePoint[], events: readonly TimelineEvent[] = []): string {
   const clean = (v: string | null) => (v ?? "").replace(/[;\n\r]/g, " ");
-  const head = ["Type", "Dato", "Leverandør", "Pris", "Kilde", "Faktura", "Δ forrige kr", "Δ forrige %", "Δ avtale %", "Årsak", "Notat"];
+  const unk = (v: string | null) => clean(v) || "Ukjent";
+  const head = [
+    "Type", "Dato", "Registrert", "Leverandør", "Pris", "Valuta", "Enhet (historisk)", "Enhetsgrunnlag", "Pakning (historisk)",
+    "Kilde", "Faktura", "Δ forrige kr", "Δ forrige %", "Δ avtale %", "Årsak", "Utgått", "Rettelse før → etter", "Notat",
+  ];
+  const corr = (c: readonly CorrectionSnapshot[]) => clean(c.map(correctionText).join(" | "));
   const lines = [head.join(";")];
   for (const r of rows) {
     lines.push([
-      "Gyldig", r.date, clean(r.supplierName), r.price.toFixed(4), r.source, clean(r.invoiceNumber),
+      "Gyldig", r.date, clean(r.createdAt), clean(r.supplierName), r.price.toFixed(4), unk(r.currency), unk(r.unit),
+      r.unitSource ? UNIT_SOURCE_LABEL[r.unitSource] : "Ukjent", unk(r.packageText), clean(priceSourceLabel(r.source)), clean(r.invoiceNumber),
       r.deltaPrevKr != null ? r.deltaPrevKr.toFixed(4) : "",
       r.deltaPrevPct != null ? r.deltaPrevPct.toFixed(1) : "",
-      r.deltaAgreementPct != null ? r.deltaAgreementPct.toFixed(1) : "", "", clean(r.notes),
+      r.deltaAgreementPct != null ? r.deltaAgreementPct.toFixed(1) : "", "", "", corr(r.corrections), clean(r.notes),
     ].join(";"));
   }
   for (const e of events) {
     lines.push([
-      HISTORY_KIND_LABEL[e.kind], e.date, clean(e.supplierName), e.price.toFixed(4), e.source, clean(e.invoiceNumber),
-      "", "", "", clean(e.reason), clean(e.notes),
+      HISTORY_KIND_LABEL[e.kind], e.date, clean(e.createdAt), clean(e.supplierName), e.price.toFixed(4), unk(e.currency), unk(e.unit),
+      e.unitSource ? UNIT_SOURCE_LABEL[e.unitSource] : "Ukjent", unk(e.packageText), clean(priceSourceLabel(e.source)), clean(e.invoiceNumber),
+      "", "", "", clean(e.reason), clean(e.supersededAt), corr(e.corrections), clean(e.notes),
     ].join(";"));
   }
   return lines.join("\n");

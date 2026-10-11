@@ -1,3 +1,4 @@
+import { QueryState } from "@/components/common/QueryState";
 import { useMemo, useState, useEffect } from "react";
 import { SupplierItemStatusChips } from "@/fakturaer/components/supplier-item/SupplierItemStatusChips";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -564,7 +565,8 @@ function SupplierPriceTimeline({
   const [rawMaterialId, setRawMaterialId] = useState(sorted[0]?.raw_material_id ?? "");
   const selected =
     sorted.find((i) => i.raw_material_id === rawMaterialId) ?? sorted[0] ?? null;
-  const { data: history = [] } = usePriceHistory(selected?.raw_material_id);
+  const historyQuery = usePriceHistory(selected?.raw_material_id);
+  const history = useMemo(() => historyQuery.data ?? [], [historyQuery.data]);
 
   const supplierNames = useMemo(
     () => new Map<string, string>([[supplierId, supplierName]]),
@@ -593,6 +595,21 @@ function SupplierPriceTimeline({
   );
 
   if (!selected) return null;
+
+  if (historyQuery.isError || historyQuery.isLoading) {
+    return (
+      <QueryState
+        isLoading={historyQuery.isLoading}
+        isError={historyQuery.isError}
+        error={historyQuery.error}
+        scope="leverandor-prisutvikling"
+        onRetry={() => void historyQuery.refetch()}
+        errorTitle="Kunne ikke hente prishistorikken"
+      >
+        {null}
+      </QueryState>
+    );
+  }
 
   return (
     <PriceTimeline

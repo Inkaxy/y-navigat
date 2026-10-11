@@ -199,6 +199,13 @@ export interface BakersRawMaterial {
   density_g_per_ml?: number | null;
   /** Rent vann — `raw_materials.is_water`. Vann uten tetthet regnes som 1 g/ml. */
   is_water?: boolean | null;
+  /** Prisstatus fra serverens prisvelger — `verifisert | uverifisert | mangler`. Ukjent = ikke hentet. */
+  cost_basis_status?: string | null;
+  /** Kilden til gjeldende kostpris — `raw_materials.price_source`. */
+  price_source?: string | null;
+  /** Når gjeldende kostpris sist ble satt — `raw_materials.price_updated_at`. */
+  price_updated_at?: string | null;
+
 
 }
 

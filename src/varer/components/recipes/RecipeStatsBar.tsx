@@ -5,6 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { fmtG, fmtPercent, type BakersTotals } from "@/varer/lib/bakers";
 import type { RecipeCostTotals } from "@/varer/lib/recipeCost";
+import { format } from "date-fns";
+import { nb } from "date-fns/locale";
+
+const fmtDate = (iso: string) => format(new Date(iso), "EEE d. MMM yyyy", { locale: nb });
 
 const nok = (v: number) =>
   `${v.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr`;
@@ -62,10 +66,16 @@ export function RecipeStatsBar({
     items.push(
       {
         label: "Råvarekost",
-        value: cost.incomplete ? `Minst ${nok(cost.totalCost)}` : nok(cost.totalCost),
+        value: cost.incomplete
+          ? `${cost.unverifiedCount > 0 ? "Foreløpig" : "Minst"} ${nok(cost.totalCost)}`
+          : nok(cost.totalCost),
         hint: cost.incomplete
-          ? `Ufullstendig — ${cost.missing.length} linje${cost.missing.length === 1 ? "" : "r"} mangler grunnlag`
-          : undefined,
+          ? `Ufullstendig — ${cost.missing.length} linje${cost.missing.length === 1 ? "" : "r"} mangler grunnlag${
+              cost.unverifiedCount > 0 ? `, ${cost.unverifiedCount} uten verifisert kilde` : ""
+            }`
+          : cost.newestVerifiedDate
+            ? `Verifiserte priser, nyeste ${fmtDate(cost.newestVerifiedDate)}`
+            : undefined,
         tone: cost.incomplete ? "warning" : undefined,
       },
       {

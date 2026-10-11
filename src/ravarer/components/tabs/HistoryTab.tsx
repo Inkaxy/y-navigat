@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QueryState } from "@/components/common/QueryState";
 import { supabase } from "@/integrations/supabase/client";
-import { formatDate, formatNok, PRICE_SOURCES } from "@/ravarer/lib/constants";
+import { formatDate, formatNok, priceSourceLabel } from "@/ravarer/lib/constants";
+import { correctionText, UNIT_SOURCE_LABEL } from "@/ravarer/lib/priceProvenance";
 import { usePriceHistory, toTimelineRow } from "@/ravarer/hooks/useRmSuppliers";
 import { historyKind, HISTORY_KIND_LABEL } from "@/ravarer/lib/priceTimeline";
 import { PriceComparisonCard } from "@/ravarer/components/PriceComparisonCard";
@@ -31,9 +32,7 @@ const KIND_LABEL: Record<EventKind, string> = {
   pris: "Prisobservasjon",
 };
 
-function sourceLabel(value: string): string {
-  return PRICE_SOURCES.find((s) => s.value === value)?.label ?? value;
-}
+const sourceLabel = priceSourceLabel;
 
 function jsonText(value: unknown): string {
   if (value == null) return "—";
@@ -103,15 +102,19 @@ export function HistoryTab({ rm }: Props) {
       });
     }
     for (const p of prices.data ?? []) {
-      const hk = historyKind(toTimelineRow(p));
+      const hk = historyKind(toTimelineRow(p), rm.base_unit);
+      const pv = p.provenance;
       list.push({
         id: `p-${p.id}`,
         kind: "pris",
         at: p.effective_date,
-        title: `${hk === "gyldig" ? "" : `${HISTORY_KIND_LABEL[hk]}: `}${formatNok(p.price)} per ${rm.base_unit}`,
+        title: `${hk === "gyldig" ? "" : `${HISTORY_KIND_LABEL[hk]}: `}${formatNok(p.price)} per ${pv.unit ?? "ukjent enhet"}${pv.currency && pv.currency !== "NOK" ? ` (${pv.currency})` : ""}`,
         detail: [
           sourceLabel(p.source),
+          pv.unitSource ? `Enhet: ${UNIT_SOURCE_LABEL[pv.unitSource]}` : "Enhet ikke dokumentert",
+          pv.packageText ? `Pakning ${pv.packageText}` : null,
           p.is_legacy ? "Gammel pakningslogikk" : null,
+          ...pv.corrections.map((c) => `Rettet: ${correctionText(c)}`),
           supersededReasonText(p.superseded_reason),
           p.notes,
         ].filter(Boolean).join(" · "),

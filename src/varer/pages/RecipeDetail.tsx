@@ -44,9 +44,9 @@ import { PrintRecipeCardDialog } from "@/varer/components/recipes/PrintRecipeCar
 import { ShareRecipeDialog } from "@/varer/components/recipes/ShareRecipeDialog";
 import {
   RECIPE_STATUS_OPTIONS, computePartSummary, computeTotalsForRecipe, lineToGrams, roundBakerGrams, scaleLines, scaledSummary,
-  type BakersRawMaterial,
 } from "@/varer/lib/bakers";
 import { computeRecipeCost } from "@/varer/lib/recipeCost";
+import { BAKERS_RM_KEY, fetchBakersRawMaterials } from "@/varer/lib/bakersRawMaterials";
 import { decideHydration } from "@/varer/lib/recipeEditorSync";
 import { useRecipeSave, RecipeSaveConflictError } from "@/varer/hooks/useRecipeSave";
 import {
@@ -72,7 +72,6 @@ import { SaveAsRawMaterialDialog, type CompositeRawMaterial } from "@/varer/comp
 import { RecipeImageUpload } from "@/varer/components/recipes/RecipeImageUpload";
 import { BASE_RECIPE_CATEGORY, costPerKg, costPerKgBlockedReason } from "@/varer/lib/halvfabrikat";
 import { copyRecipe } from "@/varer/lib/copyRecipe";
-import { fetchAllRows } from "@/lib/supabasePaging";
 import { useProductMargins } from "@/varer/hooks/useProductCalc";
 import { makeSku } from "@/varer/lib/halvfabrikat";
 import { buildRestoreInput, type RecipeVersionRow } from "@/varer/lib/recipeVersions";
@@ -109,20 +108,9 @@ export default function RecipeDetail() {
   });
 
   const rmQuery = useQuery({
-    queryKey: ["rm-bakers-map", legalEntityId],
+    queryKey: BAKERS_RM_KEY(legalEntityId),
     enabled: !!legalEntityId,
-    queryFn: async () => {
-      const rows = await fetchAllRows<BakersRawMaterial>((from, to) =>
-        supabase
-          .from("raw_materials")
-          .select("id, name, category, grain_classification, cereal_type, water_content_pct, unit_weight_grams, base_unit, current_cost_price, produced_by_recipe_id, density_g_per_ml, is_water")
-          .eq("legal_entity_id", legalEntityId!)
-          .range(from, to) as unknown as PromiseLike<{ data: BakersRawMaterial[] | null; error: { message: string } | null }>,
-      );
-      const map: Record<string, BakersRawMaterial> = {};
-      for (const r of rows) map[r.id] = r;
-      return map;
-    },
+    queryFn: () => fetchBakersRawMaterials(legalEntityId),
   });
   const rmMap = rmQuery.data ?? {};
 

@@ -47,7 +47,7 @@ describe("historikkrader: bare gyldige punkter er priser", () => {
     });
     const csv = timelineCsv(r.rows, r.events).split("\n");
     expect(csv[0]).toContain("Type;Dato");
-    expect(csv[1]).toMatch(/^Gyldig;2026-02-01;Leverandør A;12\.0000;invoice;;2\.0000;20\.0;/);
+    expect(csv[1]).toMatch(/^Gyldig;2026-02-01;;Leverandør A;12\.0000;Ukjent;Ukjent;Ukjent;Ukjent;Faktura;;2\.0000;20\.0;/);
     expect(csv[3]).toMatch(/^Utgått \/ korrigert;2026-01-15;.*Grunnenheten ble endret/);
   });
 
@@ -76,8 +76,8 @@ describe("historikkrader: bare gyldige punkter er priser", () => {
   });
 
   it("usePriceHistory henter alle sider og inkluderer felt for klassifisering", () => {
-    const src = readFileSync("src/ravarer/hooks/useRmSuppliers.ts", "utf8");
-    expect(src).toMatch(/fetchAllRows<HistoryDbRow>/);
+    const src = readFileSync("src/ravarer/hooks/priceHistoryFetch.ts", "utf8");
+    expect(src).toMatch(/fetchAllRows<PriceHistoryDbRow>/);
     expect(src).toMatch(/superseded_at, superseded_reason, is_legacy, is_credit, currency/);
   });
 });

@@ -1,10 +1,11 @@
+import { BAKERS_RM_KEY, fetchBakersRawMaterials } from "@/varer/lib/bakersRawMaterials";
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaging";
 import { deriveLabelingStatusFromDb, type LabelingStatus } from "@/varer/lib/labelStaleness";
 import { latestApprovalByRecipe } from "@/varer/lib/labelWorkspace";
-import { computeTotalsForRecipe, type BakersLine, type BakersRawMaterial } from "@/varer/lib/bakers";
+import { computeTotalsForRecipe, type BakersLine } from "@/varer/lib/bakers";
 
 /** Rå rad fra listespørringen — modulen bruker ikke de genererte Supabase-typene. */
 type RecipeLineRow = BakersLine & { id: string; raw_material_id: string | null };
@@ -35,21 +36,9 @@ export type RecipeRow = RecipeListRow & {
 /** Henter og setter sammen alt oppskriftslisten trenger. */
 export function useRecipeListData(legalEntityId: string | null | undefined) {
   const rmQuery = useQuery({
-    queryKey: ["rm-bakers-map", legalEntityId],
+    queryKey: BAKERS_RM_KEY(legalEntityId, "active"),
     enabled: !!legalEntityId,
-    queryFn: async () => {
-      const data = await fetchAllRows<BakersRawMaterial>((from, to) =>
-        supabase
-          .from("raw_materials")
-          .select("id, name, category, grain_classification, water_content_pct, unit_weight_grams, current_cost_price, density_g_per_ml, is_water")
-          .eq("legal_entity_id", legalEntityId!)
-          .eq("is_active", true)
-          .range(from, to) as unknown as PromiseLike<{ data: BakersRawMaterial[] | null; error: { message: string } | null }>,
-      );
-      const map: Record<string, BakersRawMaterial> = {};
-      for (const r of data) map[r.id] = r;
-      return map;
-    },
+    queryFn: () => fetchBakersRawMaterials(legalEntityId, { activeOnly: true }),
   });
 
   const recipesQuery = useQuery({

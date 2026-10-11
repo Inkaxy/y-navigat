@@ -104,7 +104,7 @@ const flour = (q: number, unit: string): BakersLine => ({
   quantity: q,
   unit,
   raw_material_id: "rm-flour",
-  _rm: { id: "rm-flour", name: "Hvetemel", grain_classification: "wheat", current_cost_price: 12, base_unit: "kg" },
+  _rm: { id: "rm-flour", name: "Hvetemel", grain_classification: "wheat", current_cost_price: 12, cost_basis_status: "verifisert", base_unit: "kg" },
 });
 
 describe("kost i editoren", () => {
@@ -116,7 +116,7 @@ describe("kost i editoren", () => {
   it("bruker literpris uten å kreve tetthet", () => {
     const line: BakersLine = {
       id: "olje", recipe_part_id: "p", quantity: 2, unit: "l", raw_material_id: "o",
-      _rm: { id: "o", name: "Rapsolje", current_cost_price: 30, base_unit: "l" },
+      _rm: { id: "o", name: "Rapsolje", current_cost_price: 30, cost_basis_status: "verifisert", base_unit: "l" },
     };
     expect(lineCost(line, 0).cost).toBe(60);
   });
@@ -131,7 +131,7 @@ describe("kost i editoren", () => {
   it("summerer og markerer ufullstendig når en linje ikke kan veies", () => {
     const lines: BakersLine[] = [
       flour(10, "kg"),
-      { id: "melk", recipe_part_id: "p", quantity: 2, unit: "l", raw_material_id: "m", _rm: { id: "m", name: "Melk", current_cost_price: 15, base_unit: "kg" } },
+      { id: "melk", recipe_part_id: "p", quantity: 2, unit: "l", raw_material_id: "m", _rm: { id: "m", name: "Melk", current_cost_price: 15, cost_basis_status: "verifisert", base_unit: "kg" } },
     ];
     const res = computeRecipeCost(lines);
     expect(res.incomplete).toBe(true);

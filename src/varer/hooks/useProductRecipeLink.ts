@@ -1,3 +1,4 @@
+import { fetchBakersRawMaterials } from "@/varer/lib/bakersRawMaterials";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -88,15 +89,7 @@ export interface RecipeBasisBundle {
 export const PRODUCT_RECIPE_LINK_KEY = (productId: string) => ["product-recipe-link", productId];
 
 async function loadRawMaterials(): Promise<Record<string, BakersRawMaterial>> {
-  const { data } = await supabase
-    .from("raw_materials")
-    .select(
-      "id, name, category, grain_classification, cereal_type, water_content_pct, unit_weight_grams, current_cost_price, density_g_per_ml, is_water, base_unit, is_composite, produced_by_recipe_id",
-    )
-    .limit(3000);
-  const map: Record<string, BakersRawMaterial> = {};
-  for (const r of (data ?? []) as unknown as BakersRawMaterial[]) map[r.id] = r;
-  return map;
+  return fetchBakersRawMaterials(null);
 }
 
 /** Bygger hele beregningsgrunnlaget for en oppskrift + koblingens innstillinger. */
