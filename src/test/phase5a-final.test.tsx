@@ -12,12 +12,13 @@ const io = vi.hoisted(() => ({
   rpcImpl: (async () => ({ data: {}, error: null })) as (fn: string, args: unknown) => Promise<unknown>,
   linkRead: { data: [] as unknown[] | null, error: null as unknown },
   canWrite: true,
+  linkGate: null as null | Promise<unknown>,
 }));
 vi.mock("@/integrations/supabase/client", () => {
   const builder = () => {
     const b: Record<string, unknown> = {};
     for (const m of ["select", "eq", "in"]) b[m] = () => b;
-    b.limit = () => Promise.resolve(io.linkRead);
+    b.limit = () => io.linkGate ?? Promise.resolve(io.linkRead);
     return b;
   };
   return {
@@ -29,7 +30,7 @@ vi.mock("@/integrations/supabase/client", () => {
   };
 });
 vi.mock("@/ravarer/context/RavarerContext", () => ({ useRavarer: () => ({ legalEntityId: "LE", user: null, canWrite: io.canWrite }) }));
-vi.mock("@/ravarer/hooks/useRawMaterials", () => ({ useRawMaterials: () => ({ data: [{ id: "RM-A", name: "Mel A", sku: "A", base_unit: "kg", is_active: true }] }) }));
+vi.mock("@/ravarer/hooks/useRawMaterials", () => ({ useRawMaterials: () => ({ data: [{ id: "RM-A", name: "Mel A", sku: "A", base_unit: "kg", is_active: true }, { id: "RM-B", name: "Mel B", sku: "B", base_unit: "kg", is_active: true }] }) }));
 vi.mock("@/ravarer/hooks/useSuppliers", () => ({ useSuppliers: () => ({ data: [{ id: "SUP", name: "Lev" }] }) }));
 vi.mock("@/ravarer/hooks/useSupplierDetail", () => ({ useUpdateSupplierNotes: () => ({ isPending: false, mutate: vi.fn() }) }));
 vi.mock("@/fakturaer/hooks/useMaterialChoices", () => ({ useMaterialChoices: () => ({ results: { data: [{ id: "RM-NEW", name: "Ny vare", category: null, base_unit: "kg" }], isFetching: false } }) }));
@@ -51,7 +52,7 @@ const client = () => new QueryClient({ defaultOptions: { queries: { retry: false
 const Wrap = ({ children, qc }: { children: ReactNode; qc: QueryClient }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
 
 beforeEach(() => {
-  io.uploads = []; io.rpcCalls = []; io.uploadGate = null; io.canWrite = true;
+  io.uploads = []; io.rpcCalls = []; io.uploadGate = null; io.canWrite = true; io.linkGate = null;
   io.rpcImpl = async () => ({ data: {}, error: null });
   io.linkRead = { data: [], error: null };
   resetPendingAgreementsForTest();
@@ -123,6 +124,43 @@ describe("NewAgreementDialog — livsløp og ukjent utfall", () => {
     expect((save() as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: /lagre som ny endring/i }));
     expect((save() as HTMLButtonElement).disabled).toBe(false);
+    expect(io.rpcCalls).toHaveLength(1);
+  });
+});
+
+function SwitchHost({ qc }: { qc: QueryClient }) {
+  const [open, setOpen] = useState(true);
+  const [rm, setRm] = useState("RM-A");
+  return (
+    <Wrap qc={qc}>
+      <button onClick={() => { setOpen(false); setRm("RM-B"); setTimeout(() => setOpen(true), 0); }}>bytt til B</button>
+      <NewAgreementDialog open={open} onOpenChange={setOpen} defaultRawMaterialId={rm} defaultSupplierId="SUP" />
+    </Wrap>
+  );
+}
+
+describe("NewAgreementDialog — sen avstemming A etter bytte til B", () => {
+  it("A avstemmes og ryddes, men B forblir åpen uten toast", async () => {
+    const { toast } = await import("sonner");
+    vi.mocked(toast.success).mockClear();
+    const qc = client();
+    const inval = vi.spyOn(qc, "invalidateQueries");
+    render(<SwitchHost qc={qc} />);
+    fillPrice();
+    fireEvent.click(save());
+    await waitFor(() => expect(screen.getByTestId("agreement-unknown")).toBeTruthy());
+    let release!: (v: unknown) => void;
+    io.linkGate = new Promise((r) => { release = r; });
+    fireEvent.click(screen.getByRole("button", { name: /kontroller lagret avtale/i }));
+    fireEvent.click(screen.getByText("bytt til B"));
+    await waitFor(() => expect(screen.queryByTestId("agreement-unknown")).toBeNull());
+    await waitFor(() => expect(screen.getByRole("button", { name: /lagre avtale/i })).toBeTruthy());
+    const from = (io.rpcCalls[0].args as { p_payload: { agreement_valid_from: string } }).p_payload.agreement_valid_from;
+    await act(async () => { release({ data: [{ agreed_price: 100, agreed_price_per_base_unit: null, agreement_valid_from: from, agreement_valid_to: null, agreement_document_url: null }], error: null }); await Promise.resolve(); });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(screen.getByRole("button", { name: /lagre avtale/i })).toBeTruthy();
+    expect(vi.mocked(toast.success)).not.toHaveBeenCalled();
+    expect(inval).toHaveBeenCalled();
     expect(io.rpcCalls).toHaveLength(1);
   });
 });
