@@ -11041,6 +11041,7 @@ export type Database = {
           confirmed_at: string | null
           confirmed_by: string | null
           created_at: string
+          edit_revision: number
           first_seen_invoice_id: string | null
           id: string
           last_seen_at: string
@@ -11058,6 +11059,7 @@ export type Database = {
           confirmed_at?: string | null
           confirmed_by?: string | null
           created_at?: string
+          edit_revision?: number
           first_seen_invoice_id?: string | null
           id?: string
           last_seen_at?: string
@@ -11075,6 +11077,7 @@ export type Database = {
           confirmed_at?: string | null
           confirmed_by?: string | null
           created_at?: string
+          edit_revision?: number
           first_seen_invoice_id?: string | null
           id?: string
           last_seen_at?: string
@@ -17914,6 +17917,17 @@ export type Database = {
         Args: { p_raw_material_id: string }
         Returns: Json
       }
+      rm_edit_supplier_alias: {
+        Args: {
+          p_action: string
+          p_alias_id: string
+          p_expected_snapshot: string
+          p_new_value?: string
+          p_reason: string
+          p_rms_id: string
+        }
+        Returns: Json
+      }
       rm_effective_agreement: {
         Args: { p_on_date?: string; p_raw_material_id: string }
         Returns: {
@@ -18266,6 +18280,10 @@ export type Database = {
       rm_suggest_package_from_name: {
         Args: { p_base_unit: string; p_name: string }
         Returns: number
+      }
+      rm_supplier_alias_edit_preview: {
+        Args: { p_alias_id: string; p_rms_id: string }
+        Returns: Json
       }
       rm_supplier_claim_preview: {
         Args: { p_line_ids: string[] }
