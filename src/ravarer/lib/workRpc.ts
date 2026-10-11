@@ -1,7 +1,7 @@
 import type { Json } from "@/integrations/supabase/types";
 import { bool, isObj, num, str, type Obj } from "@/fakturaer/lib/parseRpcJson";
 import {
-  ACCEPT_SKIP_REASONS, WORK_GROUPS, WORK_KINDS, toActivityKind,
+  ACCEPT_SKIP_REASONS, READ_INTEGRITY, WORK_EFFECT_STATUSES, WORK_GROUPS, WORK_KINDS, toActivityKind,
   type AcceptPriceResult, type AcceptSkipReason, type ActivityFeed, type ActivityItem, type DataQualityCounts,
   type InvoiceCounts, type PriceMover, type PriceMovers, type SupplierItemCounts, type WorkItem, type WorkItemGroup,
   type WorkItemKind, type WorkItemsCounts, type WorkItemsResult, type WorkSummary,
@@ -55,6 +55,12 @@ export function parseWorkSummary(data: Json | null | undefined): WorkSummary {
   };
 }
 
+const strings = (o: Obj, k: string): string[] => arr(o, k).filter((x): x is string => typeof x === "string");
+function pick<T extends string>(v: string | null, allowed: readonly T[], fallback: T): T {
+  const hit = allowed.find((a) => a === v);
+  return hit ?? fallback;
+}
+
 const isGroup = (v: string | null): v is WorkItemGroup => !!v && v !== "alle" && (WORK_GROUPS as readonly string[]).includes(v);
 const isKind = (v: string | null): v is WorkItemKind => !!v && (WORK_KINDS as readonly string[]).includes(v);
 
@@ -69,9 +75,15 @@ function parseWorkItem(o: Obj): WorkItem | null {
     invoice_id: str(o, "invoice_id"), invoice_number: str(o, "invoice_number"), title: str(o, "title") ?? "",
     sku: str(o, "sku"), rm_id: str(o, "rm_id"), rm_name: str(o, "rm_name"),
     open_lines: n0(o, "open_lines"), open_invoices: n0(o, "open_invoices"), invoice_count: n0(o, "invoice_count"),
-    amount: n0(o, "amount"), impact_nok: n0(o, "impact_nok"), last_date: str(o, "last_date"),
+    amount: n0(o, "amount"), impact_nok: num(o, "impact_nok"), last_date: str(o, "last_date"),
     last_open_line_id: str(o, "last_open_line_id"),
-    reasons: arr(o, "reasons").filter((x): x is string => typeof x === "string"),
+    reasons: strings(o, "reasons"),
+    effect_status: pick(str(o, "effect_status"), WORK_EFFECT_STATUSES, "unknown"),
+    effect_label: str(o, "effect_label"),
+    read_integrity: pick(str(o, "read_integrity"), READ_INTEGRITY, "unknown"),
+    read_integrity_flags: strings(o, "read_integrity_flags"),
+    unknown_effect_lines: num(o, "unknown_effect_lines"),
+    amount_kind: str(o, "amount_kind"),
   };
 }
 
