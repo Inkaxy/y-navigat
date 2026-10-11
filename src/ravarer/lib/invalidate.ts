@@ -101,6 +101,10 @@ const RAW_MATERIAL_GLOBAL_KEYS: readonly string[] = [
   "recipe-composite",
   "recipes-list",
   "rm-cost-deviations",
+  "product-cost-cache",
+  "product-calc-readiness",
+  "product-recipe-link",
+  "recipe-link-preview",
 
 ];
 
