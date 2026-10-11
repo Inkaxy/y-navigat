@@ -8,8 +8,17 @@ import { WORK_KIND_LABELS, labelFor } from "@/ravarer/lib/labels";
 import type { WorkItem } from "@/ravarer/lib/workRpcTypes";
 import { cn } from "@/lib/utils";
 import { workEffect } from "@/ravarer/lib/workEffect";
-import { kr, signedKr } from "./logic";
+import { signedKr } from "./logic";
 import { NEXT_ACTION, causeText } from "./groupCopy";
+
+function MobileEffect({ it }: { it: WorkItem }) {
+  const e = workEffect(it);
+  return (
+    <p className={cn("text-caption sm:hidden", e.kind === "read" ? "text-warning" : "text-ink-secondary")}>
+      {e.label}{e.kind === "verified" ? `: ${signedKr(e.value)}` : ""}
+    </p>
+  );
+}
 
 /** Kronevirkning: bare server-verifisert prisavvik vises som beløp. */
 export function EffectCell({ it }: { it: WorkItem }) {
@@ -97,6 +106,7 @@ export function WorkListView({ items, total, selectedKey, loading, fetchingMore,
                     <span aria-hidden className="text-ink-secondary">·</span>
                     <span className="font-medium text-primary">{NEXT_ACTION[it.kind]} →</span>
                   </p>
+                  <MobileEffect it={it} />
                 </div>
                 <EffectCell it={it} />
               </button>
