@@ -72,12 +72,13 @@ export function PriceTimeline({
   const [preset, setPreset] = useState<PeriodPreset>("last_12m");
   const [range, setRange] = useState<DateRange>(() => rangeForPreset("last_12m"));
   const [unitMode, setUnitMode] = useState<"base" | "package">("base");
+  const [shown, setShown] = useState(50);
 
   const packageFactor = baseUnitsPerPackage && baseUnitsPerPackage > 0 ? baseUnitsPerPackage : null;
   const unitFactor = unitMode === "package" && packageFactor ? packageFactor : 1;
   const unitLabel = unitMode === "package" && packageFactor ? "pakning" : baseUnit;
 
-  const { series, bands, rows } = useMemo(
+  const { series, bands, rows, events } = useMemo(
     () =>
       buildTimeline({
         history,
@@ -101,7 +102,7 @@ export function PriceTimeline({
   }, [series, bands]);
 
   const markers = useMemo(
-    () => rows.filter((r) => r.isCreditNote || r.isManual),
+    () => rows.filter((r) => r.isManual),
     [rows],
   );
 
@@ -115,7 +116,7 @@ export function PriceTimeline({
   }, [rows]);
 
   const exportCsv = () => {
-    const blob = new Blob([`\uFEFF${timelineCsv(rows)}`], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob([`\uFEFF${timelineCsv(rows, events)}`], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -163,7 +164,7 @@ export function PriceTimeline({
               </SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm" onClick={exportCsv} disabled={rows.length === 0}>
+          <Button variant="outline" size="sm" onClick={exportCsv} disabled={rows.length === 0 && events.length === 0}>
             <Download className="mr-1.5 h-3.5 w-3.5" /> CSV
           </Button>
           {actions}
@@ -227,7 +228,7 @@ export function PriceTimeline({
                 <Scatter
                   data={markers}
                   dataKey="price"
-                  name="Kreditnota / manuell"
+                  name="Manuell / avtale"
                   fill="hsl(var(--warning))"
                   shape="diamond"
                 />
@@ -252,7 +253,7 @@ export function PriceTimeline({
               </tr>
             </thead>
             <tbody>
-              {rows.slice(0, 50).map((r) => (
+              {rows.slice(0, shown).map((r) => (
                 <tr key={`${r.id}-${r.supplierKey}`} className="border-t border-line-subtle">
                   <td className="py-2">{formatDate(r.date)}</td>
                   <td className="py-2 text-ink-secondary">
@@ -266,6 +267,7 @@ export function PriceTimeline({
                   <td className="py-2 text-right tabular-nums">{formatNok(r.price)}</td>
                   <td className="py-2 text-right tabular-nums">
                     <Delta pct={r.deltaPrevPct} />
+                    {r.deltaPrevKr != null && <span className="ml-1 text-xs text-ink-secondary">({r.deltaPrevKr > 0 ? "+" : ""}{formatNok(r.deltaPrevKr)})</span>}
                   </td>
                   <td className="py-2 text-right tabular-nums">
                     <Delta pct={r.deltaAgreementPct} />
