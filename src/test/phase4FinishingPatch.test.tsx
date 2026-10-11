@@ -13,6 +13,7 @@ vi.mock("@/hooks/useCompany", () => ({ useCompany: () => ({ data: { id: "E" } })
 vi.mock("@/fakturaer/hooks/useMatchTolerances", () => ({ useMatchTolerances: () => ({ toleranceFor: () => 3, byCategory: {} }) }));
 vi.mock("@/fakturaer/lib/parseRpcJson", async (orig) => ({ ...(await orig<object>()), parsePriceReference: (d: unknown) => d }));
 
+import { osloTodayISO } from "@/lib/osloDate";
 import { completenessChecklist } from "@/ravarer/lib/rawMaterialSections";
 import { formatNutrientValue, nutrientChange, nutritionValueDiff } from "@/ravarer/lib/nutritionLabels";
 import { PriceBasisNowCard } from "@/ravarer/components/tabs/suppliers/PriceBasisNowCard";
@@ -45,7 +46,7 @@ describe("PriceBasisNowCard", () => {
   });
   it("feil etter tidligere svar: ingen bufret tall som gjeldende", async () => {
     const c = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    c.setQueryData(["rm-price-reference", "rm1", "s", expect.anything()], undefined);
+    c.setQueryData(["rm-price-reference", "rm1", "s", osloTodayISO()], { source: "last_purchase", price: 77.5, valid_from: "2026-09-01" }, { updatedAt: 0 });
     rpcMode = "error";
     render(card, { wrapper: wrap(c) });
     expect(await screen.findByText("Kunne ikke hente prisgrunnlag")).toBeTruthy();
