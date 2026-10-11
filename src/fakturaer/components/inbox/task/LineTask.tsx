@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, FileText, Loader2, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -40,6 +40,8 @@ export interface LineTaskProps {
   onSecondary: (a: SecondaryAction, line: ReviewLineRow) => void;
   onShowDocument: (line: ReviewLineRow) => void;
   onReconcile: () => void;
+  /** Øk tallet for å åpne «Endre råvare» (tast M i arbeidsflaten). */
+  editMaterialSignal?: number;
 }
 
 /**
@@ -58,6 +60,9 @@ export function LineTask(p: LineTaskProps) {
   const [recalc, setRecalc] = useState<{ lineIds: string[] } | null>(null);
   const [recalcBusy, setRecalcBusy] = useState(false);
   const [agreedOpen, setAgreedOpen] = useState(false);
+  useEffect(() => {
+    if (p.editMaterialSignal && p.canWrite) setEditMaterial(true);
+  }, [p.editMaterialSignal, p.canWrite]);
 
   const mode: TaskMode = editMaterial ? "material" : editPackage ? "package" : taskCopy.modeFor(status.key);
   const copy = taskCopy.forStatus(status.key);
@@ -282,6 +287,12 @@ export function LineTask(p: LineTaskProps) {
                   <Checkbox checked={form.rememberSku} disabled={!line.supplier_sku} onCheckedChange={(v) => form.setRememberSku(!!v)} />
                   Husk varenummeret {line.supplier_sku ?? ""}
                 </label>
+                {!form.anyPrimary && (
+                  <label className="flex items-center gap-2">
+                    <Checkbox checked={form.setAsPrimary} onCheckedChange={(v) => form.setSetAsPrimary(!!v)} />
+                    Sett {supplier} som primær leverandør
+                  </label>
+                )}
                 <label className="flex items-center gap-2">
                   <Checkbox checked={form.rememberName} disabled={!line.description} onCheckedChange={(v) => form.setRememberName(!!v)} />
                   Husk leverandørens varetekst

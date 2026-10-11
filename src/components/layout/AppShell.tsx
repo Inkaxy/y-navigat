@@ -14,14 +14,17 @@ import { MobileBottomNav } from "@/ordre/components/shell/MobileBottomNav";
  * bred matrise/tabell der hver ekstra piksel er nyttig kolonneplass.
  */
 const FULL_BLEED_PREFIXES = ["/ordre/leveringskalender"];
-/** Bare eksakt sti (ikke undersider som fakturadetalj/import/saker) — til fase 3. */
+/** Bare eksakt sti (ikke undersider som saker eller registrer linjer). */
 const FULL_BLEED_EXACT = ["/ravarer/priskontroll"];
+/** Faktura-arbeidsflaten (tre soner) bruker også hele bredden. */
+const FULL_BLEED_PATTERNS = [/^\/ravarer\/priskontroll\/faktura\/[^/]+$/];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const isOrdre = pathname === "/ordre" || pathname.startsWith("/ordre/");
   const isFullBleed =
     FULL_BLEED_EXACT.includes(pathname.replace(/\/+$/, "")) ||
+    FULL_BLEED_PATTERNS.some((re) => re.test(pathname.replace(/\/+$/, ""))) ||
     FULL_BLEED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   const appCode = resolveAppCodeFromPath(pathname);
 

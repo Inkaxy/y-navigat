@@ -44,7 +44,7 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export default function NewInvoicePage({ embedded = false }: { embedded?: boolean } = {}) {
+export default function NewInvoicePage({ embedded = false, onImported }: { embedded?: boolean; onImported?: (invoiceId: string | null) => void } = {}) {
   const navigate = useNavigate();
   const { canWrite } = useFakturaer();
   const { data: entities = [] } = useFakturaerLegalEntities();
@@ -152,7 +152,8 @@ export default function NewInvoicePage({ embedded = false }: { embedded?: boolea
         /* matching kommer i Steg 3 */
       }
 
-      navigate(paths.faktura(invoice.id));
+      if (onImported) onImported(invoice.id);
+      else navigate(paths.faktura(invoice.id));
     } catch (e: unknown) {
       showError("faktura:ny", e, "Kunne ikke lagre fakturaen. Prøv igjen.");
     } finally {

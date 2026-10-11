@@ -25,12 +25,11 @@ const DatabladEndringer = lazy(() => import("@/ravarer/pages/DatabladEndringer")
 const Matvaretabellen = lazy(() => import("@/ravarer/pages/Matvaretabellen"));
 const DatabladBulk = lazy(() => import("@/ravarer/pages/DatabladBulk"));
 
-const InvoiceDetail = lazy(() => import("@/fakturaer/pages/InvoiceDetail"));
+const FakturaWorkspace = lazy(() => import("./pages/priskontroll/faktura/FakturaWorkspace"));
 const RegistrerLinjer = lazy(() => import("@/fakturaer/pages/RegistrerLinjer"));
 const SupplierCase = lazy(() => import("@/fakturaer/pages/SupplierCase"));
 const AlleVarekort = lazy(() => import("./pages/priskontroll/AlleVarekort"));
 const VarekortPage = lazy(() => import("./pages/priskontroll/VarekortPage"));
-const ImportInvoice = lazy(() => import("@/fakturaer/pages/ImportInvoice"));
 const RavarerQueue = lazy(() => import("@/fakturaer/pages/RavarerQueue"));
 const DecisionDetail = lazy(() => import("@/fakturaer/pages/DecisionDetail"));
 const ReberegnKostpriser = lazy(() => import("@/ravarer/pages/ReberegnKostpriser"));
@@ -71,7 +70,6 @@ export function ravarerRoutes(Shell: ShellType) {
     <Route key="pk" path="/ravarer/priskontroll" element={inv(<Priskontroll />)} />,
     <Route key="pk-vk" path="/ravarer/priskontroll/varekort" element={inv(<AlleVarekort />)} />,
     <Route key="pk-vk-d" path="/ravarer/priskontroll/varekort/:supplierId/:itemKey" element={inv(<VarekortPage />)} />,
-    <Route key="pk-import" path="/ravarer/priskontroll/import" element={inv(<ImportInvoice />)} />,
     <Route key="pk-besl" path="/ravarer/priskontroll/beslutninger" element={inv(<QueueByScope />)} />,
     <Route key="pk-besl-d" path="/ravarer/priskontroll/beslutninger/:key" element={inv(<DecisionDetail />)} />,
     <Route key="pk-reb" path="/ravarer/priskontroll/verktoy/reberegn" element={rv(<InvoiceAccessGuard><ReberegnKostpriser /></InvoiceAccessGuard>)} />,
@@ -79,7 +77,7 @@ export function ravarerRoutes(Shell: ShellType) {
     <Route key="pk-fak-root" path="/ravarer/priskontroll/faktura" element={<Navigate to={paths.alleFakturaer()} replace />} />,
     <Route key="pk-sak" path="/ravarer/priskontroll/saker/:id" element={inv(<SupplierCase />)} />,
     <Route key="pk-reg" path="/ravarer/priskontroll/faktura/:id/registrer-linjer" element={inv(<RegistrerLinjer />)} />,
-    <Route key="pk-fak" path="/ravarer/priskontroll/faktura/:id" element={inv(<InvoiceDetail />)} />,
+    <Route key="pk-fak" path="/ravarer/priskontroll/faktura/:id" element={inv(<FakturaWorkspace />)} />,
 
     // Leverandører (statiske stier før /:id)
     <Route key="lev" path="/ravarer/leverandorer" element={rv(<LeverandorerHub />)} />,

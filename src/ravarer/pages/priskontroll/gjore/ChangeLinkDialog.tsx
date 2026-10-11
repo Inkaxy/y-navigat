@@ -9,6 +9,7 @@ import { useMaterialChoices } from "@/fakturaer/hooks/useMaterialChoices";
 import type { SupplierItem, SupplierItemLine } from "@/fakturaer/lib/supplierItems";
 import { cn } from "@/lib/utils";
 import { lockedLinesText } from "./logic";
+import { useConfirmMany } from "@/ravarer/ui/useConfirmMany";
 import { useChangeSupplierLink } from "./useGjoreMutations";
 import type { PanelResult } from "./types";
 
@@ -35,6 +36,7 @@ export function ChangeLinkDialog({ open, onOpenChange, item, lines, onDone }: Pr
   const scope = changeLinkScope(lines, item.rm_id);
   useEffect(() => { if (open) { setSearch(""); setPick(null); setReason(""); setError(null); } }, [open]);
 
+  const many = useConfirmMany();
   const submit = async () => {
     if (!item.rms_id || !pick) return;
     setError(null);
@@ -85,11 +87,12 @@ export function ChangeLinkDialog({ open, onOpenChange, item, lines, onDone }: Pr
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={change.isPending}>Avbryt</Button>
-          <Button onClick={() => void submit()} disabled={change.isPending || !pick || reason.trim().length === 0}>
+          <Button onClick={() => many.guard(scope.lineIds.length, "Endre kobling", () => void submit())} disabled={change.isPending || !pick || reason.trim().length === 0}>
             {change.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />}Endre kobling
           </Button>
         </DialogFooter>
       </DialogContent>
+      {many.dialog}
     </Dialog>
   );
 }

@@ -13,8 +13,8 @@ const CASES: [string, string, string][] = [
   ["/ravarer/datablad-bulk", "", "/ravarer/varer/datablad-opplasting"],
   ["/ravarer/fakturaer", "", "/ravarer/priskontroll?fane=fakturaer&visning=alle"],
   ["/ravarer/fakturaer", "?status=reconciled", "/ravarer/priskontroll?fane=fakturaer&visning=alle&status=reconciled"],
-  ["/ravarer/fakturaer/til-behandling", "?fane=klar&faktura=f1", "/ravarer/priskontroll?fane=fakturaer&visning=innboks&innboks=klar&faktura=f1"],
-  ["/ravarer/fakturaer/til-behandling", "?fane=fullfort", "/ravarer/priskontroll?fane=fakturaer&visning=innboks&innboks=fullfort"],
+  ["/ravarer/fakturaer/til-behandling", "?fane=klar&faktura=f1", "/ravarer/priskontroll/faktura/f1"],
+  ["/ravarer/fakturaer/til-behandling", "?fane=fullfort", "/ravarer/priskontroll?fane=fakturaer&visning=avstemt"],
   ["/ravarer/fakturaer/i-dag", "", "/ravarer/priskontroll?fane=gjore"],
   ["/ravarer/fakturaer/i-dag/k1", "?fra=alle", "/ravarer/priskontroll/beslutninger/k1?fra=alle"],
   ["/ravarer/fakturaer/beslutninger", "", "/ravarer/priskontroll/beslutninger"],
@@ -24,7 +24,11 @@ const CASES: [string, string, string][] = [
   ["/ravarer/fakturaer/oversikt", "", "/ravarer/priskontroll?fane=godkjenning"],
   ["/ravarer/fakturaer/saker", "", "/ravarer/priskontroll?fane=saker"],
   ["/ravarer/fakturaer/saker/c1", "", "/ravarer/priskontroll/saker/c1"],
-  ["/ravarer/fakturaer/import", "?tab=pdf", "/ravarer/priskontroll/import?tab=pdf"],
+  ["/ravarer/fakturaer/import", "?tab=pdf", "/ravarer/priskontroll?importer=pdf"],
+  ["/ravarer/priskontroll/import", "?tab=manuelt", "/ravarer/priskontroll?importer=manuelt"],
+  ["/ravarer/priskontroll/import", "", "/ravarer/priskontroll?importer=ehf"],
+  ["/fakturaer/import-pdf", "", "/ravarer/priskontroll?importer=pdf"],
+  ["/ravarer/fakturaer/til-behandling", "?fane=klar", "/ravarer/priskontroll?fane=fakturaer&visning=klar"],
   ["/ravarer/fakturaer/reberegn-kostpriser", "", "/ravarer/priskontroll/verktoy/reberegn"],
   ["/ravarer/fakturaer/i1/registrer-linjer", "", "/ravarer/priskontroll/faktura/i1/registrer-linjer"],
   ["/ravarer/fakturaer/i1", "", "/ravarer/priskontroll/faktura/i1"],
@@ -49,7 +53,7 @@ describe("omdirigering av gamle Råvarer-stier", () => {
   });
 
   it("statiske stier fanges ikke av /fakturaer/:id", () => {
-    expect(r("/ravarer/fakturaer/import", "")).toBe("/ravarer/priskontroll/import");
+    expect(r("/ravarer/fakturaer/import", "")).toBe("/ravarer/priskontroll?importer=ehf");
     expect(r("/ravarer/fakturaer/saker", "")).toBe("/ravarer/priskontroll?fane=saker");
   });
 

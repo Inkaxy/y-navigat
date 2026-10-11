@@ -3,6 +3,8 @@
  * tar sti og query, gir ny URL eller null når stien ikke er en gammel sti.
  * Query-parametre videreføres alltid, med de omdøpingene som står i tabellen.
  */
+import { normalizePriskontrollSearch } from "@/ravarer/pages/priskontroll/fakturaer/visning";
+
 const R = "/ravarer";
 
 function merge(search: string, extra: [string, string][], rename: Record<string, string | null> = {}): string {
@@ -21,7 +23,10 @@ function merge(search: string, extra: [string, string][], rename: Record<string,
   return s ? `?${s}` : "";
 }
 
-const STATIC: Record<string, { to: string; extra?: [string, string][]; rename?: Record<string, string | null> }> = {
+type Entry = { to: string; extra?: [string, string][]; rename?: Record<string, string | null>; /** Import-sidepanel: standardfane når ingen er oppgitt. */ importer?: boolean };
+const IMP = { to: `${R}/priskontroll`, rename: { tab: "importer" }, importer: true } as const;
+
+const STATIC: Record<string, Entry> = {
   "/ravarer/vareliste": { to: `${R}/varer` },
   "/ravarer/pakninger": { to: `${R}/varer/pakninger`, extra: [["filter", "ubekreftet"]] },
   "/ravarer/pakningsstorrelser": { to: `${R}/varer/pakninger` },
@@ -41,10 +46,11 @@ const STATIC: Record<string, { to: string; extra?: [string, string][]; rename?: 
   "/ravarer/fakturaer/vareminne": { to: `${R}/priskontroll/varekort` },
   "/ravarer/fakturaer/oversikt": { to: `${R}/priskontroll`, extra: [["fane", "godkjenning"]], rename: { fane: "status" } },
   "/ravarer/fakturaer/saker": { to: `${R}/priskontroll`, extra: [["fane", "saker"]] },
-  "/ravarer/fakturaer/import": { to: `${R}/priskontroll/import` },
-  "/ravarer/fakturaer/ny": { to: `${R}/priskontroll/import`, extra: [["tab", "manuelt"]] },
-  "/ravarer/fakturaer/import-ehf": { to: `${R}/priskontroll/import`, extra: [["tab", "ehf"]] },
-  "/ravarer/fakturaer/import-pdf": { to: `${R}/priskontroll/import`, extra: [["tab", "pdf"]] },
+  "/ravarer/priskontroll/import": IMP,
+  "/ravarer/fakturaer/import": IMP,
+  "/ravarer/fakturaer/ny": { ...IMP, extra: [["importer", "manuelt"]] },
+  "/ravarer/fakturaer/import-ehf": { ...IMP, extra: [["importer", "ehf"]] },
+  "/ravarer/fakturaer/import-pdf": { ...IMP, extra: [["importer", "pdf"]] },
   "/ravarer/fakturaer/reberegn-kostpriser": { to: `${R}/priskontroll/verktoy/reberegn` },
   "/ravarer/avtaler": { to: `${R}/leverandorer`, extra: [["fane", "avtaler"]] },
   "/ravarer/forhandlinger": { to: `${R}/leverandorer`, extra: [["fane", "forhandlinger"]] },
@@ -57,9 +63,9 @@ const STATIC: Record<string, { to: string; extra?: [string, string][]; rename?: 
   // Eldre aliaser utenfor /ravarer
   "/fakturaer": { to: `${R}/priskontroll`, extra: [["fane", "fakturaer"], ["visning", "alle"]] },
   "/fakturaer/til-behandling": { to: `${R}/priskontroll`, extra: [["fane", "fakturaer"], ["visning", "innboks"]], rename: { fane: "innboks" } },
-  "/fakturaer/ny": { to: `${R}/priskontroll/import`, extra: [["tab", "manuelt"]] },
-  "/fakturaer/import-ehf": { to: `${R}/priskontroll/import`, extra: [["tab", "ehf"]] },
-  "/fakturaer/import-pdf": { to: `${R}/priskontroll/import`, extra: [["tab", "pdf"]] },
+  "/fakturaer/ny": { ...IMP, extra: [["importer", "manuelt"]] },
+  "/fakturaer/import-ehf": { ...IMP, extra: [["importer", "ehf"]] },
+  "/fakturaer/import-pdf": { ...IMP, extra: [["importer", "pdf"]] },
 };
 
 const DYNAMIC: { re: RegExp; to: (m: RegExpMatchArray) => string }[] = [
@@ -87,7 +93,11 @@ export const LEGACY_RAVARER_PATHS: string[] = [
 export function resolveLegacyRavarerUrl(pathname: string, search: string): string | null {
   const p = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
   const st = STATIC[p];
-  if (st) return st.to + merge(search, st.extra ?? [], st.rename);
+  if (st) {
+    let q = merge(search, st.extra ?? [], st.rename);
+    if (st.importer && !new URLSearchParams(q.slice(1)).has("importer")) q = q ? `${q}&importer=ehf` : "?importer=ehf";
+    return (st.to === `${R}/priskontroll` && normalizePriskontrollSearch(q)) || st.to + q;
+  }
   for (const d of DYNAMIC) {
     const m = p.match(d.re);
     if (m) return d.to(m) + merge(search, []);
