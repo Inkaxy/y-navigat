@@ -16,6 +16,11 @@ export interface DeclarationNameFieldProps {
   disabled?: boolean;
   compact?: boolean;
   onSaved?: (value: string) => void;
+  /** Forslag som fyller feltet uten å regnes som lagret — «Lagre» er aktiv for et uendret forslag. */
+  initialDraft?: string | null;
+  /** Kontrollert utkast (løftes opp for «Lagre alle»). */
+  draft?: string;
+  onDraftChange?: (v: string) => void;
 }
 
 /**
@@ -24,12 +29,16 @@ export interface DeclarationNameFieldProps {
  */
 export function DeclarationNameField({
   rawMaterialId, value, rawMaterialName, matvaretabellenName, disabled, compact, onSaved,
+  initialDraft, draft: controlled, onDraftChange,
 }: DeclarationNameFieldProps) {
   const save = useSaveDeclarationName();
   const saved = (value ?? "").trim();
-  const [draft, setDraft] = useState(saved);
+  const start = saved || (initialDraft ?? "").trim();
+  const [own, setOwn] = useState(start);
   const [suggesting, setSuggesting] = useState(false);
-  useEffect(() => setDraft(saved), [saved, rawMaterialId]);
+  useEffect(() => setOwn(start), [start, rawMaterialId]);
+  const draft = controlled ?? own;
+  const setDraft = (v: string) => { setOwn(v); onDraftChange?.(v); };
 
   const dirty = draft.trim() !== saved;
   const canSave = !disabled && dirty && !!draft.trim() && !save.isPending;
