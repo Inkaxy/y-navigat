@@ -7,11 +7,26 @@ import { formatDate, formatNok } from "@/fakturaer/lib/constants";
 import { WORK_KIND_LABELS, labelFor } from "@/ravarer/lib/labels";
 import type { WorkItem } from "@/ravarer/lib/workRpcTypes";
 import { cn } from "@/lib/utils";
-import { kr } from "./logic";
+import { workEffect } from "@/ravarer/lib/workEffect";
+import { kr, signedKr } from "./logic";
+import { NEXT_ACTION, causeText } from "./groupCopy";
+
+/** Kronevirkning: bare server-verifisert prisavvik vises som beløp. */
+export function EffectCell({ it }: { it: WorkItem }) {
+  const e = workEffect(it);
+  return (
+    <div className="hidden w-32 shrink-0 text-right sm:block" title={e.kind === "verified" ? undefined : e.detail}>
+      <div className="text-caption text-ink-secondary">{e.label}</div>
+      {e.kind === "verified"
+        ? <div className="text-sm font-medium tabular-nums">{signedKr(e.value)}</div>
+        : <div className={cn("text-caption", e.kind === "read" ? "text-warning" : "text-ink-secondary")}>{e.kind === "read" ? "Lesing ukontrollert" : "—"}</div>}
+    </div>
+  );
+}
 
 export function rowSubtitle(it: WorkItem): string {
   if (it.type === "faktura") {
-    return [it.supplier_name ?? "Ukjent leverandør", it.last_date ? formatDate(it.last_date) : null, formatNok(it.amount)].filter(Boolean).join(" · ");
+    return [it.supplier_name ?? "Ukjent leverandør", it.last_date ? formatDate(it.last_date) : null, `Fakturabeløp ${formatNok(it.amount)}`].filter(Boolean).join(" · ");
   }
   const lines = `${it.open_lines} ${it.open_lines === 1 ? "linje" : "linjer"} på ${it.open_invoices} ${it.open_invoices === 1 ? "faktura" : "fakturaer"}`;
   return [it.supplier_name ?? "Ukjent leverandør", it.sku ? `varenr ${it.sku}` : null, lines].filter(Boolean).join(" · ");
@@ -30,7 +45,7 @@ type Props = {
   onToggle?: (it: WorkItem, on: boolean) => void;
 };
 
-/** Én prioritert liste: varekort og fakturasaker. */
+/** Prioritert liste: varekort og fakturasaker med årsak, neste handling og ærlig kronevirkning. */
 export function WorkListView({ items, total, selectedKey, loading, fetchingMore, onSelect, onMore, checked, onToggle }: Props) {
   if (loading) {
     return (
@@ -43,7 +58,7 @@ export function WorkListView({ items, total, selectedKey, loading, fetchingMore,
     return (
       <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border p-10 text-center text-sm text-ink-secondary">
         <CheckCircle2 className="h-6 w-6 text-success" aria-hidden />
-        Ingenting venter her. Bra jobba.
+        Ingenting venter i denne gruppen.
       </div>
     );
   }
@@ -67,7 +82,7 @@ export function WorkListView({ items, total, selectedKey, loading, fetchingMore,
                 data-key={it.key}
                 onClick={() => onSelect(it)}
                 className={cn(
-                  "relative flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/50",
+                  "relative flex w-full items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/50",
                   active && "bg-primary/5 before:absolute before:inset-y-0 before:left-0 before:w-[2px] before:bg-primary",
                 )}
               >
@@ -77,15 +92,20 @@ export function WorkListView({ items, total, selectedKey, loading, fetchingMore,
                     <span className="truncate text-sm font-medium text-foreground">{it.title}</span>
                   </div>
                   <p className="truncate text-caption text-ink-secondary">{rowSubtitle(it)}</p>
+                  <p className="flex flex-wrap items-center gap-x-2 text-caption">
+                    <span className="text-ink-secondary">{causeText(it)}</span>
+                    <span aria-hidden className="text-ink-secondary">·</span>
+                    <span className="font-medium text-primary">{NEXT_ACTION[it.kind]} →</span>
+                  </p>
                 </div>
-                {it.impact_nok > 0 && <span className="shrink-0 text-sm tabular-nums text-ink-secondary">≈ {kr(it.impact_nok)}</span>}
+                <EffectCell it={it} />
               </button>
             </li>
           );
         })}
       </ul>
       <div className="flex items-center justify-between text-caption text-ink-secondary">
-        <span className="tabular-nums">Viser {items.length} av {total}</span>
+        <span className="tabular-nums">Viser {items.length} av {total} i køen</span>
         {onMore && items.length < total && (
           <Button variant="outline" size="sm" onClick={onMore} disabled={fetchingMore}>
             {fetchingMore && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden />}Vis flere
