@@ -43,14 +43,15 @@ describe("nextInvoiceStep", () => {
     expect(nextInvoiceStep(ni({ line_count: 0, source: "manual", lines_source: null })).key).toBe("registrer_linjer");
     expect(nextInvoiceStep(ni({ lines_sum_status: "mismatch", open_count: 2 })).key).toBe("rett_sum");
     expect(nextInvoiceStep(ni({ open_count: 2 })).label).toBe("Avklar 2 linjer");
-    expect(nextInvoiceStep(ni({})).key).toBe("avstem");
-    expect(nextInvoiceStep(ni({ status: "reconciled" })).key).toBe("godkjenn");
-    expect(nextInvoiceStep(ni({ status: "reconciled", approved: true })).key).toBe("kostpris");
+    expect(nextInvoiceStep(ni({})).key).toBe("kostpris");
+    expect(nextInvoiceStep(ni({ costPosted: true })).key).toBe("avstem");
+    expect(nextInvoiceStep(ni({ status: "reconciled", costPosted: true })).key).toBe("godkjenn");
+    expect(nextInvoiceStep(ni({ status: "reconciled", approved: true })).key).toBe("ferdig");
     const f = nextInvoiceStep(ni({ status: "reconciled", approved: true, costPosted: true }));
     expect([f.key, f.enabled]).toEqual(["ferdig", false]);
   });
   it("sperrer uten rettigheter", () => {
-    expect(nextInvoiceStep(ni({ canReconcile: false, reconcileBlockedReason: "x" })).enabled).toBe(false);
+    expect(nextInvoiceStep(ni({ costPosted: true, canReconcile: false, reconcileBlockedReason: "x" })).enabled).toBe(false);
     expect(nextInvoiceStep(ni({ status: "reconciled", canApprove: false })).enabled).toBe(false);
   });
   it("flagget faktura: fjern flagg først", () => {

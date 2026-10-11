@@ -21,8 +21,8 @@ describe("R0: kostpris krever skrivetilgang, godkjenning krever approve/admin", 
     expect(bulkActionGate({ canApprove: true, canWrite: false })).toMatchObject({ approve: true, costs: false });
   });
   it("headeren: «Før kostpris» følger canPostCosts, ikke canApprove", () => {
-    expect(nextInvoiceStep({ ...base, canPostCosts: true }).enabled).toBe(true);
-    expect(nextInvoiceStep({ ...base, canPostCosts: false }).enabled).toBe(false);
+    expect(nextInvoiceStep({ ...base, status: "ready", canPostCosts: true }).enabled).toBe(true);
+    expect(nextInvoiceStep({ ...base, status: "ready", canPostCosts: false }).enabled).toBe(false);
   });
 });
 
