@@ -164,7 +164,7 @@ export function OrderDeskSplitKpi({
                 {failed ? "–" : side.value}
               </div>
             )}
-            <div className={cn("mt-1.5 text-caption text-muted-foreground", wrapSub ? "break-words" : "truncate")}>
+            <div className="mt-1.5 truncate text-caption text-muted-foreground">
               {failed ? "Kunne ikke hentes" : side.label}
             </div>
           </Link>
