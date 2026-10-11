@@ -17,21 +17,29 @@ export interface PackageFieldsProps {
   /** Automatisk utledede forslag (fra navn/referansepris). */
   row?: { foreslatt_fra_navn?: number | null; foreslatt_fra_referanse?: number | null } | null;
   autoFocus?: boolean;
+  /** Låst pakningsenhet (f.eks. fakturalinjens enhet) — vises som tekst i stedet for velger. */
+  lockedUnit?: string | null;
+  /** Feltets id (for etikett og tester). */
+  inputId?: string;
+  /** Egen etikett på mengdefeltet. */
+  unitsLabel?: string;
+  invalid?: boolean;
 }
 
 /** Felles visuelle pakningsfelt: mengde per pakning + pakningsenhet. */
 export function PackageFields({
-  baseUnit, units, onUnitsChange: setUnits, packageUnit, onPackageUnitChange: setPackageUnit, fillNote, row, autoFocus = false,
+  baseUnit, units, onUnitsChange: setUnits, packageUnit, onPackageUnitChange: setPackageUnit, fillNote, row, autoFocus = false, lockedUnit, inputId, unitsLabel, invalid,
 }: PackageFieldsProps) {
-  const isBulk = packageUnit === "bulk";
+  const locked = lockedUnit != null;
+  const isBulk = !locked && packageUnit === "bulk";
   return (
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <Label>Antall {baseUnit} per pakning {isBulk ? "" : "*"}</Label>
+                <Label htmlFor={inputId}>{unitsLabel ?? `Antall ${baseUnit} per ${locked ? lockedUnit || "pakning" : "pakning"}`} {isBulk || locked ? "" : "*"}</Label>
                 <Input
-                  type="number"
-                  step="0.001"
-                  min="0"
+                  id={inputId}
+                  {...(locked ? { inputMode: "decimal" as const } : { type: "number", step: "0.001", min: "0" })}
+                  aria-invalid={invalid}
                   value={isBulk ? "" : units}
                   onChange={e => setUnits(e.target.value)}
                   disabled={isBulk}
@@ -94,12 +102,16 @@ export function PackageFields({
               </div>
               <div>
                 <Label>Pakningsenhet</Label>
+                {locked ? (
+                  <p className="flex h-10 items-center text-sm text-ink-secondary">{lockedUnit || "fakturert enhet"} (fra fakturalinjen)</p>
+                ) : (
                 <Select value={packageUnit} onValueChange={setPackageUnit}>
                   <SelectTrigger><SelectValue placeholder="Velg" /></SelectTrigger>
                   <SelectContent>
                     {PACKAGE_UNIT_OPTIONS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                )}
               </div>
             </div>
 

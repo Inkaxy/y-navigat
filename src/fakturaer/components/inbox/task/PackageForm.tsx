@@ -1,6 +1,6 @@
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { PackageFields } from "@/ravarer/editors/PackageFields";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
@@ -62,19 +62,17 @@ export function PackageForm({ line, form }: { line: ReviewLineRow; form: LineMat
         </p>
       )}
       <div className={isPieces ? "" : "grid grid-cols-[1fr_8rem] gap-2"}>
-        <div>
-          <Label htmlFor={`pkg-size-${line.id}`} className="text-caption">
-            {isPieces ? `Antall stk per ${unit}` : `Innhold per ${unit}`}
-          </Label>
-          <Input
-            id={`pkg-size-${line.id}`}
-            inputMode="decimal"
-            value={form.packageSize}
-            onChange={(e) => form.setPackageSize(e.target.value)}
-            aria-invalid={draft.state === "invalid"}
-            className="mt-1"
-          />
-        </div>
+        <PackageFields
+          inputId={`pkg-size-${line.id}`}
+          baseUnit={base}
+          unitsLabel={isPieces ? `Antall stk per ${unit}` : `Innhold per ${unit}`}
+          units={form.packageSize}
+          onUnitsChange={form.setPackageSize}
+          packageUnit={unit}
+          onPackageUnitChange={() => undefined}
+          lockedUnit={line.unit ?? ""}
+          invalid={draft.state === "invalid"}
+        />
         {!isPieces && (
           <div>
             <Label htmlFor={`pkg-unit-${line.id}`} className="text-caption">

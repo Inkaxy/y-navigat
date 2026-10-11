@@ -1,6 +1,5 @@
 import { Loader2 } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { PackageFields } from "@/ravarer/editors/PackageFields";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import type { PackageInference } from "@/fakturaer/lib/supplierItems";
@@ -36,14 +35,16 @@ export function PackageBlock(p: Props) {
   }
   return (
     <div className="space-y-2">
-      <div className="flex items-end gap-2">
-        <div className="w-32">
-          <Label htmlFor={`${p.idPrefix}-bupp`} className="text-caption">Innhold</Label>
-          <Input id={`${p.idPrefix}-bupp`} inputMode="decimal" value={p.value} onChange={(e) => p.onChange(e.target.value)} className="mt-1 tabular-nums" />
-        </div>
-        <span className="pb-2 text-sm text-ink-secondary">{p.baseUnit} per {p.packageUnit}</span>
-        {p.loading && <Loader2 className="mb-2.5 h-4 w-4 animate-spin text-ink-secondary" aria-label="Regner ut pakning" />}
-      </div>
+      <PackageFields
+        inputId={`${p.idPrefix}-bupp`}
+        baseUnit={p.baseUnit}
+        units={p.value}
+        onUnitsChange={p.onChange}
+        packageUnit={p.packageUnit}
+        onPackageUnitChange={() => undefined}
+        lockedUnit={p.packageUnit}
+      />
+      {p.loading && <Loader2 className="h-4 w-4 animate-spin text-ink-secondary" aria-label="Regner ut pakning" />}
       {p.inference?.explanation && <p className="text-caption text-ink-secondary">{p.inference.explanation}</p>}
       {p.inference?.source && (
         <span className="inline-flex rounded-md border border-line-subtle bg-muted px-2 py-0.5 text-[11px] font-semibold text-ink-secondary">

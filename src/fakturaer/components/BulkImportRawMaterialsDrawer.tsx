@@ -11,7 +11,7 @@ import { Loader2, Sparkles, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { supplierItemKey } from "@/fakturaer/lib/supplierItemKey";
 import { invalidateAfterLink, linkSupplierItem } from "@/fakturaer/hooks/useSupplierItems";
-import { dedupeBySupplierItem, reportLinkRow } from "@/fakturaer/lib/bulkLink";
+import { dedupeBySupplierItem, failedRow, reportLinkRow, type BulkRowReport } from "@/fakturaer/lib/bulkLink";
 import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS, deriveLinePackage, packageBaseUnits, parseDecimal, resolveLineCost } from "@/fakturaer/lib/units";
 
 export interface BulkLine {
@@ -110,6 +110,7 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [skipped, setSkipped] = useState<Array<{ line_id: string; reason: string }>>([]);
+  const [rowReports, setRowReports] = useState<Record<string, BulkRowReport>>({});
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
   useEffect(() => {
@@ -238,6 +239,7 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
       const { unique: chosen } = dedupeBySupplierItem(picked, (l) => ({ supplierId, itemKey: supplierItemKey({ supplier_sku: l.supplier_sku, description: l.description }) }));
       const created: Array<{ id: string }> = [];
       const notes: string[] = [];
+      const reports: Record<string, BulkRowReport> = {};
       const skippedOut: Array<{ line_id: string; reason: string }> = [];
       let done = 0;
       setProgress({ done, total: chosen.length });
@@ -246,6 +248,7 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
         const itemKey = supplierItemKey({ supplier_sku: l.supplier_sku, description: l.description });
         if (!itemKey) {
           skippedOut.push({ line_id: l.id, reason: "Mangler varenavn og varenummer" });
+          reports[l.id] = failedRow(r.name.trim() || "uten navn", "linjen mangler varenavn og varenummer");
         } else {
           const pkgSize = num(r.package_size);
           try {
@@ -270,16 +273,19 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
             });
             if (res.raw_material_id) created.push({ id: res.raw_material_id });
             const rep = reportLinkRow(r.name.trim() || r.sku.trim() || "uten navn", res);
+            reports[l.id] = rep;
             if (rep.text !== "opprettet") notes.push(`${rep.name}: ${rep.text}`);
           } catch (e) {
-            skippedOut.push({ line_id: l.id, reason: e instanceof Error ? e.message : "ukjent feil" });
+            const msg = e instanceof Error ? e.message : "ukjent feil";
+            skippedOut.push({ line_id: l.id, reason: msg });
+            reports[l.id] = failedRow(r.name.trim() || r.sku.trim() || "uten navn", msg);
           }
         }
         done++;
         setProgress({ done, total: chosen.length });
       }
       setProgress(null);
-      return { created, skipped: skippedOut, notes };
+      return { created, skipped: skippedOut, notes, reports };
     },
     onSuccess: (res) => {
       const created = res.created?.length ?? 0;
@@ -295,11 +301,13 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
       if (res.notes.length) toast.info("Noen linjer står fortsatt åpne", { description: res.notes.join(" · "), duration: 15000 });
 
       setSkipped(skippedRows);
+      setRowReports(res.reports);
       if (skippedRows.length > 0) {
         toast.warning(`${skippedRows.length} linjer ble hoppet over — se årsakene i skuffen.`);
       }
       onComplete?.();
-      if (skippedRows.length === 0) onOpenChange(false);
+      // Lukk bare når alle rader gikk rent — ellers står radrapporten synlig i skuffen.
+      if (skippedRows.length === 0 && res.notes.length === 0) onOpenChange(false);
     },
     onError: (e: unknown) => toast.error(`Import feilet: ${e instanceof Error ? e.message : String(e)}`),
   });
@@ -395,7 +403,10 @@ export function BulkImportRawMaterialsDrawer({ open, onOpenChange, invoiceId, le
                         <div className="font-mono">{l.supplier_sku ?? "—"}</div>
                         <div>{l.description}</div>
                         <div>Antall: {l.quantity} {l.unit} · Pris: {l.unit_price}</div>
-                        {skippedByLine[l.id] && (
+                        {rowReports[l.id] && rowReports[l.id].text !== "opprettet" && (
+                          <div className={rowReports[l.id].ok ? "mt-1 text-ink-secondary" : "mt-1 font-medium text-destructive"}>{rowReports[l.id].text}</div>
+                        )}
+                        {skippedByLine[l.id] && !rowReports[l.id] && (
                           <div className="mt-1 font-medium text-warning">Hoppet over: {skippedByLine[l.id]}</div>
                         )}
                       </div>

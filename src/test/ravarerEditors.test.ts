@@ -27,7 +27,10 @@ describe("RawMaterialCreateSheet — skrivevei per kontekst", () => {
 });
 
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { rpc: vi.fn(async () => ({ data: { ok: true, supplier_id: "s1", previous_supplier_id: null, link_created: false }, error: null })) },
+  supabase: {
+    rpc: vi.fn(async () => ({ data: { ok: true, supplier_id: "s1", previous_supplier_id: null, link_created: false }, error: null })),
+    auth: { getSession: vi.fn(async () => ({ data: { session: { access_token: "tok" } } })) },
+  },
 }));
 
 describe("PrimarySupplierControl — RPC-argumenter", () => {
@@ -44,11 +47,15 @@ describe("PrimarySupplierControl — RPC-argumenter", () => {
   it("sender null for å fjerne primær", async () => {
     const { supabase } = await import("@/integrations/supabase/client");
     const { setPrimarySupplier } = await import("@/ravarer/lib/supplierLinkRpc");
-    await setPrimarySupplier("rm-1", null);
-    expect(supabase.rpc).toHaveBeenCalledWith("rm_set_primary_supplier", {
-      p_raw_material_id: "rm-1",
-      p_supplier_id: null,
-    });
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify({ ok: true, supplier_id: null, previous_supplier_id: "s1", link_created: false }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await setPrimarySupplier("rm-1", null);
+    expect(supabase.rpc).not.toHaveBeenCalled();
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/rest\/v1\/rpc\/rm_set_primary_supplier$/);
+    expect(JSON.parse(String(init.body))).toEqual({ p_raw_material_id: "rm-1", p_supplier_id: null });
+    expect(res.supplier_id).toBeNull();
+    vi.unstubAllGlobals();
   });
 });
 

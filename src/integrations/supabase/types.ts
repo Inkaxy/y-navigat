@@ -17597,7 +17597,7 @@ export type Database = {
         }[]
       }
       rm_set_primary_supplier: {
-        Args: { p_raw_material_id: string; p_supplier_id: string | null }
+        Args: { p_raw_material_id: string; p_supplier_id: string }
         Returns: Json
       }
       rm_sku_norm: { Args: { p: string }; Returns: string }
