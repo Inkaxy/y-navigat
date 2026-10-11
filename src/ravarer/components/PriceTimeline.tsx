@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { formatNok, formatDate, PRICE_SOURCES } from "@/ravarer/lib/constants";
 import { osloTodayISO } from "@/lib/osloDate";
 import { PeriodPicker } from "@/ravarer/components/PeriodPicker";
+import { PriceEventsList } from "@/ravarer/components/PriceEventsList";
 import {
   rangeForPreset,
   type DateRange,
@@ -292,8 +293,16 @@ export function PriceTimeline({
               ))}
             </tbody>
           </table>
+          {rows.length > shown && (
+            <div className="pt-2 text-center">
+              <Button variant="ghost" size="sm" onClick={() => setShown((n) => n + 50)}>
+                Vis flere ({rows.length - shown} gjenstår)
+              </Button>
+            </div>
+          )}
         </div>
       )}
+      <PriceEventsList events={events} unitLabel={unitLabel} />
     </Card>
   );
 }
