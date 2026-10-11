@@ -86,8 +86,9 @@ export function PriceTimeline({
         unitFactor,
         from: range.start,
         to: range.end,
+        currentUnit: baseUnit,
       }),
-    [history, supplierNames, links, unitFactor, range.start, range.end],
+    [history, supplierNames, links, unitFactor, range.start, range.end, baseUnit],
   );
 
   /** Ett fargekart nøklet på leverandør — brukes av både avtalebånd og linjer. */
