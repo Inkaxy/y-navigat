@@ -33,6 +33,7 @@ import { SuppliersTab } from "@/ravarer/components/tabs/SuppliersTab";
 import { RecipesTab } from "@/ravarer/components/tabs/RecipesTab";
 import { StockTab } from "@/ravarer/components/tabs/StockTab";
 import { HistoryTab } from "@/ravarer/components/tabs/HistoryTab";
+import { lagerReturnHref } from "@/ravarer/lib/lagerReturn";
 import { paths } from "@/ravarer/lib/paths";
 
 export default function RawMaterialDetail() {
@@ -142,7 +143,7 @@ export default function RawMaterialDetail() {
         canPrev={!!prev}
         canNext={!!next}
         showRename={!editingName && canWrite}
-        onBack={() => navigate(`${paths.varer()}${listSearch ? `?${listSearch}` : ""}`)}
+        onBack={() => navigate(lagerReturnHref(searchParams.get("lager")) ?? `${paths.varer()}${listSearch ? `?${listSearch}` : ""}`)}
         onPrev={() => prev && goTo(prev)}
         onNext={() => next && goTo(next)}
         onRename={startEdit}

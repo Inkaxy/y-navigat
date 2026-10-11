@@ -1,17 +1,16 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ClipboardCheck, Loader2, Package, Search } from "lucide-react";
+import { ClipboardCheck } from "lucide-react";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useAllStockStatus, type AllStockRow } from "@/ravarer/hooks/useAllStockStatus";
-import {
-  defaultCountUnit,
-  describeInCountUnit,
-  useRawMaterialUnitsFor,
-} from "@/ravarer/hooks/useRawMaterialUnits";
+import { defaultCountUnit, describeInCountUnit, useRawMaterialUnitsFor } from "@/ravarer/hooks/useRawMaterialUnits";
 import { StockAdjustDialog } from "./StockAdjustDialog";
-import { StockMovementsSheet } from "./StockMovementsSheet";
+import { StockPeek, type StockPeekItem } from "./StockPeek";
+import { DataTable, type Column } from "@/ravarer/ui/DataTable";
+import { SplitView } from "@/ravarer/ui/SplitView";
+import { stockFullHref } from "@/ravarer/lib/lagerReturn";
 import { formatDate, formatNok, formatNumber } from "@/ravarer/lib/constants";
 
 const ITEM_TYPE_LABEL: Record<string, string> = {
@@ -21,142 +20,135 @@ const ITEM_TYPE_LABEL: Record<string, string> = {
   videresalg: "Videresalg",
 };
 
-/** Alle lagerførte varer — råvarer, emballasje og handelsvarer. */
-export function AllStockTable() {
+/**
+ * Alle lagerførte varer — råvarer, emballasje og handelsvarer. Søk (`q`) og valgt vare (`valgt`) ligger i
+ * adressen, som for videresalg. Beholdning vises i varens telleenhet; lasting/feil gir aldri tall som 0.
+ */
+export function AllStockTable({ q, selectedId, onSelect }: { q: string; selectedId: string | null; onSelect: (id: string | null) => void }) {
   const { canWrite } = useRavarer();
-  const { data: rows = [], isLoading } = useAllStockStatus();
+  const [sp] = useSearchParams();
+  const query = useAllStockStatus();
+  const rows = useMemo(() => query.data ?? [], [query.data]);
   const { data: unitsByRm } = useRawMaterialUnitsFor(rows.map(r => r.raw_material_id));
-  const [q, setQ] = useState("");
-  const [selected, setSelected] = useState<AllStockRow | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [countOpen, setCountOpen] = useState(false);
+  const [countRow, setCountRow] = useState<AllStockRow | null>(null);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return rows.filter(r => !needle || `${r.name} ${r.sku} ${r.category ?? ""}`.toLowerCase().includes(needle));
   }, [rows, q]);
 
+  const ready = !!query.data && !query.isError;
   const belowMin = filtered.filter(r => r.min_stock != null && r.current_stock <= r.min_stock).length;
   const totalValue = filtered.reduce((s, r) => s + (r.stock_value ?? 0), 0);
+  const kpi = (v: string) => (ready ? v : query.isError ? "–" : "…");
+  const stockText = (r: AllStockRow) => describeInCountUnit(r.current_stock, r.base_unit, defaultCountUnit(unitsByRm?.get(r.raw_material_id)), formatNumber);
+  const under = (r: AllStockRow) => r.min_stock != null && r.current_stock <= r.min_stock;
+
+  const columns: Column<AllStockRow>[] = [
+    { id: "name", header: "Vare", alwaysVisible: true, sortKey: r => r.name, cell: r => (
+      <span className="flex flex-col"><span className="font-medium">{r.name}</span><span className="font-mono text-xs text-ink-secondary">{r.sku}</span></span>
+    ) },
+    { id: "type", header: "Type", sortKey: r => r.item_type, cell: r => <span className="text-ink-secondary">{ITEM_TYPE_LABEL[r.item_type] ?? r.item_type}</span> },
+    { id: "beh", header: "Beholdning", align: "right", sortKey: r => r.current_stock, cell: r => (
+      <span className={`tabular-nums font-medium ${r.current_stock < 0 ? "text-destructive" : ""}`}>
+        {stockText(r)}
+        {under(r) && <span className="block text-xs font-normal text-warning">Under minimum</span>}
+      </span>
+    ) },
+    { id: "min", header: "Min.", align: "right", sortKey: r => r.min_stock ?? -1, cell: r => <span className="tabular-nums text-ink-secondary">{r.min_stock == null ? "—" : `${formatNumber(r.min_stock, 3)} ${r.base_unit}`}</span> },
+    { id: "verdi", header: "Lagerverdi", align: "right", sortKey: r => r.stock_value ?? -1, cell: r => <span className="tabular-nums">{formatNok(r.stock_value)}</span> },
+    { id: "inn", header: "Sist inn", sortKey: r => r.last_in ?? "", cell: r => <span className="text-ink-secondary">{formatDate(r.last_in)}</span> },
+    { id: "ut", header: "Sist ut", sortKey: r => r.last_out ?? "", cell: r => <span className="text-ink-secondary">{formatDate(r.last_out)}</span> },
+    { id: "act", header: "Handling", align: "right", cell: r => canWrite ? (
+      <Button size="sm" variant="outline" className="min-h-[44px] xl:min-h-8" onClick={e => { e.stopPropagation(); setCountRow(r); }}>
+        <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" /> Telling
+      </Button>
+    ) : null },
+  ];
+
+  const selectedRow = selectedId ? rows.find(r => r.raw_material_id === selectedId) ?? null : null;
+  const peekItem: StockPeekItem | null = selectedRow ? {
+    rawMaterialId: selectedRow.raw_material_id,
+    name: selectedRow.name,
+    sku: selectedRow.sku,
+    facts: [
+      ["Type", ITEM_TYPE_LABEL[selectedRow.item_type] ?? selectedRow.item_type],
+      ["Beholdning", stockText(selectedRow)],
+      ["Min. beholdning", selectedRow.min_stock == null ? "—" : `${formatNumber(selectedRow.min_stock, 3)} ${selectedRow.base_unit}`],
+      ["Lagerverdi", formatNok(selectedRow.stock_value)],
+      ["Sist inn", formatDate(selectedRow.last_in)],
+      ["Sist ut", formatDate(selectedRow.last_out)],
+    ],
+  } : null;
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="p-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3" data-testid="all-stock-kpis">
+        <Card className="min-w-0 p-4">
           <p className="text-xs uppercase tracking-wider text-ink-secondary">Lagerførte varer</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums">{rows.length}</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">{kpi(String(rows.length))}</p>
         </Card>
-        <Card className={`p-4 ${belowMin > 0 ? "border-warning/50" : ""}`}>
+        <Card className={`min-w-0 p-4 ${ready && belowMin > 0 ? "border-warning/50" : ""}`}>
           <p className="text-xs uppercase tracking-wider text-ink-secondary">Under minimum</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums">{belowMin}</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">{kpi(String(belowMin))}</p>
         </Card>
-        <Card className="p-4">
+        <Card className="min-w-0 p-4">
           <p className="text-xs uppercase tracking-wider text-ink-secondary">Samlet lagerverdi</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums">{formatNok(totalValue)}</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">{kpi(formatNok(totalValue))}</p>
         </Card>
       </div>
 
-      <Card className="p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-secondary" />
-          <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Søk navn, SKU eller kategori…" className="pl-9" />
-        </div>
-      </Card>
-
-      <Card className="overflow-hidden">
-        {isLoading ? (
-          <div className="flex items-center justify-center p-12 text-ink-secondary">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Laster…
+      <SplitView
+        selected={!!selectedId}
+        list={
+          <div className="space-y-2">
+            <DataTable
+              ariaLabel="Alle lagerførte varer"
+              rows={ready ? filtered : undefined}
+              columns={columns}
+              getId={r => r.raw_material_id}
+              isLoading={query.isLoading}
+              error={query.error}
+              onRetry={() => void query.refetch()}
+              emptyText={q.trim() ? "Ingen treff." : "Ingen varer med lagerføring."}
+              activeId={selectedId}
+              onActiveChange={id => onSelect(id)}
+              onRowClick={r => onSelect(r.raw_material_id)}
+              preferenceScope="ravarer:lager-alle:kolonner"
+              renderMobileCard={r => (
+                <div className="space-y-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="font-medium [overflow-wrap:anywhere]">{r.name}</span>
+                    <span className={`shrink-0 tabular-nums font-semibold ${r.current_stock < 0 ? "text-destructive" : ""}`}>{stockText(r)}</span>
+                  </div>
+                  <div className="text-caption text-ink-secondary">
+                    {ITEM_TYPE_LABEL[r.item_type] ?? r.item_type} · min {r.min_stock == null ? "—" : `${formatNumber(r.min_stock, 3)} ${r.base_unit}`} · {formatNok(r.stock_value)}
+                  </div>
+                  {under(r) && <div className="text-caption text-warning">Under minimum</div>}
+                </div>
+              )}
+            />
+            {ready && filtered.length > 0 && (
+              <p className="text-sm text-ink-secondary">Samlet lagerverdi ({filtered.length} varer): <span className="font-semibold tabular-nums text-ink-primary">{formatNok(totalValue)}</span></p>
+            )}
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-12 text-center">
-            <Package className="mb-3 h-10 w-10 text-ink-secondary" />
-            <p className="text-ink-secondary">Ingen varer med lagerføring.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30 text-left text-xs uppercase tracking-wider text-ink-secondary">
-                <tr>
-                  <th className="px-4 py-3">Vare</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3 text-right">Beholdning</th>
-                  <th className="px-4 py-3 text-right">Min.</th>
-                  <th className="px-4 py-3 text-right">Lagerverdi</th>
-                  <th className="px-4 py-3">Sist inn</th>
-                  <th className="px-4 py-3">Sist ut</th>
-                  <th className="px-4 py-3 text-right">Handling</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(r => {
-                  const under = r.min_stock != null && r.current_stock <= r.min_stock;
-                  const countUnit = defaultCountUnit(unitsByRm?.get(r.raw_material_id));
-                  return (
-                    <tr
-                      key={r.raw_material_id}
-                      onClick={() => { setSelected(r); setSheetOpen(true); }}
-                      className={`cursor-pointer border-t border-line-subtle transition-colors hover:bg-muted/40 ${
-                        r.current_stock < 0 ? "bg-destructive/10" : under ? "bg-warning/10" : ""
-                      }`}
-                    >
-                      <td className="px-4 py-3">
-                        <div className="font-medium">{r.name}</div>
-                        <div className="font-mono text-xs text-ink-secondary">{r.sku}</div>
-                      </td>
-                      <td className="px-4 py-3 text-ink-secondary">{ITEM_TYPE_LABEL[r.item_type] ?? r.item_type}</td>
-                      <td className={`px-4 py-3 text-right tabular-nums font-medium ${r.current_stock < 0 ? "text-destructive" : ""}`}>
-                        {describeInCountUnit(r.current_stock, r.base_unit, countUnit, formatNumber)}
-                        {under && <div className="text-xs font-normal text-warning">Under minimum</div>}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">
-                        {r.min_stock == null ? "—" : `${formatNumber(r.min_stock, 3)} ${r.base_unit}`}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums">{formatNok(r.stock_value)}</td>
-                      <td className="px-4 py-3 text-ink-secondary">{formatDate(r.last_in)}</td>
-                      <td className="px-4 py-3 text-ink-secondary">{formatDate(r.last_out)}</td>
-                      <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
-                        {canWrite && (
-                          <Button size="sm" variant="outline" className="min-h-[44px] md:min-h-9" onClick={() => { setSelected(r); setCountOpen(true); }}>
-                            <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" /> Telling
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr className="border-t-2 border-line-subtle bg-muted/30 font-semibold">
-                  <td className="px-4 py-3" colSpan={4}>Samlet lagerverdi ({filtered.length} varer)</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{formatNok(totalValue)}</td>
-                  <td colSpan={3} />
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        )}
-      </Card>
-
-      <StockMovementsSheet
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-        rawMaterial={selected ? { id: selected.raw_material_id, name: selected.name, base_unit: selected.base_unit } : null}
-      />
-      <StockAdjustDialog
-        open={countOpen}
-        onOpenChange={setCountOpen}
-        mode="count"
-        rawMaterial={
-          selected
-            ? {
-                id: selected.raw_material_id,
-                name: selected.name,
-                base_unit: selected.base_unit,
-                current_stock: selected.current_stock,
-              }
-            : null
         }
+        panel={
+          <StockPeek
+            item={peekItem}
+            fullHref={selectedRow ? stockFullHref(sp, selectedRow.raw_material_id) : undefined}
+            canWrite={canWrite}
+            onClose={() => onSelect(null)}
+            onCount={selectedRow ? () => setCountRow(selectedRow) : undefined}
+          />
+        }
+      />
+
+      <StockAdjustDialog
+        open={!!countRow}
+        onOpenChange={v => { if (!v) setCountRow(null); }}
+        mode="count"
+        rawMaterial={countRow ? { id: countRow.raw_material_id, name: countRow.name, base_unit: countRow.base_unit, current_stock: countRow.current_stock } : null}
       />
     </div>
   );

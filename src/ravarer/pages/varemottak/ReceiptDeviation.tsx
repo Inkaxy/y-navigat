@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,10 +47,13 @@ export function DeviationDialog({
   line,
   invoiceNumber,
   onClose,
+  isCurrent,
 }: {
   line: ReceiptLine | null;
   invoiceNumber: string;
   onClose: () => void;
+  /** Gjeldende kontekst (montert, samme selskap/faktura, skrivetilgang) — sjekkes rett før bevegelsen skrives. */
+  isCurrent: () => boolean;
 }) {
   const move = useReceiptMovement();
   const { data: units = [] } = useRawMaterialUnits(line?.raw_material_id ?? undefined);
@@ -58,22 +62,37 @@ export function DeviationDialog({
   const [note, setNote] = useState("");
 
   const base = rowsToBase(rows, units);
+  /** Synkron lås: manuell bevegelse er ikke idempotent — to klikk skal aldri gi to bevegelser. */
+  const busy = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  /** Uklart svar: bevegelsen kan være skrevet. Aldri automatisk nytt forsøk fra denne dialogen. */
+  const [unknown, setUnknown] = useState(false);
 
   const submit = async () => {
-    if (!line?.raw_material_id || base == null || base === 0) return;
+    if (busy.current || unknown || !line?.raw_material_id || base == null || base === 0) return;
+    if (!isCurrent()) { toast.error("Konteksten er endret eller tilgangen mangler. Avviket ble ikke registrert."); onClose(); return; }
+    busy.current = true;
     const amount = Math.abs(base);
-    await move.mutateAsync({
+    // Mengde, type og notat fryses ved innsending.
+    const frozen = {
       raw_material_id: line.raw_material_id,
       quantity_base: kind === "less" ? -amount : amount,
-      kind: kind === "waste" ? "waste" : "adjustment",
+      kind: kind === "waste" ? ("waste" as const) : ("adjustment" as const),
       note:
         (kind === "waste" ? "Svinn ved mottak" : "Mottaksavvik") +
         ` faktura ${invoiceNumber}` +
         (note.trim() ? ` — ${note.trim()}` : ""),
-    });
-    setRows([emptyRow()]);
-    setNote("");
-    onClose();
+    };
+    try {
+      await move.mutateAsync(frozen);
+      if (mounted.current) onClose();
+    } catch (e) {
+      console.warn("[varemottak] avvik: uklart utfall", e);
+      if (mounted.current) setUnknown(true);
+    } finally {
+      busy.current = false;
+    }
   };
 
   return (
@@ -109,9 +128,14 @@ export function DeviationDialog({
             <Textarea value={note} onChange={e => setNote(e.target.value)} rows={2} placeholder="Valgfritt" />
           </div>
         </div>
+        {unknown && (
+          <p role="alert" className="text-sm text-destructive">
+            Utfallet er ukjent — avviket kan være registrert. Kontroller lagerbevegelsene for varen før du registrerer på nytt.
+          </p>
+        )}
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Avbryt</Button>
-          <Button onClick={submit} disabled={move.isPending || base == null || base === 0}>Registrer</Button>
+          <Button variant="outline" className="min-h-[44px]" onClick={onClose}>{unknown ? "Lukk" : "Avbryt"}</Button>
+          <Button className="min-h-[44px]" onClick={() => void submit()} disabled={unknown || move.isPending || base == null || base === 0}>Registrer</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

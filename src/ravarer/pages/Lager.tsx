@@ -20,6 +20,7 @@ import { Link } from "react-router-dom";
 import { paths } from "@/ravarer/lib/paths";
 import { formatDate, formatNumber } from "@/ravarer/lib/constants";
 import { AllStockTable } from "@/ravarer/components/stock/AllStockTable";
+import { stockFullHref } from "@/ravarer/lib/lagerReturn";
 
 const kr = (n: number | null) =>
   n == null ? "—" : new Intl.NumberFormat("nb-NO", { style: "currency", currency: "NOK", maximumFractionDigits: 0 }).format(n);
@@ -39,11 +40,20 @@ export default function LagerPage() {
       const p = new URLSearchParams(prev);
       if (v === "alle") p.set("filter", "alle");
       else p.delete("filter");
+      // Valgt vare hører til utvalget; søket beholdes.
+      p.delete("valgt");
       return p;
     }, { replace: true });
-  const [q, setQ] = useState("");
-  // Valgt vare i adressen (`valgt=<råvare-id>`): peek fra 1280 px, full bredde under.
-  const selectedId = filter === "videresalg" ? sp.get("valgt") : null;
+  // Søk og valgt vare ligger i adressen (`q`, `valgt`) for begge utvalg — fullt kort tar dem med i retur.
+  const q = sp.get("q") ?? "";
+  const setQ = (v: string) =>
+    setSp(prev => {
+      const p = new URLSearchParams(prev);
+      if (v) p.set("q", v);
+      else p.delete("q");
+      return p;
+    }, { replace: true });
+  const selectedId = sp.get("valgt");
   const setValgt = (id: string | null) =>
     setSp(prev => {
       const p = new URLSearchParams(prev);
@@ -99,6 +109,8 @@ export default function LagerPage() {
     ) : null },
   ];
 
+  const ready = !!stockQuery.data && !stockQuery.isError;
+  const kpi = (v: string) => (ready ? v : stockQuery.isError ? "–" : "…");
   const negatives = rows.filter(r => r.disponibelt < 0).length;
   const belowMin = rows.filter(r => availabilityRank(r) === 1).length;
   const totalValue = rows.reduce((s, r) => s + (r.lagerverdi ?? 0), 0);
@@ -124,23 +136,23 @@ export default function LagerPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <Card className="p-4">
             <p className="text-xs uppercase tracking-wider text-ink-secondary">Handelsvarer med lager</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">{items.length}</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums">{kpi(String(items.length))}</p>
           </Card>
           <Card className={`p-4 ${belowMinAll ? "border-warning/50" : ""}`}>
             <p className="text-xs uppercase tracking-wider text-ink-secondary">Under minimum (alle lagerførte)</p>
             <p className="mt-1 text-2xl font-semibold tabular-nums">{belowMinAll ?? "–"}</p>
           </Card>
-          <Card className={`p-4 ${belowMin > 0 ? "border-warning/50" : ""}`}>
+          <Card className={`p-4 ${ready && belowMin > 0 ? "border-warning/50" : ""}`}>
             <p className="text-xs uppercase tracking-wider text-ink-secondary">Videresalg: disponibelt under minimum</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">{belowMin}</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums">{kpi(String(belowMin))}</p>
           </Card>
-          <Card className={`p-4 ${negatives > 0 ? "border-destructive/50" : ""}`}>
+          <Card className={`p-4 ${ready && negatives > 0 ? "border-destructive/50" : ""}`}>
             <p className="text-xs uppercase tracking-wider text-ink-secondary">Oversolgt</p>
-            <p className={`mt-1 text-2xl font-semibold tabular-nums ${negatives > 0 ? "text-destructive" : ""}`}>{negatives}</p>
+            <p className={`mt-1 text-2xl font-semibold tabular-nums ${ready && negatives > 0 ? "text-destructive" : ""}`}>{kpi(String(negatives))}</p>
           </Card>
           <Card className="p-4">
             <p className="text-xs uppercase tracking-wider text-ink-secondary">Lagerverdi</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">{kr(totalValue)}</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums">{kpi(kr(totalValue))}</p>
           </Card>
         </div>
 
@@ -166,7 +178,15 @@ export default function LagerPage() {
         </div>
 
         {filter === "alle" ? (
-          <AllStockTable />
+          <div className="space-y-5">
+            <Card className="p-4">
+              <div className="relative min-w-0">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-secondary" />
+                <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Søk navn, SKU eller kategori…" aria-label="Søk i alle lagerførte varer" className="h-[44px] pl-9 xl:h-10" />
+              </div>
+            </Card>
+            <AllStockTable q={q} selectedId={selectedId} onSelect={setValgt} />
+          </div>
         ) : (
           <div className="space-y-5">
             <Card className="p-4">
@@ -246,7 +266,30 @@ export default function LagerPage() {
                   )}
                 </div>
               }
-              panel={<StockPeek row={selectedRow} canWrite={canWrite} onClose={() => setValgt(null)} onAdjust={openDialog} kr={kr} />}
+              panel={
+                <StockPeek
+                  item={selectedRow ? {
+                    rawMaterialId: selectedRow.raw_material_id,
+                    name: selectedRow.name,
+                    sku: selectedRow.sku,
+                    facts: [
+                      ["Disponibelt", `${formatNumber(selectedRow.disponibelt, 3)} ${selectedRow.base_unit}`],
+                      ["Beholdning", `${formatNumber(selectedRow.beholdning, 3)} ${selectedRow.base_unit}`],
+                      ["Reservert (kundeordrer ikke levert)", selectedRow.reservert ? formatNumber(selectedRow.reservert, 3) : "—"],
+                      ["Min. beholdning", selectedRow.min_stock == null ? "—" : formatNumber(selectedRow.min_stock, 3)],
+                      ["Dager igjen", selectedRow.dager_igjen == null ? "—" : `${formatNumber(selectedRow.dager_igjen, 0)} dager`],
+                      ["Neste levering", formatDate(selectedRow.neste_levering)],
+                      ["Sist kjøpt", formatDate(selectedRow.sist_kjopt)],
+                      ["Lagerverdi", kr(selectedRow.lagerverdi)],
+                    ],
+                  } : null}
+                  fullHref={selectedRow ? stockFullHref(sp, selectedRow.raw_material_id) : undefined}
+                  canWrite={canWrite}
+                  onClose={() => setValgt(null)}
+                  onCount={selectedRow ? () => openDialog(selectedRow, "count") : undefined}
+                  onWaste={selectedRow ? () => openDialog(selectedRow, "waste") : undefined}
+                />
+              }
             />
 
           </div>
