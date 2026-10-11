@@ -15828,6 +15828,10 @@ export type Database = {
         Args: { p_invoice_id: string }
         Returns: string
       }
+      _rm_manual_pdf_enqueue_match: {
+        Args: { p_invoice_id: string; p_replay: boolean }
+        Returns: boolean
+      }
       _rm_reconcile_core: {
         Args: { p_invoice_id: string; p_mode: string; p_uid: string }
         Returns: Json
