@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { TrendingUp } from "lucide-react";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { NewSupplierDialog } from "@/ravarer/components/NewSupplierDialog";
-import { useRawMaterialSuppliers, usePriceHistory, type RmSupplierRow } from "@/ravarer/hooks/useRmSuppliers";
+import { useRawMaterialSuppliers, usePriceHistory, toTimelineRow, type RmSupplierRow } from "@/ravarer/hooks/useRmSuppliers";
 import { PackageEditor } from "@/ravarer/editors/PackageEditor";
 import { fallbackPackageRow } from "@/ravarer/lib/packageRow";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
@@ -53,17 +53,7 @@ export function SuppliersTab({ rm }: Props) {
 
   const timelineHistory = useMemo<TimelineHistoryRow[]>(
     () =>
-      history.map((h) => ({
-        id: h.id,
-        effective_date: h.effective_date,
-        price: Number(h.price),
-        supplier_id: h.supplier_id,
-        source: h.source,
-        invoice_id: h.invoice_id,
-        invoiceNumber: h.invoices?.invoice_number ?? null,
-        isCreditNote: h.invoices?.is_credit_note ?? false,
-        notes: h.notes,
-      })),
+      history.map(toTimelineRow),
     [history],
   );
 
