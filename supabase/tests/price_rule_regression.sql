@@ -74,3 +74,16 @@ begin
   r := r || format('T6 endret=%s forhåndsvisning=%s', j->>'lines_changed', j->>'lines_preview_only');
   raise exception 'RESULTAT: %', r;
 end $$;
+
+-- T7 (2026-10-11): ekte triggersekvens, ingen manuell rm_apply. Rulles tilbake via exception.
+do $$
+declare rid uuid; s0 text; s1 text; u1 numeric; s2 text;
+begin
+  select id, cost_basis_status into rid, s0 from raw_materials where cost_basis_status='verifisert' and cost_source_history_id is not null limit 1;
+  update raw_material_price_history set superseded_at=now(), superseded_reason='test' where raw_material_id=rid and superseded_at is null;
+  select cost_basis_status into s1 from raw_materials where id=rid; u1 := rm_usable_cost(rid);
+  update raw_material_price_history set superseded_at=null, superseded_reason=null where raw_material_id=rid and superseded_reason='test';
+  select cost_basis_status into s2 from raw_materials where id=rid;
+  if s1 <> 'mangler' or u1 is not null or s2 <> 'verifisert' then raise exception 'T7 FEIL % % %', s1, u1, s2; end if;
+  raise exception 'T7 OK (rollback)';
+end $$;
