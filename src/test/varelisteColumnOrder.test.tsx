@@ -16,10 +16,11 @@ import { buildVarelisteColumns } from "@/ravarer/components/vareliste/VarelisteC
 import { LIST_COLUMNS } from "@/ravarer/lib/varelisteColumns";
 import { tableCsv, visibleColumns } from "@/ravarer/ui/dataTableLogic";
 import type { RawMaterialListItem } from "@/ravarer/lib/rawMaterialViews";
+import { PENDING_UNCHECKED } from "@/ravarer/lib/listPriceEvidence";
 
 const item = {
   id: "r1", sku: "SKU-1", name: "Combisur", declarationName: null, categories: ["Mel"], itemType: "ravare", isActive: true, baseUnit: "kg",
-  costPrice: 60.6035, costSource: "invoice", costUpdatedAt: "2026-08-18", agreedPrice: null, supplierId: "s1", supplierName: "Regal", supplierSku: null,
+  costPrice: 60.6035, costStatus: "verifisert", comparison: PENDING_UNCHECKED, costSource: "invoice", costUpdatedAt: "2026-08-18", agreedPrice: null, supplierId: "s1", supplierName: "Regal", supplierSku: null,
   primaryLinkId: null, matchedAlias: null, lastInvoicePrice: 60.6035, lastInvoiceDate: "2026-08-18", deviation: null,
   packageState: "unconfirmed", volume12m: 480, currentStock: 7, stockTracking: true, minStock: null,
   hasNutrition: true, hasDatasheet: true, hasAllergens: true, searchText: "", aliases: [],

@@ -9,6 +9,7 @@ import {
   sortItems,
   type RawMaterialListItem,
 } from "@/ravarer/lib/rawMaterialViews";
+import { PENDING_UNCHECKED } from "@/ravarer/lib/listPriceEvidence";
 
 function item(patch: Partial<RawMaterialListItem> = {}): RawMaterialListItem {
   return {
@@ -21,6 +22,7 @@ function item(patch: Partial<RawMaterialListItem> = {}): RawMaterialListItem {
     isActive: true,
     baseUnit: "kg",
     costPrice: 10,
+    costStatus: "verifisert",
     costSource: "invoice",
     costUpdatedAt: null,
     agreedPrice: 9,
@@ -32,6 +34,7 @@ function item(patch: Partial<RawMaterialListItem> = {}): RawMaterialListItem {
     matchedAlias: null,
     lastInvoicePrice: 10,
     lastInvoiceDate: "2026-01-01",
+    comparison: PENDING_UNCHECKED,
     deviation: 0,
     packageState: "confirmed",
     volume12m: 100,
