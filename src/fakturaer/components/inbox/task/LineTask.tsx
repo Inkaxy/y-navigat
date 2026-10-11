@@ -324,7 +324,7 @@ export function LineTask(p: LineTaskProps) {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onSelect={() => setEditMaterial(true)}>Endre råvare</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => p.onSecondary("create", line)}>Ny råvare …</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => p.onSecondary("not_rm", line)}>Ikke råvare … (oppgi grunn)</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => p.onSecondary("not_rm", line)}>Ikke vare … (oppgi grunn)</DropdownMenuItem>
                 <DropdownMenuItem disabled={form.aiBusy} onSelect={() => { setEditMaterial(true); void form.runAiSuggestion(); }}>Hent AI-forslag</DropdownMenuItem>
                 <DropdownMenuItem disabled={!form.selectedRmId} onSelect={() => setAgreedOpen(true)}>Registrer avtalepris</DropdownMenuItem>
                 <DropdownMenuItem disabled={!form.selectedRmId || form.busy} onSelect={() => void save(mode === "package", true)}>

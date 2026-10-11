@@ -8,7 +8,7 @@ import type { StatusTone } from "@/fakturaer/lib/lineStatus";
 import { paths } from "@/ravarer/lib/paths";
 
 function lineStatus(l: SupplierItemLine): { label: string; tone: StatusTone } {
-  if (l.line_kind && l.line_kind !== "vare" && !l.raw_material_id) return { label: "Utelatt", tone: "muted" };
+  if (l.line_kind && l.line_kind !== "vare" && !l.raw_material_id) return { label: "Ikke vare", tone: "muted" };
   if (isOpenLine(l)) return { label: reasonLabelsOf(l.review_reason)[0] ?? "Til kontroll", tone: "warning" };
   if (!l.raw_material_id) return { label: "Ikke koblet", tone: "muted" };
   return { label: "Klar", tone: "success" };

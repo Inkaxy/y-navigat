@@ -1,50 +1,79 @@
-import { AlertTriangle, CheckCircle2, ClipboardList, FileWarning, Warehouse } from "lucide-react";
-import { OrderDeskKpi } from "@/ordre/components/dashboard/OrderDeskKpi";
+import { useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { QueryErrorState } from "@/components/common/QueryState";
-import { useWorkSummary } from "@/ravarer/hooks/useWorkData";
+import { useAuth } from "@/hooks/useAuth";
+import { useHotkeys } from "@/ravarer/ui/hotkeys";
+import { useNavigate } from "react-router-dom";
 import { paths } from "@/ravarer/lib/paths";
-import { ModulePage } from "@/ravarer/ui/ModulePage";
-import { RAVARER_EYEBROW } from "./hubTabs";
+import { useWorkSummary, useWorkItems, useActivityFeed, usePriceMovers } from "@/ravarer/hooks/useWorkData";
+import { HeaderView } from "@/ravarer/pages/oversikt/HeaderView";
+import { KpiRowView } from "@/ravarer/pages/oversikt/KpiRowView";
+import { ToDoListView } from "@/ravarer/pages/oversikt/ToDoListView";
+import { ActivityView } from "@/ravarer/pages/oversikt/ActivityView";
+import { PriceMoversView } from "@/ravarer/pages/oversikt/PriceMoversView";
+import { DataQualityView } from "@/ravarer/pages/oversikt/DataQualityView";
 
-/** Oversikt (fase 1): én rad nøkkeltall fra `rm_work_summary`. Bygges ut i fase 2. */
+function firstNameFromEmail(email: string | null | undefined): string | null {
+  if (!email) return null;
+  const left = email.split("@")[0].split(/[._-]/)[0];
+  return left ? left[0].toUpperCase() + left.slice(1) : null;
+}
+
+/** Oversikt — svarer på «Hva venter? Hva skjedde? Hva endret seg?» */
 export default function RavarerOversikt() {
-  const q = useWorkSummary({ includeApproval: true });
-  const s = q.data;
-  const loading = q.isLoading;
-  const dq = s?.data_quality;
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [sp, setSp] = useSearchParams();
+  const period = (Number(sp.get("periode")) === 90 ? 90 : Number(sp.get("periode")) === 365 ? 365 : 30) as 30 | 90 | 365;
+
+  const summaryQ = useWorkSummary({ includeApproval: true });
+  const itemsQ = useWorkItems({ group: "alle", sort: "impact", limit: 7 });
+  const activityQ = useActivityFeed({ days: 7 });
+  const moversQ = usePriceMovers({ days: period });
+
+  useHotkeys(
+    useMemo(() => [
+      { keys: ["p"], description: "Gå til priskontroll", handler: () => navigate(paths.priskontroll({ fane: "gjore" })) },
+      { keys: ["v"], description: "Gå til varer", handler: () => navigate(paths.varer()) },
+    ], [navigate]),
+  );
+
+  const first = firstNameFromEmail(user?.email);
+
+  function setPeriod(p: 30 | 90 | 365) {
+    const next = new URLSearchParams(sp);
+    if (p === 30) next.delete("periode"); else next.set("periode", String(p));
+    setSp(next, { replace: true });
+  }
+
   return (
-    <ModulePage eyebrow={RAVARER_EYEBROW} title="Oversikt" subtitle="Det viktigste i Råvarer akkurat nå." embedsPage={false}>
-      {q.isError ? (
-        <QueryErrorState error={q.error} scope="ravarer:oversikt" onRetry={() => q.refetch()} />
-      ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {(loading || s?.invoice_access) && (
-            <OrderDeskKpi
-              label="Å gjøre i priskontroll" value={s?.todo_total ?? 0} to={paths.priskontroll()} icon={ClipboardList}
-              tone={(s?.todo_total ?? 0) > 0 ? "warning" : "ok"} loading={loading}
-            />
-          )}
-          {(loading || s?.invoice_access) && (
-            <OrderDeskKpi
-              label="Avstemt automatisk (7 d)" value={s?.invoices?.reconciled_auto_7d ?? 0}
-              sub={s?.invoices ? `av ${s.invoices.reconciled_7d} avstemt` : undefined}
-              to={paths.alleFakturaer({ status: "reconciled" })} icon={CheckCircle2} tone="ok" loading={loading}
-            />
-          )}
-          <OrderDeskKpi
-            label="Varer med mangler" value={dq ? dq.missing_package + dq.missing_declaration + dq.missing_nutrition : 0}
-            to={paths.pakninger()} icon={FileWarning} tone="warning" loading={loading}
-          />
-          <OrderDeskKpi
-            label="Avtaler som utløper (30 d)" value={s?.other.agreements_expiring_30d ?? 0}
-            to={paths.avtaler()} icon={AlertTriangle} tone={(s?.other.agreements_expiring_30d ?? 0) > 0 ? "warning" : "default"} loading={loading}
-          />
-          <OrderDeskKpi
-            label="Under minimumslager" value={s?.other.stock_below_min ?? 0}
-            to={paths.lager()} icon={Warehouse} tone={(s?.other.stock_below_min ?? 0) > 0 ? "warning" : "default"} loading={loading}
-          />
-        </div>
+    <div className="mx-auto w-full max-w-[1280px] space-y-6 px-page py-6">
+      <HeaderView summary={summaryQ.data ?? null} firstName={first} />
+
+      {summaryQ.isError && (
+        <QueryErrorState error={summaryQ.error} scope="ravarer:oversikt:summary" onRetry={() => summaryQ.refetch()} />
       )}
-    </ModulePage>
+      <KpiRowView summary={summaryQ.data ?? null} movers={moversQ.data ?? null} loading={summaryQ.isLoading} />
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
+        {itemsQ.isError
+          ? <QueryErrorState error={itemsQ.error} scope="ravarer:oversikt:items" onRetry={() => itemsQ.refetch()} />
+          : <ToDoListView data={itemsQ.data ?? null} loading={itemsQ.isLoading} />}
+        {activityQ.isError
+          ? <QueryErrorState error={activityQ.error} scope="ravarer:oversikt:activity" onRetry={() => activityQ.refetch()} />
+          : <ActivityView data={activityQ.data ?? null} loading={activityQ.isLoading} />}
+      </div>
+
+      {moversQ.isError
+        ? <QueryErrorState error={moversQ.error} scope="ravarer:oversikt:movers" onRetry={() => moversQ.refetch()} />
+        : <PriceMoversView data={moversQ.data ?? null} period={period} onPeriodChange={setPeriod} loading={moversQ.isLoading} />}
+
+      <DataQualityView
+        dq={summaryQ.data?.data_quality ?? null}
+        supplier={summaryQ.data?.supplier_items ?? null}
+        stockBelowMin={summaryQ.data?.other.stock_below_min ?? 0}
+        loading={summaryQ.isLoading}
+      />
+    </div>
   );
 }

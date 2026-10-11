@@ -389,7 +389,7 @@ export default function FakturaerInboxPage() {
     setBulkBusy(false);
     setSelected({});
     refresh();
-    toast[failed ? "warning" : "success"](`${ok} markert som ikke aktuell${failed ? `, ${failed} feilet` : ""}`);
+    toast[failed ? "warning" : "success"](`${ok} markert som ikke vare${failed ? `, ${failed} feilet` : ""}`);
   }
 
   function bulkCreate() {

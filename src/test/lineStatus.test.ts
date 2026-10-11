@@ -68,10 +68,10 @@ describe("lineStatus — én hovedstatus per linje", () => {
     expect(lineStatus(line({ requires_review: true, review_reason: "sku_collision,price_increase" })).label).toBe("Løs konflikt");
   });
 
-  it("ikke råvare telles som behandlet", () => {
+  it("ikke vare telles som behandlet", () => {
     const s = lineStatus(line({ match_confidence: "not_applicable", raw_material_id: null }));
     expect(s.bucket).toBe("done");
-    expect(s.label).toBe("Ikke råvare");
+    expect(s.label).toBe("Ikke vare");
   });
 
   it("bekreftet kobling, pakning og pris: Klar", () => {

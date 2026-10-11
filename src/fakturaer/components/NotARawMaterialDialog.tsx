@@ -10,8 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
+import { NOT_A_PRODUCT_REASONS } from "@/ravarer/lib/notAProductReasons";
 
-const REASONS = ["Frakt", "Miljø-/palleavgift", "Servicegebyr", "Rabatt", "Pant", "Annet"];
+
 
 export function NotARawMaterialDialog({ open, onOpenChange, line }: { open: boolean; onOpenChange: (v: boolean) => void; line: ReviewLineRow | null }) {
   const qc = useQueryClient();
@@ -53,12 +54,12 @@ export function NotARawMaterialDialog({ open, onOpenChange, line }: { open: bool
         }
       }
 
-      toast.success("Markert som ikke-råvare");
+      toast.success("Markert som ikke vare");
       qc.invalidateQueries({ queryKey: ["fakturaer-review-lines"] });
       qc.invalidateQueries({ queryKey: ["fakturaer-review-count"] });
       onOpenChange(false);
-    } catch (e: any) {
-      toast.error(e.message ?? "Feil");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Feil");
     } finally { setBusy(false); }
   }
 
@@ -67,7 +68,7 @@ export function NotARawMaterialDialog({ open, onOpenChange, line }: { open: bool
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogHeader><DialogTitle>Ikke en råvare</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Ikke vare</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <p className="rounded-lg border border-line-subtle bg-muted/30 p-3 text-xs text-ink-secondary">
             Gjelder linjer som ikke er varer (frakt, gebyr, pant). Er dette emballasje eller forbruksvarer?
@@ -78,7 +79,7 @@ export function NotARawMaterialDialog({ open, onOpenChange, line }: { open: bool
             <Select value={reason} onValueChange={setReason}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {REASONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                {NOT_A_PRODUCT_REASONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -104,7 +105,7 @@ export function NotARawMaterialDialog({ open, onOpenChange, line }: { open: bool
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Avbryt</Button>
-          <Button onClick={submit} disabled={busy}>Marker som ikke-råvare</Button>
+          <Button onClick={submit} disabled={busy}>Marker som ikke vare</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
