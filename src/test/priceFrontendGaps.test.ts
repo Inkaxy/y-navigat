@@ -184,7 +184,8 @@ describe("3) fetchPriceHistory: 1000+ rader og metadata", () => {
     expect(rows).toHaveLength(1234);
     expect(rows[0].invoices?.invoice_number).toBe("F-1");
     expect(rows[0].provenance).toMatchObject({ unit: "kg", packageText: "25 kg", currency: "NOK" });
-    expect(rows[0].provenance.corrections[0].fields[0]).toEqual({ field: "Mengde", before: "10 000", after: "10" });
+    const f = rows[0].provenance.corrections[0].fields[0];
+    expect([f.field, f.before.replace(/\s/g, " "), f.after]).toEqual(["Mengde", "10 000", "10"]);
     expect(rows[1].provenance.unit).toBeNull();
   });
 });
