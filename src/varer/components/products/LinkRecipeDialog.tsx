@@ -1,3 +1,4 @@
+import { fetchBakersRawMaterials } from "@/varer/lib/bakersRawMaterials";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Search, ChefHat, AlertTriangle, Check } from "lucide-react";
@@ -104,18 +105,11 @@ export function LinkRecipeDialog({
     queryKey: ["recipe-link-preview", selectedId],
     enabled: !!selectedId,
     queryFn: async () => {
-      const [{ data: recipe, error }, { data: rms }] = await Promise.all([
+      const [{ data: recipe, error }, map] = await Promise.all([
         supabase.from("recipes").select(RECIPE_FIELDS).eq("id", selectedId!).maybeSingle(),
-        supabase
-          .from("raw_materials")
-          .select(
-            "id, name, category, grain_classification, cereal_type, water_content_pct, unit_weight_grams, current_cost_price, density_g_per_ml, is_water, base_unit, is_composite, produced_by_recipe_id",
-          )
-          .limit(3000),
+        fetchBakersRawMaterials(null),
       ]);
       if (error) throw error;
-      const map: Record<string, BakersRawMaterial> = {};
-      for (const r of (rms ?? []) as unknown as BakersRawMaterial[]) map[r.id] = r;
       return { recipe: (recipe ?? null) as unknown as LinkedRecipe | null, rmMap: map };
     },
   });
