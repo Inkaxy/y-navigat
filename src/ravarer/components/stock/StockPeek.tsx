@@ -6,10 +6,8 @@ import { QueryState } from "@/components/common/QueryState";
 import { PeekPanel } from "@/ravarer/ui/SplitView";
 import { useStockMovements } from "@/ravarer/hooks/useStock";
 import { movementLabel, movementSourceLink } from "@/ravarer/lib/stock";
-import { formatDate, formatNumber } from "@/ravarer/lib/constants";
-import { paths } from "@/ravarer/lib/paths";
-import type { ResaleStockRow } from "@/ravarer/hooks/useResaleStock";
-import type { AdjustMode } from "./StockAdjustDialog";
+import { formatNumber } from "@/ravarer/lib/constants";
+import type { ReactNode } from "react";
 
 function fmtDateTime(v: string) {
   return new Intl.DateTimeFormat("nb-NO", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Oslo" }).format(new Date(v));
@@ -19,52 +17,53 @@ function fmtDateTime(v: string) {
  * Valgt lagervare (`?valgt=<råvare-id>`): mengder, telling/svinn med samme dialog og råvare-ID,
  * siste bevegelser og lenke til råvarekortets lagerseksjon. Ukjent valgt ID gir tomt panel med lukk.
  */
+export interface StockPeekItem {
+  rawMaterialId: string;
+  name: string;
+  sku: string;
+  /** Fakta for utvalget — hvert utvalg beholder sine egne felt og enheter. */
+  facts: [string, string][];
+}
+
 export function StockPeek({
-  row,
+  item,
+  fullHref,
   canWrite,
   onClose,
-  onAdjust,
-  kr,
+  onCount,
+  onWaste,
 }: {
-  row: ResaleStockRow | null;
+  item: StockPeekItem | null;
+  /** Full kortlenke med validert lagerretur. */
+  fullHref: string | undefined;
   canWrite: boolean;
   onClose: () => void;
-  onAdjust: (r: ResaleStockRow, m: AdjustMode) => void;
-  kr: (n: number | null) => string;
+  onCount?: () => void;
+  onWaste?: () => void;
 }) {
-  const mv = useStockMovements(row?.raw_material_id);
-  if (!row) return <PeekPanel onClose={onClose} emptyText="Varen finnes ikke i utvalget." />;
+  const mv = useStockMovements(item?.rawMaterialId);
+  if (!item) return <PeekPanel onClose={onClose} emptyText="Varen finnes ikke i utvalget." />;
   const rows = (mv.data?.rows ?? []).slice(0, 15);
-  const facts: [string, string][] = [
-    ["Disponibelt", `${formatNumber(row.disponibelt, 3)} ${row.base_unit}`],
-    ["Beholdning", `${formatNumber(row.beholdning, 3)} ${row.base_unit}`],
-    ["Reservert (kundeordrer ikke levert)", row.reservert ? formatNumber(row.reservert, 3) : "—"],
-    ["Min. beholdning", row.min_stock == null ? "—" : formatNumber(row.min_stock, 3)],
-    ["Dager igjen", row.dager_igjen == null ? "—" : `${formatNumber(row.dager_igjen, 0)} dager`],
-    ["Neste levering", formatDate(row.neste_levering)],
-    ["Sist kjøpt", formatDate(row.sist_kjopt)],
-    ["Lagerverdi", kr(row.lagerverdi)],
-  ];
+  const actions: ReactNode = canWrite && (onCount || onWaste) ? (
+    <div className="flex flex-wrap gap-2">
+      {onCount && (
+        <Button variant="outline" className="min-h-[44px] flex-1 sm:flex-none" onClick={onCount}>
+          <ClipboardCheck className="mr-1.5 h-4 w-4" aria-hidden />Telling
+        </Button>
+      )}
+      {onWaste && (
+        <Button variant="ghost" className="min-h-[44px] flex-1 sm:flex-none" onClick={onWaste}>
+          <Trash className="mr-1.5 h-4 w-4" aria-hidden />Svinn
+        </Button>
+      )}
+    </div>
+  ) : undefined;
   return (
-    <PeekPanel
-      title={row.name}
-      fullHref={paths.raavare(row.raw_material_id, { seksjon: "lager" })}
-      onClose={onClose}
-      footer={canWrite ? (
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" className="min-h-[44px] flex-1 sm:flex-none" onClick={() => onAdjust(row, "count")}>
-            <ClipboardCheck className="mr-1.5 h-4 w-4" aria-hidden />Telling
-          </Button>
-          <Button variant="ghost" className="min-h-[44px] flex-1 sm:flex-none" onClick={() => onAdjust(row, "waste")}>
-            <Trash className="mr-1.5 h-4 w-4" aria-hidden />Svinn
-          </Button>
-        </div>
-      ) : undefined}
-    >
+    <PeekPanel title={item.name} fullHref={fullHref} onClose={onClose} footer={actions}>
       <div className="space-y-4">
-        <p className="font-mono text-xs text-ink-secondary">{row.sku}</p>
+        <p className="font-mono text-xs text-ink-secondary">{item.sku}</p>
         <dl className="grid grid-cols-2 gap-3 text-sm">
-          {facts.map(([k, v]) => (
+          {item.facts.map(([k, v]) => (
             <div key={k} className="min-w-0"><dt className="text-caption text-ink-secondary">{k}</dt><dd className="tabular-nums [overflow-wrap:anywhere]">{v}</dd></div>
           ))}
         </dl>
@@ -90,7 +89,7 @@ export function StockPeek({
             </ul>
           )}
           {(mv.data?.rows.length ?? 0) > rows.length && (
-            <Link to={paths.raavare(row.raw_material_id, { seksjon: "lager" })} className="inline-flex min-h-[44px] items-center text-sm text-primary hover:underline">
+            fullHref && <Link to={fullHref} className="inline-flex min-h-[44px] items-center text-sm text-primary hover:underline">
               Se alle bevegelser på råvarekortet
             </Link>
           )}

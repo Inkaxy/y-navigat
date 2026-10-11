@@ -38,7 +38,7 @@ export function InvoiceReceiptPanel({
   const lines = useMemo(() => fixture?.lines ?? linesQuery.data ?? [], [fixture, linesQuery.data]);
   const { legalEntityId } = useRavarer();
   /** Underdialoger fryser opprinnelsen (selskap + faktura + linje). */
-  type Ctx = { entity: string | null; invoiceId: string; line: ReceiptLine };
+  type Ctx = { entity: string | null; invoiceId: string; invoiceNumber: string; line: ReceiptLine };
   const [deviationCtx, setDeviationCtx] = useState<Ctx | null>(null);
   const [packageCtx, setPackageCtx] = useState<Ctx | null>(null);
   const [rematching, setRematching] = useState(false);
@@ -49,7 +49,7 @@ export function InvoiceReceiptPanel({
   // Ny faktura, nytt selskap eller tapt skrivetilgang: foreldede underdialoger lukkes.
   useEffect(() => { setDeviationCtx(null); setPackageCtx(null); }, [invoiceId, legalEntityId, canWrite]);
   const isCurrent = (c: Ctx) => live.current.mounted && live.current.canWrite && live.current.entity === c.entity && live.current.invoiceId === c.invoiceId;
-  const ctxFor = (l: ReceiptLine): Ctx | null => (invoiceId ? { entity: legalEntityId ?? null, invoiceId, line: l } : null);
+  const ctxFor = (l: ReceiptLine): Ctx | null => (invoiceId ? { entity: legalEntityId ?? null, invoiceId, invoiceNumber, line: l } : null);
 
   /** Kun etter bekreftet pakningsendring: regn om akkurat denne linja i dens egen faktura. */
   const rematchLine = async (c: Ctx) => {
@@ -112,7 +112,15 @@ export function InvoiceReceiptPanel({
         </DialogContent>
       </Dialog>
 
-      <DeviationDialog line={deviationCtx?.line ?? null} invoiceNumber={invoiceNumber} onClose={() => setDeviationCtx(null)} />
+      {deviationCtx && (
+        <DeviationDialog
+          key={`${deviationCtx.entity ?? ""}|${deviationCtx.invoiceId}|${deviationCtx.line.id}`}
+          line={deviationCtx.line}
+          invoiceNumber={deviationCtx.invoiceNumber}
+          isCurrent={() => isCurrent(deviationCtx)}
+          onClose={() => setDeviationCtx(null)}
+        />
+      )}
       <PackageEditor
         open={!!packageCtx}
         row={packageCtx ? receiptLineAsWorklistRow(packageCtx.line) : null}

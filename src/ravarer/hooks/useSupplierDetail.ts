@@ -1,3 +1,4 @@
+import { fetchAllRowsExact } from "@/lib/countedPaging";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -176,10 +177,11 @@ export function useSupplierAliases(linkIds: string[]) {
       const out: SupplierAliasRow[] = [];
       for (let i = 0; i < linkIds.length; i += 200) {
         const chunk = linkIds.slice(i, i + 200);
-        const part = await fetchAllRows<SupplierAliasRow>((from, to) =>
+        // Bevist komplett: eksakt antall, fremdrift etter faktiske rader (lavere servertak), ingen stille avkorting.
+        const part = await fetchAllRowsExact<SupplierAliasRow>((from, to) =>
           supabase
             .from("raw_material_supplier_aliases")
-            .select("id, alias_value, alias_type, status, match_count, last_seen_at, raw_material_supplier_id")
+            .select("id, alias_value, alias_type, status, match_count, last_seen_at, raw_material_supplier_id", { count: "exact" })
             .in("raw_material_supplier_id", chunk)
             .order("alias_value")
             .order("id")
