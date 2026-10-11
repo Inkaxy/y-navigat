@@ -84,7 +84,7 @@ describe("delt tilbakekalling av dokumentverifisering (panel + Les på nytt)", (
   it("avvik etter nedlasting sperrer bruk i LesPaNytt straks, uten klikk; sen vellykket henting gjenoppretter ikke; eksplisitt «Hent på nytt» gjør", async () => {
     sequence([meta("v1"), meta("v1"), meta("v2")], () => meta("v2"));
     const qc = setup();
-    await screen.findByText(/Originalen er endret eller kunne ikke kontrolleres/);
+    await screen.findByText(/Ingenting fra den gamle versjonen vises/);
     expect(canApply()).toBe("false");
     expect(getDocument).not.toHaveBeenCalled();
     // Sen/annen fullføring av metadataoppslaget (ikke eksplisitt retry) kan ikke gjenopprette.
@@ -93,7 +93,7 @@ describe("delt tilbakekalling av dokumentverifisering (panel + Les på nytt)", (
     await new Promise((r) => setTimeout(r, 30));
     expect(canApply()).toBe("false");
     // Eksplisitt fersk kontroll med uendret original gjenoppretter.
-    fireEvent.click(screen.getByRole("button", { name: /Hent på nytt/ }));
+    fireEvent.click(screen.getAllByRole("button", { name: /Hent på nytt/ })[0]);
     await waitFor(() => expect(canApply()).toBe("true"));
     await waitFor(() => expect(getDocument).toHaveBeenCalled());
     expect(invokeMutate).not.toHaveBeenCalled(); // ingen ny AI-lesing
@@ -103,14 +103,14 @@ describe("delt tilbakekalling av dokumentverifisering (panel + Les på nytt)", (
   it("metadatafeil i kontrollen etter nedlasting sperrer bruk straks; ingen automatisk evig gjenhenting", async () => {
     sequence([meta("v1"), meta("v1")], fail);
     setup();
-    await screen.findByText(/Originalen er endret eller kunne ikke kontrolleres/);
+    await screen.findByText(/Ingenting fra den gamle versjonen vises/);
     expect(canApply()).toBe("false");
     const calls = rpcImpl.mock.calls.length;
     await new Promise((r) => setTimeout(r, 1500));
     expect(rpcImpl.mock.calls.length).toBeLessThanOrEqual(calls + 1); // høyst ett innebygd forsøk, ingen løkke
     expect(canApply()).toBe("false");
     rpcImpl.mockImplementation(async () => meta("v1"));
-    fireEvent.click(screen.getByRole("button", { name: /Hent på nytt/ }));
+    fireEvent.click(screen.getAllByRole("button", { name: /Hent på nytt/ })[0]);
     await waitFor(() => expect(canApply()).toBe("true"));
     expect(invokeMutate).not.toHaveBeenCalled();
   });
