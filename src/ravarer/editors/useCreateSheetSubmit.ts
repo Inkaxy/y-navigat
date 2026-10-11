@@ -16,7 +16,7 @@ import { DEFAULT_COST_SOURCE } from "./costPriceLogic";
 import { linkCreateBody, linkExistingBody, packageOf, suggestSku, writePathFor, type CreateContext, type CreateDraft } from "./createSheetLogic";
 
 export type CreateOutcome =
-  | { kind: "created"; rawMaterialId: string }
+  | { kind: "created"; rawMaterialId: string; warning?: string }
   | { kind: "linked"; result: LinkSupplierItemResult };
 
 /** Velger skrivevei ut fra `context.kind` — én vei per kontekst. */
@@ -48,10 +48,17 @@ export function useCreateSheetSubmit(ctx: CreateContext) {
       });
       const cost = d.startCost.trim() ? parseDecimal(d.startCost) : null;
       if (cost != null && cost > 0) {
-        await addPrice.mutateAsync({
-          raw_material_id: row.id, supplier_id: d.primarySupplierId, price: cost, effective_date: osloTodayISO(),
-          source: DEFAULT_COST_SOURCE, notes: "Startkostpris ved opprettelse", set_as_current: true,
-        });
+        // Råvaren finnes allerede — aldri kast her, ellers oppretter brukeren en duplikat.
+        try {
+          await addPrice.mutateAsync({
+            raw_material_id: row.id, supplier_id: d.primarySupplierId, price: cost, effective_date: osloTodayISO(),
+            source: DEFAULT_COST_SOURCE, notes: "Startkostpris ved opprettelse", set_as_current: true,
+          });
+        } catch (e) {
+          console.error("[create-sheet] startkostpris", e);
+          const why = e instanceof Error && e.message ? e.message : "ukjent feil";
+          return { kind: "created", rawMaterialId: row.id, warning: `Råvaren er opprettet, men startkostprisen ble ikke lagret: ${why}` };
+        }
       }
       return { kind: "created", rawMaterialId: row.id };
     }

@@ -1,6 +1,7 @@
 import type { ItemType } from "@/ravarer/lib/itemTypes";
 import type { LinkSupplierItemBody } from "@/fakturaer/lib/supplierItems";
 import { parseDecimal } from "@/ravarer/lib/packageMath";
+import { isPackageUnit, normalizeUnit } from "@/fakturaer/lib/units";
 
 export const CREATE_BASE_UNITS = ["kg", "l", "stk"] as const;
 export type CreateBaseUnit = (typeof CREATE_BASE_UNITS)[number];
