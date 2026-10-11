@@ -1,3 +1,4 @@
+import { ACTION_COPY, type ActionRequired } from "@/fakturaer/lib/financialPresentation";
 import type { WorkGroup, WorkItem, WorkItemKind, WorkItemsCounts } from "@/ravarer/lib/workRpcTypes";
 
 /** Forklaring per gruppe i Å gjøre — vises som oppgaveoverskrift. */
@@ -22,8 +23,33 @@ export const NEXT_ACTION: Record<WorkItemKind, string> = {
   faktura_klar: "Avstem fakturaen",
 };
 
+/** Serverhandlinger som overstyrer den generelle kind-teksten (kreditt, valuta, prisgrunnlag, lesing). */
+const OVERRIDING: readonly ActionRequired[] = ["review_credit_note", "review_currency", "confirm_price_basis", "review_reading"];
+const CAUSE_FOR_ACTION: Partial<Record<ActionRequired, string>> = {
+  review_credit_note: "Kreditnota – ikke en prisendring",
+  review_currency: "Fakturaen er ikke i NOK",
+  confirm_price_basis: "Prisgrunnlaget er ikke bekreftet",
+  review_reading: "Tallene er ikke kontrollert mot originalen",
+};
+function overriding(it: Pick<WorkItem, "action_required" | "kind">): ActionRequired | null {
+  const a = it.action_required;
+  if (!a) return null;
+  if (OVERRIDING.includes(a)) return a;
+  // En varelinje i prisgruppen som egentlig mangler kobling/pakning skal ikke kalles prisavvik.
+  if (a === "complete_link_or_package" && it.kind === "prisavvik") return a;
+  return null;
+}
+
+/** Neste handling for raden: serverens action_required når den er mer presis enn kind. */
+export function nextActionText(it: Pick<WorkItem, "action_required" | "kind">): string {
+  const a = overriding(it);
+  return a ? ACTION_COPY[a].label : NEXT_ACTION[it.kind];
+}
+
 /** Kort årsak til at raden står i listen. */
-export function causeText(it: Pick<WorkItem, "type" | "kind" | "open_lines" | "open_invoices">): string {
+export function causeText(it: Pick<WorkItem, "type" | "kind" | "open_lines" | "open_invoices"> & Partial<Pick<WorkItem, "action_required">>): string {
+  const a = overriding({ action_required: it.action_required ?? null, kind: it.kind });
+  if (a) return CAUSE_FOR_ACTION[a] ?? "Kobling eller pakning mangler";
   switch (it.kind) {
     case "ukoblet": return "Ikke koblet til råvare";
     case "mangler_pakning": return "Pakning ikke bekreftet";

@@ -3,7 +3,8 @@ import { ChevronDown } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { InvoiceFactsView } from "@/fakturaer/components/invoice-detail/InvoiceFactsCard";
 import type { InvoiceDetailData } from "@/fakturaer/components/invoice-detail/fetchInvoiceDetail";
-import { formatNok } from "@/fakturaer/lib/constants";
+import { formatMoney } from "@/fakturaer/lib/constants";
+import { invoiceFigures } from "@/fakturaer/lib/financialPresentation";
 import { parseReadIssues } from "@/fakturaer/lib/lineCorrection";
 import { cn } from "@/lib/utils";
 import { headerFacts } from "./InvoiceFactsSection";
@@ -22,20 +23,19 @@ type Props = {
   expanded?: boolean;
 };
 
-export type ControlFigures = { net: number | null; linesSum: number | null; diff: number | null };
+export type ControlFigures = { net: number | null; linesSum: number | null; diff: number | null; currency: string; gross: number | null };
 
-/** Netto fra fakturaen, lest linjesum og differansen — null når et tall mangler. */
-export function controlFigures(d: Pick<InvoiceDetailData, "total_amount" | "total_vat" | "lines_sum_excl_vat">): ControlFigures {
-  const net = d.total_amount != null ? Number(d.total_amount) - Number(d.total_vat ?? 0) : null;
-  const linesSum = d.lines_sum_excl_vat != null ? Number(d.lines_sum_excl_vat) : null;
-  return { net, linesSum, diff: net != null && linesSum != null ? Math.round((linesSum - net) * 100) / 100 : null };
+/** Netto, lest linjesum og differanse via den delte figurfunksjonen — ukjent mva gir ukjent netto. */
+export function controlFigures(d: Pick<InvoiceDetailData, "total_amount" | "total_vat" | "lines_sum_excl_vat"> & { currency?: string | null }): ControlFigures {
+  const f = invoiceFigures(d);
+  return { net: f.net, linesSum: f.linesSum, diff: f.diff, currency: f.currency, gross: f.gross };
 }
 
 function Figure({ label, value, tone }: { label: string; value: string; tone?: "warning" | "success" | "muted" }) {
   return (
     <div className="min-w-0">
       <dt className="text-caption text-ink-secondary">{label}</dt>
-      <dd className={cn("truncate text-sm font-medium tabular-nums", tone === "warning" && "text-warning", tone === "success" && "text-success", tone === "muted" && "text-ink-secondary")}>{value}</dd>
+      <dd className={cn("truncate text-base font-medium tabular-nums", tone === "warning" && "text-warning", tone === "success" && "text-success", tone === "muted" && "text-ink-secondary")}>{value}</dd>
     </div>
   );
 }
@@ -59,9 +59,9 @@ export function ControlSummary({ data, openCount, totalCount, canWrite, locked, 
     <Collapsible open={expanded || open} onOpenChange={setOpen} className="rounded-lg border border-border bg-card">
       <div className="space-y-2 px-4 py-3">
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
-          <Figure label="Netto på fakturaen" value={formatNok(f.net)} />
-          <Figure label="Lest linjesum" value={formatNok(f.linesSum)} />
-          <Figure label={sumStatusLabel(data.lines_sum_status)} value={f.diff == null ? "—" : `${f.diff > 0 ? "+" : ""}${formatNok(f.diff)}`}
+          <Figure label="Netto på fakturaen" value={f.net == null ? (f.gross == null ? "—" : "Ukjent – mva mangler") : formatMoney(f.net, f.currency)} tone={f.net == null && f.gross != null ? "muted" : undefined} />
+          <Figure label="Lest linjesum" value={formatMoney(f.linesSum, f.currency)} />
+          <Figure label={sumStatusLabel(data.lines_sum_status)} value={f.diff == null ? "—" : `${f.diff > 0 ? "+" : ""}${formatMoney(f.diff, f.currency)}`}
             tone={data.lines_sum_status === "mismatch" ? "warning" : checked ? "success" : "muted"} />
           <Figure label="Gjenstår" value={totalCount === 0 ? "—" : openCount === 0 ? "Alle avklart" : `${openCount} av ${totalCount} linjer`} tone={openCount > 0 ? "warning" : undefined} />
         </dl>

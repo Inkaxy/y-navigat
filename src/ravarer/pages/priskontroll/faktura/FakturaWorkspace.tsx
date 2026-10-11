@@ -42,6 +42,9 @@ import { canFetchLines } from "./invoiceSteps";
 import { CorrectLineDialog } from "./CorrectLineDialog";
 import { correctionDocLine } from "./correctionDocLine";
 import { parseReadIssues } from "@/fakturaer/lib/lineCorrection";
+import { usePriceHolds } from "@/fakturaer/hooks/usePriceHolds";
+import { PriceGateProvider } from "@/fakturaer/lib/priceGateContext";
+import type { GateLine } from "@/fakturaer/lib/financialPresentation";
 
 // v2: originaldokumentet er åpent som standard; bare et eksplisitt «skjul» huskes.
 const LS_DOC = "nbhub.faktura.docpanel.v2";
@@ -63,11 +66,14 @@ export default function FakturaWorkspace() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const wide = useIsWide();
+  // Dokument + linjer + inspektør side om side krever reell bredde; ellers åpnes inspektøren i et ark.
+  const threeZones = useIsWide(1680);
   const detail = useQuery({ queryKey: ["invoice", id], enabled: !!id, queryFn: () => fetchInvoiceDetail(id as string) });
   const data = detail.data;
   const q = useInvoiceLineQueue(id ?? null, data?.legal_entity_id ?? null, data?.supplier_id ?? null);
   const s = useInvoiceSteps(data);
   const tolerances = useMatchTolerances(data?.legal_entity_id ?? null);
+  const holds = usePriceHolds(data?.legal_entity_id ?? null, data?.supplier_id ?? null);
   const [correctFor, setCorrectFor] = useState<string | null>(null);
   const fetchLines = useFetchInvoiceLines();
   const rematch = useRematchWait(data?.legal_entity_id ?? null, () => { void detail.refetch(); q.refresh(); });
@@ -91,7 +97,12 @@ export default function FakturaWorkspace() {
   const final = data?.status === "reconciled" || data?.status === "flagged";
   // Linjene kan bare endres med skrivetilgang og når fakturaen ikke er avstemt/flagget.
   const lineWrite = s.canWrite && !final;
-  const toggleDoc = () => setDocOpen((v) => { localStorage.setItem(LS_DOC, v ? "0" : "1"); return !v; });
+  // Mobil: dokumentet vises via sonen; desktop: via docOpen. Én kilde for etikett/aria-pressed.
+  const toggleDoc = () => {
+    if (isMobile) { setZone((z) => (z === "dokument" ? "linjer" : "dokument")); return; }
+    setDocOpen((v) => { localStorage.setItem(LS_DOC, v ? "0" : "1"); return !v; });
+  };
+  const docShown = isMobile ? zone === "dokument" : docOpen;
   const editMaterial = (lineId?: string) => {
     const target = lineId ?? q.activeLine?.id;
     if (!target) return;
@@ -115,6 +126,7 @@ export default function FakturaWorkspace() {
     const first = q.visible.find((l) => q.statusOf(l).bucket === "needs");
     if (first) q.dispatch({ type: "focus", id: first.id });
     setInspectorOpen(true);
+    setZone("linjer");
   };
   const doFetch = () => {
     if (!data) return;
@@ -132,7 +144,7 @@ export default function FakturaWorkspace() {
     else if (k === "koble_kreditnota") setDialog({ kind: "credit", inv: data });
     else if (k === "hent_linjer") doFetch();
     else if (k === "registrer_linjer") navigate(paths.registrerLinjer(data.id));
-    else if (k === "rett_sum") { setFactsSignal((n) => n + 1); setZone("kontroll"); if (!docOpen && data.source_document_url) toggleDoc(); }
+    else if (k === "rett_sum") { setFactsSignal((n) => n + 1); setZone("kontroll"); if (!isMobile && !docOpen && data.source_document_url) toggleDoc(); }
     else if (k === "avklar") focusFirstOpen();
     else if (k === "avstem" && s.assessment) setDialog({ kind: "reconcile", inv: { id: data.id, invoice_number: data.invoice_number, assessment: s.assessment } });
     else if (k === "godkjenn") void s.approve();
@@ -182,10 +194,10 @@ export default function FakturaWorkspace() {
     notItem: (l: NonNullable<typeof q.activeLine>) => setLineDialog({ kind: "not_rm", line: l }),
     undo: () => void q.undo(),
     toggleDoc,
-    escape: () => (docOpen && !wide ? toggleDoc() : setInspectorOpen(false)),
+    escape: () => (docShown && !wide ? toggleDoc() : setInspectorOpen(false)),
     help: () => setHelpOpen(true),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [data, anyDialog, q.activeLine, q.accept, q.undo, lineWrite, docOpen, wide]);
+  }), [data, anyDialog, q.activeLine, q.accept, q.undo, lineWrite, docOpen, docShown, wide, isMobile]);
   useWorkspaceHotkeys(keys);
 
   if (!id) return null;
@@ -194,10 +206,13 @@ export default function FakturaWorkspace() {
   }
 
   const active = q.activeLine;
+  const gateInvoice = { is_credit_note: data.is_credit_note, currency: data.currency, lines_sum_status: data.lines_sum_status, flagged_at: data.flagged_at, extraction_issues: data.extraction_issues, status: data.status };
+  const linesById = new Map<string, GateLine>((data.invoice_lines ?? []).map((l) => [l.id, l]));
   const docFor = (line: typeof active) => (
     <InvoiceDocumentPanel
-      invoice={{ invoice_number: data.invoice_number, invoice_date: data.invoice_date, supplier_name: data.suppliers?.name ?? null, source_document_url: data.source_document_url, total_amount: data.total_amount, total_vat: data.total_vat, lines_sum_status: data.lines_sum_status, lines_sum_excl_vat: data.lines_sum_excl_vat, lines_sum_variance_pct: data.lines_sum_variance_pct, extraction_confidence: data.extraction_confidence }}
-      line={line ? { ...line, matched_name: line.matched_raw_material?.name ?? null } : null}
+      invoice={{ invoice_number: data.invoice_number, invoice_date: data.invoice_date, supplier_name: data.suppliers?.name ?? null, source_document_url: data.source_document_url, total_amount: data.total_amount, total_vat: data.total_vat, lines_sum_status: data.lines_sum_status, lines_sum_excl_vat: data.lines_sum_excl_vat, lines_sum_variance_pct: data.lines_sum_variance_pct, extraction_confidence: data.extraction_confidence, currency: data.currency, is_credit_note: data.is_credit_note, flagged_at: data.flagged_at, extraction_issues: data.extraction_issues }}
+      line={line ? { ...line, matched_name: line.matched_raw_material?.name ?? null, extraction_issues: linesById.get(line.id)?.extraction_issues } : null}
+      held={line ? holds.heldFor(line) : null}
       tolerancePct={tolerances.defaultPct}
       onClose={() => toggleDoc()}
       className="h-full"
@@ -237,6 +252,9 @@ export default function FakturaWorkspace() {
           tolerancePct={tolerances.defaultPct}
           settings={tolerances.settings}
           onCorrect={lineWrite ? (id) => setCorrectFor(id) : undefined}
+          invoice={gateInvoice}
+          heldFor={holds.heldFor}
+          compact={isMobile || (showDocZone && !threeZones)}
         />
       ) : (
         <QueueWorkspace
@@ -280,7 +298,7 @@ export default function FakturaWorkspace() {
           onSecondary={(a, l) => setLineDialog({ kind: a, line: l })}
           onShowDocument={() => { if (isMobile) setZone("dokument"); else if (!docOpen) toggleDoc(); }}
           onReconcile={runPrimary}
-          inspectorAsSheet={!wide && !isMobile}
+          inspectorAsSheet={!isMobile && (!wide || (showDocZone && !threeZones))}
           inspectorOpen={inspectorOpen}
           onInspectorOpenChange={setInspectorOpen}
           inspectorNote={active ? (
@@ -296,6 +314,7 @@ export default function FakturaWorkspace() {
   );
 
   return (
+    <PriceGateProvider invoice={gateInvoice} linesById={linesById} heldFor={holds.heldFor}>
     <div className="space-y-4">
       <WorkspaceHeader
         backHref={fakturaBackHref(readReturnParam(sp))}
@@ -313,7 +332,7 @@ export default function FakturaWorkspace() {
         undoLabel={q.undoEntry?.label ?? null}
         onUndo={() => void q.undo()}
         docPath={data.source_document_url}
-        docOpen={docOpen}
+        docOpen={docShown}
         onToggleDoc={toggleDoc}
         canWrite={s.canWrite}
         canFetch={canFetchLines({ source: data.source, line_extraction_status: data.line_extraction_status, line_count: (data.invoice_lines ?? []).length })}
@@ -343,7 +362,7 @@ export default function FakturaWorkspace() {
           </div>
         </div>
       ) : showDocZone ? (
-        <div className="grid items-start gap-4 xl:grid-cols-[minmax(300px,34%)_minmax(0,1fr)]">
+        <div className={threeZones ? "grid items-start gap-4 grid-cols-[minmax(0,42%)_minmax(0,1fr)]" : "grid items-start gap-4 grid-cols-[minmax(0,50%)_minmax(0,1fr)]"}>
           <aside className="sticky top-28 h-[calc(100vh-8rem)] min-w-0 overflow-hidden rounded-lg border border-border bg-card">{docEl}</aside>
           {linesZone}
         </div>
@@ -381,5 +400,6 @@ export default function FakturaWorkspace() {
       <LineDialogs dialog={lineDialog} onClose={() => setLineDialog(null)} q={q} canWrite={lineWrite} invoice={data} onEditMaterial={() => editMaterial()}
         onNotItemDone={(l, info) => { q.remember(l, `Ikke vare: ${l.description ?? "linje"}`); q.refresh(); s.setResult({ title: "Linjen er merket som ikke vare", items: notItemResultItems(l.description, info.patternId), undoable: true }); }} />
     </div>
+    </PriceGateProvider>
   );
 }

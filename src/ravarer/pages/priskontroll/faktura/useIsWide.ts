@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react";
 
-const WIDE_QUERY = "(min-width: 1280px)";
-const read = () => typeof window !== "undefined" && window.matchMedia(WIDE_QUERY).matches;
+const read = (q: string) => typeof window !== "undefined" && window.matchMedia(q).matches;
 
-/** ≥ 1280 px: tre soner side om side. */
-export function useIsWide(): boolean {
-  const [wide, setWide] = useState(read);
+/** ≥ 1280 px som standard. Bred nok for dokument + linjer + inspektør: `useIsWide(1680)`. */
+export function useIsWide(minWidth = 1280): boolean {
+  const query = `(min-width: ${minWidth}px)`;
+  const [wide, setWide] = useState(() => read(query));
   useEffect(() => {
-    const mq = window.matchMedia(WIDE_QUERY);
+    const mq = window.matchMedia(query);
     const on = () => setWide(mq.matches);
+    on();
     mq.addEventListener("change", on);
     return () => mq.removeEventListener("change", on);
-  }, []);
+  }, [query]);
   return wide;
 }

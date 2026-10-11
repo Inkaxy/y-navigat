@@ -25,6 +25,7 @@ import { acceptPriceVariance, canAcceptPriceVariance } from "@/fakturaer/lib/que
 import { cn } from "@/lib/utils";
 import { CreateRawMaterialFromLine } from "@/fakturaer/components/CreateRawMaterialFromLine";
 import { PriceDeviationNote } from "@/fakturaer/components/PriceDeviationNote";
+import { linePriceGate } from "@/fakturaer/lib/financialPresentation";
 import { OpenSupplierItemButton } from "@/fakturaer/components/supplier-item/OpenSupplierItemButton";
 import { useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
 import { paths } from "@/ravarer/lib/paths";
@@ -212,7 +213,8 @@ export default function DecisionDetail() {
                       <div className="rounded-lg bg-muted/40 p-3"><p className="text-sm text-ink-secondary">Referanse ({first.price_reference_source ?? "ukjent kilde"}{first.price_reference_date ? `, ${first.price_reference_date}` : ""})</p><p className="text-2xl font-semibold tabular-nums">{kr(group.expectedPerBase)}</p><p className="text-sm text-ink-secondary">per {first.matched_raw_material?.base_unit ?? "grunnenhet"}</p></div>
                       <div className="rounded-lg bg-muted/40 p-3"><p className="text-sm text-ink-secondary">Fakturert</p><p className="text-2xl font-semibold tabular-nums">{kr(group.observedPerBase)}</p><p className="text-sm text-ink-secondary">per {first.matched_raw_material?.base_unit ?? "grunnenhet"}</p></div>
                     </div>
-                    <PriceDeviationNote className="text-sm" actual={first.price_per_base_unit == null ? null : Number(first.price_per_base_unit)} expected={first.expected_price_per_base_unit == null ? null : Number(first.expected_price_per_base_unit)} baseQuantity={first.base_quantity == null ? null : Number(first.base_quantity)} tolerancePct={tol.toleranceFor(first.matched_raw_material?.category)} settings={tol.settings} />
+                    {(() => { const g = linePriceGate(first.invoice, first, false); return g.ok ? null : <p role="note" className="text-sm text-warning">{g.label}: {g.detail}</p>; })()}
+                    {linePriceGate(first.invoice, first, false).ok && <PriceDeviationNote className="text-sm" actual={first.price_per_base_unit == null ? null : Number(first.price_per_base_unit)} expected={first.expected_price_per_base_unit == null ? null : Number(first.expected_price_per_base_unit)} baseQuantity={first.base_quantity == null ? null : Number(first.base_quantity)} tolerancePct={tol.toleranceFor(first.matched_raw_material?.category)} settings={tol.settings} />}
                   </>
                 )}
 

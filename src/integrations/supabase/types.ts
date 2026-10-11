@@ -15832,6 +15832,14 @@ export type Database = {
         Args: { p_invoice_id: string; p_replay: boolean }
         Returns: boolean
       }
+      _rm_queue_line_effect: {
+        Args: { p_line_id: string; p_read_valid?: boolean }
+        Returns: number
+      }
+      _rm_queue_line_read_issue: {
+        Args: { p_invoice_read_issue?: boolean; p_line_id: string }
+        Returns: string
+      }
       _rm_reconcile_core: {
         Args: { p_invoice_id: string; p_mode: string; p_uid: string }
         Returns: Json

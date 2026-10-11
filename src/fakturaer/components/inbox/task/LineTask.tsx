@@ -17,6 +17,7 @@ import { costOf } from "@/fakturaer/lib/lineControl";
 import { LineStatusBadge } from "@/fakturaer/components/inbox/LineStatusBadge";
 import { MaterialPicker } from "@/fakturaer/components/inbox/task/MaterialPicker";
 import { PackageForm } from "@/fakturaer/components/inbox/task/PackageForm";
+import { usePriceGate } from "@/fakturaer/lib/priceGateContext";
 import { PriceCheck } from "@/fakturaer/components/inbox/task/PriceCheck";
 import { OpenSupplierItemButton } from "@/fakturaer/components/supplier-item/OpenSupplierItemButton";
 import { taskCopy, type TaskMode } from "@/fakturaer/components/inbox/task/taskCopy";
@@ -108,7 +109,9 @@ export function LineTask(p: LineTaskProps) {
     }
   }
 
-  const priceAcceptable = canAcceptPriceVariance(line);
+  const priceGate = usePriceGate(line);
+  // Felles regel: kreditnota, valuta, lesing, sumkontroll og holdt pris gir aldri «Prisen er riktig».
+  const priceAcceptable = canAcceptPriceVariance(line) && priceGate.ok;
   const [acceptBusy, setAcceptBusy] = useState(false);
   async function acceptPrice() {
     setError(null);
@@ -178,6 +181,8 @@ export function LineTask(p: LineTaskProps) {
       run: () => void acceptPrice(),
       hint: "Godtar prisen på denne linjen. Avtaleprisen endres ikke.",
     };
+  } else if (mode === "price" && p.canWrite && !priceGate.ok && priceGate.action !== "complete_link_or_package") {
+    primary = { label: priceGate.label, run: null, hint: priceGate.detail };
   } else if (mode === "price" && p.canWrite) {
     primary = {
       label: "Kontroller pakningen",

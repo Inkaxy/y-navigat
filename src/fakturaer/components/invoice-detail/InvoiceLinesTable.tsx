@@ -6,7 +6,8 @@ import { FilePenLine, LineChart as LineChartIcon, Link2, Pencil } from "lucide-r
 import { ConfidenceBadge, InvoiceLineNotes } from "@/fakturaer/components/InvoiceLineBadges";
 import { OpenSupplierItemButton } from "@/fakturaer/components/supplier-item/OpenSupplierItemButton";
 import { PriceDeviationNote } from "@/fakturaer/components/PriceDeviationNote";
-import { formatNok } from "@/fakturaer/lib/constants";
+import { formatMoney } from "@/fakturaer/lib/constants";
+import { linePriceGate, type GateInvoice, type HoldState } from "@/fakturaer/lib/financialPresentation";
 import { lineReferenceLabel } from "@/ravarer/lib/priceReference";
 import type { MatchSettings } from "@/fakturaer/hooks/useMatchTolerances";
 import type { InvoiceDetailLine } from "./fetchInvoiceDetail";
@@ -27,9 +28,18 @@ interface Props {
   settings: MatchSettings | null;
   /** «Rett fakturalinje» — samme dialog og server-RPC som i arbeidslisten. */
   onCorrect?: (lineId: string) => void;
+  /** Fakturakontekst for den felles prisregelen (kreditnota, valuta, sumkontroll, lesevarsler). */
+  invoice?: GateInvoice | null;
+  /** Holdt-tilbake-status per linje (null = ukjent). */
+  heldFor?: (line: InvoiceDetailLine) => HoldState;
+  /** Smal skjerm: kort per linje i stedet for bred tabell. */
+  compact?: boolean;
 }
 
-export function InvoiceLinesTable({ lines, supplierId, canBulkImport, canMatch, selected, onSelect, showLedgerAccount, onShowLedgerAccount, onMatch, onRegister, tolerancePct, settings, onCorrect }: Props) {
+export function InvoiceLinesTable({ lines, supplierId, canBulkImport, canMatch, selected, onSelect, showLedgerAccount, onShowLedgerAccount, onMatch, onRegister, tolerancePct, settings, onCorrect, invoice, heldFor, compact }: Props) {
+  const cur = invoice?.currency ?? "NOK";
+  const gateOf = (l: InvoiceDetailLine) => linePriceGate(invoice ?? {}, l, heldFor ? heldFor(l) : null);
+  const sorted = [...lines].sort((a, b) => (a.line_number ?? 0) - (b.line_number ?? 0));
   return (
         <Card className="overflow-hidden lg:col-span-2">
           <div className="flex items-center justify-between border-b border-line-subtle p-4">
@@ -46,6 +56,34 @@ export function InvoiceLinesTable({ lines, supplierId, canBulkImport, canMatch, 
                 <Button size="sm" variant="outline" onClick={onRegister}>Registrer linjer</Button>
               </div>
             </div>
+          ) : compact ? (
+            <ul className="divide-y divide-line-subtle">
+              {sorted.map((l) => {
+                const rm = l.raw_materials as { id: string; name: string; sku: string | null } | null;
+                const g = gateOf(l);
+                return (
+                  <li key={l.id} className="space-y-1 p-3 text-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-medium">{l.description ?? "—"}</div>
+                        {rm && <Link to={paths.raavare(rm.id)} className="text-caption text-app underline-offset-2 hover:underline">{rm.name}</Link>}
+                      </div>
+                      <div className="shrink-0 text-right tabular-nums">{formatMoney(l.total_amount, cur)}</div>
+                    </div>
+                    <div className="text-caption text-ink-secondary tabular-nums">{l.quantity ?? "—"} {l.unit ?? ""} × {formatMoney(l.unit_price, cur)}{l.supplier_sku ? ` · ${l.supplier_sku}` : ""}</div>
+                    {g.ok ? (
+                      <PriceDeviationNote actual={l.price_per_base_unit} expected={l.expected_price_per_base_unit} baseQuantity={l.base_quantity} tolerancePct={tolerancePct} settings={settings} />
+                    ) : l.raw_material_id ? <p className="text-caption text-warning">{g.label}</p> : null}
+                    <InvoiceLineNotes reviewReason={l.review_reason} lineKind={l.line_kind} resolutionNote={l.resolution_note} />
+                    <div className="flex flex-wrap gap-1">
+                      <OpenSupplierItemButton supplierId={supplierId} line={l} variant="ghost" />
+                      {onCorrect && <Button variant="ghost" size="sm" onClick={() => onCorrect(l.id)}><FilePenLine className="h-4 w-4" />Rett</Button>}
+                      {canMatch && <Button variant="ghost" size="sm" onClick={() => onMatch(l.id)}>{rm ? <Pencil className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}{rm ? "Endre match" : "Match"}</Button>}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -65,7 +103,8 @@ export function InvoiceLinesTable({ lines, supplierId, canBulkImport, canMatch, 
                   </tr>
                 </thead>
                 <tbody>
-                  {[...lines].sort((a, b) => (a.line_number ?? 0) - (b.line_number ?? 0)).map((l) => {
+                  {sorted.map((l) => {
+                    const g = gateOf(l);
                     const rm = l.raw_materials as { id: string; name: string; sku: string | null } | null;
                     return (
                       <tr key={l.id} className="border-t border-line-subtle align-top">
@@ -105,14 +144,14 @@ export function InvoiceLinesTable({ lines, supplierId, canBulkImport, canMatch, 
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums">{l.quantity}</td>
                         <td className="px-4 py-3 text-ink-secondary">{l.unit}</td>
-                        <td className="px-4 py-3 text-right tabular-nums">{formatNok(l.unit_price)}</td>
-                        <td className="px-4 py-3 text-right tabular-nums">{formatNok(l.total_amount)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{formatMoney(l.unit_price, cur)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{formatMoney(l.total_amount, cur)}</td>
                         <td className="px-4 py-3 text-right tabular-nums">
-                          {l.expected_price_per_base_unit == null ? "—" : formatNok(l.expected_price_per_base_unit)}
-                          {l.expected_price_per_base_unit != null && <span className="block text-[11px] text-ink-secondary">{lineReferenceLabel(l.price_reference_source)}</span>}
+                          {!g.ok || l.expected_price_per_base_unit == null ? "—" : formatMoney(l.expected_price_per_base_unit, cur)}
+                          {g.ok && l.expected_price_per_base_unit != null && <span className="block text-[11px] text-ink-secondary">{lineReferenceLabel(l.price_reference_source)}</span>}
                         </td>
                         <td className="px-4 py-3">
-                          <PriceDeviationNote compact actual={l.price_per_base_unit} expected={l.expected_price_per_base_unit} baseQuantity={l.base_quantity} tolerancePct={tolerancePct} settings={settings} />
+                          {g.ok ? <PriceDeviationNote compact actual={l.price_per_base_unit} expected={l.expected_price_per_base_unit} baseQuantity={l.base_quantity} tolerancePct={tolerancePct} settings={settings} /> : l.raw_material_id ? <span className="text-xs text-warning" title={g.detail}>{g.label}</span> : <span className="text-ink-secondary">—</span>}
                         </td>
                         {showLedgerAccount && (
                           <td className="px-4 py-3 font-mono text-xs text-ink-secondary">{l.ledger_account ?? "—"}</td>

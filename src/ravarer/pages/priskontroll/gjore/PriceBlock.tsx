@@ -27,6 +27,8 @@ const START_REASONS = ["start_price_manual_check", "no_automatic_basis", "no_bas
 export function priceRows(lines: SupplierItemLine[]): PriceRow[] {
   return lines.flatMap((l) => {
     if (!isOpenLine(l) || l.cost_posted) return [];
+    // Felles regel: kreditnota, flagget faktura eller ikke-positivt linjebeløp er aldri en prisendring.
+    if (l.is_credit_note || l.flagged_at || l.total_amount == null || l.total_amount <= 0) return [];
     const a = l.price_per_base_unit;
     const e = l.expected_price_per_base_unit;
     if (a == null || e == null || e <= 0 || Math.abs(a - e) < 0.005) return [];
@@ -158,7 +160,7 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
           <button type="button" className="text-primary underline underline-offset-2 disabled:opacity-50" disabled={!canWrite} onClick={() => setStartOpen(true)}>Bekreft startpris</button>
         </div>
       ) : (
-        <p className="text-sm text-ink-secondary">Ingen åpne linjer har prisavvik.</p>
+        <p className="text-sm text-ink-secondary">{lines.some((l) => isOpenLine(l) && l.is_credit_note) ? "Åpne linjer står på en kreditnota. En kreditnota er ikke en prisendring – koble den til opprinnelig faktura." : "Ingen åpne linjer har prisavvik."}</p>
       )}
 
       {firstCost.size > 1 && (

@@ -64,7 +64,10 @@ export function InvoiceDocumentLayout({ data, docOpen, isMobile, tolerancePct, o
             lines_sum_excl_vat: data.lines_sum_excl_vat,
             lines_sum_variance_pct: data.lines_sum_variance_pct,
             extraction_confidence: data.extraction_confidence,
+            currency: data.currency,
+            is_credit_note: data.is_credit_note,
           }}
+          showSumWarning
           tolerancePct={tolerancePct}
           onClose={onClose}
           className="h-full"
