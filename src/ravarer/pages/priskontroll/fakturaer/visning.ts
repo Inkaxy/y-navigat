@@ -52,13 +52,26 @@ export function normalizePriskontrollSearch(search: string): string | null {
 
 const MAX_RETURN = 1000;
 
+/** Returparameteren på faktura-arbeidsflaten. `fra` er datofilteret i listen. */
+export const RETURN_PARAM = "retur";
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Returkonteksten fra adressen: `retur`, ellers gammel `fra` når den ikke er en dato. */
+export function readReturnParam(sp: URLSearchParams): string | null {
+  const r = sp.get(RETURN_PARAM);
+  if (r) return r;
+  const legacy = sp.get("fra");
+  return legacy && !ISO_DATE.test(legacy) ? legacy : null;
+}
+
 /** Listens spørrestreng som trygg returkontekst (aldri en sti). */
 export function sanitizeReturnSearch(raw: string | null | undefined): string {
   if (typeof raw !== "string" || raw.length === 0 || raw.length > MAX_RETURN) return "";
   const body = raw.startsWith("?") ? raw.slice(1) : raw;
   if (body.startsWith("/") || body.includes("#") || /^[a-z][a-z0-9+.-]*:/i.test(body)) return "";
   const sp = new URLSearchParams(body);
-  sp.delete("fra");
+  sp.delete(RETURN_PARAM);
   const s = sp.toString();
   return s ? `?${s}` : "";
 }

@@ -24,7 +24,7 @@ import { VisningChips } from "./VisningChips";
 import { fakturaColumns, isOverdue, stepsOf } from "./fakturaColumns";
 import { FILTER_KEYS, parseFilters, toCsv } from "./fakturaListLogic";
 import { FAKTURA_PAGE_SIZE, useFakturaListe } from "./useFakturaListe";
-import { parseVisning } from "./visning";
+import { parseVisning, RETURN_PARAM } from "./visning";
 
 /** Fakturaer-fanen: én liste med hurtigfiltre, filtre, leveransestatus og masse-handlinger. */
 export function FakturaerTab() {
@@ -60,7 +60,7 @@ export function FakturaerTab() {
     setSelected(new Set());
   };
   const reset = () => update(Object.fromEntries(FILTER_KEYS.map((k) => [k, null])));
-  const open = (inv: InboxInvoice) => navigate(paths.faktura(inv.id, { fra: location.search }));
+  const open = (inv: InboxInvoice) => navigate(paths.faktura(inv.id, { [RETURN_PARAM]: location.search }));
 
   const queueRematch = (ids: string[]) => {
     if (ids.length === 0) return;
