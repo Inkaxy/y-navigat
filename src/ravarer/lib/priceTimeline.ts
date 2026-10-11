@@ -16,6 +16,68 @@ export interface TimelineHistoryRow {
   invoiceNumber?: string | null;
   isCreditNote?: boolean;
   notes?: string | null;
+  /** Utgått/korrigert (superseded_at satt). */
+  supersededAt?: string | null;
+  supersededReason?: string | null;
+  isLegacy?: boolean;
+  /** Kreditrad i historikken (is_credit). */
+  isCredit?: boolean;
+  currency?: string | null;
+}
+
+/**
+ * Hvilken type en historikkrad er. Bare «gyldig» er et ordinært prispunkt i graf,
+ * Δ og CSV-prisrader; resten vises som egne hendelser.
+ */
+export type HistoryKind = "gyldig" | "kreditnota" | "utgatt" | "eldre" | "annen_valuta" | "ugyldig";
+
+export function historyKind(h: TimelineHistoryRow): HistoryKind {
+  if (h.isCredit || h.isCreditNote) return "kreditnota";
+  if (h.supersededAt || h.supersededReason) return "utgatt";
+  if (h.isLegacy) return "eldre";
+  if ((h.currency ?? "NOK").toUpperCase() !== "NOK") return "annen_valuta";
+  if (!Number.isFinite(Number(h.price)) || Number(h.price) <= 0) return "ugyldig";
+  return "gyldig";
+}
+
+export const HISTORY_KIND_LABEL: Record<HistoryKind, string> = {
+  gyldig: "Gyldig",
+  kreditnota: "Kreditnota",
+  utgatt: "Utgått / korrigert",
+  eldre: "Eldre rad (erstattet)",
+  annen_valuta: "Annen valuta",
+  ugyldig: "Ugyldig pris",
+};
+
+/** Norske etiketter for hvorfor en observasjon er utgått. */
+export const SUPERSEDED_REASON_LABEL: Record<string, string> = {
+  linje_ukoblet: "Linjen ble koblet fra råvaren",
+  ukjent_match: "Koblingen er ikke bekreftet",
+  til_gjennomgang: "Linjen ble sendt til gjennomgang",
+  faktura_ikke_klar: "Fakturaen er ikke klar",
+  valuta_endret: "Valuta er ikke NOK",
+  faktura_flagget: "Fakturaen ble flagget",
+  ugyldig_pris: "Ugyldig pris",
+  ugyldig_mengde: "Ugyldig mengde",
+  annet_selskap: "Annet selskap",
+  leverandor_annet_selskap: "Leverandør i annet selskap",
+  ny_linjerad: "Erstattet av linjebasert observasjon",
+  enhet_endret: "Grunnenheten ble endret",
+  usannsynlig_pris_karantene: "Satt i karantene (usannsynlig pris)",
+};
+
+export interface TimelineEvent {
+  id: string;
+  date: string;
+  kind: Exclude<HistoryKind, "gyldig">;
+  price: number;
+  supplierName: string;
+  source: string;
+  invoiceId: string | null;
+  invoiceNumber: string | null;
+  reason: string | null;
+  supersededAt: string | null;
+  notes: string | null;
 }
 
 export interface TimelineLink {
@@ -39,8 +101,10 @@ export interface TimelinePoint {
   isCreditNote: boolean;
   isManual: boolean;
   notes: string | null;
-  /** Endring mot forrige punkt i samme serie, i prosent. */
+  /** Endring mot forrige gyldige punkt i samme serie, i prosent. */
   deltaPrevPct: number | null;
+  /** Endring mot forrige gyldige punkt i samme serie, i kroner (samme enhet). */
+  deltaPrevKr: number | null;
   /** Endring mot avtaleprisen som gjaldt på datoen, i prosent. */
   deltaAgreementPct: number | null;
 }
@@ -62,8 +126,10 @@ export interface AgreementBand {
 export interface TimelineResult {
   series: TimelineSeries[];
   bands: AgreementBand[];
-  /** Alle punkter, nyeste først — brukes til tabell og CSV. */
+  /** Gyldige punkter, nyeste først — brukes til tabell og CSV. */
   rows: TimelinePoint[];
+  /** Utgåtte, korrigerte, kreditnotaer og andre ikke-sammenlignbare rader, nyeste først. */
+  events: TimelineEvent[];
 }
 
 export const MANUAL_KEY = "__manual";
@@ -112,12 +178,28 @@ export function buildTimeline({
     return true;
   });
 
-  const sorted = [...inRange].sort((a, b) => a.effective_date.localeCompare(b.effective_date));
+  const nameOf = (id: string | null) => (id ? (supplierNames.get(id) ?? "Ukjent") : "Manuell");
+  const events: TimelineEvent[] = [];
+  const valid: TimelineHistoryRow[] = [];
+  for (const h of inRange) {
+    const kind = historyKind(h);
+    if (kind === "gyldig") { valid.push(h); continue; }
+    events.push({
+      id: h.id, date: h.effective_date, kind, price: Number(h.price) * unitFactor, supplierName: nameOf(h.supplier_id),
+      source: h.source, invoiceId: h.invoice_id, invoiceNumber: h.invoiceNumber ?? null,
+      reason: h.supersededReason ? (SUPERSEDED_REASON_LABEL[h.supersededReason] ?? "Annen årsak") : null,
+      supersededAt: h.supersededAt ?? null, notes: h.notes ?? null,
+    });
+  }
+  events.sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
+
+  // Stabil rekkefølge innen samme dato (id), så Δ ikke hopper mellom visninger.
+  const sorted = [...valid].sort((a, b) => a.effective_date.localeCompare(b.effective_date) || a.id.localeCompare(b.id));
 
   const bySupplier = new Map<string, TimelinePoint[]>();
   for (const h of sorted) {
     const key = h.supplier_id ?? MANUAL_KEY;
-    const name = h.supplier_id ? (supplierNames.get(h.supplier_id) ?? "Ukjent") : "Manuell";
+    const name = nameOf(h.supplier_id);
     const price = Number(h.price) * unitFactor;
     const list = bySupplier.get(key) ?? [];
     const prev = list[list.length - 1] ?? null;
@@ -133,10 +215,11 @@ export function buildTimeline({
       source: h.source,
       invoiceId: h.invoice_id,
       invoiceNumber: h.invoiceNumber ?? null,
-      isCreditNote: !!h.isCreditNote,
-      isManual: h.source === "manual",
+      isCreditNote: false,
+      isManual: h.source !== "invoice",
       notes: h.notes ?? null,
       deltaPrevPct: prev ? pct(prev.price, price) : null,
+      deltaPrevKr: prev ? Math.round((price - prev.price) * 10000) / 10000 : null,
       deltaAgreementPct: agreed != null ? pct(agreed * unitFactor, price) : null,
     });
     bySupplier.set(key, list);
@@ -160,26 +243,27 @@ export function buildTimeline({
     .flatMap((s) => s.points)
     .sort((a, b) => b.date.localeCompare(a.date) || a.supplierName.localeCompare(b.supplierName, "nb"));
 
-  return { series, bands, rows };
+  return { series, bands, rows, events };
 }
 
-/** CSV med semikolon, samme kolonner som tabellen under grafen. */
-export function timelineCsv(rows: readonly TimelinePoint[]): string {
-  const head = ["Dato", "Leverandør", "Pris", "Kilde", "Faktura", "Δ forrige %", "Δ avtale %", "Notat"];
+/** CSV med semikolon. Samme regler som skjermen: gyldige prispunkter, deretter hendelser med type. */
+export function timelineCsv(rows: readonly TimelinePoint[], events: readonly TimelineEvent[] = []): string {
+  const clean = (v: string | null) => (v ?? "").replace(/[;\n\r]/g, " ");
+  const head = ["Type", "Dato", "Leverandør", "Pris", "Kilde", "Faktura", "Δ forrige kr", "Δ forrige %", "Δ avtale %", "Årsak", "Notat"];
   const lines = [head.join(";")];
   for (const r of rows) {
-    lines.push(
-      [
-        r.date,
-        r.supplierName,
-        r.price.toFixed(4),
-        r.source,
-        r.invoiceNumber ?? "",
-        r.deltaPrevPct != null ? r.deltaPrevPct.toFixed(1) : "",
-        r.deltaAgreementPct != null ? r.deltaAgreementPct.toFixed(1) : "",
-        (r.notes ?? "").replace(/[;\n]/g, " "),
-      ].join(";"),
-    );
+    lines.push([
+      "Gyldig", r.date, clean(r.supplierName), r.price.toFixed(4), r.source, clean(r.invoiceNumber),
+      r.deltaPrevKr != null ? r.deltaPrevKr.toFixed(4) : "",
+      r.deltaPrevPct != null ? r.deltaPrevPct.toFixed(1) : "",
+      r.deltaAgreementPct != null ? r.deltaAgreementPct.toFixed(1) : "", "", clean(r.notes),
+    ].join(";"));
+  }
+  for (const e of events) {
+    lines.push([
+      HISTORY_KIND_LABEL[e.kind], e.date, clean(e.supplierName), e.price.toFixed(4), e.source, clean(e.invoiceNumber),
+      "", "", "", clean(e.reason), clean(e.notes),
+    ].join(";"));
   }
   return lines.join("\n");
 }
