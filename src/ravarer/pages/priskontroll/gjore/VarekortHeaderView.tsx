@@ -7,7 +7,7 @@ import { whatIsMissing, type SupplierItem } from "@/fakturaer/lib/supplierItems"
 import { paths } from "@/ravarer/lib/paths";
 
 /** Topp på varekortet: leverandør · varenr · beskrivelse, status, omfang og «Hva mangler». */
-export function VarekortHeaderView({ item }: { item: SupplierItem }) {
+export function VarekortHeaderView({ item, openInvoices }: { item: SupplierItem; openInvoices: number }) {
   return (
     <div className="space-y-4">
       <header className="space-y-1">
@@ -19,7 +19,7 @@ export function VarekortHeaderView({ item }: { item: SupplierItem }) {
         <div className="flex flex-wrap items-center gap-2">
           <SupplierItemStatusBadge status={item.status} />
           <span className="text-caption text-ink-secondary tabular-nums">
-            {item.open_lines} åpne {item.open_lines === 1 ? "linje" : "linjer"} på {item.invoice_count} {item.invoice_count === 1 ? "faktura" : "fakturaer"}
+            {item.open_lines} åpne {item.open_lines === 1 ? "linje" : "linjer"} på {openInvoices} {openInvoices === 1 ? "faktura" : "fakturaer"}
             {item.last_seen ? ` · sist sett ${formatDate(item.last_seen)}` : ""}
           </span>
         </div>

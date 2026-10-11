@@ -102,7 +102,7 @@ function VarekortBody({ item, lines, canWrite, onDone, onNext, onSkip, onClose }
 
   return (
     <div className="space-y-6">
-      <VarekortHeaderView item={item} />
+      <VarekortHeaderView item={item} openInvoices={scope.invoices} />
 
       {editForm ? (
         <SupplierItemLinkForm item={item} lines={lines} canWrite={canWrite} onDone={onLinkDone} onClose={onClose} onNext={onNext}
