@@ -1,27 +1,21 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-import { AlertTriangle, ClipboardCheck, Info, Loader2, Package, Search, Trash } from "lucide-react";
+import { ClipboardCheck, Info, Loader2, Package, Search, Trash } from "lucide-react";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useWorkSummary } from "@/ravarer/hooks/useWorkData";
-import { useMissingBaseQuantityLines } from "@/ravarer/hooks/useStock";
 import { availabilityRank, useResaleStockStatus, type ResaleStockRow } from "@/ravarer/hooks/useResaleStock";
 import { StockAdjustDialog, type AdjustMode } from "@/ravarer/components/stock/StockAdjustDialog";
 import { StockMovementsSheet } from "@/ravarer/components/stock/StockMovementsSheet";
-import { ReorderSuggestions } from "@/ravarer/components/stock/ReorderSuggestions";
-import { MarginTable } from "@/ravarer/components/stock/MarginTable";
 import { formatDate, formatNumber } from "@/ravarer/lib/constants";
 import { AllStockTable } from "@/ravarer/components/stock/AllStockTable";
-import { StockLedger } from "@/ravarer/components/stock/StockLedger";
-import { paths } from "@/ravarer/lib/paths";
 
 const kr = (n: number | null) =>
   n == null ? "—" : new Intl.NumberFormat("nb-NO", { style: "currency", currency: "NOK", maximumFractionDigits: 0 }).format(n);
@@ -32,7 +26,16 @@ export default function LagerPage() {
   const { data: summary } = useWorkSummary({ includeApproval: false });
   const belowMinAll = summary?.other.stock_below_min ?? null;
   const { data: items = [], isLoading } = useResaleStockStatus();
-  const { data: missingLines = [] } = useMissingBaseQuantityLines();
+  const [sp, setSp] = useSearchParams();
+  // Beholdning: «Videresalg» (standard) eller «Alle lagerførte» i adressen.
+  const filter = sp.get("filter") === "alle" ? "alle" : "videresalg";
+  const setFilter = (v: "alle" | "videresalg") =>
+    setSp(prev => {
+      const p = new URLSearchParams(prev);
+      if (v === "alle") p.set("filter", "alle");
+      else p.delete("filter");
+      return p;
+    }, { replace: true });
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<ResaleStockRow | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -97,17 +100,24 @@ export default function LagerPage() {
           </Card>
         </div>
 
-        <Tabs defaultValue="lager" className="space-y-5">
-          <TabsList>
-            <TabsTrigger value="lager">Videresalg</TabsTrigger>
-            <TabsTrigger value="alle">Alle lagerførte varer</TabsTrigger>
-            <TabsTrigger value="bevegelser">Bevegelser</TabsTrigger>
-            <TabsTrigger value="fortjeneste">Fortjeneste</TabsTrigger>
-          </TabsList>
+        <div role="radiogroup" aria-label="Utvalg" className="inline-flex rounded-md border border-line-subtle p-1">
+          {(["videresalg", "alle"] as const).map(v => (
+            <button
+              key={v}
+              role="radio"
+              aria-checked={filter === v}
+              onClick={() => setFilter(v)}
+              className={`min-h-[44px] rounded px-4 text-sm ${filter === v ? "bg-muted font-medium" : "text-ink-secondary"}`}
+            >
+              {v === "videresalg" ? "Videresalg" : "Alle lagerførte"}
+            </button>
+          ))}
+        </div>
 
-          <TabsContent value="lager" className="space-y-5">
-            <ReorderSuggestions />
-
+        {filter === "alle" ? (
+          <AllStockTable />
+        ) : (
+          <div className="space-y-5">
             <Card className="p-4">
               <div className="flex flex-wrap items-center gap-3">
                 <div className="relative flex-1 min-w-[220px]">
@@ -249,64 +259,8 @@ export default function LagerPage() {
               )}
             </Card>
 
-            {missingLines.length > 0 && (
-              <Card className="overflow-hidden border-warning/40">
-                <div className="flex items-start gap-2 border-b border-line-subtle bg-warning/10 p-4">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-                  <div>
-                    <p className="font-medium">Fakturalinjer uten mengde i baseenhet</p>
-                    <p className="text-sm text-ink-secondary">
-                      Siste 90 dager. Linjene er matchet mot en handelsvare med lagerføring, men ga ingen innkjøpsbevegelse fordi
-                      pakningsstørrelsen mangler. Fyll inn pakningen på fakturalinjen for å få mengden inn på lageret.
-                    </p>
-                  </div>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/30 text-left text-xs uppercase tracking-wider text-ink-secondary">
-                      <tr>
-                        <th className="px-4 py-3">Faktura</th>
-                        <th className="px-4 py-3">Dato</th>
-                        <th className="px-4 py-3">Beskrivelse</th>
-                        <th className="px-4 py-3">Handelsvare</th>
-                        <th className="px-4 py-3 text-right">Antall</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {missingLines.map(l => (
-                        <tr key={l.id} className="border-t border-line-subtle">
-                          <td className="px-4 py-3">
-                            <Link to={paths.faktura(l.invoice_id)} className="text-primary hover:underline">
-                              {l.invoice_number}
-                            </Link>
-                          </td>
-                          <td className="px-4 py-3 text-ink-secondary">{formatDate(l.invoice_date)}</td>
-                          <td className="px-4 py-3">{l.description ?? "—"}</td>
-                          <td className="px-4 py-3 text-ink-secondary">{l.raw_material_name}</td>
-                          <td className="px-4 py-3 text-right tabular-nums">
-                            {formatNumber(l.quantity, 2)} <span className="text-xs text-ink-secondary">{l.unit ?? ""}</span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-            )}
-          </TabsContent>
-
-          <TabsContent value="alle">
-            <AllStockTable />
-          </TabsContent>
-
-          <TabsContent value="bevegelser">
-            <StockLedger />
-          </TabsContent>
-
-          <TabsContent value="fortjeneste">
-            <MarginTable />
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
 
         <StockMovementsSheet
           open={sheetOpen}
