@@ -87,7 +87,7 @@ describe("detalj-KPI fra bundet bevis", () => {
   it("trygg siste faktura: eksakt fortegnet avvik, også 0 og negativt", async () => {
     rowFor = safe(-12.34, 53.12);
     const { unmount } = render(<Strip />, { wrapper });
-    expect(await screen.findByText("-12,3 %")).toBeTruthy();
+    expect(await screen.findByText(/^[-\u2212]12,3 %$/)).toBeTruthy();
     unmount();
     client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     rowFor = safe(0, 60.6035);
