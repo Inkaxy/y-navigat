@@ -157,7 +157,7 @@ describe("koblede næringsfelt", () => {
     expect(within(box).getByText("Norge")).toBeInTheDocument();
     expect(within(box).getByText(/uansett hvilke enkeltfelt/)).toBeInTheDocument();
     // Fravalg av hele næringsgruppen sender ikke næring (og dermed ikke de koblede feltene).
-    fireEvent.click(within(dlg).getByRole("checkbox", { name: "Bruk næringsverdier" }));
+    fireEvent.click(within(dlg).getByRole("checkbox", { name: "Bruk næring" }));
     fireEvent.click(within(dlg).getByRole("button", { name: /Anvend valgte/ }));
     await waitFor(() => expect(count("apply-datasheet-update")).toBe(1));
     const body = log.find((l) => l.kind === "apply-datasheet-update")?.payload as Record<string, unknown>;
