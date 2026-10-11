@@ -1,6 +1,5 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { Link } from "react-router-dom";
+import { Plus, Trash2, Undo2 } from "lucide-react";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,437 +7,230 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Loader2, Plus, Trash2 } from "lucide-react";
-import { toast } from "sonner";
-import { showError } from "@/lib/userError";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
-import { useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
 import { QueryState } from "@/components/common/QueryState";
 import { StartPriceCandidatesCard } from "@/fakturaer/components/StartPriceCandidatesCard";
+import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { TieredPriceSettings } from "./TieredPriceSettings";
-import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
+import { SettingsSaveBar } from "./SettingsSaveBar";
+import { usePriceSettingsDraft, type SaveResult } from "@/ravarer/hooks/usePriceSettingsDraft";
+import { useCategoryUsage } from "@/ravarer/lib/categoryUsage";
+import { ENGINE_DEFAULTS, type PriceDraft } from "@/ravarer/lib/priceSettingsDraft";
+import { paths } from "@/ravarer/lib/paths";
 
-interface ToleranceRow {
-  id: string;
-  legal_entity_id: string;
-  category: string;
-  price_tolerance_pct: number;
-}
-
-const SETTINGS_KEY = "invoice-match-tolerances";
-
+/**
+ * Priskontroll-innstillinger: prisavvik, matching, startpris og kategoritoleranser i ÉN kladd med felles
+ * «Lagre endringer»/«Avbryt». Ingen feltendring skriver før Lagre. Startpriskandidater og omberegning er egne handlinger.
+ */
 export default function MatchToleranserPage() {
-  const { legalEntityId, canWrite } = useRavarer();
-  const qc = useQueryClient();
-  const [newCat, setNewCat] = useState("");
-  const [newPct, setNewPct] = useState("5");
-  const [deleteRow, setDeleteRow] = useState<ToleranceRow | null>(null);
-
-  const tolerances = useMatchTolerances(legalEntityId);
-
-  const rowsQuery = useQuery({
-    queryKey: ["match-tolerances", legalEntityId],
-    enabled: !!legalEntityId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("invoice_match_category_tolerances")
-        .select("id, legal_entity_id, category, price_tolerance_pct")
-        .eq("legal_entity_id", legalEntityId)
-        .order("category");
-      if (error) throw error;
-      return (data ?? []) as ToleranceRow[];
-    },
-  });
-  const rows = rowsQuery.data ?? [];
-
-  /** Kategoriene som finnes på råvarene — grunnlag for kategorivelgeren. */
-  const categoriesQuery = useQuery({
-    queryKey: ["raw-material-categories", legalEntityId],
-    enabled: !!legalEntityId,
-    staleTime: 5 * 60 * 1000,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("raw_materials")
-        .select("category")
-        .eq("legal_entity_id", legalEntityId)
-        .not("category", "is", null)
-        .limit(2000);
-      if (error) throw error;
-      const set = new Set<string>();
-      (data ?? []).forEach((r) => {
-        if (r.category) set.add(r.category);
-      });
-      return [...set].sort((a, b) => a.localeCompare(b, "nb"));
-    },
-  });
-  const availableCategories = (categoriesQuery.data ?? []).filter((c) => !rows.some((r) => r.category === c));
-
-  const invalidate = () => {
-    void qc.invalidateQueries({ queryKey: ["match-tolerances"] });
-    void qc.invalidateQueries({ queryKey: [SETTINGS_KEY] });
-  };
-
-  const saveSettings = useMutation({
-    mutationFn: async (patch: Record<string, number | boolean | null>) => {
-      const { data: auth } = await supabase.auth.getUser();
-      const { error } = await supabase.from("invoice_match_settings").upsert(
-        {
-          legal_entity_id: legalEntityId,
-          ...patch,
-          updated_at: new Date().toISOString(),
-          updated_by: auth.user?.id ?? null,
-        },
-        { onConflict: "legal_entity_id" },
-      );
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      invalidateRavarerCounts(qc);
-      invalidate();
-      toast.success("Innstillinger lagret");
-    },
-    onError: (e) => showError("match-innstillinger", e, "Kunne ikke lagre innstillingene"),
-  });
-
-  const upsert = useMutation({
-    mutationFn: async (input: { id?: string; category: string; price_tolerance_pct: number }) => {
-      if (input.id) {
-        const { error } = await supabase
-          .from("invoice_match_category_tolerances")
-          .update({ price_tolerance_pct: input.price_tolerance_pct })
-          .eq("id", input.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("invoice_match_category_tolerances").insert({
-          legal_entity_id: legalEntityId,
-          category: input.category,
-          price_tolerance_pct: input.price_tolerance_pct,
-        });
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => {
-      invalidateRavarerCounts(qc);
-      invalidate();
-      toast.success("Lagret");
-      setNewCat("");
-      setNewPct("5");
-    },
-    onError: (e) => showError("match-toleranse", e, "Kunne ikke lagre toleransen"),
-  });
-
-  const del = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("invoice_match_category_tolerances").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      invalidateRavarerCounts(qc);
-      invalidate();
-      setDeleteRow(null);
-      toast.success("Kategorien er fjernet");
-    },
-    onError: (e) => showError("match-toleranse-slett", e, "Kunne ikke slette kategorien"),
-  });
-
-  const s = tolerances.settings;
+  const { legalEntityId, canWrite, accessLevel } = useRavarer();
+  const canEdit = canWrite && (accessLevel === "approve" || accessLevel === "admin");
+  const m = usePriceSettingsDraft(legalEntityId, canEdit);
+  const guard = useUnsavedChangesGuard(m.dirty || m.saving, m.cancel);
+  const cats = useCategoryUsage(legalEntityId);
+  const dis = !canEdit || m.saving || m.status !== "ready";
 
   return (
     <div className="space-y-5">
-      <RavarerHeaderBanner
-        title="Match-toleranser"
-        subtitle="Én kilde for prisavvik og automatisk matching av fakturalinjer"
-      />
+      <RavarerHeaderBanner title="Match-toleranser" subtitle="Én kilde for prisavvik og automatisk matching av fakturalinjer" />
 
-      <TieredPriceSettings legalEntityId={legalEntityId} settings={s} canWrite={canWrite} loading={tolerances.isLoading} />
+      {m.status !== "ready" ? (
+        <QueryState scope="Priskontroll-innstillinger" isLoading={m.status === "loading"} isError={m.status === "error"} error={m.readError}
+          onRetry={m.retry} isEmpty={false}>{null}</QueryState>
+      ) : m.draft && (
+        <>
+          {m.settingsAbsent && (
+            <p role="note" className="rounded-md border border-border bg-muted/40 p-2 text-caption">
+              Selskapet har ingen lagrede innstillinger ennå. Feltene viser standardverdiene som gjelder nå; ingenting lagres før du trykker «Lagre endringer».
+            </p>
+          )}
+          <TieredPriceSettings draft={m.draft} update={m.update} disabled={dis} legalEntityId={legalEntityId} canWrite={canEdit} />
+          <MatchingCard d={m.draft} update={m.update} disabled={dis} />
+          <StartPriceCard d={m.draft} update={m.update} disabled={dis} />
+          <CategoryCard d={m.draft} update={m.update} disabled={dis} baseRows={m.baseRows} cats={cats} />
+          {m.errors.length > 0 && (
+            <ul role="alert" className="space-y-1 rounded-md border border-destructive/40 p-2 text-caption text-destructive">
+              {m.errors.map((e) => <li key={e}>{e}</li>)}
+            </ul>
+          )}
+          <ResultPanel result={m.result} needsReread={m.needsReread} onReread={() => void m.reread()} />
+          {canEdit && (
+            <SettingsSaveBar dirty={m.dirty} saving={m.saving} canSave={m.canSave} onSave={m.save} onCancel={m.cancel}
+              status={m.needsReread ? <span className="text-destructive">Les innstillingene på nytt før du lagrer igjen.</span> : undefined} />
+          )}
+        </>
+      )}
 
-      <Card className="space-y-4 p-4">
-        <div>
-          <h2 className="text-title text-sm font-semibold">Matching og automatikk</h2>
-          <p className="text-caption text-ink-secondary">
-            Gjelder alle råvarer uten egen kategoritoleranse. Brukes både i behandlingskøen og i fargelegging av avvik.
-          </p>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <NumField
-            label="Fuzzy-terskel for forslag"
-            hint="Hvor likt navnet må være (0–1) før linjen får et matchforslag."
-            step={0.05}
-            value={s?.fuzzy_match_threshold ?? 0.5}
-            disabled={!canWrite || tolerances.isLoading}
-            onCommit={(v) => saveSettings.mutate({ fuzzy_match_threshold: v })}
-          />
-          <NumField
-            label="Fuzzy-terskel for automatch"
-            hint="Over denne likheten (0–1) matches linjen automatisk uten gjennomgang."
-            step={0.05}
-            value={s?.fuzzy_auto_match_threshold ?? 0.85}
-            disabled={!canWrite || tolerances.isLoading}
-            onCommit={(v) => saveSettings.mutate({ fuzzy_auto_match_threshold: v })}
-          />
-          <NumField
-            label="Krav om klar vinner (0–1)"
-            hint="Beste forslag må være så mye bedre enn nest beste før automatch tillates."
-            step={0.05}
-            value={s?.fuzzy_auto_match_dominance_threshold ?? 0.1}
-            disabled={!canWrite || tolerances.isLoading}
-            onCommit={(v) => saveSettings.mutate({ fuzzy_auto_match_dominance_threshold: v })}
-          />
-        </div>
-
-        <div className="space-y-3 border-t border-line-subtle pt-3">
-          <ToggleRow
-            label="Godkjenn automatisk innenfor toleranse"
-            hint="Linjer med prisavvik under toleransen markeres ikke for gjennomgang."
-            checked={!!s?.auto_approve_within_tolerance}
-            disabled={!canWrite || tolerances.isLoading}
-            onChange={(v) => saveSettings.mutate({ auto_approve_within_tolerance: v })}
-          />
-          <ToggleRow
-            label="Godkjenn automatisk mot tidligere registrert pris"
-            hint="Linjer som er koblet automatisk og har samme pris som forrige registrerte kjøp (innenfor toleransen) blir ferdig kontrollert. Avvik over toleransen blir alltid liggende til behandling. Attestering og betaling er fortsatt en egen handling."
-            checked={!!s?.auto_check_against_last_purchase}
-            disabled={!canWrite || tolerances.isLoading}
-            onChange={(v) => saveSettings.mutate({ auto_check_against_last_purchase: v })}
-          />
-        </div>
-      </Card>
-
-      <Card className="space-y-4 p-4">
-        <div>
-          <h2 className="text-title text-sm font-semibold">Startpris</h2>
-          <p className="text-caption text-ink-secondary">
-            Startprisen er den første kjøpsprisen et menneske har kontrollert og bekreftet hos en leverandør. Den er
-            fast, og en gyldig avtalepris går alltid foran. Startpris blir aldri automatisk til avtalepris.
-          </p>
-        </div>
-
-        <div className="space-y-3">
-          <ToggleRow
-            label="Bruk første bekreftede kjøpspris som startpris"
-            hint="Køen tilbyr «Bekreft startpris» på linjer der vare, pakning og nettopris er kontrollert. Ingenting lagres uten at du bekrefter."
-            checked={!!s?.use_first_confirmed_price_as_start}
-            disabled={!canWrite || tolerances.isLoading}
-            onChange={(v) => saveSettings.mutate({ use_first_confirmed_price_as_start: v })}
-          />
-          <ToggleRow
-            label="Tillat automatisk linjekontroll mot startpris"
-            hint="Når den er av, må hver linje som måles mot startpris kontrolleres manuelt. Slås den på, kan linjer innenfor grensene under bli ferdig kontrollert uten manuelt trykk — attestering og betaling er fortsatt en egen handling."
-            checked={!!s?.auto_check_against_start_price}
-            disabled={!canWrite || tolerances.isLoading}
-            onChange={(v) => saveSettings.mutate({ auto_check_against_start_price: v })}
-          />
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <NumField
-            label="Toleranse mot startpris (%)"
-            hint="Avvik over denne grensen sendes alltid til gjennomgang."
-            value={s?.start_price_tolerance_pct ?? 2}
-            disabled={!canWrite || tolerances.isLoading}
-            onCommit={(v) => saveSettings.mutate({ start_price_tolerance_pct: v })}
-          />
-          <NumField
-            label="Maksimal kronepåvirkning (kr)"
-            hint="Valgfritt. Er avviket større i kroner enn dette, går linjen til gjennomgang selv om prosenten er innenfor. Tom = ingen kronegrense."
-            step={1}
-            value={s?.start_price_max_impact_nok ?? 0}
-            disabled={!canWrite || tolerances.isLoading}
-            onCommit={(v) => saveSettings.mutate({ start_price_max_impact_nok: v > 0 ? v : null })}
-          />
-        </div>
-      </Card>
-
-      <StartPriceCandidatesCard legalEntityId={legalEntityId} canWrite={canWrite} />
-
-      <Card className="space-y-3 p-4">
-        <div>
-          <h2 className="text-title text-sm font-semibold">Toleranse per kategori</h2>
-          <p className="text-caption text-ink-secondary">Overstyrer den globale toleransen for valgt kategori.</p>
-        </div>
-
-        <QueryState
-          scope="Kategoritoleranser"
-          isLoading={rowsQuery.isLoading}
-          isError={rowsQuery.isError}
-          error={rowsQuery.error}
-          onRetry={() => void rowsQuery.refetch()}
-          isEmpty={false}
-        >
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wider text-ink-secondary">
-              <tr>
-                <th className="py-2">Kategori</th>
-                <th className="w-40 py-2">Toleranse %</th>
-                <th className="w-12 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} className="border-t border-line-subtle">
-                  <td className="py-2">{r.category}</td>
-                  <td className="py-2">
-                    <Input
-                      type="number"
-                      step="0.1"
-                      defaultValue={r.price_tolerance_pct}
-                      disabled={!canWrite}
-                      onBlur={(e) => {
-                        const v = parseFloat(e.target.value);
-                        if (!isNaN(v) && v !== r.price_tolerance_pct)
-                          upsert.mutate({ id: r.id, category: r.category, price_tolerance_pct: v });
-                      }}
-                      className="h-8"
-                    />
-                  </td>
-                  <td className="py-2">
-                    {canWrite && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        aria-label={`Slett toleranse for ${r.category}`}
-                        onClick={() => setDeleteRow(r)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {rows.length === 0 && (
-                <tr className="border-t border-line-subtle">
-                  <td colSpan={3} className="py-3 text-ink-secondary">
-                    Ingen kategorier har egen toleranse ennå.
-                  </td>
-                </tr>
-              )}
-              {canWrite && (
-                <tr className="border-t border-line-subtle">
-                  <td className="py-2">
-                    <Select value={newCat} onValueChange={setNewCat}>
-                      <SelectTrigger className="h-8">
-                        <SelectValue placeholder="Velg kategori" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableCategories.map((c) => (
-                          <SelectItem key={c} value={c}>
-                            {c}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </td>
-                  <td className="py-2">
-                    <Input
-                      value={newPct}
-                      onChange={(e) => setNewPct(e.target.value)}
-                      type="number"
-                      step="0.1"
-                      className="h-8"
-                    />
-                  </td>
-                  <td className="py-2">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      aria-label="Legg til kategoritoleranse"
-                      disabled={!newCat.trim() || upsert.isPending}
-                      onClick={() =>
-                        upsert.mutate({ category: newCat.trim(), price_tolerance_pct: parseFloat(newPct) || 0 })
-                      }
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </QueryState>
-      </Card>
-
-      <AlertDialog open={!!deleteRow} onOpenChange={(v) => { if (!v) setDeleteRow(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Slette toleransen for «{deleteRow?.category}»?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Kategorien faller tilbake på den globale toleransen.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Avbryt</AlertDialogCancel>
-            <AlertDialogAction onClick={() => deleteRow && del.mutate(deleteRow.id)}>
-              {del.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Slett
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Egen, eksplisitt handling med egen bekreftelse — ikke en del av kladden. */}
+      <StartPriceCandidatesCard legalEntityId={legalEntityId} canWrite={canEdit} />
+      <UnsavedChangesDialog {...guard.dialogProps} />
     </div>
   );
 }
 
-function NumField({
-  label,
-  hint,
-  value,
-  step = 0.1,
-  disabled,
-  onCommit,
-}: {
-  label: string;
-  hint: string;
-  value: number;
-  step?: number;
-  disabled?: boolean;
-  onCommit: (v: number) => void;
+function ResultPanel({ result, needsReread, onReread }: { result: SaveResult | null; needsReread: boolean; onReread: () => void }) {
+  if (!result && !needsReread) return null;
+  if (result?.kind === "saved") return <p role="status" className="text-sm text-success">Alle endringer er lagret.</p>;
+  if (result?.kind === "stale") return <p role="status" className="text-sm text-ink-secondary">Lagringen gjaldt et annet selskap og vises ikke her.</p>;
+  return (
+    <div role="alert" className="space-y-2 rounded-md border border-destructive/40 p-3 text-sm">
+      {result && (
+        <>
+          <p className="font-medium text-destructive">{result.kind === "partial" ? "Bare noe ble lagret." : "Ingenting ble bekreftet lagret."}</p>
+          <ul className="space-y-0.5 text-caption">
+            {result.steps.map((s) => <li key={s.label} className={s.ok ? "text-success" : "text-destructive"}>{s.ok ? "Lagret" : "Feilet eller ukjent"}: {s.label}</li>)}
+          </ul>
+          <p className="text-caption text-ink-secondary">Kladden for det som ikke ble lagret, er beholdt. Neste lagring sender bare det som fortsatt avviker fra det som faktisk er lagret.</p>
+        </>
+      )}
+      {needsReread && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-caption text-destructive">Kunne ikke lese lagret tilstand etter lagringen.</span>
+          <Button type="button" variant="outline" className="min-h-[44px] md:min-h-9" onClick={onReread}>Les på nytt</Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+type CardProps = { d: PriceDraft; update: (p: Partial<PriceDraft>) => void; disabled: boolean };
+
+function MatchingCard({ d, update, disabled }: CardProps) {
+  return (
+    <Card className="space-y-4 p-4">
+      <div>
+        <h2 className="text-title text-sm font-semibold">Matching og automatikk</h2>
+        <p className="text-caption text-ink-secondary">
+          Hvor likt et fakturanavn må være en vare før det foreslås eller kobles. Automatisk godkjenning bruker toleransen over (eller kategoritoleransen).
+        </p>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <NumField id="m-fuzzy" label="Terskel for forslag (0–1)" hint={`Tomt = standard ${ENGINE_DEFAULTS.fuzzy}`.replace(".", ",")} value={d.fuzzy} disabled={disabled} onChange={(v) => update({ fuzzy: v })} />
+        <NumField id="m-auto" label="Terskel for automatisk kobling (0–1)" hint={`Tomt = standard ${ENGINE_DEFAULTS.fuzzyAuto}`.replace(".", ",")} value={d.fuzzyAuto} disabled={disabled} onChange={(v) => update({ fuzzyAuto: v })} />
+        <NumField id="m-dom" label="Krav om klar vinner (0–1)" hint={`Beste forslag må slå nest beste med minst dette. Tomt = standard ${ENGINE_DEFAULTS.dominance}`.replace(".", ",")} value={d.dominance} disabled={disabled} onChange={(v) => update({ dominance: v })} />
+      </div>
+      <div className="space-y-1 border-t border-line-subtle pt-3">
+        <ToggleRow label="Godkjenn automatisk innenfor toleranse" hint="Linjer med prisavvik under toleransen markeres ikke for gjennomgang." checked={d.autoApprove} disabled={disabled} onChange={(v) => update({ autoApprove: v })} />
+        <ToggleRow label="Godkjenn automatisk mot tidligere registrert pris"
+          hint="Automatisk koblede linjer med samme pris som forrige registrerte kjøp (innenfor toleransen) blir ferdig kontrollert. Avvik over toleransen blir alltid liggende. Attestering og betaling er fortsatt en egen handling."
+          checked={d.lastPurchase} disabled={disabled} onChange={(v) => update({ lastPurchase: v })} />
+      </div>
+    </Card>
+  );
+}
+
+function StartPriceCard({ d, update, disabled }: CardProps) {
+  return (
+    <Card className="space-y-4 p-4">
+      <div>
+        <h2 className="text-title text-sm font-semibold">Startpris</h2>
+        <p className="text-caption text-ink-secondary">
+          Startprisen er den første kjøpsprisen et menneske har kontrollert og bekreftet hos en leverandør. En gyldig avtalepris går alltid foran,
+          og startpris blir aldri automatisk avtalepris. Grensene under gjelder bare linjer som måles mot startpris; ellers gjelder toleransen øverst.
+        </p>
+      </div>
+      <div className="space-y-1">
+        <ToggleRow label="Bruk første bekreftede kjøpspris som startpris" hint="Køen tilbyr «Bekreft startpris» der vare, pakning og nettopris er kontrollert. Ingenting lagres uten at du bekrefter."
+          checked={d.useFirstStart} disabled={disabled} onChange={(v) => update({ useFirstStart: v })} />
+        <ToggleRow label="Tillat automatisk linjekontroll mot startpris" hint="Av: hver linje mot startpris kontrolleres manuelt. På: linjer innenfor grensene under kan bli ferdig kontrollert uten trykk."
+          checked={d.autoCheckStart} disabled={disabled} onChange={(v) => update({ autoCheckStart: v })} />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <NumField id="s-tol" label="Toleranse mot startpris (%)" hint={`Over dette går linjen alltid til gjennomgang. Tomt = standard ${ENGINE_DEFAULTS.startTol} %`} value={d.startTol} disabled={disabled} onChange={(v) => update({ startTol: v })} />
+        <NumField id="s-max" label="Maksimal kronepåvirkning (kr)" hint="Valgfritt. Større avvik i kroner går til gjennomgang selv om prosenten er innenfor. Tomt eller 0 = ingen kronegrense." value={d.startMaxImpact} disabled={disabled} onChange={(v) => update({ startMaxImpact: v })} />
+      </div>
+    </Card>
+  );
+}
+
+function CategoryCard({ d, update, disabled, baseRows, cats }: CardProps & {
+  baseRows: { category: string }[];
+  cats: ReturnType<typeof useCategoryUsage>;
 }) {
+  const used = new Set(d.cats.map((c) => c.category));
+  const removed = baseRows.filter((r) => !used.has(r.category));
+  const options = (cats.data?.categories ?? []).map((c) => c.category).filter((c) => !used.has(c));
+  const setCat = (i: number, patch: Partial<PriceDraft["cats"][number]>) => update({ cats: d.cats.map((c, j) => (j === i ? { ...c, ...patch } : c)) });
+  return (
+    <Card className="space-y-3 p-4">
+      <div>
+        <h2 className="text-title text-sm font-semibold">Toleranse per kategori</h2>
+        <p className="text-caption text-ink-secondary">Erstatter toleransen øverst for varer i kategorien. Maksgrensen og minste kronevirkning gjelder fortsatt.</p>
+      </div>
+      <ul className="divide-y divide-line-subtle">
+        {d.cats.map((c, i) => (
+          <li key={`${c.category}-${i}`} className="flex flex-wrap items-center gap-2 py-2">
+            {baseRows.some((r) => r.category === c.category) ? (
+              <span className="min-w-0 flex-1 text-sm [overflow-wrap:anywhere]">{c.category}</span>
+            ) : (
+              <div className="min-w-[12rem] flex-1">
+                <Select value={c.category || undefined} onValueChange={(v) => setCat(i, { category: v })} disabled={disabled}>
+                  <SelectTrigger className="min-h-[44px] md:min-h-9" aria-label="Velg kategori"><SelectValue placeholder="Velg kategori" /></SelectTrigger>
+                  <SelectContent>
+                    {[...(c.category ? [c.category] : []), ...options].map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <Input aria-label={`Toleranse % for ${c.category || "ny kategori"}`} inputMode="decimal" className="min-h-[44px] w-28 tabular-nums md:min-h-9" value={c.pct} disabled={disabled} onChange={(e) => setCat(i, { pct: e.target.value })} />
+            <span className="text-caption text-ink-secondary">%</span>
+            <Button type="button" size="icon" variant="ghost" className="h-[44px] w-[44px] md:h-9 md:w-9" disabled={disabled} aria-label={`Fjern toleranse for ${c.category || "ny kategori"}`}
+              onClick={() => update({ cats: d.cats.filter((_, j) => j !== i) })}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </li>
+        ))}
+        {d.cats.length === 0 && <li className="py-3 text-sm text-ink-secondary">Ingen kategorier har egen toleranse.</li>}
+      </ul>
+      {removed.length > 0 && (
+        <div className="space-y-1 rounded-md bg-muted/40 p-2 text-caption">
+          <p>Fjernes ved lagring (faller tilbake på toleransen øverst):</p>
+          <ul className="flex flex-wrap gap-2">
+            {removed.map((r) => (
+              <li key={r.category}>
+                <Button type="button" size="sm" variant="outline" className="min-h-[44px] md:min-h-8" disabled={disabled}
+                  onClick={() => {
+                    const orig = baseRows.find((b) => b.category === r.category);
+                    if (orig && "price_tolerance_pct" in orig) update({ cats: [...d.cats, { category: r.category, pct: String(orig.price_tolerance_pct).replace(".", ",") }] });
+                  }}>
+                  <Undo2 className="mr-1 h-3.5 w-3.5" aria-hidden />Angre «{r.category}»
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="outline" className="min-h-[44px] md:min-h-9" disabled={disabled || cats.isError || cats.isLoading}
+          onClick={() => update({ cats: [...d.cats, { category: "", pct: "5" }] })}>
+          <Plus className="mr-1 h-4 w-4" aria-hidden />Legg til kategoritoleranse
+        </Button>
+        {cats.isLoading && <span className="text-caption text-ink-secondary">Henter kategorier …</span>}
+        {cats.isError && (
+          <span role="alert" className="text-caption text-destructive">
+            Kunne ikke hente kategoriene. <button type="button" className="underline" onClick={() => void cats.refetch()}>Prøv igjen</button>
+          </span>
+        )}
+        <Link to={paths.innstillinger({ seksjon: "kategorier" })} className="text-caption text-primary hover:underline">Se kategorioversikten</Link>
+      </div>
+    </Card>
+  );
+}
+
+function NumField({ id, label, hint, value, disabled, onChange }: { id: string; label: string; hint: string; value: string; disabled: boolean; onChange: (v: string) => void }) {
   return (
     <div className="space-y-1">
-      <Label className="text-xs">{label}</Label>
-      <Input
-        type="number"
-        step={step}
-        defaultValue={value}
-        key={value}
-        disabled={disabled}
-        className="h-9"
-        onBlur={(e) => {
-          const v = parseFloat(e.target.value);
-          if (!isNaN(v) && v !== value) onCommit(v);
-        }}
-      />
+      <Label htmlFor={id} className="text-xs">{label}</Label>
+      <Input id={id} inputMode="decimal" value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} className="min-h-[44px] tabular-nums md:min-h-9" />
       <p className="text-caption text-ink-secondary">{hint}</p>
     </div>
   );
 }
 
-function ToggleRow({
-  label,
-  hint,
-  checked,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  hint: string;
-  checked: boolean;
-  disabled?: boolean;
-  onChange: (v: boolean) => void;
-}) {
+function ToggleRow({ label, hint, checked, disabled, onChange }: { label: string; hint: string; checked: boolean; disabled: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div className="flex items-start justify-between gap-4">
+    <div className="flex min-h-[44px] items-start justify-between gap-4 py-1">
       <div>
         <div className="text-sm font-medium">{label}</div>
         <p className="text-caption text-ink-secondary">{hint}</p>
