@@ -52,6 +52,7 @@ export function PriskontrollToolsMenu() {
           </DropdownMenuLabel>
         )}
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild><Link to={paths.alleVarekort()}>Alle varekort</Link></DropdownMenuItem>
         <DropdownMenuItem asChild><Link to={paths.reberegn()}>Reberegn kostpriser</Link></DropdownMenuItem>
         <DropdownMenuItem asChild><Link to={paths.beslutninger()}>Beslutninger per gruppe (gammel visning)</Link></DropdownMenuItem>
       </DropdownMenuContent>
