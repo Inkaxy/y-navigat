@@ -9,7 +9,7 @@ import { parseApplyOutcome, parseCandidates, retryStage, safeForBulk, summarizeE
 const calls: string[] = [];
 const deleteFilters: unknown[][] = [];
 let deleteReturns: { id: string }[] = [];
-let orphans = [{ id: "o1", file_name: "gammel.pdf", file_path: "le/bulk/x/gammel.pdf", supplier_name: "Regal", uploaded_at: "2026-09-01", status: "done", ai_confidence: null }];
+const orphans = [{ id: "o1", file_name: "gammel.pdf", file_path: "le/bulk/x/gammel.pdf", supplier_name: "Regal", uploaded_at: "2026-09-01", status: "done", ai_confidence: null }];
 
 vi.mock("@/ravarer/context/RavarerContext", () => ({ useRavarer: () => ({ canWrite: true, legalEntityId: "le" }) }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), warning: vi.fn(), error: vi.fn((m: string) => calls.push(`toast:${m}`)), info: vi.fn() } }));
