@@ -88,7 +88,7 @@ describe("InvoiceDocumentPanel + PdfDocumentViewer: verifiseringsepoke", () => {
     const seq = [meta("v1"), meta("v1"), meta("v2")]; // metadata, før nedlasting, etter nedlasting
     rpcImpl.mockImplementation(async () => seq.shift() ?? meta("v2"));
     setup();
-    await screen.findByText(/Originalen er endret mens den ble hentet/);
+    await screen.findByText(/Originalen er endret eller kunne ikke kontrolleres/);
     expect(getDocument).not.toHaveBeenCalled();
   });
 
