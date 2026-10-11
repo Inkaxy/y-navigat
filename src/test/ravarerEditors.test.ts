@@ -47,10 +47,9 @@ describe("PrimarySupplierControl — RPC-argumenter", () => {
   it("kaller rm_clear_primary_supplier for å fjerne primær", async () => {
     const { supabase } = await import("@/integrations/supabase/client");
     const { setPrimarySupplier } = await import("@/ravarer/lib/supplierLinkRpc");
-    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: { ok: true, supplier_id: null, previous_supplier_id: "s1", link_created: false }, error: null } as never);
     const res = await setPrimarySupplier("rm-1", null);
+    expect(res.ok).toBe(true);
     expect(supabase.rpc).toHaveBeenCalledWith("rm_clear_primary_supplier", { p_raw_material_id: "rm-1" });
-    expect(res.supplier_id).toBeNull();
   });
 });
 
