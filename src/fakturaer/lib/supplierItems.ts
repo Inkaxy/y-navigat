@@ -1,6 +1,5 @@
 import { LINE_KIND_LABEL } from "@/ravarer/lib/labels";
 import { REASON_LABELS, type ReasonCode } from "@/fakturaer/lib/reviewReasons";
-import type { StatusTone } from "@/fakturaer/lib/lineStatus";
 
 export const SUPPLIER_ITEM_STATUSES = ["ukoblet", "mangler_pakning", "prisavvik", "kontroll", "koblet", "ikke_vare"] as const;
 export type SupplierItemStatus = (typeof SUPPLIER_ITEM_STATUSES)[number];
