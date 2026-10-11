@@ -1,114 +1,77 @@
-import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, Loader2, RefreshCw } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { showError } from "@/lib/userError";
 import { evaluatePriceDeviation } from "@/fakturaer/lib/priceDeviation";
 import { parseDecimal } from "@/fakturaer/lib/units";
-import { FALLBACK_TOLERANCE_PCT, DEFAULT_HARD_CAP_PCT, DEFAULT_MIN_IMPACT_NOK, type MatchSettings } from "@/fakturaer/hooks/useMatchTolerances";
 import { cn } from "@/lib/utils";
 import { RematchAllDialog } from "@/ravarer/components/RematchAllDialog";
 import { useRematchStatus } from "@/fakturaer/hooks/useRematchStatus";
-import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
+import type { PriceDraft } from "@/ravarer/lib/priceSettingsDraft";
 
 const LINE_KINDS = [
   ["frakt", "Frakt"], ["gebyr", "Gebyr"], ["avrunding", "Avrunding"], ["rabatt", "Rabatt"], ["pant", "Pant"], ["mva", "Mva"], ["annet", "Annet"],
 ] as const;
 
-interface Draft {
-  tol: string; minImpact: string; hardCap: string;
-  firstPrice: boolean; inferPkg: boolean; autoReconcile: boolean; kinds: string[];
-}
-
-const fromSettings = (s: MatchSettings | null): Draft => ({
-  tol: String(s?.default_price_tolerance_pct ?? FALLBACK_TOLERANCE_PCT).replace(".", ","),
-  minImpact: String(s?.price_min_impact_nok ?? DEFAULT_MIN_IMPACT_NOK).replace(".", ","),
-  hardCap: String(s?.price_hard_cap_pct ?? DEFAULT_HARD_CAP_PCT).replace(".", ","),
-  firstPrice: s?.auto_accept_first_price ?? true,
-  inferPkg: s?.auto_confirm_inferred_package ?? true,
-  autoReconcile: s?.auto_reconcile_clean_imports ?? true,
-  kinds: s?.auto_exclude_line_kinds ?? ["frakt", "gebyr", "avrunding", "rabatt"],
-});
-
-export function TieredPriceSettings({ legalEntityId, settings, canWrite, loading }: { legalEntityId: string | null; settings: MatchSettings | null; canWrite: boolean; loading: boolean }) {
-  const qc = useQueryClient();
-  const [d, setD] = useState<Draft>(() => fromSettings(settings));
-  const [saved, setSaved] = useState(false);
-  const [dirty, setDirty] = useState(false);
+/**
+ * Nivådelt prisavvik og automatikk — del av den felles kladden (ingen egen lagring).
+ * «Beregn alle åpne på nytt» er en egen, eksplisitt handling med egen bekreftelse.
+ */
+export function TieredPriceSettings({ draft, update, disabled, legalEntityId, canWrite }: {
+  draft: PriceDraft; update: (p: Partial<PriceDraft>) => void; disabled: boolean; legalEntityId: string | null; canWrite: boolean;
+}) {
   const [rematchOpen, setRematchOpen] = useState(false);
-  // Bakgrunnsrefetch skal aldri overskrive et påbegynt utkast.
-  useEffect(() => { if (!dirty) setD(fromSettings(settings)); }, [settings, dirty]);
   const status = useRematchStatus(legalEntityId);
   const busy = (status.data?.queued ?? 0) + (status.data?.in_flight ?? 0) > 0;
-
-  const tol = parseDecimal(d.tol), minImpact = parseDecimal(d.minImpact), hardCap = parseDecimal(d.hardCap);
-  const valid = tol != null && tol >= 0 && minImpact != null && minImpact >= 0 && hardCap != null && tol != null && hardCap >= tol;
-
-  const save = useMutation({
-    mutationFn: async () => {
-      if (!legalEntityId || !valid) throw new Error("ugyldig");
-      const { data: auth } = await supabase.auth.getUser();
-      const { error } = await supabase.from("invoice_match_settings").upsert({
-        legal_entity_id: legalEntityId,
-        default_price_tolerance_pct: tol, price_min_impact_nok: minImpact, price_hard_cap_pct: hardCap,
-        auto_accept_first_price: d.firstPrice, auto_confirm_inferred_package: d.inferPkg, auto_reconcile_clean_imports: d.autoReconcile,
-        auto_exclude_line_kinds: d.kinds, updated_at: new Date().toISOString(), updated_by: auth.user?.id ?? null,
-      }, { onConflict: "legal_entity_id" });
-      if (error) throw error;
-    },
-    onSuccess: async () => { invalidateRavarerCounts(qc); setSaved(true); await qc.invalidateQueries({ queryKey: ["invoice-match-tolerances"] }); setDirty(false); },
-    onError: (e) => showError("nivadelt-prisavvik", e, "Kunne ikke lagre innstillingene"),
-  });
-
-  const change = (p: Partial<Draft>) => { setSaved(false); setDirty(true); setD((x) => ({ ...x, ...p })); };
+  const tol = parseDecimal(draft.tol), minImpact = parseDecimal(draft.minImpact), hardCap = parseDecimal(draft.hardCap);
+  const valid = tol != null && tol >= 0 && minImpact != null && minImpact >= 0 && hardCap != null && hardCap >= tol;
   const example = valid ? evaluatePriceDeviation({ actual: 10.42, expected: 10, baseQuantity: 50, tolPct: tol, minImpactNok: minImpact, hardCapPct: hardCap }) : null;
-  const dis = !canWrite || loading;
 
   const num = (id: string, label: string, v: string, on: (s: string) => void) => (
     <div>
       <Label htmlFor={id} className="text-caption">{label}</Label>
-      <Input id={id} inputMode="decimal" value={v} disabled={dis} onChange={(e) => on(e.target.value)} className="mt-1 tabular-nums" />
+      <Input id={id} inputMode="decimal" value={v} disabled={disabled} onChange={(e) => on(e.target.value)} className="mt-1 min-h-[44px] tabular-nums md:min-h-10" />
     </div>
   );
   const toggle = (label: string, checked: boolean, on: (v: boolean) => void) => (
-    <label className="flex items-center justify-between gap-3 text-sm"><span>{label}</span><Switch checked={checked} disabled={dis} onCheckedChange={on} /></label>
+    <label className="flex min-h-[44px] items-center justify-between gap-3 text-sm"><span>{label}</span><Switch checked={checked} disabled={disabled} onCheckedChange={on} aria-label={label} /></label>
   );
 
   return (
     <Card className="space-y-4 p-4">
       <div>
         <h2 className="text-title text-sm font-semibold">Nivådelt prisavvik</h2>
-        <p className="text-caption text-ink-secondary">Et avvik går til kontroll når det er over maksgrensen, eller over toleransen og samtidig over minstebeløpet i kroner.</p>
+        <p className="text-caption text-ink-secondary">
+          Et avvik går til kontroll når det er over maksgrensen, eller over toleransen og samtidig over minstebeløpet i kroner.
+          Toleransen gjelder alle varer uten egen kategoritoleranse (se nederst); maksgrensen gjelder alltid.
+        </p>
       </div>
       <div className="grid gap-4 sm:grid-cols-3">
-        {num("tp-tol", "Toleranse (%)", d.tol, (v) => change({ tol: v }))}
-        {num("tp-min", "Minste kronevirkning før avvik teller (kr)", d.minImpact, (v) => change({ minImpact: v }))}
-        {num("tp-cap", "Maksgrense (%) — over dette går linjen alltid til kontroll", d.hardCap, (v) => change({ hardCap: v }))}
+        {num("tp-tol", "Toleranse (%)", draft.tol, (v) => update({ tol: v }))}
+        {num("tp-min", "Minste kronevirkning før avvik teller (kr)", draft.minImpact, (v) => update({ minImpact: v }))}
+        {num("tp-cap", "Maksgrense (%) — over dette går linjen alltid til kontroll", draft.hardCap, (v) => update({ hardCap: v }))}
       </div>
-      {!valid && <p className="text-caption text-destructive">Fyll inn gyldige tall. Maksgrensen må være minst like høy som toleransen.</p>}
       {example && (
         <p className="rounded-md bg-muted/40 p-2 text-caption">
           Eksempel: 50 kg kjøpt til 10,42 kr/kg mot 10,00 kr/kg gir {example.explanation}. {example.large ? "Linjen går til kontroll." : "Linjen går ikke til kontroll."}
         </p>
       )}
-      <div className="space-y-3 border-t border-line-subtle pt-3">
-        {toggle("Godta første dokumenterte pris automatisk", d.firstPrice, (v) => change({ firstPrice: v }))}
-        {toggle("Bekreft pakning automatisk når regnestykket og varenavnet er enige", d.inferPkg, (v) => change({ inferPkg: v }))}
-        {toggle("Avstem rene fakturaer automatisk", d.autoReconcile, (v) => change({ autoReconcile: v }))}
+      <div className="space-y-1 border-t border-line-subtle pt-3">
+        {toggle("Godta første dokumenterte pris automatisk", draft.firstPrice, (v) => update({ firstPrice: v }))}
+        {toggle("Bekreft pakning automatisk når regnestykket og varenavnet er enige", draft.inferPkg, (v) => update({ inferPkg: v }))}
+        {toggle("Avstem rene fakturaer automatisk", draft.autoReconcile, (v) => update({ autoReconcile: v }))}
       </div>
       <div>
         <p className="text-caption">Linjetyper som utelates automatisk</p>
         <div className="mt-1 flex flex-wrap gap-1.5">
           {LINE_KINDS.map(([k, l]) => {
-            const on = d.kinds.includes(k);
+            const on = draft.kinds.includes(k);
             return (
-              <button key={k} type="button" disabled={dis} aria-pressed={on} onClick={() => change({ kinds: on ? d.kinds.filter((x) => x !== k) : [...d.kinds, k] })}
-                className={cn("rounded-full border px-3 py-1 text-sm", on ? "border-primary bg-primary/10 text-primary" : "border-line-subtle text-ink-secondary")}>
+              <button key={k} type="button" disabled={disabled} aria-pressed={on} onClick={() => update({ kinds: on ? draft.kinds.filter((x) => x !== k) : [...draft.kinds, k] })}
+                className={cn("min-h-[44px] rounded-full border px-3 text-sm md:min-h-8", on ? "border-primary bg-primary/10 text-primary" : "border-line-subtle text-ink-secondary")}>
                 {l}
               </button>
             );
@@ -116,14 +79,11 @@ export function TieredPriceSettings({ legalEntityId, settings, canWrite, loading
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-3 border-t border-line-subtle pt-3">
-        <Button type="button" disabled={dis || !valid || save.isPending} onClick={() => save.mutate()}>
-          {save.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />}Lagre
-        </Button>
-        {saved && <span role="status" className="inline-flex items-center gap-1 text-sm text-success"><Check className="h-4 w-4" aria-hidden />Lagret</span>}
-        <Button type="button" variant="outline" disabled={!legalEntityId} onClick={() => setRematchOpen(true)}>
+        <Button type="button" variant="outline" className="min-h-[44px] md:min-h-10" disabled={!legalEntityId} onClick={() => setRematchOpen(true)}>
           {busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden /> : <RefreshCw className="mr-1.5 h-4 w-4" aria-hidden />}
           {busy ? "Omberegning pågår …" : "Beregn alle åpne fakturaer på nytt …"}
         </Button>
+        <span className="text-caption text-ink-secondary">Bruker lagrede innstillinger, ikke ulagrede endringer.</span>
       </div>
       {status.data && (
         <p className="text-caption text-ink-secondary tabular-nums">

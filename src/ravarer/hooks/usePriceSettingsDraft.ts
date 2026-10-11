@@ -169,5 +169,5 @@ export function usePriceSettingsDraft(legalEntityId: string | null, canEdit: boo
 }
 
 function isOk(r: unknown): boolean {
-  return typeof r === "object" && r !== null && "isSuccess" in r && (r as { isSuccess: unknown }).isSuccess === true;
+  return typeof r === "object" && r !== null && "isSuccess" in r && r.isSuccess === true;
 }
