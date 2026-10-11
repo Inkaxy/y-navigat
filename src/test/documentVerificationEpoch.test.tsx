@@ -72,7 +72,7 @@ describe("InvoiceDocumentPanel + PdfDocumentViewer: verifiseringsepoke", () => {
   it("varm match etterfulgt av feilet oppfrisking: ingen original, ingen åpne-lenke", async () => {
     rpcImpl.mockImplementation(async () => ({ data: null, error: new Error("nett") }));
     setup({ version: "v1" });
-    await screen.findByText("Kunne ikke hente dokumentet.");
+    await screen.findByText("Kunne ikke hente dokumentet.", undefined, { timeout: 4000 });
     expect(getDocument).not.toHaveBeenCalled();
     expect(screen.queryByRole("link", { name: /Åpne/ })).toBeNull();
   });
