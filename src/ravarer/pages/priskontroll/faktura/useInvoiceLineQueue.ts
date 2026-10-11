@@ -147,12 +147,14 @@ export function useInvoiceLineQueue(invoiceId: string | null, legalEntityId: str
     const idx = ids.indexOf(lineId);
     const r = await linesQuery.refetch();
     void countsQuery.refetch();
+    // Headeren («Avklar N linjer», tidslinjen) leser fakturaen — hent den også.
+    refresh();
     const rows = r.data?.rows ?? [];
     const open = (id: string) => { const row = rows.find((x) => x.id === id); return !!row && statusOf(row).bucket === "needs"; };
     if (open(lineId)) return;
     const nextId = [...ids.slice(idx + 1), ...ids.slice(0, Math.max(idx, 0))].find((id) => id !== lineId && open(id));
     if (nextId) dispatch({ type: "focus", id: nextId });
-  }, [queue.ids, linesQuery, countsQuery, statusOf]);
+  }, [queue.ids, linesQuery, countsQuery, statusOf, refresh]);
 
   return {
     lines, visible, linesQuery, countsQuery, statusOf, links, toleranceFor,
