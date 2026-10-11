@@ -29,8 +29,13 @@ type Props = {
   docOpen: boolean;
   onToggleDoc: () => void;
   canWrite: boolean;
-  isTripletex: boolean;
+  /** «Hent linjer» gjør noe (Tripletex og linjene er ikke lest ennå). */
+  canFetch: boolean;
   rematchBusy: boolean;
+  /** Køstatus mens «Beregn på nytt» venter. */
+  rematchNote?: string | null;
+  /** «N av M linjer avklart». */
+  lineProgress?: { done: number; total: number } | null;
   onMenu: (a: HeaderMenuAction) => void;
 };
 
@@ -58,6 +63,11 @@ export function WorkspaceHeader(p: Props) {
             <span className="tabular-nums">{formatNok(p.amount)}</span>
             <InvoiceStatusBadge status={p.status} reconciledMode={p.reconciledMode} />
             <DeliveryTimeline steps={p.steps} flagged={p.status === "flagged"} creditNote={p.isCreditNote} />
+            {p.lineProgress && p.lineProgress.total > 0 && (
+              <span className="tabular-nums" aria-label={`${p.lineProgress.done} av ${p.lineProgress.total} linjer avklart`}>
+                {p.lineProgress.done} av {p.lineProgress.total} linjer avklart
+              </span>
+            )}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -76,7 +86,7 @@ export function WorkspaceHeader(p: Props) {
               {p.canWrite && !final && (
                 <DropdownMenuItem disabled={p.rematchBusy} onSelect={() => p.onMenu("rematch")}>Beregn på nytt</DropdownMenuItem>
               )}
-              {p.canWrite && p.isTripletex && <DropdownMenuItem onSelect={() => p.onMenu("fetch")}>Hent linjer på nytt</DropdownMenuItem>}
+              {p.canWrite && p.canFetch && <DropdownMenuItem onSelect={() => p.onMenu("fetch")}>Hent linjer</DropdownMenuItem>}
               {p.canWrite && !final && <DropdownMenuItem onSelect={() => p.onMenu("register")}>Registrer linjer</DropdownMenuItem>}
               {p.canWrite && p.isCreditNote && <DropdownMenuItem onSelect={() => p.onMenu("credit")}>Koble kreditnota</DropdownMenuItem>}
               <DropdownMenuSeparator />
@@ -92,7 +102,7 @@ export function WorkspaceHeader(p: Props) {
           </Button>
         </div>
       </div>
-      <p className="text-right text-caption text-ink-secondary">{p.next.hint}</p>
+      <p className="text-right text-caption text-ink-secondary" aria-live="polite">{p.rematchNote ? `${p.rematchNote} · ` : ""}{p.next.hint}</p>
     </header>
   );
 }
