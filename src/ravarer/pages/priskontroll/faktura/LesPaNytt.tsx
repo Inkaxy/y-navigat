@@ -99,7 +99,7 @@ export default function LesPaNytt() {
   const document = docMatch === "changed"
     ? <p role="alert" className="p-4 text-sm text-warning">Originalen er endret siden lesingen. Den nåværende filen er ikke dokumentet forslaget ble lest fra, og vises ikke her. Start en ny lesing.</p>
     : doc.url && r && current
-      ? <PdfDocumentViewer url={doc.url} cacheKey={current.path} version={current.version} accessScope={ver.accessScope} verifyIdentity={ver.recheck} onIdentityChanged={ver.refresh} title="Originalfaktura" fallback={<a className="underline" href={doc.url} target="_blank" rel="noreferrer">Åpne originalen</a>} />
+      ? <PdfDocumentViewer url={doc.url} cacheKey={current.path} version={current.version} accessScope={ver.accessScope} verifyIdentity={ver.recheck} generation={ver.generation} onIdentityChanged={ver.refresh} title="Originalfaktura" fallback={<a className="underline" href={doc.url} target="_blank" rel="noreferrer">Åpne originalen</a>} />
       : <p className="p-4 text-sm text-ink-secondary">{ver.isError || ver.revoked ? "Gjeldende original kunne ikke kontrolleres. Forslaget kan ikke tas i bruk." : ver.verifying || doc.isLoading ? "Kontrollerer gjeldende original …" : "Originalen kan ikke kontrolleres eller vises nå."}</p>;
 
   const title = inv.data ? `${inv.data.suppliers?.name ?? "Ukjent leverandør"} · Faktura ${inv.data.invoice_number ?? ""}` : "Faktura";

@@ -155,7 +155,7 @@ export function InvoiceDocumentPanel({ invoiceId, invoice, line, onClose, classN
             <Skeleton className="h-[60vh] w-full" />
           </div>
         ) : (
-          <PdfDocumentViewer url={url} cacheKey={path} version={current.version} accessScope={ver.accessScope} verifyIdentity={ver.recheck} onIdentityChanged={ver.refresh} title={`Originalfaktura ${invoice?.invoice_number ?? ""}`} fallback={open} />
+          <PdfDocumentViewer url={url} cacheKey={path} version={current.version} accessScope={ver.accessScope} verifyIdentity={ver.recheck} generation={ver.generation} onIdentityChanged={ver.refresh} title={`Originalfaktura ${invoice?.invoice_number ?? ""}`} fallback={open} />
         )}
       </div>
     </div>
