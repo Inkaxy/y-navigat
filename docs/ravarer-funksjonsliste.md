@@ -20,22 +20,22 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| R7 | Fritekstsøk på navn, SKU, lev.-SKU og alias, med chip «lev.nr X» | /varer › søkefelt | 4 | Gammel plass |
-| R8 | Filtre for kategori, varetype og status, lagret i URL | /varer › filterrad (bunnark på mobil) | 4 | Gammel plass |
-| R9 | Åtte innebygde visninger (Alle, Mangler pakning/deklarasjon/næring, Avvik, Ikke kjøpt 12 mnd, Uten leverandør, Inaktive) | /varer?liste=pakning\|deklarasjon\|naering\|prisavvik\|uten-leverandor\|ikke-kjopt\|inaktive (arbeidslister) | 4 | Gammel plass |
-| R10 | Avviksregel: kategoritoleranse + maksgrense (`isLargeDeviation`) | ?liste=prisavvik; samme regel i forrige/neste på råvarekortet | 4 | Gammel plass |
-| R11 | Lagrede visninger (inkl. view): lagre, bruke, slette | /varer › visningsvelger | 4 | Gammel plass |
-| R12 | Kolonnevelger med 15 kolonner (inkl. Priskilde, Pris oppdatert, Beholdning), lagret per bruker | /varer › DataTable kolonnevelger | 4 | Gammel plass |
-| R13 | Sortering på 11 nøkler (`sort=key:dir`) | /varer › DataTable-header | 4 | Gammel plass |
-| R14 | Radklikk åpner råvaren med listekonteksten bevart | ?valgt=:id (peek-panel) + «Åpne fullt» → /varer/:id med liste-query | 4 | Gammel plass |
-| R15 | Inline kostpris med «Hvorfor?», skriver prishistorikk og setter gjeldende pris | Celle Kostpris → CostPriceEditor (begrunnelse) | 4 | Gammel plass |
-| R16 | Inline avtalepris (primærkobling, ellers eldre felt) | Celle Avtalepris → kobling hos primærleverandør; eldre felt har knappen «Flytt til leverandør» | 4 | Gammel plass |
-| R17 | Inline primærkategori | Celle Kategori | 4 | Gammel plass |
-| R18 | Velg rader og «Velg alle synlige» | DataTable masseutvalg | 4 | Gammel plass |
-| R19 | Masse: sett kategori | Massehandlingsrad | 4 | Gammel plass |
-| R20 | Masse: sett varetype | Massehandlingsrad | 4 | Gammel plass |
-| R21 | Masse: sett primærleverandør | Massehandlingsrad via PrimarySupplierControl (synker `is_primary`) | 4 | Gammel plass |
-| R22 | Masse: aktiver og deaktiver | Massehandlingsrad | 4 | Gammel plass |
+| R7 | Fritekstsøk på navn, SKU, lev.-SKU og alias, med chip «lev.nr X» | /varer › søkefelt | 4 | Flyttet — Vareliste (DataTable + SplitView/RawMaterialPeek, VarelisteCells) (kilde/komponenttest; ikke nettleserverifisert) |
+| R8 | Filtre for kategori, varetype og status, lagret i URL | /varer › filterrad (bunnark på mobil) | 4 | Flyttet — Vareliste (DataTable + SplitView/RawMaterialPeek, VarelisteCells) (kilde/komponenttest; ikke nettleserverifisert) |
+| R9 | Åtte innebygde visninger (Alle, Mangler pakning/deklarasjon/næring, Avvik, Ikke kjøpt 12 mnd, Uten leverandør, Inaktive) | /varer?liste=pakning\|deklarasjon\|naering\|prisavvik\|uten-leverandor\|ikke-kjopt\|inaktive (arbeidslister) | 4 | Flyttet — Vareliste (DataTable + SplitView/RawMaterialPeek, VarelisteCells) (kilde/komponenttest; ikke nettleserverifisert) |
+| R10 | Avviksregel: kategoritoleranse + maksgrense (`isLargeDeviation`) | ?liste=prisavvik; samme regel i forrige/neste på råvarekortet | 4 | Flyttet — Vareliste (DataTable + SplitView/RawMaterialPeek, VarelisteCells) (kilde/komponenttest; ikke nettleserverifisert) |
+| R11 | Lagrede visninger (inkl. view): lagre, bruke, slette | /varer › visningsvelger | 4 | Flyttet — Vareliste (DataTable + SplitView/RawMaterialPeek, VarelisteCells) (kilde/komponenttest; ikke nettleserverifisert) |
+| R12 | Kolonnevelger med 15 kolonner (inkl. Priskilde, Pris oppdatert, Beholdning), lagret per bruker | /varer › DataTable kolonnevelger | 4 | Flyttet — Vareliste (DataTable + SplitView/RawMaterialPeek, VarelisteCells) (kilde/komponenttest; ikke nettleserverifisert) |
+| R13 | Sortering på 11 nøkler (`sort=key:dir`) | /varer › DataTable-header | 4 | Flyttet — Vareliste (DataTable + SplitView/RawMaterialPeek, VarelisteCells) (kilde/komponenttest; ikke nettleserverifisert) |
+| R14 | Radklikk åpner råvaren med listekonteksten bevart | ?valgt=:id (peek-panel) + «Åpne fullt» → /varer/:id med liste-query | 4 | Flyttet — Vareliste (DataTable + SplitView/RawMaterialPeek, VarelisteCells) (kilde/komponenttest; ikke nettleserverifisert) |
+| R15 | Inline kostpris med «Hvorfor?», skriver prishistorikk og setter gjeldende pris | Celle Kostpris → CostPriceEditor (begrunnelse) | 4 | Flyttet — Vareliste (DataTable + SplitView/RawMaterialPeek, VarelisteCells) (kilde/komponenttest; ikke nettleserverifisert) |
+| R16 | Inline avtalepris (primærkobling, ellers eldre felt) | Celle Avtalepris → kobling hos primærleverandør; eldre felt har knappen «Flytt til leverandør» | 4 | Flyttet — Vareliste (DataTable + SplitView/RawMaterialPeek, VarelisteCells) (kilde/komponenttest; ikke nettleserverifisert) |
+| R17 | Inline primærkategori | Celle Kategori | 4 | Flyttet — Vareliste (DataTable + SplitView/RawMaterialPeek, VarelisteCells) (kilde/komponenttest; ikke nettleserverifisert) |
+| R18 | Velg rader og «Velg alle synlige» | DataTable masseutvalg | 4 | Flyttet — Vareliste (DataTable + SplitView/RawMaterialPeek, VarelisteCells) (kilde/komponenttest; ikke nettleserverifisert) |
+| R19 | Masse: sett kategori | Massehandlingsrad | 4 | Flyttet — Vareliste (DataTable + SplitView/RawMaterialPeek, VarelisteCells) (kilde/komponenttest; ikke nettleserverifisert) |
+| R20 | Masse: sett varetype | Massehandlingsrad | 4 | Flyttet — Vareliste (DataTable + SplitView/RawMaterialPeek, VarelisteCells) (kilde/komponenttest; ikke nettleserverifisert) |
+| R21 | Masse: sett primærleverandør | Massehandlingsrad via PrimarySupplierControl (synker `is_primary`) | 4 | Flyttet — Vareliste (DataTable + SplitView/RawMaterialPeek, VarelisteCells) (kilde/komponenttest; ikke nettleserverifisert) |
+| R22 | Masse: aktiver og deaktiver | Massehandlingsrad | 4 | Flyttet — Vareliste (DataTable + SplitView/RawMaterialPeek, VarelisteCells) (kilde/komponenttest; ikke nettleserverifisert) |
 | R23 | Masse: kø for å bekrefte pakning (hopper over bekreftede) | Massehandlingsrad → PackageEditor i kø | 4 | Gammel plass |
 | R24 | Masse: CSV med valgte rader × synlige kolonner (`;`, BOM) | Massehandlingsrad «Eksporter CSV» (norske verdier) | 4 | Gammel plass |
 | R25 | Tøm valg | Massehandlingsrad | 4 | Gammel plass |
@@ -48,65 +48,65 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| R31 | Brødsmuler og «Tilbake» som bevarer listefiltre | /varer/:id › header (crumbs) | 4 | Gammel plass |
-| R32 | Forrige/neste og `[` / `]` i listerekkefølge | Header; bruker samme filter og avviksregel som listen | 4 | Gammel plass |
-| R33 | Endre navn (`rename_raw_material`) | Header «Endre navn» | 4 | Gammel plass |
-| R34 | Statuschips (aktiv, type, kategorier, deklarasjon, datablad, allergener, næring) | Header: StatusPill + komplett-sjekkliste med hopp til løsning | 4 | Gammel plass |
-| R35 | KPI-stripe med 9 KPI-er og lenke til primærleverandør | ?seksjon=sammendrag | 4 | Gammel plass |
-| R36 | Fane lagret i URL (`?tab=`) | `?seksjon=` med kart fra gamle `?tab=`-verdier | 4 | Gammel plass |
-| R37 | ⌘S lagrer aktiv fane | ⌘S lagrer seksjonen, med indikator for ulagrede endringer | 4 | Gammel plass |
+| R31 | Brødsmuler og «Tilbake» som bevarer listefiltre | /varer/:id › header (crumbs) | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R32 | Forrige/neste og `[` / `]` i listerekkefølge | Header; bruker samme filter og avviksregel som listen | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R33 | Endre navn (`rename_raw_material`) | Header «Endre navn» | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R34 | Statuschips (aktiv, type, kategorier, deklarasjon, datablad, allergener, næring) | Header: StatusPill + komplett-sjekkliste med hopp til løsning | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R35 | KPI-stripe med 9 KPI-er og lenke til primærleverandør | ?seksjon=sammendrag | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R36 | Fane lagret i URL (`?tab=`) | `?seksjon=` med kart fra gamle `?tab=`-verdier | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R37 | ⌘S lagrer aktiv fane | ⌘S lagrer seksjonen, med indikator for ulagrede endringer | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
 
 ## Råvarekort – Oversikt
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| R38 | SKU, navn, deklarasjonsnavn, beskrivelse, basisenhet, primær + flere kategorier (★) | ?seksjon=grunndata (deklarasjonsnavn også i ?seksjon=deklarasjon) | 4 | Gammel plass |
-| R39 | Vis pakning + «Endre pakning» (forhåndsvis, regn om, angre) | ?seksjon=grunndata › Pakning → PackageEditor | 4 | Gammel plass |
-| R40 | Brytere for Aktiv og Emballasje | ?seksjon=grunndata | 4 | Gammel plass |
-| R41 | Bakerifelt: kornklasse, kornslag (validering), vann %, vekt per stk | ?seksjon=grunndata › Bakerifelt | 4 | Gammel plass |
-| R42 | Gjeldende kostpris, avtalepris (eldre felt) og primærleverandør | ?seksjon=pris (CostPriceEditor) + ?seksjon=leverandorer (PrimarySupplierControl, «Eldre avtalepris» → «Flytt til leverandør») | 4 | Gammel plass |
-| R43 | Omregningshistorikk med «Angre» | ?seksjon=grunndata › Omregninger | 4 | Gammel plass |
-| R44 | Forkast/Lagre med vakt mot å forlate ulagrede endringer | Sticky lagrerad for alle seksjoner | 4 | Gammel plass |
+| R38 | SKU, navn, deklarasjonsnavn, beskrivelse, basisenhet, primær + flere kategorier (★) | ?seksjon=grunndata (deklarasjonsnavn også i ?seksjon=deklarasjon) | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R39 | Vis pakning + «Endre pakning» (forhåndsvis, regn om, angre) | ?seksjon=grunndata › Pakning → PackageEditor | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R40 | Brytere for Aktiv og Emballasje | ?seksjon=grunndata | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R41 | Bakerifelt: kornklasse, kornslag (validering), vann %, vekt per stk | ?seksjon=grunndata › Bakerifelt | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R42 | Gjeldende kostpris, avtalepris (eldre felt) og primærleverandør | ?seksjon=pris (CostPriceEditor) + ?seksjon=leverandorer (PrimarySupplierControl, «Eldre avtalepris» → «Flytt til leverandør») | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R43 | Omregningshistorikk med «Angre» | ?seksjon=grunndata › Omregninger | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R44 | Forkast/Lagre med vakt mot å forlate ulagrede endringer | Sticky lagrerad for alle seksjoner | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
 
 ## Råvarekort – Priser & leverandører
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| R45 | «Prisgrunnlag akkurat nå» per leverandør, med toleranse | ?seksjon=pris › Prisgrunnlag nå (+ peek-panel i varelisten) | 4 | Gammel plass |
-| R46 | «Varekort hos leverandører»: tabell + varekort-panel (koble, opprett, pakning, primær, ikke vare) | ?seksjon=leverandorer › Varekort → samme varekort-panel som i Priskontroll | 4 | Gammel plass |
-| R47 | Startpris: «Sett som avtalepris» og «Fjern startpris» med begrunnelse (approve/admin) | ?seksjon=pris › Startpris | 4 | Gammel plass |
-| R48 | Koblingstabell: bytte prisenhet, karantenemerke, utløpsfarger, avtaledokument | ?seksjon=leverandorer › Koblinger (farger fra `agreementStatus.ts`) | 4 | Gammel plass |
-| R49 | «Ny leverandør» | ?seksjon=leverandorer › felles SupplierDialog | 4 | Gammel plass |
-| R50 | Koble/rediger leverandør (SKU, produktnavn, pakning, baseenheter, avtalepris per pakning/base, gyldighet, primær, fjern) | ?seksjon=leverandorer › RmSupplierDialog (pakning via PackageEditor, primær via PrimarySupplierControl) | 4 | Gammel plass |
-| R51 | Pristidslinje med avtalebånd, Δ, klikk til faktura og CSV | ?seksjon=pris › Pristidslinje | 4 | Gammel plass |
-| R52 | «Registrer pris» (pris, dato, leverandør, kilde, notat, sett gjeldende) | ?seksjon=pris › «Registrer pris» (CostPriceEditor) | 4 | Gammel plass |
-| R53 | Siste fakturalinjer med lenker | ?seksjon=pris › Siste fakturalinjer → /priskontroll/faktura/:id | 4 | Gammel plass |
-| R54 | Innkjøpsstatistikk: periode og sammenligning, månedstabell, innsikt | ?seksjon=pris › Innkjøp (uten emoji) | 4 | Gammel plass |
+| R45 | «Prisgrunnlag akkurat nå» per leverandør, med toleranse | ?seksjon=pris › Prisgrunnlag nå (+ peek-panel i varelisten) | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R46 | «Varekort hos leverandører»: tabell + varekort-panel (koble, opprett, pakning, primær, ikke vare) | ?seksjon=leverandorer › Varekort → samme varekort-panel som i Priskontroll | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R47 | Startpris: «Sett som avtalepris» og «Fjern startpris» med begrunnelse (approve/admin) | ?seksjon=pris › Startpris | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R48 | Koblingstabell: bytte prisenhet, karantenemerke, utløpsfarger, avtaledokument | ?seksjon=leverandorer › Koblinger (farger fra `agreementStatus.ts`) | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R49 | «Ny leverandør» | ?seksjon=leverandorer › felles SupplierDialog | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R50 | Koble/rediger leverandør (SKU, produktnavn, pakning, baseenheter, avtalepris per pakning/base, gyldighet, primær, fjern) | ?seksjon=leverandorer › RmSupplierDialog (pakning via PackageEditor, primær via PrimarySupplierControl) | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R51 | Pristidslinje med avtalebånd, Δ, klikk til faktura og CSV | ?seksjon=pris › Pristidslinje | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R52 | «Registrer pris» (pris, dato, leverandør, kilde, notat, sett gjeldende) | ?seksjon=pris › «Registrer pris» (CostPriceEditor) | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R53 | Siste fakturalinjer med lenker | ?seksjon=pris › Siste fakturalinjer → /priskontroll/faktura/:id | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R54 | Innkjøpsstatistikk: periode og sammenligning, månedstabell, innsikt | ?seksjon=pris › Innkjøp (uten emoji) | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
 
 ## Råvarekort – Næring & deklarasjon
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| R55 | Deklarasjonsnavn med «Foreslå» og «Bruk Matvaretabellen-navn» | ?seksjon=deklarasjon | 4 | Gammel plass |
-| R56 | Datablad: opplasting, AI-uttrekk, «Bruk» per felt, bekreft fjerning av allergener, snarvei til pakning, versjonshistorikk | ?seksjon=deklarasjon › Datablad | 4 | Gammel plass |
-| R57 | Matvaretabellen-kilde (oppdater, hent på nytt, bekreft overskriving, koble fra) | ?seksjon=deklarasjon › Matvaretabellen-kilde | 4 | Gammel plass |
-| R58 | 11 næringsfelt med «Manuelt overstyrt», auto-energi, «Marker som verifisert», kJ/kcal-varsel, kilde, lagre | ?seksjon=naering | 4 | Gammel plass |
-| R59 | Ingrediensdeklarasjon, opprinnelsesland, kilde, E-numre | ?seksjon=deklarasjon | 4 | Gammel plass |
-| R60 | 25 allergener med tre tilstander, lagres straks | ?seksjon=naering › Allergener | 4 | Gammel plass |
-| R61 | AI-forslag til allergener (velg, bruk, forkast) | ?seksjon=naering › Allergener | 4 | Gammel plass |
-| R62 | Næringsfanen skjules for emballasje | Seksjonsnavigasjonen skjuler naering når `is_packaging` | 4 | Gammel plass |
+| R55 | Deklarasjonsnavn med «Foreslå» og «Bruk Matvaretabellen-navn» | ?seksjon=deklarasjon | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R56 | Datablad: opplasting, AI-uttrekk, «Bruk» per felt, bekreft fjerning av allergener, snarvei til pakning, versjonshistorikk | ?seksjon=deklarasjon › Datablad | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R57 | Matvaretabellen-kilde (oppdater, hent på nytt, bekreft overskriving, koble fra) | ?seksjon=deklarasjon › Matvaretabellen-kilde | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R58 | 11 næringsfelt med «Manuelt overstyrt», auto-energi, «Marker som verifisert», kJ/kcal-varsel, kilde, lagre | ?seksjon=naering | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R59 | Ingrediensdeklarasjon, opprinnelsesland, kilde, E-numre | ?seksjon=deklarasjon | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R60 | 25 allergener med tre tilstander, lagres straks | ?seksjon=naering › Allergener | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R61 | AI-forslag til allergener (velg, bruk, forkast) | ?seksjon=naering › Allergener | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R62 | Næringsfanen skjules for emballasje | Seksjonsnavigasjonen skjuler naering når `is_packaging` | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
 
 ## Råvarekort – Oppskrifter, Lager, Historikk (gamle faner)
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| R63 | Oppskrifter som bruker råvaren (mengde, kost, andel), med lenker | ?seksjon=bruk › Oppskrifter | 4 | Gammel plass |
-| R64 | Lagersporing, min. beholdning, telling, ark med bevegelser | ?seksjon=lager | 4 | Gammel plass |
-| R65 | Bryter for handelsvare (videresalg) | ?seksjon=lager | 4 | Gammel plass |
-| R66 | «Selges som» (legg til produkt, faktor/enhet, fjern) | ?seksjon=bruk › Selges som | 4 | Gammel plass |
-| R67 | Avanserte enheter (standard innkjøps-, telle- og salgsenhet; legg til, rediger, slett; pris per enhet) | ?seksjon=lager › Enheter | 4 | Gammel plass |
-| R68 | Prissammenligning (avtale, forrige kjøp, snitt 90 d; leverandørfilter; fakturalenker) | ?seksjon=pris › Sammenligning | 4 | Gammel plass |
-| R69 | Samlet tidslinje med filter, merker for eldre logikk og karantene, fakturalenker | ?seksjon=historikk (norske etiketter) | 4 | Gammel plass |
+| R63 | Oppskrifter som bruker råvaren (mengde, kost, andel), med lenker | ?seksjon=bruk › Oppskrifter | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R64 | Lagersporing, min. beholdning, telling, ark med bevegelser | ?seksjon=lager | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R65 | Bryter for handelsvare (videresalg) | ?seksjon=lager | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R66 | «Selges som» (legg til produkt, faktor/enhet, fjern) | ?seksjon=bruk › Selges som | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R67 | Avanserte enheter (standard innkjøps-, telle- og salgsenhet; legg til, rediger, slett; pris per enhet) | ?seksjon=lager › Enheter | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R68 | Prissammenligning (avtale, forrige kjøp, snitt 90 d; leverandørfilter; fakturalenker) | ?seksjon=pris › Sammenligning | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
+| R69 | Samlet tidslinje med filter, merker for eldre logikk og karantene, fakturalenker | ?seksjon=historikk (norske etiketter) | 4 | Flyttet — RawMaterialDetail ?seksjon= (kilde/komponenttest; ikke nettleserverifisert) |
 
 ## Lager
 
@@ -154,22 +154,22 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| R97 | Statuskort (mangler, avviker, ustabil pris, uten pris, mangler kostpris, ubekreftet, OK, ingen fakturaer) | /varer?liste=pakning › tellerchips | 4 | Gammel plass |
-| R98 | URL-filter (ubekreftet, mistenkelig, bekreftet, alle) og søk | ?liste=pakning&filter=… + søk | 4 | Gammel plass |
-| R99 | Kolonner i arbeidslisten (referanse, forslag, spredning, kjøpt 12 mnd m.m.) | ?liste=pakning › arbeidsmodus-kolonner | 4 | Gammel plass |
-| R100 | Forslag fra siste faktura | ?liste=pakning › kolonne Forslag | 4 | Gammel plass |
-| R101 | Bekreft via SetPackageDialog (forslag, egen leverandørpakning, begrunnelse, forhåndsvis, bruk, angre, tidligere omregninger) | ?liste=pakning › «Bekreft» → PackageEditor | 4 | Gammel plass |
-| R102 | Kort med mistenkelige pakninger | ?liste=pakning&filter=mistenkelig | 4 | Gammel plass |
+| R97 | Statuskort (mangler, avviker, ustabil pris, uten pris, mangler kostpris, ubekreftet, OK, ingen fakturaer) | /varer?liste=pakning › tellerchips | 4 | Flyttet — PackageMode (kilde/komponenttest; ikke nettleserverifisert) |
+| R98 | URL-filter (ubekreftet, mistenkelig, bekreftet, alle) og søk | ?liste=pakning&filter=… + søk | 4 | Flyttet — PackageMode (kilde/komponenttest; ikke nettleserverifisert) |
+| R99 | Kolonner i arbeidslisten (referanse, forslag, spredning, kjøpt 12 mnd m.m.) | ?liste=pakning › arbeidsmodus-kolonner | 4 | Flyttet — PackageMode (kilde/komponenttest; ikke nettleserverifisert) |
+| R100 | Forslag fra siste faktura | ?liste=pakning › kolonne Forslag | 4 | Flyttet — PackageMode (kilde/komponenttest; ikke nettleserverifisert) |
+| R101 | Bekreft via SetPackageDialog (forslag, egen leverandørpakning, begrunnelse, forhåndsvis, bruk, angre, tidligere omregninger) | ?liste=pakning › «Bekreft» → PackageEditor | 4 | Flyttet — PackageMode (kilde/komponenttest; ikke nettleserverifisert) |
+| R102 | Kort med mistenkelige pakninger | ?liste=pakning&filter=mistenkelig | 4 | Flyttet — PackageMode (kilde/komponenttest; ikke nettleserverifisert) |
 
 ## Deklarasjonsnavn
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| R103 | Arbeidsliste sortert etter bruk | /varer?liste=deklarasjon | 4 | Gammel plass |
-| R104 | Lagre inline | ?liste=deklarasjon › inline-felt | 4 | Gammel plass |
-| R105 | «Lagre alle utfylte (N)» | ?liste=deklarasjon › «Lagre alle» | 4 | Gammel plass |
-| R106 | Seksjon for sammensatte råvarer | ?liste=deklarasjon › gruppe «Sammensatte» | 4 | Gammel plass |
-| R107 | Åpne råvaren | Peek-panel / «Åpne fullt» ?seksjon=deklarasjon | 4 | Gammel plass |
+| R103 | Arbeidsliste sortert etter bruk | /varer?liste=deklarasjon | 4 | Flyttet — DeclarationMode (kilde/komponenttest; ikke nettleserverifisert) |
+| R104 | Lagre inline | ?liste=deklarasjon › inline-felt | 4 | Flyttet — DeclarationMode (kilde/komponenttest; ikke nettleserverifisert) |
+| R105 | «Lagre alle utfylte (N)» | ?liste=deklarasjon › «Lagre alle» | 4 | Flyttet — DeclarationMode (kilde/komponenttest; ikke nettleserverifisert) |
+| R106 | Seksjon for sammensatte råvarer | ?liste=deklarasjon › gruppe «Sammensatte» | 4 | Flyttet — DeclarationMode (kilde/komponenttest; ikke nettleserverifisert) |
+| R107 | Åpne råvaren | Peek-panel / «Åpne fullt» ?seksjon=deklarasjon | 4 | Flyttet — DeclarationMode (kilde/komponenttest; ikke nettleserverifisert) |
 
 ## Matvaretabellen
 
@@ -188,13 +188,13 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| R116 | Arbeidsliste uten næring, sortert etter bruk | /varer?liste=naering | 4 | Gammel plass |
-| R117 | Masse: «Koble entydige treff» (≥ 0,8) | ?liste=naering › «Koble entydige (N)» | 4 | Gammel plass |
-| R118 | Forslagschips med % | ?liste=naering › inline forslag | 4 | Gammel plass |
-| R119 | «Velg annen» med bekreft overskriving | ?liste=naering › FoodPickerDialog | 4 | Gammel plass |
-| R120 | «Hopp over» | ?liste=naering › radhandling | 4 | Gammel plass |
-| R121 | Seksjon for delvise data (datablad/manuelt) | ?liste=naering › gruppe «Delvise data» | 4 | Gammel plass |
-| R122 | Koble fra Matvaretabellen | ?liste=naering radmeny + ?seksjon=deklarasjon › Matvaretabellen-kilde | 4 | Gammel plass |
+| R116 | Arbeidsliste uten næring, sortert etter bruk | /varer?liste=naering | 4 | Flyttet — NutritionMode (kilde/komponenttest; ikke nettleserverifisert) |
+| R117 | Masse: «Koble entydige treff» (≥ 0,8) | ?liste=naering › «Koble entydige (N)» | 4 | Flyttet — NutritionMode (kilde/komponenttest; ikke nettleserverifisert) |
+| R118 | Forslagschips med % | ?liste=naering › inline forslag | 4 | Flyttet — NutritionMode (kilde/komponenttest; ikke nettleserverifisert) |
+| R119 | «Velg annen» med bekreft overskriving | ?liste=naering › FoodPickerDialog | 4 | Flyttet — NutritionMode (kilde/komponenttest; ikke nettleserverifisert) |
+| R120 | «Hopp over» | ?liste=naering › radhandling | 4 | Flyttet — NutritionMode (kilde/komponenttest; ikke nettleserverifisert) |
+| R121 | Seksjon for delvise data (datablad/manuelt) | ?liste=naering › gruppe «Delvise data» | 4 | Flyttet — NutritionMode (kilde/komponenttest; ikke nettleserverifisert) |
+| R122 | Koble fra Matvaretabellen | ?liste=naering radmeny + ?seksjon=deklarasjon › Matvaretabellen-kilde | 4 | Flyttet — NutritionMode (kilde/komponenttest; ikke nettleserverifisert) |
 
 ## Leverandører
 
@@ -234,11 +234,11 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| R142 | Filter (uavklarte, alle) | /varer?liste=datablad | 4 | Gammel plass |
-| R143 | Detalj for endringen, før/etter | ?liste=datablad › peek-panel | 4 | Gammel plass |
-| R144 | Bekreft én | Peek-panel › «Bekreft endring» | 4 | Gammel plass |
-| R145 | Bekreft alle | ?liste=datablad › «Bekreft alle (N)» | 4 | Gammel plass |
-| R146 | Åpne råvarens næringsfane | → /varer/:id?seksjon=naering | 4 | Gammel plass |
+| R142 | Filter (uavklarte, alle) | /varer?liste=datablad | 4 | Flyttet — DatasheetMode (kilde/komponenttest; ikke nettleserverifisert) |
+| R143 | Detalj for endringen, før/etter | ?liste=datablad › peek-panel | 4 | Flyttet — DatasheetMode (kilde/komponenttest; ikke nettleserverifisert) |
+| R144 | Bekreft én | Peek-panel › «Bekreft endring» | 4 | Flyttet — DatasheetMode (kilde/komponenttest; ikke nettleserverifisert) |
+| R145 | Bekreft alle | ?liste=datablad › «Bekreft alle (N)» | 4 | Flyttet — DatasheetMode (kilde/komponenttest; ikke nettleserverifisert) |
+| R146 | Åpne råvarens næringsfane | → /varer/:id?seksjon=naering | 4 | Flyttet — DatasheetMode (kilde/komponenttest; ikke nettleserverifisert) |
 
 ## Datablad-opplasting
 
