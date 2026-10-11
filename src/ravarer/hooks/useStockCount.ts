@@ -1,91 +1,89 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
-import type { CountApplyResult, CountLinePayload } from "@/ravarer/lib/rpcContracts";
+import type { CountLinePayload } from "@/ravarer/lib/rpcContracts";
+import {
+  classifyCountError,
+  CountOutcomeUnknownError,
+  CountRejectedError,
+  parseCountResult,
+  type CountResult,
+} from "@/ravarer/lib/countSubmission";
+
+export type { CountResult } from "@/ravarer/lib/countSubmission";
+export type { CountResultRow } from "@/ravarer/lib/rpcContracts";
 
 export interface CountLineInput {
   raw_material_id: string;
   counted_base: number;
   /** Beholdningen som lå til grunn da telleren skrev tallet. */
-  expected_base?: number | null;
+  expected_base: number;
   line_note?: string | null;
-}
-
-export interface CountResultRow {
-  raw_material_id: string;
-  name?: string | null;
-  before?: number | null;
-  counted?: number | null;
-  diff?: number | null;
-}
-
-export interface CountResult {
-  ok: boolean;
-  adjusted: number;
-  unchanged: number;
-  rows: CountResultRow[];
-  alreadyApplied: boolean;
+  location?: string | null;
 }
 
 /** Sant når feilen kom av at beholdningen ble endret av andre underveis. */
-export function isCountConflict(message: string): boolean {
-  return /Beholdningen er endret av andre/i.test(message);
+export function isCountConflict(e: unknown): boolean {
+  return e instanceof CountRejectedError && e.kind === "conflict";
 }
 
-function normalize(data: unknown): CountResult {
-  if (!data || typeof data !== "object" || Array.isArray(data)) {
-    throw new Error("Tellingen ga et uventet svar fra serveren. Ingenting er bokført.");
-  }
-  const res = data as Partial<CountResult> & { error?: string; already_applied?: boolean };
-  if (res.ok === false) {
-    throw new Error(res.error ?? "Serveren avviste tellingen. Ingenting er bokført.");
-  }
-  if (typeof res.adjusted !== "number" && typeof res.adjusted !== "string") {
-    throw new Error("Tellingen mangler svar på hvor mange varer som ble justert.");
-  }
-  return {
-    ok: true,
-    adjusted: Number(res.adjusted ?? 0),
-    unchanged: Number(res.unchanged ?? 0),
-    rows: Array.isArray(res.rows) ? (res.rows as CountResultRow[]) : [],
-    alreadyApplied: res.already_applied === true,
-  };
+/** Bygger den nøyaktige, ordnede linjelisten som sendes (og lagres for nytt forsøk). */
+export function buildCountPayload(lines: CountLineInput[]): CountLinePayload[] {
+  return lines.map(l => ({
+    raw_material_id: l.raw_material_id,
+    counted_base: l.counted_base,
+    expected_base: l.expected_base,
+    line_note: l.line_note ?? null,
+    location: l.location ?? null,
+  }));
+}
+
+function toJson(lines: CountLinePayload[]): Json {
+  return lines.map(l => ({
+    raw_material_id: l.raw_material_id,
+    counted_base: l.counted_base,
+    expected_base: l.expected_base,
+    line_note: l.line_note ?? null,
+    location: l.location ?? null,
+  }));
 }
 
 /**
- * Bokfører en varetelling via `rm_stock_count_apply_v2`: den låser varene i fast
- * rekkefølge, avviser tellingen hvis beholdningen er endret av andre underveis
- * (feilkode 40001), avviser duplikat linjeinnhold (23505), og er idempotent på
- * operasjons-ID-en — et nytt forsøk etter nettbrudd dobbeltfører altså ikke.
+ * Bokfører en varetelling via `rm_stock_count_apply_v2`. Kalleren sender den
+ * FERDIGE linjelisten (samme rekkefølge ved hvert forsøk); serveren er idempotent
+ * på operasjons-ID + innhold. Transportfeil og uventet svar er ukjent utfall.
  */
 export function useApplyRmStockCount() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { opId: string; lines: CountLineInput[]; note: string }): Promise<CountResult> => {
-      if (input.lines.length === 0) throw new Error("Ingen varer er talt opp");
-      const missingExpected = input.lines.find(l => l.expected_base == null);
-      if (missingExpected) throw new Error("Mangler forventet beholdning for en eller flere linjer");
-      const payload: CountLinePayload[] = input.lines.map(l => ({
-        raw_material_id: l.raw_material_id,
-        counted_base: l.counted_base,
-        expected_base: l.expected_base as number,
-        line_note: l.line_note ?? null,
-      }));
-      const { data, error } = await supabase.rpc("rm_stock_count_apply_v2", {
-        p_op_id: input.opId,
-        p_lines: payload as unknown as never,
-        p_note: input.note,
-      });
-      if (error) {
-        if (error.code === "23505") throw new Error("Tellingen inneholder annet innhold enn forventet");
-        if (error.code === "40001") throw new Error("Beholdningen er endret av andre — last på nytt og prøv igjen");
-        throw error;
+    mutationFn: async (input: { opId: string; lines: CountLinePayload[]; note: string }): Promise<CountResult> => {
+      if (input.lines.length === 0) throw new CountRejectedError("rejected", "Ingen varer er talt opp");
+      if (input.lines.some(l => !Number.isFinite(l.expected_base) || !Number.isFinite(l.counted_base))) {
+        throw new CountRejectedError("rejected", "Mangler forventet eller talt beholdning for en eller flere linjer");
       }
-      return normalize(data as unknown as CountApplyResult);
+      let res: { data: unknown; error: { code?: string; message?: string } | null };
+      try {
+        res = await supabase.rpc("rm_stock_count_apply_v2", {
+          p_op_id: input.opId,
+          p_lines: toJson(input.lines),
+          p_note: input.note,
+        });
+      } catch (e) {
+        console.warn("[varetelling] nettfeil", e);
+        throw new CountOutcomeUnknownError();
+      }
+      if (res.error) throw classifyCountError(res.error);
+      return parseCountResult(res.data, { opId: input.opId, materialIds: input.lines.map(l => l.raw_material_id) });
     },
     onSuccess: res => {
       invalidateRawMaterial(qc);
+      void qc.invalidateQueries({ queryKey: ["raw-material-stock-status"] });
+      if (res.detailsUnavailable) {
+        toast.success("Tellingen er bokført. Detaljene kunne ikke vises — se Bevegelser.");
+        return;
+      }
       if (res.alreadyApplied) {
         toast.success("Tellingen var allerede bokført — ingenting ble ført på nytt.");
         return;
@@ -93,12 +91,16 @@ export function useApplyRmStockCount() {
       toast.success(`Telling bokført: ${res.adjusted} justert, ${res.unchanged} uendret`);
     },
     onError: (e: unknown) => {
-      const message = e instanceof Error ? e.message : "Tellingen kunne ikke bokføres";
-      toast.error(
-        isCountConflict(message)
-          ? `${message}. Ingenting er bokført — oppdater beholdningen og tell disse varene på nytt.`
-          : message,
-      );
+      if (e instanceof CountOutcomeUnknownError) {
+        toast.error(e.message);
+        return;
+      }
+      if (e instanceof CountRejectedError) {
+        const suffix = e.kind === "content" ? "" : " Ingenting ble bokført.";
+        toast.error(`${e.message}${suffix}`);
+        return;
+      }
+      toast.error("Tellingen kunne ikke bokføres.");
     },
   });
 }

@@ -18,6 +18,33 @@ export interface CountDraft {
   note: string;
   opId: string;
   savedAt: string;
+  /**
+   * Frosset forventet beholdning per vare (det telleren så da tallet ble skrevet).
+   * Følger utkastet, slik at et gjenopptatt lokalt utkast aldri måles mot dagens
+   * beholdning og konfliktkontrollen forblir virksom.
+   */
+  expected: Record<string, number>;
+  /**
+   * Sant for eldre utkast lagret uten `expected`. Da finnes ikke det opprinnelige
+   * utgangspunktet, og det må gjennomgås eksplisitt — ingen stille ny baseline.
+   */
+  legacyBaseline: boolean;
+}
+
+function parseExpected(v: unknown): Record<string, number> | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const out: Record<string, number> = {};
+  for (const [k, n] of Object.entries(v as Record<string, unknown>)) {
+    if (typeof n === "number" && Number.isFinite(n)) out[k] = n;
+  }
+  return out;
+}
+
+/** Varer med tall i utkastet som mangler frosset forventet beholdning. */
+export function missingBaseline(draft: Pick<CountDraft, "entries" | "expected">): string[] {
+  return Object.entries(draft.entries)
+    .filter(([id, rows]) => rows.some(r => r.amount.trim() !== "") && !(id in draft.expected))
+    .map(([id]) => id);
 }
 
 const PREFIX = "nbhub:rm-count:";
@@ -38,7 +65,7 @@ export function countDraftKey(legalEntityId: string | null | undefined, dateISO:
 }
 
 export function emptyDraft(): CountDraft {
-  return { entries: {}, lineNotes: {}, note: "", opId: newOpId(), savedAt: new Date().toISOString() };
+  return { entries: {}, lineNotes: {}, note: "", opId: newOpId(), savedAt: new Date().toISOString(), expected: {}, legacyBaseline: false };
 }
 
 /** Sant når utkastet faktisk inneholder noe verdt å gjenoppta. */
@@ -62,6 +89,8 @@ export function loadCountDraft(key: string): CountDraft | null {
       // Eldre utkast uten operasjons-ID får en ny, slik at de fortsatt kan bokføres.
       opId: typeof d.opId === "string" && d.opId ? d.opId : newOpId(),
       savedAt: typeof d.savedAt === "string" ? d.savedAt : new Date().toISOString(),
+      expected: parseExpected(d.expected) ?? {},
+      legacyBaseline: parseExpected(d.expected) == null,
     };
     return draftHasContent(draft) ? draft : null;
   } catch {
@@ -70,9 +99,9 @@ export function loadCountDraft(key: string): CountDraft | null {
   }
 }
 
-export function saveCountDraft(key: string, draft: Omit<CountDraft, "savedAt">): void {
+export function saveCountDraft(key: string, draft: Omit<CountDraft, "savedAt" | "legacyBaseline">): void {
   try {
-    const payload: CountDraft = { ...draft, savedAt: new Date().toISOString() };
+    const payload: CountDraft = { ...draft, legacyBaseline: false, savedAt: new Date().toISOString() };
     if (!draftHasContent(payload)) {
       localStorage.removeItem(key);
       return;

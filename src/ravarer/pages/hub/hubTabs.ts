@@ -54,5 +54,14 @@ export function lagerTabs(s: WorkSummary | undefined): SectionTab[] {
     { id: "beholdning", label: "Beholdning", count: s?.other.stock_below_min, tone: "warning" },
     { id: "varemottak", label: "Varemottak" },
     { id: "telling", label: "Varetelling" },
+    { id: "bevegelser", label: "Bevegelser" },
+    { id: "fortjeneste", label: "Fortjeneste" },
+    { id: "bestilling", label: "Bestilling" },
   ];
 }
+
+export const LAGER_TABS = ["beholdning", "varemottak", "telling", "bevegelser", "fortjeneste", "bestilling"] as const;
+export type LagerTab = (typeof LAGER_TABS)[number];
+/** Fanespesifikke adresseparametere som fjernes ved fanebytte. */
+export const LAGER_TAB_PARAMS = ["valgt", "fra", "til", "leverandor", "filter"];
+

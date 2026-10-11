@@ -60,13 +60,13 @@ export function UnitAmountRows({ rows, onChange, units, baseUnit, allowMultiple 
           <Input
             type="text"
             inputMode="decimal"
-            className={compact ? "h-11 w-28 text-right tabular-nums" : "h-11 text-right tabular-nums"}
+            className={compact ? "h-[44px] w-28 text-right tabular-nums" : "h-[44px] text-right tabular-nums"}
             value={row.amount}
             placeholder="0"
             onChange={e => setRow(i, { amount: e.target.value })}
           />
           <Select value={row.unitKey} onValueChange={v => setRow(i, { unitKey: v })}>
-            <SelectTrigger className="h-11 w-[170px]">
+            <SelectTrigger className="h-[44px] w-[170px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -79,14 +79,14 @@ export function UnitAmountRows({ rows, onChange, units, baseUnit, allowMultiple 
             </SelectContent>
           </Select>
           {allowMultiple && rows.length > 1 && (
-            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => onChange(rows.filter((_, idx) => idx !== i))}>
+            <Button variant="ghost" size="icon" className="h-[44px] w-[44px]" aria-label="Fjern rad" onClick={() => onChange(rows.filter((_, idx) => idx !== i))}>
               <X className="h-4 w-4" />
             </Button>
           )}
         </div>
       ))}
       {allowMultiple && units.length > 0 && (
-        <Button variant="ghost" size="sm" onClick={() => onChange([...rows, emptyRow()])}>
+        <Button variant="ghost" size="sm" className="min-h-[44px] sm:min-h-0" onClick={() => onChange([...rows, emptyRow()])}>
           <Plus className="mr-1.5 h-3.5 w-3.5" /> Legg til delsum
         </Button>
       )}

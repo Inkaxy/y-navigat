@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,14 +6,23 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ClipboardCheck, Loader2, Search } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { AlertTriangle, ClipboardCheck, Loader2, Search } from "lucide-react";
 
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useAllStockStatus, type AllStockRow } from "@/ravarer/hooks/useAllStockStatus";
 import { useRawMaterialUnitsFor, type RawMaterialUnitRow } from "@/ravarer/hooks/useRawMaterialUnits";
-import { useApplyRmStockCount, type CountResult } from "@/ravarer/hooks/useStockCount";
+import { buildCountPayload } from "@/ravarer/hooks/useStockCount";
 import { BASE_KEY, UnitAmountRows, emptyRow, rowsToBase, type UnitAmountRow } from "@/ravarer/components/stock/UnitAmountRows";
 import { formatNok, formatNumber } from "@/ravarer/lib/constants";
 import { QueryState } from "@/components/common/QueryState";
@@ -23,19 +32,17 @@ import {
   countDraftKey,
   loadCountDraft,
   loadLocations,
+  missingBaseline,
   newOpId,
   saveCountDraft,
   shouldAutosave,
   saveLocation,
   type CountDraft,
 } from "@/ravarer/lib/countDraft";
-import {
-  discardCountSheet,
-  fetchOpenCountSheet,
-  saveCountSheet,
-  type CountSheetPayload,
-} from "@/ravarer/lib/countSheets";
-
+import { discardCountSheet, fetchOpenCountSheet, saveCountSheet, type CountSheetPayload } from "@/ravarer/lib/countSheets";
+import type { CountResult } from "@/ravarer/lib/countSubmission";
+import { useCountSubmission } from "./varetelling/useCountSubmission";
+import { CountResultDialog, CountSubmissionBanner, DraftSaveStatus, type ServerSaveState } from "./varetelling/CountPanels";
 
 export default function Varetelling() {
   const { canWrite, legalEntityId, user } = useRavarer();
@@ -43,14 +50,14 @@ export default function Varetelling() {
   const stockQuery = useAllStockStatus();
   const rows = useMemo(() => stockQuery.data ?? [], [stockQuery.data]);
   const unitsQuery = useRawMaterialUnitsFor(rows.map(r => r.raw_material_id));
-  // Feil fra begge kildene samles ett sted, med felles «Prøv igjen».
   const loadError = stockQuery.error ?? unitsQuery.error;
   const isLoading = stockQuery.isLoading || unitsQuery.isLoading;
   const retryAll = () => {
     void stockQuery.refetch();
     void unitsQuery.refetch();
   };
-  const apply = useApplyRmStockCount();
+  const submission = useCountSubmission(legalEntityId);
+  const locked = submission.locked;
 
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("all");
@@ -58,29 +65,20 @@ export default function Varetelling() {
   const [note, setNote] = useState("");
   const [entries, setEntries] = useState<Record<string, UnitAmountRow[]>>({});
   const [lineNotes, setLineNotes] = useState<Record<string, string>>({});
-  // Lokasjon er egen, varig informasjon om varen — ikke en del av telleutkastet,
-  // og huskes derfor per selskap på tvers av datoer, ikke per telling.
   const [locations, setLocations] = useState<Record<string, string>>({});
-  // Forventet beholdning fryses ved første endring på linja. Uten dette ville
-  // et bakgrunnsoppdatert tall gjøre konfliktkontrollen verdiløs: serveren ville
-  // sammenlignet mot beholdningen i det øyeblikket brukeren trykket «Bokfør».
+  // Forventet beholdning fryses ved første endring på linja og følger utkastet (lokalt og server).
   const [frozen, setFrozen] = useState<Record<string, number>>({});
   const [result, setResult] = useState<CountResult | null>(null);
-  // Et lagret utkast tas aldri i bruk uten at brukeren sier ja — ellers dukker
-  // gamle tall opp midt i en ny telling.
   const [pendingDraft, setPendingDraft] = useState<CountDraft | null>(null);
-  const [pendingExpected, setPendingExpected] = useState<Record<string, number>>({});
   const [draftSource, setDraftSource] = useState<"lokalt" | "server">("lokalt");
   const [draftLoaded, setDraftLoaded] = useState(false);
-  // Autosave skal aldri kjøre før brukeren faktisk har gjort noe med tellingen —
-  // ellers sletter den tomme førstegangs-lagringen et allerede lagret utkast.
   const [dirty, setDirty] = useState(false);
-  // Operasjons-ID: følger tellingen til den er bokført, slik at et nytt forsøk
-  // etter nettbrudd eller dobbeltklikk aldri fører tellingen to ganger.
-  const [opId, setOpId] = useState<string>(() => newOpId());
+  const [confirmZero, setConfirmZero] = useState(false);
+  const [serverSave, setServerSave] = useState<ServerSaveState>("idle");
+  const [opId, setOpId] = useState<string>(() => submission.pending?.opId ?? newOpId());
+  // Generasjon for serverlagring: sene svar etter bokføring/forkasting ignoreres.
+  const saveGen = useRef(0);
 
-  // Utkast hentes både lokalt og fra serveren; serverutkastet vinner når det er nyere,
-  // slik at en telling kan fortsette på et annet nettbrett.
   useEffect(() => {
     let cancelled = false;
     const local = loadCountDraft(draftKey);
@@ -100,8 +98,9 @@ export default function Varetelling() {
         note: sheet.payload.note,
         opId: sheet.op_id,
         savedAt: sheet.updated_at,
+        expected: sheet.payload.expected,
+        legacyBaseline: false,
       });
-      setPendingExpected(sheet.payload.expected);
       setDraftSource("server");
     });
     return () => {
@@ -110,34 +109,31 @@ export default function Varetelling() {
   }, [draftKey, legalEntityId]);
 
   useEffect(() => {
-    if (!shouldAutosave(draftLoaded, dirty)) return;
-    saveCountDraft(draftKey, { entries, lineNotes, note, opId });
-  }, [draftKey, draftLoaded, dirty, entries, lineNotes, note, opId]);
+    if (locked || !shouldAutosave(draftLoaded, dirty)) return;
+    saveCountDraft(draftKey, { entries, lineNotes, note, opId, expected: frozen });
+  }, [draftKey, draftLoaded, dirty, entries, lineNotes, note, opId, frozen, locked]);
 
-  // Serverlagring er sekundær og skjer med ro: den skal ikke forstyrre tastingen.
+  // Serverlagring er sekundær; den stanses mens en innsending er uavklart.
   useEffect(() => {
-    if (!draftLoaded || !legalEntityId || !user?.id) return;
+    if (locked || !draftLoaded || !legalEntityId || !user?.id || !dirty) return;
     if (Object.keys(entries).length === 0) return;
     const payload: CountSheetPayload = { entries, lineNotes, expected: frozen, note };
+    const gen = ++saveGen.current;
     const t = setTimeout(() => {
-      void saveCountSheet({
-        legalEntityId,
-        dateISO: osloTodayISO(),
-        opId,
-        payload,
-        createdBy: user.id,
+      setServerSave("saving");
+      void saveCountSheet({ legalEntityId, dateISO: osloTodayISO(), opId, payload, createdBy: user.id }).then(ok => {
+        if (gen !== saveGen.current) return;
+        setServerSave(ok ? "saved" : "failed");
       });
     }, 1500);
     return () => clearTimeout(t);
-  }, [draftLoaded, legalEntityId, user?.id, entries, lineNotes, frozen, note, opId]);
-
+  }, [locked, draftLoaded, legalEntityId, user?.id, dirty, entries, lineNotes, frozen, note, opId]);
 
   const categories = useMemo(
     () => Array.from(new Set(rows.map(r => r.category).filter((c): c is string => !!c))).sort((a, b) => a.localeCompare(b, "nb")),
     [rows],
   );
   const itemTypes = useMemo(() => Array.from(new Set(rows.map(r => r.item_type).filter(Boolean))).sort(), [rows]);
-
   const visible = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return rows.filter(
@@ -152,19 +148,15 @@ export default function Varetelling() {
     setLocations(loadLocations(legalEntityId));
   }, [legalEntityId]);
 
-  const locationFor = (id: string) => locations[id] ?? "";
   const setLocationFor = (id: string, value: string) => {
     setLocations(prev => ({ ...prev, [id]: value }));
     saveLocation(legalEntityId, id, value);
   };
-
   const unitsFor = (id: string): RawMaterialUnitRow[] => unitsQuery.data?.get(id) ?? [];
-  /** Beholdningen linja skal måles mot: frosset verdi hvis den finnes. */
   const expectedFor = (r: AllStockRow) => frozen[r.raw_material_id] ?? r.current_stock;
   const freeze = (r: AllStockRow) =>
     setFrozen(prev => (r.raw_material_id in prev ? prev : { ...prev, [r.raw_material_id]: r.current_stock }));
   const rowsFor = (id: string) => entries[id] ?? [emptyRow()];
-
   const countedBase = (r: AllStockRow) => rowsToBase(rowsFor(r.raw_material_id), unitsFor(r.raw_material_id));
 
   const filled = useMemo(
@@ -172,6 +164,8 @@ export default function Varetelling() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [rows, entries, unitsQuery.data],
   );
+  const needsBaseline = useMemo(() => new Set(missingBaseline({ entries, expected: frozen })), [entries, frozen]);
+  const nameOf = (id: string) => rows.find(r => r.raw_material_id === id)?.name ?? "Ukjent vare";
 
   const diffValue = filled.reduce((sum, r) => {
     const counted = countedBase(r);
@@ -179,64 +173,83 @@ export default function Varetelling() {
     return sum + (counted - expectedFor(r)) * (r.current_cost_price ?? 0);
   }, 0);
 
-  // Lagrevakt: et påbegynt telleutkast skal ikke forsvinne ved en refresh.
   const hasDraft = Object.keys(entries).length > 0;
   useEffect(() => {
-    if (!hasDraft) return;
+    if (!hasDraft && !locked) return;
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [hasDraft]);
+  }, [hasDraft, locked]);
+
+  const resetAfterApplied = () => {
+    saveGen.current++;
+    setEntries({});
+    setLineNotes({});
+    setFrozen({});
+    setNote("");
+    setOpId(newOpId());
+    setDirty(false);
+    setServerSave("idle");
+    clearCountDraft(draftKey);
+  };
 
   const submit = async () => {
-    if (apply.isPending) return;
-    const lines = filled
+    if (locked || !legalEntityId || needsBaseline.size > 0) return;
+    const inputs = filled
       .map(r => ({
         raw_material_id: r.raw_material_id,
         counted_base: countedBase(r) as number,
-        // Beholdningen telleren så da linja ble talt — frosset, ikke hentet på nytt.
-        expected_base: expectedFor(r),
+        expected_base: frozen[r.raw_material_id],
         line_note: (lineNotes[r.raw_material_id] ?? "").trim() || null,
+        location: (locations[r.raw_material_id] ?? "").trim() || null,
       }))
-      .filter(l => Number.isFinite(l.counted_base));
-    if (lines.length === 0) return;
-    try {
-      const details = filled
-        .map(r => {
-          const n = (lineNotes[r.raw_material_id] ?? "").trim();
-          return n ? `${r.name}: ${n}` : null;
-        })
-        .filter((x): x is string => !!x);
-      const fullNote = [note.trim() || "Varetelling", ...details].join(" | ");
-      const res = await apply.mutateAsync({ opId, lines, note: fullNote });
+      .filter(l => Number.isFinite(l.counted_base) && Number.isFinite(l.expected_base));
+    if (inputs.length !== filled.length || inputs.length === 0) return;
+    const details = filled
+      .map(r => {
+        const n = (lineNotes[r.raw_material_id] ?? "").trim();
+        return n ? `${r.name}: ${n}` : null;
+      })
+      .filter((x): x is string => !!x);
+    const fullNote = [note.trim() || "Varetelling", ...details].join(" | ");
+    saveGen.current++;
+    const res = await submission.send({
+      legalEntityId,
+      opId,
+      lines: buildCountPayload(inputs),
+      note: fullNote,
+      sentAt: new Date().toISOString(),
+    });
+    if (res) {
       setResult(res);
-      // Utkastet tømmes kun når tellingen faktisk ble bokført, og neste telling
-      // får en ny operasjons-ID.
-      setEntries({});
-      setLineNotes({});
-      setFrozen({});
-      setNote("");
-      setOpId(newOpId());
-      setDirty(false);
-      clearCountDraft(draftKey);
-    } catch {
-      // Feilmeldingen vises av mutasjonen; utkastet og operasjons-ID-en beholdes,
-      // slik at et nytt forsøk er trygt.
+      resetAfterApplied();
     }
   };
 
+  const retrySubmission = async () => {
+    const res = await submission.retry();
+    if (res) {
+      setResult(res);
+      resetAfterApplied();
+    }
+  };
 
-  /** Fyller 0 på alt som er synlig og ikke talt — «resten er tomt». */
+  const releaseSubmission = () => {
+    const kind = submission.state.kind === "rejected" ? submission.state.error.kind : null;
+    if (!submission.release()) return;
+    // Bare bevist innholdskonflikt krever ny ID; den byttes som følge av brukerens eksplisitte valg.
+    if (kind === "content") setOpId(newOpId());
+  };
+
   const setRestToZero = () => {
     setDirty(true);
     setEntries(prev => {
       const next = { ...prev };
       for (const r of visible) {
-        const current = next[r.raw_material_id] ?? prev[r.raw_material_id];
-        const hasValue = (current ?? []).some(row => row.amount.trim() !== "");
+        const hasValue = (prev[r.raw_material_id] ?? []).some(row => row.amount.trim() !== "");
         if (!hasValue) {
           next[r.raw_material_id] = [{ amount: "0", unitKey: BASE_KEY }];
           freeze(r);
@@ -245,6 +258,7 @@ export default function Varetelling() {
       return next;
     });
   };
+  const restCount = visible.filter(r => !(entries[r.raw_material_id] ?? []).some(row => row.amount.trim() !== "")).length;
 
   const countUnitText = (r: AllStockRow) => {
     const units = unitsFor(r.raw_material_id);
@@ -254,47 +268,77 @@ export default function Varetelling() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pb-4">
       <RavarerHeaderBanner />
 
-      {pendingDraft && (
+      <CountSubmissionBanner pending={submission.pending} state={submission.state} onRetry={() => void retrySubmission()} onRelease={releaseSubmission} canWrite={canWrite} />
+
+      {pendingDraft && !locked && (
         <Card className="flex flex-wrap items-center justify-between gap-3 border-warning/50 p-4">
           <p className="text-sm">
-            Du har en påbegynt telling fra i dag som ikke ble bokført
-            {draftSource === "server" ? " (lagret på serveren)" : ""}.
+            Du har en påbegynt telling fra i dag som ikke ble bokført{draftSource === "server" ? " (lagret på serveren)" : " (lagret på denne enheten)"}.
           </p>
           <div className="flex gap-2">
             <Button
               variant="outline"
+              className="min-h-[44px]"
               onClick={() => {
                 setDirty(false);
                 clearCountDraft(draftKey);
                 if (draftSource === "server") void discardCountSheet(pendingDraft.opId);
                 setPendingDraft(null);
-                setPendingExpected({});
               }}
             >
               Forkast
             </Button>
             <Button
+              className="min-h-[44px]"
               onClick={() => {
                 setDirty(true);
                 setEntries(pendingDraft.entries);
                 setLineNotes(pendingDraft.lineNotes);
                 setNote(pendingDraft.note);
-                // Frosne forventede tall følger med, slik at konfliktkontrollen
-                // fortsatt måler mot beholdningen da varen faktisk ble talt.
-                setFrozen(pendingExpected);
-                // Samme telling fortsetter på samme operasjons-ID.
+                // Det opprinnelige utgangspunktet følger med; mangler det, må det gjennomgås eksplisitt.
+                setFrozen(pendingDraft.expected);
                 setOpId(pendingDraft.opId);
                 setPendingDraft(null);
-                setPendingExpected({});
               }}
-
             >
               Fortsett tellingen
             </Button>
           </div>
+        </Card>
+      )}
+
+      {needsBaseline.size > 0 && !locked && (
+        <Card role="alert" className="space-y-3 border-warning/60 p-4">
+          <div className="flex items-start gap-2 text-sm">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
+            <div>
+              <p className="font-medium">Utkastet mangler opprinnelig beholdning for {needsBaseline.size} varer</p>
+              <p className="text-ink-secondary">
+                Utkastet er lagret med en eldre versjon. Hvis beholdningen er endret siden du talte, vil det ikke bli oppdaget. Kontroller
+                tallene mot dagens beholdning før du bruker den som utgangspunkt: {Array.from(needsBaseline).map(nameOf).join(", ")}.
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            className="min-h-[44px]"
+            onClick={() => {
+              setDirty(true);
+              setFrozen(prev => {
+                const next = { ...prev };
+                for (const id of needsBaseline) {
+                  const r = rows.find(x => x.raw_material_id === id);
+                  if (r) next[id] = r.current_stock;
+                }
+                return next;
+              });
+            }}
+          >
+            Jeg har kontrollert — bruk dagens beholdning
+          </Button>
         </Card>
       )}
 
@@ -318,18 +362,18 @@ export default function Varetelling() {
       <Card className="p-4">
         <div className="flex flex-wrap items-end gap-3">
           <div className="relative min-w-[220px] flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-secondary" />
-            <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Søk navn eller SKU…" className="h-11 pl-9" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-secondary" aria-hidden />
+            <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Søk navn eller SKU…" aria-label="Søk i tellelisten" className="h-[44px] pl-9" />
           </div>
           <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger className="h-11 w-[200px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-[44px] w-full sm:w-[200px]" aria-label="Kategori"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Alle kategorier</SelectItem>
               {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={itemType} onValueChange={setItemType}>
-            <SelectTrigger className="h-11 w-[180px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-[44px] w-full sm:w-[180px]" aria-label="Varetype"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Alle varetyper</SelectItem>
               {itemTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
@@ -351,24 +395,45 @@ export default function Varetelling() {
           />
         </Card>
       ) : (
-        <div className="space-y-3">
+        <fieldset disabled={locked} aria-label="Telleliste" className="space-y-3 disabled:opacity-70">
           {visible.map(r => {
             const counted = countedBase(r);
             const diff = counted == null ? null : counted - expectedFor(r);
+            const base = frozen[r.raw_material_id];
+            const drifted = base != null && base !== r.current_stock;
             return (
               <Card key={r.raw_material_id} className="p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-[200px]">
-                    <p className="font-medium">{r.name}</p>
+                  <div className="min-w-0 flex-1 sm:min-w-[200px]">
+                    <p className="break-words font-medium">{r.name}</p>
                     <p className="text-xs text-ink-secondary">
                       Bokført: {formatNumber(r.current_stock, 2)} {r.base_unit}
                       {countUnitText(r) && <> · {countUnitText(r)}</>}
                     </p>
+                    {drifted && (
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-warning">
+                        <span>
+                          Talt mot {formatNumber(base, 2)} {r.base_unit} — beholdningen er nå {formatNumber(r.current_stock, 2)}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="min-h-[44px] sm:min-h-0"
+                          onClick={() => {
+                            setDirty(true);
+                            setFrozen(prev => ({ ...prev, [r.raw_material_id]: r.current_stock }));
+                          }}
+                        >
+                          Bruk ny beholdning
+                        </Button>
+                      </div>
+                    )}
                     <Input
-                      value={locationFor(r.raw_material_id)}
+                      value={locations[r.raw_material_id] ?? ""}
                       onChange={e => setLocationFor(r.raw_material_id, e.target.value)}
                       placeholder="Lokasjon"
-                      className="mt-2 h-9 text-sm"
+                      aria-label={`Lokasjon for ${r.name}`}
+                      className="mt-2 h-[44px] text-sm sm:h-9"
                     />
                     <Input
                       value={lineNotes[r.raw_material_id] ?? ""}
@@ -377,7 +442,8 @@ export default function Varetelling() {
                         setLineNotes(prev => ({ ...prev, [r.raw_material_id]: e.target.value }));
                       }}
                       placeholder="Notat"
-                      className="mt-2 h-9 text-sm"
+                      aria-label={`Notat for ${r.name}`}
+                      className="mt-2 h-[44px] text-sm sm:h-9"
                     />
                   </div>
                   <div className="flex flex-col items-end gap-2">
@@ -407,58 +473,51 @@ export default function Varetelling() {
               </Card>
             );
           })}
-        </div>
+        </fieldset>
       )}
 
-      <Card className="sticky bottom-4 space-y-3 p-4 shadow-lg">
-        <div>
-          <Label className="text-xs">Notat på tellingen</Label>
-          <Textarea value={note} onChange={e => { setDirty(true); setNote(e.target.value); }} rows={2} placeholder="F.eks. «Månedstelling tørrvarelager»" />
-        </div>
+      <Card className="sticky bottom-0 z-10 space-y-3 p-4 shadow-lg sm:bottom-4">
+        <fieldset disabled={locked}>
+          <Label className="text-xs" htmlFor="count-note">Notat på tellingen</Label>
+          <Textarea id="count-note" value={note} onChange={e => { setDirty(true); setNote(e.target.value); }} rows={2} placeholder="F.eks. «Månedstelling tørrvarelager»" />
+        </fieldset>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-ink-secondary">
-            {filled.length} varer talt opp. Varer uten tall hoppes over.
-          </p>
-          <Button variant="outline" className="w-full sm:w-auto" onClick={setRestToZero} disabled={!canWrite}>
+          <div className="space-y-1">
+            <p className="text-sm text-ink-secondary">{filled.length} varer talt opp. Varer uten tall hoppes over.</p>
+            <DraftSaveStatus hasDraft={hasDraft && dirty} server={serverSave} />
+          </div>
+          <Button variant="outline" className="min-h-[44px] w-full sm:w-auto" onClick={() => setConfirmZero(true)} disabled={!canWrite || locked || restCount === 0}>
             Sett resten til 0
           </Button>
-          <Button className="w-full sm:w-auto" size="lg" disabled={!canWrite || filled.length === 0 || apply.isPending} onClick={submit}>
-            {apply.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ClipboardCheck className="mr-2 h-4 w-4" />}
+          <Button
+            className="min-h-[44px] w-full sm:w-auto"
+            size="lg"
+            disabled={!canWrite || locked || filled.length === 0 || needsBaseline.size > 0}
+            onClick={() => void submit()}
+          >
+            {submission.isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : <ClipboardCheck className="mr-2 h-4 w-4" aria-hidden />}
             Bokfør telling
           </Button>
         </div>
       </Card>
 
-      <Dialog open={!!result} onOpenChange={v => !v && setResult(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Telling bokført</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm">
-              {result?.adjusted ?? 0} varer justert, {result?.unchanged ?? 0} uendret.
-            </p>
-            {(result?.rows?.length ?? 0) > 0 && (
-              <div className="max-h-72 overflow-auto">
-                <table className="w-full text-sm">
-                  <thead className="text-left text-xs uppercase text-ink-secondary">
-                    <tr><th className="pb-2">Vare</th><th className="pb-2 text-right">Differanse</th></tr>
-                  </thead>
-                  <tbody>
-                    {result?.rows.map(row => (
-                      <tr key={row.raw_material_id} className="border-t border-line-subtle">
-                        <td className="py-2">{row.name ?? row.raw_material_id}</td>
-                        <td className="py-2 text-right tabular-nums">{formatNumber(Number(row.diff ?? 0), 2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setResult(null)}>Lukk</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AlertDialog open={confirmZero} onOpenChange={setConfirmZero}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sett {restCount} varer til 0?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Alle synlige varer uten tall i dette utvalget får talt beholdning 0. Ved bokføring blir de ført ned til null. Varer som er skjult
+              av søk eller filter berøres ikke.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="min-h-[44px]">Avbryt</AlertDialogCancel>
+            <AlertDialogAction className="min-h-[44px]" onClick={setRestToZero}>Sett til 0</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <CountResultDialog result={result} onClose={() => setResult(null)} />
     </div>
   );
 }
