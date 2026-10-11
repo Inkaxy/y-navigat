@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ExternalLink, Loader2, MoreHorizontal, RefreshCw, Search } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -102,8 +102,13 @@ export default function Matvaretabellen() {
   const [linkFood, setLinkFood] = useState<FoodRow | null>(null);
   const [createFood, setCreateFood] = useState<FoodRow | null>(null);
   /** «Bruk eksisterende» fra opprettelsesarket: samme gjennomgåtte flyt (kildesjekk + bekreftelse). */
-  const [existingFood, setExistingFood] = useState<FoodRow | null>(null);
-  const existingFlow = useNutritionLinkFlow(existingFood?.food_id ?? null, !!existingFood, () => setExistingFood(null));
+  const [existing, setExisting] = useState<{ food: FoodRow; rawMaterialId: string } | null>(null);
+  const existingFlow = useNutritionLinkFlow(existing?.food.food_id ?? null, !!existing, () => setExisting(null));
+  const { choose: chooseExisting } = existingFlow;
+  // Kjøres etter at flyten har startet ny økt for denne matvaren (effektrekkefølge), så sjekken tilhører økten.
+  useEffect(() => {
+    if (existing) void chooseExisting(existing.rawMaterialId, "valgt råvare");
+  }, [existing, chooseExisting]);
   /** Ny råvare er opprettet, men koblingen feilet: prøv koblingen igjen uten å opprette på nytt. */
   const [createdUnlinked, setCreatedUnlinked] = useState<{ rawMaterialId: string; food: FoodRow } | null>(null);
 
@@ -276,13 +281,12 @@ export default function Matvaretabellen() {
           onUseExisting={(id) => {
             const food = createFood;
             setCreateFood(null);
-            setExistingFood(food);
-            void existingFlow.choose(id, "valgt råvare");
+            setExisting({ food, rawMaterialId: id });
           }}
         />
       )}
 
-      <AlertDialog open={!!existingFlow.pending} onOpenChange={(v) => { if (!v) { existingFlow.cancelOverwrite(); setExistingFood(null); } }}>
+      <AlertDialog open={!!existingFlow.pending} onOpenChange={(v) => { if (!v) { existingFlow.cancelOverwrite(); setExisting(null); } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Overskrive næringsdata?</AlertDialogTitle>
