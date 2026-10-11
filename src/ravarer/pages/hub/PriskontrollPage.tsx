@@ -12,7 +12,6 @@ import { FakturaerTab } from "@/ravarer/pages/priskontroll/fakturaer/FakturaerTa
 import { normalizePriskontrollSearch } from "@/ravarer/pages/priskontroll/fakturaer/visning";
 import { ImportSheet } from "@/ravarer/pages/priskontroll/import/ImportSheet";
 import { GjoreWorkspace } from "@/ravarer/pages/priskontroll/gjore/GjoreWorkspace";
-import { useCompany } from "@/hooks/useCompany";
 import { PriskontrollToolsMenu } from "./PriskontrollToolsMenu";
 import { PRISKONTROLL_TAB_PARAMS, PRISKONTROLL_TABS, priskontrollTabs, RAVARER_EYEBROW } from "./hubTabs";
 
