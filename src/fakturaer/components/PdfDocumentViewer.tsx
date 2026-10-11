@@ -14,7 +14,7 @@ GlobalWorkerOptions.workerSrc = workerUrl;
  * Bufret innhold er bare uforanderlige bytes + innholdsavtrykk. PDF-objekt og blob-lenker
  * eies av den monterte visningen og ryddes når den forsvinner (aldri delt via cache).
  */
-export type DocBytes = { kind: "pdf" | "image"; bytes: Uint8Array; type: string; fingerprint: string };
+export type DocBytes = { kind: "pdf" | "image"; bytes: Uint8Array<ArrayBuffer>; type: string; fingerprint: string };
 
 async function fingerprintOf(buf: ArrayBuffer): Promise<string> {
   if (globalThis.crypto?.subtle) {
