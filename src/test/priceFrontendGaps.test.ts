@@ -174,7 +174,7 @@ describe("3) historisk grunnlag i graf og CSV", () => {
     const rows = PRICE_HISTORY_FIXTURE;
     const a = buildTimeline({ history: rows, supplierNames: new Map([["s1", "Regal"]]), links: [], currentUnit: "kg" });
     const b = buildTimeline({ history: rows, supplierNames: new Map([["s1", "Regal"]]), links: [], currentUnit: "g" });
-    const units = (x: typeof a) => [...x.points, ...x.events].map((p) => `${p.id}:${p.unit ?? "?"}:${p.packageText ?? "?"}`).sort();
+    const units = (x: typeof a) => [...x.rows, ...x.events].map((p) => `${p.id}:${p.unit ?? "?"}:${p.packageText ?? "?"}`).sort();
     expect(units(b)).toEqual(units(a));
   });
 });
