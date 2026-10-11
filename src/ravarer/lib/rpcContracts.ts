@@ -17,6 +17,8 @@ export interface CountLinePayload {
   /** Beholdningen klienten så da telleren skrev tallet — brukes til konfliktkontroll. RPC-en avviser null. */
   expected_base: number;
   line_note?: string | null;
+  /** Hylle/lagerplass; RPC-en tar den med i bevegelsesnotatet. */
+  location?: string | null;
 }
 
 export interface CountResultRow {
