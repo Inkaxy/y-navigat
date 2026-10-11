@@ -48,6 +48,7 @@ const refLabel = (s: string | null) => (s && s in PRICE_REFERENCE_LABEL ? PRICE_
 export function PriceBlockView(p: PriceBlockViewProps) {
   const chosen = p.rows.filter((r) => p.selected.has(r.id));
   const ch = priceChange(chosen);
+  const positiveCount = ch?.positiveIds.length ?? 0;
   const primary = pricePrimaryAction({ pct: positiveCount ? Math.max(ch?.pct ?? 0, 0.0001) : null, hardCapPct: p.hardCapPct, hasAgreement: p.hasAgreement });
   const unit = p.baseUnit ?? "enhet";
   const disabled = !p.canWrite || p.busy || chosen.length === 0 || p.status !== "ready";
@@ -55,7 +56,6 @@ export function PriceBlockView(p: PriceBlockViewProps) {
   // Én felles referanse bare når alle valgte linjer peker på samme grunnlag.
   const refKeys = [...new Set(chosen.map((r) => `${r.reference_source}|${r.reference_id}`))];
   const oneRef = refKeys.length === 1 ? chosen[0] : null;
-  const positiveCount = ch?.positiveIds.length ?? 0;
 
   return (
     <div className="space-y-3">

@@ -5,6 +5,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { decideApply, type ApplyCall } from "@/fakturaer/hooks/useInvoiceReread";
 import { emptySelection, parseRun, rereadSums, type Candidate, type OldLine, type PendingApply, type RereadRun, type Selection, type Values } from "@/fakturaer/lib/reread";
 import { classifyDbError } from "@/fakturaer/lib/sqlstate";
+import type { Json } from "@/integrations/supabase/types";
 import { classifyRegister, runPreview, type Deps, type RunRow } from "../../supabase/functions/reread-invoice-preview/flow";
 import { mapLine } from "../../supabase/functions/reread-invoice-preview/proposal";
 import { checkSum, sanitizeLines } from "../../supabase/functions/_shared/invoiceExtraction";
@@ -128,7 +129,7 @@ describe("lesing – ærlig gjenopprettbar tilstand", () => {
 
 // ---- Kreditnota: bare eksplisitt lesing ----------------------------------------------------------------
 describe("kreditnota fra ny lesing", () => {
-  const row = (read: Record<string, unknown>, credit = true) => {
+  const row = (read: { [k: string]: Json }, credit = true) => {
     const base = rereadFixtureRow("ready");
     const snap = base.snapshot as { invoice: Record<string, unknown> };
     return parseRun({ ...base, snapshot: { ...snap, invoice: { ...snap.invoice, is_credit_note: credit } }, proposal: { ...(base.proposal as Record<string, unknown>), header: { read, is_credit_note: credit } } });
@@ -218,8 +219,8 @@ describe("Idun 8050625 – fasit", () => {
     expect(lines).toHaveLength(2);
     expect(lines.map((l) => l.total_amount)).toEqual([310597.32, 19689.75]);
     expect(lines.every((l) => l.unit === "stk" && l.package_size == null)).toBe(true);
-    expect(lines[0].number_evidence.length).toBeGreaterThan(0);
-    const c = mapLine(lines[0], 0);
+    expect(lines[0].number_evidence?.length ?? 0).toBeGreaterThan(0);
+    const c = mapLine(Object.fromEntries(Object.entries(lines[0])), 0);
     expect(c.values.total_amount).toBe(310597.32);
     const sc = checkSum(lines, 330287.07, 381799.11, 51512.04);
     expect(sc.missing_amount).toBe(0);
