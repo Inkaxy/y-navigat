@@ -122,7 +122,7 @@ export function MaterialBlock(p: Props) {
         <Label htmlFor={`${p.idPrefix}-search`} className="text-caption">Søk i råvareregisteret</Label>
         <div className="relative mt-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-secondary" aria-hidden />
-          <Input id={`${p.idPrefix}-search`} value={p.search} onChange={(e) => p.onSearch(e.target.value)} placeholder="Navn eller varenummer" className="pl-9" />
+          <Input data-action="material-search" id={`${p.idPrefix}-search`} value={p.search} onChange={(e) => p.onSearch(e.target.value)} placeholder="Navn eller varenummer" className="pl-9" />
         </div>
         {p.searching && <Loader2 className="mx-auto my-2 h-4 w-4 animate-spin text-ink-secondary" aria-label="Søker" />}
       </div>

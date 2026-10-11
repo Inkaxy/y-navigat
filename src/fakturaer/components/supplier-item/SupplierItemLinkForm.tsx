@@ -8,6 +8,7 @@ import { useLinkSupplierItem, usePackageInference } from "@/fakturaer/hooks/useS
 import { MaterialBlock, type NewMaterialDraft } from "./MaterialBlock";
 import { PackageBlock } from "./PackageBlock";
 import { LinkResultBox } from "./LinkResultBox";
+import { AiSuggestion } from "./AiSuggestion";
 import { NOT_ITEM_REASONS, nameFromDescription, needsPackage, openScope, suggestedBaseUnit } from "@/fakturaer/lib/linkFormLogic";
 import { parseDecimal } from "@/fakturaer/lib/units";
 import type { LinkSupplierItemBody, LinkSupplierItemResult, SupplierItem, SupplierItemLine } from "@/fakturaer/lib/supplierItems";
@@ -19,6 +20,10 @@ interface Props {
   onDone?: (r: LinkSupplierItemResult) => void;
   onClose: () => void;
   onNext?: () => void;
+  /** Åpne «Ny råvare»-panelet i stedet for innebygd skjema. */
+  onCreateNew?: () => void;
+  /** Start med pakningen i endre-modus («Kontroller pakningen»). */
+  startEditingPackage?: boolean;
 }
 
 const Block = ({ n, title, children }: { n: number; title: string; children: React.ReactNode }) => (
@@ -29,7 +34,7 @@ const Block = ({ n, title, children }: { n: number; title: string; children: Rea
 );
 
 /** Én flate, tre blokker, én hovedknapp. */
-export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onClose, onNext }: Props) {
+export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onClose, onNext, onCreateNew, startEditingPackage = false }: Props) {
   const { data: company } = useCompany();
   const link = useLinkSupplierItem();
   const scope = openScope(lines);
@@ -42,7 +47,7 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
   const [draft, setDraft] = useState<NewMaterialDraft>({ name: nameFromDescription(item.description), itemType: "ravare", category: "", baseUnit: "stk", declarationName: "" });
   const [bupp, setBupp] = useState("");
   const [confirm, setConfirm] = useState(false);
-  const [editPkg, setEditPkg] = useState(false);
+  const [editPkg, setEditPkg] = useState(startEditingPackage);
   const [primary, setPrimary] = useState(false);
   const [notItem, setNotItem] = useState<string | null>(null);
   const [touched, setTouched] = useState({ baseUnit: false, bupp: false, confirm: false });
@@ -121,7 +126,7 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
         <MaterialBlock
           idPrefix={`si-${item.item_key}`}
           mode={mode}
-          onModeChange={setMode}
+          onModeChange={(m) => (m === "new" && onCreateNew ? onCreateNew() : setMode(m))}
           selected={selected.data ?? null}
           selectedId={selectedId}
           onSelect={setSelectedId}
@@ -133,6 +138,7 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
           draft={draft}
           onDraft={onDraft}
         />
+        {mode === "existing" && !item.rm_id && refLineId && <AiSuggestion lineId={refLineId} onPick={(id) => { setMode("existing"); setSelectedId(id); }} />}
       </Block>
       {pkgNeeded && baseUnit && (
         <Block n={2} title={`Hva inneholder én ${refLine?.unit ?? "pakning"}?`}>
@@ -163,8 +169,8 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
       {!canWrite && <p className="text-caption text-ink-secondary">Du har bare lesetilgang.</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
-      <div className="flex flex-wrap items-center gap-3 border-t border-line-subtle pt-4">
-        <Button type="button" onClick={onLink} disabled={disabled || materialLoading || !hasMaterial || !pkgValid}>
+      <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-3 border-t border-line-subtle bg-card px-4 py-3">
+        <Button type="button" data-primary-action onClick={onLink} disabled={disabled || materialLoading || !hasMaterial || !pkgValid}>
           {link.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />}
           {mode === "new" ? `Opprett råvare og koble ${n} ${n === 1 ? "linje" : "linjer"}` : `Koble og regn om ${n} ${n === 1 ? "linje" : "linjer"}`}
         </Button>
