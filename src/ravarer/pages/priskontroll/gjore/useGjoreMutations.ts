@@ -7,7 +7,7 @@ import { changeLinkErrorMessage, claimErrorMessage } from "./logic";
 import { parseChangeLink, parseClaimCredit, type ChangeLinkResult, type ClaimCreditResult } from "./rpc";
 
 import type { Json } from "@/integrations/supabase/types";
-import { claimSubmitError } from "@/ravarer/lib/supplierClaim";
+import { ClaimSubmitError, claimSubmitCode, claimSubmitError } from "@/ravarer/lib/supplierClaim";
 
 /** Valgt linje med nøyaktig serverkontrollert grunnlag fra rm_supplier_claim_preview. */
 type LineRef = { id: string; price_per_base_unit: Json; basis: Json };
@@ -41,7 +41,7 @@ export function useClaimCredit() {
       });
       if (error) {
         console.error("[claim-credit]", error);
-        throw new Error(/claim_|forbidden|linje_allerede/.test(error.message) ? claimSubmitError(error.message) : claimErrorMessage(error.message));
+        throw new ClaimSubmitError(claimSubmitCode(error.message), /claim_|forbidden|linje_allerede/.test(error.message) ? claimSubmitError(error.message) : claimErrorMessage(error.message));
       }
       return parseClaimCredit(data);
     },
