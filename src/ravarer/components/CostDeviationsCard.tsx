@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { QueryState } from "@/components/common/QueryState";
 import { useCompany } from "@/hooks/useCompany";
+import { useRavarerAccessLevel } from "@/ravarer/hooks/useRavarerAccessLevel";
 import { useCostDeviations, useRefreshCostPrices } from "@/ravarer/hooks/useCostPriceSource";
 import { formatDate, formatNok } from "@/ravarer/lib/constants";
 import { paths } from "@/ravarer/lib/paths";

@@ -1,3 +1,4 @@
+import { CostSourceInfo } from "@/ravarer/components/CostSourceInfo";
 import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -21,8 +22,6 @@ interface Props {
 const sourceLabel = (s: string | null) => PRICE_SOURCES.find((p) => p.value === s)?.label ?? s ?? "ukjent kilde";
 
 /** «Pris og leverandør» på råvarekortet — kun lesing + felles redigerere. */
-import { CostSourceInfo } from "@/ravarer/components/CostSourceInfo";
-
 export function PriceSupplierCard({ rm, canWrite, onEditLink }: Props) {
   const { data: links = [] } = useRawMaterialSuppliers(rm.id);
   const { data: all = [] } = useSuppliers();
