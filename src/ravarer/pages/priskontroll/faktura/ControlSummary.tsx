@@ -45,8 +45,7 @@ export function ControlSummary({ data, openCount, totalCount, canWrite, locked, 
   const invIssues = parseReadIssues(data.extraction_issues);
   const lineIssues = (data.invoice_lines ?? []).filter((l) => l.match_confidence !== "not_applicable" && parseReadIssues(l.extraction_issues).length > 0).length;
   const extractionFailed = data.line_extraction_status === "failed" && !!data.line_extraction_error;
-  const needsAttention = data.lines_sum_status === "mismatch" || invIssues.length > 0 || lineIssues > 0 || extractionFailed;
-  const [open, setOpen] = useState(needsAttention);
+  const [open, setOpen] = useState(extractionFailed);
   useEffect(() => { if (openSignal > 0) setOpen(true); }, [openSignal]);
   const f = controlFigures(data);
   const checked = sumOk(data.lines_sum_status);
@@ -68,7 +67,7 @@ export function ControlSummary({ data, openCount, totalCount, canWrite, locked, 
         </dl>
         <div className="flex items-center justify-between gap-2">
           <p className={cn("min-w-0 text-xs", readNote ? "text-warning" : "text-ink-secondary")}>
-            {readNote ?? (checked ? "Linjesummen er kontrollert mot fakturaen." : "Linjesummen er ikke kontrollert mot fakturaen ennå.")}
+            {readNote ?? (data.lines_sum_status === "mismatch" ? "Linjesummen stemmer ikke med fakturaen. Kontroller linjene mot originalen." : checked ? "Linjesummen er kontrollert mot fakturaen." : "Linjesummen er ikke kontrollert mot fakturaen ennå.")}
           </p>
           {!expanded && (
             <CollapsibleTrigger className="flex shrink-0 items-center gap-1 rounded-sm text-caption text-ink-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
