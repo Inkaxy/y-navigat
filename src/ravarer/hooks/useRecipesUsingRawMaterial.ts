@@ -46,7 +46,7 @@ export async function fetchRecipeUsage(rawMaterialId: string): Promise<RecipeUsa
     ]);
     if (recs.error) throw recs.error;
     allLines.push(...lines);
-    for (const r of recs.data ?? []) recipes.set(r.id, { name: r.name, status: r.status ?? null });
+    for (const r of recs.data ?? []) recipes.set(r.id, { name: r.name ?? "Uten navn", status: r.status ?? null });
   }
 
   const rmIds = Array.from(new Set(allLines.map((l) => l.raw_material_id).filter((v): v is string => !!v)));
