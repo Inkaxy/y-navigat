@@ -50,3 +50,39 @@ export async function fetchAllCounted<T extends { id: string }>(o: CountedFetchO
   if ((await exactCount(o.count)) !== expected) throw new IncompleteFetchError("changed");
   return out;
 }
+
+type CountedPage<T> = PromiseLike<{ data: T[] | null; error: unknown; count?: number | null }>;
+
+/**
+ * Offset-paginering som beviser fullstendighet: hver side ber om `count: "exact"` for samme filter,
+ * neste side starter fra FAKTISK mottatt antall (ikke forespurt sidestørrelse), og antallet må være
+ * likt på alle sider. Rader må ha unik `id` (stabil sortering med id som siste nøkkel).
+ * Tom side før antallet, duplikat eller endret antall kaster — aldri en delvis liste som komplett.
+ */
+export async function fetchAllRowsExact<T extends { id: string }>(
+  build: (from: number, to: number) => CountedPage<T>,
+  pageSize = 1000,
+  signal?: AbortSignal,
+): Promise<T[]> {
+  const out: T[] = [];
+  const seen = new Set<string>();
+  let expected: number | null = null;
+  for (;;) {
+    if (signal?.aborted) throw new IncompleteFetchError("aborted");
+    const r = await build(out.length, out.length + pageSize - 1);
+    if (r.error || !Array.isArray(r.data)) throw new IncompleteFetchError("page");
+    if (typeof r.count !== "number" || !Number.isInteger(r.count) || r.count < 0) throw new IncompleteFetchError("count");
+    if (expected == null) expected = r.count;
+    else if (r.count !== expected) throw new IncompleteFetchError("changed");
+    if (out.length >= expected) break;
+    if (r.data.length === 0) throw new IncompleteFetchError("early_end");
+    for (const row of r.data) {
+      if (typeof row.id !== "string" || seen.has(row.id)) throw new IncompleteFetchError("order");
+      seen.add(row.id);
+      out.push(row);
+    }
+    if (out.length > expected) throw new IncompleteFetchError("overflow");
+    if (out.length === expected) break;
+  }
+  return out;
+}

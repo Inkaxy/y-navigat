@@ -25,13 +25,19 @@ export default function LagerHub() {
   const { legalEntityId } = useRavarer();
   const { data: summary } = useWorkSummary({ includeApproval: false });
   const tab = activeTabFrom(sp, "fane", [...LAGER_TABS], "beholdning") as LagerTab;
-  const [visited, setVisited] = useState<Set<LagerTab>>(() => new Set([tab]));
+  // Besøkte faner er bundet til selskapet. Nåværende fane er alltid med — også ved direkte
+  // inngang (`?fane=telling`) og etter selskapsbytte — så utkastet holdes montert.
+  const [visitedState, setVisitedState] = useState<{ entity: string | null; tabs: Set<LagerTab> }>(
+    () => ({ entity: legalEntityId ?? null, tabs: new Set([tab]) }),
+  );
+  const entity = legalEntityId ?? null;
+  const visited = visitedState.entity === entity ? visitedState.tabs : new Set<LagerTab>([tab]);
   useEffect(() => {
-    setVisited(prev => (prev.has(tab) ? prev : new Set(prev).add(tab)));
-  }, [tab]);
-  useEffect(() => {
-    setVisited(new Set());
-  }, [legalEntityId]);
+    setVisitedState(prev =>
+      prev.entity !== entity ? { entity, tabs: new Set([tab]) }
+        : prev.tabs.has(tab) ? prev : { entity, tabs: new Set(prev.tabs).add(tab) },
+    );
+  }, [tab, entity]);
 
   const pane = (id: LagerTab, node: JSX.Element) => {
     const keep = KEEP_ALIVE.includes(id) && visited.has(id);
@@ -55,7 +61,7 @@ export default function LagerHub() {
         {pane("telling", <Varetelling />)}
         {pane("bevegelser", <StockLedger />)}
         {pane("fortjeneste", <MarginTable />)}
-        {pane("bestilling", <ReorderSuggestions />)}
+        {pane("bestilling", <ReorderSuggestions standalone />)}
       </Suspense>
     </ModulePage>
   );

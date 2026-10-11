@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchAllRows } from "@/lib/supabasePaging";
+import { fetchAllRowsExact } from "@/lib/countedPaging";
 import { osloDateISOPlusDays } from "@/lib/osloDate";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 
@@ -19,7 +19,7 @@ export interface MissingQuantityLine {
   movement: MovementStatus;
 }
 
-type PageResult<T> = PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
+type PageResult<T> = PromiseLike<{ data: T[] | null; error: { message: string } | null; count?: number | null }>;
 
 /**
  * Diagnostikk: lagerførte videresalgsvarer, fakturadato siste 90 dager, samme selskap,
@@ -29,10 +29,10 @@ type PageResult<T> = PromiseLike<{ data: T[] | null; error: { message: string } 
  */
 export async function fetchMissingQuantityLines(legalEntityId: string): Promise<MissingQuantityLine[]> {
   type Rm = { id: string; name: string };
-  const rms = await fetchAllRows<Rm>((from, to) =>
+  const rms = await fetchAllRowsExact<Rm>((from, to) =>
     supabase
       .from("raw_materials")
-      .select("id, name")
+      .select("id, name", { count: "exact" })
       .eq("legal_entity_id", legalEntityId)
       .eq("is_resale_item", true)
       .eq("stock_tracking", true)
@@ -50,10 +50,10 @@ export async function fetchMissingQuantityLines(legalEntityId: string): Promise<
   const lines: Line[] = [];
   for (let i = 0; i < ids.length; i += 200) {
     const chunk = ids.slice(i, i + 200);
-    const part = await fetchAllRows<Line>((from, to) =>
+    const part = await fetchAllRowsExact<Line>((from, to) =>
       supabase
         .from("invoice_lines")
-        .select("id, invoice_id, description, quantity, unit, raw_material_id, invoice:invoices!inner(invoice_number, invoice_date, status, legal_entity_id)")
+        .select("id, invoice_id, description, quantity, unit, raw_material_id, invoice:invoices!inner(invoice_number, invoice_date, status, legal_entity_id)", { count: "exact" })
         .in("raw_material_id", chunk)
         .is("base_quantity", null)
         .gte("invoice.invoice_date", since)
@@ -67,14 +67,15 @@ export async function fetchMissingQuantityLines(legalEntityId: string): Promise<
   try {
     const lineIds = lines.map(l => l.id);
     for (let i = 0; i < lineIds.length; i += 300) {
-      type M = { source_id: string | null; movement_type: string; quantity_base: number | null };
-      const rows = await fetchAllRows<M>((from, to) =>
+      type M = { id: string; source_id: string | null; movement_type: string; quantity_base: number | null };
+      const rows = await fetchAllRowsExact<M>((from, to) =>
         supabase
           .from("stock_movements")
-          .select("source_id, movement_type, quantity_base")
+          .select("id, source_id, movement_type, quantity_base", { count: "exact" })
           .eq("source_table", "invoice_lines")
           .in("source_id", lineIds.slice(i, i + 300))
           .order("source_id")
+          .order("id")
           .range(from, to) as PageResult<M>,
       );
       for (const m of rows) {

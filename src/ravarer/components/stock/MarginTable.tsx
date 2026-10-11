@@ -1,3 +1,4 @@
+import { QueryState } from "@/components/common/QueryState";
 import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +12,8 @@ const kr = (n: number | null) =>
 
 /** «Fortjeneste» — dekningsbidrag per handelsvare, lavest dekningsgrad først. */
 export function MarginTable() {
-  const { data = [], isLoading } = useResaleMargins();
+  const marginsQuery = useResaleMargins();
+  const { data = [], isLoading } = marginsQuery;
   const [q, setQ] = useState("");
 
   const rows = useMemo(() => {
@@ -31,7 +33,7 @@ export function MarginTable() {
       <Card className="p-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-secondary" />
-          <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Søk vare eller solgt vare…" className="pl-9" />
+          <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Søk vare eller solgt vare…" aria-label="Søk i fortjeneste" className="h-[44px] pl-9 md:h-10" />
         </div>
       </Card>
 
@@ -39,6 +41,10 @@ export function MarginTable() {
         {isLoading ? (
           <div className="flex items-center justify-center p-12 text-ink-secondary">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Laster…
+          </div>
+        ) : marginsQuery.isError ? (
+          <div className="p-6">
+            <QueryState scope="ravarer:fortjeneste" isError error={marginsQuery.error} onRetry={() => void marginsQuery.refetch()}>{null}</QueryState>
           </div>
         ) : rows.length === 0 ? (
           <div className="p-12 text-center text-ink-secondary">Ingen handelsvarer å regne fortjeneste på ennå.</div>

@@ -5,15 +5,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
-import { ClipboardCheck, Info, Loader2, Package, Search, Trash } from "lucide-react";
+import { ClipboardCheck, Search, Trash } from "lucide-react";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useWorkSummary } from "@/ravarer/hooks/useWorkData";
 import { availabilityRank, useResaleStockStatus, type ResaleStockRow } from "@/ravarer/hooks/useResaleStock";
 import { StockAdjustDialog, type AdjustMode } from "@/ravarer/components/stock/StockAdjustDialog";
-import { StockMovementsSheet } from "@/ravarer/components/stock/StockMovementsSheet";
+import { StockPeek } from "@/ravarer/components/stock/StockPeek";
+import { DataTable, type Column } from "@/ravarer/ui/DataTable";
+import { SplitView } from "@/ravarer/ui/SplitView";
+import { Link } from "react-router-dom";
+import { paths } from "@/ravarer/lib/paths";
 import { formatDate, formatNumber } from "@/ravarer/lib/constants";
 import { AllStockTable } from "@/ravarer/components/stock/AllStockTable";
 
@@ -25,7 +29,8 @@ export default function LagerPage() {
   // Samme tall som Lager-merket i menyen og Beholdning-fanen (alle lagerførte, beholdning < min).
   const { data: summary } = useWorkSummary({ includeApproval: false });
   const belowMinAll = summary?.other.stock_below_min ?? null;
-  const { data: items = [], isLoading } = useResaleStockStatus();
+  const stockQuery = useResaleStockStatus();
+  const { data: items = [], isLoading } = stockQuery;
   const [sp, setSp] = useSearchParams();
   // Beholdning: «Videresalg» (standard) eller «Alle lagerførte» i adressen.
   const filter = sp.get("filter") === "alle" ? "alle" : "videresalg";
@@ -37,8 +42,16 @@ export default function LagerPage() {
       return p;
     }, { replace: true });
   const [q, setQ] = useState("");
+  // Valgt vare i adressen (`valgt=<råvare-id>`): peek fra 1280 px, full bredde under.
+  const selectedId = filter === "videresalg" ? sp.get("valgt") : null;
+  const setValgt = (id: string | null) =>
+    setSp(prev => {
+      const p = new URLSearchParams(prev);
+      if (id) p.set("valgt", id);
+      else p.delete("valgt");
+      return p;
+    }, { replace: true });
   const [selected, setSelected] = useState<ResaleStockRow | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -54,6 +67,37 @@ export default function LagerPage() {
       return a.name.localeCompare(b.name, "nb");
     });
   }, [items, q]);
+
+  const selectedRow = selectedId ? items.find(i => i.raw_material_id === selectedId) ?? null : null;
+
+  const columns: Column<ResaleStockRow>[] = [
+    { id: "name", header: "Vare", alwaysVisible: true, sortKey: r => r.name, cell: r => (
+      <span className="flex flex-col"><span className="font-medium">{r.name}</span><span className="font-mono text-xs text-ink-secondary">{r.sku}</span></span>
+    ) },
+    { id: "disp", header: "Disponibelt", align: "right", sortKey: r => r.disponibelt, cell: r => {
+      const rank = availabilityRank(r);
+      return (
+        <span className={`tabular-nums font-bold ${rank === 0 ? "text-destructive" : ""}`}>
+          {formatNumber(r.disponibelt, 3)} <span className="text-xs font-normal text-ink-secondary">{r.base_unit}</span>
+          {rank === 0 && <span className="block text-xs font-normal text-destructive">Solgt mer enn det finnes</span>}
+          {rank === 2 && <span className="block text-xs font-normal text-warning">Under 7 dager igjen</span>}
+        </span>
+      );
+    } },
+    { id: "beh", header: "Beholdning", align: "right", sortKey: r => r.beholdning, cell: r => <span className="tabular-nums">{formatNumber(r.beholdning, 3)}</span> },
+    { id: "res", header: "Reservert", align: "right", sortKey: r => r.reservert ?? 0, cell: r => <span className="tabular-nums text-ink-secondary">{r.reservert ? formatNumber(r.reservert, 3) : "—"}</span> },
+    { id: "min", header: "Min. beholdning", align: "right", sortKey: r => r.min_stock ?? -1, cell: r => <span className="tabular-nums text-ink-secondary">{r.min_stock == null ? "—" : formatNumber(r.min_stock, 3)}</span> },
+    { id: "dager", header: "Dager igjen", align: "right", sortKey: r => r.dager_igjen ?? Number.MAX_SAFE_INTEGER, cell: r => <span className="tabular-nums text-ink-secondary">{r.dager_igjen == null ? "—" : `${formatNumber(r.dager_igjen, 0)} dager`}</span> },
+    { id: "neste", header: "Neste levering", sortKey: r => r.neste_levering ?? "", cell: r => <span className="text-ink-secondary">{formatDate(r.neste_levering)}</span> },
+    { id: "sist", header: "Sist kjøpt", sortKey: r => r.sist_kjopt ?? "", cell: r => <span className="text-ink-secondary">{formatDate(r.sist_kjopt)}</span> },
+    { id: "verdi", header: "Lagerverdi", align: "right", sortKey: r => r.lagerverdi ?? -1, cell: r => <span className="tabular-nums">{kr(r.lagerverdi)}</span> },
+    { id: "act", header: "Handling", align: "right", cell: r => canWrite ? (
+      <span className="flex justify-end gap-1">
+        <Button size="sm" variant="outline" className="min-h-[44px] xl:min-h-8" onClick={() => openDialog(r, "count")}><ClipboardCheck className="mr-1.5 h-3.5 w-3.5" /> Telling</Button>
+        <Button size="sm" variant="ghost" className="min-h-[44px] xl:min-h-8" onClick={() => openDialog(r, "waste")}><Trash className="mr-1.5 h-3.5 w-3.5" /> Svinn</Button>
+      </span>
+    ) : null },
+  ];
 
   const negatives = rows.filter(r => r.disponibelt < 0).length;
   const belowMin = rows.filter(r => availabilityRank(r) === 1).length;
@@ -100,6 +144,7 @@ export default function LagerPage() {
           </Card>
         </div>
 
+        <div className="flex flex-wrap items-center justify-between gap-3">
         <div role="radiogroup" aria-label="Utvalg" className="inline-flex rounded-md border border-line-subtle p-1">
           {(["videresalg", "alle"] as const).map(v => (
             <button
@@ -113,6 +158,12 @@ export default function LagerPage() {
             </button>
           ))}
         </div>
+        {canWrite && (
+          <Button asChild variant="outline" className="min-h-[44px]">
+            <Link to={paths.lager({ fane: "telling" })}><ClipboardCheck className="mr-1.5 h-4 w-4" aria-hidden />Registrer telling</Link>
+          </Button>
+        )}
+        </div>
 
         {filter === "alle" ? (
           <AllStockTable />
@@ -120,15 +171,15 @@ export default function LagerPage() {
           <div className="space-y-5">
             <Card className="p-4">
               <div className="flex flex-wrap items-center gap-3">
-                <div className="relative flex-1 min-w-[220px]">
+                <div className="relative min-w-0 flex-1 sm:min-w-[220px]">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-secondary" />
-                  <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Søk navn eller SKU…" className="pl-9" />
+                  <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Søk navn eller SKU…" aria-label="Søk i lagerførte varer" className="h-[44px] pl-9 xl:h-10" />
                 </div>
                 {canWrite && rows.length > 0 && (
                   <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <ClipboardCheck className="mr-1.5 h-4 w-4" /> Registrer telling
+                      <Button variant="outline" size="sm" className="min-h-[44px] xl:min-h-9">
+                        <ClipboardCheck className="mr-1.5 h-4 w-4" /> Telling for én vare
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-[320px] p-0" align="end">
@@ -155,118 +206,52 @@ export default function LagerPage() {
               </div>
             </Card>
 
-            <Card className="overflow-hidden">
-              {isLoading ? (
-                <div className="flex items-center justify-center p-12 text-ink-secondary">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Laster…
+            <SplitView
+              selected={!!selectedId}
+              list={
+                <div className="space-y-2">
+                  <DataTable
+                    ariaLabel="Lagerførte handelsvarer"
+                    rows={stockQuery.data ? rows : undefined}
+                    columns={columns}
+                    getId={r => r.raw_material_id}
+                    isLoading={isLoading}
+                    error={stockQuery.error}
+                    onRetry={() => void stockQuery.refetch()}
+                    emptyText="Ingen handelsvarer med lagerføring ennå."
+                    activeId={selectedId}
+                    onActiveChange={id => setValgt(id)}
+                    onRowClick={r => setValgt(r.raw_material_id)}
+                    preferenceScope="ravarer:lager:kolonner"
+                    renderMobileCard={r => {
+                      const rank = availabilityRank(r);
+                      return (
+                        <div className="space-y-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="font-medium [overflow-wrap:anywhere]">{r.name}</span>
+                            <span className={`shrink-0 tabular-nums font-semibold ${rank === 0 ? "text-destructive" : ""}`}>{formatNumber(r.disponibelt, 3)} {r.base_unit}</span>
+                          </div>
+                          <div className="text-caption text-ink-secondary">
+                            Beholdning {formatNumber(r.beholdning, 3)} · min {r.min_stock == null ? "—" : formatNumber(r.min_stock, 3)} · {r.dager_igjen == null ? "dager ukjent" : `${formatNumber(r.dager_igjen, 0)} dager igjen`}
+                          </div>
+                          {rank === 0 && <div className="text-caption text-destructive">Solgt mer enn det finnes</div>}
+                          {rank === 1 && <div className="text-caption text-warning">Under minimum</div>}
+                          {rank === 2 && <div className="text-caption text-warning">Under 7 dager igjen</div>}
+                        </div>
+                      );
+                    }}
+                  />
+                  {stockQuery.data && rows.length > 0 && (
+                    <p className="text-sm text-ink-secondary">Samlet lagerverdi ({rows.length} varer): <span className="font-semibold tabular-nums text-ink-primary">{kr(totalValue)}</span></p>
+                  )}
                 </div>
-              ) : rows.length === 0 ? (
-                <div className="flex flex-col items-center justify-center p-12 text-center">
-                  <Package className="mb-3 h-10 w-10 text-ink-secondary" />
-                  <p className="text-ink-secondary">Ingen handelsvarer med lagerføring ennå.</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/30 text-left text-xs uppercase tracking-wider text-ink-secondary">
-                      <tr>
-                        <th className="px-4 py-3">Vare</th>
-                        <th className="px-4 py-3 text-right">Disponibelt</th>
-                        <th className="px-4 py-3 text-right">Beholdning</th>
-                        <th className="px-4 py-3 text-right">
-                          <Tooltip>
-                            <TooltipTrigger className="inline-flex items-center gap-1 uppercase">
-                              Reservert <Info className="h-3 w-3" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-[260px]">
-                              Bestilt av kunder på ordrer som ennå ikke er levert.
-                            </TooltipContent>
-                          </Tooltip>
-                        </th>
-                        <th className="px-4 py-3 text-right">Min. beholdning</th>
-                        <th className="px-4 py-3 text-right">Dager igjen</th>
-                        <th className="px-4 py-3">Neste levering</th>
-                        <th className="px-4 py-3">Sist kjøpt</th>
-                        <th className="px-4 py-3 text-right">Lagerverdi</th>
-                        <th className="px-4 py-3 text-right">Handling</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map(r => {
-                        const rank = availabilityRank(r);
-                        return (
-                          <tr
-                            key={r.raw_material_id}
-                            onClick={() => { setSelected(r); setSheetOpen(true); }}
-                            className={`cursor-pointer border-t border-line-subtle transition-colors hover:bg-muted/40 ${
-                              rank === 0 ? "bg-destructive/10" : rank === 1 ? "bg-warning/10" : ""
-                            }`}
-                          >
-                            <td className="px-4 py-3">
-                              <div className="font-medium">{r.name}</div>
-                              <div className="font-mono text-xs text-ink-secondary">{r.sku}</div>
-                            </td>
-                            <td className={`px-4 py-3 text-right tabular-nums text-base font-bold ${rank === 0 ? "text-destructive" : ""}`}>
-                              {formatNumber(r.disponibelt, 3)}{" "}
-                              <span className="text-xs font-normal text-ink-secondary">{r.base_unit}</span>
-                              {rank === 0 && (
-                                <div className="text-xs font-normal text-destructive">Solgt mer enn det finnes</div>
-                              )}
-                              {rank === 2 && (
-                                <div className="text-xs font-normal text-warning">Under 7 dager igjen</div>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-right tabular-nums">{formatNumber(r.beholdning, 3)}</td>
-                            <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">
-                              {r.reservert ? formatNumber(r.reservert, 3) : "—"}
-                            </td>
-                            <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">
-                              {r.min_stock == null ? "—" : formatNumber(r.min_stock, 3)}
-                            </td>
-                            <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">
-                              {r.dager_igjen == null ? "—" : `${formatNumber(r.dager_igjen, 0)} dager`}
-                            </td>
-                            <td className="px-4 py-3 text-ink-secondary">{formatDate(r.neste_levering)}</td>
-                            <td className="px-4 py-3 text-ink-secondary">{formatDate(r.sist_kjopt)}</td>
-                            <td className="px-4 py-3 text-right tabular-nums">{kr(r.lagerverdi)}</td>
-                            <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
-                              {canWrite && (
-                                <div className="flex justify-end gap-1">
-                                  <Button size="sm" variant="outline" onClick={() => openDialog(r, "count")}>
-                                    <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" /> Telling
-                                  </Button>
-                                  <Button size="sm" variant="ghost" onClick={() => openDialog(r, "waste")}>
-                                    <Trash className="mr-1.5 h-3.5 w-3.5" /> Svinn
-                                  </Button>
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                    <tfoot>
-                      <tr className="border-t-2 border-line-subtle bg-muted/30 font-semibold">
-                        <td className="px-4 py-3" colSpan={8}>
-                          Samlet lagerverdi ({rows.length} varer)
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums">{kr(totalValue)}</td>
-                        <td />
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              )}
-            </Card>
+              }
+              panel={<StockPeek row={selectedRow} canWrite={canWrite} onClose={() => setValgt(null)} onAdjust={openDialog} kr={kr} />}
+            />
 
           </div>
         )}
 
-        <StockMovementsSheet
-          open={sheetOpen}
-          onOpenChange={setSheetOpen}
-          rawMaterial={selected ? { id: selected.raw_material_id, name: selected.name, base_unit: selected.base_unit } : null}
-        />
         <StockAdjustDialog
           open={dialogOpen}
           onOpenChange={setDialogOpen}

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 type Row = Record<string, unknown>;
-const TABLES = vi.hoisted(() => ({ data: {} as Record<string, Row[]>, fail: new Set<string>(), writes: 0 }));
+const TABLES = vi.hoisted(() => ({ data: {} as Record<string, Row[]>, fail: new Set<string>(), writes: 0, cap: 1000 }));
 
 vi.mock("@/integrations/supabase/client", () => {
   const builder = (table: string) => {
@@ -9,7 +9,7 @@ vi.mock("@/integrations/supabase/client", () => {
     for (const m of ["select", "eq", "in", "is", "gte", "lte", "order"]) b[m] = () => b;
     for (const m of ["insert", "update", "upsert", "delete"]) b[m] = () => { TABLES.writes++; return b; };
     b.range = (from: number, to: number) =>
-      Promise.resolve(TABLES.fail.has(table) ? { data: null, error: { message: "nede" } } : { data: (TABLES.data[table] ?? []).slice(from, to + 1), error: null });
+      Promise.resolve(TABLES.fail.has(table) ? { data: null, error: { message: "nede" } } : { data: (TABLES.data[table] ?? []).slice(from, Math.min(to + 1, from + TABLES.cap)), error: null, count: (TABLES.data[table] ?? []).length });
     return b;
   };
   return { supabase: { from: (t: string) => builder(t), rpc: () => { TABLES.writes++; } } };
@@ -26,14 +26,15 @@ beforeEach(() => {
   TABLES.data = { raw_materials: [{ id: "rm", name: "Cola" }] };
   TABLES.fail = new Set();
   TABLES.writes = 0;
+  TABLES.cap = 1000;
 });
 
 describe("Mengde i baseenhet — diagnostikk", () => {
   it("live-lignende avstemte linjer med purchase 48/24 vises som «bevegelse registrert», uten skriving", async () => {
     TABLES.data.invoice_lines = [line("f338384e", "be7121b9", "A"), line("9237ee6c", "dbd30a3f", "B")];
     TABLES.data.stock_movements = [
-      { source_id: "f338384e", movement_type: "purchase", quantity_base: 48 },
-      { source_id: "9237ee6c", movement_type: "purchase", quantity_base: 24 },
+      { id: "m1", source_id: "f338384e", movement_type: "purchase", quantity_base: 48 },
+      { id: "m2", source_id: "9237ee6c", movement_type: "purchase", quantity_base: 24 },
     ];
     const rows = await fetchMissingQuantityLines("le");
     expect(rows).toHaveLength(2);
@@ -51,6 +52,12 @@ describe("Mengde i baseenhet — diagnostikk", () => {
     const rows = await fetchMissingQuantityLines("le");
     expect(rows).toHaveLength(1205);
     expect(rows.some(r => r.id === "l1204")).toBe(true);
+  });
+  it("serverens radgrense under sidestørrelsen: 201 rader med tak 200 gir alle, ikke 200", async () => {
+    TABLES.cap = 200;
+    TABLES.data.invoice_lines = Array.from({ length: 201 }, (_, i) => line(`l${String(i).padStart(4, "0")}`, "i", "A"));
+    const rows = await fetchMissingQuantityLines("le");
+    expect(rows).toHaveLength(201);
   });
   it("feil i linjeoppslag kastes (vises som feil, ikke tom liste)", async () => {
     TABLES.fail.add("invoice_lines");

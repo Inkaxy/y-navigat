@@ -68,3 +68,17 @@ export function useRavarer() {
   if (!ctx) throw new Error("useRavarer must be used within RavarerProvider");
   return ctx;
 }
+
+/**
+ * Kun for skrivebeskyttede forhåndsvisninger (`/forhandsvisning/*`): fast kontekst uten innlogging.
+ * Komponenter under denne skal ha egne inerte innganger; den gir ingen tilgang mot serveren.
+ */
+export function RavarerStaticProvider({ children, canWrite, legalEntityId = "preview-entity" }: { children: ReactNode; canWrite: boolean; legalEntityId?: string }) {
+  return (
+    <Ctx.Provider
+      value={{ loading: false, session: null, user: null, legalEntityId, hasLegalEntity: true, accessLevel: canWrite ? "write" : "read", canRead: true, canWrite, canDelete: false }}
+    >
+      {children}
+    </Ctx.Provider>
+  );
+}

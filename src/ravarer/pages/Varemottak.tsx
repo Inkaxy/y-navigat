@@ -164,7 +164,7 @@ export default function Varemottak() {
                       <td className="px-4 py-3 text-right tabular-nums">{formatNok(inv.total_amount)}</td>
                       <td className="px-4 py-3"><StatusBadges inv={inv} /></td>
                       <td className="px-4 py-3 text-right">
-                        <Button size="sm" variant="outline" onClick={() => setParam("valgt", inv.id)}>Se mottak</Button>
+                        <Button size="sm" variant="outline" className="min-h-[44px] md:min-h-9" onClick={() => setParam("valgt", inv.id)}>Se mottak</Button>
                       </td>
                     </tr>
                   ))}

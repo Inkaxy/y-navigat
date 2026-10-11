@@ -39,7 +39,7 @@ import {
   saveLocation,
   type CountDraft,
 } from "@/ravarer/lib/countDraft";
-import { discardCountSheet, fetchOpenCountSheet, saveCountSheet, type CountSheetPayload } from "@/ravarer/lib/countSheets";
+import { discardCountSheet, fetchOpenCountSheetResult, saveCountSheet, type CountSheetPayload } from "@/ravarer/lib/countSheets";
 import type { CountResult } from "@/ravarer/lib/countSubmission";
 import { useCountSubmission } from "./varetelling/useCountSubmission";
 import { CountResultDialog, CountSubmissionBanner, DraftSaveStatus, type ServerSaveState } from "./varetelling/CountPanels";
@@ -56,7 +56,7 @@ export default function Varetelling() {
     void stockQuery.refetch();
     void unitsQuery.refetch();
   };
-  const submission = useCountSubmission(legalEntityId);
+  const submission = useCountSubmission(legalEntityId, canWrite);
   const locked = submission.locked;
 
   const [q, setQ] = useState("");
@@ -78,6 +78,11 @@ export default function Varetelling() {
   const [opId, setOpId] = useState<string>(() => submission.pending?.opId ?? newOpId());
   // Generasjon for serverlagring: sene svar etter bokføring/forkasting ignoreres.
   const saveGen = useRef(0);
+  const [localSaveFailed, setLocalSaveFailed] = useState(false);
+  const [serverDraftLoad, setServerDraftLoad] = useState<"loading" | "done" | "error">("loading");
+  const [serverDraftReload, setServerDraftReload] = useState(0);
+  const dirtyRef = useRef(false);
+  dirtyRef.current = dirty;
 
   useEffect(() => {
     let cancelled = false;
@@ -88,8 +93,15 @@ export default function Varetelling() {
     }
     setDraftLoaded(true);
     if (!legalEntityId) return () => { cancelled = true; };
-    void fetchOpenCountSheet(legalEntityId, osloTodayISO()).then(sheet => {
-      if (cancelled || !sheet) return;
+    setServerDraftLoad("loading");
+    void fetchOpenCountSheetResult(legalEntityId, osloTodayISO()).then(res => {
+      if (cancelled) return;
+      if (res.kind === "error") { setServerDraftLoad("error"); return; }
+      setServerDraftLoad("done");
+      if (res.kind !== "draft") return;
+      const sheet = res.row;
+      // Et pågående redigert utkast erstattes aldri stille av et serverutkast.
+      if (dirtyRef.current) return;
       const serverNewer = !local || (sheet.updated_at && sheet.updated_at > local.savedAt);
       if (!serverNewer) return;
       setPendingDraft({
@@ -106,16 +118,17 @@ export default function Varetelling() {
     return () => {
       cancelled = true;
     };
-  }, [draftKey, legalEntityId]);
+  }, [draftKey, legalEntityId, serverDraftReload]);
 
   useEffect(() => {
-    if (locked || !shouldAutosave(draftLoaded, dirty)) return;
-    saveCountDraft(draftKey, { entries, lineNotes, note, opId, expected: frozen });
-  }, [draftKey, draftLoaded, dirty, entries, lineNotes, note, opId, frozen, locked]);
+    if (locked || !canWrite || !shouldAutosave(draftLoaded, dirty)) return;
+    setLocalSaveFailed(!saveCountDraft(draftKey, { entries, lineNotes, note, opId, expected: frozen }));
+  }, [draftKey, draftLoaded, dirty, entries, lineNotes, note, opId, frozen, locked, canWrite]);
 
-  // Serverlagring er sekundær; den stanses mens en innsending er uavklart.
+  // Serverlagring er sekundær; den stanses mens en innsending er uavklart og uten skrivetilgang.
+  // Tilgangstap avbryter en planlagt (ikke sendt) lagring via effektens opprydding.
   useEffect(() => {
-    if (locked || !draftLoaded || !legalEntityId || !user?.id || !dirty) return;
+    if (locked || !canWrite || !draftLoaded || !legalEntityId || !user?.id || !dirty) return;
     if (Object.keys(entries).length === 0) return;
     const payload: CountSheetPayload = { entries, lineNotes, expected: frozen, note };
     const gen = ++saveGen.current;
@@ -127,7 +140,7 @@ export default function Varetelling() {
       });
     }, 1500);
     return () => clearTimeout(t);
-  }, [locked, draftLoaded, legalEntityId, user?.id, dirty, entries, lineNotes, frozen, note, opId]);
+  }, [locked, canWrite, draftLoaded, legalEntityId, user?.id, dirty, entries, lineNotes, frozen, note, opId]);
 
   const categories = useMemo(
     () => Array.from(new Set(rows.map(r => r.category).filter((c): c is string => !!c))).sort((a, b) => a.localeCompare(b, "nb")),
@@ -197,7 +210,7 @@ export default function Varetelling() {
   };
 
   const submit = async () => {
-    if (locked || !legalEntityId || needsBaseline.size > 0) return;
+    if (locked || !canWrite || !legalEntityId || needsBaseline.size > 0) return;
     const inputs = filled
       .map(r => ({
         raw_material_id: r.raw_material_id,
@@ -239,7 +252,7 @@ export default function Varetelling() {
 
   const releaseSubmission = () => {
     const kind = submission.state.kind === "rejected" ? submission.state.error.kind : null;
-    if (!submission.release()) return;
+    if (!canWrite || !submission.release()) return;
     // Bare bevist innholdskonflikt krever ny ID; den byttes som følge av brukerens eksplisitte valg.
     if (kind === "content") setOpId(newOpId());
   };
@@ -271,7 +284,23 @@ export default function Varetelling() {
     <div className="space-y-5 pb-4">
       <RavarerHeaderBanner />
 
-      <CountSubmissionBanner pending={submission.pending} state={submission.state} onRetry={() => void retrySubmission()} onRelease={releaseSubmission} canWrite={canWrite} />
+      <CountSubmissionBanner
+        pending={submission.pending}
+        state={submission.state}
+        onRetry={() => void retrySubmission()}
+        onRelease={releaseSubmission}
+        onReconcile={() => void submission.reconcile()}
+        canWrite={canWrite}
+        stockRefreshFailed={stockQuery.isError}
+        stockRefreshing={stockQuery.isFetching}
+      />
+
+      {serverDraftLoad === "error" && (
+        <Card role="alert" className="flex flex-wrap items-center justify-between gap-3 border-warning/50 p-4 text-sm">
+          <span>Kunne ikke sjekke om det finnes et lagret utkast på serveren. Lokalt utkast er beholdt.</span>
+          <Button variant="outline" className="min-h-[44px]" onClick={() => setServerDraftReload(n => n + 1)}>Prøv igjen</Button>
+        </Card>
+      )}
 
       {pendingDraft && !locked && (
         <Card className="flex flex-wrap items-center justify-between gap-3 border-warning/50 p-4">
@@ -282,7 +311,9 @@ export default function Varetelling() {
             <Button
               variant="outline"
               className="min-h-[44px]"
+              disabled={!canWrite}
               onClick={() => {
+                if (!canWrite) return;
                 setDirty(false);
                 clearCountDraft(draftKey);
                 if (draftSource === "server") void discardCountSheet(pendingDraft.opId);
@@ -293,7 +324,9 @@ export default function Varetelling() {
             </Button>
             <Button
               className="min-h-[44px]"
+              disabled={!canWrite}
               onClick={() => {
+                if (!canWrite) return;
                 setDirty(true);
                 setEntries(pendingDraft.entries);
                 setLineNotes(pendingDraft.lineNotes);
@@ -395,7 +428,7 @@ export default function Varetelling() {
           />
         </Card>
       ) : (
-        <fieldset disabled={locked} aria-label="Telleliste" className="space-y-3 disabled:opacity-70">
+        <fieldset disabled={locked || !canWrite} aria-label="Telleliste" className="space-y-3 disabled:opacity-70">
           {visible.map(r => {
             const counted = countedBase(r);
             const diff = counted == null ? null : counted - expectedFor(r);
@@ -477,14 +510,14 @@ export default function Varetelling() {
       )}
 
       <Card className="sticky bottom-0 z-10 space-y-3 p-4 shadow-lg sm:bottom-4">
-        <fieldset disabled={locked}>
+        <fieldset disabled={locked || !canWrite}>
           <Label className="text-xs" htmlFor="count-note">Notat på tellingen</Label>
           <Textarea id="count-note" value={note} onChange={e => { setDirty(true); setNote(e.target.value); }} rows={2} placeholder="F.eks. «Månedstelling tørrvarelager»" />
         </fieldset>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <p className="text-sm text-ink-secondary">{filled.length} varer talt opp. Varer uten tall hoppes over.</p>
-            <DraftSaveStatus hasDraft={hasDraft && dirty} server={serverSave} />
+            <DraftSaveStatus hasDraft={hasDraft && dirty} server={serverSave} localFailed={localSaveFailed} />
           </div>
           <Button variant="outline" className="min-h-[44px] w-full sm:w-auto" onClick={() => setConfirmZero(true)} disabled={!canWrite || locked || restCount === 0}>
             Sett resten til 0
@@ -512,7 +545,7 @@ export default function Varetelling() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="min-h-[44px]">Avbryt</AlertDialogCancel>
-            <AlertDialogAction className="min-h-[44px]" onClick={setRestToZero}>Sett til 0</AlertDialogAction>
+            <AlertDialogAction className="min-h-[44px]" disabled={!canWrite || locked} onClick={() => { if (canWrite && !locked) setRestToZero(); }}>Sett til 0</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

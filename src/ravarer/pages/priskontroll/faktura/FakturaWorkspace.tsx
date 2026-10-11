@@ -125,6 +125,10 @@ export default function FakturaWorkspace() {
   // `?linje=<id>`: åpne nøyaktig denne linjen (også lukkede). Ukjent ID velger aldri en annen linje.
   const targetLine = sp.get("linje");
   const [lineNotice, setLineNotice] = useState<string | null>(null);
+  /** Ugyldig mål: ingen annen linje vises som valgt før brukeren selv velger en. */
+  const [suppressActive, setSuppressActive] = useState(false);
+  /** Gyldig mål i lagret tabellvisning: arbeidslisten åpnes for denne økten så målet er synlig valgt. */
+  const [forceList, setForceList] = useState(false);
   const handledTarget = useRef<string | null>(null);
   useEffect(() => {
     if (!targetLine || !q.linesQuery.isSuccess) return;
@@ -138,7 +142,10 @@ export default function FakturaWorkspace() {
       setInspectorOpen(true);
       setZone("linjer");
       setLineNotice(null);
+      setSuppressActive(false);
+      setForceList(true);
     } else {
+      setSuppressActive(true);
       setLineNotice("Linjen fra lenken finnes ikke på denne fakturaen eller er ikke tilgjengelig for deg. Ingen annen linje er valgt.");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -205,7 +212,7 @@ export default function FakturaWorkspace() {
   const keys = useMemo(() => ({
     enabled: !!data && !anyDialog,
     canWrite: lineWrite,
-    activeLine: q.activeLine,
+    activeLine: suppressActive ? null : q.activeLine,
     next: () => q.dispatch({ type: "next" }),
     prev: () => q.dispatch({ type: "prev" }),
     enter: (l: typeof q.activeLine) => {
@@ -220,7 +227,7 @@ export default function FakturaWorkspace() {
     escape: () => (docShown && !wide ? toggleDoc() : setInspectorOpen(false)),
     help: () => setHelpOpen(true),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [data, anyDialog, q.activeLine, q.accept, q.undo, lineWrite, docOpen, docShown, wide, isMobile]);
+  }), [data, anyDialog, q.activeLine, suppressActive, q.accept, q.undo, lineWrite, docOpen, docShown, wide, isMobile]);
   useWorkspaceHotkeys(keys);
 
   if (!id) return null;
@@ -228,7 +235,8 @@ export default function FakturaWorkspace() {
     return <QueryState scope="faktura-arbeidsflate" isLoading={detail.isLoading} isError={detail.isError || (!detail.isLoading && !data)} error={detail.error} onRetry={() => void detail.refetch()}>{null}</QueryState>;
   }
 
-  const active = q.activeLine;
+  const active = suppressActive ? null : q.activeLine;
+  const showTable = tableView && !forceList;
   const linesById = new Map((data.invoice_lines ?? []).map((l) => [l.id, l]));
   // Kallerens EGEN radversjon/råvare binder statusen. Lånes aldri fra en annen cache; mangler den, er prisen ukjent.
   const gateFor = ownLineGate(safety.gateFor, data.id);
@@ -260,9 +268,9 @@ export default function FakturaWorkspace() {
       {s.result && <ResultBox title={s.result.title} items={s.result.items} onUndo={s.result.undoable && q.undoEntry ? () => { s.setResult(null); void q.undo(); } : undefined} onNext={() => s.setResult(null)} nextLabel="Lukk" />}
       {lastLinked && <SimilarLinesHint rmsId={lastLinked.rmsId} name={lastLinked.name} onOpen={() => q.setBulkLink(lastLinked)} onDismiss={() => setLastLinked(null)} />}
       <div className="flex justify-end">
-        <Button variant="ghost" size="sm" aria-pressed={tableView} onClick={() => setTableView(!tableView)}>{tableView ? "Vis arbeidsliste" : "Vis som tabell"}</Button>
+        <Button variant="ghost" size="sm" aria-pressed={showTable} onClick={() => { setForceList(false); setTableView(!showTable); }}>{showTable ? "Vis arbeidsliste" : "Vis som tabell"}</Button>
       </div>
-      {tableView ? (
+      {showTable ? (
         <InvoiceLinesTable
           lines={data.invoice_lines ?? []}
           supplierId={data.supplier_id}
@@ -299,7 +307,7 @@ export default function FakturaWorkspace() {
           onRetry={() => void q.linesQuery.refetch()}
           emptyTitle={q.showOnlyOpen || q.reason !== "all" ? (q.total > 0 ? "Ingen linjer passer filteret" : "Ingen linjer må avklares") : "Fakturaen har ingen linjer"}
           activeLine={active}
-          onSelect={(l) => { q.dispatch({ type: "focus", id: l.id }); setInspectorOpen(true); }}
+          onSelect={(l) => { setSuppressActive(false); q.dispatch({ type: "focus", id: l.id }); setInspectorOpen(true); }}
           onPrev={() => q.dispatch({ type: "prev" })}
           onNext={() => q.dispatch({ type: "next" })}
           selected={q.selected}

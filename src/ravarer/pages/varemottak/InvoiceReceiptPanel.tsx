@@ -1,4 +1,6 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { ReceiveOutcomeUnknownError } from "@/ravarer/lib/receiptStatus";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -23,27 +25,41 @@ export function InvoiceReceiptPanel({
   invoiceNumber,
   onClose,
   canWrite,
+  fixture,
 }: {
   invoiceId: string | null;
   invoiceNumber: string;
   onClose: () => void;
   canWrite: boolean;
+  /** Bare skrivebeskyttet forhåndsvisning: faste linjer, ingen nettverk; handlinger rapporteres via `onAction`. */
+  fixture?: { lines: ReceiptLine[]; onAction: (message: string) => void };
 }) {
-  const linesQuery = useReceiptLines(invoiceId ?? undefined);
-  const lines = useMemo(() => linesQuery.data ?? [], [linesQuery.data]);
-  const [deviationLine, setDeviationLine] = useState<ReceiptLine | null>(null);
-  const [packageLine, setPackageLine] = useState<ReceiptLine | null>(null);
+  const linesQuery = useReceiptLines(fixture ? undefined : invoiceId ?? undefined);
+  const lines = useMemo(() => fixture?.lines ?? linesQuery.data ?? [], [fixture, linesQuery.data]);
+  const { legalEntityId } = useRavarer();
+  /** Underdialoger fryser opprinnelsen (selskap + faktura + linje). */
+  type Ctx = { entity: string | null; invoiceId: string; line: ReceiptLine };
+  const [deviationCtx, setDeviationCtx] = useState<Ctx | null>(null);
+  const [packageCtx, setPackageCtx] = useState<Ctx | null>(null);
   const [rematching, setRematching] = useState(false);
   const qc = useQueryClient();
+  const live = useRef({ entity: legalEntityId ?? null, invoiceId, canWrite, mounted: true });
+  live.current = { ...live.current, entity: legalEntityId ?? null, invoiceId, canWrite };
+  useEffect(() => { live.current.mounted = true; return () => { live.current.mounted = false; }; }, []);
+  // Ny faktura, nytt selskap eller tapt skrivetilgang: foreldede underdialoger lukkes.
+  useEffect(() => { setDeviationCtx(null); setPackageCtx(null); }, [invoiceId, legalEntityId, canWrite]);
+  const isCurrent = (c: Ctx) => live.current.mounted && live.current.canWrite && live.current.entity === c.entity && live.current.invoiceId === c.invoiceId;
+  const ctxFor = (l: ReceiptLine): Ctx | null => (invoiceId ? { entity: legalEntityId ?? null, invoiceId, line: l } : null);
 
-  /** Kun etter bekreftet pakningsendring: regn om akkurat denne linja. */
-  const rematchLine = async (line: ReceiptLine) => {
-    if (!invoiceId) return;
+  /** Kun etter bekreftet pakningsendring: regn om akkurat denne linja i dens egen faktura. */
+  const rematchLine = async (c: Ctx) => {
+    // Ingen ny sideeffekt hvis konteksten er borte eller tilgangen tapt.
+    if (!isCurrent(c)) return;
     setRematching(true);
     try {
-      const { error } = await supabase.functions.invoke("match-invoice-lines", { body: { invoice_id: invoiceId, line_ids: [line.id] } });
+      const { error } = await supabase.functions.invoke("match-invoice-lines", { body: { invoice_id: c.invoiceId, line_ids: [c.line.id] } });
       if (error) throw error;
-      await qc.invalidateQueries({ queryKey: ["receipt-lines", invoiceId] });
+      await qc.invalidateQueries({ queryKey: ["receipt-lines", c.invoiceId] });
       toast.success("Linja er regnet om på nytt");
     } catch (e) {
       console.warn("[varemottak] omregning feilet", e);
@@ -56,17 +72,20 @@ export function InvoiceReceiptPanel({
   return (
     <>
       <Dialog open={!!invoiceId} onOpenChange={v => !v && onClose()}>
-        <DialogContent className="flex max-h-[92vh] max-w-4xl flex-col gap-0 p-0">
-          <DialogHeader className="border-b border-line-subtle p-4">
+        <DialogContent
+          className="flex w-[calc(100vw-1rem)] min-w-0 max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:p-0"
+          closeClassName="right-1 top-1 inline-flex h-[44px] w-[44px] items-center justify-center"
+        >
+          <DialogHeader className="min-w-0 border-b border-line-subtle p-4 pr-14">
             <DialogTitle>Mottak — faktura {invoiceNumber}</DialogTitle>
           </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            {linesQuery.isLoading || linesQuery.isError ? (
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4">
+            {!fixture && (linesQuery.isLoading || linesQuery.isError) ? (
               <QueryState scope="ravarer:varemottak-linjer" isLoading={linesQuery.isLoading} isError={linesQuery.isError} error={linesQuery.error} onRetry={() => void linesQuery.refetch()} />
             ) : lines.length === 0 ? (
               <p className="text-sm text-ink-secondary">Fakturaen har ingen linjer.</p>
             ) : (
-              <ul className="space-y-3" aria-label="Fakturalinjer">
+              <ul className="min-w-0 space-y-3" aria-label="Fakturalinjer">
                 {lines.map(l => (
                   <ReceiptLineCard
                     key={l.id}
@@ -75,30 +94,36 @@ export function InvoiceReceiptPanel({
                     invoiceNumber={invoiceNumber}
                     canWrite={canWrite}
                     busy={rematching}
-                    onDeviation={() => setDeviationLine(l)}
-                    onPackage={() => setPackageLine(l)}
+                    readAt={linesQuery.dataUpdatedAt}
+                    reading={linesQuery.isFetching}
+                    readFailed={linesQuery.isError}
+                    onReread={() => void linesQuery.refetch()}
+                    onFixtureReceive={fixture ? (msg) => fixture.onAction(msg) : undefined}
+                    onDeviation={() => { if (fixture) fixture.onAction(`Avvik for ${l.description ?? l.id} åpnes ikke i forhåndsvisningen.`); else if (canWrite) setDeviationCtx(ctxFor(l)); }}
+                    onPackage={() => { if (fixture) fixture.onAction("Pakning åpnes ikke i forhåndsvisningen."); else if (canWrite) setPackageCtx(ctxFor(l)); }}
                   />
                 ))}
               </ul>
             )}
           </div>
-          <DialogFooter className="border-t border-line-subtle p-4">
+          <DialogFooter className="min-w-0 border-t border-line-subtle p-4">
             <Button variant="outline" className="min-h-[44px]" onClick={onClose}>Lukk</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <DeviationDialog line={deviationLine} invoiceNumber={invoiceNumber} onClose={() => setDeviationLine(null)} />
+      <DeviationDialog line={deviationCtx?.line ?? null} invoiceNumber={invoiceNumber} onClose={() => setDeviationCtx(null)} />
       <PackageEditor
-        open={!!packageLine}
-        row={packageLine ? receiptLineAsWorklistRow(packageLine) : null}
+        open={!!packageCtx}
+        row={packageCtx ? receiptLineAsWorklistRow(packageCtx.line) : null}
         onOpenChange={v => {
-          if (!v) setPackageLine(null);
+          if (!v) setPackageCtx(null);
         }}
         onApplied={() => {
-          // Rematch bare når pakningen faktisk ble lagret, aldri ved avbrutt dialog.
-          const line = packageLine;
-          if (line) void rematchLine(line);
+          // Rematch bare når pakningen faktisk ble lagret, aldri ved avbrutt dialog,
+          // og bare for den frosne opprinnelsen mens den fortsatt er gjeldende.
+          const c = packageCtx;
+          if (c) void rematchLine(c);
         }}
       />
     </>
@@ -111,19 +136,35 @@ function ReceiptLineCard({
   invoiceNumber,
   canWrite,
   busy,
+  readAt = 0,
+  reading = false,
+  readFailed = false,
+  onReread,
+  onFixtureReceive,
   onDeviation,
   onPackage,
 }: {
+  onFixtureReceive?: (message: string) => void;
   line: ReceiptLine;
   invoiceId: string;
   invoiceNumber: string;
   canWrite: boolean;
   busy: boolean;
+  /** Tidspunkt for siste vellykkede autoritative lesing av linjene. */
+  readAt?: number;
+  reading?: boolean;
+  readFailed?: boolean;
+  onReread?: () => void;
   onDeviation: () => void;
   onPackage: () => void;
 }) {
   const receive = useReceiveInvoiceLine();
   const sending = useRef(false);
+  /** Ukjent utfall: frosset til en vellykket lesing ETTER forsøket er fullført. */
+  const [unknownAt, setUnknownAt] = useState<number | null>(null);
+  const resolved = unknownAt != null && readAt > unknownAt && !reading && !readFailed;
+  useEffect(() => { if (resolved) setUnknownAt(null); }, [resolved]);
+  const frozenUnknown = unknownAt != null && !resolved;
   const [lot, setLot] = useState("");
   const [bestBefore, setBestBefore] = useState("");
   const state = receiptState(line);
@@ -132,7 +173,11 @@ function ReceiptLineCard({
   const id = `rl-${line.id}`;
 
   const confirm = () => {
-    if (sending.current || state.kind !== "receivable" || !lotCheck.ok || !dateCheck.ok || !line.raw_material_id) return;
+    if (sending.current || frozenUnknown || reading || !canWrite || state.kind !== "receivable" || !lotCheck.ok || !dateCheck.ok || !line.raw_material_id) return;
+    if (onFixtureReceive) {
+      onFixtureReceive(`Ville sendt rm_receive_invoice_line for linje ${line.id} (parti ${lotCheck.value ?? "—"}, best før ${dateCheck.value ?? "—"}).`);
+      return;
+    }
     sending.current = true;
     // Linje, parti og dato fryses i dette kallet; serveren bestemmer mengden.
     receive.mutate(
@@ -144,12 +189,15 @@ function ReceiptLineCard({
         lot_number: state.credit ? null : lotCheck.value,
         best_before: state.credit ? null : dateCheck.value,
       },
-      { onSettled: () => { sending.current = false; } },
+      {
+        onError: e => { if (e instanceof ReceiveOutcomeUnknownError) setUnknownAt(Date.now()); },
+        onSettled: () => { sending.current = false; },
+      },
     );
   };
 
   return (
-    <li className="rounded-lg border border-line-subtle p-3">
+    <li className="min-w-0 rounded-lg border border-line-subtle p-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="break-words font-medium">{line.raw_material_name ?? line.description ?? "Uten beskrivelse"}</p>
@@ -171,12 +219,12 @@ function ReceiptLineCard({
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <Label htmlFor={`${id}-lot`} className="text-xs">Partinummer (valgfritt)</Label>
-                <Input id={`${id}-lot`} value={lot} onChange={e => setLot(e.target.value)} className="h-[44px]" aria-invalid={!lotCheck.ok} />
+                <Input id={`${id}-lot`} value={lot} disabled={frozenUnknown} onChange={e => setLot(e.target.value)} className="h-[44px] min-w-0" aria-invalid={!lotCheck.ok} />
                 {!lotCheck.ok && <p className="mt-1 text-xs text-destructive">{lotCheck.message}</p>}
               </div>
               <div>
                 <Label htmlFor={`${id}-bf`} className="text-xs">Best før (valgfritt)</Label>
-                <Input id={`${id}-bf`} type="date" value={bestBefore} onChange={e => setBestBefore(e.target.value)} className="h-[44px]" aria-invalid={!dateCheck.ok} />
+                <Input id={`${id}-bf`} type="date" value={bestBefore} disabled={frozenUnknown} onChange={e => setBestBefore(e.target.value)} className="h-[44px] min-w-0" aria-invalid={!dateCheck.ok} />
                 {!dateCheck.ok && <p className="mt-1 text-xs text-destructive">{dateCheck.message}</p>}
               </div>
             </div>
@@ -189,7 +237,16 @@ function ReceiptLineCard({
             {state.hasMovement === null && " Lagerbevegelse er ukjent — serveren kontrollerer og fører aldri dobbelt."}
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button className="min-h-[44px] flex-1 sm:flex-none" disabled={receive.isPending || !lotCheck.ok || !dateCheck.ok} onClick={confirm}>
+            {frozenUnknown && (
+              <div role="alert" className="w-full space-y-2 text-xs">
+                <p className="text-warning">
+                  Utfallet er ukjent — mottaket kan være registrert. Status må leses på nytt før du kan prøve igjen.
+                  {reading ? " Leser status …" : readFailed ? " Lesingen feilet." : ""}
+                </p>
+                {onReread && <Button variant="outline" className="min-h-[44px]" disabled={reading} onClick={onReread}>Les status på nytt</Button>}
+              </div>
+            )}
+            <Button className="min-h-[44px] flex-1 sm:flex-none" disabled={receive.isPending || frozenUnknown || reading || !lotCheck.ok || !dateCheck.ok} onClick={confirm}>
               {receive.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
               {state.credit ? "Bekreft retur" : "Bekreft mottak"}
             </Button>

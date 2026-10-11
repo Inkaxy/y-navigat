@@ -99,16 +99,19 @@ export function loadCountDraft(key: string): CountDraft | null {
   }
 }
 
-export function saveCountDraft(key: string, draft: Omit<CountDraft, "savedAt" | "legacyBaseline">): void {
+/** Returnerer false når lokal lagring feilet (full disk/privat modus) — vises for brukeren. */
+export function saveCountDraft(key: string, draft: Omit<CountDraft, "savedAt" | "legacyBaseline">): boolean {
   try {
     const payload: CountDraft = { ...draft, legacyBaseline: false, savedAt: new Date().toISOString() };
     if (!draftHasContent(payload)) {
       localStorage.removeItem(key);
-      return;
+      return true;
     }
     localStorage.setItem(key, JSON.stringify(payload));
-  } catch {
-    // Full disk eller privat modus: tellingen fungerer fortsatt i denne økten.
+    return true;
+  } catch (e) {
+    console.warn("[varetelling] kunne ikke lagre utkast lokalt", e);
+    return false;
   }
 }
 
