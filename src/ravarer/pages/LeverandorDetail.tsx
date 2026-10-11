@@ -1,640 +1,102 @@
-import { QueryState } from "@/components/common/QueryState";
-import { useMemo, useState, useEffect } from "react";
-import { SupplierItemStatusChips } from "@/fakturaer/components/supplier-item/SupplierItemStatusChips";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useCallback, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  ArrowLeft,
-  Loader2,
-  Truck,
-  Package,
-  FileText,
-  Tags,
-  Search,
-  ArrowUpDown,
-  AlertTriangle,
-} from "lucide-react";
+import { QueryState } from "@/components/common/QueryState";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { cn } from "@/lib/utils";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
-import { OrderDeskKpi } from "@/ordre/components/dashboard/OrderDeskKpi";
-import { Boxes, CalendarClock, CalendarDays, PieChart, TrendingUp, Wallet } from "lucide-react";
-import { PriceTimeline } from "@/ravarer/components/PriceTimeline";
-import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
-import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
-import { formatNok, formatDate, formatNumber } from "@/ravarer/lib/constants";
-import { useRavarer } from "@/ravarer/context/RavarerContext";
-import {
-  useSupplier,
-  useSupplierItems,
-  useSupplierInvoices,
-  useSupplierSpend,
-  useSupplierAliases,
-  useUpdateSupplierNotes,
-  useTotalSpend,
-  useSupplierPriceIndex,
-  type SupplierItemRow,
-} from "@/ravarer/hooks/useSupplierDetail";
-import { useTimelineHistory } from "@/ravarer/hooks/useRmSuppliers";
-import { isAgreementConfirmed } from "@/ravarer/lib/priceTimeline";
 import { SupplierDialog } from "@/ravarer/components/NewSupplierDialog";
-import { AgreementDocumentLink } from "@/ravarer/components/AgreementDocumentLink";
-import { getAgreementStatus } from "@/ravarer/lib/agreementStatus";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { useSupplier } from "@/ravarer/hooks/useSupplierDetail";
 import { paths } from "@/ravarer/lib/paths";
+import {
+  listReturnSearch, readSupplierSection, supplierSectionSearch, SUPPLIER_SECTION_LABEL, SUPPLIER_SECTIONS, type SupplierSectionId,
+} from "@/ravarer/lib/supplierSections";
+import { SupplierOverviewSection } from "@/ravarer/components/supplier/SupplierOverviewSection";
+import { SupplierItemsSection } from "@/ravarer/components/supplier/SupplierItemsSection";
+import { SupplierAgreementsSection } from "@/ravarer/components/supplier/SupplierAgreementsSection";
+import { SupplierInvoicesSection } from "@/ravarer/components/supplier/SupplierInvoicesSection";
+import { SupplierAliasesSection } from "@/ravarer/components/supplier/SupplierAliasesSection";
+import { SupplierNegotiationsSection } from "@/ravarer/components/supplier/SupplierNegotiationsSection";
+import { SupplierNotesSection } from "@/ravarer/components/supplier/SupplierNotesSection";
 
-type ItemSort = { key: "name" | "price"; dir: "asc" | "desc" };
-
-
-function EmptyTab({ icon: Icon, text }: { icon: typeof Package; text: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center p-12 text-center">
-      <Icon className="mb-3 h-10 w-10 text-ink-secondary" />
-      <p className="text-ink-secondary">{text}</p>
-    </div>
-  );
-}
-
+/** Leverandørkortet: samme seksjonsramme som råvarekortet (`?seksjon=`), med listekontekst i `?liste=`. */
 export default function LeverandorDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const [sp] = useSearchParams();
   const navigate = useNavigate();
-  const { canWrite, legalEntityId } = useRavarer();
+  const { canWrite } = useRavarer();
   const [editOpen, setEditOpen] = useState(false);
-
-  const { data: supplier, isLoading } = useSupplier(id);
-  const { data: items = [], isLoading: itemsLoading } = useSupplierItems(id);
-  const [invoiceLimit, setInvoiceLimit] = useState(50);
-  const { data: invoiceData, isLoading: invoicesLoading } = useSupplierInvoices(id, invoiceLimit);
-  const { data: spend } = useSupplierSpend(id);
-  const { data: totalSpend } = useTotalSpend(legalEntityId);
-  const { data: priceIndex } = useSupplierPriceIndex(id);
-  const linkIds = useMemo(() => items.map((i) => i.id), [items]);
-  const { data: aliases = [], isLoading: aliasesLoading } = useSupplierAliases(linkIds);
-
-  const [notes, setNotes] = useState("");
   const [notesDirty, setNotesDirty] = useState(false);
-  const saveNotes = useUpdateSupplierNotes(id);
-  useEffect(() => {
-    if (supplier && !notesDirty) setNotes(supplier.notes ?? "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supplier?.id, supplier?.notes]);
+  const onDirty = useCallback((d: boolean) => setNotesDirty(d), []);
+  const guard = useUnsavedChangesGuard(notesDirty);
+  const supplier = useSupplier(id);
+  const section = readSupplierSection(sp);
+  const hrefFor = (s: SupplierSectionId) => `${paths.leverandor(id ?? "")}${supplierSectionSearch(sp, s)}`;
+  const backHref = `${paths.leverandorer()}${listReturnSearch(sp)}`;
+  const go = (s: SupplierSectionId) => guard.requestAction(() => navigate(hrefFor(s), { replace: true }));
 
-  const [itemSort, setItemSort] = useState<ItemSort>({ key: "name", dir: "asc" });
-  const [aliasSearch, setAliasSearch] = useState("");
-
-  const sortedItems = useMemo(() => {
-    const list = [...items];
-    list.sort((a, b) => {
-      let cmp = 0;
-      if (itemSort.key === "name") {
-        cmp = (a.raw_material?.name ?? "").localeCompare(b.raw_material?.name ?? "", "nb");
-      } else {
-        cmp = Number(a.agreed_price_per_base_unit ?? -1) - Number(b.agreed_price_per_base_unit ?? -1);
-      }
-      return itemSort.dir === "asc" ? cmp : -cmp;
-    });
-    return list;
-  }, [items, itemSort]);
-
-  /** Avtaler som utløper innen 90 dager (inkludert de som ryker innen 30). */
-  const expiring90 = useMemo(
-    () =>
-      items.filter((i) => {
-        const st = getAgreementStatus(i.agreement_valid_from, i.agreement_valid_to);
-        return st === "expiring_30" || st === "expiring_90";
-      }).length,
-    [items],
-  );
-
-  const sharePct =
-    totalSpend && totalSpend > 0 && spend != null ? (spend / totalSpend) * 100 : null;
-
-  const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
-  const filteredAliases = useMemo(() => {
-    const q = aliasSearch.trim().toLowerCase();
-    if (!q) return aliases;
-    return aliases.filter((a) => {
-      const item = itemById.get(a.raw_material_supplier_id);
-      return (
-        a.alias_value.toLowerCase().includes(q) ||
-        (item?.raw_material?.name ?? "").toLowerCase().includes(q)
-      );
-    });
-  }, [aliases, aliasSearch, itemById]);
-
-  function toggleSort(key: ItemSort["key"]) {
-    setItemSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
-  }
-
-  if (isLoading) {
+  if (supplier.isLoading || supplier.isError || !supplier.data) {
     return (
-      <div className="flex items-center justify-center p-12 text-ink-secondary">
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Laster…
-      </div>
-    );
-  }
-
-  if (!supplier) {
-    return (
-      <Card className="p-12 text-center">
-        <Truck className="mx-auto mb-3 h-10 w-10 text-ink-secondary" />
-        <p className="text-ink-secondary">Fant ikke leverandøren.</p>
-        <Button variant="outline" className="mt-4" onClick={() => navigate(paths.leverandorer())}>
-          Tilbake til leverandører
-        </Button>
-      </Card>
-    );
-  }
-
-  const invoices = invoiceData?.rows ?? [];
-  const invoiceTotal = invoiceData?.total ?? 0;
-
-  return (
-    <div className="space-y-5">
-      <RavarerHeaderBanner
-        title={supplier.name}
-        subtitle="Leverandørkort — varer, fakturaer og aliaser"
-        actions={
-          <div className="flex items-center gap-2">
-            {canWrite && (
-              <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
-                Rediger leverandør
-              </Button>
-            )}
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => navigate(paths.leverandorer())}>
-              <ArrowLeft className="h-4 w-4" /> Tilbake
-            </Button>
-          </div>
-        }
-      />
-
-      <Card className="space-y-4 p-5">
-        <div className="flex flex-wrap items-center gap-2">
-          {supplier.tripletex_is_inactive ? (
-            <Badge variant="outline" className="text-ink-secondary">Inaktiv i Tripletex</Badge>
-          ) : supplier.is_active ? (
-            <Badge variant="outline" className="border-success/30 bg-success/10 text-success">Aktiv</Badge>
-          ) : (
-            <Badge variant="outline" className="text-ink-secondary">Inaktiv</Badge>
-          )}
-          {supplier.track_invoice_lines && (
-            <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
-              Følger fakturalinjer
-            </Badge>
-          )}
-          {supplier.tripletex_supplier_number && (
-            <Badge variant="outline" className="text-ink-secondary">
-              Tripletex #{supplier.tripletex_supplier_number}
-            </Badge>
-          )}
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div>
-            <p className="text-xs uppercase tracking-wider text-ink-secondary">Org.nr</p>
-            <p className="font-mono text-sm">{supplier.org_number ?? "—"}</p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-wider text-ink-secondary">E-post</p>
-            {supplier.contact_email ? (
-              <a href={`mailto:${supplier.contact_email}`} className="text-sm text-primary hover:underline">
-                {supplier.contact_email}
-              </a>
-            ) : (
-              <p className="text-sm text-ink-secondary">—</p>
-            )}
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-wider text-ink-secondary">Telefon</p>
-            {supplier.contact_phone ? (
-              <a href={`tel:${supplier.contact_phone}`} className="text-sm text-primary hover:underline">
-                {supplier.contact_phone}
-              </a>
-            ) : (
-              <p className="text-sm text-ink-secondary">—</p>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <p className="text-xs uppercase tracking-wider text-ink-secondary">Notater</p>
-          <Textarea
-            value={notes}
-            disabled={!canWrite}
-            onChange={(e) => {
-              setNotes(e.target.value);
-              setNotesDirty(true);
-            }}
-            placeholder="Avtalevilkår, kontaktpersoner, leveringsdager …"
-            rows={3}
-          />
-          {canWrite && notesDirty && (
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                disabled={saveNotes.isPending}
-                onClick={() => saveNotes.mutate(notes, { onSuccess: () => setNotesDirty(false) })}
-              >
-                {saveNotes.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-                Lagre notat
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setNotes(supplier.notes ?? "");
-                  setNotesDirty(false);
-                }}
-              >
-                Avbryt
-              </Button>
-            </div>
-          )}
-        </div>
-      </Card>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <OrderDeskKpi icon={FileText} label="Fakturaer" value={String(supplier.invoice_count ?? invoiceTotal ?? 0)} />
-        <OrderDeskKpi icon={CalendarDays} label="Siste faktura" value={formatDate(supplier.last_invoice_date)} />
-        <OrderDeskKpi icon={Boxes} label="Varer koblet" value={String(items.length)} sub="Råvarer koblet til leverandøren" />
-        <OrderDeskKpi icon={Wallet} label="Kjøpt siste 12 mnd (eks. mva)" value={formatNok(spend ?? 0)} sub="Kreditnotaer trukket fra" />
-        <OrderDeskKpi
-          icon={PieChart}
-          label="Andel av totalt innkjøp"
-          value={sharePct == null ? "—" : `${sharePct.toFixed(1)} %`}
-          sub="Andel av alt innkjøp siste 12 mnd"
-        />
-        <OrderDeskKpi
-          icon={CalendarClock}
-          tone={expiring90 > 0 ? "warning" : "default"}
-          label="Avtaler som utløper ≤ 90 d"
-          value={String(expiring90)}
-          sub="Sluttdato innen 90 dager"
-        />
-        <OrderDeskKpi
-          icon={TrendingUp}
-          label="Prisindeks"
-          value={priceIndex?.indexPct == null ? "—" : `${priceIndex.indexPct.toFixed(0)}`}
-          sub="Siste pris mot 12 mnd snitt (100 = uendret)"
-        />
-      </div>
-
-      <SupplierDialog open={editOpen} onOpenChange={setEditOpen} supplier={supplier} />
-
-      <Tabs defaultValue="varer">
-        <TabsList>
-          <TabsTrigger value="varer">Varer ({items.length})</TabsTrigger>
-          <TabsTrigger value="fakturaer">Fakturaer ({invoiceTotal})</TabsTrigger>
-          <TabsTrigger value="aliaser">Aliaser ({aliases.length})</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="varer" className="space-y-4">
-          {id && <SupplierItemStatusChips supplierId={id} />}
-          {items.length > 0 && (
-            <SupplierPriceTimeline supplierId={supplier.id} supplierName={supplier.name} items={items} />
-          )}
-          <Card className="overflow-hidden">
-            {itemsLoading ? (
-              <div className="flex items-center justify-center p-12 text-ink-secondary">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Laster…
-              </div>
-            ) : items.length === 0 ? (
-              <EmptyTab icon={Package} text="Ingen varer er koblet til denne leverandøren ennå." />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/30 text-left text-xs uppercase tracking-wider text-ink-secondary">
-                    <tr>
-                      <th className="px-4 py-3">
-                        <button className="inline-flex items-center gap-1" onClick={() => toggleSort("name")}>
-                          Vare <ArrowUpDown className="h-3 w-3" />
-                        </button>
-                      </th>
-                      <th className="px-4 py-3">Leverandørens SKU</th>
-                      <th className="px-4 py-3">Pakning</th>
-                      <th className="px-4 py-3 text-right">
-                        <button className="inline-flex items-center gap-1" onClick={() => toggleSort("price")}>
-                          Avtalepris/baseenhet <ArrowUpDown className="h-3 w-3" />
-                        </button>
-                      </th>
-                      <th className="px-4 py-3 text-right">Siste kjøpspris</th>
-                      <th className="px-4 py-3">Avtale</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedItems.map((r) => {
-                      const hasAgreement = r.agreed_price_per_base_unit != null;
-                      return (
-                        <tr
-                          key={r.id}
-                          onClick={() => navigate(paths.raavare(r.raw_material_id))}
-                          className="cursor-pointer border-t border-line-subtle transition-colors hover:bg-muted/40"
-                        >
-                          <td className="px-4 py-3 font-medium">
-                            <div className="flex items-center gap-2">
-                              <Link
-                                to={paths.raavare(r.raw_material_id)}
-                                onClick={(e) => e.stopPropagation()}
-                                className="hover:underline"
-                              >
-                                {r.raw_material?.name ?? "—"}
-                              </Link>
-                              <ItemTypeBadge itemType={r.raw_material?.item_type ?? null} />
-                            </div>
-                            {r.supplier_product_name && (
-                              <p className="text-xs text-ink-secondary">{r.supplier_product_name}</p>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 font-mono text-xs text-ink-secondary">{r.supplier_sku ?? "—"}</td>
-                          <td className="px-4 py-3 text-ink-secondary">
-                            {r.package_size != null
-                              ? `${formatNumber(r.package_size)} ${r.package_unit ?? ""}`.trim()
-                              : "—"}
-                          </td>
-                          <td className="px-4 py-3 text-right tabular-nums">
-                            {formatNok(r.agreed_price_per_base_unit)}
-                            {r.raw_material?.base_unit && r.agreed_price_per_base_unit != null && (
-                              <span className="text-xs text-ink-secondary"> /{r.raw_material.base_unit}</span>
-                            )}
-                            {(r.agreement_valid_from || r.agreement_valid_to) && (
-                              <p className="text-xs text-ink-secondary">
-                                {formatDate(r.agreement_valid_from)} – {formatDate(r.agreement_valid_to)}
-                              </p>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-right tabular-nums">
-                            {formatNok(r.last_invoice_price)}
-                            {r.last_invoice_date && (
-                              <p className="text-xs text-ink-secondary">{formatDate(r.last_invoice_date)}</p>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            {hasAgreement ? (
-                              <Badge variant="outline" className="border-success/30 bg-success/10 text-success">
-                                Avtale
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-ink-secondary">Ingen avtale</Badge>
-                            )}
-                            {r.agreement_document_url && (
-                              <div className="mt-1">
-                                <AgreementDocumentLink path={r.agreement_document_url} label="Dokument" />
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="fakturaer">
-          <Card className="overflow-hidden">
-            {invoicesLoading ? (
-              <div className="flex items-center justify-center p-12 text-ink-secondary">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Laster…
-              </div>
-            ) : invoices.length === 0 ? (
-              <EmptyTab icon={FileText} text="Det er ikke hentet inn noen fakturaer fra denne leverandøren ennå." />
-            ) : (
-              <>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/30 text-left text-xs uppercase tracking-wider text-ink-secondary">
-                      <tr>
-                        <th className="px-4 py-3">Fakturanr</th>
-                        <th className="px-4 py-3">Dato</th>
-                        <th className="px-4 py-3 text-right">Beløp</th>
-                        <th className="px-4 py-3">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {invoices.map((inv) => (
-                        <tr
-                          key={inv.id}
-                          onClick={() => navigate(paths.faktura(inv.id))}
-                          className="cursor-pointer border-t border-line-subtle transition-colors hover:bg-muted/40"
-                        >
-                          <td className="px-4 py-3 font-mono text-xs">
-                            <Link
-                              to={paths.faktura(inv.id)}
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-primary hover:underline"
-                            >
-                              {inv.invoice_number}
-                            </Link>
-                          </td>
-                          <td className="px-4 py-3 text-ink-secondary">{formatDate(inv.invoice_date)}</td>
-                          <td className="px-4 py-3 text-right tabular-nums">{formatNok(inv.total_amount)}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <InvoiceStatusBadge status={inv.status} />
-                              {inv.lines_sum_status === "mismatch" && (
-                                <Badge
-                                  variant="outline"
-                                  className="gap-1 border-warning/30 bg-warning/15 text-warning"
-                                  title="Varelinjene summerer seg ikke til fakturabeløpet"
-                                >
-                                  <AlertTriangle className="h-3 w-3" /> Sum-avvik
-                                </Badge>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="flex items-center justify-between border-t border-line-subtle px-4 py-3 text-sm text-ink-secondary">
-                  <span>
-                    Viser {invoices.length} av {invoiceTotal}
-                  </span>
-                  {invoices.length < invoiceTotal && (
-                    <Button size="sm" variant="outline" onClick={() => setInvoiceLimit((l) => l + 50)}>
-                      Vis flere
-                    </Button>
-                  )}
-                </div>
-              </>
-            )}
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="aliaser">
-          <Card className="overflow-hidden">
-            <div className="border-b border-line-subtle p-4">
-              <div className="relative max-w-sm">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-secondary" />
-                <Input
-                  value={aliasSearch}
-                  onChange={(e) => setAliasSearch(e.target.value)}
-                  placeholder="Søk alias eller vare…"
-                  className="pl-9"
-                />
-              </div>
-            </div>
-            {aliasesLoading ? (
-              <div className="flex items-center justify-center p-12 text-ink-secondary">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Laster…
-              </div>
-            ) : aliases.length === 0 ? (
-              <EmptyTab
-                icon={Tags}
-                text="Ingen aliaser er registrert — aliaser lages når fakturalinjer kobles til varer."
-              />
-            ) : filteredAliases.length === 0 ? (
-              <EmptyTab icon={Search} text="Ingen aliaser matcher søket." />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/30 text-left text-xs uppercase tracking-wider text-ink-secondary">
-                    <tr>
-                      <th className="px-4 py-3">Alias</th>
-                      <th className="px-4 py-3">Type</th>
-                      <th className="px-4 py-3">Peker på vare</th>
-                      <th className="px-4 py-3 text-right">Treff</th>
-                      <th className="px-4 py-3">Sist sett</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredAliases.map((a) => {
-                      const item = itemById.get(a.raw_material_supplier_id);
-                      return (
-                        <tr key={a.id} className="border-t border-line-subtle">
-                          <td className="px-4 py-3 font-mono text-xs">{a.alias_value}</td>
-                          <td className="px-4 py-3 text-ink-secondary">
-                            {a.alias_type === "supplier_sku" ? "SKU" : a.alias_type === "product_name" ? "Navn" : a.alias_type}
-                          </td>
-                          <td className="px-4 py-3">
-                            {item ? (
-                              <Link
-                                to={paths.raavare(item.raw_material_id)}
-                                className="text-primary hover:underline"
-                              >
-                                {item.raw_material?.name ?? "—"}
-                              </Link>
-                            ) : (
-                              "—"
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">{a.match_count ?? 0}</td>
-                          <td className="px-4 py-3 text-ink-secondary">{formatDate(a.last_seen_at)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
-
-/** Prisutvikling for én av leverandørens varer, filtrert på denne leverandøren. */
-function SupplierPriceTimeline({
-  supplierId,
-  supplierName,
-  items,
-}: {
-  supplierId: string;
-  supplierName: string;
-  items: SupplierItemRow[];
-}) {
-  const sorted = useMemo(
-    () =>
-      [...items].sort((a, b) =>
-        (a.raw_material?.name ?? "").localeCompare(b.raw_material?.name ?? "", "nb"),
-      ),
-    [items],
-  );
-  const [rawMaterialId, setRawMaterialId] = useState(sorted[0]?.raw_material_id ?? "");
-  const selected =
-    sorted.find((i) => i.raw_material_id === rawMaterialId) ?? sorted[0] ?? null;
-  const historyQuery = useTimelineHistory(selected?.raw_material_id);
-  const history = historyQuery.rows;
-
-  const supplierNames = useMemo(
-    () => new Map<string, string>([[supplierId, supplierName]]),
-    [supplierId, supplierName],
-  );
-  const links = useMemo(
-    () =>
-      selected
-        ? [
-            {
-              supplier_id: supplierId,
-              agreed_price_per_base_unit: selected.agreed_price_per_base_unit,
-              agreement_valid_from: selected.agreement_valid_from,
-              agreement_valid_to: selected.agreement_valid_to,
-              agreement_confirmed: isAgreementConfirmed(selected),
-            },
-          ]
-        : [],
-    [selected, supplierId],
-  );
-  const rows = useMemo(
-    () =>
-      history.filter((h) => h.supplier_id === supplierId),
-    [history, supplierId],
-  );
-
-  if (!selected) return null;
-
-  if (historyQuery.isError || historyQuery.isLoading) {
-    return (
-      <QueryState
-        isLoading={historyQuery.isLoading}
-        isError={historyQuery.isError}
-        error={historyQuery.error}
-        scope="leverandor-prisutvikling"
-        onRetry={() => void historyQuery.refetch()}
-        errorTitle="Kunne ikke hente prishistorikken"
-      >
+      <QueryState isLoading={supplier.isLoading} isError={supplier.isError} error={supplier.error} onRetry={() => void supplier.refetch()}
+        scope="Leverandøren" isEmpty={!supplier.data} emptyTitle="Fant ikke leverandøren" emptyDescription="Den kan være slettet, eller lenken kan være feil.">
         {null}
       </QueryState>
     );
   }
+  const s = supplier.data;
+  const listSearch = sp.get("liste") ?? "";
 
   return (
-    <PriceTimeline
-      history={rows}
-      supplierNames={supplierNames}
-      links={links}
-      baseUnit={selected.raw_material?.base_unit ?? "enhet"}
-      title={`Prisutvikling — ${selected.raw_material?.name ?? "vare"}`}
-      exportName={`prisutvikling-${supplierName}`}
-      projectionError={historyQuery.projectionError}
-      onRetryProjection={historyQuery.retryProjection}
-      actions={
-        <Select value={selected.raw_material_id} onValueChange={setRawMaterialId}>
-          <SelectTrigger className="h-9 w-[240px]" aria-label="Velg vare">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {sorted.map((i) => (
-              <SelectItem key={i.id} value={i.raw_material_id}>
-                {i.raw_material?.name ?? "Ukjent vare"}
-              </SelectItem>
+    <div className="space-y-5">
+      <RavarerHeaderBanner
+        title={s.name}
+        subtitle="Leverandørkort"
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {canWrite && <Button size="sm" variant="outline" className="min-h-[44px] md:min-h-9" onClick={() => setEditOpen(true)}>Rediger leverandør</Button>}
+            <Button asChild variant="outline" size="sm" className="min-h-[44px] gap-1.5 md:min-h-9">
+              <Link to={backHref}><ArrowLeft className="h-4 w-4" aria-hidden />Tilbake til listen</Link>
+            </Button>
+          </div>
+        }
+      />
+      <SupplierDialog open={editOpen} onOpenChange={setEditOpen} supplier={s} />
+
+      <div className="grid gap-5 lg:grid-cols-[200px_minmax(0,1fr)]">
+        <nav aria-label="Seksjoner på leverandørkortet" className="hidden lg:block">
+          <ul className="sticky top-4 space-y-0.5">
+            {SUPPLIER_SECTIONS.map((sid) => (
+              <li key={sid}>
+                <Link to={hrefFor(sid)} replace aria-current={section === sid ? "page" : undefined}
+                  className={cn("flex min-h-10 items-center rounded-md px-3 text-sm transition-colors", section === sid ? "bg-muted font-semibold text-foreground" : "text-ink-secondary hover:bg-muted/60")}>
+                  {SUPPLIER_SECTION_LABEL[sid]}
+                </Link>
+              </li>
             ))}
-          </SelectContent>
-        </Select>
-      }
-    />
+          </ul>
+        </nav>
+        <div className="lg:hidden">
+          <Select value={section} onValueChange={(v) => go(v as SupplierSectionId)}>
+            <SelectTrigger className="h-[44px]" aria-label="Velg seksjon"><SelectValue /></SelectTrigger>
+            <SelectContent>{SUPPLIER_SECTIONS.map((sid) => <SelectItem key={sid} value={sid}>{SUPPLIER_SECTION_LABEL[sid]}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <section aria-labelledby="supplier-section-title" className="min-w-0 space-y-4">
+          <h2 id="supplier-section-title" className="font-display text-title">{SUPPLIER_SECTION_LABEL[section]}</h2>
+          {section === "oversikt" && <SupplierOverviewSection supplier={s} />}
+          {section === "varer" && <SupplierItemsSection supplier={s} />}
+          {section === "avtaler" && <SupplierAgreementsSection supplier={s} />}
+          {section === "fakturaer" && <SupplierInvoicesSection supplierId={s.id} listSearch={listSearch} />}
+          {section === "aliaser" && <SupplierAliasesSection supplierId={s.id} />}
+          {section === "forhandlinger" && <SupplierNegotiationsSection supplierId={s.id} />}
+          {section === "notater" && <SupplierNotesSection supplier={s} canWrite={canWrite} onDirtyChange={onDirty} />}
+        </section>
+      </div>
+      <UnsavedChangesDialog {...guard.dialogProps} />
+    </div>
   );
 }
