@@ -264,3 +264,20 @@ describe("ReadingState og retry-knapp", () => {
     expect(screen.getByRole("button", { name: /Prøv igjen med samme valg/ })).toBeDisabled();
   });
 });
+
+describe("bytte mellom bufrede kjøringer", () => {
+  it("ny kjøring arver ikke begrunnelse/valg fra forrige forhåndsvisning", async () => {
+    const { RereadView } = await import("@/fakturaer/components/reread/RereadView");
+    const a = parseRun(rereadFixtureRow("ready"));
+    const b = { ...a, id: "annen-kjoring" };
+    const props = { document: null, canApply: true, readOnlyReason: null, pending: null, saving: false, applyMessage: null, onApply: vi.fn(), onRetryPending: vi.fn() };
+    const { rerender } = render(<RereadView run={a} {...props} />);
+    const reason = () => screen.queryByLabelText("Begrunnelse") as HTMLTextAreaElement | null;
+    if (!reason()) fireEvent.mouseDown(screen.getByRole("tab", { name: /Valgt linje/ }));
+    fireEvent.change(reason()!, { target: { value: "Valg for kjøring A" } });
+    expect(reason()!.value).toBe("Valg for kjøring A");
+    rerender(<RereadView run={b} {...props} />);
+    if (!reason()) fireEvent.mouseDown(screen.getByRole("tab", { name: /Valgt linje/ }));
+    expect(reason()!.value).toBe("");
+  });
+});
