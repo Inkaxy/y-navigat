@@ -39,7 +39,7 @@ export function WorkspaceHeader(p: Props) {
   const doc = useInvoiceDocumentUrl(p.docPath);
   const final = p.status === "reconciled";
   return (
-    <header className="sticky top-0 z-20 -mx-page space-y-2 border-b border-border bg-background/95 px-page py-3 backdrop-blur">
+    <header className="sticky top-0 z-20 space-y-2 border-b border-border bg-background/95 py-3 backdrop-blur">
       <div className="flex flex-wrap items-center gap-2">
         <Button asChild variant="ghost" size="sm" className="-ml-2 gap-1.5">
           <Link to={p.backHref}><ArrowLeft className="h-4 w-4" aria-hidden />Fakturaer</Link>
