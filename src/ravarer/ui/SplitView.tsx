@@ -10,9 +10,9 @@ import { cn } from "@/lib/utils";
  */
 export function SplitView({ list, panel, className }: { list: ReactNode; panel: ReactNode; className?: string }) {
   return (
-    <div className={cn("grid gap-4 xl:h-[calc(100dvh-var(--shell-offset,7rem))] xl:grid-cols-[minmax(380px,0.9fr)_minmax(460px,1.1fr)]", className)}>
-      <div className="min-h-0 overflow-auto">{list}</div>
-      <div className="hidden min-h-0 xl:block">{panel}</div>
+    <div className={cn("grid gap-4 xl:h-[calc(100dvh-var(--shell-offset,7rem))] xl:grid-cols-[minmax(340px,0.9fr)_minmax(440px,1.1fr)]", className)}>
+      <div className="min-h-0 min-w-0 overflow-auto">{list}</div>
+      <div className="hidden min-h-0 min-w-0 xl:block">{panel}</div>
     </div>
   );
 }

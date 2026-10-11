@@ -76,9 +76,14 @@ export function GjoreWorkspace() {
   useEffect(() => clearTimer, []);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- synk bare ved nytt søk
   useEffect(() => { if ((sp.get("q") ?? "") !== q) set({ q: q || null }); }, [q]);
-  useEffect(() => setLimit(PAGE), [gruppe, sort, leverandor, q]);
+  // Tilbake/fram: adressens søk vinner over feltet. Skriving → debounce → adresse (ingen løkke: like verdier hoppes over).
+  const urlQ = sp.get("q") ?? "";
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- reager bare på adresseendring
+  useEffect(() => { if (urlQ !== q) setQText(urlQ); }, [urlQ]);
+  useEffect(() => setLimit(PAGE), [gruppe, sort, leverandor, urlQ]);
 
-  const work = useWorkItems({ group: gruppe, search: q || null, supplierId: leverandor, sort, limit });
+  // Listen hentes alltid for søket i adressen, så den viser det adressen lover.
+  const work = useWorkItems({ group: gruppe, search: urlQ || null, supplierId: leverandor, sort, limit });
   const items = useMemo(() => work.data?.items ?? [], [work.data]);
   // Masseutvalg beholder hele elementet, så valget overlever filterbytte og paginering.
   const [checked, setChecked] = useState<Map<string, WorkItem>>(new Map());
@@ -164,7 +169,7 @@ export function GjoreWorkspace() {
   const filterCount = (leverandor ? 1 : 0) + (sort !== "impact" ? 1 : 0);
   const supplierSelect = (
     <Select value={leverandor ?? "alle"} onValueChange={(v) => set({ leverandor: v === "alle" ? null : v })}>
-      <SelectTrigger className="lg:w-48" aria-label="Leverandør"><SelectValue placeholder="Alle leverandører" /></SelectTrigger>
+      <SelectTrigger className="w-full 2xl:w-52" aria-label="Leverandør"><SelectValue placeholder="Alle leverandører" /></SelectTrigger>
       <SelectContent>
         <SelectItem value="alle">Alle leverandører</SelectItem>
         {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
@@ -173,12 +178,12 @@ export function GjoreWorkspace() {
   );
   const sortSelect = (
     <Select value={sort} onValueChange={(v) => set({ sort: v === "impact" ? null : v })}>
-      <SelectTrigger className="lg:w-48" aria-label="Sortering"><SelectValue /></SelectTrigger>
+      <SelectTrigger className="w-full 2xl:w-44" aria-label="Sortering"><SelectValue /></SelectTrigger>
       <SelectContent>{GJORE_SORTS.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
     </Select>
   );
 
-  const list = (
+  const toolbar = (
     <div className="space-y-3">
       <header className="space-y-1">
         <h2 className="font-serif text-lg leading-tight">{copy.title}</h2>
@@ -186,15 +191,15 @@ export function GjoreWorkspace() {
         {countText && <p className="text-caption tabular-nums text-ink-secondary" aria-live="polite">{countText} i køen</p>}
       </header>
       <div className="flex gap-2">
-        <div className="relative flex-1">
+        <div className="relative min-w-0 flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-ink-secondary" aria-hidden />
           <Input ref={searchRef} className="pl-8" aria-label="Søk" placeholder="Søk vare, leverandør eller faktura" value={qText} onChange={(e) => setQText(e.target.value)} />
         </div>
-        <div className="hidden gap-2 lg:flex">{supplierSelect}{sortSelect}</div>
+        <div className="hidden shrink-0 gap-2 2xl:flex">{supplierSelect}{sortSelect}</div>
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" className="gap-1.5 lg:hidden" aria-label="Filtre">
-              <SlidersHorizontal className="h-4 w-4" aria-hidden />{filterCount > 0 ? filterCount : null}
+            <Button variant="outline" className="shrink-0 gap-1.5 2xl:hidden" aria-label="Filtre">
+              <SlidersHorizontal className="h-4 w-4" aria-hidden /><span className="hidden sm:inline">Filtre</span>{filterCount > 0 ? ` (${filterCount})` : null}
             </Button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-72 space-y-3">
@@ -202,8 +207,12 @@ export function GjoreWorkspace() {
             <div className="space-y-1"><p className="text-caption text-ink-secondary">Rekkefølge</p>{sortSelect}</div>
           </PopoverContent>
         </Popover>
-        <Button variant="ghost" size="icon" className="hidden lg:inline-flex" aria-label="Vis hurtigtaster" onClick={() => setHelp(true)}><Keyboard className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="icon" className="hidden shrink-0 lg:inline-flex" aria-label="Vis hurtigtaster" onClick={() => setHelp(true)}><Keyboard className="h-4 w-4" /></Button>
       </div>
+    </div>
+  );
+  const list = (
+    <div className="min-w-0 space-y-3">
       <GjoreBulkBar selected={[...checked.values()]} onClear={() => setChecked(new Map())} />
       <QueryState isLoading={false} isError={work.isError} error={work.error} scope="ravarer:gjore" onRetry={() => void work.refetch()}>
         <WorkListView items={items} total={work.data?.total ?? 0} selectedKey={valgt} loading={work.isLoading} fetchingMore={work.isFetching && limit > items.length}
@@ -223,19 +232,26 @@ export function GjoreWorkspace() {
 
   return (
     <>
-      <div className="grid gap-4 lg:grid-cols-[200px_minmax(0,1fr)]">
-        <aside className="lg:sticky lg:top-4 lg:self-start">
+      <div className="grid gap-4 lg:grid-cols-[184px_minmax(0,1fr)]">
+        <aside className="min-w-0 lg:sticky lg:top-4 lg:self-start">
           <WorkGroupNav active={gruppe} counts={counts} onPick={pickGroup} />
         </aside>
-        <SplitView list={list} panel={sel ? (
+        <div className="min-w-0 space-y-3">
+        {toolbar}
+        <SplitView list={list}
+          // Uten valg får listen plassen; panelet blir en smal, kort hjelp i stedet for en tom flate.
+          className={sel ? undefined : "xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]"}
+          panel={sel ? (
           <PeekPanel onClose={() => select(null)}
-            fullHref={sel.type === "varekort" ? paths.varekort(sel.supplierId, sel.itemKey) : fullPage(sel)}>
+            // Samme listekontekst (gruppe/sort/søk/leverandør) som smal navigasjon.
+            fullHref={fullPage(sel)}>
             {panelBody}
           </PeekPanel>
         ) : (
           <GjoreEmptyPanel group={gruppe} total={work.data?.total ?? null} first={items[0] ?? null}
             onStart={() => { if (items[0]) { select(items[0].key, true); focusPanel(); } }} onHelp={() => setHelp(true)} />
         )} />
+        </div>
       </div>
       <ShortcutHelp open={help} onOpenChange={setHelp} bindings={bindings} />
     </>

@@ -18,7 +18,7 @@ export function GjoreEmptyPanel({ group, total, first, onStart, onHelp }: Props)
     );
   }
   return (
-    <section aria-label="Detaljer" className="flex h-full flex-col justify-between gap-6 rounded-lg border border-border bg-card p-6">
+    <section aria-label="Detaljer" className="flex flex-col gap-5 self-start rounded-lg border border-border bg-card p-5">
       <div className="space-y-4">
         <p className="text-caption uppercase tracking-wider text-ink-secondary">{copy.title}</p>
         <p className="text-sm text-ink-secondary">{copy.explain}</p>

@@ -100,8 +100,8 @@ export function WorkListView({ items, total, selectedKey, loading, fetchingMore,
                     <StatusPill label={meta.label} tokenVar={meta.tokenVar} />
                     <span className="truncate text-sm font-medium text-foreground">{it.title}</span>
                   </div>
-                  <p className="truncate text-caption text-ink-secondary">{rowSubtitle(it)}</p>
-                  <p className="flex flex-wrap items-center gap-x-2 text-caption">
+                  <p className="truncate text-sm text-ink-secondary">{rowSubtitle(it)}</p>
+                  <p className="flex flex-wrap items-center gap-x-2 text-sm">
                     <span className="text-ink-secondary">{causeText(it)}</span>
                     <span aria-hidden className="text-ink-secondary">·</span>
                     <span className="font-medium text-primary">{nextActionText(it)} →</span>
