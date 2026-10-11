@@ -23,7 +23,7 @@ import { planClaim, type ClaimPlan } from "@/ravarer/lib/supplierClaim";
 import { fetchClaimPreview } from "@/ravarer/hooks/useClaimPreview";
 import { ClaimCreditDialog, type ClaimForm } from "./ClaimCreditDialog";
 import { useClaimCredit, useRematchInvoices } from "./useGjoreMutations";
-import { acceptResultTitle, claimFailureMessage, kr, skipLineText } from "./logic";
+import { acceptResultTitle, claimFailureMessage, kr, priceChange, skipLineText } from "./logic";
 import type { PanelResult } from "./types";
 
 const START_REASONS = ["start_price_manual_check", "no_automatic_basis", "no_baseline"];
@@ -44,7 +44,7 @@ export function splitByGate<L extends GateLine>(cands: L[], gateOf: (l: L) => Pr
     if (!g.ok) { blocked.push({ ...base, label: g.label, detail: g.detail }); continue; }
     const s = g.safety;
     if (s.price_per_base_unit == null || s.expected_price_per_base_unit == null || s.effect_nok == null || priceDirection(s) === "same") continue;
-    rows.push({ ...base, quantity: l.quantity, unit: l.unit, price_per_base_unit: s.price_per_base_unit, expected_price_per_base_unit: s.expected_price_per_base_unit, base_quantity: s.base_quantity, effect_nok: s.effect_nok, reference_source: s.reference_source });
+    rows.push({ ...base, quantity: l.quantity, unit: l.unit, price_per_base_unit: s.price_per_base_unit, expected_price_per_base_unit: s.expected_price_per_base_unit, base_quantity: s.base_quantity, effect_nok: s.effect_nok, reference_source: s.reference_source, reference_id: s.reference_id });
   }
   return { rows, blocked };
 }
@@ -90,7 +90,8 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
   const [startOpen, setStartOpen] = useState(false);
   const startLine = startPriceLine(lines);
   const chosen = status === "ready" ? rows.filter((r) => selected.has(r.id)) : [];
-  const refLine = chosen[0] ?? null;
+  // Referansedato bare når alle valgte linjer har samme grunnlag.
+  const refLine = chosen.length > 0 && new Set(chosen.map((r) => `${r.reference_source}|${r.reference_id}`)).size === 1 ? chosen[0] : null;
   // Referansedatoen finnes på fakturalinjen, men ikke i varekortets linjeliste.
   const refDate = useQuery({
     queryKey: ["price-reference-date", refLine?.id ?? null],
@@ -144,7 +145,8 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
   // Serveren kontrollerer nøyaktig de valgte linjene og avgjør krav eller prisforespørsel.
   const onCase = async () => {
     setError(null); setErrorReasons([]); setClaimError(null);
-    const ids = chosen.map((r) => r.id);
+    // Bare dyrere linjer går til leverandørsak; lavere priser står igjen til egen vurdering.
+    const ids = priceChange(chosen)?.positiveIds ?? [];
     setPreviewing(true);
     try {
       const preview = await fetchClaimPreview(ids);

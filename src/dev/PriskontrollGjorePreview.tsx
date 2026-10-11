@@ -38,7 +38,7 @@ const ITEM: SupplierItem = {
 };
 const r = (id: string, inv: string, date: string, qty: number): PriceRow => ({
   id, invoice_id: inv, invoice_number: inv, invoice_date: date, quantity: qty / 5, unit: "kanne",
-  price_per_base_unit: 78.4, expected_price_per_base_unit: 70.13, base_quantity: qty, effect_nok: Math.round(8.27 * qty * 100) / 100, reference_source: "agreement",
+  price_per_base_unit: 78.4, expected_price_per_base_unit: 70.13, base_quantity: qty, effect_nok: Math.round(8.27 * qty * 100) / 100, reference_source: "agreement", reference_id: "ref1",
 });
 const ROWS = [r("a", "771201", "2026-09-24", 50), r("b", "771455", "2026-10-01", 50), r("c", "771702", "2026-10-08", 50)];
 const FACTS: InvoiceFacts = {
