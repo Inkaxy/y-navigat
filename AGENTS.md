@@ -22,3 +22,5 @@
 - Prishistorikkens enhet/pakning/valuta per observasjon leses bare fra låst `snapshot_*` (satt av trigger ved innsetting, uforanderlig); dagens råvare/fakturalinje brukes aldri som historisk grunnlag. Why: prislikhet og tidsstempel-heuristikk merket gamle priser med dagens enhet/pakning.
 - Oppskrift-PDF regner linjekost via `pdfLineCost` (verifisert status kreves) og viser ingen total/per stk når noe mangler. Why: manglende pris ble summert som 0 kr og ga full sum.
 - Skrivebeskyttede testdatasider ligger i appen på `/forhandsvisning/pris` (også `/price-calc-preview.html`) og `/forhandsvisning/pdf-import`, med egen QueryClient uten nettverk. Why: lokale HTML-innganger finnes ikke i publisert bygg.
+- Kronevirkning i arbeidslisten vises bare via `workEffect` (`src/ravarer/lib/workEffect.ts`): kun server-verifisert `effect_status` gir beløp, manglende felt = ukjent. Why: bruttobeløp fra feillest historikk ble vist som besparelse.
+- Sumkontroll regnes som gjort bare for `SUM_CHECKED_STATUSES` (`ok`/`overridden`) i `invoiceSteps.ts`. Why: `not_checked`/`no_lines` ble tolket som kontrollert.
