@@ -319,38 +319,38 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| F5 | Prioritert topp-5 over beslutninger på tvers av fakturaer | /ravarer › «Til deg» (topp 7) + /priskontroll?fane=gjore sortert etter kronevirkning | 2 | Gammel plass |
-| F6 | Tellere «N åpne beslutninger på M fakturaer» og «gjentatte linjer slått sammen» | /ravarer › header-setning + Å gjøre-køtall | 2 | Gammel plass |
+| F5 | Prioritert topp-5 over beslutninger på tvers av fakturaer | /ravarer › «Til deg» (topp 7) + /priskontroll?fane=gjore sortert etter kronevirkning | 2 | Flyttet |
+| F6 | Tellere «N åpne beslutninger på M fakturaer» og «gjentatte linjer slått sammen» | /ravarer › header-setning + Å gjøre-køtall | 2 | Flyttet |
 | F7 | Kort for varekort som venter, med lenke | /ravarer › KPI «Å gjøre i priskontroll» → ?fane=gjore | 2 | Gammel plass |
 | F8 | Kort med fakturaer klare til intern godkjenning | /ravarer › KPI → /priskontroll?fane=godkjenning | 2 | Gammel plass |
-| F9 | Beslutningsliste: søk, leverandørfilter, typefilter, paging, «alle» eller «bare råvarer» | ?fane=gjore › venstre: køer, søk, leverandørfilter | 3 | Gammel plass |
-| F10 | Material: velg forslag, søk i hele registeret, bruk på alle like linjer og husk (alias) | Varekort-panel › Råvare-blokk | 3 | Gammel plass |
-| F11 | Material: opprett ny råvare og koble resten av gruppen | Varekort-panel › «Opprett ny råvare» | 3 | Gammel plass |
-| F12 | Package: bekreft pakning for alle linjer i gruppen | Varekort-panel › Pakning-blokk | 3 | Gammel plass |
-| F13 | First cost: sett manglende pakning og før første kostpris | Varekort-panel › «Første kostpris» | 3 | Gammel plass |
-| F14 | Price: referanse mot fakturert pris, nivådelt forklaring, samlet kronebeløp | Varekort-panel › Prisblokk | 3 | Gammel plass |
-| F15 | Price: godta avviket for alle linjer, med sjekk av at linjene er uendret | Prisblokk › «Godta ny pris» (`rm_supplier_item_accept_price`) | 3 | Gammel plass |
-| F16 | Price: opprett én leverandørsak for gruppen | Prisblokk › «Opprett leverandørsak» | 3 | Gammel plass |
-| F17 | Gå automatisk til neste etter lagring, i samme filterrekkefølge | Resultatboks + «Neste» (auto ved tastatur) | 3 | Gammel plass |
-| F18 | Frys gruppen mens den vises | Varekort-panel fryser valgt element (`?valgt=`) | 3 | Gammel plass |
+| F9 | Beslutningsliste: søk, leverandørfilter, typefilter, paging, «alle» eller «bare råvarer» | ?fane=gjore › venstre: køer, søk, leverandørfilter | 3 | Flyttet |
+| F10 | Material: velg forslag, søk i hele registeret, bruk på alle like linjer og husk (alias) | Varekort-panel › Råvare-blokk | 3 | Flyttet |
+| F11 | Material: opprett ny råvare og koble resten av gruppen | Varekort-panel › «Opprett ny råvare» | 3 | Flyttet |
+| F12 | Package: bekreft pakning for alle linjer i gruppen | Varekort-panel › Pakning-blokk | 3 | Flyttet |
+| F13 | First cost: sett manglende pakning og før første kostpris | Varekort-panel › «Første kostpris» | 3 | Flyttet |
+| F14 | Price: referanse mot fakturert pris, nivådelt forklaring, samlet kronebeløp | Varekort-panel › Prisblokk | 3 | Flyttet |
+| F15 | Price: godta avviket for alle linjer, med sjekk av at linjene er uendret | Prisblokk › «Godta ny pris» (`rm_supplier_item_accept_price`) | 3 | Flyttet |
+| F16 | Price: opprett én leverandørsak for gruppen | Prisblokk › «Opprett leverandørsak» | 3 | Flyttet |
+| F17 | Gå automatisk til neste etter lagring, i samme filterrekkefølge | Resultatboks + «Neste» (auto ved tastatur) | 3 | Flyttet |
+| F18 | Frys gruppen mens den vises | Varekort-panel fryser valgt element (`?valgt=`) | 3 | Flyttet |
 
 ## Varekoblinger / varekort
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| F53 | Liste over leverandørvarer: søk, leverandørfilter, seks statusfaner med antall | ?fane=gjore › køer (Mangler kobling, Mangler pakning, Prisendringer, Kontroll) + visning «Alle varekort» for Koblet/Ikke vare | 3 | Gammel plass |
-| F54 | Kolonner (leverandør, varenr., beskrivelse, råvare, pakning, siste pris %, linjer, årsaker, sist sett, status); mobil; tastatur | ?fane=gjore › listerader (mobilkort, J/K) | 3 | Gammel plass |
-| F55 | Paging og URL-synk av alle filtre | ?fane=gjore&q=&leverandor=&valgt= | 3 | Gammel plass |
-| F56 | «Hva mangler» i klartekst + merknader (f.eks. karantene) | Varekort-panel › topp | 3 | Gammel plass |
-| F57 | Velg eksisterende råvare (forslag med «Hvorfor», søk) | Varekort-panel › Råvare-blokk | 3 | Gammel plass |
-| F58 | Opprett ny råvare (navn fra beskrivelse, gjettet grunnenhet, varetype, kategori, deklarasjonsnavn) | Råvare-blokk → RawMaterialCreateSheet | 3 | Gammel plass |
-| F59 | Utledet pakning (regnestykke/varenavn) med forklaring, kildemerke, forhåndskrysset bekreftelse | Varekort-panel › Pakning-blokk | 3 | Gammel plass |
-| F60 | Vis bekreftet pakning med «Endre» | Pakning-blokk → PackageEditor | 3 | Gammel plass |
-| F61 | «N åpne linjer på M fakturaer» + «Sett som primær leverandør» | Varekort-panel › Gjelder-blokk (PrimarySupplierControl) | 3 | Gammel plass |
-| F62 | Koble og regn om alle åpne linjer på alle fakturaer i ett steg | Varekort-panel › hovedknapp (L) | 3 | Gammel plass |
-| F63 | «Dette er ikke en vare» med grunn; nye linjer utelates automatisk | Varekort-panel › «Ikke vare» (X) | 3 | Gammel plass |
-| F64 | Resultatoppsummering (koblet, auto-avstemt, gjenstående årsaker, ikke regnet om) + «Neste varekort» | Resultatboks + «Neste» | 3 | Gammel plass |
-| F65 | Historikk per linje (faktura, mengde, beløp, kr/grunnenhet, status, linjetype, kostpris ført, prishistorikk, merknad) | Varekort-panel › Historikk | 3 | Gammel plass |
+| F53 | Liste over leverandørvarer: søk, leverandørfilter, seks statusfaner med antall | ?fane=gjore › køer (Mangler kobling, Mangler pakning, Prisendringer, Kontroll) + visning «Alle varekort» for Koblet/Ikke vare | 3 | Flyttet |
+| F54 | Kolonner (leverandør, varenr., beskrivelse, råvare, pakning, siste pris %, linjer, årsaker, sist sett, status); mobil; tastatur | ?fane=gjore › listerader (mobilkort, J/K) | 3 | Flyttet |
+| F55 | Paging og URL-synk av alle filtre | ?fane=gjore&q=&leverandor=&valgt= | 3 | Flyttet |
+| F56 | «Hva mangler» i klartekst + merknader (f.eks. karantene) | Varekort-panel › topp | 3 | Flyttet |
+| F57 | Velg eksisterende råvare (forslag med «Hvorfor», søk) | Varekort-panel › Råvare-blokk | 3 | Flyttet |
+| F58 | Opprett ny råvare (navn fra beskrivelse, gjettet grunnenhet, varetype, kategori, deklarasjonsnavn) | Råvare-blokk → RawMaterialCreateSheet | 3 | Flyttet |
+| F59 | Utledet pakning (regnestykke/varenavn) med forklaring, kildemerke, forhåndskrysset bekreftelse | Varekort-panel › Pakning-blokk | 3 | Flyttet |
+| F60 | Vis bekreftet pakning med «Endre» | Pakning-blokk → PackageEditor | 3 | Flyttet |
+| F61 | «N åpne linjer på M fakturaer» + «Sett som primær leverandør» | Varekort-panel › Gjelder-blokk (PrimarySupplierControl) | 3 | Flyttet |
+| F62 | Koble og regn om alle åpne linjer på alle fakturaer i ett steg | Varekort-panel › hovedknapp (L) | 3 | Flyttet |
+| F63 | «Dette er ikke en vare» med grunn; nye linjer utelates automatisk | Varekort-panel › «Ikke vare» (X) | 3 | Flyttet |
+| F64 | Resultatoppsummering (koblet, auto-avstemt, gjenstående årsaker, ikke regnet om) + «Neste varekort» | Resultatboks + «Neste» | 3 | Flyttet |
+| F65 | Historikk per linje (faktura, mengde, beløp, kr/grunnenhet, status, linjetype, kostpris ført, prishistorikk, merknad) | Varekort-panel › Historikk | 3 | Flyttet |
 | F66 | Varekort nås fra råvarekort, leverandørkort og vareliste | /varer/:id?seksjon=leverandorer, /leverandorer/:id?seksjon=varer, /varer peek → samme panel | 4 | Gammel plass |
 
 ## Til behandling / innboks
@@ -454,15 +454,15 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 | F90 | Liste over saker med status | /priskontroll?fane=saker | 3 | Gammel plass |
 | F91 | Sak: linjer, kreditfordeling (kreditnota, faktura, beløp), idempotent lagring | /priskontroll/saker/:id | 3 | Gammel plass |
 | F92 | Merk som løst, avbryt eller åpne igjen, med begrunnelse | /saker/:id › sticky handlingsrad | 3 | Gammel plass |
-| F93 | Flagg faktura med begrunnelse og handlingstype | Flagg-dialog fra /faktura/:id, fakturaliste og Fakturasak-kort (kan opprette sak; lover ikke e-post) | 3 | Gammel plass |
+| F93 | Flagg faktura med begrunnelse og handlingstype | Flagg-dialog fra /faktura/:id, fakturaliste og Fakturasak-kort (kan opprette sak; lover ikke e-post) | 3 | Flyttet |
 | F94 | Koble kreditnota til opprinnelig faktura | Å gjøre › Fakturasak-kort «Koble kreditnota» + /faktura/:id | 3 | Gammel plass |
 
 ## Vareminne-funksjoner som må gjenopprettes
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| F100 | Endre eksisterende kobling med påkrevd begrunnelse, sperre når kostpris er ført, vis aliaser og pakninger | Varekort-panel › «Endre kobling» (`rm_change_supplier_link`) + leverandørkort ?seksjon=aliaser | 3 | Gammel plass |
-| F110 | Revisjonshistorikk (AuditHistory) for faktura og leverandørkobling | /faktura/:id › Historikk; varekort-panel › Historikk; råvarekort ?seksjon=historikk | 3 | Gammel plass |
+| F100 | Endre eksisterende kobling med påkrevd begrunnelse, sperre når kostpris er ført, vis aliaser og pakninger | Varekort-panel › «Endre kobling» (`rm_change_supplier_link`) + leverandørkort ?seksjon=aliaser | 3 | Flyttet |
+| F110 | Revisjonshistorikk (AuditHistory) for faktura og leverandørkobling | /faktura/:id › Historikk; varekort-panel › Historikk; råvarekort ?seksjon=historikk | 3 | Flyttet |
 
 ## Kryssmodul-funksjoner (må fortsatt virke)
 

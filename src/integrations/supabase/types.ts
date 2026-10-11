@@ -17649,6 +17649,19 @@ export type Database = {
         }
         Returns: Json
       }
+      rm_supplier_item_claim_credit: {
+        Args: {
+          p_follow_up_on?: string
+          p_item_key: string
+          p_legal_entity_id: string
+          p_lines: Json
+          p_reason?: string
+          p_responsible_user_id?: string
+          p_supplier_id: string
+          p_title: string
+        }
+        Returns: Json
+      }
       rm_supplier_item_lines: {
         Args: {
           p_item_key: string

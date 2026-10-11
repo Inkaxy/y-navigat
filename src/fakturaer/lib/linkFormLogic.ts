@@ -1,3 +1,4 @@
+import { NOT_A_PRODUCT_REASONS } from "@/ravarer/lib/notAProductReasons";
 import { stripPackageTokens, toBaseFactor } from "@/fakturaer/lib/units";
 import type { PackageInference, SupplierItemLine } from "@/fakturaer/lib/supplierItems";
 
@@ -38,4 +39,5 @@ export const SOURCE_LABEL: Record<NonNullable<PackageInference["source"]>, strin
   varenavn: "Bare varenavnet",
 };
 
-export const NOT_ITEM_REASONS = ["Frakt", "Gebyr/avgift", "Pant som ikke skal følges", "Rabatt", "Annet"] as const;
+/** Samme grunnliste som resten av «Ikke vare»-vokabularet. */
+export const NOT_ITEM_REASONS = NOT_A_PRODUCT_REASONS;

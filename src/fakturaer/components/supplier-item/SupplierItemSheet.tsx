@@ -6,38 +6,29 @@ import { whatIsMissing, type LinkSupplierItemResult, type SupplierItem, type Sup
 import { SupplierItemStatusBadge } from "./SupplierItemStatusBadge";
 import { SupplierItemLinkForm } from "./SupplierItemLinkForm";
 import { SupplierItemHistory } from "./SupplierItemHistory";
+import { VarekortPanel } from "@/ravarer/pages/priskontroll/gjore/VarekortPanel";
 
 interface Props {
   supplierId: string | null;
   itemKey: string | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onDone?: (r: LinkSupplierItemResult) => void;
+  onDone?: () => void;
   onNext?: () => void;
   /** Kjent rad fra listen — vises mens ferskt varekort hentes. */
   item?: SupplierItem | null;
 }
 
-export function SupplierItemSheet({ supplierId, itemKey, open, onOpenChange, onDone, onNext, item: known }: Props) {
+export function SupplierItemSheet({ supplierId, itemKey, open, onOpenChange, onDone, onNext }: Props) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-[720px]">
-        <SheetHeader className="sr-only"><SheetTitle>Varekort</SheetTitle><SheetDescription>Kobling av leverandørvare til råvare</SheetDescription></SheetHeader>
-        {open && <SheetBody supplierId={supplierId} itemKey={itemKey} known={known} onClose={() => onOpenChange(false)} onDone={onDone} onNext={onNext} />}
+        <SheetHeader className="sr-only"><SheetTitle>Varekort</SheetTitle><SheetDescription>Alle beslutninger om én leverandørvare</SheetDescription></SheetHeader>
+        {open && supplierId && itemKey && (
+          <VarekortPanel supplierId={supplierId} itemKey={itemKey} onDone={() => onDone?.()} onNext={onNext} onClose={() => onOpenChange(false)} />
+        )}
       </SheetContent>
     </Sheet>
-  );
-}
-
-function SheetBody({ supplierId, itemKey, known, onClose, onDone, onNext }: { supplierId: string | null; itemKey: string | null; known?: SupplierItem | null; onClose: () => void; onDone?: (r: LinkSupplierItemResult) => void; onNext?: () => void }) {
-  const q = useSupplierItems({ supplierId, itemKey, pageSize: 1, enabled: !!supplierId && !!itemKey });
-  const item = q.data?.items[0] ?? known ?? null;
-  const lines = useSupplierItemLines(supplierId, itemKey);
-  const { canWrite } = useInvoiceRights();
-  return (
-    <QueryState isLoading={q.isLoading && !known} isError={q.isError} error={q.error} scope="fakturaer:varekort" onRetry={() => void q.refetch()} isEmpty={!item} emptyTitle="Fant ikke varekortet">
-      {item && <SupplierItemView item={item} linesQuery={lines} canWrite={canWrite} onClose={onClose} onDone={onDone} onNext={onNext} />}
-    </QueryState>
   );
 }
 

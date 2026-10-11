@@ -13,9 +13,11 @@ interface Props {
   invoiceId: string;
   invoiceNumber: string;
   reviewLineCount: number;
+  /** Kalles etter vellykket avstemming. */
+  onReconciled?: (historyWritten: number) => void;
 }
 
-export function ConfirmReconcileDialog({ open, onOpenChange, invoiceId, invoiceNumber, reviewLineCount }: Props) {
+export function ConfirmReconcileDialog({ open, onOpenChange, invoiceId, invoiceNumber, reviewLineCount, onReconciled }: Props) {
   const [busy, setBusy] = useState(false);
   const qc = useQueryClient();
 
@@ -35,6 +37,7 @@ export function ConfirmReconcileDialog({ open, onOpenChange, invoiceId, invoiceN
       );
       invalidateInvoice(qc, invoiceId);
       onOpenChange(false);
+      onReconciled?.(res.history_written ?? 0);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Kunne ikke bekrefte prismatch");
     } finally {

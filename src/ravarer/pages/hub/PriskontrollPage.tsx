@@ -10,11 +10,10 @@ import { ModulePage } from "@/ravarer/ui/ModulePage";
 import { SectionTabs } from "@/ravarer/ui/SectionTabs";
 import { activeTabFrom } from "@/ravarer/ui/sectionTabsLogic";
 import { cn } from "@/lib/utils";
-import { FakturaerStripe } from "./FakturaerStripe";
+import { GjoreWorkspace } from "@/ravarer/pages/priskontroll/gjore/GjoreWorkspace";
 import { PriskontrollToolsMenu } from "./PriskontrollToolsMenu";
 import { PRISKONTROLL_TAB_PARAMS, PRISKONTROLL_TABS, priskontrollTabs, RAVARER_EYEBROW } from "./hubTabs";
 
-const Varekoblinger = lazy(() => import("@/fakturaer/pages/Varekoblinger"));
 const Innboks = lazy(() => import("@/fakturaer/pages/ReviewQueue"));
 const AlleFakturaer = lazy(() => import("@/fakturaer/pages/FakturaerList"));
 const Godkjenning = lazy(() => import("@/fakturaer/pages/InvoiceOverview"));
@@ -63,10 +62,7 @@ export default function PriskontrollPage() {
     >
       <Suspense fallback={<QueryLoadingState rows={6} />}>
         {tab === "gjore" && (
-          <>
-            <FakturaerStripe />
-            <Varekoblinger />
-          </>
+          <GjoreWorkspace />
         )}
         {tab === "fakturaer" && (
           <>

@@ -28,6 +28,8 @@ const DatabladBulk = lazy(() => import("@/ravarer/pages/DatabladBulk"));
 const InvoiceDetail = lazy(() => import("@/fakturaer/pages/InvoiceDetail"));
 const RegistrerLinjer = lazy(() => import("@/fakturaer/pages/RegistrerLinjer"));
 const SupplierCase = lazy(() => import("@/fakturaer/pages/SupplierCase"));
+const AlleVarekort = lazy(() => import("./pages/priskontroll/AlleVarekort"));
+const VarekortPage = lazy(() => import("./pages/priskontroll/VarekortPage"));
 const ImportInvoice = lazy(() => import("@/fakturaer/pages/ImportInvoice"));
 const RavarerQueue = lazy(() => import("@/fakturaer/pages/RavarerQueue"));
 const DecisionDetail = lazy(() => import("@/fakturaer/pages/DecisionDetail"));
@@ -67,6 +69,8 @@ export function ravarerRoutes(Shell: ShellType) {
 
     // Priskontroll
     <Route key="pk" path="/ravarer/priskontroll" element={inv(<Priskontroll />)} />,
+    <Route key="pk-vk" path="/ravarer/priskontroll/varekort" element={inv(<AlleVarekort />)} />,
+    <Route key="pk-vk-d" path="/ravarer/priskontroll/varekort/:supplierId/:itemKey" element={inv(<VarekortPage />)} />,
     <Route key="pk-import" path="/ravarer/priskontroll/import" element={inv(<ImportInvoice />)} />,
     <Route key="pk-besl" path="/ravarer/priskontroll/beslutninger" element={inv(<QueueByScope />)} />,
     <Route key="pk-besl-d" path="/ravarer/priskontroll/beslutninger/:key" element={inv(<DecisionDetail />)} />,
