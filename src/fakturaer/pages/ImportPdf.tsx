@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { runAutoMatchAfterImport } from "@/fakturaer/lib/queueActions";
 import { paths } from "@/ravarer/lib/paths";
 import { PdfLineCards } from "@/fakturaer/components/import-pdf/PdfLineCards";
-import { lineFromExtraction, manualReading, manualSaveErrorMessage, parseManualSaveResult, parseReadIssues, rowPayload, validConfidence, type PdfLine } from "@/fakturaer/lib/manualPdfSave";
+import { lineFromExtraction, manualReading, manualSaveErrorMessage, settleManualSave, UNKNOWN_SAVE_OUTCOME, parseReadIssues, rowPayload, validConfidence, type PdfLine } from "@/fakturaer/lib/manualPdfSave";
 
 interface ExtractedData {
   supplier_name: string | null;
@@ -232,7 +232,8 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
       const conf = validConfidence(parseResult?.confidence);
       const sumCheck = sumNow();
       const noteParts = [kid && `KID: ${kid}`, accountNumber && `Konto: ${accountNumber}`].filter(Boolean) as string[];
-      const { data, error } = await supabase.rpc("rm_save_manual_pdf_invoice", {
+      const outcome = await settleManualSave(
+        async () => await supabase.rpc("rm_save_manual_pdf_invoice", {
         p_legal_entity_id: legalEntityId,
         p_supplier: supplierMode === "create"
           ? { name: newSupplierName.trim(), org_number: newSupplierOrgNr.trim() || null }
@@ -246,27 +247,24 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
           issues: parseReadIssues(parseResult?.sum_check?.issues),
         },
         p_rows: lines.map(rowPayload),
-      });
-      if (error) throw error;
-      const res = parseManualSaveResult(data);
-      if (!res.ok) {
-        // Ingenting ble lagret: fjern PDF-en vi lastet opp i dette forsøket.
-        if (uploadedNow) {
-          const { error: rmErr } = await supabase.storage.from("invoice-pdfs").remove([uploadedNow]);
+      }),
+        uploadedNow,
+        async (p) => {
+          const { error: rmErr } = await supabase.storage.from("invoice-pdfs").remove([p]);
           if (rmErr) console.warn("Kunne ikke rydde opplastet PDF", rmErr.message);
           setDocPath(null);
-        }
-        toast.error(manualSaveErrorMessage(res.code));
-        return;
-      }
+        },
+      );
+      if (outcome.kind === "unknown") { toast.error(UNKNOWN_SAVE_OUTCOME); return; }
+      if (outcome.kind === "rejected") { toast.error(manualSaveErrorMessage(outcome.code)); return; }
+      const res = outcome.result;
       if (supplierMode === "create") await refetchSuppliers();
 
       const newSavedIds = [...savedIds, res.invoiceId];
       setSavedIds(newSavedIds);
       const hasMore = queueIndex < queue.length - 1;
 
-      // Auto-match rett etter import — samme kall som ved manuell registrering.
-      if (res.lines > 0 && !res.replayed) await runAutoMatchAfterImport(res.invoiceId);
+      // Matching køes av serveren i samme transaksjon (og fortsettes én gang ved replay).
 
       if (hasMore) {
         toast.success(`Faktura ${queueIndex + 1} av ${queue.length} lagret — neste fil`);
