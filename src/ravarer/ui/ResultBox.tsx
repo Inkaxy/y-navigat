@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -7,10 +8,12 @@ type Props = {
   onUndo?: () => void;
   onNext?: () => void;
   nextLabel?: string;
+  /** Valgfritt ekstra innhold, f.eks. lenke til en opprettet sak. */
+  children?: ReactNode;
 };
 
 /** Standard resultat etter en handling: hva skjedde, valgfri «Angre», og «Neste». */
-export function ResultBox({ title, items = [], onUndo, onNext, nextLabel = "Neste" }: Props) {
+export function ResultBox({ title, items = [], onUndo, onNext, nextLabel = "Neste", children }: Props) {
   return (
     <div role="status" className="rounded-lg border border-success/40 bg-success/5 p-4">
       <div className="flex items-start gap-2">
@@ -22,12 +25,13 @@ export function ResultBox({ title, items = [], onUndo, onNext, nextLabel = "Nest
               {items.map((t) => <li key={t}>{t}</li>)}
             </ul>
           )}
+          {children && <div className="mt-2 text-sm">{children}</div>}
         </div>
       </div>
       {(onUndo || onNext) && (
         <div className="mt-3 flex justify-end gap-2">
           {onUndo && <Button variant="ghost" size="sm" onClick={onUndo}>Angre</Button>}
-          {onNext && <Button size="sm" onClick={onNext}>{nextLabel}</Button>}
+          {onNext && <Button size="sm" data-action="next" onClick={onNext}>{nextLabel}</Button>}
         </div>
       )}
     </div>
