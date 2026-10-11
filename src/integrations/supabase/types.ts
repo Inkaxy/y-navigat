@@ -18049,6 +18049,15 @@ export type Database = {
           supplier_name: string
         }[]
       }
+      rm_save_manual_pdf_invoice: {
+        Args: {
+          p_invoice: Json
+          p_legal_entity_id: string
+          p_rows: Json
+          p_supplier: Json
+        }
+        Returns: Json
+      }
       rm_set_documented_cost_price: {
         Args: {
           p_effective_date: string
