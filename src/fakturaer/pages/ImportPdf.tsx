@@ -135,17 +135,21 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
     return c !== null && c < LOW_CONF;
   };
 
-  const runParse = async () => {
+  // Leverandør valgt før lesing gir leverandørens bekreftede rettelser som eksempler (selskap + leverandør).
+  const [parsedWithSupplier, setParsedWithSupplier] = useState<string | null>(null);
+  const runParse = async (supplierOverride?: string) => {
     if (!file || !legalEntityId) return;
     setParsing(true);
     try {
       const pdf_base64 = await fileToBase64(file);
+      const sid = supplierOverride ?? (supplierMode === "existing" && supplierId ? supplierId : null);
       const { data, error } = await supabase.functions.invoke("extract-invoice-from-pdf", {
-        body: { legal_entity_id: legalEntityId, pdf_base64 },
+        body: { legal_entity_id: legalEntityId, pdf_base64, ...(sid ? { supplier_id: sid } : {}) },
       });
       if (error) throw error;
       const result = data as ParseResult;
       setParseResult(result);
+      setParsedWithSupplier(sid);
 
       // Pre-fill
       const e = result.extracted;
@@ -173,8 +177,11 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
         discount_amount: l.discount_amount ?? null,
       })));
 
-      const match = result.matched_supplier ?? result.name_matched_supplier;
-      if (match) {
+      const match = sid ? null : result.matched_supplier ?? result.name_matched_supplier;
+      if (sid) {
+        setSupplierMode("existing");
+        setSupplierId(sid);
+      } else if (match) {
         setSupplierMode("existing");
         setSupplierId(match.id);
       } else if (e.supplier_name) {
@@ -396,6 +403,16 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
               </Select>
             </div>
             <div>
+              <Label>Leverandør (valgfritt)</Label>
+              <Select value={supplierMode === "existing" ? supplierId : ""} onValueChange={(v) => { setSupplierMode("existing"); setSupplierId(v); }} disabled={!legalEntityId || parsing}>
+                <SelectTrigger aria-label="Leverandør før lesing"><SelectValue placeholder="Finn automatisk" /></SelectTrigger>
+                <SelectContent>
+                  {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-xs text-ink-secondary">Med leverandør valgt brukes bekreftede rettelser for denne leverandøren som eksempler ved lesingen.</p>
+            </div>
+            <div>
               <Label>PDF-fil(er) *</Label>
               <Input type="file" accept="application/pdf,.pdf" multiple disabled={!legalEntityId || parsing}
                 onChange={(e) => {
@@ -418,7 +435,7 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
 
           <div className="mt-5 flex justify-end gap-2">
             <Button variant="outline" onClick={() => navigate(paths.alleFakturaer())}>Avbryt</Button>
-            <Button onClick={runParse} disabled={!file || !legalEntityId || parsing} className="gap-2">
+            <Button onClick={() => void runParse()} disabled={!file || !legalEntityId || parsing} className="gap-2">
               {parsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
               {queue.length > 1 ? `Les første (1 av ${queue.length})` : "Les og fortsett"}
             </Button>
@@ -463,6 +480,12 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
         <Badge variant={overallLow ? "destructive" : "secondary"}>
           Sikkerhet: {(parseResult.confidence * 100).toFixed(0)}%
         </Badge>
+        {supplierMode === "existing" && supplierId && parsedWithSupplier !== supplierId && (
+          <Button size="sm" variant="outline" disabled={parsing} onClick={() => void runParse(supplierId)}>
+            {parsing ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+            Les på nytt med leverandørens rettelser
+          </Button>
+        )}
         {parseResult.warnings.map((w, i) => (
           <Badge key={i} variant="outline" className="gap-1 text-warning">
             <AlertTriangle className="h-3 w-3" /> {w}

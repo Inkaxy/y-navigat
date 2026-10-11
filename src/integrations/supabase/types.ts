@@ -3316,6 +3316,7 @@ export type Database = {
           description: string | null
           discount_amount: number | null
           expected_price_per_base_unit: number | null
+          extraction_evidence: Json | null
           extraction_issues: Json
           id: string
           invoice_id: string
@@ -3355,6 +3356,7 @@ export type Database = {
           description?: string | null
           discount_amount?: number | null
           expected_price_per_base_unit?: number | null
+          extraction_evidence?: Json | null
           extraction_issues?: Json
           id?: string
           invoice_id: string
@@ -3394,6 +3396,7 @@ export type Database = {
           description?: string | null
           discount_amount?: number | null
           expected_price_per_base_unit?: number | null
+          extraction_evidence?: Json | null
           extraction_issues?: Json
           id?: string
           invoice_id?: string
@@ -3697,6 +3700,7 @@ export type Database = {
           line_extraction_attempts: number
           line_extraction_error: string | null
           line_extraction_status: string
+          line_extraction_token: string | null
           lines_source: string | null
           lines_sum_excl_vat: number | null
           lines_sum_status: string
@@ -3743,6 +3747,7 @@ export type Database = {
           line_extraction_attempts?: number
           line_extraction_error?: string | null
           line_extraction_status?: string
+          line_extraction_token?: string | null
           lines_source?: string | null
           lines_sum_excl_vat?: number | null
           lines_sum_status?: string
@@ -3789,6 +3794,7 @@ export type Database = {
           line_extraction_attempts?: number
           line_extraction_error?: string | null
           line_extraction_status?: string
+          line_extraction_token?: string | null
           lines_source?: string | null
           lines_sum_excl_vat?: number | null
           lines_sum_status?: string
@@ -15753,6 +15759,7 @@ export type Database = {
         }
         Returns: Json
       }
+      _rm_bounded_issues: { Args: { p: Json; p_source: string }; Returns: Json }
       _rm_cost_candidates: {
         Args: { p_as_of: string; p_raw_material_id: string }
         Returns: {
@@ -15766,6 +15773,10 @@ export type Database = {
           source: string
           supplier_id: string
         }[]
+      }
+      _rm_invoice_extraction_blocker: {
+        Args: { p_invoice_id: string }
+        Returns: string
       }
       _rm_reconcile_core: {
         Args: { p_invoice_id: string; p_mode: string; p_uid: string }
@@ -17668,6 +17679,7 @@ export type Database = {
           p_max_attempts?: number
         }
         Returns: {
+          claim_token: string
           id: string
           invoice_number: string
           line_extraction_attempts: number
@@ -17784,6 +17796,19 @@ export type Database = {
           original: Json
           supplier_sku_norm: string
         }[]
+      }
+      rm_fail_invoice_line_extraction: {
+        Args: { p_invoice_id: string; p_patch: Json; p_token: string }
+        Returns: boolean
+      }
+      rm_finalize_invoice_line_extraction: {
+        Args: {
+          p_invoice: Json
+          p_invoice_id: string
+          p_rows: Json
+          p_token: string
+        }
+        Returns: Json
       }
       rm_infer_package: {
         Args: { p_base_unit?: string; p_line_id: string }

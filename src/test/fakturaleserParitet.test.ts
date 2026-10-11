@@ -118,3 +118,22 @@ describe("kildeparitet", () => {
     expect(imp).toContain("toInvoiceLineRows");
   });
 });
+
+import { describe as d2, it as i2, expect as e2 } from "vitest";
+import { computeConfidence as cc2, sanitizeLines as sl2 } from "../../supabase/functions/_shared/invoiceExtraction";
+
+d2("import bevarer leserens varsler og bevis", () => {
+  i2("tvetydig_tall og råtekst følger raden til ferdigstillingen", () => {
+    const [r] = toInvoiceLineRows([{ description: "Mandler", quantity: null, unit_price: 110, total_amount: null,
+      read_issues: [{ code: "tvetydig_tall", message: "Tvetydig tall i mengde («10.000»)" }],
+      number_evidence: [{ field: "quantity", raw: "10.000" }], confidence: null }], "inv", null);
+    e2(r.read_issues.map((x) => x.code)).toContain("tvetydig_tall");
+    e2(r.evidence.number_evidence).toEqual(expect.arrayContaining([{ field: "quantity", raw: "10.000" }]));
+    e2(r.evidence.confidence).toBeNull();
+  });
+  i2("manglende linjescore arver ikke header 99 %", () => {
+    const lines = sl2([{ description: "a", quantity: 3, unit_price: 10, total_amount: 30 }]);
+    e2(lines[0].confidence).toBeNull();
+    e2(cc2({ fieldConfidence: { total_amount: 0.99 }, lines, sumDeviationPct: null, method: "ai" })).toBeLessThanOrEqual(0.6);
+  });
+});
