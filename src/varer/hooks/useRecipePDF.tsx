@@ -406,9 +406,9 @@ export function useRecipePDF() {
       ]);
       const blob = await pdf(<RecipePDFDocument data={data} />).toBlob();
       openBlob(blob, `Produksjonsark - ${data.name} - ${data.scaledUnits} stk.pdf`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      toast.error(err?.message ?? "Kunne ikke lage produksjonsarket");
+      toast.error("Kunne ikke lage produksjonsarket");
     } finally {
       setGenerating(null);
     }
@@ -431,9 +431,9 @@ export function useRecipePDF() {
         <RecipeCardPDFDocument data={{ ...data, imageUrl }} showCosts={options.includeCosts} />,
       ).toBlob();
       openBlob(blob, `Oppskrift - ${data.name}.pdf`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      toast.error(err?.message ?? "Kunne ikke lage oppskriftskortet");
+      toast.error("Kunne ikke lage oppskriftskortet");
     } finally {
       setGenerating(null);
     }
