@@ -78,7 +78,7 @@ export function PdfDocumentViewer({ url, cacheKey, version, title, fallback, cla
     return (
       <div role="alert" className={cn("flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm", className)}>
         <span>Originalen er endret mens den ble hentet. Ingenting fra den gamle versjonen vises.</span>
-        <Button size="sm" variant="outline" className="min-h-11" onClick={() => onIdentityChanged?.()}><RefreshCw className="h-4 w-4" /> Hent på nytt</Button>
+        <Button size="sm" variant="outline" className="min-h-11" onClick={() => { onIdentityChanged?.(); void q.refetch(); }}><RefreshCw className="h-4 w-4" /> Hent på nytt</Button>
       </div>
     );
   }
