@@ -70,7 +70,8 @@ export default function RawMaterialDetail() {
   // Kjent gammel `tab` (eller ugyldig seksjon) skrives om én gang; øvrige parametre beholdes.
   useEffect(() => {
     if (normalized && page.rm) setSearchParams(normalized, { replace: true });
-  }, [normalized, page.rm, setSearchParams]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- nøkkel er URL-strengen, ikke objektet
+  }, [normalized?.toString(), !!page.rm]);
 
   // Hele varelisten hentes KUN for «forrige/neste». Kom brukeren hit uten
   // listekontekst (direktelenke, søk) OG uten at varelisten allerede er
