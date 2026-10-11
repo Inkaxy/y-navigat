@@ -30,6 +30,13 @@ function formatPlainValue(value: unknown): string {
   return String(value);
 }
 
+/** Full detalj beholder hendelsen, slik at forrige/neste går per hendelse (ikke per råvare). */
+export function withEvent(listSearch: string, eventId: string): URLSearchParams {
+  const n = new URLSearchParams(listSearch);
+  n.set("endring", eventId);
+  return n;
+}
+
 /** Radene lagrer per-felt skalarer, ikke jsonb-objekter. */
 function diffRows(c: ChangelogRow) {
   if (c.change_type === "nutrition_changed" && c.field) return [nutritionValueDiff(c.field, c.old_value, c.new_value)];
@@ -158,7 +165,7 @@ export default function DatasheetMode() {
           />
         }
         panel={
-          <PeekPanel title={active?.raw_materials?.name} fullHref={active ? `${paths.raavare(active.raw_material_id)}${sectionSearch(new URLSearchParams(listSearch), "deklarasjon")}` : undefined} onClose={endring ? () => setActive(null) : undefined} emptyText="Velg en endring i listen"
+          <PeekPanel title={active?.raw_materials?.name} fullHref={active ? `${paths.raavare(active.raw_material_id)}${sectionSearch(withEvent(listSearch, active.id), "deklarasjon")}` : undefined} onClose={endring ? () => setActive(null) : undefined} emptyText="Velg en endring i listen"
             footer={active && !active.acknowledged && canWrite ? <Button className="min-h-11 w-full" onClick={() => ack.mutate(active.id)} disabled={ack.isPending}>Bekreft endring</Button> : undefined}>
             {active ? (
               <div className="space-y-4">
