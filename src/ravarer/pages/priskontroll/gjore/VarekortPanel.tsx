@@ -17,7 +17,6 @@ import { RawMaterialCreateSheet } from "@/ravarer/editors/RawMaterialCreateSheet
 import { NOT_A_PRODUCT_REASONS } from "@/ravarer/lib/notAProductReasons";
 import { savePrimaryAndRefresh } from "@/ravarer/lib/primaryChoice";
 import { paths } from "@/ravarer/lib/paths";
-import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { ResultBox } from "@/ravarer/ui/ResultBox";
 import { VarekortHeaderView, VBlock } from "./VarekortHeaderView";
 import { PriceBlock, hasPriceWork } from "./PriceBlock";
