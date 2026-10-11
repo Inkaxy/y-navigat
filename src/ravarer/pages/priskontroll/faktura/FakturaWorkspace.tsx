@@ -122,6 +122,27 @@ export default function FakturaWorkspace() {
     setPendingFocus(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingFocus, q.visible]);
+  // `?linje=<id>`: åpne nøyaktig denne linjen (også lukkede). Ukjent ID velger aldri en annen linje.
+  const targetLine = sp.get("linje");
+  const [lineNotice, setLineNotice] = useState<string | null>(null);
+  const handledTarget = useRef<string | null>(null);
+  useEffect(() => {
+    if (!targetLine || !q.linesQuery.isSuccess) return;
+    const key = `${id}:${targetLine}`;
+    if (handledTarget.current === key) return;
+    handledTarget.current = key;
+    if (q.lines.some((l) => l.id === targetLine)) {
+      q.setOnlyOpen(false);
+      q.setReason("all");
+      setPendingFocus(targetLine);
+      setInspectorOpen(true);
+      setZone("linjer");
+      setLineNotice(null);
+    } else {
+      setLineNotice("Linjen fra lenken finnes ikke på denne fakturaen eller er ikke tilgjengelig for deg. Ingen annen linje er valgt.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetLine, id, q.linesQuery.isSuccess, q.lines]);
   const focusFirstOpen = () => {
     q.setOnlyOpen(true);
     const first = q.visible.find((l) => q.statusOf(l).bucket === "needs");
@@ -234,6 +255,7 @@ export default function FakturaWorkspace() {
   const linesZone = (
     <div className="min-w-0 space-y-3">
       {!isMobile && control()}
+      {lineNotice && <p role="alert" className="rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-sm">{lineNotice}</p>}
       {lockNote && <p role="note" className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-ink-secondary">{lockNote}</p>}
       {s.result && <ResultBox title={s.result.title} items={s.result.items} onUndo={s.result.undoable && q.undoEntry ? () => { s.setResult(null); void q.undo(); } : undefined} onNext={() => s.setResult(null)} nextLabel="Lukk" />}
       {lastLinked && <SimilarLinesHint rmsId={lastLinked.rmsId} name={lastLinked.name} onOpen={() => q.setBulkLink(lastLinked)} onDismiss={() => setLastLinked(null)} />}
