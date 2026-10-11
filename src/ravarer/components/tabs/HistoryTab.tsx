@@ -9,7 +9,8 @@ import { QueryState } from "@/components/common/QueryState";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate, formatNok, priceSourceLabel } from "@/ravarer/lib/constants";
 import { correctionText, UNIT_SOURCE_LABEL } from "@/ravarer/lib/priceProvenance";
-import { usePriceHistory, toTimelineRow } from "@/ravarer/hooks/useRmSuppliers";
+import { useTimelineHistory } from "@/ravarer/hooks/useRmSuppliers";
+import { RECONSTRUCTED_NOTE } from "@/ravarer/lib/priceProvenance";
 import { historyKind, HISTORY_KIND_LABEL } from "@/ravarer/lib/priceTimeline";
 import { PriceComparisonCard } from "@/ravarer/components/PriceComparisonCard";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
@@ -75,7 +76,8 @@ export function HistoryTab({ rm }: Props) {
     },
   });
 
-  const prices = usePriceHistory(rm.id);
+  // Samme sammenslåtte historikk (låst snapshot + serverens kontrollerte projeksjon) som graf/liste/CSV.
+  const prices = useTimelineHistory(rm.id);
 
   const events = useMemo<TimelineEvent[]>(() => {
     const list: TimelineEvent[] = [];
@@ -101,9 +103,12 @@ export function HistoryTab({ rm }: Props) {
         invoiceId: null,
       });
     }
-    for (const p of prices.data ?? []) {
-      const hk = historyKind(toTimelineRow(p), rm.base_unit);
-      const pv = p.provenance;
+    const merged = new Map(prices.rows.map((r) => [r.id, r]));
+    for (const p of prices.raw) {
+      const row = merged.get(p.id);
+      if (!row) continue;
+      const hk = historyKind(row, rm.base_unit);
+      const pv = { ...p.provenance, unit: row.unit ?? null, currency: row.currency ?? p.provenance.currency, unitSource: row.unitSource ?? null };
       list.push({
         id: `p-${p.id}`,
         kind: "pris",
@@ -112,6 +117,9 @@ export function HistoryTab({ rm }: Props) {
         detail: [
           sourceLabel(p.source),
           pv.unitSource ? `Enhet: ${UNIT_SOURCE_LABEL[pv.unitSource]}` : "Enhet ikke dokumentert",
+          row.unitSource === "currently_verified_line" ? `${RECONSTRUCTED_NOTE}${row.checkedAt ? ` (${formatDateTime(row.checkedAt)})` : ""}` : null,
+          row.held ? "Holdt til kontroll — ikke prisreferanse" : null,
+          row.duplicateSource ? "Duplikat — ikke prisreferanse" : null,
           pv.packageText ? `Pakning ${pv.packageText}` : null,
           p.is_legacy ? "Gammel pakningslogikk" : null,
           ...pv.corrections.map((c) => `Rettet: ${correctionText(c)}`),
@@ -124,11 +132,12 @@ export function HistoryTab({ rm }: Props) {
     return list
       .filter((e) => filter === "alle" || e.kind === filter)
       .sort((a, b) => b.at.localeCompare(a.at));
-  }, [changelog.data, recalcs.data, prices.data, filter, rm.base_unit]);
+  }, [changelog.data, recalcs.data, prices.rows, prices.raw, filter, rm.base_unit]);
 
   const isLoading = changelog.isLoading || recalcs.isLoading || prices.isLoading;
   const isError = changelog.isError || recalcs.isError || prices.isError;
-  const error = changelog.error ?? recalcs.error ?? prices.error;
+  const projectionError = prices.projectionError;
+  const error = changelog.error ?? recalcs.error ?? (prices.isError ? prices.error : null);
 
   return (
     <div className="space-y-4">
