@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -40,7 +40,14 @@ export function VarekortPanel({ supplierId, itemKey, onDone, onNext, onSkip, onC
   const lines = useSupplierItemLines(supplierId, itemKey);
   const { canWrite } = useInvoiceRights();
   const [result, setResult] = useState<PanelResult | null>(null);
-  const item = q.data?.items[0] ?? null;
+  const live = q.data?.items[0] ?? null;
+  // Frys: det brukeren jobber med endrer seg ikke under hånden. Nye data vises som varsel med «Oppdater».
+  const [snap, setSnap] = useState<{ item: SupplierItem; lines: SupplierItemLine[] } | null>(null);
+  useEffect(() => {
+    if (!snap && live && lines.data) setSnap({ item: live, lines: lines.data });
+  }, [snap, live, lines.data]);
+  const change = snap && live && lines.data ? frozenChange(snap.lines, lines.data, snap.item, live) : null;
+  const item = snap?.item ?? live;
   const done = (r: PanelResult) => { setResult(r); onDone?.(r); };
 
   if (result) {
@@ -55,15 +62,36 @@ export function VarekortPanel({ supplierId, itemKey, onDone, onNext, onSkip, onC
     <QueryState isLoading={q.isLoading || lines.isLoading} isError={q.isError || lines.isError} error={q.error ?? lines.error} scope="ravarer:varekort"
       onRetry={() => { void q.refetch(); void lines.refetch(); }} isEmpty={!item} emptyTitle="Fant ikke varekortet">
       {item && (
-        <VarekortBody key={`${item.supplier_id}|${item.item_key}`} item={item} lines={lines.data ?? []} canWrite={canWrite}
+        <>
+        {change && (
+          <div role="status" className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
+            <span>{change}</span>
+            <Button size="sm" variant="outline" onClick={() => setSnap(live && lines.data ? { item: live, lines: lines.data } : null)}>Oppdater</Button>
+          </div>
+        )}
+        <VarekortBody key={`${item.supplier_id}|${item.item_key}`} item={item} lines={snap?.lines ?? lines.data ?? []} canWrite={canWrite} stale={!!change}
           onDone={done} onNext={onNext} onSkip={onSkip} onClose={onClose ?? (() => undefined)} />
+        </>
       )}
     </QueryState>
   );
 }
 
-function VarekortBody({ item, lines, canWrite, onDone, onNext, onSkip, onClose }: {
-  item: SupplierItem; lines: SupplierItemLine[]; canWrite: boolean;
+/** Hva har endret seg siden varekortet ble åpnet? null = ingenting som påvirker beslutningen. */
+export function frozenChange(before: readonly SupplierItemLine[], after: readonly SupplierItemLine[], bi: SupplierItem, ai: SupplierItem): string | null {
+  const open = (ls: readonly SupplierItemLine[]) => new Set(ls.filter((l) => l.requires_review).map((l) => l.id));
+  const b = open(before); const a = open(after);
+  const added = [...a].filter((id) => !b.has(id)).length;
+  const removed = [...b].filter((id) => !a.has(id)).length;
+  const parts: string[] = [];
+  if (added) parts.push(`${added} ${added === 1 ? "ny åpen linje" : "nye åpne linjer"}`);
+  if (removed) parts.push(`${removed} ${removed === 1 ? "linje er" : "linjer er"} løst et annet sted`);
+  if (bi.status !== ai.status || bi.rm_id !== ai.rm_id) parts.push("koblingen eller statusen er endret");
+  return parts.length ? `Varekortet er endret siden du åpnet det: ${parts.join(", ")}.` : null;
+}
+
+function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, onClose }: {
+  item: SupplierItem; lines: SupplierItemLine[]; canWrite: boolean; stale?: boolean;
   onDone: (r: PanelResult) => void; onNext?: () => void; onSkip?: () => void; onClose: () => void;
 }) {
   const { data: company } = useCompany();
@@ -92,7 +120,9 @@ function VarekortBody({ item, lines, canWrite, onDone, onNext, onSkip, onClose }
     if (!company) return;
     setError(null);
     try {
-      const r = await link.mutateAsync({ legal_entity_id: company.id, supplier_id: item.supplier_id, item_key: item.item_key, not_raw_material: true, reason });
+      // Bare linjene som vises (fryst utvalg) — nye linjer krever «Oppdater» først.
+      const lineIds = lines.filter((l) => l.requires_review).map((l) => l.id);
+      const r = await link.mutateAsync({ legal_entity_id: company.id, supplier_id: item.supplier_id, item_key: item.item_key, not_raw_material: true, reason, line_ids: lineIds.length ? lineIds : undefined });
       onDone({ title: `Merket som ikke vare (${reason})`, items: linkResultSummary(r) });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Kunne ikke lagre.");
@@ -158,6 +188,7 @@ function VarekortBody({ item, lines, canWrite, onDone, onNext, onSkip, onClose }
         </VBlock>
       )}
 
+      {stale && <p className="text-caption text-ink-secondary">Handlinger gjelder linjene som vises. Trykk «Oppdater» for å ta med nye linjer.</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       {!canWrite && <p className="text-caption text-ink-secondary">Du har bare lesetilgang.</p>}
 
