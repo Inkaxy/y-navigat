@@ -495,7 +495,7 @@ export default function Varetelling() {
                     {diff != null && (
                       <Badge
                         variant="outline"
-                        className={diff < 0 ? "border-destructive/50 text-destructive" : diff > 0 ? "border-success/50 text-success" : ""}
+                        className={"self-start sm:self-auto " + (diff < 0 ? "border-destructive/50 text-destructive" : diff > 0 ? "border-success/50 text-success" : "")}
                       >
                         {diff > 0 ? "+" : ""}
                         {formatNumber(diff, 2)} {r.base_unit}
