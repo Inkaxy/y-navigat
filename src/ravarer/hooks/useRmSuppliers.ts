@@ -66,6 +66,7 @@ export function toTimelineRow(h: PriceHistoryRow): TimelineHistoryRow {
     isLegacy: !!h.is_legacy, isCredit: !!h.is_credit, currency: h.provenance.currency, createdAt: h.created_at ?? null,
     unit: h.provenance.unit, unitSource: h.provenance.unitSource, packageText: h.provenance.packageText,
     corrections: h.provenance.corrections,
+    invoice_line_id: h.invoice_line_id ?? h.invoice_line_ref ?? null,
   };
 }
 

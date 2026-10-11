@@ -40,6 +40,13 @@ export interface TimelineHistoryRow {
   checkedAt?: string | null;
   /** Grunnenheter per pakning bevist fra radens EGEN kildelinje (ikke dagens pakning). */
   sourceBasePerPackage?: number | null;
+  /** Radens fakturalinje (`invoice_line_id`, ellers dokumentert `invoice_line_ref`). */
+  invoice_line_id?: string | null;
+  /**
+   * Gjeldende kontroll (hold/duplikat/linjekontroll) er ukjent — serverkontrollen feilet, laster
+   * eller identiteten stemte ikke. Originalverdien beholdes som hendelse, men er ikke sammenlignbar.
+   */
+  controlUnknown?: "feil" | "laster" | "identitet" | null;
 }
 
 /**
@@ -47,7 +54,7 @@ export interface TimelineHistoryRow {
  * Δ og CSV-prisrader; resten vises som egne hendelser.
  */
 export type HistoryKind =
-  | "gyldig" | "kreditnota" | "til_kontroll" | "duplikat" | "utgatt" | "eldre" | "annen_valuta" | "ukjent_valuta" | "annen_enhet" | "ukjent_enhet" | "ugyldig";
+  | "gyldig" | "kreditnota" | "til_kontroll" | "kontroll_ukjent" | "duplikat" | "utgatt" | "eldre" | "annen_valuta" | "ukjent_valuta" | "annen_enhet" | "ukjent_enhet" | "ugyldig";
 
 /**
  * `currentUnit` gis av alle visninger med hentet grunnlag: da er bare rader med
@@ -56,6 +63,7 @@ export type HistoryKind =
 export function historyKind(h: TimelineHistoryRow, currentUnit?: string | null): HistoryKind {
   if (h.isCredit || h.isCreditNote) return "kreditnota";
   if (h.held) return "til_kontroll";
+  if (h.controlUnknown) return "kontroll_ukjent";
   if (h.duplicateSource) return "duplikat";
   if (h.supersededAt || h.supersededReason) return "utgatt";
   if (h.isLegacy) return "eldre";
@@ -81,6 +89,7 @@ export const HISTORY_KIND_LABEL: Record<HistoryKind, string> = {
   gyldig: "Gyldig",
   kreditnota: "Kreditnota",
   til_kontroll: "Til kontroll",
+  kontroll_ukjent: "Kontroll ukjent — ikke sammenlignbar",
   duplikat: "Duplikat av samme fakturalinje",
   utgatt: "Utgått / korrigert",
   eldre: "Eldre rad (erstattet)",
