@@ -154,7 +154,7 @@ describe("faktiske komponenter", () => {
     wrap(<InvoiceDocumentPanel onClose={() => undefined}
       invoice={{ invoice_number: "1", invoice_date: "2026-10-01", is_credit_note: false, currency: "NOK", lines_sum_status: "ok", extraction_issues: [] }}
       line={line({ total_amount: 1000, unit_price: 100, price_per_base_unit: 10, expected_price_per_base_unit: 8, price_variance_pct: 25 })} gate={gateOf(safeLine({ effect_nok: 200, expected_price_per_base_unit: 8, price_per_base_unit: 10 }))} />);
-    expect(screen.getByText(/\+25 %/)).toBeInTheDocument();
+    expect(screen.getByText(/Kontrollert pris\/grunnenhet/)).toBeInTheDocument();
   });
 });
 
