@@ -93,7 +93,7 @@ export function useToggleExample() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (a: { id: string; active: boolean; reason?: string }) => {
-      const { error } = await supabase.rpc("rm_set_extraction_example_active", { p_example_id: a.id, p_active: a.active, p_reason: a.reason ?? null });
+      const { error } = await supabase.rpc("rm_set_extraction_example_active", { p_example_id: a.id, p_active: a.active, p_reason: a.reason });
       if (error) {
         const m = error.message;
         throw new Error(/forbidden/.test(m) ? "Du mangler skrivetilgang til fakturaer."
