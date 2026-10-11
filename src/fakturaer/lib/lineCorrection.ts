@@ -4,11 +4,11 @@ import { parseNorwegianNumber } from "@/fakturaer/lib/invoiceReadCheck";
 
 /** Feltene «Rett fakturalinje» kan endre — samme liste som rm_correct_invoice_line. */
 export const CORRECTION_FIELDS = [
-  "supplier_sku", "description", "quantity", "unit", "package_size", "package_unit", "count_per_package", "unit_price", "total_amount", "line_kind",
+  "supplier_sku", "description", "quantity", "unit", "package_size", "package_unit", "count_per_package", "unit_price", "total_amount", "line_kind", "unit_price_basis", "discount_amount",
 ] as const;
 export type CorrectionField = (typeof CORRECTION_FIELDS)[number];
 
-export const NUMERIC_FIELDS: readonly CorrectionField[] = ["quantity", "package_size", "count_per_package", "unit_price", "total_amount"];
+export const NUMERIC_FIELDS: readonly CorrectionField[] = ["quantity", "package_size", "count_per_package", "unit_price", "total_amount", "discount_amount"];
 
 export const CORRECTION_FIELD_LABEL: Record<CorrectionField, string> = {
   supplier_sku: "Varenr.",
@@ -21,7 +21,17 @@ export const CORRECTION_FIELD_LABEL: Record<CorrectionField, string> = {
   unit_price: "Enhetspris eks. mva",
   total_amount: "Linjesum eks. mva",
   line_kind: "Linjetype",
+  unit_price_basis: "Prisen gjelder per",
+  discount_amount: "Rabatt i kr (positiv)",
 };
+
+export const PRICE_BASIS_OPTIONS: readonly { value: string; label: string }[] = [
+  { value: "", label: "Ukjent (kontrolleres)" },
+  { value: "mengdeenhet", label: "Fakturert enhet" },
+  { value: "pakning", label: "Pakning" },
+  { value: "stk", label: "Stk i pakningen" },
+  { value: "kg", label: "Kg" }, { value: "g", label: "Gram" }, { value: "l", label: "Liter" }, { value: "ml", label: "Ml" },
+];
 
 export const LINE_KIND_OPTIONS: readonly { value: string; label: string; hint: string }[] = [
   { value: "vare", label: "Vare", hint: "Råvare eller emballasje som skal kobles og prissjekkes." },
@@ -71,6 +81,7 @@ export function buildChanges(original: CorrectionValues, draft: CorrectionDraft)
         const n = parseNorwegianNumber(raw);
         if (n == null) { errors[f] = "Ikke et gyldig tall"; continue; }
         if ((f === "package_size" || f === "count_per_package") && n <= 0) { errors[f] = "Må være større enn 0"; continue; }
+        if (f === "discount_amount" && n < 0) { errors[f] = "Oppgi rabatt som positivt beløp"; continue; }
         next = n;
       }
     } else next = raw === "" ? null : raw;
@@ -90,6 +101,7 @@ const ERRORS: readonly [RegExp, string][] = [
   [/ingen_endring/, "Ingen felt er endret."],
   [/ugyldig_tall/, "Et tall er ugyldig."],
   [/ugyldig_linjetype/, "Ugyldig linjetype."],
+  [/ugyldig_prisgrunnlag/, "Ugyldig prisgrunnlag."],
 ];
 
 export function correctionErrorMessage(message: string | null | undefined): string {
@@ -97,7 +109,7 @@ export function correctionErrorMessage(message: string | null | undefined): stri
   return ERRORS.find(([re]) => re.test(m))?.[1] ?? "Rettelsen ble ikke lagret. Prøv igjen.";
 }
 
-export type CorrectionResult = { ok: boolean; changed: string[]; remainingIssues: ReadIssue[]; exampleId: string | null; linesSumStatus: string | null };
+export type CorrectionResult = { ok: boolean; changed: string[]; remainingIssues: ReadIssue[]; exampleId: string | null; exampleActive: boolean | null; linesSumStatus: string | null };
 
 export function parseCorrectionResult(v: Json | null): CorrectionResult {
   const o = isRecord(v) ? v : {};
@@ -106,6 +118,7 @@ export function parseCorrectionResult(v: Json | null): CorrectionResult {
     changed: Array.isArray(o.changed) ? o.changed.filter((x): x is string => typeof x === "string") : [],
     remainingIssues: parseReadIssues(o.remaining_issues),
     exampleId: typeof o.example_id === "string" ? o.example_id : null,
+    exampleActive: typeof o.example_active === "boolean" ? o.example_active : null,
     linesSumStatus: typeof o.lines_sum_status === "string" ? o.lines_sum_status : null,
   };
 }
