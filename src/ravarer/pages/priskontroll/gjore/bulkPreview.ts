@@ -30,7 +30,9 @@ export function candidatesFrom(rows: readonly { invoice_line_id: string; raw_mat
     by.set(r.raw_material_id, c);
   }
   const candidates = [...by.values()].sort((a, b) => b.lines - a.lines || a.name.localeCompare(b.name, "nb"));
-  return { candidates, unambiguous: candidates.length === 1 ? candidates[0] : null };
+  // Automatisk forhåndsvalg bare når ALLE valgte linjer har forslag og alle peker på samme råvare.
+  const allCovered = lineIds.length > 0 && lineIds.every((id) => top.has(id));
+  return { candidates, unambiguous: allCovered && candidates.length === 1 ? candidates[0] : null };
 }
 
 export async function loadCardPreview(it: WorkItem, legalEntityId: string, withSuggestions: boolean): Promise<CardPreview> {

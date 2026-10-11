@@ -10707,6 +10707,41 @@ export type Database = {
           },
         ]
       }
+      raw_material_price_review_holds: {
+        Row: {
+          held_at: string
+          history_id: string
+          reason: string
+          release_reason: string | null
+          released_at: string | null
+          released_by: string | null
+        }
+        Insert: {
+          held_at?: string
+          history_id: string
+          reason: string
+          release_reason?: string | null
+          released_at?: string | null
+          released_by?: string | null
+        }
+        Update: {
+          held_at?: string
+          history_id?: string
+          reason?: string
+          release_reason?: string | null
+          released_at?: string | null
+          released_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "raw_material_price_review_holds_history_id_fkey"
+            columns: ["history_id"]
+            isOneToOne: true
+            referencedRelation: "raw_material_price_history"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       raw_material_products: {
         Row: {
           base_units_per_sold_unit: number
@@ -17919,6 +17954,10 @@ export type Database = {
           p_tol_pct: number
         }
         Returns: Json
+      }
+      rm_price_line_validation_reason: {
+        Args: { p_line_id: string }
+        Returns: string
       }
       rm_price_movers: {
         Args: { p_days?: number; p_legal_entity_id: string; p_limit?: number }
