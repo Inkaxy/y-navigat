@@ -36,9 +36,9 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 | R20 | Masse: sett varetype | Massehandlingsrad | 4 | Flyttet — Vareliste (DataTable + SplitView/RawMaterialPeek, VarelisteCells) (kilde/komponenttest; ikke nettleserverifisert) |
 | R21 | Masse: sett primærleverandør | Massehandlingsrad via PrimarySupplierControl (synker `is_primary`) | 4 | Flyttet — Vareliste (DataTable + SplitView/RawMaterialPeek, VarelisteCells) (kilde/komponenttest; ikke nettleserverifisert) |
 | R22 | Masse: aktiver og deaktiver | Massehandlingsrad | 4 | Flyttet — Vareliste (DataTable + SplitView/RawMaterialPeek, VarelisteCells) (kilde/komponenttest; ikke nettleserverifisert) |
-| R23 | Masse: kø for å bekrefte pakning (hopper over bekreftede) | Massehandlingsrad → PackageEditor i kø | 4 | Gammel plass |
-| R24 | Masse: CSV med valgte rader × synlige kolonner (`;`, BOM) | Massehandlingsrad «Eksporter CSV» (norske verdier) | 4 | Gammel plass |
-| R25 | Tøm valg | Massehandlingsrad | 4 | Gammel plass |
+| R23 | Masse: kø for å bekrefte pakning (hopper over bekreftede) | Massehandlingsrad → PackageEditor i kø | 4 | Flyttet — Vareliste massehandlingsrad → PackageEditor-kø (kilde/komponenttest; ikke nettleserverifisert) |
+| R24 | Masse: CSV med valgte rader × synlige kolonner (`;`, BOM) | Massehandlingsrad «Eksporter CSV» (norske verdier) | 4 | Flyttet — Vareliste `tableCsv` valgte × synlige kolonner (kolonnerekkefølge-test; ikke nettleserverifisert) |
+| R25 | Tøm valg | Massehandlingsrad | 4 | Flyttet — Vareliste massehandlingsrad (kilde; ikke nettleserverifisert) |
 | R26 | Hurtigtaster `/`, ↑, ↓, Enter, `e`, `n`, Esc | useHotkeys + J/K og `?`-liste | 4 | Gammel plass |
 | R28 | Banner om leverandørvarer som venter, lenke til Varekoblinger | Hint i header «N varekort venter» → /priskontroll?fane=gjore | 4 | Gammel plass |
 | R29 | Mobil kortliste med merkene Avvik, Mangler deklarasjon og Inaktiv | DataTable mobilkort på /varer | 6 | Gammel plass |
@@ -175,14 +175,14 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| R108 | Kort for dekning av næringsdata | /varer/matvaretabellen › header | 4 | Gammel plass |
-| R109 | Gruppefilter, søk og paging | /varer/matvaretabellen › DataTable | 4 | Gammel plass |
-| R110 | Kolonner for næringsstoffer | /varer/matvaretabellen › DataTable | 4 | Gammel plass |
-| R111 | Koble til eksisterende råvarer (flere, merket «Allerede koblet», bekreft overskriving) | Radmeny › «Koble til råvare» | 4 | Gammel plass |
-| R112 | Opprett som ny råvare | Radmeny → RawMaterialCreateSheet (forhåndsutfylt) | 4 | Gammel plass |
-| R113 | Åpne i matvaretabellen.no | Radmeny | 4 | Gammel plass |
-| R114 | Synk fra Matvaretabellen | Header «Oppdater fra Matvaretabellen» | 4 | Gammel plass |
-| R115 | Lenke til Koble Matvaretabellen | Dekningskort → /varer?liste=naering | 4 | Gammel plass |
+| R108 | Kort for dekning av næringsdata | /varer/matvaretabellen › header | 4 | Flyttet — Matvaretabellen (DataTable + mobilkort, felles koblingsflyt; komponenttest; ikke nettleserverifisert) |
+| R109 | Gruppefilter, søk og paging | /varer/matvaretabellen › DataTable | 4 | Flyttet — Matvaretabellen (DataTable + mobilkort, felles koblingsflyt; komponenttest; ikke nettleserverifisert) |
+| R110 | Kolonner for næringsstoffer | /varer/matvaretabellen › DataTable | 4 | Flyttet — Matvaretabellen (DataTable + mobilkort, felles koblingsflyt; komponenttest; ikke nettleserverifisert) |
+| R111 | Koble til eksisterende råvarer (flere, merket «Allerede koblet», bekreft overskriving) | Radmeny › «Koble til råvare» | 4 | Flyttet — Matvaretabellen (DataTable + mobilkort, felles koblingsflyt; komponenttest; ikke nettleserverifisert) |
+| R112 | Opprett som ny råvare | Radmeny → RawMaterialCreateSheet (forhåndsutfylt) | 4 | Flyttet — Matvaretabellen (DataTable + mobilkort, felles koblingsflyt; komponenttest; ikke nettleserverifisert) |
+| R113 | Åpne i matvaretabellen.no | Radmeny | 4 | Flyttet — Matvaretabellen (DataTable + mobilkort, felles koblingsflyt; komponenttest; ikke nettleserverifisert) |
+| R114 | Synk fra Matvaretabellen | Header «Oppdater fra Matvaretabellen» | 4 | Flyttet — Matvaretabellen (DataTable + mobilkort, felles koblingsflyt; komponenttest; ikke nettleserverifisert) |
+| R115 | Lenke til Koble Matvaretabellen | Dekningskort → /varer?liste=naering | 4 | Flyttet — Matvaretabellen (DataTable + mobilkort, felles koblingsflyt; komponenttest; ikke nettleserverifisert) |
 
 ## Koble Matvaretabellen
 
@@ -244,14 +244,14 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| R147 | Masseopplasting av inntil 100 filer | /varer/datablad-opplasting | 4 | Gammel plass |
-| R148 | Sammendrag av hva AI leste | Samme side › rad per fil | 4 | Gammel plass |
-| R149 | Kandidatmatching (forhåndsvalgt ≥ 0,7) | Rad per fil › kandidatvelger | 4 | Gammel plass |
-| R150 | Anvend per fil | Rad per fil › «Anvend» | 4 | Gammel plass |
-| R151 | Bekreft alle med høy konfidens | Header-handling | 4 | Gammel plass |
-| R152 | Opprett råvare fra datablad | Rad per fil → RawMaterialCreateSheet (datablad-variant) | 4 | Gammel plass |
-| R153 | Pakningsdialog | Rad per fil → PackageEditor | 4 | Gammel plass |
-| R154 | Rydd opp foreldreløse datablad (åpne, slett) | Seksjon «Rydd opp» | 4 | Gammel plass |
+| R147 | Masseopplasting av inntil 100 filer | /varer/datablad-opplasting | 4 | Flyttet — DatabladBulk/BulkFileRow/OrphanCleanup (komponent-/regeltest med mocket I/O; ikke nettleserverifisert, ingen ekte opplasting/AI/sletting) |
+| R148 | Sammendrag av hva AI leste | Samme side › rad per fil | 4 | Flyttet — DatabladBulk/BulkFileRow/OrphanCleanup (komponent-/regeltest med mocket I/O; ikke nettleserverifisert, ingen ekte opplasting/AI/sletting) |
+| R149 | Kandidatmatching (forhåndsvalgt ≥ 0,7) | Rad per fil › kandidatvelger | 4 | Flyttet — DatabladBulk/BulkFileRow/OrphanCleanup (komponent-/regeltest med mocket I/O; ikke nettleserverifisert, ingen ekte opplasting/AI/sletting) |
+| R150 | Anvend per fil | Rad per fil › «Anvend» | 4 | Flyttet — DatabladBulk/BulkFileRow/OrphanCleanup (komponent-/regeltest med mocket I/O; ikke nettleserverifisert, ingen ekte opplasting/AI/sletting) |
+| R151 | Bekreft alle med høy konfidens | Header-handling | 4 | Flyttet — DatabladBulk/BulkFileRow/OrphanCleanup (komponent-/regeltest med mocket I/O; ikke nettleserverifisert, ingen ekte opplasting/AI/sletting) |
+| R152 | Opprett råvare fra datablad | Rad per fil → RawMaterialCreateSheet (datablad-variant) | 4 | Flyttet — DatabladBulk/BulkFileRow/OrphanCleanup (komponent-/regeltest med mocket I/O; ikke nettleserverifisert, ingen ekte opplasting/AI/sletting) |
+| R153 | Pakningsdialog | Rad per fil → PackageEditor | 4 | Flyttet — DatabladBulk/BulkFileRow/OrphanCleanup (komponent-/regeltest med mocket I/O; ikke nettleserverifisert, ingen ekte opplasting/AI/sletting) |
+| R154 | Rydd opp foreldreløse datablad (åpne, slett) | Seksjon «Rydd opp» | 4 | Flyttet — DatabladBulk/BulkFileRow/OrphanCleanup (komponent-/regeltest med mocket I/O; ikke nettleserverifisert, ingen ekte opplasting/AI/sletting) |
 
 ## Forhandlinger
 
