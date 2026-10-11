@@ -105,26 +105,10 @@ export default function DecisionDetail() {
     }
   }
 
-  /** Ny råvare opprettes fra første linje; de øvrige like linjene kobles til den samme råvaren. */
-  async function onRawMaterialCreated(rawMaterialId: string) {
-    if (!group) return;
-    const rest = group.shared ? group.lines.slice(1) : [];
-    if (rest.length === 0) {
-      toast.success("Råvaren er opprettet og koblet");
-      await done();
-      return;
-    }
-    setBusy(true);
-    try {
-      const r = await applyMaterialToLines(rest, rawMaterialId);
-      report(r.failed || r.learningFailed ? "Ny råvare opprettet, kobling av øvrige linjer" : "Ny råvare opprettet og brukt på alle linjene", r);
-      await done();
-    } catch (e) {
-      toast.error(e instanceof Error ? `Råvaren er opprettet, men de øvrige linjene ble ikke koblet: ${e.message}` : "Råvaren er opprettet, men de øvrige linjene ble ikke koblet");
-      await done();
-    } finally {
-      setBusy(false);
-    }
+  /** Ny råvare kobles til ALLE åpne linjer på varekortet av serveren — ingen ekstra skriving her. */
+  async function onRawMaterialCreated() {
+    toast.success("Råvaren er opprettet og koblet");
+    await done();
   }
 
   async function createCase() {
@@ -206,8 +190,8 @@ export default function DecisionDetail() {
                           <Plus className="mr-1 h-4 w-4" aria-hidden />Opprett ny råvare
                         </Button>
                       )}
-                      <CreateRawMaterialFromLine open={createOpen} onOpenChange={setCreateOpen} line={first} onCreated={(id) => void onRawMaterialCreated(id)} />
-                      <p className="text-sm text-ink-secondary">Er det ikke en råvare (frakt, gebyr, pant)? <Link className="text-primary hover:underline" to={paths.fakturaInnboks({ faktura: first.invoice_id })}>Marker som ikke råvare på fakturaen</Link>.</p>
+                      <CreateRawMaterialFromLine open={createOpen} onOpenChange={setCreateOpen} line={first} onCreated={() => void onRawMaterialCreated()} />
+                      <p className="text-sm text-ink-secondary">Er det ikke en råvare (frakt, gebyr, pant)? <Link className="text-primary hover:underline" to={paths.fakturaInnboks({ faktura: first.invoice_id })}>Marker som ikke vare på fakturaen</Link>.</p>
                     </div>
                     <div className="border-t border-line-subtle pt-3 text-sm">
                       <p className="flex items-center gap-2 font-medium text-primary"><Brain className="h-4 w-4" aria-hidden />Dette huskes</p>

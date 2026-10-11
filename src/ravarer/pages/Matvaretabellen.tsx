@@ -316,6 +316,11 @@ export default function Matvaretabellen() {
             setCreateFood(null);
             if (id) await apply.mutateAsync({ rawMaterialId: id, foodId });
           }}
+          onUseExisting={(id) => {
+            const foodId = createFood.food_id;
+            setCreateFood(null);
+            apply.mutate({ rawMaterialId: id, foodId });
+          }}
         />
       )}
     </div>

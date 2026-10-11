@@ -12,14 +12,15 @@ describe("RawMaterialCreateSheet — skrivevei per kontekst", () => {
   it("datasheet → datasheet", () => {
     expect(writePathFor({ kind: "datasheet", datasheetId: "d", fileName: "x.pdf", aiFields: {} })).toBe("datasheet");
   });
-  it("supplier_item-body setter primær og tar med linjer når gitt", () => {
-    const ctx = { kind: "supplier_item" as const, supplierId: "s1", itemKey: "sku:a", lineIds: ["l1", "l2"] };
+  it("supplier_item-body setter primær og kobler ALLE åpne linjer (ingen line_ids)", () => {
+    const ctx = { kind: "supplier_item" as const, supplierId: "s1", itemKey: "sku:a", inferLineId: "l1" };
     const draft = { ...initialDraft(ctx), name: "Hvetemel", units: "25", packageUnit: "kg" };
     const body = linkCreateBody(ctx, draft, "le-1");
     expect(body.supplier_id).toBe("s1");
     expect(body.item_key).toBe("sku:a");
     expect(body.set_primary).toBe(true);
-    expect(body.line_ids).toEqual(["l1", "l2"]);
+    expect(body.line_ids).toBeUndefined();
+    expect(body.package?.confirm).toBe(false);
     expect(body.new_raw_material?.name).toBe("Hvetemel");
     expect(body.package?.base_units_per_package).toBe(25);
   });

@@ -9,6 +9,7 @@ import { MaterialBlock, type NewMaterialDraft } from "./MaterialBlock";
 import { PackageBlock } from "./PackageBlock";
 import { LinkResultBox } from "./LinkResultBox";
 import { AiSuggestion } from "./AiSuggestion";
+import { RawMaterialCreateSheet } from "@/ravarer/editors/RawMaterialCreateSheet";
 import { NOT_ITEM_REASONS, nameFromDescription, needsPackage, openScope, suggestedBaseUnit } from "@/fakturaer/lib/linkFormLogic";
 import { parseDecimal } from "@/fakturaer/lib/units";
 import type { LinkSupplierItemBody, LinkSupplierItemResult, SupplierItem, SupplierItemLine } from "@/fakturaer/lib/supplierItems";
@@ -48,6 +49,7 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
   const [bupp, setBupp] = useState("");
   const [confirm, setConfirm] = useState(false);
   const [editPkg, setEditPkg] = useState(startEditingPackage);
+  const [ownCreateOpen, setOwnCreateOpen] = useState(false);
   const [primary, setPrimary] = useState(false);
   const [notItem, setNotItem] = useState<string | null>(null);
   const [touched, setTouched] = useState({ baseUnit: false, bupp: false, confirm: false });
@@ -126,7 +128,7 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
         <MaterialBlock
           idPrefix={`si-${item.item_key}`}
           mode={mode}
-          onModeChange={(m) => (m === "new" && onCreateNew ? onCreateNew() : setMode(m))}
+          onModeChange={(m) => (m === "new" ? (onCreateNew ? onCreateNew() : setOwnCreateOpen(true)) : setMode(m))}
           selected={selected.data ?? null}
           selectedId={selectedId}
           onSelect={setSelectedId}
@@ -197,6 +199,14 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
             <Button type="button" size="sm" variant="ghost" onClick={() => setNotItem(null)}>Avbryt</Button>
           </div>
         </div>
+      )}
+      {ownCreateOpen && (
+        <RawMaterialCreateSheet
+          open={ownCreateOpen}
+          onOpenChange={setOwnCreateOpen}
+          context={{ kind: "supplier_item", supplierId: item.supplier_id, itemKey: item.item_key, inferLineId: refLineId ?? null, lineUnit: refLine?.unit ?? null, prefill: { name: nameFromDescription(item.description), sku: item.supplier_sku ?? "" } }}
+          onDone={(_id, o) => { if (o.kind === "linked") onDone?.(o.result); }}
+        />
       )}
     </div>
   );
