@@ -89,7 +89,9 @@ export function useInvoicePriceSafety(invoiceIds: readonly (string | null | unde
   });
   // Ny gjengivelse når en kvittering passerer fristen, slik at utløpt status aldri blir stående som godkjent.
   const [now, setNow] = useState(() => Date.now());
-  const nextExpiry = Math.min(...qs.map((q) => (q.data ? q.data.received_at + SAFETY_MAX_AGE_MS + 1 : Infinity)));
+  // Neste FREMTIDIGE frist; allerede utløpte kvitteringer skal ikke blokkere planlegging av senere frister.
+  const nowMs = Date.now();
+  const nextExpiry = Math.min(...qs.map((q) => { const e = q.data ? q.data.received_at + SAFETY_MAX_AGE_MS + 1 : Infinity; return e > nowMs ? e : Infinity; }));
   useEffect(() => {
     if (!Number.isFinite(nextExpiry)) return;
     const t = setTimeout(() => setNow(Date.now()), Math.max(0, nextExpiry - Date.now()));
