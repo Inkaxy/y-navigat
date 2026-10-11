@@ -20,7 +20,7 @@ import { ShortcutHelp } from "@/ravarer/ui/ShortcutHelp";
 import { useConfirmMany } from "@/ravarer/ui/useConfirmMany";
 import type { EditMaterialSignal } from "@/fakturaer/lib/editMaterialSignal";
 import { FakturaerDialogs, type DialogState } from "@/ravarer/pages/priskontroll/fakturaer/FakturaerDialogs";
-import { fakturaBackHref, readReturnParam } from "@/ravarer/pages/priskontroll/fakturaer/visning";
+import { fakturaReturn, readReturnParam } from "@/ravarer/pages/priskontroll/fakturaer/visning";
 import { ControlSummary } from "./ControlSummary";
 import { SumOverrideDialog } from "./SumOverrideDialog";
 import { recheckInvoiceLinesSum } from "@/fakturaer/lib/linesSum";
@@ -342,7 +342,7 @@ export default function FakturaWorkspace() {
     <PriceGateProvider gateFor={gateFor}>
     <div className="space-y-4">
       <WorkspaceHeader
-        backHref={fakturaBackHref(readReturnParam(sp))}
+        backHref={fakturaReturn(readReturnParam(sp)).href}
         supplier={data.suppliers?.name ?? "Leverandør"}
         invoiceNumber={data.invoice_number}
         invoiceDate={data.invoice_date}
@@ -361,7 +361,7 @@ export default function FakturaWorkspace() {
         onToggleDoc={toggleDoc}
         canWrite={s.canWrite}
         canFetch={canFetchLines({ source: data.source, line_extraction_status: data.line_extraction_status, line_count: (data.invoice_lines ?? []).length })}
-        backLabel={new URLSearchParams(readReturnParam(sp) ?? "").get("fane") === "gjore" ? "Å gjøre" : "Fakturaer"}
+        backLabel={fakturaReturn(readReturnParam(sp)).label}
         sumMismatch={data.lines_sum_status === "mismatch"}
         canCorrect={(data.invoice_lines ?? []).length > 0}
         rematchBusy={rematch.busy}
