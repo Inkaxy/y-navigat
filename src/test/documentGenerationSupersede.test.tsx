@@ -98,7 +98,7 @@ describe("delt verifiseringsgenerasjon — utdaterte kontroller", () => {
     act(() => { p = r.current.a.recheck(ident("v1")).catch(() => "kastet"); });
     await act(async () => { calls[calls.length - 1].resolve(fail()); await p; });
     expect(await p).toBe("kastet");
-    expect(r.current.a.revoked).toBe(true);
+    await waitFor(() => expect(r.current.a.revoked).toBe(true));
     expect(r.current.b.verifiedCurrent).toBeNull();
     const n = calls.length;
     await act(async () => { await new Promise((res) => setTimeout(res, 20)); });
