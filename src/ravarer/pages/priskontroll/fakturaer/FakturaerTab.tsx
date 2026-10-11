@@ -50,7 +50,10 @@ export function FakturaerTab() {
   const update = (next: Record<string, string | null>, resetPage = true) => {
     setSp((prev) => {
       const p = new URLSearchParams(prev);
-      for (const [k, v] of Object.entries(next)) (v == null || v === "" ? p.delete(k) : p.set(k, v));
+      for (const [k, v] of Object.entries(next)) {
+        if (v == null || v === "") p.delete(k);
+        else p.set(k, v);
+      }
       if (resetPage) p.delete("side");
       return p;
     }, { replace: true });
