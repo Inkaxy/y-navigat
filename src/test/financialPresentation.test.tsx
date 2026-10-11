@@ -181,3 +181,34 @@ describe("PDF-identitet", () => {
     expect(documentIdentity("a.pdf", "v1", "x")).not.toBe(documentIdentity("a.pdf", "v2", "x"));
   });
 });
+
+describe("MELIS 25 KG – blandet retning", () => {
+  const rows = [
+    { id: "085d68a6", invoice_id: "666738", invoice_number: "666738", invoice_date: "2026-09-21", quantity: 600, unit: "kg", price_per_base_unit: 28.81, expected_price_per_base_unit: 14, base_quantity: 600, effect_nok: 8886, reference_source: "last_purchase", reference_id: "8b999cac" },
+    { id: "d4738b98", invoice_id: "525582", invoice_number: "525582", invoice_date: "2025-10-13", quantity: 600, unit: "kg", price_per_base_unit: 14.5, expected_price_per_base_unit: 25.76, base_quantity: 600, effect_nok: 6756, reference_source: "last_purchase", reference_id: "042239c2" },
+  ];
+  it("viser netto, absolutt og bare dyrere linje til sak; ulike grunnlag", async () => {
+    const { PriceBlockView } = await import("@/ravarer/pages/priskontroll/gjore/PriceBlockView");
+    wrap(<PriceBlockView rows={rows} blocked={[]} status="ready" selected={new Set(["085d68a6", "d4738b98"])} onToggle={() => undefined} baseUnit="kg" referenceDate={null}
+      hasAgreement={false} tolerancePct={3} hardCapPct={15} settings={null} reason="" onReason={() => undefined} canWrite busy={false}
+      onAccept={() => undefined} onCase={() => undefined} onFixAgreement={() => undefined} onCheckPackage={() => undefined} />);
+    expect(screen.getByText(/Ulike sammenligningsgrunnlag/)).toBeInTheDocument();
+    expect(screen.getByText(/\+2\s?130/)).toBeInTheDocument();
+    expect(screen.getByText(/15\s?642/)).toBeInTheDocument();
+    expect(screen.getByText(/8\s?886.*1 linje/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /for 1 dyrere linje/ })).toBeEnabled();
+  });
+  it("bare lavere pris valgt: ingen sak", async () => {
+    const { PriceBlockView } = await import("@/ravarer/pages/priskontroll/gjore/PriceBlockView");
+    wrap(<PriceBlockView rows={rows} blocked={[]} status="ready" selected={new Set(["d4738b98"])} onToggle={() => undefined} baseUnit="kg" referenceDate={null}
+      hasAgreement={false} tolerancePct={3} hardCapPct={15} settings={null} reason="" onReason={() => undefined} canWrite busy={false}
+      onAccept={() => undefined} onCase={() => undefined} onFixAgreement={() => undefined} onCheckPackage={() => undefined} />);
+    expect(screen.getByRole("button", { name: /Opprett leverandørsak/ })).toBeDisabled();
+  });
+  it("serverens forhåndsvisning (rot-fixture): prisforespørsel 0 kr, observert 8886 — ikke krav", () => {
+    const pl = planClaim(parseClaimPreview({ lines: [{ line_id: "085d68a6", eligible: true, basis: { case_kind: "price_inquiry", amount_excl_vat: 0, observed_effect_excl_vat: 8886, price_per_base_unit: 28.81, price_reference_source: "last_purchase" } }] }, ["085d68a6"]));
+    expect(pl).toMatchObject({ ok: true, kind: "price_inquiry", amount: 0, observed: 8886 });
+    const both = planClaim(parseClaimPreview({ lines: [{ line_id: "d4738b98", eligible: false, reason: "ingen_merkostnad" }] }, ["d4738b98"]));
+    expect(both.ok).toBe(false);
+  });
+});
