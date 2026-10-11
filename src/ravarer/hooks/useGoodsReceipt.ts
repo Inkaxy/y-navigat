@@ -4,7 +4,14 @@ import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { fetchAllRows } from "@/lib/supabasePaging";
-import type { ReceiveLineResult } from "@/ravarer/lib/rpcContracts";
+import {
+  parseReceiveResult,
+  ReceiveOutcomeUnknownError,
+  type MovementEvidence,
+  type ReceiptLineFacts,
+  type ReceiptRecord,
+  type ReceiveOutcome,
+} from "@/ravarer/lib/receiptStatus";
 
 
 export interface ReceiptInvoiceRow {
@@ -12,33 +19,29 @@ export interface ReceiptInvoiceRow {
   invoice_number: string;
   invoice_date: string;
   status: string;
+  is_credit_note: boolean;
   supplier_id: string | null;
   supplier_name: string | null;
   total_amount: number | null;
-  /** Antall linjer med lagerbevegelse ('purchase' mot invoice_lines). */
-  received_lines: number;
-  /** Lagerførte varer uten bevegelse — typisk fordi base_quantity mangler. */
-  missing_lines: number;
+  /** Lagerførte linjer med bekreftet mottak (`rm_goods_receipts`). */
+  confirmed_lines: number;
+  /** Lagerførte linjer med lagerbevegelse, men uten bekreftet mottak. */
+  movement_only_lines: number;
+  /** Lagerførte linjer uten mottak og uten bevegelse. */
+  open_lines: number;
   /** Linjer som gjelder varer uten lagerføring. */
   untracked_lines: number;
   total_lines: number;
+  /** Mottaks- eller bevegelsesoppslaget feilet; tellerne over er da ufullstendige. */
+  evidence_error: boolean;
 }
 
-export interface ReceiptLine {
+export interface ReceiptLine extends ReceiptLineFacts {
   id: string;
   line_number: number | null;
   description: string | null;
-  quantity: number | null;
-  unit: string | null;
-  base_quantity: number | null;
   total_amount: number | null;
-  raw_material_id: string | null;
   raw_material_name: string | null;
-  base_unit: string | null;
-  stock_tracking: boolean;
-  /** Sum av 'purchase'-bevegelser knyttet til linja. */
-  received_base: number | null;
-  has_movement: boolean;
 }
 
 interface InvoiceFilters {
@@ -47,136 +50,172 @@ interface InvoiceFilters {
   supplierId?: string | null;
 }
 
-interface RawLine {
-  id: string;
-  invoice_id: string;
-  line_number: number | null;
-  description: string | null;
-  quantity: number | null;
-  unit: string | null;
-  base_quantity: number | null;
-  total_amount: number | null;
-  raw_material_id: string | null;
-  raw_materials: { id: string; name: string; base_unit: string; stock_tracking: boolean } | null;
+type PageResult<T> = PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
+
+/** Henter mottak for linjene; feil gir `null` (ukjent), aldri tomt. */
+async function fetchReceipts(lineIds: string[]): Promise<Map<string, ReceiptRecord> | null> {
+  const out = new Map<string, ReceiptRecord>();
+  try {
+    for (let i = 0; i < lineIds.length; i += 300) {
+      const chunk = lineIds.slice(i, i + 300);
+      type Row = { invoice_line_id: string; quantity_base: number; received_at: string; lot_id: string | null };
+      const rows = await fetchAllRows<Row>((from, to) =>
+        supabase
+          .from("rm_goods_receipts")
+          .select("invoice_line_id, quantity_base, received_at, lot_id")
+          .in("invoice_line_id", chunk)
+          .order("invoice_line_id")
+          .range(from, to) as PageResult<Row>,
+      );
+      rows.forEach(r => out.set(r.invoice_line_id, { quantity_base: Number(r.quantity_base), received_at: r.received_at, lot_id: r.lot_id }));
+    }
+    return out;
+  } catch (e) {
+    console.warn("[varemottak] mottaksoppslag feilet", e);
+    return null;
+  }
 }
 
-/** Fakturaer i perioden med mottaksstatus per faktura. */
+/** Henter purchase/return-bevegelser mot linjene; feil gir `null` (ukjent). */
+async function fetchMovements(lineIds: string[]): Promise<Map<string, MovementEvidence> | null> {
+  const out = new Map<string, MovementEvidence>();
+  try {
+    for (let i = 0; i < lineIds.length; i += 300) {
+      const chunk = lineIds.slice(i, i + 300);
+      type Row = { source_id: string | null; quantity_base: number | null; movement_type: string };
+      const rows = await fetchAllRows<Row>((from, to) =>
+        supabase
+          .from("stock_movements")
+          .select("source_id, quantity_base, movement_type")
+          .eq("source_table", "invoice_lines")
+          .in("movement_type", ["purchase", "return"])
+          .in("source_id", chunk)
+          .order("source_id")
+          .range(from, to) as PageResult<Row>,
+      );
+      for (const m of rows) {
+        if (!m.source_id) continue;
+        const cur = out.get(m.source_id) ?? { quantity_base: 0, types: [] };
+        cur.quantity_base += Number(m.quantity_base) || 0;
+        if (!cur.types.includes(m.movement_type)) cur.types.push(m.movement_type);
+        out.set(m.source_id, cur);
+      }
+    }
+    return out;
+  } catch (e) {
+    console.warn("[varemottak] bevegelsesoppslag feilet", e);
+    return null;
+  }
+}
+
+/** Fakturaer i perioden med mottaksstatus per faktura. Hele perioden hentes (sidevis), aldri stille avkortet. */
 export function useReceiptInvoices(filters: InvoiceFilters) {
   const { legalEntityId } = useRavarer();
   return useQuery({
     queryKey: ["receipt-invoices", legalEntityId, filters.fromDate, filters.toDate, filters.supplierId ?? null],
     enabled: !!legalEntityId,
     queryFn: async (): Promise<ReceiptInvoiceRow[]> => {
-      let q = supabase
-        .from("invoices")
-        .select("id, invoice_number, invoice_date, status, supplier_id, total_amount, suppliers(name)")
-        .eq("legal_entity_id", legalEntityId!)
-        .in("status", ["ready", "reconciled"])
-        .gte("invoice_date", filters.fromDate)
-        .lte("invoice_date", filters.toDate)
-        .order("invoice_date", { ascending: false })
-        .limit(200);
-      if (filters.supplierId) q = q.eq("supplier_id", filters.supplierId);
-      const { data: invoices, error } = await q;
-      if (error) throw error;
-
-      const ids = (invoices ?? []).map(i => i.id);
+      type Inv = {
+        id: string; invoice_number: string; invoice_date: string; status: string; is_credit_note: boolean | null;
+        supplier_id: string | null; total_amount: number | null; suppliers: { name: string } | null;
+      };
+      const invoices = await fetchAllRows<Inv>((from, to) => {
+        let q = supabase
+          .from("invoices")
+          .select("id, invoice_number, invoice_date, status, is_credit_note, supplier_id, total_amount, suppliers(name)")
+          .eq("legal_entity_id", legalEntityId as string)
+          .in("status", ["ready", "reconciled"])
+          .gte("invoice_date", filters.fromDate)
+          .lte("invoice_date", filters.toDate);
+        if (filters.supplierId) q = q.eq("supplier_id", filters.supplierId);
+        return q.order("invoice_date", { ascending: false }).order("id").range(from, to) as PageResult<Inv>;
+      });
+      const ids = invoices.map(i => i.id);
       if (ids.length === 0) return [];
 
-      // Fakturalinjer og bevegelser hentes komplett — tallene under er summer,
-      // og en enkelt .limit() ville stille kuttet perioden.
       type CountLine = { id: string; invoice_id: string; raw_materials: { stock_tracking: boolean } | null };
-      const lines = await fetchAllRows<CountLine>((from, to) =>
-        supabase
-          .from("invoice_lines")
-          .select("id, invoice_id, base_quantity, raw_material_id, raw_materials(stock_tracking)")
-          .in("invoice_id", ids)
-          .order("id")
-          .range(from, to) as unknown as PromiseLike<{ data: CountLine[] | null; error: { message: string } | null }>,
-      );
-
-      const lineIds = lines.map(l => l.id);
-      const movedLineIds = new Set<string>();
-      for (let i = 0; i < lineIds.length; i += 500) {
-        const chunk = lineIds.slice(i, i + 500);
-        const movements = await fetchAllRows<{ source_id: string | null }>((from, to) =>
+      const lines: CountLine[] = [];
+      for (let i = 0; i < ids.length; i += 200) {
+        const chunk = ids.slice(i, i + 200);
+        const part = await fetchAllRows<CountLine>((from, to) =>
           supabase
-            .from("stock_movements")
-            .select("source_id")
-            .eq("source_table", "invoice_lines")
-            .eq("movement_type", "purchase")
-            .in("source_id", chunk)
-            .order("source_id")
-            .range(from, to),
+            .from("invoice_lines")
+            .select("id, invoice_id, raw_materials(stock_tracking)")
+            .in("invoice_id", chunk)
+            .order("id")
+            .range(from, to) as PageResult<CountLine>,
         );
-        movements.forEach(m => m.source_id && movedLineIds.add(m.source_id));
+        lines.push(...part);
       }
+      const trackedIds = lines.filter(l => l.raw_materials?.stock_tracking).map(l => l.id);
+      const [receipts, movements] = await Promise.all([fetchReceipts(trackedIds), fetchMovements(trackedIds)]);
 
-      return (invoices ?? []).map(inv => {
-        const mine = lines.filter(l => l.invoice_id === inv.id);
-        let received = 0;
-        let missing = 0;
+      const byInvoice = new Map<string, CountLine[]>();
+      lines.forEach(l => byInvoice.set(l.invoice_id, [...(byInvoice.get(l.invoice_id) ?? []), l]));
+      return invoices.map(inv => {
+        const mine = byInvoice.get(inv.id) ?? [];
+        let confirmed = 0;
+        let movementOnly = 0;
+        let open = 0;
         let untracked = 0;
         for (const l of mine) {
-          const tracked = !!(l.raw_materials as { stock_tracking: boolean } | null)?.stock_tracking;
-          if (!tracked) untracked++;
-          else if (movedLineIds.has(l.id)) received++;
-          else missing++;
+          if (!l.raw_materials?.stock_tracking) untracked++;
+          else if (receipts?.has(l.id)) confirmed++;
+          else if (movements?.has(l.id)) movementOnly++;
+          else open++;
         }
         return {
           id: inv.id,
           invoice_number: inv.invoice_number,
           invoice_date: inv.invoice_date,
           status: inv.status,
+          is_credit_note: inv.is_credit_note === true,
           supplier_id: inv.supplier_id,
-          supplier_name: (inv.suppliers as { name: string } | null)?.name ?? null,
+          supplier_name: inv.suppliers?.name ?? null,
           total_amount: inv.total_amount == null ? null : Number(inv.total_amount),
-          received_lines: received,
-          missing_lines: missing,
+          confirmed_lines: confirmed,
+          movement_only_lines: movementOnly,
+          open_lines: open,
           untracked_lines: untracked,
           total_lines: mine.length,
+          evidence_error: receipts == null || movements == null,
         };
       });
     },
   });
 }
 
-/** Linjene på én faktura med mottatt mengde per linje. */
+/** Linjene på én faktura med bekreftet mottak og lagerbevegelse hver for seg. */
 export function useReceiptLines(invoiceId: string | undefined) {
+  const { legalEntityId } = useRavarer();
   return useQuery({
-    queryKey: ["receipt-lines", invoiceId],
-    enabled: !!invoiceId,
+    queryKey: ["receipt-lines", invoiceId, legalEntityId],
+    enabled: !!invoiceId && !!legalEntityId,
     queryFn: async (): Promise<ReceiptLine[]> => {
+      const { data: inv, error: invErr } = await supabase
+        .from("invoices")
+        .select("id, is_credit_note")
+        .eq("id", invoiceId as string)
+        .eq("legal_entity_id", legalEntityId as string)
+        .maybeSingle();
+      if (invErr) throw invErr;
+      if (!inv) throw new Error("Fakturaen finnes ikke i dette selskapet.");
+      type RawLine = {
+        id: string; line_number: number | null; description: string | null; quantity: number | null; unit: string | null;
+        base_quantity: number | null; total_amount: number | null; raw_material_id: string | null; requires_review: boolean | null;
+        match_confidence: string | null; raw_materials: { id: string; name: string; base_unit: string; stock_tracking: boolean } | null;
+      };
       const rows = await fetchAllRows<RawLine>((from, to) =>
         supabase
           .from("invoice_lines")
-          .select(
-            "id, invoice_id, line_number, description, quantity, unit, base_quantity, total_amount, raw_material_id, raw_materials(id, name, base_unit, stock_tracking)",
-          )
-          .eq("invoice_id", invoiceId!)
+          .select("id, line_number, description, quantity, unit, base_quantity, total_amount, raw_material_id, requires_review, match_confidence, raw_materials(id, name, base_unit, stock_tracking)")
+          .eq("invoice_id", invoiceId as string)
           .order("line_number")
-          .range(from, to) as unknown as PromiseLike<{ data: RawLine[] | null; error: { message: string } | null }>,
+          .order("id")
+          .range(from, to) as PageResult<RawLine>,
       );
-
-      const receivedByLine = new Map<string, number>();
-      if (rows.length > 0) {
-        // Feil her ville ellers vist «ikke mottatt» på linjer som faktisk er lagerført.
-        const movements = await fetchAllRows<{ source_id: string | null; quantity_base: number | null }>((from, to) =>
-          supabase
-            .from("stock_movements")
-            .select("source_id, quantity_base")
-            .eq("source_table", "invoice_lines")
-            .eq("movement_type", "purchase")
-            .in("source_id", rows.map(r => r.id))
-            .order("source_id")
-            .range(from, to),
-        );
-        movements.forEach(m => {
-          if (!m.source_id) return;
-          receivedByLine.set(m.source_id, (receivedByLine.get(m.source_id) ?? 0) + (Number(m.quantity_base) || 0));
-        });
-      }
-
+      const ids = rows.map(r => r.id);
+      const [receipts, movements] = ids.length ? await Promise.all([fetchReceipts(ids), fetchMovements(ids)]) : [new Map(), new Map()];
       return rows.map(r => ({
         id: r.id,
         line_number: r.line_number,
@@ -189,8 +228,11 @@ export function useReceiptLines(invoiceId: string | undefined) {
         raw_material_name: r.raw_materials?.name ?? null,
         base_unit: r.raw_materials?.base_unit ?? null,
         stock_tracking: !!r.raw_materials?.stock_tracking,
-        received_base: receivedByLine.has(r.id) ? receivedByLine.get(r.id)! : null,
-        has_movement: receivedByLine.has(r.id),
+        requires_review: r.requires_review === true,
+        not_applicable: r.match_confidence === "not_applicable",
+        is_credit_note: inv.is_credit_note === true,
+        receipt: receipts == null ? { status: "error" } : { status: "ok", value: receipts.get(r.id) ?? null },
+        movement: movements == null ? { status: "error" } : { status: "ok", value: movements.get(r.id) ?? null },
       }));
     },
   });
@@ -236,44 +278,54 @@ export function useReceiptMovement() {
 export interface ReceiveLineInput {
   invoice_line_id: string;
   invoice_id: string;
+  /** Visning/invalidering; serveren leser råvare og mengde selv. */
   raw_material_id: string;
-  quantity_base: number;
   invoice_number: string;
-  occurred_at?: string;
-  /** Partinummer fra pakken, hvis leverandøren oppgir det. */
+  /** Partinummer fra pakken, hvis leverandøren oppgir det. Aldri gjettet fra fakturaen. */
   lot_number?: string | null;
-  /** Best før-dato på partiet. */
+  /** Best før-dato (åååå-mm-dd). */
   best_before?: string | null;
 }
 
 /**
- * Fører én fakturalinje inn på lager via RPC-en `rm_receive_invoice_line`: den
- * låser linja og fakturaen, kontrollerer tilgang og selskap i basen, og fører
- * ALDRI en bevegelse på toppen av den fakturalinje-triggeren allerede har laget.
- * Kreditnota beholder negativ mengde.
+ * Bekrefter mottak av én fakturalinje via `rm_receive_invoice_line`. Serveren er
+ * mengdeautoritet, knytter mottak/parti til en eventuell eksisterende bevegelse
+ * og fører aldri en ekstra. Klienten skriver ingen bevegelse etter kallet.
+ * Transportfeil/uventet svar er ukjent utfall: status hentes på nytt.
  */
 export function useReceiveInvoiceLine() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: ReceiveLineInput): Promise<{ skipped: boolean }> => {
-      const { data, error } = await supabase.rpc("rm_receive_invoice_line", {
-        p_line_id: input.invoice_line_id,
-        p_lot_number: input.lot_number ?? undefined,
-        p_best_before: input.best_before ?? undefined,
-        p_note: `Mottak faktura ${input.invoice_number}`,
-      });
-      if (error) throw error;
-      const res = data as unknown as ReceiveLineResult;
-      return { skipped: res.already_received === true || !!res.skipped };
+    mutationFn: async (input: ReceiveLineInput): Promise<ReceiveOutcome> => {
+      let res: { data: unknown; error: { message?: string; code?: string } | null };
+      try {
+        res = await supabase.rpc("rm_receive_invoice_line", {
+          p_line_id: input.invoice_line_id,
+          p_lot_number: input.lot_number ?? undefined,
+          p_best_before: input.best_before ?? undefined,
+          p_note: `Mottak faktura ${input.invoice_number}`,
+        });
+      } catch (e) {
+        console.warn("[varemottak] nettfeil", e);
+        throw new ReceiveOutcomeUnknownError();
+      }
+      if (res.error) {
+        if (!res.error.code) throw new ReceiveOutcomeUnknownError();
+        throw new Error(res.error.message || "Mottaket ble avvist.");
+      }
+      return parseReceiveResult(res.data);
     },
-
-
-    onSuccess: (res, vars) => {
+    onSettled: (_res, _err, vars) => {
+      // Etter hvert forsøk (også ukjent) leses autoritativ mottaksstatus på nytt.
       invalidateRawMaterial(qc, vars.raw_material_id);
       void qc.invalidateQueries({ queryKey: ["receipt-lines", vars.invoice_id] });
       void qc.invalidateQueries({ queryKey: ["receipt-invoices"] });
-      toast.success(res.skipped ? "Linja er allerede mottatt" : "Ført inn på lager");
     },
-    onError: (e: unknown) => toast.error(`Kunne ikke motta: ${e instanceof Error ? e.message : String(e)}`),
+    onSuccess: res => {
+      if (res.kind === "not_stock") toast.info("Varen er ikke lagerført — ingenting ble ført på lager.");
+      else if (res.kind === "already") toast.success("Linja var allerede mottatt — ingenting ble ført på nytt.");
+      else toast.success("Mottak bekreftet");
+    },
+    onError: (e: unknown) => toast.error(e instanceof ReceiveOutcomeUnknownError ? e.message : `Kunne ikke motta: ${e instanceof Error ? e.message : "ukjent feil"}`),
   });
 }
