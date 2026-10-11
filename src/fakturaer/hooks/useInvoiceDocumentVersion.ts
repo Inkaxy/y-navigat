@@ -64,9 +64,9 @@ export function useInvoiceDocumentVersion(invoiceId: string | null | undefined) 
 }
 
 /** Sammenlign gjeldende original med lesingens frosne dokument (id, sti, lagringsversjon, tidspunkt). */
-export function snapshotDocumentMatch(snapshot: Json | null | undefined, current: DocumentVersion | null | undefined): "match" | "changed" | "unknown" {
+export function snapshotDocumentMatch(snapshotDocument: Json | null | undefined, current: DocumentVersion | null | undefined): "match" | "changed" | "unknown" {
   if (!current) return "unknown";
-  const doc = isRec(snapshot) && isRec(snapshot.document) ? snapshot.document : null;
+  const doc = isRec(snapshotDocument) ? snapshotDocument : null;
   if (!doc) return "unknown";
   if (!current.available) return "changed";
   const same = doc.id === current.object_id && doc.name === current.path

@@ -55,7 +55,7 @@ export default function LesPaNytt() {
   const [pendingTick, setPendingTick] = useState(0);
   // Lesingen er frosset mot et bestemt dokument. Gjeldende original må være samme objekt/versjon.
   const ver = useInvoiceDocumentVersion(id);
-  const docMatch = snapshotDocumentMatch(run.data?.snapshot ?? null, ver.data);
+  const docMatch = snapshotDocumentMatch(run.data?.snapshotDocument ?? null, ver.data);
   const current = ver.data?.available ? ver.data : null;
   const doc = useInvoiceDocumentUrl(docMatch === "match" && current ? current.path : null, current?.version ?? null);
   const back = paths.faktura(id);
