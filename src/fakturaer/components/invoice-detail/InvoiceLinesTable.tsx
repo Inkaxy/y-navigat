@@ -7,7 +7,8 @@ import { ConfidenceBadge, InvoiceLineNotes } from "@/fakturaer/components/Invoic
 import { OpenSupplierItemButton } from "@/fakturaer/components/supplier-item/OpenSupplierItemButton";
 import { PriceDeviationNote } from "@/fakturaer/components/PriceDeviationNote";
 import { formatMoney } from "@/fakturaer/lib/constants";
-import { linePriceGate, type GateInvoice, type HoldState } from "@/fakturaer/lib/financialPresentation";
+import type { PriceGate } from "@/fakturaer/lib/financialPresentation";
+import { UNCHECKED } from "@/fakturaer/lib/priceSafety";
 import { lineReferenceLabel } from "@/ravarer/lib/priceReference";
 import type { MatchSettings } from "@/fakturaer/hooks/useMatchTolerances";
 import type { InvoiceDetailLine } from "./fetchInvoiceDetail";
@@ -28,17 +29,17 @@ interface Props {
   settings: MatchSettings | null;
   /** «Rett fakturalinje» — samme dialog og server-RPC som i arbeidslisten. */
   onCorrect?: (lineId: string) => void;
-  /** Fakturakontekst for den felles prisregelen (kreditnota, valuta, sumkontroll, lesevarsler). */
-  invoice?: GateInvoice | null;
-  /** Holdt-tilbake-status per linje (null = ukjent). */
-  heldFor?: (line: InvoiceDetailLine) => HoldState;
+  /** Fakturaens valuta for originalbeløp. */
+  invoice?: { currency?: string | null } | null;
+  /** Serverens prisstatus per linje; uten den er alt ukjent. */
+  gateOf?: (line: InvoiceDetailLine) => PriceGate;
   /** Smal skjerm: kort per linje i stedet for bred tabell. */
   compact?: boolean;
 }
 
-export function InvoiceLinesTable({ lines, supplierId, canBulkImport, canMatch, selected, onSelect, showLedgerAccount, onShowLedgerAccount, onMatch, onRegister, tolerancePct, settings, onCorrect, invoice, heldFor, compact }: Props) {
+export function InvoiceLinesTable({ lines, supplierId, canBulkImport, canMatch, selected, onSelect, showLedgerAccount, onShowLedgerAccount, onMatch, onRegister, tolerancePct, settings, onCorrect, invoice, gateOf: gateIn, compact }: Props) {
   const cur = invoice?.currency ?? "NOK";
-  const gateOf = (l: InvoiceDetailLine) => linePriceGate(invoice ?? {}, l, heldFor ? heldFor(l) : null);
+  const gateOf = (l: InvoiceDetailLine): PriceGate => (gateIn ? gateIn(l) : UNCHECKED);
   const sorted = [...lines].sort((a, b) => (a.line_number ?? 0) - (b.line_number ?? 0));
   return (
         <Card className="overflow-hidden lg:col-span-2">
@@ -72,7 +73,7 @@ export function InvoiceLinesTable({ lines, supplierId, canBulkImport, canMatch, 
                     </div>
                     <div className="text-caption text-ink-secondary tabular-nums">{l.quantity ?? "—"} {l.unit ?? ""} × {formatMoney(l.unit_price, cur)}{l.supplier_sku ? ` · ${l.supplier_sku}` : ""}</div>
                     {g.ok ? (
-                      <PriceDeviationNote actual={l.price_per_base_unit} expected={l.expected_price_per_base_unit} baseQuantity={l.base_quantity} tolerancePct={tolerancePct} settings={settings} />
+                      <PriceDeviationNote actual={g.safety.price_per_base_unit} expected={g.safety.expected_price_per_base_unit} baseQuantity={g.safety.base_quantity} tolerancePct={tolerancePct} settings={settings} />
                     ) : l.raw_material_id ? <p className="text-caption text-warning">{g.label}</p> : null}
                     <InvoiceLineNotes reviewReason={l.review_reason} lineKind={l.line_kind} resolutionNote={l.resolution_note} />
                     <div className="flex flex-wrap gap-1">
@@ -151,7 +152,7 @@ export function InvoiceLinesTable({ lines, supplierId, canBulkImport, canMatch, 
                           {g.ok && l.expected_price_per_base_unit != null && <span className="block text-[11px] text-ink-secondary">{lineReferenceLabel(l.price_reference_source)}</span>}
                         </td>
                         <td className="px-4 py-3">
-                          {g.ok ? <PriceDeviationNote compact actual={l.price_per_base_unit} expected={l.expected_price_per_base_unit} baseQuantity={l.base_quantity} tolerancePct={tolerancePct} settings={settings} /> : l.raw_material_id ? <span className="text-xs text-warning" title={g.detail}>{g.label}</span> : <span className="text-ink-secondary">—</span>}
+                          {g.ok ? <PriceDeviationNote compact actual={g.safety.price_per_base_unit} expected={g.safety.expected_price_per_base_unit} baseQuantity={g.safety.base_quantity} tolerancePct={tolerancePct} settings={settings} /> : l.raw_material_id ? <span className="text-xs text-warning" title={g.detail}>{g.label}</span> : <span className="text-ink-secondary">—</span>}
                         </td>
                         {showLedgerAccount && (
                           <td className="px-4 py-3 font-mono text-xs text-ink-secondary">{l.ledger_account ?? "—"}</td>

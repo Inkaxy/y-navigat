@@ -6,7 +6,11 @@ import { parseRematchQueued } from "@/fakturaer/lib/parseRpcJson";
 import { changeLinkErrorMessage, claimErrorMessage } from "./logic";
 import { parseChangeLink, parseClaimCredit, type ChangeLinkResult, type ClaimCreditResult } from "./rpc";
 
-type LineRef = { id: string; price_per_base_unit: number };
+import type { Json } from "@/integrations/supabase/types";
+import { claimSubmitError } from "@/ravarer/lib/supplierClaim";
+
+/** Valgt linje med nøyaktig serverkontrollert grunnlag fra rm_supplier_claim_preview. */
+type LineRef = { id: string; price_per_base_unit: number; basis: Json };
 
 function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
   invalidateInvoice(qc);
@@ -22,30 +26,27 @@ export type ClaimCreditInput = {
   reason?: string | null; responsibleUserId?: string | null; followUpOn?: string | null;
 };
 
-/** Godtar merprisen og oppretter én leverandørsak med merkostnaden som krav. */
+/** Godtar prisen (så fakturaen kan avstemmes) og oppretter én sak: dokumentert krav eller prisforespørsel. */
 export function useClaimCredit() {
   const qc = useQueryClient();
   const { data: company } = useCompany();
   return useMutation({
     mutationFn: async (i: ClaimCreditInput): Promise<ClaimCreditResult> => {
       if (!company?.id) throw new Error("Fant ikke selskapet.");
+      const pLines: Json = i.lines.map((l) => ({ id: l.id, price_per_base_unit: l.price_per_base_unit, basis: l.basis }));
       const { data, error } = await supabase.rpc("rm_supplier_item_claim_credit", {
-        p_legal_entity_id: company.id, p_supplier_id: i.supplierId, p_item_key: i.itemKey, p_lines: i.lines,
+        p_legal_entity_id: company.id, p_supplier_id: i.supplierId, p_item_key: i.itemKey, p_lines: pLines,
         p_title: i.title, p_reason: i.reason || undefined, p_responsible_user_id: i.responsibleUserId || undefined,
         p_follow_up_on: i.followUpOn || undefined,
       });
       if (error) {
         console.error("[claim-credit]", error);
-        throw new Error(claimErrorMessage(error.message));
+        throw new Error(/claim_|forbidden|linje_allerede/.test(error.message) ? claimSubmitError(error.message) : claimErrorMessage(error.message));
       }
-      const r = parseClaimCredit(data);
-      if (!r.ok || !r.caseId) return r;
-      // Serveren returnerer bare antall linjer — hent beløpet fra saken (faller tilbake til «ca.» i UI).
-      const { data: cl, error: clErr } = await supabase.from("supplier_deviation_case_lines").select("amount_excl_vat").eq("case_id", r.caseId).limit(500);
-      if (clErr) { console.error("[claim-credit] beløp", clErr); return r; }
-      return { ...r, amount: (cl ?? []).reduce((s, x) => s + (Number(x.amount_excl_vat) || 0), 0) };
+      return parseClaimCredit(data);
     },
-    onSuccess: (r) => { if (r.ok) invalidateAll(qc); },
+    // Også ved feil: grunnlaget kan ha endret seg, så kontrollene hentes på nytt.
+    onSettled: () => invalidateAll(qc),
   });
 }
 

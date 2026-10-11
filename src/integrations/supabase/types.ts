@@ -13740,6 +13740,7 @@ export type Database = {
       }
       supplier_case_email_drafts: {
         Row: {
+          basis_snapshot: Json | null
           body: string
           case_id: string
           created_at: string
@@ -13751,6 +13752,7 @@ export type Database = {
           version: number
         }
         Insert: {
+          basis_snapshot?: Json | null
           body: string
           case_id: string
           created_at?: string
@@ -13762,6 +13764,7 @@ export type Database = {
           version: number
         }
         Update: {
+          basis_snapshot?: Json | null
           body?: string
           case_id?: string
           created_at?: string
@@ -15888,6 +15891,7 @@ export type Database = {
         Returns: Json
       }
       _rm_bounded_issues: { Args: { p: Json; p_source: string }; Returns: Json }
+      _rm_claim_basis: { Args: { p_line_id: string }; Returns: Json }
       _rm_cost_candidates: {
         Args: { p_as_of: string; p_raw_material_id: string }
         Returns: {
@@ -15925,6 +15929,10 @@ export type Database = {
       _rm_reread_blocker: { Args: { p_invoice_id: string }; Returns: string }
       _rm_reread_snapshot: { Args: { p_invoice_id: string }; Returns: Json }
       _rm_reread_values: { Args: { p: Json }; Returns: Json }
+      _rm_validate_case_claim: {
+        Args: { p_case_id: string }
+        Returns: undefined
+      }
       _validate_and_resolve_cake_line: {
         Args: { p_legal_entity_id: string; p_merknad: Json }
         Returns: {
@@ -17975,6 +17983,10 @@ export type Database = {
         Args: { p_invoice_id: string }
         Returns: boolean
       }
+      rm_invoice_line_price_safety: {
+        Args: { p_invoice_id: string }
+        Returns: Json
+      }
       rm_invoice_lines_trusted: {
         Args: { p_invoice: Database["public"]["Tables"]["invoices"]["Row"] }
         Returns: boolean
@@ -18043,6 +18055,10 @@ export type Database = {
         Returns: Json
       }
       rm_match_key: { Args: { p: string }; Returns: string }
+      rm_material_price_projection: {
+        Args: { p_raw_material_id: string }
+        Returns: Json
+      }
       rm_move_legacy_agreed_price: {
         Args: {
           p_raw_material_id: string
@@ -18246,6 +18262,10 @@ export type Database = {
       rm_suggest_package_from_name: {
         Args: { p_base_unit: string; p_name: string }
         Returns: number
+      }
+      rm_supplier_claim_preview: {
+        Args: { p_line_ids: string[] }
+        Returns: Json
       }
       rm_supplier_item_accept_price: {
         Args: {

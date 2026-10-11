@@ -195,4 +195,7 @@ export function invalidateRavarerCounts(qc: QueryClient): void {
   for (const queryKey of RAVARER_COUNT_KEYS) {
     void qc.invalidateQueries({ queryKey: [...queryKey] });
   }
+  // Prisstatus per fakturalinje avhenger av referanser som kan gjelde andre fakturaer: hele familien.
+  void qc.invalidateQueries({ queryKey: ["invoice-line-price-safety"] });
+  void qc.invalidateQueries({ queryKey: ["supplier-claim-preview"] });
 }

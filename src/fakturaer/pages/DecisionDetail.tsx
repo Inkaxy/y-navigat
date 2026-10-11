@@ -25,7 +25,7 @@ import { acceptPriceVariance, canAcceptPriceVariance } from "@/fakturaer/lib/que
 import { cn } from "@/lib/utils";
 import { CreateRawMaterialFromLine } from "@/fakturaer/components/CreateRawMaterialFromLine";
 import { PriceDeviationNote } from "@/fakturaer/components/PriceDeviationNote";
-import { linePriceGate } from "@/fakturaer/lib/financialPresentation";
+import { useInvoicePriceSafety } from "@/fakturaer/hooks/useInvoicePriceSafety";
 import { OpenSupplierItemButton } from "@/fakturaer/components/supplier-item/OpenSupplierItemButton";
 import { useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
 import { paths } from "@/ravarer/lib/paths";
@@ -143,6 +143,8 @@ export default function DecisionDetail() {
   }
 
   const first = group?.lines[0];
+  const safety = useInvoicePriceSafety([first?.invoice_id], { pending: busy });
+  const firstGate = first ? safety.gateFor({ id: first.id, invoice_id: first.invoice_id }) : null;
   const suggested = group ? materialOptions(group) : [];
   const options = [...suggested, ...(found.data ?? []).filter((m) => !suggested.some((o) => o.id === m.id))
     .map((m) => ({ id: m.id, name: m.name, detail: [m.category, m.base_unit ? `grunnenhet ${m.base_unit}` : null].filter(Boolean).join(" · "), confidence: 0 }))];
@@ -213,8 +215,8 @@ export default function DecisionDetail() {
                       <div className="rounded-lg bg-muted/40 p-3"><p className="text-sm text-ink-secondary">Referanse ({first.price_reference_source ?? "ukjent kilde"}{first.price_reference_date ? `, ${first.price_reference_date}` : ""})</p><p className="text-2xl font-semibold tabular-nums">{kr(group.expectedPerBase)}</p><p className="text-sm text-ink-secondary">per {first.matched_raw_material?.base_unit ?? "grunnenhet"}</p></div>
                       <div className="rounded-lg bg-muted/40 p-3"><p className="text-sm text-ink-secondary">Fakturert</p><p className="text-2xl font-semibold tabular-nums">{kr(group.observedPerBase)}</p><p className="text-sm text-ink-secondary">per {first.matched_raw_material?.base_unit ?? "grunnenhet"}</p></div>
                     </div>
-                    {(() => { const g = linePriceGate(first.invoice, first, false); return g.ok ? null : <p role="note" className="text-sm text-warning">{g.label}: {g.detail}</p>; })()}
-                    {linePriceGate(first.invoice, first, false).ok && <PriceDeviationNote className="text-sm" actual={first.price_per_base_unit == null ? null : Number(first.price_per_base_unit)} expected={first.expected_price_per_base_unit == null ? null : Number(first.expected_price_per_base_unit)} baseQuantity={first.base_quantity == null ? null : Number(first.base_quantity)} tolerancePct={tol.toleranceFor(first.matched_raw_material?.category)} settings={tol.settings} />}
+                    {firstGate && !firstGate.ok && <p role="note" className="text-sm text-warning">{firstGate.label}: {firstGate.detail}</p>}
+                    {firstGate?.ok && <PriceDeviationNote className="text-sm" actual={firstGate.safety.price_per_base_unit} expected={firstGate.safety.expected_price_per_base_unit} baseQuantity={firstGate.safety.base_quantity} tolerancePct={tol.toleranceFor(first.matched_raw_material?.category)} settings={tol.settings} />}
                   </>
                 )}
 
