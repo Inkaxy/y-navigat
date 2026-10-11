@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { Search } from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -21,6 +23,7 @@ type Props = {
 /** Filterlinjen på Fakturaer-fanen. Alt ligger i adressen. */
 export function FakturaerFilters({ filters: f, legalEntityId, showStatus, onChange, onReset }: Props) {
   const [q, setQ] = useState(f.q);
+  const [supplierOpen, setSupplierOpen] = useState(false);
   const debounced = useDebouncedValue(q, 300);
   const { data: suppliers = [] } = useInvoiceSuppliers(legalEntityId);
   useEffect(() => setQ(f.q), [f.q]);
@@ -40,13 +43,28 @@ export function FakturaerFilters({ filters: f, legalEntityId, showStatus, onChan
           <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-ink-secondary" aria-hidden />
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Søk leverandør, fakturanr eller bilagsnr" aria-label="Søk leverandør, fakturanr eller bilagsnr" className="pl-8" />
         </div>
-        <Select value={sel(f.leverandor)} onValueChange={set("leverandor")}>
-          <SelectTrigger className="w-[200px]" aria-label="Leverandør"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Alle leverandører</SelectItem>
-            {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <Popover open={supplierOpen} onOpenChange={setSupplierOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="w-[210px] justify-between font-normal" aria-label="Leverandør">
+              <span className="truncate">{suppliers.find((s) => s.id === f.leverandor)?.name ?? "Alle leverandører"}</span>
+              <ChevronDown className="h-4 w-4 shrink-0 opacity-50" aria-hidden />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[280px] p-0" align="start">
+            <Command>
+              <CommandInput placeholder="Søk leverandør…" />
+              <CommandList>
+                <CommandEmpty>Ingen leverandører funnet.</CommandEmpty>
+                <CommandGroup>
+                  <CommandItem value="Alle leverandører" onSelect={() => { onChange({ leverandor: null }); setSupplierOpen(false); }}>Alle leverandører</CommandItem>
+                  {suppliers.map((s) => (
+                    <CommandItem key={s.id} value={`${s.name} ${s.id}`} onSelect={() => { onChange({ leverandor: s.id }); setSupplierOpen(false); }}>{s.name}</CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
         {showStatus && (
           <Select value={sel(f.status)} onValueChange={set("status")}>
             <SelectTrigger className="w-[160px]" aria-label="Status"><SelectValue /></SelectTrigger>
