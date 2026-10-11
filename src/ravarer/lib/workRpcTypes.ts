@@ -104,3 +104,8 @@ export type AcceptPriceResult = {
   invoices: string[];
   rematch: { ok: boolean; queued: number; already_queued: number; pending: number } | null;
 };
+
+/** Konservative standardverdier når serveren ikke sender effektfeltene. */
+export const WORK_ITEM_EFFECT_DEFAULTS = {
+  effect_status: "unknown", effect_label: null, read_integrity: "unknown", read_integrity_flags: [], unknown_effect_lines: null, amount_kind: null,
+} as const satisfies Pick<WorkItem, "effect_status" | "effect_label" | "read_integrity" | "read_integrity_flags" | "unknown_effect_lines" | "amount_kind">;
