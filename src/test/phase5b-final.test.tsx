@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /** Fase 5B sluttrest: faktiske komponenter/hooks med mocket I/O. Ingen ekte bevegelser eller skriving. */
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
@@ -203,6 +203,22 @@ describe("Lager › Beholdning", () => {
     const kpis = screen.getAllByText("–");
     expect(kpis.length).toBeGreaterThanOrEqual(4);
     expect(screen.queryByText(/^0$/)).toBeNull();
+  });
+  it("mobil: ett kontekstuelt nøkkeltallsområde per utvalg; desktopkortene beholdes", () => {
+    const { unmount } = render(<Wrap><LagerPage /></Wrap>);
+    const m = screen.getByTestId("stock-kpis-mobile");
+    expect(within(m).getByText("Videresalg under minimum")).toBeTruthy();
+    expect(within(m).getByText("Under minimum (alle lagerførte)")).toBeTruthy();
+    expect(within(m).queryByText(/^0$/)).toBeNull();
+    expect(screen.getByTestId("stock-kpis-desktop").className).toContain("hidden");
+    // Mobilområdet kommer etter utvalg/handlinger og før søket.
+    const radios = screen.getByRole("radiogroup", { name: "Utvalg" });
+    expect(radios.compareDocumentPosition(m) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(m.compareDocumentPosition(screen.getByLabelText("Søk i lagerførte varer")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    unmount();
+    render(<Wrap url="/?filter=alle"><LagerPage /></Wrap>);
+    expect(within(screen.getByTestId("stock-kpis-mobile")).getByText("Nøkkeltall for videresalg")).toBeTruthy();
+    expect(within(screen.getByTestId("all-stock-kpis-mobile")).getByText("Lagerførte varer")).toBeTruthy();
   });
   it("Alle lagerførte: feil gir «Prøv igjen», ikke «Ingen varer»", () => {
     render(<Wrap url="/?filter=alle"><LagerPage /></Wrap>);
