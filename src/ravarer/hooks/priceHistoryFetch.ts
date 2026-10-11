@@ -104,6 +104,7 @@ export async function fetchPriceHistory(rawMaterialId: string): Promise<PriceHis
     if (c.error) throw c.error;
     for (const d of l.data ?? []) lines.set(d.id, d);
     for (const d of c.data ?? []) {
+      if (!d.invoice_line_id || !d.corrected_at) continue;
       const list = corrections.get(d.invoice_line_id) ?? [];
       list.push(parseCorrection(d));
       corrections.set(d.invoice_line_id, list);
