@@ -25,14 +25,17 @@ export function InvoiceReceiptPanel({
   invoiceNumber,
   onClose,
   canWrite,
+  fixture,
 }: {
   invoiceId: string | null;
   invoiceNumber: string;
   onClose: () => void;
   canWrite: boolean;
+  /** Bare skrivebeskyttet forhåndsvisning: faste linjer, ingen nettverk; handlinger rapporteres via `onAction`. */
+  fixture?: { lines: ReceiptLine[]; onAction: (message: string) => void };
 }) {
-  const linesQuery = useReceiptLines(invoiceId ?? undefined);
-  const lines = useMemo(() => linesQuery.data ?? [], [linesQuery.data]);
+  const linesQuery = useReceiptLines(fixture ? undefined : invoiceId ?? undefined);
+  const lines = useMemo(() => fixture?.lines ?? linesQuery.data ?? [], [fixture, linesQuery.data]);
   const { legalEntityId } = useRavarer();
   /** Underdialoger fryser opprinnelsen (selskap + faktura + linje). */
   type Ctx = { entity: string | null; invoiceId: string; line: ReceiptLine };
@@ -77,7 +80,7 @@ export function InvoiceReceiptPanel({
             <DialogTitle>Mottak — faktura {invoiceNumber}</DialogTitle>
           </DialogHeader>
           <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4">
-            {linesQuery.isLoading || linesQuery.isError ? (
+            {!fixture && (linesQuery.isLoading || linesQuery.isError) ? (
               <QueryState scope="ravarer:varemottak-linjer" isLoading={linesQuery.isLoading} isError={linesQuery.isError} error={linesQuery.error} onRetry={() => void linesQuery.refetch()} />
             ) : lines.length === 0 ? (
               <p className="text-sm text-ink-secondary">Fakturaen har ingen linjer.</p>
@@ -95,8 +98,9 @@ export function InvoiceReceiptPanel({
                     reading={linesQuery.isFetching}
                     readFailed={linesQuery.isError}
                     onReread={() => void linesQuery.refetch()}
-                    onDeviation={() => { if (canWrite) setDeviationCtx(ctxFor(l)); }}
-                    onPackage={() => { if (canWrite) setPackageCtx(ctxFor(l)); }}
+                    onFixtureReceive={fixture ? (msg) => fixture.onAction(msg) : undefined}
+                    onDeviation={() => { if (fixture) fixture.onAction(`Avvik for ${l.description ?? l.id} åpnes ikke i forhåndsvisningen.`); else if (canWrite) setDeviationCtx(ctxFor(l)); }}
+                    onPackage={() => { if (fixture) fixture.onAction("Pakning åpnes ikke i forhåndsvisningen."); else if (canWrite) setPackageCtx(ctxFor(l)); }}
                   />
                 ))}
               </ul>
@@ -136,9 +140,11 @@ function ReceiptLineCard({
   reading = false,
   readFailed = false,
   onReread,
+  onFixtureReceive,
   onDeviation,
   onPackage,
 }: {
+  onFixtureReceive?: (message: string) => void;
   line: ReceiptLine;
   invoiceId: string;
   invoiceNumber: string;
@@ -168,6 +174,10 @@ function ReceiptLineCard({
 
   const confirm = () => {
     if (sending.current || frozenUnknown || reading || !canWrite || state.kind !== "receivable" || !lotCheck.ok || !dateCheck.ok || !line.raw_material_id) return;
+    if (onFixtureReceive) {
+      onFixtureReceive(`Ville sendt rm_receive_invoice_line for linje ${line.id} (parti ${lotCheck.value ?? "—"}, best før ${dateCheck.value ?? "—"}).`);
+      return;
+    }
     sending.current = true;
     // Linje, parti og dato fryses i dette kallet; serveren bestemmer mengden.
     receive.mutate(
