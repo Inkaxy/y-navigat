@@ -2,6 +2,7 @@
  * Godkjenning-fanen: hurtigfiltre og filtrering. Rene funksjoner (testes).
  */
 import { approvalBucket, type OverviewRow } from "@/fakturaer/lib/approval";
+import { costPostingAllowed } from "@/ravarer/pages/priskontroll/faktura/invoiceSteps";
 
 export const GODKJENNING_STATUSER = ["klare", "avventer", "godkjent", "kostpris"] as const;
 export type GodkjenningStatus = (typeof GODKJENNING_STATUSER)[number];
@@ -23,11 +24,12 @@ export function parseGodkjenningStatus(v: string | null): GodkjenningStatus {
 }
 
 /**
- * «Kostpris kan føres»: godkjent, og ingen kostpris er ført ennå. Hvilke linjer
- * som er trygge avgjør serveren (`rm_post_safe_line_costs`) ved føring.
+ * «Kostpris kan føres»: samme regel som `rm_post_safe_line_costs` — åpen status
+ * (imported/needs_review/ready), ikke kreditnota, og ingen kostpris ført ennå.
+ * Godkjenning kreves IKKE. Hvilke linjer som er trygge avgjør serveren.
  */
-export function canPostCosts(r: Pick<OverviewRow, "approved_at" | "cost_posted_lines">): boolean {
-  return !!r.approved_at && r.cost_posted_lines === 0;
+export function canPostCosts(r: Pick<OverviewRow, "status" | "is_credit_note" | "cost_posted_lines">): boolean {
+  return costPostingAllowed(r) && r.cost_posted_lines === 0;
 }
 
 export function matchesStatus(r: OverviewRow, s: GodkjenningStatus): boolean {
