@@ -119,7 +119,7 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
         <p className="text-sm text-ink-secondary">Ingen åpne linjer har prisavvik.</p>
       )}
 
-      {agreementOpen === false && rematch.isSuccess && (
+      {rematch.isSuccess && (
         <p role="status" className="mt-2 text-caption text-ink-secondary">{rematch.data.queued} fakturaer lagt i kø for ny beregning.</p>
       )}
       {invoiceIds.length > 0 && canWrite && (
