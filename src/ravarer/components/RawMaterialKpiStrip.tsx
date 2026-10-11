@@ -3,7 +3,10 @@ import { OrderDeskKpi } from "@/ordre/components/dashboard/OrderDeskKpi";
 import { BookOpen, Coins, FileText, Handshake, Package, Percent, Truck, Wallet } from "lucide-react";
 import { formatDate, formatNok } from "@/ravarer/lib/constants";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
-import { chooseAgreedPrice, kpiDeviation, pricePerPackage } from "@/ravarer/lib/rawMaterialKpi";
+import { chooseAgreedPrice, pricePerPackage } from "@/ravarer/lib/rawMaterialKpi";
+import { formatNumber } from "@/ravarer/lib/constants";
+import { latestInvoiceOf, reasonLabel } from "@/ravarer/lib/listPriceEvidence";
+import type { MaterialPriceEvidence } from "@/ravarer/hooks/useMaterialPriceEvidence";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 import type { RmSupplierRow } from "@/ravarer/hooks/useRmSuppliers";
 import { paths } from "@/ravarer/lib/paths";
@@ -15,11 +18,13 @@ import { costSummary } from "@/ravarer/lib/costSummary";
 interface Props {
   rm: RawMaterialRow;
   links: readonly RmSupplierRow[];
+  /** Bundet serverbevis (samme eier som listen). Leverandørbufferen brukes aldri. */
+  evidence: MaterialPriceEvidence;
   recipeCount: number;
   spend12m: number | null;
 }
 
-export function RawMaterialKpiStrip({ rm, links, recipeCount, spend12m }: Props) {
+export function RawMaterialKpiStrip({ rm, links, evidence, recipeCount, spend12m }: Props) {
   const { data: suppliers = [] } = useSuppliers();
   const supplierName = useMemo(() => {
     const map = new Map(suppliers.map((s) => [s.id, s.name]));
@@ -31,11 +36,6 @@ export function RawMaterialKpiStrip({ rm, links, recipeCount, spend12m }: Props)
     [links, rm.primary_supplier_id],
   );
 
-  const lastInvoice = useMemo(() => {
-    const withPrice = links.filter((l) => l.last_invoice_price != null && l.last_invoice_date);
-    return withPrice.sort((a, b) => (b.last_invoice_date ?? "").localeCompare(a.last_invoice_date ?? ""))[0] ?? null;
-  }, [links]);
-
   const agreed = chooseAgreedPrice({
     linkPricePerBaseUnit: primary?.agreed_price_per_base_unit ?? null,
     linkValidFrom: primary?.agreement_valid_from ?? null,
@@ -43,15 +43,20 @@ export function RawMaterialKpiStrip({ rm, links, recipeCount, spend12m }: Props)
     rawMaterialAgreedPrice: rm.agreed_price,
   });
 
-  // Bare bekreftet avtale (hvem/når) kan brukes som sammenligning; kostpris bare når verifisert.
+  // Avtalen vises som registrert/bekreftet, men erstatter aldri serverens kostprisavvik.
   const agreementOk = agreed.source === "link" && !!primary && isAgreementConfirmed(primary);
-  const cost = costSummary(rm);
+  const cost = costSummary(rm, evidence.cost);
   const verified = cost.verified;
-  const deviation = kpiDeviation(
-    lastInvoice?.last_invoice_price ?? null,
-    agreementOk ? agreed.value : null,
-    verified ? rm.current_cost_price : null,
-  );
+  const bound = evidence.bound;
+  const latest = latestInvoiceOf(bound);
+  const pendingLabel = evidence.loading ? "Kontrollerer prisgrunnlag …" : evidence.isError ? "Prisgrunnlag kunne ikke kontrolleres" : "Prisgrunnlag ikke kontrollert";
+  const devPct = bound && bound.status === "eligible" ? bound.deviationPct : null;
+  const devReason = !bound ? pendingLabel : bound.status === "eligible" ? null : reasonLabel(bound.costReason ?? bound.invoiceReason ?? bound.reason);
+  const invoiceSub = !bound
+    ? pendingLabel
+    : !latest.date
+      ? reasonLabel(bound.invoiceReason ?? bound.reason)
+      : [formatDate(latest.date), latest.number ? `Faktura ${latest.number}` : null, latest.reason].filter(Boolean).join(" · ");
 
   const factor = confirmedFactor(rm);
   const perPackage = verified ? pricePerPackage(rm.current_cost_price, factor) : null;
@@ -76,8 +81,8 @@ export function RawMaterialKpiStrip({ rm, links, recipeCount, spend12m }: Props)
       <OrderDeskKpi
         icon={FileText}
         label="Siste fakturapris"
-        value={lastInvoice?.last_invoice_price != null ? formatNok(lastInvoice.last_invoice_price) : "—"}
-        sub={lastInvoice ? `${formatDate(lastInvoice.last_invoice_date)} · ${supplierName(lastInvoice.supplier_id) ?? "—"}` : "Ingen fakturalinjer"}
+        value={latest.price != null && bound?.baseUnit ? `${formatNok(latest.price)} / ${bound.baseUnit}` : latest.date ? "Ukjent" : "—"}
+        sub={invoiceSub}
       />
       <OrderDeskKpi
         icon={Handshake}
@@ -95,10 +100,10 @@ export function RawMaterialKpiStrip({ rm, links, recipeCount, spend12m }: Props)
       />
       <OrderDeskKpi
         icon={Percent}
-        tone={deviation.pct != null && deviation.pct > 5 ? "warning" : "default"}
-        label="Avvik"
-        value={deviation.pct != null ? `${deviation.pct > 0 ? "+" : ""}${deviation.pct.toFixed(1)} %` : "—"}
-        sub={deviation.basis ? `Siste faktura mot ${deviation.basis}` : "Mangler grunnlag"}
+        tone={devPct != null && devPct > 5 ? "warning" : "default"}
+        label="Siste faktura mot kostpris"
+        value={devPct != null ? `${devPct > 0 ? "+" : ""}${formatNumber(devPct, 1)} %` : "—"}
+        sub={devReason ?? `Kontrollert ${formatDate(evidence.checkedAt)} · ikke avtalepris`}
       />
       <OrderDeskKpi
         icon={Truck}
