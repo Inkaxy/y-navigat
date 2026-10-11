@@ -4,8 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 export interface TripletexCredentialRow {
   legal_entity_id: string;
   mode: "jwt" | "standard" | "private";
-  has_consumer_token: boolean;
-  has_employee_token: boolean;
+  /** null = ukjent (statuslesingen feilet) — aldri det samme som bekreftet «ikke lagret». */
+  has_consumer_token: boolean | null;
+  has_employee_token: boolean | null;
   sync_enabled: boolean;
   sync_frequency_minutes: number;
   last_synced_at: string | null;
@@ -32,15 +33,18 @@ export function useTripletexCredentials(legalEntityId: string | null | undefined
       if (!data) return null;
       // Token-flagg hentes via SECURITY DEFINER funksjon — selve token-feltene
       // er REVOKED for authenticated for å hindre eksponering.
-      const { data: tokenStatus } = await (supabase.rpc as any)("tripletex_token_status", {
-        _legal_entity_id: legalEntityId,
+      const { data: tokenStatus, error: statusError } = await supabase.rpc("tripletex_token_status", {
+        _legal_entity_id: legalEntityId!,
       });
-      const status = Array.isArray(tokenStatus) ? tokenStatus[0] : tokenStatus;
+      if (statusError) console.warn("[tripletex] tokenstatus kunne ikke leses", statusError.code);
+      const row: unknown = Array.isArray(tokenStatus) ? tokenStatus[0] : tokenStatus;
+      const flag = (k: "has_consumer_token" | "has_employee_token"): boolean | null =>
+        statusError || typeof row !== "object" || row === null || !(k in row) ? null : (row as Record<string, unknown>)[k] === true;
       return {
         legal_entity_id: data.legal_entity_id,
         mode: (data.mode as "jwt" | "standard" | "private") ?? "standard",
-        has_consumer_token: !!status?.has_consumer_token,
-        has_employee_token: !!status?.has_employee_token,
+        has_consumer_token: flag("has_consumer_token"),
+        has_employee_token: flag("has_employee_token"),
         sync_enabled: data.sync_enabled,
         sync_frequency_minutes: data.sync_frequency_minutes,
         last_synced_at: data.last_synced_at,
