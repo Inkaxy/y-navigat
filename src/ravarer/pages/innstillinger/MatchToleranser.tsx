@@ -137,7 +137,7 @@ function StartPriceCard({ d, update, disabled }: CardProps) {
           checked={d.autoCheckStart} disabled={disabled} onChange={(v) => update({ autoCheckStart: v })} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <NumField id="s-tol" label="Toleranse mot startpris (%)" hint={`Over dette går linjen alltid til gjennomgang. Tomt = standard ${ENGINE_DEFAULTS.startTol} %`} value={d.startTol} disabled={disabled} onChange={(v) => update({ startTol: v })} />
+        <NumField id="s-tol" label="Toleranse mot startpris (%)" hint="Avvik over denne grensen går alltid til gjennomgang." value={d.startTol} disabled={disabled} onChange={(v) => update({ startTol: v })} />
         <NumField id="s-max" label="Maksimal kronepåvirkning (kr)" hint="Valgfritt. Større avvik i kroner går til gjennomgang selv om prosenten er innenfor. Tomt eller 0 = ingen kronegrense." value={d.startMaxImpact} disabled={disabled} onChange={(v) => update({ startMaxImpact: v })} />
       </div>
     </Card>

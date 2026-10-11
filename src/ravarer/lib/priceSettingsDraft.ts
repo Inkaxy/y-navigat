@@ -32,7 +32,7 @@ export function draftFrom(s: MatchSettings | null, rows: readonly CatRow[]): Pri
     fuzzy: txt(s?.fuzzy_match_threshold),
     fuzzyAuto: txt(s?.fuzzy_auto_match_threshold),
     dominance: txt(s?.fuzzy_auto_match_dominance_threshold),
-    startTol: txt(s?.start_price_tolerance_pct),
+    startTol: txt(s?.start_price_tolerance_pct ?? ENGINE_DEFAULTS.startTol),
     startMaxImpact: txt(s?.start_price_max_impact_nok),
     firstPrice: s?.auto_accept_first_price ?? true,
     inferPkg: s?.auto_confirm_inferred_package ?? true,
@@ -49,7 +49,7 @@ export function draftFrom(s: MatchSettings | null, rows: readonly CatRow[]): Pri
 export interface SettingsPayload {
   default_price_tolerance_pct: number; price_min_impact_nok: number; price_hard_cap_pct: number;
   fuzzy_match_threshold: number | null; fuzzy_auto_match_threshold: number | null; fuzzy_auto_match_dominance_threshold: number | null;
-  start_price_tolerance_pct: number | null; start_price_max_impact_nok: number | null;
+  start_price_tolerance_pct: number; start_price_max_impact_nok: number | null;
   auto_accept_first_price: boolean; auto_confirm_inferred_package: boolean; auto_reconcile_clean_imports: boolean;
   auto_approve_within_tolerance: boolean; auto_check_against_last_purchase: boolean;
   use_first_confirmed_price_as_start: boolean; auto_check_against_start_price: boolean;
@@ -84,7 +84,7 @@ export function parseDraft(d: PriceDraft): Parsed {
     fuzzy_match_threshold: opt(d.fuzzy, "Terskel for forslag", 1),
     fuzzy_auto_match_threshold: opt(d.fuzzyAuto, "Terskel for automatisk kobling", 1),
     fuzzy_auto_match_dominance_threshold: opt(d.dominance, "Krav om klar vinner", 1),
-    start_price_tolerance_pct: opt(d.startTol, "Toleranse mot startpris"),
+    start_price_tolerance_pct: req(d.startTol, "Toleranse mot startpris"),
     // 0 kr betyr «ingen kronegrense», som før.
     start_price_max_impact_nok: startMax != null && startMax > 0 ? startMax : null,
     auto_accept_first_price: d.firstPrice, auto_confirm_inferred_package: d.inferPkg, auto_reconcile_clean_imports: d.autoReconcile,
