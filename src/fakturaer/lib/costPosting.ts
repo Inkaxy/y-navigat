@@ -22,24 +22,46 @@ const ERR: Record<string, string> = {
  * resten. Første dokumenterte kostpris uten avtale føres med kilde.
  * Sumavvik, duplikat og flagg på fakturaen stopper føringen.
  */
-export async function postSafeCosts(invoiceIds: readonly string[], lineIds?: readonly string[]): Promise<CostPostingResult[]> {
+export async function postSafeCosts(
+  invoiceIds: readonly string[],
+  lineIds?: readonly string[],
+  onProgress?: (done: number, total: number) => void,
+): Promise<CostPostingResult[]> {
   const out: CostPostingResult[] = [];
   for (const invoiceId of invoiceIds) {
+    const r = await postOne(invoiceId, lineIds);
+    out.push(r);
+    onProgress?.(out.length, invoiceIds.length);
+  }
+  return out;
+}
+
+async function postOne(invoiceId: string, lineIds?: readonly string[]): Promise<CostPostingResult> {
+  try {
     const { data, error } = await supabase.rpc("rm_post_safe_line_costs", {
       p_invoice_id: invoiceId,
       p_line_ids: lineIds ? [...lineIds] : undefined,
     });
     if (error) {
       const k = Object.keys(ERR).find((x) => error.message.includes(x));
-      out.push({ invoiceId, posted: 0, skipped: 0, error: k ? ERR[k] : "Føringen ble avvist" });
-      continue;
+      return { invoiceId, posted: 0, skipped: 0, error: k ? ERR[k] : "Føringen ble avvist" };
     }
-    const r = (data ?? {}) as { ok?: boolean; posted?: number; skipped?: unknown[]; blockers?: string[] };
-    if (r.ok !== true) {
-      out.push({ invoiceId, posted: 0, skipped: 0, error: `Fakturaen er sperret (${(r.blockers ?? []).map(blockerLabel).join(", ")})` });
-      continue;
-    }
-    out.push({ invoiceId, posted: Number(r.posted ?? 0), skipped: Array.isArray(r.skipped) ? r.skipped.length : 0, error: null });
+    const r = parseCostPostingJson(data);
+    if (r.ok !== true) return { invoiceId, posted: 0, skipped: 0, error: `Fakturaen er sperret (${r.blockers.map(blockerLabel).join(", ")})` };
+    return { invoiceId, posted: r.posted, skipped: r.skipped, error: null };
+  } catch (e) {
+    console.error("[for-kostpris]", e);
+    return { invoiceId, posted: 0, skipped: 0, error: "Føringen ble avvist" };
   }
-  return out;
+}
+
+/** Typet lesing av svaret fra `rm_post_safe_line_costs`. */
+export function parseCostPostingJson(v: unknown): { ok: boolean; posted: number; skipped: number; blockers: string[] } {
+  const o = v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+  return {
+    ok: o.ok === true,
+    posted: Number.isFinite(Number(o.posted)) ? Number(o.posted) : 0,
+    skipped: Array.isArray(o.skipped) ? o.skipped.length : 0,
+    blockers: Array.isArray(o.blockers) ? o.blockers.filter((b): b is string => typeof b === "string") : [],
+  };
 }

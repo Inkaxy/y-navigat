@@ -70,6 +70,27 @@ export function approvalReport(
   return { ok, failed, title, items };
 }
 
+/** Samlet resultat etter kostprisføring, med feil per faktura. */
+export function costReport(
+  results: readonly { invoiceId: string; posted: number; skipped: number; error: string | null }[],
+  numberOf: (id: string) => string,
+): BulkReport {
+  const posted = results.reduce((a, r) => a + r.posted, 0);
+  const skipped = results.reduce((a, r) => a + r.skipped, 0);
+  const failedRows = results.filter((r) => r.error);
+  const ok = results.length - failedRows.length;
+  return {
+    ok, failed: failedRows.length,
+    title: failedRows.length === 0
+      ? `Kostpris ført på ${posted} trygge linjer (${ok} av ${results.length} fakturaer)`
+      : `Kostpris ført på ${posted} trygge linjer, ${failedRows.length} av ${results.length} fakturaer feilet`,
+    items: [
+      ...(skipped ? [`${skipped} linjer venter på avklaring`] : []),
+      ...failedRows.map((f) => `${numberOf(f.invoiceId)}: ${f.error}`),
+    ],
+  };
+}
+
 export const APPROVER_ROLE_TEXT = "Intern godkjenning krever godkjenner- eller admin-rolle";
 export const WRITE_ROLE_TEXT = "Føring av kostpris krever skrivetilgang til fakturaer";
 

@@ -24,9 +24,8 @@ import { DeliveryTimeline } from "@/ravarer/pages/priskontroll/faktura/DeliveryT
 import { blockerLabel } from "@/fakturaer/lib/approval";
 import { ApprovalHistorySheet } from "./ApprovalHistorySheet";
 import { ConfirmInvoiceList } from "./ConfirmInvoiceList";
-import { costReport } from "./approvalLogic";
 import { ApprovedBy, approvalColumns, RowMenu } from "./approvalColumns";
-import { bulkActionGate, approvalReport, canPostCosts, countByStatus, filterApprovalRows, GODKJENNING_LABEL, GODKJENNING_STATUSER, parseGodkjenningStatus, type GodkjenningStatus } from "./approvalLogic";
+import { bulkActionGate, approvalReport, canPostCosts, costReport, countByStatus, filterApprovalRows, GODKJENNING_LABEL, GODKJENNING_STATUSER, parseGodkjenningStatus, type GodkjenningStatus } from "./approvalLogic";
 import { approvalSteps, useApprovalDelivery, useApprovalOverview } from "./useGodkjenning";
 
 const PAGE = 25;
