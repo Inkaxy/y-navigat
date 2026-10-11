@@ -29,7 +29,6 @@ import { bulkActionGate, approvalReport, countByStatus, filterApprovalRows, GODK
 import { approvalSteps, useApprovalDelivery, useApprovalOverview } from "./useGodkjenning";
 
 const PAGE = 25;
-export { APPROVER_ROLE_TEXT, WRITE_ROLE_TEXT } from "./approvalLogic";
 
 type Result = { title: string; items: string[]; error: boolean } | null;
 
