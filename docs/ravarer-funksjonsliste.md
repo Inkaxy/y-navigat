@@ -323,11 +323,11 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 | F6 | Tellere «N åpne beslutninger på M fakturaer» og «gjentatte linjer slått sammen» | /ravarer › header-setning + Å gjøre-køtall | 2 | Flyttet |
 | F7 | Kort for varekort som venter, med lenke | /ravarer › KPI «Å gjøre i priskontroll» → ?fane=gjore | 2 | Flyttet |
 | F8 | Kort med fakturaer klare til intern godkjenning | /ravarer › KPI → /priskontroll?fane=godkjenning | 2 | Flyttet |
-| F9 | Beslutningsliste: søk, leverandørfilter, typefilter, paging, «alle» eller «bare råvarer» | ?fane=gjore › venstre: køer, søk, leverandørfilter | 3 | Flyttet |
+| F9 | Beslutningsliste: søk, leverandørfilter, typefilter, paging, «alle» eller «bare råvarer» | /ravarer/priskontroll?fane=gjore › venstre: grupper (gamle `type`/`omfang` omdirigeres til `gruppe`), søk, leverandørfilter, paginering | 3 | Flyttet |
 | F10 | Material: velg forslag, søk i hele registeret, bruk på alle like linjer og husk (alias) | Varekort-panel › Råvare-blokk | 3 | Flyttet |
 | F11 | Material: opprett ny råvare og koble resten av gruppen | Varekort-panel › «Opprett ny råvare» | 3 | Flyttet |
 | F12 | Package: bekreft pakning for alle linjer i gruppen | Varekort-panel › Pakning-blokk | 3 | Flyttet |
-| F13 | First cost: sett manglende pakning og før første kostpris | Varekort-panel › «Første kostpris» | 3 | Flyttet |
+| F13 | First cost: sett manglende pakning og før første kostpris | Varekort-panel › Prisblokk «Bekreft startpris» (én linje) og «Før første kostpris på N fakturaer» (`rm_post_safe_line_costs` per faktura) | 3 | Flyttet |
 | F14 | Price: referanse mot fakturert pris, nivådelt forklaring, samlet kronebeløp | Varekort-panel › Prisblokk | 3 | Flyttet |
 | F15 | Price: godta avviket for alle linjer, med sjekk av at linjene er uendret | Prisblokk › «Godta ny pris» (`rm_supplier_item_accept_price`) | 3 | Flyttet |
 | F16 | Price: opprett én leverandørsak for gruppen | Prisblokk › «Opprett leverandørsak» | 3 | Flyttet |

@@ -32,10 +32,10 @@ describe("Ikke vare — regelen beholdes ved angring", () => {
 });
 
 import { firstCostLinesByInvoice, firstCostReport } from "@/ravarer/pages/priskontroll/gjore/firstCost";
-import type { SupplierItemLine } from "@/fakturaer/lib/supplierItems";
+import type { FirstCostLine } from "@/ravarer/pages/priskontroll/gjore/firstCost";
 
 describe("F13 første kostpris på tvers av fakturaer", () => {
-  const l = (p: Partial<SupplierItemLine>): SupplierItemLine => ({ id: "l", invoice_id: "i1", invoice_status: "ready", is_credit_note: false, cost_posted: false, raw_material_id: "rm", price_per_base_unit: 10, base_quantity: 2, match_confidence: "high", requires_review: true, ...p } as Partial<SupplierItemLine> as SupplierItemLine);
+  const l = (p: Partial<FirstCostLine>): FirstCostLine => ({ id: "l", invoice_id: "i1", invoice_status: "ready", is_credit_note: false, cost_posted: false, raw_material_id: "rm", price_per_base_unit: 10, base_quantity: 2, flagged_at: null, ...p });
   it("grupperer trygge linjer per faktura", () => {
     const m = firstCostLinesByInvoice({ rm_id: "rm", rm_cost: null }, [
       l({ id: "a" }), l({ id: "b", invoice_id: "i2" }), l({ id: "c", invoice_id: "i3", invoice_status: "reconciled" }),
