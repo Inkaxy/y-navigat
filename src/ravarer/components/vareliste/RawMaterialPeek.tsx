@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { QueryState } from "@/components/common/QueryState";
 import { useRawMaterialPage } from "@/ravarer/hooks/useRawMaterialPage";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
-import { formatDate, formatNok, priceSourceLabel } from "@/ravarer/lib/constants";
+import { formatNok } from "@/ravarer/lib/constants";
 import { paths } from "@/ravarer/lib/paths";
 import { completenessChecklist, sectionSearch, type SectionId } from "@/ravarer/lib/rawMaterialSections";
 import { agreementStatusLabel, derivedPackagePrice, packageLabel } from "@/ravarer/lib/supplierPackagePrice";
