@@ -7,6 +7,7 @@ import type { Json } from "@/integrations/supabase/types";
 import { ACTION_COPY, type ActionRequired, type PriceGate } from "./financialPresentation";
 
 export type ReferenceSource = "agreement" | "last_purchase" | "start_price";
+export type BaseUnit = "kg" | "g" | "l" | "ml" | "stk";
 export type LineSafety = {
   line_id: string;
   line_version: string | null;
@@ -16,42 +17,107 @@ export type LineSafety = {
   reason_code: string | null;
   reference_source: ReferenceSource | null;
   reference_id: string | null;
+  /** Fra serverens gjeldende referanse (schema 2). Null = udatert gyldig grunnlag, aldri «i dag». */
+  reference_date: string | null;
+  base_unit: BaseUnit | null;
+  currency: "NOK" | null;
   expected_price_per_base_unit: number | null;
   price_per_base_unit: number | null;
   base_quantity: number | null;
 };
-export type InvoiceSafety = { invoice_id: string; checked_at: string; lines: Map<string, LineSafety> };
+export type InvoiceSafety = {
+  invoice_id: string;
+  legal_entity_id: string;
+  checked_at: string;
+  lines: Map<string, LineSafety>;
+};
 
 type Rec = Record<string, unknown>;
 const isRec = (v: unknown): v is Rec => !!v && typeof v === "object" && !Array.isArray(v);
 const numOrNull = (v: unknown): number | null | "bad" => (v == null ? null : typeof v === "number" && Number.isFinite(v) ? v : "bad");
 const strOrNull = (v: unknown): string | null | "bad" => (v == null ? null : typeof v === "string" ? v : "bad");
 const REFS: ReferenceSource[] = ["agreement", "last_purchase", "start_price"];
+export const COMPARABLE_UNITS: readonly BaseUnit[] = ["kg", "g", "l", "ml", "stk"];
+const nonEmpty = (v: string | null): v is string => typeof v === "string" && v.trim() !== "";
+
+/** Ekte kalenderdato (YYYY-MM-DD, evt. med klokkeslett). Ugyldig = "bad". */
+function isoDateOrNull(v: unknown): string | null | "bad" {
+  if (v == null) return null;
+  if (typeof v !== "string") return "bad";
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/.exec(v);
+  if (!m) return "bad";
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d ? v.slice(0, 10) : "bad";
+}
+
+/**
+ * PostgreSQL-tidsstempel → sammenlignbar nøkkel med full mikrosekundpresisjon i UTC.
+ * `Date.parse` alene mister mikrosekunder. Mangler sone eller er formen ugyldig: null.
+ */
+export function versionKey(v: string | null | undefined): string | null {
+  if (typeof v !== "string") return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(Z|[+-]\d{2}(?::?\d{2})?)$/.exec(v.trim());
+  if (!m) return null;
+  const [, y, mo, d, h, mi, se, frac = "", tz] = m;
+  let off = 0;
+  if (tz !== "Z") {
+    const t = /^([+-])(\d{2}):?(\d{2})?$/.exec(tz);
+    if (!t) return null;
+    off = (t[1] === "-" ? -1 : 1) * (Number(t[2]) * 60 + Number(t[3] ?? "0"));
+  }
+  const ms = Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(se)) - off * 60_000;
+  if (!Number.isFinite(ms)) return null;
+  return `${ms / 1000}.${frac.padEnd(6, "0")}`;
+}
 
 function parseLine(v: unknown): LineSafety | null {
-  if (!isRec(v) || typeof v.line_id !== "string" || typeof v.can_compare !== "boolean") return null;
+  if (!isRec(v) || typeof v.line_id !== "string" || v.line_id === "" || typeof v.can_compare !== "boolean") return null;
   const nums = ["effect_nok", "expected_price_per_base_unit", "price_per_base_unit", "base_quantity"].map((k) => numOrNull(v[k]));
-  const strs = ["line_version", "raw_material_id", "reason_code", "reference_id"].map((k) => strOrNull(v[k]));
-  if (nums.includes("bad") || strs.includes("bad")) return null;
+  const strs = ["line_version", "raw_material_id", "reason_code", "reference_id", "base_unit", "currency"].map((k) => strOrNull(v[k]));
+  const refDate = isoDateOrNull(v.reference_date);
+  if (nums.includes("bad") || strs.includes("bad") || refDate === "bad") return null;
   const ref = v.reference_source == null ? null : typeof v.reference_source === "string" && (REFS as string[]).includes(v.reference_source) ? (v.reference_source as ReferenceSource) : "bad";
   if (ref === "bad") return null;
   const [effect, expected, ppbu, bq] = nums as (number | null)[];
-  const [version, rm, reason, refId] = strs as (string | null)[];
-  // Godkjent krever endelig, ikke-negativ virkning; ellers er linjen ukjent.
-  if (v.can_compare && (effect == null || effect < 0)) return null;
+  const [version, rm, reason, refId, unit, currency] = strs as (string | null)[];
+  if (!v.can_compare) {
+    return { line_id: v.line_id, line_version: version, raw_material_id: rm, can_compare: false, effect_nok: null, reason_code: reason,
+      reference_source: null, reference_id: null, reference_date: null, base_unit: null, currency: null,
+      expected_price_per_base_unit: null, price_per_base_unit: null, base_quantity: null };
+  }
+  // Godkjent krever komplett, gyldig kvittering. Ett manglende felt = ukjent (linjen utelates), aldri delvis godkjent.
+  const unitOk = unit != null && (COMPARABLE_UNITS as readonly string[]).includes(unit);
+  const pos = (x: number | null): x is number => x != null && x > 0;
+  if (!nonEmpty(version) || !nonEmpty(rm) || !nonEmpty(refId) || ref == null || !unitOk || currency !== "NOK" || reason != null
+    || !pos(ppbu) || !pos(expected) || !pos(bq) || effect == null || effect < 0) return null;
   return {
-    line_id: v.line_id, line_version: version, raw_material_id: rm, can_compare: v.can_compare, effect_nok: v.can_compare ? effect : null,
-    reason_code: reason, reference_source: v.can_compare ? ref : null, reference_id: v.can_compare ? refId : null,
-    expected_price_per_base_unit: v.can_compare ? expected : null, price_per_base_unit: v.can_compare ? ppbu : null, base_quantity: v.can_compare ? bq : null,
+    line_id: v.line_id, line_version: version, raw_material_id: rm, can_compare: true, effect_nok: effect, reason_code: null,
+    reference_source: ref, reference_id: refId, reference_date: refDate, base_unit: unit as BaseUnit, currency: "NOK",
+    expected_price_per_base_unit: expected, price_per_base_unit: ppbu, base_quantity: bq,
   };
 }
 
-/** Svar → status per linje. Feil faktura-ID eller ugyldig form gir null (alt ukjent). Ugyldige linjer utelates (= ukjent). */
-export function parsePriceSafety(data: Json | unknown, invoiceId: string): InvoiceSafety | null {
-  if (!isRec(data) || data.invoice_id !== invoiceId || !Array.isArray(data.lines)) return null;
+/**
+ * Svar (schema 2) → status per linje. Feil faktura, manglende selskap, ugyldig tidspunkt eller
+ * duplikate linje-ID-er gir null (alt ukjent). Ugyldige linjer utelates (= ukjent).
+ */
+export function parsePriceSafety(data: Json | unknown, invoiceId: string, expectedEntityId?: string | null): InvoiceSafety | null {
+  if (!isRec(data) || data.schema_version !== 2 || data.invoice_id !== invoiceId || !Array.isArray(data.lines)) return null;
+  if (typeof data.legal_entity_id !== "string" || data.legal_entity_id === "") return null;
+  if (expectedEntityId !== undefined && data.legal_entity_id !== expectedEntityId) return null;
+  if (typeof data.checked_at !== "string" || !Number.isFinite(Date.parse(data.checked_at))) return null;
   const lines = new Map<string, LineSafety>();
-  for (const l of data.lines) { const p = parseLine(l); if (p) lines.set(p.line_id, p); }
-  return { invoice_id: invoiceId, checked_at: typeof data.checked_at === "string" ? data.checked_at : "", lines };
+  const seen = new Set<string>();
+  for (const l of data.lines) {
+    if (isRec(l) && typeof l.line_id === "string") {
+      if (seen.has(l.line_id)) return null;
+      seen.add(l.line_id);
+    }
+    const p = parseLine(l);
+    if (p) lines.set(p.line_id, p);
+  }
+  return { invoice_id: invoiceId, legal_entity_id: data.legal_entity_id, checked_at: data.checked_at, lines };
 }
 
 const REASONS: Record<string, { label: string; action: ActionRequired; detail?: string }> = {
@@ -82,14 +148,21 @@ export function reasonGate(code: string | null): PriceGate {
   return { ok: false, reason: code ?? "unknown", action: r.action, label: r.label, detail: r.detail ?? ACTION_COPY[r.action].detail };
 }
 
+/** Den faktiske raden som skal vise status. `undefined` = ikke kjent fra kallstedet. */
+export type CallerBinding = { updated_at?: string | null; raw_material_id?: string | null };
+
 /**
- * Status for én linje. `fresh=false` (lasting/feil/oppdatering/ventende endring) gir alltid ukjent.
- * Linjeversjon må stemme med lastet linje når den er kjent.
+ * Status for én linje. `fresh=false` (lasting/feil/oppdatering/utløpt/ventende endring) gir alltid ukjent.
+ * Godkjent krever at kvitteringen gjelder nøyaktig samme radversjon (full presisjon) og råvare som
+ * kallerens egen rad. Kjent, men ulik eller manglende versjon = ukjent.
  */
-export function safetyGate(entry: LineSafety | undefined, fresh: boolean, loadedVersion?: string | null): PriceGate {
+export function safetyGate(entry: LineSafety | undefined, fresh: boolean, caller?: CallerBinding | string | null): PriceGate {
   if (!fresh || !entry) return UNCHECKED;
-  if (loadedVersion != null && entry.line_version != null && Date.parse(loadedVersion) !== Date.parse(entry.line_version)) return UNCHECKED;
   if (!entry.can_compare) return reasonGate(entry.reason_code);
+  const b: CallerBinding = typeof caller === "string" || caller == null ? { updated_at: caller ?? null } : caller;
+  const mine = versionKey(b.updated_at ?? null);
+  if (mine == null || mine !== versionKey(entry.line_version)) return UNCHECKED;
+  if (b.raw_material_id !== undefined && b.raw_material_id !== entry.raw_material_id) return UNCHECKED;
   return { ok: true, safety: entry };
 }
 
