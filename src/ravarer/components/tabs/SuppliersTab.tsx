@@ -23,9 +23,12 @@ import { QueryErrorState, QueryLoadingState } from "@/components/common/QuerySta
 
 interface Props {
   rm: RawMaterialRow;
+  /** Seksjon på råvarekortet: «pris» (prisgrunnlag/historikk) eller «leverandorer» (koblinger/varekort). Udefinert = begge. */
+  part?: "pris" | "leverandorer";
 }
 
-export function SuppliersTab({ rm }: Props) {
+export function SuppliersTab({ rm, part }: Props) {
+  const show = (p: "pris" | "leverandorer") => !part || part === p;
   const { canWrite } = useRavarer();
   const { data: allSuppliers = [] } = useSuppliers();
   const { data: links = [], isLoading } = useRawMaterialSuppliers(rm.id);
@@ -74,10 +77,10 @@ export function SuppliersTab({ rm }: Props) {
 
   return (
     <div className="space-y-5">
-      <PriceBasisNowCard rawMaterialId={rm.id} category={rm.category} baseUnit={rm.base_unit} links={links} supplierNames={supplierNames} />
-      <SupplierItemsForMaterialCard rawMaterialId={rm.id} />
-      <StartPriceCard links={links} supplierNames={supplierNames} currentBaseUnit={rm.base_unit} />
-      <SupplierLinksTable
+      {show("pris") && <PriceBasisNowCard rawMaterialId={rm.id} category={rm.category} baseUnit={rm.base_unit} links={links} supplierNames={supplierNames} />}
+      {show("leverandorer") && <SupplierItemsForMaterialCard rawMaterialId={rm.id} />}
+      {show("pris") && <StartPriceCard links={links} supplierNames={supplierNames} currentBaseUnit={rm.base_unit} />}
+      {show("leverandorer") && <SupplierLinksTable
         links={links}
         supplierMap={supplierMap}
         units={units}
@@ -91,9 +94,9 @@ export function SuppliersTab({ rm }: Props) {
         hasHistory={(sid) => history.some((h) => h.supplier_id === sid && h.source === "invoice" && !h.is_legacy)}
         onNewSupplier={() => setSupplierOpen(true)}
         onLink={(existingId) => setLinkOpen({ open: true, existingId })}
-      />
+      />}
 
-      {historyQuery.isError ? (
+      {!show("pris") ? null : historyQuery.isError ? (
         <QueryErrorState error={historyQuery.error} scope="ravarer:pristidslinje" title="Kunne ikke hente prishistorikken" onRetry={() => void historyQuery.refetch()} />
       ) : historyQuery.isLoading ? (
         <QueryLoadingState />
@@ -117,8 +120,8 @@ export function SuppliersTab({ rm }: Props) {
       />
       )}
 
-      <RecentInvoiceLinesCard rawMaterialId={rm.id} baseUnit={rm.base_unit} eligibleLineIds={historyQuery.eligibleLineIds} />
-      <PurchaseStatsCard rawMaterialId={rm.id} baseUnit={rm.base_unit} />
+      {show("pris") && <RecentInvoiceLinesCard rawMaterialId={rm.id} baseUnit={rm.base_unit} eligibleLineIds={historyQuery.eligibleLineIds} />}
+      {show("pris") && <PurchaseStatsCard rawMaterialId={rm.id} baseUnit={rm.base_unit} />}
 
       <NewSupplierDialog open={supplierOpen} onOpenChange={setSupplierOpen} />
       <RmSupplierDialog
