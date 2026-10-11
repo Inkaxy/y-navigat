@@ -33,9 +33,9 @@ export function parseApplyResult(data: unknown, req: ApplyRequest): ApplyMatvare
   const water = bool(data, "water_content_set");
   const waterSkip = bool(data, "water_g_skipped");
   if (water == null || waterSkip == null) return null;
-  const decl = data.declaration_name_set;
-  if (decl != null && typeof decl !== "string") return null;
-  return { written, skipped, water_content_set: water, water_g_skipped: waterSkip, declaration_name_set: decl ?? null, forced: req.force };
+  const decl = bool(data, "declaration_name_set");
+  if (decl == null) return null;
+  return { written, skipped, water_content_set: water, water_g_skipped: waterSkip, declaration_name_set: decl, forced: req.force };
 }
 
 /** Én setning om hva som faktisk ble skrevet — aldri ubetinget «næringsverdier hentet». */
@@ -44,7 +44,7 @@ export function applyResultMessage(r: ApplyMatvaretabellenResult | null): { tone
   const parts: string[] = [];
   parts.push(r.written.length > 0 ? `${r.written.length} felt hentet fra Matvaretabellen${r.forced ? " (overskrevet)" : ""}` : "Ingen felt ble skrevet");
   if (r.skipped.length > 0) parts.push(`${r.skipped.length} beholdt fra datablad/manuell kilde`);
-  if (r.declaration_name_set) parts.push(`deklarasjonsnavn satt til «${r.declaration_name_set}»`);
+  if (r.declaration_name_set) parts.push("deklarasjonsnavn satt");
   return { tone: r.written.length > 0 && r.skipped.length === 0 ? "success" : "warning", text: parts.join(" · ") };
 }
 
