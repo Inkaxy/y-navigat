@@ -304,7 +304,7 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 | R192 | Visning av før, etter, endring, kilde og regnestykke | /verktoy/reberegn › kolonner | 3 | Gammel plass |
 | R193 | Bekreft bruk (prøvekjøring → bruk → oppdater statistikk) | /verktoy/reberegn › «Oppdater kostpriser» | 3 | Gammel plass |
 | R194 | Angre batch | /verktoy/reberegn › resultat «Angre» | 3 | Gammel plass |
-| R195 | Lenker til Pakninger og fakturaer | → /varer?liste=pakning og /priskontroll/faktura/:id | 3 | Gammel plass |
+| R195 | Lenker til Pakninger og fakturaer | → /varer?liste=pakning og /priskontroll/faktura/:id | 3 | Flyttet |
 
 ## Ny råvare (alle veier → én dialog)
 
@@ -357,19 +357,19 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| F19 | Innboksfaner «Må avklares», «Klar til å fullføre», «Fullført» | /priskontroll?fane=fakturaer › hurtigfiltre | 3 | Gammel plass |
-| F20 | Søk på leverandør eller fakturanr., leverandørfilter, «Vis flere» | ?fane=fakturaer › DataTable | 3 | Gammel plass |
+| F19 | Innboksfaner «Må avklares», «Klar til å fullføre», «Fullført» | /priskontroll?fane=fakturaer › hurtigfiltre | 3 | Flyttet |
+| F20 | Søk på leverandør eller fakturanr., leverandørfilter, «Vis flere» | ?fane=fakturaer › DataTable | 3 | Flyttet |
 | F21 | «Oppdater matching» for alle fakturaer, med fremdrift og feilliste | Priskontroll › Verktøy «Beregn alle åpne på nytt» (kø + status) | 3 | Gammel plass |
-| F22 | Hovedknapp per faktura (Se flagget, Hent linjer, Registrer linjer, Koble kreditnota, Fullfør kontroll, Avklar N) | ?fane=fakturaer › rad-hovedknapp + Å gjøre › Fakturasak-kort | 3 | Gammel plass |
-| F23 | Radmeny (åpne detalj, kjør matching, flagg, fjern flagg) | ?fane=fakturaer › radmeny | 3 | Gammel plass |
-| F24 | Fokusvisning: fremdrift, angre siste, originalfaktura, «Bekreft prismatch» | /priskontroll/faktura/:id › header (tidslinje + én hovedknapp) | 3 | Gammel plass |
-| F25 | Varsel om feil på fakturanivå med «Rett registreringen» | /faktura/:id › faktasone | 3 | Gammel plass |
-| F26 | Linjekø: årsaksfilter (13 grupper), tre sorteringer | ?fane=gjore (kronevirkning, hyppighet, dato) + /faktura/:id › linjefilter | 3 | Gammel plass |
+| F22 | Hovedknapp per faktura (Se flagget, Hent linjer, Registrer linjer, Koble kreditnota, Fullfør kontroll, Avklar N) | ?fane=fakturaer › rad-hovedknapp + Å gjøre › Fakturasak-kort | 3 | Flyttet |
+| F23 | Radmeny (åpne detalj, kjør matching, flagg, fjern flagg) | ?fane=fakturaer › radmeny | 3 | Flyttet |
+| F24 | Fokusvisning: fremdrift, angre siste, originalfaktura, «Bekreft prismatch» | /priskontroll/faktura/:id › header (tidslinje + én hovedknapp) | 3 | Flyttet |
+| F25 | Varsel om feil på fakturanivå med «Rett registreringen» | /faktura/:id › faktasone | 3 | Flyttet |
+| F26 | Linjekø: årsaksfilter (13 grupper), tre sorteringer | ?fane=gjore (kronevirkning, hyppighet, dato) + /faktura/:id › linjefilter | 3 | Flyttet |
 | F27 | «Kontroller linjer på tvers av fakturaer» (opptil 200) | ?fane=gjore (gruppert per varekort på tvers av fakturaer) | 3 | Gammel plass |
 | F28 | Masse: godta forslag, ikke aktuell, opprett råvarer | ?fane=gjore › masseutvalg | 3 | Gammel plass |
 | F44 | Hurtigtaster ↑/↓, Enter, m, n, x, u, Esc | Å gjøre: J/K, Enter, L, P, G, X, U, `?`; linjeinspektør: m, n, x, u | 3 | Gammel plass |
 | F45 | Angre siste linjehandling | U / «Angre» i resultatboks og linjeinspektør | 3 | Gammel plass |
-| F46 | Dokumentpanel ved siden av køen; tilstand huskes | /faktura/:id › dokumentsone (kan skjules) | 3 | Gammel plass |
+| F46 | Dokumentpanel ved siden av køen; tilstand huskes | /faktura/:id › dokumentsone (kan skjules) | 3 | Flyttet |
 
 ## Linjeoppgave og MatchDrawer
 
@@ -398,16 +398,16 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| F82 | Filtre: selskap, status, leverandør, periode, avvik, betalt, fritekst; sortering og paging | /priskontroll?fane=fakturaer › DataTable | 3 | Gammel plass |
-| F83 | Kolonner: kilde, betalt, status, uttrekksstatus, sumavvik, lav lesesikkerhet | ?fane=fakturaer › kolonne Leveransestatus (Mottatt → … → Kostpris ført) + egne kolonner | 3 | Gammel plass |
-| F84 | Banner med linjer til gjennomgang + Tripletex-statuskort | ?fane=fakturaer › header-tellere + TripletexStatusCard | 3 | Gammel plass |
+| F82 | Filtre: selskap, status, leverandør, periode, avvik, betalt, fritekst; sortering og paging | /priskontroll?fane=fakturaer › DataTable | 3 | Flyttet |
+| F83 | Kolonner: kilde, betalt, status, uttrekksstatus, sumavvik, lav lesesikkerhet | ?fane=fakturaer › kolonne Leveransestatus (Mottatt → … → Kostpris ført) + egne kolonner | 3 | Flyttet |
+| F84 | Banner med linjer til gjennomgang + Tripletex-statuskort | ?fane=fakturaer › header-tellere + TripletexStatusCard | 3 | Flyttet |
 | F107 | Automatisk avstemming og visningen «Avstemt automatisk» | Leveransestatus «Avstemt (auto)» + /ravarer › «Skjedde automatisk» | 3 | Gammel plass |
 
 ## Fakturadetalj
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| F67 | Status, inkl. «Avstemt automatisk» med forklaring | /priskontroll/faktura/:id › header-tidslinje | 3 | Gammel plass |
+| F67 | Status, inkl. «Avstemt automatisk» med forklaring | /priskontroll/faktura/:id › header-tidslinje | 3 | Flyttet |
 | F68 | Vis/skjul original side om side eller som bunnark; åpne i ny fane | Dokumentsone (bunnark på mobil) | 3 | Gammel plass |
 | F69 | Hent linjer fra PDF/Tripletex med teller for forsøk og feilmelding | Hovedknapp «Hent linjer» (én knapp, riktig kilde) | 3 | Gammel plass |
 | F70 | Kjør automatisk matching på nytt | Én omberegningsknapp (køen) | 3 | Gammel plass |
@@ -421,21 +421,21 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 | F78 | Kortet Detaljer (org.nr., forfall osv.) | Faktasone | 3 | Gammel plass |
 | F79 | Linjetabell: forventet pris, referansekilde, avvik, matchtype, årsaker, linjetype, merknad, valgfri konto | Linjesone (midten) | 3 | Gammel plass |
 | F80 | Per linje: «Åpne varekort», «Match/Endre match», «Se prishistorikk» | Linjesone › radhandlinger → linjeinspektør / varekort-panel / /varer/:id?seksjon=pris | 3 | Gammel plass |
-| F81 | «Registrer linjer» når fakturaen mangler linjer | Hovedknapp → /faktura/:id/registrer-linjer | 3 | Gammel plass |
+| F81 | «Registrer linjer» når fakturaen mangler linjer | Hovedknapp → /faktura/:id/registrer-linjer | 3 | Flyttet |
 
 ## Import
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| F95 | Import av EHF | /priskontroll?importer=ehf (sidepanel) | 3 | Gammel plass |
-| F96 | Import av PDF med AI-uttrekk, automatisk leverandør og forhåndsvisning | ?importer=pdf (leverandør via felles SupplierDialog-logikk) | 3 | Gammel plass |
-| F97 | Manuell registrering av faktura | ?importer=manuelt | 3 | Gammel plass |
+| F95 | Import av EHF | /priskontroll?importer=ehf (sidepanel) | 3 | Flyttet |
+| F96 | Import av PDF med AI-uttrekk, automatisk leverandør og forhåndsvisning | ?importer=pdf (leverandør via felles SupplierDialog-logikk) | 3 | Flyttet |
+| F97 | Manuell registrering av faktura | ?importer=manuelt | 3 | Flyttet |
 
 ## Registrer linjer
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| F98 | Registrer eller erstatt linjer, deretter matching | /priskontroll/faktura/:id/registrer-linjer | 3 | Gammel plass |
+| F98 | Registrer eller erstatt linjer, deretter matching | /priskontroll/faktura/:id/registrer-linjer | 3 | Flyttet |
 
 ## Godkjenning / Fakturaoversikt
 
@@ -444,7 +444,7 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 | F85 | Bøttene Klare, Avventer, Godkjent; søk og leverandørfilter | /priskontroll?fane=godkjenning | 3 | Gammel plass |
 | F86 | Blokkeringer per faktura | ?fane=godkjenning › rad/peek | 3 | Gammel plass |
 | F87 | Godkjenn valgte internt (med bekreftelse; ingen betaling) | ?fane=godkjenning › sticky handlingsrad | 3 | Gammel plass |
-| F88 | Før kostpris for trygge linjer | ?fane=godkjenning › handlingsrad + hovedknapp «Før kostpris» på /faktura/:id | 3 | Gammel plass |
+| F88 | Før kostpris for trygge linjer | ?fane=godkjenning › handlingsrad + hovedknapp «Før kostpris» på /faktura/:id | 3 | Flyttet |
 | F89 | Historikk og tilbaketrekking av godkjenning med begrunnelse | ?fane=godkjenning › peek › Historikk | 3 | Gammel plass |
 
 ## Leverandørsaker, flagg og kreditnota
@@ -455,7 +455,7 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 | F91 | Sak: linjer, kreditfordeling (kreditnota, faktura, beløp), idempotent lagring | /priskontroll/saker/:id | 3 | Gammel plass |
 | F92 | Merk som løst, avbryt eller åpne igjen, med begrunnelse | /saker/:id › sticky handlingsrad | 3 | Gammel plass |
 | F93 | Flagg faktura med begrunnelse og handlingstype | Flagg-dialog fra /faktura/:id, fakturaliste og Fakturasak-kort (kan opprette sak; lover ikke e-post) | 3 | Flyttet |
-| F94 | Koble kreditnota til opprinnelig faktura | Å gjøre › Fakturasak-kort «Koble kreditnota» + /faktura/:id | 3 | Gammel plass |
+| F94 | Koble kreditnota til opprinnelig faktura | Å gjøre › Fakturasak-kort «Koble kreditnota» + /faktura/:id | 3 | Flyttet |
 
 ## Vareminne-funksjoner som må gjenopprettes
 
