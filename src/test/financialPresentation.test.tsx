@@ -212,3 +212,14 @@ describe("MELIS 25 KG – blandet retning", () => {
     expect(both.ok).toBe(false);
   });
 });
+
+describe("leveransestatus på kreditnota", () => {
+  it("kostpris er «ikke relevant», ikke «ja»", async () => {
+    const { DeliveryTimeline } = await import("@/ravarer/pages/priskontroll/faktura/DeliveryTimeline");
+    const { TooltipProvider } = await import("@/components/ui/tooltip");
+    wrap(<TooltipProvider><DeliveryTimeline steps={[{ key: "kostpris", label: "Kostpris ført", done: true, na: true, detail: "Ikke relevant for kreditnota" }]} creditNote /></TooltipProvider>);
+    const ol = screen.getByRole("list");
+    expect(ol.getAttribute("aria-label")).toContain("Kostpris ført: ikke relevant");
+    expect(ol.getAttribute("aria-label")).not.toContain("Kostpris ført: ja");
+  });
+});

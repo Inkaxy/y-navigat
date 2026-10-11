@@ -20,6 +20,7 @@ import { paths } from "@/ravarer/lib/paths";
 import { ResultBox } from "@/ravarer/ui/ResultBox";
 import { VarekortHeaderView, VBlock } from "./VarekortHeaderView";
 import { PriceBlock, hasPriceWork } from "./PriceBlock";
+import { packageConflict, packageLabel } from "./packageLabel";
 import { ChangeLinkDialog } from "./ChangeLinkDialog";
 import { SupplierLinkAliases } from "./SupplierLinkAliases";
 import type { PanelResult } from "./types";
@@ -164,7 +165,8 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
           } />
           <VBlock n={2} title="Pakning" done summary={
             <span className="flex flex-wrap items-center gap-2 text-ink-secondary">
-              {item.base_units_per_package != null ? `${item.base_units_per_package.toLocaleString("nb-NO")} ${item.rm_base_unit ?? ""} per ${item.package_unit ?? "pakning"}` : "Regnes direkte fra fakturaenheten"}
+              {packageLabel(item)}
+              {packageConflict(item) && <span className="text-caption text-warning">{packageConflict(item)}</span>}
               <Button data-action="check-package" size="sm" variant="ghost" disabled={!canWrite} onClick={() => { setEditPkg(true); setEditForm(true); }}>Endre</Button>
             </span>
           } />

@@ -125,3 +125,15 @@ describe("Endre kobling — omfang", () => {
       .toEqual({ lineIds: ["a", "c"], movable: 1, locked: 1 });
   });
 });
+
+describe("pakningsetikett (MELIS)", () => {
+  it("målenhet er innhold, ikke «per kg»; konflikt vises", async () => {
+    const { packageConflict, packageLabel } = await import("@/ravarer/pages/priskontroll/gjore/packageLabel");
+    const melis = { base_units_per_package: 25, rm_base_unit: "kg", package_unit: "kg", package_size: 600 };
+    expect(packageLabel(melis)).toBe("Pakningsinnhold: 25 kg");
+    expect(packageLabel(melis)).not.toMatch(/per kg/);
+    expect(packageConflict(melis)).toMatch(/600 kg stemmer ikke med innhold 25 kg/);
+    expect(packageLabel({ ...melis, package_unit: "sekk", package_size: 25 })).toBe("25 kg per sekk");
+    expect(packageConflict({ ...melis, package_size: 25 })).toBeNull();
+  });
+});

@@ -11,6 +11,8 @@ export interface DeliveryStep {
   done: boolean;
   /** Kort forklaring til tooltip. */
   detail: string;
+  /** Steget gjelder ikke denne fakturaen (f.eks. kostpris på kreditnota). Aldri «utført». */
+  na?: boolean;
 }
 
 export interface DeliveryInvoice {
@@ -121,7 +123,7 @@ export function deliverySteps(inv: DeliveryInvoice, extras: DeliveryExtras): Del
             : "Ikke kontrollert ennå",
     },
     inv.is_credit_note
-      ? { key: "kostpris", label: "Kostpris ført", done: true, detail: "Ikke relevant for kreditnota" }
+      ? { key: "kostpris", label: "Kostpris ført", done: true, na: true, detail: "Ikke relevant for kreditnota" }
       : { key: "kostpris", label: "Kostpris ført", done: extras.costPosted, detail: costDetail(extras, avstemt) },
     { key: "avstemt", label: "Avstemt", done: avstemt, detail: avstemt ? `Avstemt ${mode}` : "Ikke avstemt" },
     { key: "godkjent", label: "Godkjent", done: extras.approved, detail: extras.approved ? "Internt godkjent" : "Ikke godkjent" },
