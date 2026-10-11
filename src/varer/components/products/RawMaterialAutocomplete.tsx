@@ -145,14 +145,14 @@ export function RawMaterialAutocomplete({
     queryKey: ["halvfabrikat_autocomplete", legalEntityId],
     enabled: !!onSelectSubProduct && !!legalEntityId,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("products")
         .select("id, display_name")
         .eq("legal_entity_id", legalEntityId!)
         .eq("calc_type", "halvfabrikat")
         .order("display_name");
       if (error) throw error;
-      return (data ?? []) as { id: string; display_name: string }[];
+      return (data ?? []);
     },
   });
 
