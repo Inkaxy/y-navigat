@@ -16,3 +16,6 @@
 - Kalkyler leser kostpris via `rm_usable_cost` (null når `cost_basis_status=mangler`); kun `cost_eligible`-historikk og linjekonsistente fakturaobservasjoner kvalifiserer, og liter↔kg krever registrert tetthet. Why: ugyldiggjort kilde eller gjettet omregning ga stille feil kalkyle.
 - Kalkyler henter råvarer bare via `fetchBakersRawMaterials` (`src/varer/lib/bakersRawMaterials.ts`) og regner kost i `recipeCost.ts`, der bare `cost_basis_status='verifisert'` er fullstendig. Why: ulike kolonnelister under samme query key ga manglende grunnenhet/status og stille feil kost.
 - Prishistorikk hentes via `priceHistoryFetch.ts` med historisk enhet/pakning/valuta per rad (`priceProvenance.ts`); udokumentert enhet er ukjent og ikke sammenlignbar i graf/Δ/CSV. Why: eldre observasjoner ble merket med dagens enhet.
+
+- Manuell PDF-import lagrer leverandør, faktura og linjer bare via `rm_save_manual_pdf_invoice` (én transaksjon, dokumentsti som gjentaksnøkkel, samme lesevarsler/tallbevis som Tripletex). Why: tre separate klient-inserts kunne etterlate halve fakturaer og mistet lesebevis.
+- Root-migrasjoner kjørt direkte mot live speiles byte-identisk i `supabase/live-mirror/`, ikke i `supabase/migrations`. Why: migrasjonsmappen styres av verktøyet som ville kjørt SQL-en på nytt.
