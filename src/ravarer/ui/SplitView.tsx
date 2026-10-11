@@ -5,14 +5,19 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
- * Liste + panel. Fra 1280 px vises listen og panelet side om side; under det
- * skjules panelet og listen navigerer til full side (`fullHref` på radene).
+ * Liste + panel. Fra 1280 px vises listen og panelet side om side. Under 1280 px vises
+ * listen når ingenting er valgt, og det valgte panelet (i full bredde) når noe er valgt —
+ * aldri et skjult panel. `selected` styrer smal visning; uten den beholdes gammel oppførsel
+ * (panelet skjules og radene navigerer til full side).
  */
-export function SplitView({ list, panel, className }: { list: ReactNode; panel: ReactNode; className?: string }) {
+export function SplitView({ list, panel, className, selected }: { list: ReactNode; panel: ReactNode; className?: string; selected?: boolean }) {
+  const narrowShowsPanel = selected === true;
+  // `selected === false`: ingenting valgt → listen får full bredde også på desktop.
+  const listOnly = selected === false;
   return (
-    <div className={cn("grid gap-4 xl:h-[calc(100dvh-var(--shell-offset,7rem))] xl:grid-cols-[minmax(340px,0.9fr)_minmax(440px,1.1fr)]", className)}>
-      <div className="min-h-0 min-w-0 overflow-auto">{list}</div>
-      <div className="hidden min-h-0 min-w-0 xl:block">{panel}</div>
+    <div className={cn("grid gap-4", !listOnly && "xl:h-[calc(100dvh-var(--shell-offset,7rem))] xl:grid-cols-[minmax(340px,0.9fr)_minmax(440px,1.1fr)]", className)}>
+      <div className={cn("min-h-0 min-w-0 overflow-auto", narrowShowsPanel && "hidden xl:block")} data-split="list">{list}</div>
+      {!listOnly && <div className={cn("min-h-0 min-w-0", narrowShowsPanel ? "block" : "hidden xl:block")} data-split="panel">{panel}</div>}
     </div>
   );
 }
@@ -46,7 +51,7 @@ export function PeekPanel({ title, fullHref, onClose, footer, children, emptyTex
             </Button>
           )}
           {onClose && (
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose} aria-label="Lukk panelet">
+            <Button variant="ghost" size="icon" className="h-11 w-11 xl:h-8 xl:w-8" onClick={onClose} aria-label="Lukk panelet">
               <X className="h-4 w-4" />
             </Button>
           )}

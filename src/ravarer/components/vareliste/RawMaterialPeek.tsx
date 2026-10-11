@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
-import { Maximize2 } from "lucide-react";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { PeekPanel } from "@/ravarer/ui/SplitView";
 import { Button } from "@/components/ui/button";
 import { QueryState } from "@/components/common/QueryState";
 import { useRawMaterialPage } from "@/ravarer/hooks/useRawMaterialPage";
@@ -15,17 +14,22 @@ const STATUS: Record<string, string> = { verifisert: "Verifisert", uverifisert: 
 const fullPrice = (n: number) => n.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 6 });
 
 /**
- * Peek for valgt råvare i varearbeidsflaten. Sidepanel (Sheet) på alle bredder — aldri et skjult
- * panel. Data fra samme felles henting som råvarekortet; delspørringsfeil vises, aldri som «mangler».
+ * Peek for valgt råvare i varearbeidsflaten: panelet ved siden av listen fra 1280 px,
+ * og hele bredden under 1280 px (SplitView). Samme felles henting som råvarekortet;
+ * delspørringsfeil vises, aldri som «mangler».
  */
 export function RawMaterialPeek({ id, listSearch, onClose }: { id: string | null; listSearch: string; onClose: () => void }) {
+  const sp = new URLSearchParams(listSearch);
   return (
-    <Sheet open={!!id} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
-        {id && <PeekBody id={id} listSearch={listSearch} />}
-      </SheetContent>
-    </Sheet>
+    <PeekPanel title={id ? <PeekTitle id={id} /> : undefined} fullHref={id ? `${paths.raavare(id)}${sectionSearch(sp, "sammendrag")}` : undefined} onClose={id ? onClose : undefined} emptyText="Velg en vare i listen">
+      {id ? <PeekBody id={id} listSearch={listSearch} /> : null}
+    </PeekPanel>
   );
+}
+
+function PeekTitle({ id }: { id: string }) {
+  const page = useRawMaterialPage(id);
+  return <>{page.rm?.name ?? "Råvare"}</>;
 }
 
 function PeekBody({ id, listSearch }: { id: string; listSearch: string }) {
@@ -46,12 +50,8 @@ function PeekBody({ id, listSearch }: { id: string; listSearch: string }) {
   const verified = rm.cost_basis_status === "verifisert";
   return (
     <div className="space-y-5">
-      <SheetHeader>
-        <SheetTitle className="font-display text-title">{rm.name}</SheetTitle>
-        <SheetDescription>SKU {rm.sku} · {rm.base_unit}{rm.is_active ? "" : " · Inaktiv"}</SheetDescription>
-      </SheetHeader>
+      <p className="text-caption text-ink-secondary">SKU {rm.sku} · {rm.base_unit}{rm.is_active ? "" : " · Inaktiv"}</p>
       <div className="flex flex-wrap gap-2">
-        <Button asChild size="sm" className="min-h-11 gap-1.5"><Link to={href("sammendrag")}><Maximize2 className="h-3.5 w-3.5" aria-hidden />Åpne fullt</Link></Button>
         <Button asChild size="sm" variant="outline" className="min-h-11"><Link to={href("pris")}>Pris</Link></Button>
         <Button asChild size="sm" variant="outline" className="min-h-11"><Link to={href("leverandorer")}>Leverandører</Link></Button>
       </div>

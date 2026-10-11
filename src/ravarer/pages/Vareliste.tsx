@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -23,14 +22,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ArrowUpDown, Columns3, Loader2, Package, Search, SlidersHorizontal, X } from "lucide-react";
+import { Columns3, Search, SlidersHorizontal, X } from "lucide-react";
 import { toast } from "sonner";
 
-import { QueryState } from "@/components/common/QueryState";
 import { RavarerHeaderBanner, NewRawMaterialButton } from "@/ravarer/components/RavarerHeaderBanner";
 import { RawMaterialCreateSheet } from "@/ravarer/editors/RawMaterialCreateSheet";
 import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
-import { VarelisteRow, type InlineField } from "@/ravarer/components/vareliste/VarelisteRow";
+import { buildVarelisteColumns, type InlineField } from "@/ravarer/components/vareliste/VarelisteCells";
+import { DataTable } from "@/ravarer/ui/DataTable";
+import { SplitView } from "@/ravarer/ui/SplitView";
+import { tableCsv, visibleColumns as visibleOf } from "@/ravarer/ui/dataTableLogic";
+import { RawMaterialPeek } from "@/ravarer/components/vareliste/RawMaterialPeek";
+import { deviationRuleFor } from "@/ravarer/lib/varerOrder";
 import { VarelisteBulkBar } from "@/ravarer/components/vareliste/VarelisteBulkBar";
 import { PackageEditor } from "@/ravarer/editors/PackageEditor";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
@@ -49,10 +52,8 @@ import {
   type ListSortKey,
   type RawMaterialListItem,
 } from "@/ravarer/lib/rawMaterialViews";
-import { LIST_COLUMNS, DEFAULT_HIDDEN_COLUMNS, isColumnVisible } from "@/ravarer/lib/varelisteColumns";
+import { LIST_COLUMNS, DEFAULT_HIDDEN_COLUMNS } from "@/ravarer/lib/varelisteColumns";
 import { DEFAULT_HARD_CAP_PCT, useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
-import { csvValue } from "@/ravarer/lib/varelisteCsv";
-import { isLargeDeviation } from "@/ravarer/components/vareliste/PriceCells";
 import { SupplierItemsBanner } from "@/ravarer/components/vareliste/SupplierItemsBanner";
 import { SaveViewDialog } from "@/ravarer/components/vareliste/SaveViewDialog";
 import { paths } from "@/ravarer/lib/paths";
@@ -96,20 +97,16 @@ function parseSort(value: string | null): { key: ListSortKey; dir: "asc" | "desc
 const EMPTY_HIDDEN: string[] = DEFAULT_HIDDEN_COLUMNS;
 const EMPTY_VIEWS: SavedView[] = [];
 
-function csvCell(value: string): string {
-  return /[";\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
-}
-
 export interface VarelisteProps {
   /** Arbeidsliste i varearbeidsflaten (vareliste-familien). */
   liste?: Liste;
-  /** Radklikk åpner peek-panelet i stedet for full side (lenker beholder full side / ctrl-klikk). */
-  onPeek?: (id: string) => void;
-  /** Rad vist i peek-panelet (aktiv rad — ikke det samme som avkrysset utvalg). */
+  /** Radklikk/piltaster velger aktiv rad (`valgt`) som vises i panelet. Lenker åpner full side. */
+  onActiveChange?: (id: string | null) => void;
+  /** Aktiv rad i panelet — ikke det samme som avkrysset utvalg (`selected`). */
   activeId?: string | null;
 }
 
-export default function VarelistePage({ liste, onPeek, activeId = null }: VarelisteProps = {}) {
+export default function VarelistePage({ liste, onActiveChange, activeId = null }: VarelisteProps = {}) {
   const { canWrite, legalEntityId, loading: accessLoading } = useRavarer();
   const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
@@ -145,7 +142,6 @@ export default function VarelistePage({ liste, onPeek, activeId = null }: Vareli
   }, [params, setParams, canWrite, accessLoading]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [focusedId, setFocusedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id: string; field: InlineField } | null>(null);
   const [packageQueue, setPackageQueue] = useState<string[]>([]);
   const [saveViewOpen, setSaveViewOpen] = useState(false);
@@ -197,38 +193,14 @@ export default function VarelistePage({ liste, onPeek, activeId = null }: Vareli
 
   const hardCap = tolerances.settings?.price_hard_cap_pct ?? DEFAULT_HARD_CAP_PCT;
 
-  const filtered = useMemo(
-    () => filterAndSortItems(items, listQuery, (i) => isLargeDeviation(i.deviation, tolerances.toleranceFor(i.categories[0]), hardCap)),
-    [items, listQuery, tolerances, hardCap],
-  );
+  // Samme avviksregel (kategoritoleranse + maksgrense) som detaljens forrige/neste — én kilde.
+  const deviationRule = useMemo(() => deviationRuleFor(tolerances.toleranceFor, hardCap), [tolerances, hardCap]);
+  const filtered = useMemo(() => filterAndSortItems(items, listQuery, deviationRule), [items, listQuery, deviationRule]);
 
-  /** Filtrene følger med til detaljen, slik at «Tilbake» og «forrige/neste» beholder dem. */
-  const listSearch = params.toString();
+  /** Filtrene følger med til detaljen, slik at «Tilbake» og «forrige/neste» beholder dem. Valgt rad er ikke listekontekst. */
+  const listSearch = useMemo(() => { const n = new URLSearchParams(params); n.delete("valgt"); return n.toString(); }, [params]);
 
   const hiddenColumns = hiddenColumnsPref.value;
-  const visibleColumns = useMemo(
-    () => LIST_COLUMNS.filter((c) => isColumnVisible(c.id, hiddenColumns)),
-    [hiddenColumns],
-  );
-
-  const toggleSort = useCallback(
-    (key: ListSortKey) => {
-      const dir = sort.key === key && sort.dir === "asc" ? "desc" : "asc";
-      setParam({ sort: `${key}:${dir}` });
-    },
-    [setParam, sort.key, sort.dir],
-  );
-
-  const toggleSelect = useCallback((id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const allVisibleSelected = filtered.length > 0 && filtered.every((i) => selected.has(i.id));
 
   const commitPrice = useCallback(
     (item: RawMaterialListItem, field: "cost" | "agreed", value: number, reason: string) => {
@@ -281,10 +253,9 @@ export default function VarelistePage({ liste, onPeek, activeId = null }: Vareli
   );
 
   const exportCsv = useCallback(() => {
+    // Valgte rader (i synlig rekkefølge) × synlige kolonner, fra SAMME kolonneliste som tabellen.
     const rows = filtered.filter((i) => selected.has(i.id));
-    const header = visibleColumns.map((c) => c.label);
-    const lines = [header.join(";"), ...rows.map((i) => visibleColumns.map((c) => csvCell(csvValue(c.id, i))).join(";"))];
-    const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob(["\uFEFF" + tableCsv(rows, visibleOf(columnsRef.current, hiddenColumns))], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -292,7 +263,7 @@ export default function VarelistePage({ liste, onPeek, activeId = null }: Vareli
     a.click();
     URL.revokeObjectURL(url);
     toast.success(`${rows.length} rader eksportert`);
-  }, [filtered, selected, visibleColumns]);
+  }, [filtered, selected, hiddenColumns]);
 
   const saveCurrentView = useCallback(
     (name: string) => {
@@ -337,41 +308,37 @@ export default function VarelistePage({ liste, onPeek, activeId = null }: Vareli
     [setParam],
   );
 
-  // Hurtigtaster: «/» søk, ↑/↓ markering, Enter åpner, «e» kostpris, «n» ny, Esc, «?» oversikt.
+  // Hurtigtaster: «/» søk, ↑/↓ (j/k) aktiv rad, Enter åpner fullt, «e» kostpris, «n» ny, Esc, «?» oversikt.
+  // Radnavigasjon og Enter eies av DataTable; resten her.
   const [helpOpen, setHelpOpen] = useState(false);
-  const moveFocus = useCallback(
-    (delta: number) => {
-      if (filtered.length === 0) return;
-      const idx = filtered.findIndex((i) => i.id === focusedId);
-      const nextIdx = idx < 0 ? 0 : Math.min(Math.max(idx + delta, 0), filtered.length - 1);
-      setFocusedId(filtered[nextIdx]?.id ?? filtered[0].id);
-    },
-    [filtered, focusedId],
+  const openFull = useCallback(
+    (id: string) => navigate(`${paths.raavare(id)}${listSearch ? `?${listSearch}` : ""}`),
+    [navigate, listSearch],
   );
   const hotkeys = useMemo<HotkeyBinding[]>(
     () => [
       { keys: ["/"], description: "Søk", handler: () => searchRef.current?.focus() },
-      { keys: ["ArrowDown"], description: "Neste rad", handler: () => moveFocus(1) },
-      { keys: ["ArrowUp"], description: "Forrige rad", handler: () => moveFocus(-1) },
-      {
-        keys: ["Enter"],
-        description: "Åpne råvaren",
-        handler: () => {
-          if (focusedId) navigate(`${paths.raavare(focusedId)}${listSearch ? `?${listSearch}` : ""}`);
-        },
-      },
       {
         keys: ["e"],
         description: "Endre kostpris",
         handler: () => {
-          if (focusedId && canWrite) setCostFor(focusedId);
+          if (activeId && canWrite) setCostFor(activeId);
         },
       },
       { keys: ["n"], description: "Ny råvare", handler: () => { if (canWrite) setNewOpen(true); } },
       { keys: ["Escape"], description: "Avbryt redigering", handler: () => setEditing(null) },
       { keys: ["?"], description: "Vis hurtigtaster", handler: () => setHelpOpen(true) },
     ],
-    [moveFocus, focusedId, canWrite, navigate, listSearch],
+    [activeId, canWrite],
+  );
+  const helpBindings = useMemo<HotkeyBinding[]>(
+    () => [
+      ...hotkeys,
+      { keys: ["ArrowDown", "j"], description: "Neste rad", handler: () => undefined },
+      { keys: ["ArrowUp", "k"], description: "Forrige rad", handler: () => undefined },
+      { keys: ["Enter"], description: "Åpne råvaren", handler: () => undefined },
+    ],
+    [hotkeys],
   );
   useHotkeys(hotkeys);
 
@@ -387,6 +354,16 @@ export default function VarelistePage({ liste, onPeek, activeId = null }: Vareli
     [items],
   );
   const cancelEdit = useCallback(() => setEditing(null), []);
+
+  const columns = useMemo(
+    () => buildVarelisteColumns({
+      canWrite, categoryOptions: allCategoryOptions, toleranceFor: tolerances.toleranceFor, hardCap,
+      editing, onStartEdit: startEdit, onCancelEdit: cancelEdit, onCommitPrice: commitPrice, onCommitCategory: commitCategory, listSearch,
+    }),
+    [canWrite, allCategoryOptions, tolerances, hardCap, editing, startEdit, cancelEdit, commitPrice, commitCategory, listSearch],
+  );
+  const columnsRef = useRef(columns);
+  columnsRef.current = columns;
 
   /** Bulk «Bekreft pakning»: bare varer som faktisk står i pakningskøen. */
   const startPackageQueue = useCallback(() => {
@@ -601,119 +578,52 @@ export default function VarelistePage({ liste, onPeek, activeId = null }: Vareli
           </p>
         </Card>
 
-        <Card className="overflow-hidden">
-          <QueryState
-            isLoading={isLoading}
-            isError={isError}
-            error={error}
-            onRetry={refetch}
-            scope="ravarer:vareliste"
-            isEmpty={!isLoading && !isError && filtered.length === 0}
-            emptyTitle={items.length === 0 ? "Ingen varer ennå." : "Ingen treff."}
-            emptyDescription={
-              items.length === 0 ? undefined : "Juster søket eller filtrene for å se flere varer."
-            }
-            emptyIcon={Package}
-            loadingFallback={
-              <div className="flex items-center justify-center p-12 text-muted-foreground">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> Laster…
-              </div>
-            }
-          >
-            {/* Tabell fra md og opp.
-                Egen rullekasse med høydetak: brede tabeller kan rulles
-                vannrett, og `sticky` på thead fester seg til toppen av
-                kassen i stedet for å bli klippet bort. */}
-            <div className="hidden max-h-[70vh] overflow-auto md:block">
-              <table className="w-full min-w-[900px] text-sm">
-                <thead className="sticky top-0 z-20 bg-muted text-left text-xs uppercase text-muted-foreground">
-                  <tr>
-                    <th className="w-9 px-3 py-2">
-                      <Checkbox
-                        checked={allVisibleSelected}
-                        onCheckedChange={(checked) =>
-                          setSelected(checked ? new Set(filtered.map((i) => i.id)) : new Set())
-                        }
-                        aria-label="Velg alle synlige"
-                      />
-                    </th>
-                    {visibleColumns.map((c) => (
-                      <th
-                        key={c.id}
-                        className={`px-3 py-2 font-medium ${c.numeric ? "text-right" : ""}`}
-                      >
-                        {c.sortKey ? (
-                          <button
-                            type="button"
-                            className="inline-flex items-center gap-1 hover:text-foreground"
-                            onClick={() => toggleSort(c.sortKey as ListSortKey)}
-                          >
-                            {c.label}
-                            <ArrowUpDown className="h-3 w-3" aria-hidden="true" />
-                          </button>
-                        ) : (
-                          c.label
-                        )}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((item) => (
-                    <VarelisteRow
-                      key={item.id}
-                      item={item}
-                      hiddenColumns={hiddenColumns}
-                      categoryOptions={allCategoryOptions}
-                      selected={selected.has(item.id)}
-                      focused={focusedId === item.id}
-                      active={activeId === item.id}
-                      onPeek={onPeek}
-                      canWrite={canWrite}
-                      tolerance={tolerances.toleranceFor(item.categories[0])}
-                      hardCap={hardCap}
-                      editing={editing?.id === item.id ? editing.field : null}
-                      onToggleSelect={toggleSelect}
-                      onStartEdit={startEdit}
-                      onCancelEdit={cancelEdit}
-                      onCommitPrice={commitPrice}
-                      onCommitCategory={commitCategory}
-                      onFocusRow={setFocusedId}
-                      listSearch={listSearch}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Kortliste under md */}
-            <ul className="divide-y divide-border md:hidden">
-              {filtered.map((item) => (
-                <li key={item.id} className="p-3">
-                  <Link
-                    to={`${paths.raavare(item.id)}${listSearch ? `?${listSearch}` : ""}`}
-                    className="block"
-                  >
-                    <p className="font-medium">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.supplierName ?? "Uten leverandør"} · {formatNok(item.costPrice)} /{" "}
-                      {item.baseUnit}
-                    </p>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {isLargeDeviation(item.deviation, tolerances.toleranceFor(item.categories[0]), hardCap) && item.deviation != null && (
-                          <Badge variant="outline" className="border-destructive/40 text-destructive">
-                            Avvik {formatNumber(item.deviation, 1)} %
-                          </Badge>
-                        )}
-                      {!item.declarationName && <Badge variant="outline">Mangler deklarasjon</Badge>}
-                      {!item.isActive && <Badge variant="outline">Inaktiv</Badge>}
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </QueryState>
-        </Card>
+        <SplitView
+          selected={!!activeId}
+          list={
+            <DataTable
+              ariaLabel="Vareliste"
+              rows={isLoading ? undefined : filtered}
+              columns={columns}
+              getId={(i) => i.id}
+              isLoading={isLoading}
+              error={isError ? error : undefined}
+              onRetry={refetch}
+              emptyText={items.length === 0 ? "Ingen varer ennå." : "Ingen treff."}
+              emptyDescription={items.length === 0 ? undefined : "Juster søket eller filtrene for å se flere varer."}
+              selectable
+              selected={selected}
+              onSelectedChange={setSelected}
+              activeId={activeId}
+              onActiveChange={onActiveChange ?? ((id) => { if (id) openFull(id); })}
+              onEnter={(i) => openFull(i.id)}
+              hotkeys
+              sort={{ id: sort.key, dir: sort.dir }}
+              onSortChange={(next) => setParam({ sort: next ? `${next.id}:${next.dir}` : null })}
+              hidden={hiddenColumns}
+              onHiddenChange={hiddenColumnsPref.setValue}
+              columnMenu={false}
+              scrollClassName="max-h-[70vh]"
+              minTableWidth={activeId ? "720px" : "900px"}
+              renderMobileCard={(item) => (
+                <div className="rounded-lg border border-border p-3">
+                  <p className="font-medium">{item.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {item.supplierName ?? "Uten leverandør"} · {formatNok(item.costPrice)} / {item.baseUnit}
+                  </p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {deviationRule(item) && item.deviation != null && (
+                      <Badge variant="outline" className="border-destructive/40 text-destructive">Avvik {formatNumber(item.deviation, 1)} %</Badge>
+                    )}
+                    {!item.declarationName && <Badge variant="outline">Mangler deklarasjon</Badge>}
+                    {!item.isActive && <Badge variant="outline">Inaktiv</Badge>}
+                  </div>
+                </div>
+              )}
+            />
+          }
+          panel={<RawMaterialPeek id={activeId} listSearch={listSearch} onClose={() => onActiveChange?.(null)} />}
+        />
 
         <VarelisteBulkBar
           count={selected.size}
@@ -741,7 +651,7 @@ export default function VarelistePage({ liste, onPeek, activeId = null }: Vareli
           onPrimaryClose={() => setPrimaryFor(null)}
           suppliers={suppliers}
         />
-        <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} bindings={hotkeys} />
+        <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} bindings={helpBindings} />
 
         <PackageEditor
           key={packageQueue[0] ?? "none"}

@@ -53,10 +53,10 @@ export function readListe(sp: URLSearchParams): Liste {
 /** Parametre hver modus eier. Søk (`q`) er felles og beholdes alltid. */
 const MODE_PARAMS: Record<"vareliste" | Exclude<Liste, "alle" | "prisavvik" | "uten-leverandor" | "ikke-kjopt" | "inaktive">, readonly string[]> = {
   vareliste: ["kat", "type", "status", "sort", "view"],
-  pakning: ["filter"],
+  pakning: ["filter", "pstatus", "sort"],
   deklarasjon: [],
   naering: [],
-  datablad: ["endring"],
+  datablad: ["visning", "endring"],
 };
 
 const familyOf = (l: Liste) => (isVarelisteMode(l) ? "vareliste" : (l as keyof typeof MODE_PARAMS));

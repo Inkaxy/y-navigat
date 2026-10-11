@@ -7,7 +7,7 @@ import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMe
 import { QueryState } from "@/components/common/QueryState";
 import { useUiPreference } from "@/hooks/useUiPreference";
 import { cn } from "@/lib/utils";
-import { sortRows, stepRow, toggleSelection, type SortDir, type SortValue } from "@/ravarer/ui/dataTableLogic";
+import { INTERACTIVE_SELECTOR, sortRows, stepRow, toggleSelection, visibleColumns, type SortDir, type SortValue } from "@/ravarer/ui/dataTableLogic";
 import { useHotkeys } from "@/ravarer/ui/hotkeys";
 
 export type Column<T> = {
@@ -19,6 +19,12 @@ export type Column<T> = {
   width?: string;
   hideable?: boolean;
   defaultHidden?: boolean;
+  /** Kan aldri skjules (f.eks. navn). */
+  alwaysVisible?: boolean;
+  /** CSV-verdi. Eksport bruker samme kolonneliste og rekkefølge som tabellen. */
+  csv?: (row: T) => string;
+  /** Overskriftens visningsnavn i kolonnevelgeren hvis forskjellig. */
+  menuLabel?: string;
 };
 
 type Props<T> = {
@@ -48,6 +54,18 @@ type Props<T> = {
   sort?: { id: string; dir: SortDir } | null;
   onSortChange?: (s: { id: string; dir: SortDir } | null) => void;
   ariaLabel: string;
+  /** Styrte skjulte kolonner (f.eks. migrert brukerpreferanse). Overstyrer `preferenceScope`. */
+  hidden?: readonly string[];
+  onHiddenChange?: (hidden: string[]) => void;
+  /** Vis kolonnevelgeren (standard: når kolonnevalg er lagret/styrt). */
+  columnMenu?: boolean;
+  /** Enter på aktiv rad (standard: samme som radklikk). */
+  onEnter?: (row: T) => void;
+  rowClassName?: (row: T) => string | undefined;
+  /** Ekstra klasser på tabellens rullekasse (høydetak o.l.). */
+  scrollClassName?: string;
+  minTableWidth?: string;
+  emptyDescription?: string;
 };
 
 const ALIGN = { left: "text-left", right: "text-right", center: "text-center" } as const;
@@ -60,8 +78,11 @@ export function DataTable<T>(p: Props<T>) {
   const anchor = useRef<string | null>(null);
   const defaultHidden = useMemo(() => p.columns.filter((c) => c.defaultHidden).map((c) => c.id), [p.columns]);
   const { value: hiddenPref, setValue: setHiddenPref } = useUiPreference<string[]>(p.preferenceScope ?? "ravarer:datatable:ephemeral", defaultHidden);
-  const hidden = new Set(p.preferenceScope ? hiddenPref : defaultHidden);
-  const cols = p.columns.filter((c) => !hidden.has(c.id));
+  const hiddenList = p.hidden ?? (p.preferenceScope ? hiddenPref : defaultHidden);
+  const hidden = new Set(hiddenList);
+  const setHidden = (next: string[]) => (p.onHiddenChange ? p.onHiddenChange(next) : setHiddenPref(next));
+  const cols = visibleColumns(p.columns, hiddenList);
+  const showMenu = p.columnMenu ?? (!!p.preferenceScope || !!p.onHiddenChange);
 
   const sorted = useMemo(() => {
     if (controlled) return p.rows ?? [];
@@ -82,7 +103,7 @@ export function DataTable<T>(p: Props<T>) {
       { keys: ["k", "ArrowUp"], description: "Forrige rad", handler: () => p.onActiveChange?.(stepRow(ids, p.activeId ?? null, -1)) },
       {
         keys: ["Enter"], description: "Åpne valgt rad",
-        handler: () => { const r = sorted.find((x) => p.getId(x) === p.activeId); if (r) open(r); },
+        handler: () => { const r = sorted.find((x) => p.getId(x) === p.activeId); if (r) (p.onEnter ?? open)(r); },
       },
     ],
     { enabled: !!p.hotkeys && !!p.onActiveChange },
@@ -111,8 +132,9 @@ export function DataTable<T>(p: Props<T>) {
       onRetry={p.onRetry}
       isEmpty={!p.isLoading && sorted.length === 0}
       emptyTitle={p.emptyText ?? "Ingen treff"}
+      emptyDescription={p.emptyDescription}
     >
-      {p.preferenceScope && (
+      {showMenu && (
         <div className="mb-2 flex justify-end">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -120,13 +142,13 @@ export function DataTable<T>(p: Props<T>) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Vis kolonner</DropdownMenuLabel>
-              {p.columns.filter((c) => c.hideable).map((c) => (
+              {p.columns.filter((c) => c.hideable && !c.alwaysVisible).map((c) => (
                 <DropdownMenuCheckboxItem
                   key={c.id}
                   checked={!hidden.has(c.id)}
-                  onCheckedChange={(v) => setHiddenPref(v ? [...hidden].filter((x) => x !== c.id) : [...hidden, c.id])}
+                  onCheckedChange={(v) => setHidden(v ? [...hidden].filter((x) => x !== c.id) : [...hidden, c.id])}
                 >
-                  {c.header}
+                  {c.menuLabel ?? c.header}
                 </DropdownMenuCheckboxItem>
               ))}
             </DropdownMenuContent>
@@ -156,8 +178,8 @@ export function DataTable<T>(p: Props<T>) {
           ))}
         </ul>
       )}
-      <div className={cn("overflow-auto rounded-lg border border-border bg-card", p.renderMobileCard && "hidden md:block")}>
-        <table className="w-full text-sm tabular-nums" aria-label={p.ariaLabel}>
+      <div className={cn("overflow-auto rounded-lg border border-border bg-card", p.renderMobileCard && "hidden md:block", p.scrollClassName)}>
+        <table className="w-full text-sm tabular-nums" style={p.minTableWidth ? { minWidth: p.minTableWidth } : undefined} aria-label={p.ariaLabel}>
           <thead className="sticky top-0 z-10 bg-card">
             <tr className="h-9 border-b border-border text-caption text-muted-foreground">
               {p.selectable && (
@@ -189,15 +211,22 @@ export function DataTable<T>(p: Props<T>) {
                 <tr
                   key={id}
                   aria-selected={active}
-                  onClick={() => { p.onActiveChange?.(id); open(r); }}
+                  onClick={(e) => {
+                    const t = e.target as HTMLElement | null;
+                    if (t?.closest(INTERACTIVE_SELECTOR) && t.closest("tr") === e.currentTarget) return;
+                    if (window.getSelection()?.toString()) return;
+                    p.onActiveChange?.(id);
+                    open(r);
+                  }}
                   className={cn(
                     "h-9", (clickable || p.onActiveChange) && "cursor-pointer hover:bg-muted/40",
                     active && "bg-primary/5 shadow-[inset_2px_0_0_0_hsl(var(--primary))]",
+                    p.rowClassName?.(r),
                   )}
                 >
                   {p.selectable && (
                     <td className="px-2" onClick={(e) => onCheck(id, e)}>
-                      <Checkbox checked={p.selected?.has(id) ?? false} aria-label="Velg rad" />
+                      <Checkbox checked={p.selected?.has(id) ?? false} aria-label="Velg rad" onClick={(e) => e.preventDefault()} />
                     </td>
                   )}
                   {cols.map((c) => (

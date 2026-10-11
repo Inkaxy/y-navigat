@@ -45,3 +45,34 @@ export function stepRow(ids: string[], current: string | null, dir: 1 | -1): str
   const i = ids.indexOf(current) + dir;
   return ids[Math.min(ids.length - 1, Math.max(0, i))];
 }
+
+/** Minimal kolonnekontrakt for CSV — samme objekter som tabellen rendrer. */
+export interface CsvColumn<T> {
+  id: string;
+  header: string;
+  csv?: (row: T) => string;
+  alwaysVisible?: boolean;
+}
+
+/** Synlige kolonner i DEFINISJONSREKKEFØLGE. Overskrift, celle og CSV bruker alle denne listen. */
+export function visibleColumns<C extends { id: string; alwaysVisible?: boolean }>(columns: readonly C[], hidden: readonly string[]): C[] {
+  const h = new Set(hidden);
+  return columns.filter((c) => c.alwaysVisible || !h.has(c.id));
+}
+
+function csvCell(value: string): string {
+  return /[";\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+/**
+ * CSV for valgte rader × synlige kolonner, i radenes rekkefølge (som vist) og kolonnenes
+ * definisjonsrekkefølge. Kolonner uten `csv` eksporteres tomme — aldri forskjøvet.
+ */
+export function tableCsv<T>(rows: readonly T[], cols: readonly CsvColumn<T>[], sep = ";"): string {
+  const lines = [cols.map((c) => csvCell(c.header)).join(sep)];
+  for (const r of rows) lines.push(cols.map((c) => csvCell(c.csv ? c.csv(r) : "")).join(sep));
+  return lines.join("\n");
+}
+
+/** Klikk på kontroller i en rad skal ikke åpne/velge raden. */
+export const INTERACTIVE_SELECTOR = 'a, button, input, select, textarea, label, [role="combobox"], [role="checkbox"], [role="button"], [contenteditable="true"]';
