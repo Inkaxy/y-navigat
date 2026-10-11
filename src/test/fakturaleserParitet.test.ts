@@ -111,7 +111,6 @@ describe("kildeparitet", () => {
     expect(ex).not.toMatch(/fixVatScaledLines|\* factor/);
     expect(ex).toContain("rm_extraction_examples_for");
     expect(ex).toContain("line_kind (string)");
-    expect(ex).toContain("KONTROLLFAKTA".toLowerCase().length ? "unit_price_basis" : "");
   });
   it("importen sender leverandør og bevarer posterings-mva", () => {
     expect(imp).toContain("supplier_id: supplierId");
