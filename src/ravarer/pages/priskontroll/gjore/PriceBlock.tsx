@@ -19,8 +19,8 @@ import { PriceBlockView, type BlockedRow, type PriceRow } from "./PriceBlockView
 import { useInvoicePriceSafety } from "@/fakturaer/hooks/useInvoicePriceSafety";
 import { priceDirection } from "@/fakturaer/lib/priceSafety";
 import type { PriceGate } from "@/fakturaer/lib/financialPresentation";
-import { planClaim, type ClaimPlan } from "@/ravarer/lib/supplierClaim";
-import { fetchClaimPreview } from "@/ravarer/hooks/useClaimPreview";
+import { useClaimFlow } from "./useClaimFlow";
+import { DuplicateCaseNotice } from "@/ravarer/pages/priskontroll/saker/CaseRecovery";
 import { ClaimCreditDialog, type ClaimForm } from "./ClaimCreditDialog";
 import { useClaimCredit, useRematchInvoices } from "./useGjoreMutations";
 import { acceptResultTitle, claimFailureMessage, kr, priceChange, skipLineText } from "./logic";
@@ -84,7 +84,8 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [errorReasons, setErrorReasons] = useState<string[]>([]);
-  const [plan, setPlan] = useState<Extract<ClaimPlan, { ok: true }> | null>(null);
+  const flow = useClaimFlow();
+  const plan = flow.state.plan;
   const [claimError, setClaimError] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [agreementOpen, setAgreementOpen] = useState(false);
@@ -137,10 +138,8 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
     const ids = priceChange(chosen)?.positiveIds ?? [];
     setPreviewing(true);
     try {
-      const preview = await fetchClaimPreview(ids);
-      const pl = planClaim(preview);
-      if (!pl.ok) { setError(pl.message); setErrorReasons(pl.reasons); return; }
-      setPlan(pl);
+      const bad = await flow.start(ids);
+      if (bad) { setError(bad.message); setErrorReasons(bad.reasons); return; }
     } catch (e) {
       console.error("[claim-preview]", e);
       setError("Linjene kunne ikke kontrolleres. Prøv igjen.");
@@ -156,14 +155,14 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
       const r = await claim.mutateAsync({ supplierId: item.supplier_id, itemKey: item.item_key, lines: plan.lines, title: f.title.trim(), reason: f.reason.trim() || null, followUpOn: f.followUpOn || null });
       if (!r.ok) { setClaimError(claimFailureMessage(r.reason, r.skipped)); return; }
       const kind = r.caseKind ?? plan.kind;
-      setPlan(null);
+      flow.close();
       onDone({
         title: kind === "documented_claim" ? `Krav opprettet (${kr(plan.amount)} eks. mva) · fakturaen kan avstemmes` : "Prisforespørsel opprettet · fakturaen kan avstemmes",
         items: r.skipped.map(skipLineText),
         link: r.caseId ? { to: paths.sak(r.caseId), label: "Åpne leverandørsaken" } : undefined,
       });
     } catch (e) {
-      setClaimError(e instanceof Error ? e.message : "Saken kunne ikke opprettes.");
+      setClaimError(await flow.onSubmitError(e));
     }
   };
 
@@ -210,9 +209,12 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
       )}
 
       <ClaimCreditDialog
-        open={!!plan} onOpenChange={(v) => { if (!v) setPlan(null); }} kind={plan?.kind ?? null} amount={plan?.amount ?? null} observed={plan?.observed ?? null} lineCount={plan?.lines.length ?? 0}
+        open={flow.open} onOpenChange={(v) => { if (!v) { flow.close(); setClaimError(null); } }} kind={plan?.kind ?? null} amount={plan?.amount ?? null} observed={plan?.observed ?? null} lineCount={plan?.lines.length ?? 0}
         defaultTitle={`${plan?.kind === "documented_claim" ? "Krav" : "Prisforespørsel"} ${name} ${formatDate(osloTodayISO())}`}
         busy={claim.isPending} error={claimError} onSubmit={(f) => void onClaim(f)}
+        stale={!!flow.state.stalePlan} onRecheck={() => { setClaimError(null); void flow.recheck(); }} recheckBusy={flow.state.recheck === "busy"} recheckError={flow.state.recheck === "error"}
+        blocked={flow.state.blocked} changes={flow.state.changes}
+        notice={flow.state.duplicate ? <DuplicateCaseNotice openCaseId={flow.state.duplicate.openCaseId} supplierId={item.supplier_id} /> : null}
       />
       {agreementOpen && (
         <NewAgreementDialog open={agreementOpen} onOpenChange={setAgreementOpen} defaultRawMaterialId={item.rm_id ?? undefined} defaultSupplierId={item.supplier_id} />
