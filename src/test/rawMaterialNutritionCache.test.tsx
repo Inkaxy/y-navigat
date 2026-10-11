@@ -62,6 +62,8 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
+vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" }, session: null, loading: false, signOut: async () => undefined }) }));
+
 vi.mock("@/ravarer/context/RavarerContext", () => ({
   useRavarer: () => ({ canWrite: true, user: { id: "u1" }, accessLevel: "write" }),
 }));
