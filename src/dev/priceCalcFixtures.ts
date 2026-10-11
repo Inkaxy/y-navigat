@@ -8,14 +8,14 @@ const today = new Date();
 const iso = (daysAgo: number) => osloDateISO(new Date(today.getTime() - daysAgo * 86400000));
 
 export const PRICE_HISTORY_FIXTURE: TimelineHistoryRow[] = [
-  { id: "z-early", effective_date: iso(10), price: 10, supplier_id: "s1", source: "invoice", invoice_id: "i1", invoiceNumber: "F-1001", createdAt: `${iso(10)}T08:00:00Z`, currency: "NOK", unit: "kg", unitSource: "fakturalinje", packageText: "25 kg" },
-  { id: "a-late", effective_date: iso(10), price: 12, supplier_id: "s1", source: "invoice", invoice_id: "i2", invoiceNumber: "F-1002", createdAt: `${iso(10)}T09:00:00Z`, currency: "NOK", unit: "kg", unitSource: "fakturalinje", packageText: "25 kg",
+  { id: "z-early", effective_date: iso(10), price: 10, supplier_id: "s1", source: "invoice", invoice_id: "i1", invoiceNumber: "F-1001", createdAt: `${iso(10)}T08:00:00Z`, currency: "NOK", unit: "kg", unitSource: "ved_registrering", packageText: "25 kg" },
+  { id: "a-late", effective_date: iso(10), price: 12, supplier_id: "s1", source: "invoice", invoice_id: "i2", invoiceNumber: "F-1002", createdAt: `${iso(10)}T09:00:00Z`, currency: "NOK", unit: "kg", unitSource: "ved_registrering", packageText: "25 kg",
     corrections: [{ at: `${iso(9)}T10:00:00Z`, reason: "Feil lest mengde", fields: [{ field: "Mengde", before: "10 000", after: "10" }] }] },
   { id: "m-manual", effective_date: iso(30), price: 11.5, supplier_id: null, source: MANUAL_SRC, invoice_id: null, createdAt: `${iso(30)}T12:00:00Z`, currency: "NOK", unit: null, unitSource: null, packageText: null, notes: "Eldre manuell pris" },
-  { id: "g-gram", effective_date: iso(60), price: 0.011, supplier_id: "s1", source: "invoice", invoice_id: "i3", invoiceNumber: "F-0901", createdAt: `${iso(60)}T12:00:00Z`, currency: "NOK", unit: "g", unitSource: "enhetsbytte", packageText: "10 × 1 kg" },
-  { id: "s-old", effective_date: iso(90), price: 9.4, supplier_id: "s1", source: "invoice", invoice_id: "i4", invoiceNumber: "F-0800", createdAt: `${iso(90)}T12:00:00Z`, currency: "NOK", supersededAt: `${iso(80)}T12:00:00Z`, supersededReason: "ny_linjerad", unit: "kg", unitSource: "fakturalinje", packageText: "25 kg" },
-  { id: "k-credit", effective_date: iso(20), price: 10.8, supplier_id: "s1", source: "invoice", invoice_id: "i5", invoiceNumber: "K-12", isCredit: true, createdAt: `${iso(20)}T12:00:00Z`, currency: "NOK", unit: "kg", unitSource: "fakturalinje", packageText: null },
-  { id: "e-eur", effective_date: iso(40), price: 1.1, supplier_id: "s2", source: "invoice", invoice_id: "i6", invoiceNumber: "EU-7", createdAt: `${iso(40)}T12:00:00Z`, currency: "EUR", unit: "kg", unitSource: "fakturalinje", packageText: null },
+  { id: "g-gram", effective_date: iso(60), price: 0.011, supplier_id: "s1", source: "invoice", invoice_id: "i3", invoiceNumber: "F-0901", createdAt: `${iso(60)}T12:00:00Z`, currency: "NOK", unit: "g", unitSource: "revidert_enhetsbytte", packageText: "10 × 1 kg" },
+  { id: "s-old", effective_date: iso(90), price: 9.4, supplier_id: "s1", source: "invoice", invoice_id: "i4", invoiceNumber: "F-0800", createdAt: `${iso(90)}T12:00:00Z`, currency: "NOK", supersededAt: `${iso(80)}T12:00:00Z`, supersededReason: "ny_linjerad", unit: "kg", unitSource: "ved_registrering", packageText: "25 kg" },
+  { id: "k-credit", effective_date: iso(20), price: 10.8, supplier_id: "s1", source: "invoice", invoice_id: "i5", invoiceNumber: "K-12", isCredit: true, createdAt: `${iso(20)}T12:00:00Z`, currency: "NOK", unit: "kg", unitSource: "ved_registrering", packageText: null },
+  { id: "e-eur", effective_date: iso(40), price: 1.1, supplier_id: "s2", source: "invoice", invoice_id: "i6", invoiceNumber: "EU-7", createdAt: `${iso(40)}T12:00:00Z`, currency: "EUR", unit: "kg", unitSource: "ved_registrering", packageText: null },
 ];
 
 const rm = (o: Partial<BakersRawMaterial> & { id: string; name: string }): BakersRawMaterial => ({
