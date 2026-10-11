@@ -2,7 +2,9 @@ import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import type { Column } from "@/ravarer/ui/DataTable";
 import type { InboxInvoice } from "@/fakturaer/hooks/useInboxInvoices";
-import { formatDate, formatNok, INVOICE_SOURCES, todayIso } from "@/fakturaer/lib/constants";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { InvoiceStatusBadge } from "@/fakturaer/components/InvoiceStatusBadge";
+import { formatDate, formatNok, INVOICE_SOURCES, LOW_EXTRACTION_CONFIDENCE, todayIso } from "@/fakturaer/lib/constants";
 import { getPaidBadgeInfo } from "@/fakturaer/lib/paidStatus";
 import { extrasFor, type DeliveryExtrasMap } from "@/ravarer/hooks/useInvoiceDeliveryStatus";
 import { DeliveryTimeline } from "@/ravarer/pages/priskontroll/faktura/DeliveryTimeline";
@@ -44,8 +46,39 @@ export function LinesProgress({ inv }: { inv: InboxInvoice }) {
   );
 }
 
-export function fakturaColumns(extras: DeliveryExtrasMap | undefined, actions: (inv: InboxInvoice) => ReactNode): Column<InboxInvoice>[] {
-  return [
+/** Merker per rad: linjer feilet, lav lesesikkerhet og sumavvik. */
+export function InvoiceRowFlags({ inv }: { inv: InboxInvoice }) {
+  const lowConf = inv.extraction_confidence != null && inv.extraction_confidence < LOW_EXTRACTION_CONFIDENCE;
+  return (
+    <>
+      {inv.line_extraction_status === "failed" && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge variant="outline" tabIndex={0} className="border-destructive/30 bg-destructive/10 text-destructive">Linjer feilet</Badge>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">{inv.line_extraction_error ?? "Linjene kunne ikke leses."}</TooltipContent>
+        </Tooltip>
+      )}
+      {lowConf && (
+        <Badge variant="outline" className="border-warning/30 bg-warning/15 text-warning" title="Lav lesesikkerhet">
+          Lesesikkerhet {Math.round((inv.extraction_confidence ?? 0) * 100)} %
+        </Badge>
+      )}
+      {inv.lines_sum_status === "mismatch" && <Badge variant="outline" className="border-warning/30 bg-warning/15 text-warning">Sumavvik</Badge>}
+    </>
+  );
+}
+
+/**
+ * `sortable` avgjør hvilke kolonner som kan sorteres (serveren kan ikke sortere
+ * på alt). Radene sorteres av kalleren, ikke av tabellen.
+ */
+export function fakturaColumns(
+  extras: DeliveryExtrasMap | undefined,
+  actions: (inv: InboxInvoice) => ReactNode,
+  sortable: (id: string) => boolean = () => true,
+): Column<InboxInvoice>[] {
+  const cols: Column<InboxInvoice>[] = [
     { id: "leverandor", header: "Leverandør", cell: (r) => <span className="font-medium">{r.supplier_name ?? "Ukjent leverandør"}</span>, sortKey: (r) => r.supplier_name },
     { id: "nr", header: "Fakturanr", cell: (r) => <span className="font-mono text-xs">{r.invoice_number}</span>, sortKey: (r) => r.invoice_number },
     { id: "dato", header: "Fakturadato", cell: (r) => formatDate(r.invoice_date), sortKey: (r) => r.invoice_date, hideable: true },
@@ -55,11 +88,19 @@ export function fakturaColumns(extras: DeliveryExtrasMap | undefined, actions: (
       cell: (r) => <span className={isOverdue(r) ? "font-medium text-destructive" : undefined}>{formatDate(r.due_date)}</span>,
     },
     { id: "belop", header: "Beløp", align: "right", cell: (r) => formatNok(r.total_amount), sortKey: (r) => r.total_amount },
+    {
+      id: "status", header: "Status", sortKey: (r) => r.status,
+      cell: (r) => (
+        <div className="flex flex-wrap items-center gap-1">
+          <InvoiceStatusBadge status={r.status} reconciledMode={r.reconciled_mode} />
+          <InvoiceRowFlags inv={r} />
+        </div>
+      ),
+    },
     { id: "linjer", header: "Linjer", cell: (r) => <LinesProgress inv={r} />, sortKey: (r) => r.assessment.openCount, hideable: true },
     {
       id: "leveranse", header: "Leveransestatus", hideable: true,
       cell: (r) => <DeliveryTimeline steps={stepsOf(r, extras)} flagged={r.status === "flagged"} creditNote={!!r.is_credit_note} showLabel />,
-      sortKey: (r) => stepsOf(r, extras).filter((s) => s.done).length,
     },
     { id: "kilde", header: "Kilde", hideable: true, cell: (r) => INVOICE_SOURCES.find((s) => s.value === r.source)?.label ?? r.source ?? "—" },
     {
@@ -69,4 +110,5 @@ export function fakturaColumns(extras: DeliveryExtrasMap | undefined, actions: (
     { id: "bilag", header: "Bilagsnr", hideable: true, defaultHidden: true, cell: (r) => r.tripletex_voucher_number ?? "—", sortKey: (r) => r.tripletex_voucher_number },
     { id: "handling", header: "", align: "right", cell: (r) => actions(r) },
   ];
+  return cols.map((c) => (c.sortKey && !sortable(c.id) ? { ...c, sortKey: undefined } : c));
 }
