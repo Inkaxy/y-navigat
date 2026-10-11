@@ -72,7 +72,7 @@ export default function FakturaWorkspace() {
   const fetchLines = useFetchInvoiceLines();
   const rematch = useRematchWait(data?.legal_entity_id ?? null, () => { void detail.refetch(); q.refresh(); });
   const confirmMany = useConfirmMany();
-  const [docOpen, setDocOpen] = useState(() => localStorage.getItem(LS_DOC) !== "0");
+  const [docOpen, setDocOpen] = useState(() => localStorage.getItem(LS_DOC) !== "0" && typeof window !== "undefined" && window.matchMedia("(min-width: 1280px)").matches);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [editSignal, setEditSignal] = useState<EditMaterialSignal | null>(null);
   const [pendingFocus, setPendingFocus] = useState<string | null>(null);
@@ -278,7 +278,7 @@ export default function FakturaWorkspace() {
           onSaved={q.handleSaved}
           onLinked={(rmsId, name) => setLastLinked({ rmsId, name })}
           onSecondary={(a, l) => setLineDialog({ kind: a, line: l })}
-          onShowDocument={() => { if (!docOpen) toggleDoc(); }}
+          onShowDocument={() => { if (isMobile) setZone("dokument"); else if (!docOpen) toggleDoc(); }}
           onReconcile={runPrimary}
           inspectorAsSheet={!wide && !isMobile}
           inspectorOpen={inspectorOpen}
