@@ -1,70 +1,56 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { AlertTriangle, Check, PackageCheck, PackagePlus, Truck } from "lucide-react";
-
-import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { PackageEditor } from "@/ravarer/editors/PackageEditor";
-import type { PackageWorklistRow } from "@/ravarer/hooks/usePackageSizes";
-import { useRawMaterialSearchIndex } from "@/ravarer/hooks/useRawMaterialSearchIndex";
+import { AlertTriangle, PackageCheck, PackagePlus } from "lucide-react";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
-import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
-import { useRawMaterialUnits, useRawMaterialUnitsFor } from "@/ravarer/hooks/useRawMaterialUnits";
-import {
-  useReceiptInvoices,
-  useReceiptLines,
-  useReceiptMovement,
-  useReceiveInvoiceLine,
-  type ReceiptLine,
-} from "@/ravarer/hooks/useGoodsReceipt";
+import { useReceiptInvoices, type ReceiptInvoiceRow } from "@/ravarer/hooks/useGoodsReceipt";
 import { QueryState } from "@/components/common/QueryState";
-import { UnitAmountRows, emptyRow, rowsToBase, type UnitAmountRow } from "@/ravarer/components/stock/UnitAmountRows";
-import { formatDate, formatNok, formatNumber } from "@/ravarer/lib/constants";
+import { formatDate, formatNok } from "@/ravarer/lib/constants";
 import { osloDateISOPlusDays, osloTodayISO } from "@/lib/osloDate";
 import { paths } from "@/ravarer/lib/paths";
+import { InvoiceReceiptPanel } from "./varemottak/InvoiceReceiptPanel";
+import { ManualReceiptDialog } from "./varemottak/ManualReceiptDialog";
 
-const isoDaysAgo = (days: number) => osloDateISOPlusDays(-days);
-const today = () => osloTodayISO();
+const ISO = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Varemottak: periode/leverandør/valgt faktura ligger i adressen (`fra`, `til`, `leverandor`, `valgt`). */
 export default function Varemottak() {
   const { canWrite } = useRavarer();
-  const [fromDate, setFromDate] = useState(isoDaysAgo(14));
-  const [toDate, setToDate] = useState(today());
-  const [supplierId, setSupplierId] = useState<string>("all");
-  const [openInvoiceId, setOpenInvoiceId] = useState<string | null>(null);
+  const [sp, setSp] = useSearchParams();
+  const fromRaw = sp.get("fra");
+  const toRaw = sp.get("til");
+  const fromDate = fromRaw && ISO.test(fromRaw) ? fromRaw : osloDateISOPlusDays(-14);
+  const toDate = toRaw && ISO.test(toRaw) ? toRaw : osloTodayISO();
+  const supplierId = sp.get("leverandor") ?? "all";
+  const openInvoiceId = sp.get("valgt");
   const [manualOpen, setManualOpen] = useState(false);
+  const setParam = (k: string, v: string | null) =>
+    setSp(prev => {
+      const p = new URLSearchParams(prev);
+      if (v) p.set(k, v);
+      else p.delete(k);
+      return p;
+    }, { replace: k !== "valgt" });
 
   const { data: suppliers = [] } = useSuppliers();
-  const invoicesQuery = useReceiptInvoices({
-    fromDate,
-    toDate,
-    supplierId: supplierId === "all" ? null : supplierId,
-  });
+  const invoicesQuery = useReceiptInvoices({ fromDate, toDate, supplierId: supplierId === "all" ? null : supplierId });
   const invoices = useMemo(() => invoicesQuery.data ?? [], [invoicesQuery.data]);
-  const isLoading = invoicesQuery.isLoading;
-
+  const evidenceError = invoices.some(i => i.evidence_error);
   const totals = useMemo(
     () => ({
       invoices: invoices.length,
-      received: invoices.reduce((s, i) => s + i.received_lines, 0),
-      missing: invoices.reduce((s, i) => s + i.missing_lines, 0),
+      confirmed: invoices.reduce((s, i) => s + i.confirmed_lines, 0),
+      waiting: invoices.reduce((s, i) => s + i.open_lines + i.movement_only_lines, 0),
     }),
     [invoices],
   );
-
   const openInvoice = invoices.find(i => i.id === openInvoiceId) ?? null;
 
   return (
@@ -74,58 +60,63 @@ export default function Varemottak() {
       <div className="grid gap-4 sm:grid-cols-3">
         <Card className="p-4">
           <p className="text-xs uppercase tracking-wider text-ink-secondary">Fakturaer i perioden</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums">{totals.invoices}</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">{invoicesQuery.isSuccess ? totals.invoices : "–"}</p>
         </Card>
         <Card className="p-4">
-          <p className="text-xs uppercase tracking-wider text-ink-secondary">Linjer inn på lager</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums">{totals.received}</p>
+          <p className="text-xs uppercase tracking-wider text-ink-secondary">Linjer bekreftet mottatt</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">{invoicesQuery.isSuccess && !evidenceError ? totals.confirmed : "–"}</p>
         </Card>
-        <Card className={`p-4 ${totals.missing > 0 ? "border-warning/50" : ""}`}>
-          <p className="text-xs uppercase tracking-wider text-ink-secondary">Mangler bevegelse</p>
-          <p className={`mt-1 text-2xl font-semibold tabular-nums ${totals.missing > 0 ? "text-warning" : ""}`}>
-            {totals.missing}
+        <Card className={`p-4 ${totals.waiting > 0 ? "border-warning/50" : ""}`}>
+          <p className="text-xs uppercase tracking-wider text-ink-secondary">Venter på mottak</p>
+          <p className={`mt-1 text-2xl font-semibold tabular-nums ${totals.waiting > 0 ? "text-warning" : ""}`}>
+            {invoicesQuery.isSuccess && !evidenceError ? totals.waiting : "–"}
           </p>
         </Card>
       </div>
 
       <Card className="p-4">
         <div className="flex flex-wrap items-end gap-3">
-          <div>
-            <Label className="text-xs">Fra dato</Label>
-            <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="w-[160px]" />
+          <div className="w-full sm:w-auto">
+            <Label className="text-xs" htmlFor="vm-fra">Fra dato</Label>
+            <Input id="vm-fra" type="date" value={fromDate} onChange={e => setParam("fra", e.target.value || null)} className="h-[44px] sm:w-[160px]" />
           </div>
-          <div>
-            <Label className="text-xs">Til dato</Label>
-            <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="w-[160px]" />
+          <div className="w-full sm:w-auto">
+            <Label className="text-xs" htmlFor="vm-til">Til dato</Label>
+            <Input id="vm-til" type="date" value={toDate} onChange={e => setParam("til", e.target.value || null)} className="h-[44px] sm:w-[160px]" />
           </div>
-          <div>
+          <div className="w-full sm:w-auto">
             <Label className="text-xs">Leverandør</Label>
-            <Select value={supplierId} onValueChange={setSupplierId}>
-              <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
+            <Select value={supplierId} onValueChange={v => setParam("leverandor", v === "all" ? null : v)}>
+              <SelectTrigger className="h-[44px] sm:w-[220px]" aria-label="Leverandør"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Alle leverandører</SelectItem>
-                {suppliers.map(s => (
-                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                ))}
+                {suppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
-          <div className="ml-auto">
+          <div className="w-full sm:ml-auto sm:w-auto">
             {canWrite && (
-              <Button onClick={() => setManualOpen(true)}>
-                <PackagePlus className="mr-1.5 h-4 w-4" /> Manuelt mottak
+              <Button className="min-h-[44px] w-full" onClick={() => setManualOpen(true)}>
+                <PackagePlus className="mr-1.5 h-4 w-4" aria-hidden /> Manuelt mottak
               </Button>
             )}
           </div>
         </div>
       </Card>
 
+      {evidenceError && (
+        <p role="alert" className="rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-sm">
+          Mottaks- eller lagerstatus kunne ikke hentes for alle linjer. Tallene vises ikke før de er kjent.{" "}
+          <button className="min-h-[44px] underline" onClick={() => void invoicesQuery.refetch()}>Prøv igjen</button>
+        </p>
+      )}
+
       <Card className="overflow-hidden">
-        {isLoading || invoicesQuery.isError || invoices.length === 0 ? (
+        {invoicesQuery.isLoading || invoicesQuery.isError || invoices.length === 0 ? (
           <div className="p-6">
             <QueryState
               scope="ravarer:varemottak"
-              isLoading={isLoading}
+              isLoading={invoicesQuery.isLoading}
               isError={invoicesQuery.isError}
               error={invoicesQuery.error}
               isEmpty={invoices.length === 0}
@@ -134,482 +125,79 @@ export default function Varemottak() {
             />
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30 text-left text-xs uppercase tracking-wider text-ink-secondary">
-                <tr>
-                  <th className="px-4 py-3">Faktura</th>
-                  <th className="px-4 py-3">Dato</th>
-                  <th className="px-4 py-3">Leverandør</th>
-                  <th className="px-4 py-3 text-right">Beløp</th>
-                  <th className="px-4 py-3">Mottaksstatus</th>
-                  <th className="px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map(inv => (
-                  <tr key={inv.id} className="border-t border-line-subtle">
-                    <td className="px-4 py-3">
-                      <Link to={paths.faktura(inv.id)} className="font-mono text-xs text-primary hover:underline">
-                        {inv.invoice_number}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-ink-secondary">{formatDate(inv.invoice_date)}</td>
-                    <td className="px-4 py-3">{inv.supplier_name ?? "—"}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{formatNok(inv.total_amount)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1.5">
-                        <Badge variant="outline" className="text-success">
-                          <PackageCheck className="mr-1 h-3 w-3" /> {inv.received_lines} inn
-                        </Badge>
-                        {inv.missing_lines > 0 && (
-                          <Badge variant="outline" className="border-warning/50 text-warning">
-                            <AlertTriangle className="mr-1 h-3 w-3" /> {inv.missing_lines} mangler
-                          </Badge>
-                        )}
-                        {inv.untracked_lines > 0 && (
-                          <Badge variant="outline" className="text-ink-secondary">{inv.untracked_lines} uten lager</Badge>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Button size="sm" variant="outline" onClick={() => setOpenInvoiceId(inv.id)}>Se mottak</Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
-
-      <InvoiceReceiptDialog
-        invoiceId={openInvoiceId}
-        invoiceNumber={openInvoice?.invoice_number ?? ""}
-        onClose={() => setOpenInvoiceId(null)}
-        canWrite={canWrite}
-      />
-      <ManualReceiptDialog open={manualOpen} onOpenChange={setManualOpen} />
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-
-function InvoiceReceiptDialog({
-  invoiceId,
-  invoiceNumber,
-  onClose,
-  canWrite,
-}: {
-  invoiceId: string | null;
-  invoiceNumber: string;
-  onClose: () => void;
-  canWrite: boolean;
-}) {
-  const linesQuery = useReceiptLines(invoiceId ?? undefined);
-  const lines = useMemo(() => linesQuery.data ?? [], [linesQuery.data]);
-  const unitsQuery = useRawMaterialUnitsFor(lines.map(l => l.raw_material_id).filter((x): x is string => !!x));
-  // Feil på linjer og enheter samles ett sted, med felles «Prøv igjen».
-  const loadError = linesQuery.error ?? unitsQuery.error;
-  const isLoading = linesQuery.isLoading || unitsQuery.isLoading;
-  const retryAll = () => {
-    void linesQuery.refetch();
-    void unitsQuery.refetch();
-  };
-  const [deviationLine, setDeviationLine] = useState<ReceiptLine | null>(null);
-  const receive = useReceiveInvoiceLine();
-  const qc = useQueryClient();
-  const [packageLine, setPackageLine] = useState<ReceiptLine | null>(null);
-  const [rematching, setRematching] = useState(false);
-
-  /** Etter at pakningen er satt må linja regnes om på nytt for å få mengde. */
-  const rematchLine = async (line: ReceiptLine) => {
-    if (!invoiceId) return;
-    setRematching(true);
-    try {
-      const { error } = await supabase.functions.invoke("match-invoice-lines", {
-        body: { invoice_id: invoiceId, line_ids: [line.id] },
-      });
-      if (error) throw error;
-      await qc.invalidateQueries({ queryKey: ["receipt-lines", invoiceId] });
-      toast.success("Linja er regnet om på nytt");
-    } catch (e) {
-      toast.error(`Kunne ikke regne om linja: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setRematching(false);
-    }
-  };
-
-  const purchaseUnitText = (line: ReceiptLine) => {
-    if (line.base_quantity == null || !line.raw_material_id) return null;
-    const units = unitsQuery.data?.get(line.raw_material_id) ?? [];
-    const preferred = units.find(u => u.is_default_purchase) ?? units.find(u => u.is_default_count);
-    if (!preferred || !Number(preferred.units_in_base)) return null;
-    const qty = line.base_quantity / Number(preferred.units_in_base);
-    return `${formatNumber(qty, 2)} ${preferred.unit_label}`;
-  };
-
-  return (
-    <>
-      <Dialog open={!!invoiceId} onOpenChange={v => !v && onClose()}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Mottak — faktura {invoiceNumber}</DialogTitle>
-          </DialogHeader>
-          {isLoading || loadError ? (
-            <QueryState
-              scope="ravarer:varemottak-linjer"
-              isLoading={isLoading}
-              isError={!!loadError}
-              error={loadError}
-              onRetry={retryAll}
-            />
-          ) : (
-            <div className="max-h-[65vh] overflow-auto">
+          <>
+            <p className="border-b border-line-subtle px-4 py-2 text-xs text-ink-secondary">Alle {invoices.length} fakturaer i perioden vises.</p>
+            <ul className="divide-y divide-line-subtle md:hidden" aria-label="Fakturaer">
+              {invoices.map(inv => (
+                <li key={inv.id}>
+                  <button className="block min-h-[44px] w-full p-4 text-left" onClick={() => setParam("valgt", inv.id)}>
+                    <span className="flex justify-between gap-2">
+                      <span className="font-mono text-xs">{inv.invoice_number}</span>
+                      <span className="text-xs text-ink-secondary">{formatDate(inv.invoice_date)}</span>
+                    </span>
+                    <span className="mt-1 block break-words text-sm">{inv.supplier_name ?? "Ukjent leverandør"}</span>
+                    <span className="mt-2 block"><StatusBadges inv={inv} /></span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-card text-left text-xs uppercase tracking-wider text-ink-secondary">
+                <thead className="bg-muted/30 text-left text-xs uppercase tracking-wider text-ink-secondary">
                   <tr>
-                    <th className="py-2">Vare</th>
-                    <th className="py-2 text-right">Fakturert</th>
-                    <th className="py-2 text-right">Omregnet</th>
-                    <th className="py-2">Status</th>
-                    <th className="py-2"></th>
+                    <th className="px-4 py-3">Faktura</th>
+                    <th className="px-4 py-3">Dato</th>
+                    <th className="px-4 py-3">Leverandør</th>
+                    <th className="px-4 py-3 text-right">Beløp</th>
+                    <th className="px-4 py-3">Mottaksstatus</th>
+                    <th className="px-4 py-3"><span className="sr-only">Handling</span></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {lines.map(l => (
-                    <tr key={l.id} className="border-t border-line-subtle align-top">
-                      <td className="py-3">
-                        <p className="font-medium">{l.raw_material_name ?? l.description ?? "—"}</p>
-                        {l.raw_material_name && l.description && (
-                          <p className="text-xs text-ink-secondary">{l.description}</p>
-                        )}
+                  {invoices.map(inv => (
+                    <tr key={inv.id} className={`border-t border-line-subtle ${inv.id === openInvoiceId ? "bg-muted/40" : ""}`}>
+                      <td className="px-4 py-3">
+                        <Link to={paths.faktura(inv.id)} className="font-mono text-xs text-primary hover:underline">{inv.invoice_number}</Link>
                       </td>
-                      <td className="py-3 text-right tabular-nums">
-                        {formatNumber(l.quantity, 2)} <span className="text-xs text-ink-secondary">{l.unit ?? ""}</span>
-                      </td>
-                      <td className="py-3 text-right tabular-nums">
-                        {l.base_quantity == null ? (
-                          <span className="text-ink-secondary">—</span>
-                        ) : (
-                          <>
-                            {formatNumber(l.base_quantity, 2)} <span className="text-xs text-ink-secondary">{l.base_unit}</span>
-                            {purchaseUnitText(l) && (
-                              <p className="text-xs text-ink-secondary">{purchaseUnitText(l)}</p>
-                            )}
-                          </>
-                        )}
-                      </td>
-                      <td className="py-3">
-                        {!l.stock_tracking ? (
-                          <Badge variant="outline" className="text-ink-secondary">Ikke lagerført</Badge>
-                        ) : l.has_movement ? (
-                          <Badge variant="outline" className="text-success">
-                            <Check className="mr-1 h-3 w-3" /> Inn på lager
-                          </Badge>
-                        ) : l.base_quantity == null ? (
-                          <div className="space-y-1">
-                            <Badge variant="outline" className="border-warning/50 text-warning">
-                              Mangler omregning
-                            </Badge>
-                            <p className="text-xs text-ink-secondary">Mangler pakning på varen.</p>
-                            {canWrite && l.raw_material_id && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={rematching}
-                                onClick={() => setPackageLine(l)}
-                              >
-                                Sett pakning
-                              </Button>
-                            )}
-                          </div>
-                        ) : (
-                          <Badge variant="outline" className="text-ink-secondary">Ikke mottatt</Badge>
-                        )}
-                      </td>
-                      <td className="py-3 text-right">
-                        {canWrite && l.stock_tracking && l.raw_material_id && (
-                          <div className="flex justify-end gap-1">
-                            {l.has_movement ? (
-                              <Button size="sm" variant="outline" disabled>
-                                Mottatt
-                              </Button>
-                            ) : (
-                              l.base_quantity != null && l.base_quantity > 0 && invoiceId && (
-                                <Button
-                                  size="sm"
-                                  disabled={receive.isPending}
-                                  onClick={() =>
-                                    void receive.mutate({
-                                      invoice_line_id: l.id,
-                                      invoice_id: invoiceId,
-                                      raw_material_id: l.raw_material_id!,
-                                      quantity_base: l.base_quantity!,
-                                      invoice_number: invoiceNumber,
-                                    })
-                                  }
-                                >
-                                  Motta
-                                </Button>
-                              )
-                            )}
-                            <Button size="sm" variant="ghost" onClick={() => setDeviationLine(l)}>Avvik</Button>
-                          </div>
-                        )}
+                      <td className="px-4 py-3 text-ink-secondary">{formatDate(inv.invoice_date)}</td>
+                      <td className="px-4 py-3">{inv.supplier_name ?? "—"}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{formatNok(inv.total_amount)}</td>
+                      <td className="px-4 py-3"><StatusBadges inv={inv} /></td>
+                      <td className="px-4 py-3 text-right">
+                        <Button size="sm" variant="outline" onClick={() => setParam("valgt", inv.id)}>Se mottak</Button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={onClose}>Lukk</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </>
+        )}
+      </Card>
 
-      <DeviationDialog line={deviationLine} invoiceNumber={invoiceNumber} onClose={() => setDeviationLine(null)} />
-
-      <PackageEditor
-        open={!!packageLine}
-        row={packageLine ? receiptLineAsWorklistRow(packageLine) : null}
-        onOpenChange={v => {
-          if (v) return;
-          setPackageLine(null);
-        }}
-        onApplied={() => {
-          // Rematch skal bare kjøre når pakningen faktisk ble lagret, ikke ved avbrutt dialog.
-          const line = packageLine;
-          if (line) void rematchLine(line);
-        }}
-      />
-    </>
+      <InvoiceReceiptPanel invoiceId={openInvoiceId} invoiceNumber={openInvoice?.invoice_number ?? ""} onClose={() => setParam("valgt", null)} canWrite={canWrite} />
+      <ManualReceiptDialog open={manualOpen} onOpenChange={setManualOpen} />
+    </div>
   );
 }
 
-/** Pakningsdialogen forventer en arbeidslisterad; her har vi bare fakturalinja. */
-function receiptLineAsWorklistRow(line: ReceiptLine): PackageWorklistRow {
-  return {
-    id: line.raw_material_id!,
-    legal_entity_id: null,
-    name: line.raw_material_name ?? line.description ?? "",
-    base_unit: line.base_unit,
-    category: null,
-    current_cost_price: null,
-    pakningsfaktor: null,
-    faktor_kilde: null,
-    bekreftet_dato: null,
-    antall_fakturalinjer: null,
-    antall_leverandorer: null,
-    enheter_i_bruk: line.unit,
-    linjer_uten_pris: null,
-    kjopt_kr_totalt: null,
-    siste_faktura: null,
-    pris_spredning: null,
-    implisert_mengde: null,
-    referansepris: null,
-    referansekilde: null,
-    referansedato: null,
-    referanse_faktor: null,
-    foreslatt_fra_navn: null,
-    foreslatt_fra_referanse: null,
-    status: "mangler_pakning",
-  };
-}
-
-type DeviationKind = "less" | "more" | "waste";
-
-function DeviationDialog({
-  line,
-  invoiceNumber,
-  onClose,
-}: {
-  line: ReceiptLine | null;
-  invoiceNumber: string;
-  onClose: () => void;
-}) {
-  const move = useReceiptMovement();
-  const { data: units = [] } = useRawMaterialUnits(line?.raw_material_id ?? undefined);
-  const [kind, setKind] = useState<DeviationKind>("less");
-  const [rows, setRows] = useState<UnitAmountRow[]>([emptyRow()]);
-  const [note, setNote] = useState("");
-
-  const base = rowsToBase(rows, units);
-
-  const submit = async () => {
-    if (!line?.raw_material_id || base == null || base === 0) return;
-    const amount = Math.abs(base);
-    await move.mutateAsync({
-      raw_material_id: line.raw_material_id,
-      quantity_base: kind === "less" ? -amount : amount,
-      kind: kind === "waste" ? "waste" : "adjustment",
-      note:
-        (kind === "waste" ? "Svinn ved mottak" : "Mottaksavvik") +
-        ` faktura ${invoiceNumber}` +
-        (note.trim() ? ` — ${note.trim()}` : ""),
-    });
-    setRows([emptyRow()]);
-    setNote("");
-    onClose();
-  };
-
+function StatusBadges({ inv }: { inv: ReceiptInvoiceRow }) {
+  if (inv.evidence_error) return <Badge variant="outline" className="border-warning/50 text-warning">Status ukjent</Badge>;
   return (
-    <Dialog open={!!line} onOpenChange={v => !v && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Registrer avvik — {line?.raw_material_name ?? ""}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div>
-            <Label className="text-xs">Type</Label>
-            <Select value={kind} onValueChange={v => setKind(v as DeviationKind)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="less">Mottok mindre enn fakturert</SelectItem>
-                <SelectItem value="more">Mottok mer enn fakturert</SelectItem>
-                <SelectItem value="waste">Knust / ødelagt ved mottak</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-xs">Differanse</Label>
-            <UnitAmountRows rows={rows} onChange={setRows} units={units} baseUnit={line?.base_unit ?? ""} />
-            {base != null && (
-              <p className="mt-1 text-xs text-ink-secondary">
-                Bokføres som {kind === "less" ? "−" : kind === "waste" ? "−" : "+"}
-                {formatNumber(Math.abs(base), 2)} {line?.base_unit}
-              </p>
-            )}
-          </div>
-          <div>
-            <Label className="text-xs">Notat</Label>
-            <Textarea value={note} onChange={e => setNote(e.target.value)} rows={2} placeholder="Valgfritt" />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Avbryt</Button>
-          <Button onClick={submit} disabled={move.isPending || base == null || base === 0}>Registrer</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function ManualReceiptDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
-  const { data: materials = [] } = useRawMaterials();
-  const move = useReceiptMovement();
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [rmId, setRmId] = useState<string | null>(null);
-  const [rows, setRows] = useState<UnitAmountRow[]>([emptyRow()]);
-  const [date, setDate] = useState(today());
-  const [note, setNote] = useState("");
-
-  const [search, setSearch] = useState("");
-  const index = useRawMaterialSearchIndex();
-  // Søket dekker leverandørens varenummer og bekreftede aliaser, ikke bare navn
-  // — «slice(0, 400)» gjorde at varer bakerst i lista aldri kunne velges.
-  const matches = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    if (!needle) return materials.slice(0, 50);
-    return materials
-      .filter(m => {
-        if (`${m.name} ${m.sku ?? ""}`.toLowerCase().includes(needle)) return true;
-        const links = index.data?.linksByRawMaterial.get(m.id) ?? [];
-        return links.some(
-          l =>
-            (l.supplierSku ?? "").toLowerCase().includes(needle) ||
-            (l.supplierProductName ?? "").toLowerCase().includes(needle) ||
-            l.aliases.some(a => a.toLowerCase().includes(needle)),
-        );
-      })
-      .slice(0, 50);
-  }, [materials, search, index.data]);
-
-  const rm = materials.find(m => m.id === rmId) ?? null;
-  const { data: units = [] } = useRawMaterialUnits(rmId ?? undefined);
-  const base = rowsToBase(rows, units);
-
-  const submit = async () => {
-    if (!rmId || base == null || base <= 0) return;
-    await move.mutateAsync({
-      raw_material_id: rmId,
-      quantity_base: base,
-      kind: "purchase",
-      note: "Manuelt mottak" + (note.trim() ? ` — ${note.trim()}` : ""),
-      occurred_at: new Date(`${date}T12:00:00`).toISOString(),
-    });
-    setRmId(null);
-    setRows([emptyRow()]);
-    setNote("");
-    onOpenChange(false);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle><Truck className="mr-2 inline h-4 w-4" />Manuelt mottak</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div>
-            <Label className="text-xs">Vare</Label>
-            <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full justify-start font-normal">
-                  {rm ? rm.name : "Velg vare…"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[380px] p-0" align="start">
-                <Command shouldFilter={false}>
-                  <CommandInput placeholder="Søk navn, varenummer eller alias…" value={search} onValueChange={setSearch} />
-                  <CommandList>
-                    <CommandEmpty>Ingen treff.</CommandEmpty>
-                    <CommandGroup>
-                      {matches.map(m => (
-                        <CommandItem
-                          key={m.id}
-                          value={`${m.name} ${m.sku ?? ""}`}
-                          onSelect={() => {
-                            setRmId(m.id);
-                            setPickerOpen(false);
-                          }}
-                        >
-                          {m.name}
-                          <span className="ml-2 text-xs text-ink-secondary">{m.base_unit}</span>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
-          <div>
-            <Label className="text-xs">Mengde</Label>
-            <UnitAmountRows rows={rows} onChange={setRows} units={units} baseUnit={rm?.base_unit ?? ""} />
-            {base != null && rm && (
-              <p className="mt-1 text-xs text-ink-secondary">
-                Bokføres som +{formatNumber(base, 2)} {rm.base_unit}
-              </p>
-            )}
-          </div>
-          <div>
-            <Label className="text-xs">Dato</Label>
-            <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
-          </div>
-          <div>
-            <Label className="text-xs">Notat</Label>
-            <Textarea value={note} onChange={e => setNote(e.target.value)} rows={2} placeholder="Valgfritt" />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Avbryt</Button>
-          <Button onClick={submit} disabled={move.isPending || !rmId || base == null || base <= 0}>Registrer mottak</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <span className="flex flex-wrap gap-1.5">
+      {inv.is_credit_note && <Badge variant="outline">Kreditnota</Badge>}
+      <Badge variant="outline" className="text-success">
+        <PackageCheck className="mr-1 h-3 w-3" aria-hidden /> {inv.confirmed_lines} mottatt
+      </Badge>
+      {inv.movement_only_lines > 0 && (
+        <Badge variant="outline" className="border-warning/50 text-warning">{inv.movement_only_lines} på lager, ikke bekreftet</Badge>
+      )}
+      {inv.open_lines > 0 && (
+        <Badge variant="outline" className="border-warning/50 text-warning">
+          <AlertTriangle className="mr-1 h-3 w-3" aria-hidden /> {inv.open_lines} venter
+        </Badge>
+      )}
+      {inv.untracked_lines > 0 && <Badge variant="outline" className="text-ink-secondary">{inv.untracked_lines} uten lager</Badge>}
+    </span>
   );
 }
