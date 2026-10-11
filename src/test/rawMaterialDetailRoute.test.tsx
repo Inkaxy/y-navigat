@@ -43,6 +43,7 @@ vi.mock("@/ravarer/components/tabs/SuppliersTab", () => ({ SuppliersTab: () => <
 vi.mock("@/ravarer/components/tabs/RecipesTab", () => ({ RecipesTab: () => null }));
 vi.mock("@/ravarer/components/tabs/StockTab", () => ({ StockTab: () => null }));
 vi.mock("@/ravarer/components/tabs/HistoryTab", () => ({ HistoryTab: () => <div data-testid="stub-historikk" /> }));
+vi.mock("@/components/layout/PageHeader", () => ({ PageHeader: ({ title, actions }: { title: React.ReactNode; actions?: React.ReactNode }) => <header>{title}{actions}</header> }));
 vi.mock("@/ravarer/components/stock/SellsAsSection", () => ({ SellsAsSection: () => null }));
 vi.mock("@/ravarer/components/RawMaterialKpiStrip", () => ({ RawMaterialKpiStrip: () => null }));
 vi.mock("@/ravarer/hooks/usePurchaseStats", () => ({ useRawMaterialPurchaseStats: () => ({ data: null }) }));
