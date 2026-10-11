@@ -2,6 +2,7 @@
 // Bevarer linjetype, prisgrunnlag (per enhet / per kg/l) og linjerabatt slik at databasens
 // lesekontroll (rm_line_read_issues_v2) regner med riktig grunnlag i stedet for å gjette.
 import { parsePackageFromDescription } from "../_shared/units.ts";
+import { resolveLineNumbers } from "../_shared/numberTokens.ts";
 import { LINE_KINDS, normalizeUnit, num, toDbPriceBasis, discountAmountFrom, type DbPriceBasis } from "../_shared/invoiceExtraction.ts";
 
 export interface InvoiceLineRow {
@@ -53,7 +54,10 @@ export function toInvoiceLineRows(rawLines: unknown, invoiceId: string, ledgerAc
       const pb = typeof l.price_basis === "string" && BASES.includes(l.price_basis) ? (l.price_basis as DbPriceBasis) : null;
       const modelBasis = l.unit_price_basis === "per_base" ? "per_base" : l.unit_price_basis === "per_unit" ? "per_unit" : null;
       const basis = pb ?? toDbPriceBasis(modelBasis, unit, packageUnit);
-      const total = num(l.total_amount);
+      // Samme feltbevisste tolkning som leseren: tvetydig råtekst («10.000») avgjøres bare av regnestykket.
+      const factor = basis && basis !== "mengdeenhet" && basis !== "pakning" && basis !== "stk" && packageSize != null && modelBasis === "per_base" ? packageSize * (countPerPackage ?? 1) : 1;
+      const nums = resolveLineNumbers(l, factor);
+      const total = nums.total_amount;
       const discRaw = num(l.discount_amount);
       const discount = discRaw != null && discRaw > 0 ? discRaw : discountAmountFrom(num(l.discount_pct), total);
       return {
@@ -61,9 +65,9 @@ export function toInvoiceLineRows(rawLines: unknown, invoiceId: string, ledgerAc
         line_number: i + 1,
         supplier_sku: typeof l.sku === "string" && l.sku.trim() ? l.sku.trim() : null,
         description: typeof l.description === "string" ? l.description : null,
-        quantity: num(l.quantity),
+        quantity: nums.quantity,
         unit,
-        unit_price: num(l.unit_price),
+        unit_price: nums.unit_price,
         total_amount: total,
         vat_rate: num(l.vat_rate),
         package_size: packageSize,

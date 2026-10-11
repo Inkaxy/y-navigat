@@ -19,7 +19,7 @@ describe("delt lesekontroll", () => {
 describe("norske tall", () => {
   it.each([
     ["1 234 567,89", 1234567.89], ["1.234,50", 1234.5], ["12,5 kr", 12.5], ["-12,5", -12.5], ["1,234.50", 1234.5],
-    ["1.234.567", 1234567], ["1.234", 1234], ["0,95", 0.95], ["kr 98 400,00", 98400], [" 7 ", 7],
+    ["1.234.567", 1234567], ["0,95", 0.95], ["kr 98 400,00", 98400], [" 7 ", 7],
   ])("%s → %s", (s, n) => expect(parseNorwegianNumber(s)).toBe(n));
   it.each(["abc", "", "1,2,3x", "NaN", "Infinity"])("ugyldig «%s» → null", (s) => expect(parseNorwegianNumber(s)).toBeNull());
   it("ikke-endelige tall avvises", () => expect(parseNorwegianNumber(Number.POSITIVE_INFINITY)).toBeNull());
@@ -198,5 +198,57 @@ describe("delvis kostprisføring (3C)", () => {
     const n = nextInvoiceStep({ ...base, status: "reconciled", ...extrasFromCounts(true, 1, 3) });
     expect(n.key).toBe("ferdig");
     expect(n.hint).toMatch(/delvis ført \(1 av 3/);
+  });
+});
+
+// ---------- Ekte regresjon: PALS526301 (blandet tallformat på samme side) ----------
+import { parseNumberToken, resolveLineNumbers } from "../../supabase/functions/_shared/numberTokens";
+import { sanitizeLines as sanitizeReal, checkSum as checkSumReal } from "../../supabase/functions/_shared/invoiceExtraction";
+import { toInvoiceLineRows as toRowsReal } from "../../supabase/functions/tripletex-import-invoice-lines/rows";
+import { parseNorwegianNumber as pnn } from "@/fakturaer/lib/invoiceReadCheck";
+
+const PALS = [
+  { sku: "5011 0", q: "10.000", p: "110,00", t: "1 100,00", eq: 10, ep: 110, et: 1100 },
+  { sku: "5301 0", q: "10.000", p: "113,00", t: "1 130,00", eq: 10, ep: 113, et: 1130 },
+  { sku: "6541 1", q: "11.340", p: "86,00", t: "975,24", eq: 11.34, ep: 86, et: 975.24 },
+  { sku: "4041 2", q: "396.000", p: "52,00", t: "20 592,00", eq: 396, ep: 52, et: 20592 },
+  { sku: "1031 2", q: "25.000", p: "79,50", t: "1 987,50", eq: 25, ep: 79.5, et: 1987.5 },
+];
+const palsModel = PALS.map((r) => ({ line_kind: "vare", sku: r.sku, description: "Vare", unit: "kg", unit_price_basis: "per_unit", confidence: 0.9,
+  quantity: r.q, unit_price: r.p, total_amount: r.t, quantity_raw: r.q, unit_price_raw: r.p, total_amount_raw: r.t }));
+
+describe("PALS526301 — mengde med punktum, beløp med komma", () => {
+  it("token-regler", () => {
+    expect(parseNumberToken("1.234,50")).toMatchObject({ value: 1234.5, ambiguous: false });
+    expect(parseNumberToken("1 700").value).toBe(1700);
+    expect(parseNumberToken("10.000")).toMatchObject({ value: null, ambiguous: true, candidates: [10, 10000] });
+    expect(pnn("10.000")).toBeNull();
+    expect(pnn("1.234.567")).toBe(1234567);
+    expect(parseNumberToken(10000).value).toBe(10000); // JSON-tall endres ikke
+  });
+  it("«10.000» = 10 med regnestykke som bevis", () => {
+    const r = resolveLineNumbers({ quantity_raw: "10.000", unit_price_raw: "110,00", total_amount_raw: "1 100,00" });
+    expect(r.quantity).toBe(10);
+    expect(r.evidence.find((e) => e.field === "quantity")).toMatchObject({ raw: "10.000", how: "regnestykke" });
+  });
+  it("tvetydig uten kontekst tolkes ikke blindt", () => {
+    const r = resolveLineNumbers({ quantity_raw: "10.000", unit_price_raw: null, total_amount_raw: "1 100,00" });
+    expect(r.quantity).toBeNull();
+    expect(r.unresolved).toContain("quantity");
+    const l = sanitizeReal([{ line_kind: "vare", quantity: "10.000", unit: "kg", total_amount: "1 100,00" }])[0];
+    expect(l.quantity).toBeNull();
+    expect(l.read_issues.map((i) => i.code)).toContain("tvetydig_tall");
+  });
+  it("alle fem linjer gjennom leserens normalisering og importen", () => {
+    const lines = sanitizeReal(palsModel);
+    PALS.forEach((r, i) => {
+      expect(lines[i]).toMatchObject({ quantity: r.eq, unit_price: r.ep, total_amount: r.et });
+      expect(lines[i].read_issues).toEqual([]);
+    });
+    expect(checkSumReal(lines, 25784.74, 29652.45, 3867.71).deviation_pct ?? 0).toBeCloseTo(0, 2);
+    const rows = toRowsReal(palsModel, "inv", null);
+    PALS.forEach((r, i) => expect(rows[i]).toMatchObject({ quantity: r.eq, unit_price: r.ep, total_amount: r.et }));
+    // Allerede tolkede linjer fra leseren (tall) går uendret gjennom importen.
+    expect(toRowsReal(lines, "inv", null).map((x) => x.quantity)).toEqual([10, 10, 11.34, 396, 25]);
   });
 });
