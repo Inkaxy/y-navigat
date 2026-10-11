@@ -209,7 +209,7 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
       )}
 
       <ClaimCreditDialog
-        open={flow.open} onOpenChange={(v) => { if (!v) { flow.close(); setClaimError(null); } }} kind={plan?.kind ?? null} amount={plan?.amount ?? null} observed={plan?.observed ?? null} lineCount={plan?.lines.length ?? 0}
+        open={flow.open} onOpenChange={(v) => { if (!v) { flow.close(); setClaimError(null); } }} kind={flow.state.duplicate ? null : plan?.kind ?? null} amount={plan?.amount ?? null} observed={plan?.observed ?? null} lineCount={plan?.lines.length ?? 0}
         defaultTitle={`${plan?.kind === "documented_claim" ? "Krav" : "Prisforespørsel"} ${name} ${formatDate(osloTodayISO())}`}
         busy={claim.isPending} error={claimError} onSubmit={(f) => void onClaim(f)}
         stale={!!flow.state.stalePlan} onRecheck={() => { setClaimError(null); void flow.recheck(); }} recheckBusy={flow.state.recheck === "busy"} recheckError={flow.state.recheck === "error"}
