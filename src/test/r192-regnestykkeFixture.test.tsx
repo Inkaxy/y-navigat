@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 
-const rpc = vi.fn();
+const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc, from: rpc } }));
 import RegnestykkePreviewContent from "@/dev/RegnestykkePreviewContent";
 
