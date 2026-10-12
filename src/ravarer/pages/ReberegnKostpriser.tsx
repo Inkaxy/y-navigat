@@ -14,7 +14,7 @@ import { ModulePage } from "@/ravarer/ui/ModulePage";
 import { DataTable } from "@/ravarer/ui/DataTable";
 import { FilterChips } from "@/ravarer/ui/FilterChips";
 import { RAVARER_EYEBROW } from "@/ravarer/pages/hub/hubTabs";
-import { BUCKETS, RECALC_COLUMNS, UNDO_LABEL, kr } from "@/ravarer/pages/reberegn/reberegnColumns";
+import { BUCKETS, RECALC_COLUMNS, RecalcDrilldown, UNDO_LABEL, kr } from "@/ravarer/pages/reberegn/reberegnColumns";
 import { useCostRecalc, type RecalcBucket, type RecalcRow } from "@/fakturaer/hooks/useCostRecalc";
 import { outstanding, unresolvedIds } from "@/ravarer/lib/recalcLedger";
 import { paths } from "@/ravarer/lib/paths";
@@ -139,7 +139,7 @@ export default function ReberegnKostpriser() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-surface-sunken text-caption uppercase tracking-wide text-ink-secondary">
-                    <tr><th className="px-3 py-2 text-left">Råvare</th><th className="px-3 py-2 text-left">Status</th><th className="px-3 py-2 text-right">Før</th><th className="px-3 py-2 text-right">Faktisk etter</th><th className="px-3 py-2 text-right">Linjer endret</th></tr>
+                    <tr><th className="px-3 py-2 text-left">Råvare</th><th className="px-3 py-2 text-left">Status</th><th className="px-3 py-2 text-right">Før</th><th className="px-3 py-2 text-right">Faktisk etter</th><th className="px-3 py-2 text-right">Linjer endret</th><th className="px-3 py-2 text-left">Kilde og pakning</th></tr>
                   </thead>
                   <tbody className="divide-y divide-line-subtle">
                     {b.items.map((it) => (
@@ -149,13 +149,14 @@ export default function ReberegnKostpriser() {
                         <td className="px-3 py-2 text-right tabular-nums">{kr(it.costBefore)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{kr(it.costAfter)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{it.linesChanged}</td>
+                        <td className="px-3 py-2"><RecalcDrilldown rawMaterialId={it.rawMaterialId} name={it.name} /></td>
                       </tr>
                     ))}
                     {b.failures.map((f) => (
                       <tr key={f.rawMaterialId}>
                         <td className="px-3 py-2">{(rows ?? []).find((x) => x.rawMaterialId === f.rawMaterialId)?.name ?? "Råvare"}</td>
                         <td className="px-3 py-2"><StatusPill label="Feilet" tokenVar="--state-danger" /> <span className="text-caption text-ink-secondary">{f.message}</span></td>
-                        <td colSpan={3} />
+                        <td colSpan={3} /><td className="px-3 py-2"><RecalcDrilldown rawMaterialId={f.rawMaterialId} name="råvaren" /></td>
                       </tr>
                     ))}
                   </tbody>

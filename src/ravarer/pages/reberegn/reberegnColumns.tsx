@@ -1,4 +1,6 @@
+import { Link } from "react-router-dom";
 import { StatusPill } from "@/ordre/components/ui/status-pill";
+import { paths } from "@/ravarer/lib/paths";
 import type { Column } from "@/ravarer/ui/DataTable";
 import type { RecalcBucket, RecalcRow } from "@/fakturaer/hooks/useCostRecalc";
 import type { UndoState } from "@/ravarer/lib/recalcLedger";
@@ -24,6 +26,21 @@ export const UNDO_LABEL: Record<UndoState, { label: string; token: string }> = {
   uavklart: { label: "Uavklart", token: "--state-warning" },
 };
 
+/**
+ * R192/R195: trygg innsyn fra hver vare til eksisterende, verifisert pris-/kildevisning og pakningslisten.
+ * Bulk-svaret har ingen faktura-/linje-ID-er, så kilde, regnestykke og fakturaer vises der de faktisk er bevist:
+ * råvarekortets prisseksjon (kostkilde med faktura og prisgrunnlag) — ingenting fabrikkeres her.
+ */
+export function RecalcDrilldown({ rawMaterialId, name }: { rawMaterialId: string; name: string }) {
+  const cls = "inline-flex min-h-[44px] items-center text-primary underline-offset-2 hover:underline";
+  return (
+    <span className="inline-flex flex-wrap gap-x-3" onClick={(e) => e.stopPropagation()}>
+      <Link className={cls} to={paths.raavare(rawMaterialId, { seksjon: "pris" })} aria-label={`Kilde, regnestykke og fakturaer for ${name}`}>Kilde og fakturaer</Link>
+      <Link className={cls} to={paths.pakninger({ valgt: rawMaterialId })} aria-label={`Pakning for ${name}`}>Pakning</Link>
+    </span>
+  );
+}
+
 export const RECALC_COLUMNS: Column<RecalcRow>[] = [
   { id: "name", header: "Råvare", alwaysVisible: true, sortKey: (r) => r.name, cell: (r) => (
     <div className="min-w-0"><div className="font-medium text-ink-primary">{r.name}</div>{r.sku && <div className="text-caption text-ink-secondary">{r.sku}</div>}</div>
@@ -36,4 +53,5 @@ export const RECALC_COLUMNS: Column<RecalcRow>[] = [
   { id: "lines", header: "Linjer endres / ukjent / utelatt", align: "right", sortKey: (r) => r.proposal?.linesChanged ?? -1, cell: (r) => (
     r.proposal ? <span className="tabular-nums">{r.proposal.linesChanged} / {r.proposal.linesUnknown} / {r.proposal.linesExcluded}</span> : <span className="text-ink-secondary">{r.failure ?? "—"}</span>
   ) },
+  { id: "kilde", header: "Kilde og pakning", cell: (r) => <RecalcDrilldown rawMaterialId={r.rawMaterialId} name={r.name} /> },
 ];
