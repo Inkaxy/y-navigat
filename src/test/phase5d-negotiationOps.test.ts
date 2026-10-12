@@ -79,3 +79,16 @@ describe("vareidentitet", () => {
     expect(sameItemSet([{ raw_material_id: "a" }], ["a", "b"])).toBe(false);
   });
 });
+
+import { estimateSavings } from "@/ravarer/lib/negotiationOps";
+describe("estimateSavings", () => {
+  it("ukjent pakning/baseline gir ukjent, ikke oppdiktet besparelse", () => {
+    const r = estimateSavings([
+      { hasWinner: true, volumeBaseline: 100, costBaseline: 1000, winnerPerBase: 9 },
+      { hasWinner: true, volumeBaseline: 100, costBaseline: 1000, winnerPerBase: null },
+      { hasWinner: true, volumeBaseline: null, costBaseline: 1000, winnerPerBase: 5 },
+      { hasWinner: false, volumeBaseline: 1, costBaseline: 1, winnerPerBase: 1 },
+    ]);
+    expect(r).toEqual({ value: 100, known: 1, unknown: 2 });
+  });
+});

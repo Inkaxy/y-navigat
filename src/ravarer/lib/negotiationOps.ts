@@ -193,3 +193,24 @@ export function sameItemSet(existing: ReadonlyArray<{ raw_material_id: string }>
   for (const x of b) if (!a.has(x)) return false;
   return true;
 }
+
+// ---------------------------------------------------------------------------
+// Besparelse
+
+/**
+ * Estimert årlig besparelse. Linjer der vinnerprisen ikke kan regnes om til
+ * grunnenhet, eller baseline mangler, telles som ukjente — aldri som 0 eller gjettet.
+ */
+export function estimateSavings(
+  lines: ReadonlyArray<{ volumeBaseline: number | null; costBaseline: number | null; winnerPerBase: number | null; hasWinner: boolean }>,
+): { value: number; known: number; unknown: number } {
+  let value = 0, known = 0, unknown = 0;
+  for (const l of lines) {
+    if (!l.hasWinner) continue;
+    if (l.winnerPerBase == null || l.volumeBaseline == null || l.costBaseline == null ||
+        !Number.isFinite(l.winnerPerBase) || !(l.volumeBaseline > 0)) { unknown++; continue; }
+    value += l.costBaseline - l.volumeBaseline * l.winnerPerBase;
+    known++;
+  }
+  return { value, known, unknown };
+}
