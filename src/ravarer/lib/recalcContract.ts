@@ -74,7 +74,7 @@ export function parseRecalcEnvelope(data: unknown, expect: { ids: readonly strin
       if (expect.dryRun ? rid !== null : !isUuid(rid)) return null;
       okN++; sumChanged += raw.lines_changed;
       items.push({
-        rawMaterialId: raw.raw_material_id, ok: true, name: raw.raw_material, recalcId: rid,
+        rawMaterialId: raw.raw_material_id, ok: true, name: raw.raw_material, recalcId: rid as string | null,
         linesTotal: raw.lines_total, linesChanged: raw.lines_changed, linesUnknown: raw.lines_unknown, linesExcluded: raw.lines_excluded,
         costBefore: before, costAfter: after,
       });
