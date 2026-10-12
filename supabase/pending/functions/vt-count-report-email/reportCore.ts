@@ -78,3 +78,36 @@ export function classifyGraph(status: number | null): "akseptert_av_tjenesten" |
   if (status != null && status >= 400 && status < 500 && status !== 408 && status !== 429) return "avvist";
   return "ukjent";
 }
+
+/** Forhåndsvisningens versjon binder både vedlegg OG valgt avsender: byttet postboks krever ny forhåndsvisning. */
+export const previewHash = async (attHash: string, sender: string | null) => sha256Hex(`${attHash}\n--sender--\n${sender ?? ""}`);
+
+export type MailOutcome = "akseptert_av_tjenesten" | "avvist" | "ukjent";
+export interface ClaimData { claimed: boolean; state: string; recipient?: string; subject?: string; message?: string; csv?: string; pdf_b64?: string; attachment_base?: string; final?: boolean; sender?: string }
+export interface StoredSendDeps {
+  claim(): Promise<{ data: ClaimData | null; error: { code?: string } | null }>;
+  /** Én Graph-sending med LAGREDE felt; returnerer HTTP-status, eller kaster ved nett/konfig. */
+  graphSend(c: ClaimData): Promise<number>;
+  finish(state: MailOutcome, detail: string | null): Promise<{ error: unknown }>;
+}
+/** Fullfører en lagret reservasjon. Uklar claim (transport/ukjent feil) gir «ukjent» og ingen Graph-kall. */
+export async function runStoredSend(opId: string, d: StoredSendDeps): Promise<{ status: number; body: Record<string, unknown> }> {
+  const claim = await d.claim();
+  if (claim.error) {
+    const code = String(claim.error.code ?? "");
+    if (code === "42501" || code === "23505") return { status: 409, body: { error: "Sendingen tilhører en annen bruker eller forespørselen samsvarer ikke med den lagrede. Denne forespørselen ble ikke utført; den lagrede sendingens status er uendret — bruk «Sjekk status».", op_id: opId } };
+    return { status: 200, body: { state: "ukjent", op_id: opId, detail: "Kunne ikke bekrefte om sendingen ble startet (forbindelses- eller serverfeil). Den sendes ikke automatisk på nytt — bruk «Sjekk status»." } };
+  }
+  const c = claim.data;
+  if (!c || typeof c.claimed !== "boolean") return { status: 200, body: { state: "ukjent", op_id: opId, detail: "Uventet svar ved start av sending. Den sendes ikke automatisk på nytt — bruk «Sjekk status»." } };
+  if (!c.claimed) return { status: 200, body: { state: c.state, replayed: true } };
+  let status: number | null = null; let detail: string | null = null;
+  try { status = await d.graphSend(c); if (status !== 202) detail = `Microsoft svarte ${status}`; }
+  catch (e) {
+    if (e instanceof Error && /konfigurert|koblet/.test(e.message)) { status = 400; detail = "Microsoft 365 er ikke konfigurert"; }
+    else detail = "Nettverksfeil eller tidsavbrudd — ukjent om e-posten ble sendt";
+  }
+  const state = classifyGraph(status);
+  const fin = await d.finish(state, detail);
+  return { status: 200, body: { state: fin.error ? "ukjent" : state, detail } };
+}
