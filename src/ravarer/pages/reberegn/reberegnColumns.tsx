@@ -8,6 +8,12 @@ import type { UndoState } from "@/ravarer/lib/recalcLedger";
 export const kr = (v: number | null | undefined) =>
   v == null || !Number.isFinite(v) ? "—" : `${v.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} kr`;
 
+/** Endring = serverens egne før/etter-tall i forslaget; mangler ett av dem, vises ingen endring. */
+export function costChange(before: number | null | undefined, after: number | null | undefined): number | null {
+  return before == null || after == null || !Number.isFinite(before) || !Number.isFinite(after) ? null : after - before;
+}
+const signedKr = (v: number | null) => (v == null ? "—" : `${v > 0 ? "+" : v < 0 ? "−" : ""}${kr(Math.abs(v))}`);
+
 export const BUCKETS: Record<RecalcBucket, { label: string; help: string }> = {
   endres: { label: "Linjer endres", help: "Serveren foreslår å rette mengde/pris på én eller flere fakturalinjer." },
   usikker: { label: "Usikre linjer", help: "Ingen linjer endres, men noen linjer mangler sikker mengde i grunnenhet." },
@@ -49,6 +55,9 @@ export const RECALC_COLUMNS: Column<RecalcRow>[] = [
   { id: "current", header: "Gjeldende kost", align: "right", sortKey: (r) => r.currentPrice, cell: (r) => <span className="tabular-nums">{kr(r.currentPrice)}{r.baseUnit ? ` / ${r.baseUnit}` : ""}</span> },
   { id: "proposal", header: "Foreløpig forslag nå", align: "right", sortKey: (r) => r.proposal?.costAfter ?? null, cell: (r) => (
     <span className="tabular-nums" title="Serverens forslag akkurat nå. Endelig kostpris settes av kostprisregelen ved kjøring og kan avvike.">{r.proposal ? kr(r.proposal.costAfter) : "—"}</span>
+  ) },
+  { id: "change", header: "Endring i forslaget", align: "right", sortKey: (r) => costChange(r.proposal?.costBefore, r.proposal?.costAfter), cell: (r) => (
+    <span className="tabular-nums" title="Forslagets etter minus før, begge fra serverens prøvekjøring.">{signedKr(costChange(r.proposal?.costBefore, r.proposal?.costAfter))}</span>
   ) },
   { id: "lines", header: "Linjer endres / ukjent / utelatt", align: "right", sortKey: (r) => r.proposal?.linesChanged ?? -1, cell: (r) => (
     r.proposal ? <span className="tabular-nums">{r.proposal.linesChanged} / {r.proposal.linesUnknown} / {r.proposal.linesExcluded}</span> : <span className="text-ink-secondary">{r.failure ?? "—"}</span>
