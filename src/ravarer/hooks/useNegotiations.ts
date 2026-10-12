@@ -332,6 +332,6 @@ export function useGenerateRfqCredentials() {
       qc.invalidateQueries({ queryKey: ["negotiation", v.negotiationId] });
       qc.invalidateQueries({ queryKey: ["negotiation-recipients", v.negotiationId] });
     },
-    onError: (e: any) => toast.error(`Kunne ikke generere passord: ${e.message ?? e}`),
+    onError: () => toast.error("Lenkene ble ikke bekreftet generert. Passord kan være endret — generer nye lenker bevisst ved behov."),
   });
 }
