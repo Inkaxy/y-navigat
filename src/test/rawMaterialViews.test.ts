@@ -43,7 +43,7 @@ function item(patch: Partial<RawMaterialListItem> = {}): RawMaterialListItem {
     minStock: null,
     hasNutrition: true,
     hasDatasheet: true,
-    hasAllergens: true,
+    hasAllergens: true, allergensReviewed: null,
     aliases: [],
     searchText: buildSearchText(["Hvetemel", "RM-1", "12345"]),
     ...patch,

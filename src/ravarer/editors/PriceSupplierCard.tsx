@@ -80,6 +80,9 @@ export function PriceSupplierCard({ rm, canWrite, onEditLink }: Props) {
               <p className="mt-1 text-lg font-semibold tabular-nums">
                 {primaryLink?.agreed_price_per_base_unit != null ? `${formatNok(primaryLink.agreed_price_per_base_unit)}/${rm.base_unit}` : "Ingen avtalepris"}
               </p>
+              {primaryLink?.agreed_price_per_base_unit != null && !(primaryLink.agreed_price_set_at && primaryLink.agreed_price_set_by) && (
+                <p className="text-caption text-warning">Registrert avtalepris — ikke bekreftet</p>
+              )}
               <p className="text-caption text-muted-foreground">
                 {primaryLink ? `Primærkobling · ${names.get(primaryLink.supplier_id) ?? "Ukjent"}` : "Ingen primærleverandør"}
               </p>

@@ -43,7 +43,4 @@ export async function recheckInvoiceLinesSum(invoiceId: string): Promise<LinesSu
   });
 }
 
-export function formatVariancePct(v: number | null | undefined): string {
-  if (v == null) return "—";
-  return `${v > 0 ? "+" : ""}${v.toFixed(1)} %`;
-}
+export { formatSignedPct as formatVariancePct } from "./sumDirection";

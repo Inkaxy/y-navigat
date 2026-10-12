@@ -1,3 +1,4 @@
+import { correctionTarget } from "./correctionTarget";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useUiPreference } from "@/hooks/useUiPreference";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -166,6 +167,20 @@ export default function FakturaWorkspace() {
   };
   const doRematch = () => { if (data) rematch.start(data.id); };
 
+  /** Én inngang til rettedialogen: valgt linje på denne fakturaen, ellers linje med lesevarsel. */
+  const openCorrection = () => {
+    if (!data) return;
+    if (!lineWrite) { s.setResult({ title: "Linjene kan ikke rettes her", items: [final ? "Fakturaen er avstemt eller flagget." : "Du har ikke skrivetilgang."], error: true }); return; }
+    const t = correctionTarget(data.invoice_lines ?? [], suppressActive ? null : q.activeLine?.id, (l) => parseReadIssues(l.extraction_issues).length > 0);
+    if (!t) {
+      setZone("linjer"); setInspectorOpen(true);
+      s.setResult({ title: "Velg linjen som skal rettes", items: ["Velg linjen i listen og bruk «Rett fakturalinje»."] });
+      return;
+    }
+    if (!isMobile && !docOpen && data.source_document_url) toggleDoc();
+    setCorrectFor(t.id);
+  };
+
   const runPrimary = () => {
     if (!data || !s.next) return;
     const k = s.next.key;
@@ -173,7 +188,7 @@ export default function FakturaWorkspace() {
     else if (k === "koble_kreditnota") setDialog({ kind: "credit", inv: data });
     else if (k === "hent_linjer") doFetch();
     else if (k === "registrer_linjer") navigate(paths.registrerLinjer(data.id));
-    else if (k === "rett_sum") { setFactsSignal((n) => n + 1); setZone("kontroll"); if (!isMobile && !docOpen && data.source_document_url) toggleDoc(); }
+    else if (k === "rett_sum") { setFactsSignal((n) => n + 1); openCorrection(); }
     else if (k === "avklar") focusFirstOpen();
     else if (k === "avstem" && s.assessment) setDialog({ kind: "reconcile", inv: { id: data.id, invoice_number: data.invoice_number, assessment: s.assessment } });
     else if (k === "godkjenn") void s.approve();
@@ -188,11 +203,8 @@ export default function FakturaWorkspace() {
     else if (a === "register") navigate(paths.registrerLinjer(data.id));
     else if (a === "reread") navigate(paths.lesPaNytt(data.id));
     else if (a === "credit") setDialog({ kind: "credit", inv: data });
-    else if (a === "correct") {
-      const lines = data.invoice_lines ?? [];
-      const target = lines.find((l) => parseReadIssues(l.extraction_issues).length > 0) ?? q.activeLine ?? lines[0];
-      if (target) setCorrectFor(target.id);
-    }
+    else if (a === "correct") openCorrection();
+    else if (a === "facts") { setFactsSignal((n) => n + 1); setZone("kontroll"); }
     else if (a === "recheck") {
       void recheckInvoiceLinesSum(data.id).then(() => { void detail.refetch(); s.setResult({ title: "Summen er kontrollert på nytt", items: [] }); },
         () => s.setResult({ title: "Summen kunne ikke kontrolleres", items: ["Prøv igjen."], error: true }));
@@ -268,7 +280,7 @@ export default function FakturaWorkspace() {
       {s.result && <ResultBox title={s.result.title} items={s.result.items} onUndo={s.result.undoable && q.undoEntry ? () => { s.setResult(null); void q.undo(); } : undefined} onNext={() => s.setResult(null)} nextLabel="Lukk" />}
       {lastLinked && <SimilarLinesHint rmsId={lastLinked.rmsId} name={lastLinked.name} onOpen={() => q.setBulkLink(lastLinked)} onDismiss={() => setLastLinked(null)} />}
       <div className="flex justify-end">
-        <Button variant="ghost" size="sm" aria-pressed={showTable} onClick={() => { setForceList(false); setTableView(!showTable); }}>{showTable ? "Vis arbeidsliste" : "Vis som tabell"}</Button>
+        <Button variant="ghost" size="sm" className="min-h-[44px]" aria-pressed={showTable} onClick={() => { setForceList(false); setTableView(!showTable); }}>{showTable ? "Vis arbeidsliste" : "Vis som tabell"}</Button>
       </div>
       {showTable ? (
         <InvoiceLinesTable
@@ -336,7 +348,7 @@ export default function FakturaWorkspace() {
           onInspectorOpenChange={setInspectorOpen}
           inspectorNote={active ? (
             <div className="space-y-2">
-              <Button variant="outline" size="sm" onClick={() => setCorrectFor(active.id)}>Rett fakturalinje</Button>
+              <Button variant="outline" size="sm" className="min-h-[44px]" onClick={() => setCorrectFor(active.id)}>Rett fakturalinje</Button>
               <SupplierItemScopeNote supplierId={data.supplier_id} line={active} />
             </div>
           ) : null}
@@ -393,7 +405,7 @@ export default function FakturaWorkspace() {
           {!(zone === "linjer" && inspectorOpen) && (
             <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 py-3 backdrop-blur">
               <p className="mb-1.5 truncate text-caption text-ink-secondary">{s.next.hint}</p>
-              <Button className="w-full" disabled={!s.next.enabled || s.busy || fetchLines.isPending} onClick={runPrimary}>{s.next.label}</Button>
+              <Button className="min-h-[44px] w-full" disabled={!s.next.enabled || s.busy || fetchLines.isPending} onClick={runPrimary}>{s.next.label}</Button>
             </div>
           )}
         </div>

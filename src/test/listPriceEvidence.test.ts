@@ -120,7 +120,7 @@ describe("felles modell: filter, sortering, CSV", () => {
     costStatus, costSource: "invoice", costUpdatedAt: null, agreedPrice: null, supplierId: "s", supplierName: "S", supplierSku: null,
     primaryLinkId: null, matchedAlias: null, lastInvoicePrice: 565.38, lastInvoiceDate: null, comparison,
     deviation: comparison.state === "eligible" ? comparison.deviation : null, packageState: "missing", volume12m: 1, currentStock: 0,
-    stockTracking: false, minStock: null, hasNutrition: true, hasDatasheet: true, hasAllergens: true, searchText: buildSearchText([id]), aliases: [],
+    stockTracking: false, minStock: null, hasNutrition: true, hasDatasheet: true, hasAllergens: true, allergensReviewed: null, searchText: buildSearchText([id]), aliases: [],
   });
   const elig = (d: number): ListComparison => ({ state: "eligible", deviation: d, invoicePpbu: 10, invoiceDate: null, invoiceNumber: null, invoiceId: "i", checkedAt: V });
   const unk: ListComparison = { state: "unknown", label: "Kostprisen er ikke verifisert", needsControl: true, invoiceId: "i", invoiceDate: null, checkedAt: V };

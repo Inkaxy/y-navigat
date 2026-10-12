@@ -1,3 +1,4 @@
+import { formatMachineNumbersNb } from "@/fakturaer/lib/sumDirection";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,7 +21,7 @@ export function ReadIssuesBanner({ invoiceId, issues, lineIssueCount, canWrite, 
     <div role="status" className="space-y-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
       <p className="font-medium">Lesingen må kontrolleres før automatisk kostpris og avstemming</p>
       <ul className="list-disc pl-5">
-        {issues.map((i) => <li key={i.code + i.message}>{i.message}</li>)}
+        {issues.map((i) => <li key={i.code + i.message}>{formatMachineNumbersNb(i.message)}</li>)}
         {lineIssueCount > 0 && <li>{lineIssueCount} {lineIssueCount === 1 ? "linje har" : "linjer har"} lesevarsel. Velg linjen og bruk «Rett fakturalinje».</li>}
       </ul>
       {issues.length > 0 && canWrite && !locked && (open ? (

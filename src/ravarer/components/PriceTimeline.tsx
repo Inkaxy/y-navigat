@@ -1,3 +1,4 @@
+import { formatSignedPct } from "@/fakturaer/lib/sumDirection";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -333,8 +334,7 @@ function Delta({ pct }: { pct: number | null }) {
   const cls = pct > 0.05 ? "text-warning" : pct < -0.05 ? "text-success" : "text-ink-secondary";
   return (
     <span className={cls}>
-      {pct > 0 ? "+" : ""}
-      {pct.toFixed(1)} %
+      {formatSignedPct(pct)}
     </span>
   );
 }
@@ -360,13 +360,11 @@ function TimelineTooltip({ active, payload, unitLabel }: TooltipProps) {
       {p.unitSource === "currently_verified_line" && <div className="text-ink-secondary">{RECONSTRUCTED_NOTE}{p.checkedAt ? ` (${formatDate(p.checkedAt.slice(0, 10))})` : ""}</div>}
       <div className="mt-1 space-y-0.5 text-ink-secondary">
         <div>
-          Δ forrige: {p.deltaPrevPct != null ? `${p.deltaPrevPct > 0 ? "+" : ""}${p.deltaPrevPct.toFixed(1)} %` : "—"}
+          Δ forrige: {formatSignedPct(p.deltaPrevPct)}
         </div>
         <div>
           Δ avtale:{" "}
-          {p.deltaAgreementPct != null
-            ? `${p.deltaAgreementPct > 0 ? "+" : ""}${p.deltaAgreementPct.toFixed(1)} %`
-            : "—"}
+          {formatSignedPct(p.deltaAgreementPct)}
         </div>
         <div>Kilde: {sourceLabel(p.source)}</div>
         {p.isCreditNote && <div>Kreditnota</div>}

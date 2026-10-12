@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatNok } from "@/fakturaer/lib/constants";
 import { formatVariancePct } from "@/fakturaer/lib/linesSum";
 import { toast } from "sonner";
+import { sumDirection, sumDirectionText } from "@/fakturaer/lib/sumDirection";
 
 interface Props {
   invoiceId: string;
@@ -84,7 +85,7 @@ export function LinesSumMismatchAlert({
           <p className="text-ink-secondary">
             Varelinjene summerer seg til {formatNok(linesSum)}, fakturaen er på {formatNok(expected)}
             {totalVat != null && totalAmount != null && ` eks. mva (${formatNok(totalAmount)} inkl. mva)`}. Avvik{" "}
-            {formatVariancePct(variancePct)}. Det kan mangle linjer. Godkjenning er blokkert til dette er sett på.
+            {formatVariancePct(variancePct)}. {sumDirectionText(sumDirection(linesSum, totalVat != null ? expected : null))} Godkjenning er blokkert til dette er sett på.
           </p>
           <div className="flex flex-wrap gap-2 pt-1">
             <Button size="sm" variant="outline" onClick={recheck} disabled={busy} className="gap-1.5">

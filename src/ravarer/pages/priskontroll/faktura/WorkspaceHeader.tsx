@@ -9,7 +9,7 @@ import { isFlaggable } from "@/fakturaer/lib/flagging";
 import { DeliveryTimeline } from "./DeliveryTimeline";
 import type { DeliveryStep, NextStep } from "./invoiceSteps";
 
-export type HeaderMenuAction = "flag" | "unflag" | "rematch" | "fetch" | "register" | "credit" | "history" | "recheck" | "vat" | "override" | "correct" | "reread";
+export type HeaderMenuAction = "flag" | "unflag" | "rematch" | "fetch" | "register" | "credit" | "history" | "recheck" | "vat" | "override" | "correct" | "reread" | "facts";
 
 type Props = {
   backHref: string;
@@ -53,11 +53,11 @@ export function WorkspaceHeader(p: Props) {
   return (
     <header className="sticky top-0 z-20 space-y-2 border-b border-border bg-background/95 py-3 backdrop-blur">
       <div className="flex flex-wrap items-center gap-2">
-        <Button asChild variant="ghost" size="sm" className="-ml-2 gap-1.5">
+        <Button asChild variant="ghost" size="sm" className="-ml-2 min-h-[44px] gap-1.5">
           <Link to={p.backHref}><ArrowLeft className="h-4 w-4" aria-hidden />{p.backLabel ?? "Fakturaer"}</Link>
         </Button>
         {p.undoLabel && (
-          <Button variant="ghost" size="sm" className="gap-1.5" onClick={p.onUndo}>
+          <Button variant="ghost" size="sm" className="min-h-[44px] gap-1.5" onClick={p.onUndo}>
             <Undo2 className="h-4 w-4" aria-hidden />Angre «{p.undoLabel}»
           </Button>
         )}
@@ -79,13 +79,13 @@ export function WorkspaceHeader(p: Props) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {p.docPath && (
-            <Button variant={p.docOpen ? "secondary" : "outline"} size="sm" className="gap-1.5" onClick={p.onToggleDoc} aria-pressed={p.docOpen}>
+            <Button variant={p.docOpen ? "secondary" : "outline"} size="sm" className="min-h-[44px] gap-1.5" onClick={p.onToggleDoc} aria-pressed={p.docOpen}>
               <FileText className="h-4 w-4" aria-hidden />{p.docOpen ? "Skjul dokument" : "Vis dokument"}
             </Button>
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Flere valg for fakturaen"><MoreHorizontal className="h-4 w-4" /></Button>
+              <Button variant="outline" size="icon" className="h-[44px] w-[44px]" aria-label="Flere valg for fakturaen"><MoreHorizontal className="h-4 w-4" /></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {p.canWrite && isFlaggable(p.status) && <DropdownMenuItem onSelect={() => p.onMenu("flag")}>Flagg …</DropdownMenuItem>}
@@ -98,6 +98,7 @@ export function WorkspaceHeader(p: Props) {
               {p.canWrite && !final && p.canCorrect && p.docPath && <DropdownMenuItem onSelect={() => p.onMenu("reread")}>Les originalen på nytt …</DropdownMenuItem>}
               {p.canWrite && !final && p.canCorrect && <DropdownMenuItem onSelect={() => p.onMenu("correct")}>Rett linjer mot originalen …</DropdownMenuItem>}
               <DropdownMenuSeparator />
+              {p.sumMismatch && <DropdownMenuItem onSelect={() => p.onMenu("facts")}>Vis sumkontroll</DropdownMenuItem>}
               <DropdownMenuItem onSelect={() => p.onMenu("recheck")}>Kontroller summen på nytt</DropdownMenuItem>
               {p.canWrite && p.sumMismatch && <DropdownMenuItem onSelect={() => p.onMenu("vat")}>Forslag ved mva-avvik</DropdownMenuItem>}
               {p.canWrite && p.sumMismatch && !final && <DropdownMenuItem onSelect={() => p.onMenu("override")}>Overstyr sumavvik med begrunnelse …</DropdownMenuItem>}
@@ -109,7 +110,7 @@ export function WorkspaceHeader(p: Props) {
               <DropdownMenuItem onSelect={() => p.onMenu("history")}>Revisjonshistorikk</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button size="sm" className="hidden sm:inline-flex" data-primary-action disabled={!p.next.enabled || p.busy} title={p.next.hint} onClick={p.onPrimary}>
+          <Button size="sm" className="hidden min-h-[44px] sm:inline-flex" data-primary-action disabled={!p.next.enabled || p.busy} title={p.next.hint} onClick={p.onPrimary}>
             {p.busy && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden />}
             {p.next.label}
           </Button>

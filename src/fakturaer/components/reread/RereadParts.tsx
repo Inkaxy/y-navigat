@@ -1,3 +1,4 @@
+import { formatMachineNumbersNb } from "@/fakturaer/lib/sumDirection";
 import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Issue, Value } from "@/fakturaer/lib/reread";
@@ -17,7 +18,7 @@ export function IssueList({ title, issues, className }: { title: string; issues:
   return (
     <div className={cn("rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm", className)}>
       <p className="flex items-center gap-1.5 font-medium"><AlertTriangle className="h-4 w-4" aria-hidden />{title}</p>
-      <ul className="mt-1 list-disc space-y-0.5 pl-5">{issues.map((i, n) => <li key={`${i.code}-${n}`}>{i.message}</li>)}</ul>
+      <ul className="mt-1 list-disc space-y-0.5 pl-5">{issues.map((i, n) => <li key={`${i.code}-${n}`}>{formatMachineNumbersNb(i.message)}</li>)}</ul>
     </div>
   );
 }

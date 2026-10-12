@@ -1,3 +1,4 @@
+import { sumDirection, sumDirectionText } from "@/fakturaer/lib/sumDirection";
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -67,7 +68,7 @@ export function ControlSummary({ data, openCount, totalCount, canWrite, locked, 
         </dl>
         <div className="flex items-center justify-between gap-2">
           <p className={cn("min-w-0 text-xs", readNote ? "text-warning" : "text-ink-secondary")}>
-            {readNote ?? (data.lines_sum_status === "mismatch" ? "Linjesummen stemmer ikke med fakturaen. Kontroller linjene mot originalen." : checked ? "Linjesummen er kontrollert mot fakturaen." : "Linjesummen er ikke kontrollert mot fakturaen ennå.")}
+            {readNote ?? (data.lines_sum_status === "mismatch" ? sumDirectionText(sumDirection(f.linesSum, f.net)) : checked ? "Linjesummen er kontrollert mot fakturaen." : "Linjesummen er ikke kontrollert mot fakturaen ennå.")}
           </p>
           {!expanded && (
             <CollapsibleTrigger className="flex shrink-0 items-center gap-1 rounded-sm text-caption text-ink-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
