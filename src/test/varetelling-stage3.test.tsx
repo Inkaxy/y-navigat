@@ -153,6 +153,7 @@ async function started(api: ReturnType<typeof createFakeVtApi>, ids = ["t1"]) {
   await api.startCount({ opId: crypto.randomUUID(), countId, expectedRevision: 1 });
   return countId;
 }
+const tab = async (name: "Telle" | "Oversikt" | "Papir" | "Kontroll") => fireEvent.click(await screen.findByRole("button", { name }));
 const cardOf = (el: HTMLElement) => { const c = el.closest("[data-testid='vt-line']"); if (!(c instanceof HTMLElement)) throw new Error("kort"); return c; };
 const jpg = (c = "a") => new File([c], "side.jpg", { type: "image/jpeg" });
 
@@ -180,7 +181,8 @@ describe("tellekort", () => {
     await screen.findByText(/Utkast — ikke lagret/);
     m.open(`/?telling=${id}`);
     expect((await screen.findAllByText(/utkast som ikke er sendt/)).length).toBeGreaterThan(0);
-    expect(screen.getByText(/har utkast eller sending med ukjent utfall/)).toBeTruthy();
+    await tab("Kontroll");
+    expect(await screen.findByText(/har utkast eller sending med ukjent utfall/)).toBeTruthy();
     m.open(`/?telling=${id}&liste=${list1.id}`);
     expect(((await screen.findByLabelText("Sukker (demo): antall kg")) as HTMLInputElement).value).toBe("4,2");
     expect(spy).not.toHaveBeenCalled();
@@ -190,7 +192,7 @@ describe("tellekort", () => {
 describe("opplasting – syntetisk lesing (IKKE ekte AI)", () => {
   it("flere filer i rekkefølge; usikkert løst-felt må avklares før godkjenning; samme sider = duplikat", async () => {
     const m = setup(); const id = await started(m.api);
-    m.open(`/?telling=${id}&liste=${m.api._state.lists[0].id}`);
+    m.open(`/?telling=${id}&liste=${m.api._state.lists[0].id}`); await tab("Papir");
     fireEvent.change(await screen.findByLabelText(/Velg sider/), { target: { files: [jpg()] } });
     fireEvent.click(await screen.findByRole("button", { name: /Last opp 1 side og les/ }));
     const cards = await screen.findAllByTestId("vt-proposal");
@@ -228,7 +230,7 @@ describe("opplasting – syntetisk lesing (IKKE ekte AI)", () => {
   });
   it("ukjent lesing: ingen automatisk ny lesing; godkjenner må tillate", async () => {
     const m = setup({ readOutcome: "ukjent" }); const id = await started(m.api);
-    m.open(`/?telling=${id}&liste=${m.api._state.lists[0].id}`);
+    m.open(`/?telling=${id}&liste=${m.api._state.lists[0].id}`); await tab("Papir");
     fireEvent.change(await screen.findByLabelText(/Velg sider/), { target: { files: [jpg()] } });
     fireEvent.click(await screen.findByRole("button", { name: /Last opp 1 side og les/ }));
     fireEvent.click((await screen.findAllByRole("button", { name: "Vis" }))[0]);
@@ -240,7 +242,7 @@ describe("opplasting – syntetisk lesing (IKKE ekte AI)", () => {
 
 describe("rapport på e-post", () => {
   async function toPreview(m: ReturnType<typeof setup>, id: string) {
-    m.open(`/?telling=${id}`);
+    m.open(`/?telling=${id}`); await tab("Oversikt");
     fireEvent.click(await screen.findByRole("button", { name: /Send rapport på e-post/ }));
     fireEvent.change(await screen.findByLabelText(/Mottaker/), { target: { value: "henrik@nottero-bakeri.no" } });
   }
@@ -261,7 +263,7 @@ describe("rapport på e-post", () => {
     expect(m.s3._counters.graphCalls).toBe(1);
     const line = m.api._state.lines[0];
     await m.api.saveLine({ opId: "chg", lineId: line.id, expectedRevision: line.revision, state: "null", countedBase: 0, entry: [], note: null });
-    resetPendingStores(); m.open(`/?telling=${id}`); // omlasting
+    resetPendingStores(); m.open(`/?telling=${id}`); await tab("Oversikt"); // omlasting
     expect(await screen.findByText(/ikke avklart/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Send rapport på e-post/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /Sjekk status/ }));
@@ -283,11 +285,11 @@ describe("rapport på e-post", () => {
 describe("tildeling og kalender", () => {
   it("Ta listen → Mine lister; kalender viser tellingen; avbrutt telling kan ikke endre tildeling", async () => {
     const m = setup(); const id = await started(m.api);
-    m.open(`/?telling=${id}&liste=${m.api._state.lists[0].id}`);
+    m.open(`/?telling=${id}&liste=${m.api._state.lists[0].id}`); await tab("Kontroll");
     fireEvent.click(await screen.findByRole("button", { name: "Ta listen" }));
     await screen.findByText("Listen er tildelt deg.");
     m.open("/?vt=mine"); expect(await screen.findByRole("button", { name: /Tørrlager \(demo\)/ })).toBeTruthy();
-    m.open("/?vt=kalender"); expect(await screen.findByRole("button", { name: /T, .*12\.10\.2026/ })).toBeTruthy();
+    m.open("/?vt=kalender"); expect((await screen.findAllByRole("button", { name: /T, .*12\.10\.2026/ })).length).toBeGreaterThan(0);
     const c = m.api._state.counts.find(x => x.id === id); if (c) c.status = "avbrutt";
     await expect(m.s3.assign({ opId: "a", listId: m.api._state.lists[0].id, userId: "u1", role: "teller", remove: true })).rejects.toThrow(/avsluttet/);
   });

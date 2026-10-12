@@ -189,7 +189,7 @@ describe("varetelling – skjermer", () => {
     await screen.findByText(/linjer, 2 varer/);
     fireEvent.click(screen.getByRole("button", { name: "Planlegg telling" }));
     fireEvent.click(await screen.findByRole("button", { name: "Start telling" }));
-    await screen.findByLabelText("Sammendrag Hele tellingen");
+    await screen.findByRole("button", { name: "Telle" });
     const input = await screen.findByLabelText("Hvetemel (demo): antall sekk 25 kg");
     fireEvent.change(input, { target: { value: "3" } });
     fireEvent.change(screen.getByLabelText("Hvetemel (demo): antall kg"), { target: { value: "7,5" } });
