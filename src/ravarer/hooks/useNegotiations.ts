@@ -260,9 +260,11 @@ export function useUpsertNegotiationRecipients() {
 
       const toInsert = input.recipients.filter((r) => !existingBySupplier.has(r.supplier_id));
       if (toInsert.length > 0) {
-        const { error: insErr } = await supabase
-          .from("negotiation_recipients")
-          .insert(toInsert.map((r) => ({ ...r, negotiation_id: input.negotiationId })));
+        // access_token har databasedefault (genereres på serveren), men typegenereringen
+        // markerer kolonnen som påkrevd. Klienten skal aldri sette eller se tokenet.
+        type RecipientInsert = Database["public"]["Tables"]["negotiation_recipients"]["Insert"];
+        const insertRows = toInsert.map((r) => ({ ...r, negotiation_id: input.negotiationId })) as unknown as RecipientInsert[];
+        const { error: insErr } = await supabase.from("negotiation_recipients").insert(insertRows);
         if (insErr) throw insErr;
       }
 

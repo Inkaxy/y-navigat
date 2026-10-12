@@ -74,16 +74,6 @@ export const NEGOTIATION_STATUS_LABEL: Record<string, string> = {
 export type LabelMeta = { label: string; tokenVar: string; hint?: string };
 export type LabelMap = Record<string, LabelMeta>;
 
-/** Forhandlingsstatus med fargetoken (StatusPill). */
-export const NEGOTIATION_STATUS_LABELS: LabelMap = {
-  draft: { label: NEGOTIATION_STATUS_LABEL.draft, tokenVar: "--state-neutral", hint: "Ikke sendt ut ennå." },
-  invited: { label: NEGOTIATION_STATUS_LABEL.invited, tokenVar: "--state-info", hint: "Lenker er generert." },
-  in_progress: { label: NEGOTIATION_STATUS_LABEL.in_progress, tokenVar: "--state-warning" },
-  awaiting_confirmation: { label: NEGOTIATION_STATUS_LABEL.awaiting_confirmation, tokenVar: "--state-info", hint: "Venter på at leverandøren bekrefter." },
-  concluded: { label: NEGOTIATION_STATUS_LABEL.concluded, tokenVar: "--state-success" },
-  cancelled: { label: NEGOTIATION_STATUS_LABEL.cancelled, tokenVar: "--state-danger" },
-};
-
 /** Status per vare i en live-forhandling. */
 export const LIVE_ITEM_STATUS_LABELS: LabelMap = {
   pending: { label: "Ikke startet", tokenVar: "--state-neutral" },
