@@ -7,6 +7,7 @@ import { MemoryRouter } from "react-router-dom";
 const h = vi.hoisted(() => ({ state: {} as Record<string, unknown> }));
 vi.mock("@/fakturaer/hooks/useCostRecalc", () => ({ useCostRecalc: () => h.state }));
 vi.mock("@/ravarer/components/CostDeviationsCard", () => ({ CostDeviationsCard: () => <div data-testid="avvik" /> }));
+vi.mock("@/ravarer/ui/ModulePage", () => ({ ModulePage: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
 
 import ReberegnKostpriser from "@/ravarer/pages/ReberegnKostpriser";
 
