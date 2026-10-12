@@ -16,7 +16,7 @@ const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
 const rec = (id: string, sup: string) => ({ id, supplier_id: sup } as NegotiationRecipientRow);
 const recipients = [rec(A, "supA"), rec(B, "supB")];
-const cred = (rid: string, sup: string, pw: string) => ({ recipient_id: rid, supplier_id: sup, supplier_name: sup, access_token: `tok-${rid.slice(0, 4)}`, password: pw, contact_email: `${sup}@x.no` });
+const cred = (rid: string, sup: string, pw: string) => ({ recipient_id: rid, supplier_id: sup, supplier_name: sup, access_token: `tok-${rid.slice(0, 4)}`, password: pw, contact_email: `${sup}@x.no`, portal_url: `https://x/tilbud/tok-${rid.slice(0, 4)}` });
 
 function deferred<T>() { let r!: (v: T) => void; const p = new Promise<T>((res) => { r = res; }); return { p, r }; }
 
@@ -34,7 +34,7 @@ beforeEach(() => { invoke.mockReset(); updateNeg.mockReset().mockResolvedValue(u
 
 describe("EndSessionDialog (live-bekreftelse)", () => {
   it("viser B sitt passord når B er valgt, også med omvendt svarrekkefølge", async () => {
-    invoke.mockResolvedValue({ data: { credentials: [cred(B, "supB", "pwB"), cred(A, "supA", "pwA")] }, error: null });
+    invoke.mockResolvedValue({ data: { success: true, credentials: [cred(B, "supB", "pwB"), cred(A, "supA", "pwA")] }, error: null });
     setup();
     fireEvent.click(screen.getByRole("button", { name: /Avslutt og generer lenke/ }));
     const box = await screen.findByTestId("end-credentials");
@@ -51,13 +51,13 @@ describe("EndSessionDialog (live-bekreftelse)", () => {
     fireEvent.click(btn); fireEvent.click(btn);
     await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
     rerender(<EndSessionDialog {...props} selectedRecipient={recipients[0]} />);
-    await act(async () => { d.r({ data: { credentials: [cred(A, "supA", "pwA"), cred(B, "supB", "pwB")] }, error: null }); });
+    await act(async () => { d.r({ data: { success: true, credentials: [cred(A, "supA", "pwA"), cred(B, "supB", "pwB")] }, error: null }); });
     const box = await screen.findByTestId("end-credentials");
     expect(box.textContent).toContain("pwB");
   });
 
   it("manglende eller duplisert mottaker gir ukjent utfall uten passord, og krever eksplisitt bekreftelse", async () => {
-    invoke.mockResolvedValue({ data: { credentials: [cred(A, "supA", "pwA"), cred(A, "supA", "pwA2")] }, error: null });
+    invoke.mockResolvedValue({ data: { success: true, credentials: [cred(A, "supA", "pwA"), cred(A, "supA", "pwA2")] }, error: null });
     setup();
     fireEvent.click(screen.getByRole("button", { name: /Avslutt og generer lenke/ }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/ukjent/);
@@ -85,7 +85,7 @@ describe("EndSessionDialog (live-bekreftelse)", () => {
     fireEvent.click(screen.getByRole("button", { name: /Avslutt og generer lenke/ }));
     await waitFor(() => expect(invoke).toHaveBeenCalled());
     rerender(<EndSessionDialog {...props} legalEntityId="e2" />);
-    await act(async () => { d.r({ data: { credentials: [cred(A, "supA", "pwA"), cred(B, "supB", "pwB")] }, error: null }); });
+    await act(async () => { d.r({ data: { success: true, credentials: [cred(A, "supA", "pwA"), cred(B, "supB", "pwB")] }, error: null }); });
     expect(screen.queryByTestId("end-credentials")).toBeNull();
     expect(logEvent).not.toHaveBeenCalled();
   });
@@ -97,7 +97,7 @@ describe("EndSessionDialog (live-bekreftelse)", () => {
     fireEvent.click(screen.getByRole("button", { name: /Avslutt og generer lenke/ }));
     await waitFor(() => expect(invoke).toHaveBeenCalled());
     unmount();
-    await act(async () => { d.r({ data: { credentials: [cred(A, "supA", "pwA"), cred(B, "supB", "pwB")] }, error: null }); });
+    await act(async () => { d.r({ data: { success: true, credentials: [cred(A, "supA", "pwA"), cred(B, "supB", "pwB")] }, error: null }); });
     expect(logEvent).not.toHaveBeenCalled();
   });
 
