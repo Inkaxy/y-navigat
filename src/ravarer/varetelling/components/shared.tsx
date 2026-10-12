@@ -1,6 +1,14 @@
 import type { ReactNode, SelectHTMLAttributes } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { PendingOp } from "../pendingStore";
+import type { VtLocation } from "../types";
+
+export const locName = (locs: VtLocation[], id: string | null) => {
+  const l = locs.find(x => x.id === id);
+  return l ? `${l.department} / ${l.name}` : "Uten plassering";
+};
 
 /** Native select med samme uttrykk som Input; 48 px på mobil. */
 export function NativeSelect({ className, ...p }: SelectHTMLAttributes<HTMLSelectElement>) {
@@ -30,6 +38,17 @@ export function Notice({ tone = "info", title, children }: { tone?: "info" | "wa
   );
 }
 
+/** Uavklart utfall: bare samme handling kan sendes på nytt (samme operasjons-ID). */
+export function PendingNotice({ op, onResend }: { op: PendingOp | undefined; onResend: () => void }) {
+  if (!op || op.state !== "unknown") return null;
+  return (
+    <Notice tone="danger" title="Forrige sending har ukjent utfall.">
+      Den kan allerede være utført. Send den samme handlingen på nytt — serveren gjenkjenner den og utfører den ikke to ganger.
+      <div className="mt-2"><Button variant="outline" className="min-h-[48px]" onClick={onResend}>Send samme på nytt</Button></div>
+    </Notice>
+  );
+}
+
 export function Loading({ label = "Laster …" }: { label?: string }) {
   return (
     <p className="flex items-center gap-2 py-6 text-sm text-muted-foreground" role="status">
@@ -39,6 +58,7 @@ export function Loading({ label = "Laster …" }: { label?: string }) {
 }
 
 export function formatDateNo(iso: string): string {
+  if (!iso) return "—";
   const [y, m, d] = iso.slice(0, 10).split("-");
   return `${d}.${m}.${y}`;
 }

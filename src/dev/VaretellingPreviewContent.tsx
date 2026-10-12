@@ -18,7 +18,7 @@ export default function VaretellingPreviewContent() {
     <ModuleScope appCode="ravarer">
       <QueryClientProvider client={qc}>
         <VtApiContext.Provider value={api}>
-          <VtScopeContext.Provider value={{ entity: "demo-firma", canWrite: true, canApprove: true }}>
+          <VtScopeContext.Provider value={{ entity: "demo-firma", userId: null, canWrite: true, canApprove: true }}>
             <main className="mx-auto max-w-5xl space-y-4 p-4">
               <p role="note" className="rounded-md border p-3 text-sm font-medium">Demonstrasjon – syntetiske data. Ingenting lagres.</p>
               <h1 className="text-2xl font-semibold">Varetelling</h1>
