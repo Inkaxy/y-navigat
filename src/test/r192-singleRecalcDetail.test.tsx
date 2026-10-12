@@ -4,7 +4,7 @@
  * Ingen ekte prøvekjøring, kjøring eller angring.
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act, cleanup, within } from "@testing-library/react";
+import { render, screen, fireEvent, act, cleanup, within, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { parseSingleRecalcPreview } from "@/ravarer/lib/singleRecalcPreview";
 
@@ -121,7 +121,7 @@ describe("R192 komponent", () => {
     expect(screen.getByRole("dialog")).toBeTruthy();
     await act(async () => { fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" }); });
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(document.activeElement).toBe(b);
+    await waitFor(() => expect(document.activeElement).toBe(b));
   });
 
   it("sen A etter bytte til B fyller ikke B", async () => {

@@ -2,7 +2,7 @@
 /** Demosiden /forhandsvisning/regnestykke: faktisk detalj, syntetiske data, ingen nettverk eller skrivekontroller. */
 import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 
 const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc, from: rpc } }));
@@ -29,6 +29,6 @@ describe("regnestykke-demo", () => {
     expect(screen.queryByRole("button", { name: /Lagre|Kjør|Reberegn|Angre/ })).toBeNull();
     expect(rpc).not.toHaveBeenCalled();
     await act(async () => { fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" }); });
-    expect(document.activeElement).toBe(b);
+    await waitFor(() => expect(document.activeElement).toBe(b));
   });
 });
