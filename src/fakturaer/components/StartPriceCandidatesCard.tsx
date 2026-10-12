@@ -95,7 +95,7 @@ export function StartPriceCandidatesCard({
           <table className="w-full text-sm">
             <thead className="text-left text-xs uppercase tracking-wider text-ink-secondary">
               <tr>
-                <th className="w-9 py-2"></th>
+                <th className="w-11 py-2"><span className="sr-only">Velg</span></th>
                 <th className="py-2">Vare</th>
                 <th className="py-2">Leverandør</th>
                 <th className="py-2">Kilde</th>
@@ -108,7 +108,8 @@ export function StartPriceCandidatesCard({
                 const failure = rejected.find((f) => f.id === r.invoice_line_id);
                 return (
                   <tr key={r.invoice_line_id} className="border-t border-line-subtle align-top">
-                    <td className="py-2">
+                    <td className="py-0">
+                      <label className="-ml-3 flex h-[44px] w-[44px] cursor-pointer items-center justify-center">
                       <Checkbox
                         checked={!!selected[r.invoice_line_id]}
                         disabled={!canWrite}
@@ -117,6 +118,7 @@ export function StartPriceCandidatesCard({
                         }
                         aria-label={`Velg ${r.raw_material_name ?? "vare"}`}
                       />
+                      </label>
                     </td>
                     <td className="py-2">
                       <div className="font-medium">{r.raw_material_name ?? "Ukjent vare"}</div>

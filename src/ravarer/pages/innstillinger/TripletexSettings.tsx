@@ -156,6 +156,8 @@ function EntityConfig({ legalEntityId, onState }: { legalEntityId: string; onSta
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [saveOutcome, setSaveOutcome] = useState<{ kind: "saved" | "unknown" | "rejected"; message: string } | null>(null);
   const busy = useRef(false);
+  /** Ukjent lagringsutfall: lagring sperres til konfigurasjonen faktisk er lest på nytt. */
+  const [recon, setRecon] = useState<null | "reading" | "failed">(null);
   const live = useRef({ mounted: true, canEdit: false });
   const canEdit = canWrite && accessLevel === "admin";
   live.current.canEdit = canEdit;
@@ -227,12 +229,13 @@ function EntityConfig({ legalEntityId, onState }: { legalEntityId: string; onSta
   };
 
   const handleSave = async () => {
-    if (busy.current || block || !dirty || !canEdit) return;
+    if (busy.current || recon || block || !dirty || !canEdit) return;
     busy.current = true;
     setSaving(true);
     setSaveOutcome(null);
     // Frosset innhold: selskap, ikke-hemmelige felt (med revisjon) og de innsendte nøklene.
     const frozen = { rev: draft?.rev ?? 0, form, tokens: { ...tokens } };
+    let unknown = false;
     try {
       const { data, error } = await supabase.functions.invoke("tripletex-save-credentials", {
         body: tripletexSavePayload(legalEntityId, frozen.form, frozen.tokens),
@@ -243,9 +246,9 @@ function EntityConfig({ legalEntityId, onState }: { legalEntityId: string; onSta
         const status = (error as { context?: Response })?.context?.status;
         // 4xx = avvist (ingenting lagret). Ellers kan utfallet være ukjent.
         if (status != null && status >= 400 && status < 500) setSaveOutcome({ kind: "rejected", message: msg });
-        else setSaveOutcome({ kind: "unknown", message: "Utfallet er ukjent. Konfigurasjonen er lest på nytt — kontroller den før du lagrer igjen." });
+        else unknown = true;
       } else if (!isTripletexSaved(data)) {
-        setSaveOutcome({ kind: "unknown", message: "Uventet svar: lagringen er ikke bekreftet. Konfigurasjonen er lest på nytt — kontroller den før du lagrer igjen." });
+        unknown = true;
       } else {
         // Bare innsendte verdier kvitteres: en nøkkel skrevet inn etter trykk på Lagre beholdes.
         setTokens((t) => ({
@@ -258,17 +261,38 @@ function EntityConfig({ legalEntityId, onState }: { legalEntityId: string; onSta
       }
     } catch (e) {
       console.warn("[tripletex] lagring: ukjent utfall", e instanceof Error ? e.name : "ukjent");
-      if (live.current.mounted) setSaveOutcome({ kind: "unknown", message: "Utfallet er ukjent. Kontroller konfigurasjonen før du lagrer igjen." });
-    } finally {
+      unknown = true;
+    }
+    if (live.current.mounted) setSaving(false);
+    if (unknown) { await reconcile(); return; }
+    busy.current = false;
+    void qc.invalidateQueries({ queryKey: ["tripletex-credentials", legalEntityId] });
+  };
+
+  /** Leser lagret konfigurasjon etter ukjent utfall; frigjør bare ved vellykket lesing. Kladd og nøkler beholdes. */
+  const reconcile = async () => {
+    busy.current = true;
+    if (live.current.mounted) {
+      setRecon("reading");
+      setSaveOutcome({ kind: "unknown", message: "Utfallet av lagringen er ukjent. Leser gjeldende konfigurasjon …" });
+    }
+    let ok = false;
+    try { const r = await credQ.refetch(); ok = r.isSuccess && !r.isError; } catch (e) { console.warn("[tripletex] avstemming feilet", e instanceof Error ? e.name : "ukjent"); }
+    if (!live.current.mounted) return;
+    if (ok) {
       busy.current = false;
-      void qc.invalidateQueries({ queryKey: ["tripletex-credentials", legalEntityId] });
-      if (live.current.mounted) setSaving(false);
+      setRecon(null);
+      setSaveOutcome({ kind: "unknown", message: "Utfallet av lagringen er fortsatt ukjent (ingen kvittering). Det som vises nå er gjeldende lagret konfigurasjon — kontroller den før du lagrer igjen." });
+    } else {
+      setRecon("failed");
+      setSaveOutcome({ kind: "unknown", message: "Utfallet av lagringen er ukjent, og konfigurasjonen kunne ikke leses. Lagring er sperret til den er lest." });
     }
   };
 
-  const cancel = () => { if (busy.current) return; setDraft(null); setTokens({ jwt: "", consumer: "", employee: "" }); setSaveOutcome(null); };
+  const cancel = () => { if (busy.current || recon) return; setDraft(null); setTokens({ jwt: "", consumer: "", employee: "" }); setSaveOutcome(null); };
 
   const handleSyncNow = async () => {
+    if (!live.current.canEdit || syncing) return;
     setSyncing(true);
     try {
       const { data, error } = await supabase.functions.invoke("tripletex-sync-invoices", {
@@ -292,6 +316,7 @@ function EntityConfig({ legalEntityId, onState }: { legalEntityId: string; onSta
   };
 
   const handleSupplierSync = async () => {
+    if (!live.current.canEdit || supplierSyncing) return;
     setSupplierSyncing(true);
     try {
       const { data, error } = await supabase.functions.invoke("tripletex-sync-suppliers", {
@@ -432,6 +457,12 @@ function EntityConfig({ legalEntityId, onState }: { legalEntityId: string; onSta
               <AlertDescription>{saveOutcome.message}</AlertDescription>
             </Alert>
           )}
+          {recon && (
+            <div className="flex flex-wrap items-center gap-2" data-testid="tripletex-reconcile">
+              <span className="text-sm">{recon === "reading" ? "Leser gjeldende konfigurasjon …" : "Gjeldende konfigurasjon er ikke lest."}</span>
+              {recon === "failed" && <Button variant="outline" className="min-h-[44px]" onClick={() => void reconcile()}>Les konfigurasjonen på nytt</Button>}
+            </div>
+          )}
           {dirty && block && <p className="text-sm text-warning" role="note">{block}</p>}
 
           <div className="flex flex-wrap gap-2 pt-2">
@@ -440,11 +471,11 @@ function EntityConfig({ legalEntityId, onState }: { legalEntityId: string; onSta
             </Button>
             {isConfigured && (
               <>
-                <Button variant="outline" onClick={handleSyncNow} disabled={syncing} className="gap-2">
+                <Button variant="outline" onClick={handleSyncNow} disabled={syncing || !canEdit} className="min-h-[44px] gap-2 md:min-h-10">
                   <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
                   {syncing ? "Synker fakturaer…" : "Kjør fakturasynk nå"}
                 </Button>
-                <Button variant="outline" onClick={handleSupplierSync} disabled={supplierSyncing} className="gap-2">
+                <Button variant="outline" onClick={handleSupplierSync} disabled={supplierSyncing || !canEdit} className="min-h-[44px] gap-2 md:min-h-10">
                   <RefreshCw className={`h-4 w-4 ${supplierSyncing ? "animate-spin" : ""}`} />
                   {supplierSyncing ? "Synker leverandører…" : "Kjør leverandørsynk nå"}
                 </Button>
@@ -454,7 +485,7 @@ function EntityConfig({ legalEntityId, onState }: { legalEntityId: string; onSta
         </CardContent>
       </Card>
       {canEdit && (
-        <SettingsSaveBar dirty={dirty} saving={saving} canSave={dirty && !block && !saving && loaded} onSave={() => void handleSave()} onCancel={cancel} />
+        <SettingsSaveBar dirty={dirty} saving={saving} canSave={dirty && !block && !saving && loaded && !recon} onSave={() => void handleSave()} onCancel={cancel} />
       )}
 
       {isConfigured && (
