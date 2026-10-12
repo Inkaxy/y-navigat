@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Flag, History, Pause, Play, Radio, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
+import { negotiationListReturn } from "@/ravarer/lib/negotiationOps";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ function errText(e: unknown, fallback: string) {
 export default function LiveForhandlingWorkspace() {
   const { id = "" } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const qc = useQueryClient();
   const { user, legalEntityId } = useRavarer();
   const rights = useInvoiceRights();
@@ -211,7 +213,7 @@ export default function LiveForhandlingWorkspace() {
   }, [neg, id, navigate]);
 
   const back = (
-    <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={() => navigate(paths.forhandlinger())}>
+    <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={() => navigate(negotiationListReturn(searchParams.get("retur")))}>
       <ArrowLeft className="mr-1 h-4 w-4" aria-hidden /> Forhandlinger
     </Button>
   );
