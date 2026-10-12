@@ -1,315 +1,230 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useParams } from "react-router-dom";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, Lock, Send, Save, AlertTriangle, Upload, FileText, X } from "lucide-react";
+import { StatusPill } from "@/ordre/components/ui/status-pill";
+import { FileText, Loader2, RefreshCw, Save, Send, Upload, X } from "lucide-react";
 import { toast } from "sonner";
+import {
+  accessErrorText, callPortal, emptyResponse, formatDeadline, parseRfqBundle, uploadPdf,
+  type RfqBundle, type RfqResponse,
+} from "./portal/portalApi";
+import { PortalActionBar, PortalLogin, PortalNotice, PortalShell } from "./portal/PortalShell";
 
-type Item = {
-  id: string;
-  raw_material_id: string;
-  expected_annual_volume: number | null;
-  expected_annual_volume_unit: string | null;
-  suggested_package_size: number | null;
-  suggested_package_unit: string | null;
-  raw_materials?: { name: string; base_unit: string; package_size: number | null; package_unit: string | null };
+type NumField = "offered_price" | "offered_package_size" | "contract_length_months" | "min_order_volume";
+type TextField = "offered_package_unit" | "min_order_unit" | "payment_terms" | "delivery_terms" | "notes" | "datasheet_url";
+
+const SUBMIT_REJECTIONS: Record<string, string> = {
+  already_submitted: "Tilbudet er allerede sendt og låst.",
+  negotiation_closed: "Forespørselen er avsluttet og tar ikke imot svar.",
+  deadline_passed: "Svarfristen er passert.",
+  item_not_in_negotiation: "En linje hører ikke til denne forespørselen. Last inn på nytt.",
+  invalid_item: "En linje mangler vare. Last inn på nytt.",
 };
 
-type ResponseRow = {
-  negotiation_item_id: string;
-  offered_price?: number | null;
-  offered_package_size?: number | null;
-  offered_package_unit?: string | null;
-  contract_length_months?: number | null;
-  min_order_volume?: number | null;
-  min_order_unit?: string | null;
-  payment_terms?: string | null;
-  delivery_terms?: string | null;
-  notes?: string | null;
-  datasheet_url?: string | null;
-  status?: string;
-};
-
-const FN_BASE = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1`;
-
+/** Offentlig tilbudsportal (`/tilbud/:token`). Tilgang krever token + passord på hvert kall. */
 export default function SupplierPortal() {
   const { token = "" } = useParams<{ token: string }>();
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [bundle, setBundle] = useState<any | null>(null);
-  const [responses, setResponses] = useState<Record<string, ResponseRow>>({});
+  const [bundle, setBundle] = useState<RfqBundle | null>(null);
+  const [responses, setResponses] = useState<Record<string, RfqResponse>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [unknownSave, setUnknownSave] = useState<null | "draft" | "final">(null);
+  const [uploading, setUploading] = useState<Record<string, boolean>>({});
+  // Lenkebytte (ny token) gjør alle pågående svar foreldet.
+  const epoch = useRef(0);
+  const busy = useRef(false);
 
-  async function login(e?: React.FormEvent) {
+  useEffect(() => {
+    epoch.current += 1;
+    busy.current = false;
+    setBundle(null); setResponses({}); setSubmitted(false); setUnknownSave(null); setPassword(""); setError(null); setLoading(false);
+  }, [token]);
+
+  async function load(e?: FormEvent) {
     e?.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`${FN_BASE}/validate-rfq-access`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, password }),
-      });
-      const data = await res.json();
-      if (!res.ok || data.result !== "ok") {
-        const map: Record<string, string> = {
-          invalid_token: "Ugyldig lenke",
-          wrong_password: "Feil passord",
-          locked: "Tilgang midlertidig låst (for mange forsøk)",
-          expired: "Lenken er utløpt",
-          rate_limited: "For mange forsøk – vent litt før du prøver igjen",
-        };
-        setError(map[data.result] ?? "Tilgang nektet");
-        return;
-      }
-      setBundle(data);
-      const map: Record<string, ResponseRow> = {};
-      for (const it of data.items as Item[]) {
-        const existing = (data.responses ?? []).find((r: any) => r.negotiation_item_id === it.id);
-        map[it.id] = existing ?? { negotiation_item_id: it.id };
-        if (existing?.status === "submitted") setSubmitted(true);
-      }
-      setResponses(map);
-    } catch (err: any) {
-      setError(err?.message ?? "Ukjent feil");
-    } finally {
-      setLoading(false);
+    if (busy.current) return;
+    busy.current = true;
+    const my = epoch.current;
+    setLoading(true); setError(null);
+    const out = await callPortal("validate-rfq-access", { token, password });
+    if (my !== epoch.current) return;
+    busy.current = false;
+    setLoading(false);
+    const parsed = out.kind === "ok" ? parseRfqBundle(out.body) : null;
+    if (!parsed) { setError(accessErrorText(out)); return; }
+    const map: Record<string, RfqResponse> = {};
+    let locked = false;
+    for (const it of parsed.items) {
+      const existing = parsed.responses.find((r) => r.negotiation_item_id === it.id);
+      map[it.id] = existing ?? emptyResponse(it.id);
+      if (existing?.status === "submitted") locked = true;
     }
+    setBundle(parsed); setResponses(map); setSubmitted(locked); setUnknownSave(null);
   }
 
-  function update(itemId: string, field: keyof ResponseRow, value: any) {
-    setResponses((prev) => ({ ...prev, [itemId]: { ...prev[itemId], [field]: value } }));
-  }
+  const setNum = (id: string, f: NumField, v: string) =>
+    setResponses((p) => ({ ...p, [id]: { ...p[id], [f]: v === "" ? null : Number(v) } }));
+  const setText = (id: string, f: TextField, v: string | null) =>
+    setResponses((p) => ({ ...p, [id]: { ...p[id], [f]: v } }));
 
   async function handleUpload(itemId: string, file: File) {
-    try {
-      const res = await fetch(`${FN_BASE}/request-rfq-datasheet-upload`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, password, negotiation_item_id: itemId, filename: file.name }),
-      });
-      const data = await res.json();
-      if (!res.ok || data.result !== "ok") {
-        toast.error("Kunne ikke starte opplasting");
-        return;
-      }
-      const put = await fetch(data.signedUrl ?? data.signed_url, {
-        method: "PUT",
-        headers: { "Content-Type": file.type || "application/pdf" },
-        body: file,
-      });
-      if (!put.ok) {
-        toast.error("Opplasting feilet");
-        return;
-      }
-      update(itemId, "datasheet_url", data.path);
-      toast.success(`Lastet opp: ${file.name}`);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Opplasting feilet");
-    }
+    const my = epoch.current;
+    setUploading((u) => ({ ...u, [itemId]: true }));
+    const path = await uploadPdf("request-rfq-datasheet-upload", { token, password }, itemId, file);
+    if (my !== epoch.current) return;
+    setUploading((u) => ({ ...u, [itemId]: false }));
+    if (!path) { toast.error("Opplasting feilet. Prøv igjen."); return; }
+    setText(itemId, "datasheet_url", path);
+    toast.success(`Lastet opp: ${file.name}`);
   }
 
   async function save(finalize: boolean) {
+    if (busy.current || submitted || unknownSave) return;
     if (finalize && !confirm("Er du sikker? Etter sending kan du ikke endre tilbudet uten å kontakte oss.")) return;
+    busy.current = true;
+    const my = epoch.current;
     setLoading(true);
-    try {
-      const res = await fetch(`${FN_BASE}/submit-negotiation-response`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, password, finalize, responses: Object.values(responses) }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        toast.error(data.result === "already_submitted" ? "Tilbudet er allerede sendt" : "Lagring feilet");
-        if (data.result === "already_submitted") setSubmitted(true);
-        return;
-      }
-      if (finalize) {
-        setSubmitted(true);
-        toast.success("Tilbud sendt. Takk!");
-      } else {
-        toast.success("Kladd lagret");
-      }
-    } catch (err: any) {
-      toast.error(err?.message ?? "Lagring feilet");
-    } finally {
-      setLoading(false);
+    const out = await callPortal("submit-negotiation-response", { token, password, finalize, responses: Object.values(responses) });
+    if (my !== epoch.current) return;
+    busy.current = false;
+    setLoading(false);
+    if (out.kind === "ok" && out.body.success === true) {
+      if (finalize) { setSubmitted(true); toast.success("Tilbud sendt. Takk!"); } else toast.success("Kladd lagret");
+      return;
     }
+    if (out.kind === "rejected") {
+      if (out.code === "already_submitted") setSubmitted(true);
+      toast.error((out.code && SUBMIT_REJECTIONS[out.code]) || "Lagring ble avvist.");
+      return;
+    }
+    // Uklart: kan være lagret/sendt. Lås skjemaet til status er lest på nytt — aldri automatisk nytt kall.
+    setUnknownSave(finalize ? "final" : "draft");
   }
 
   if (!bundle) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="mx-auto flex min-h-screen max-w-md items-center justify-center p-6">
-          <Card className="w-full p-6">
-            <div className="mb-6 flex items-center gap-2">
-              <Lock className="h-5 w-5 text-ink-secondary" />
-              <h1 className="text-lg font-semibold">Tilbudsportal</h1>
-            </div>
-            <form onSubmit={login} className="space-y-4">
-              <div>
-                <Label>Passord</Label>
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="6 tegn"
-                  autoFocus
-                />
-              </div>
-              {error && (
-                <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                  {error}
-                </div>
-              )}
-              <Button type="submit" disabled={loading || !password} className="w-full">
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Logg inn"}
-              </Button>
-              <p className="text-center text-xs text-ink-secondary">
-                Passordet er sendt til deg på e-post fra Nøtterø Bakeri.
-              </p>
-            </form>
-          </Card>
-        </div>
-      </div>
-    );
+    return <PortalLogin title="Tilbudsportal" hint="Passordet er sendt til deg på e-post fra Nøtterø Bakeri."
+      password={password} onPassword={setPassword} onSubmit={load} loading={loading} error={error} />;
   }
 
+  const locked = submitted || unknownSave !== null;
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-3xl space-y-6 p-6">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-ink-secondary">Tilbudsforespørsel</p>
-          <h1 className="text-2xl font-semibold tracking-tight">{bundle.negotiation_title}</h1>
-          <p className="mt-1 text-sm text-ink-secondary">
-            {bundle.supplier_name} · Frist: {bundle.response_deadline ? new Date(bundle.response_deadline).toLocaleDateString("nb-NO") : "—"}
-          </p>
-          {submitted && (
-            <Badge variant="outline" className="mt-2 border-success/30 bg-success/10 text-success">
-              Sendt — låst
-            </Badge>
-          )}
-        </div>
+    <PortalShell eyebrow="Tilbudsforespørsel" title={bundle.negotiation_title ?? "Forespørsel"}
+      status={submitted ? <StatusPill label="Sendt — låst" tokenVar="--state-success" size="md" /> : <StatusPill label="Åpen for svar" tokenVar="--state-info" size="md" />}
+      meta={<>{bundle.supplier_name ?? "Leverandør"} · Svarfrist {formatDeadline(bundle.response_deadline)}</>}>
+      {unknownSave && (
+        <PortalNotice tone="warning" action={
+          <Button variant="outline" className="h-[44px]" onClick={() => void load()} disabled={loading}>
+            <RefreshCw className="mr-2 h-4 w-4" aria-hidden /> Les status på nytt
+          </Button>}>
+          {unknownSave === "final" ? "Vi vet ikke om tilbudet ble sendt" : "Vi vet ikke om kladden ble lagret"} — svaret kom ikke fram.
+          Skjemaet er låst til status er lest på nytt. Ingenting sendes automatisk igjen.
+        </PortalNotice>
+      )}
+      {!submitted && !unknownSave && (
+        <p className="text-body text-ink-secondary">Prisen gjelder pakningen du oppgir. Fyll ut det du kan, lagre kladd underveis, og send når tilbudet er komplett.</p>
+      )}
+      {bundle.items.length === 0 && <PortalNotice tone="info">Forespørselen har ingen varelinjer.</PortalNotice>}
 
-        {(bundle.items as Item[]).map((it) => {
-          const r = responses[it.id] ?? { negotiation_item_id: it.id };
-          const rmName = it.raw_materials?.name ?? "Råvare";
-          const baseUnit = it.raw_materials?.base_unit ?? "";
-          return (
-            <Card key={it.id} className="space-y-4 p-5">
-              <div>
-                <h3 className="font-semibold text-ink-primary">{rmName}</h3>
-                <p className="text-sm text-ink-secondary">
-                  Forventet årsvolum: {it.expected_annual_volume ?? "—"} {it.expected_annual_volume_unit ?? baseUnit}
-                </p>
+      {bundle.items.map((it) => {
+        const r = responses[it.id] ?? emptyResponse(it.id);
+        const name = it.rm_name ?? "Råvare";
+        const base = it.base_unit ?? "";
+        const fid = (f: string) => `rfq-${it.id}-${f}`;
+        return (
+          <section key={it.id} aria-labelledby={fid("title")} className="space-y-4 rounded-[10px] border border-line-subtle bg-surface-raised p-4 sm:p-5">
+            <div>
+              <h2 id={fid("title")} className="text-title font-semibold text-ink-primary">{name}</h2>
+              <p className="text-body text-ink-secondary">
+                Forventet årsvolum: {it.expected_annual_volume ?? "—"} {it.expected_annual_volume_unit ?? base}
+                {it.suggested_package_size != null && <> · Foreslått pakning {it.suggested_package_size} {it.suggested_package_unit ?? ""}</>}
+              </p>
+            </div>
+            <fieldset disabled={locked} className="grid gap-3 sm:grid-cols-2">
+              <legend className="sr-only">Tilbud for {name}</legend>
+              <div className="space-y-1.5">
+                <Label htmlFor={fid("price")}>Pris per pakning (NOK, eks. mva)</Label>
+                <Input id={fid("price")} type="number" inputMode="decimal" step="0.01" className="h-[44px]"
+                  value={r.offered_price ?? ""} onChange={(e) => setNum(it.id, "offered_price", e.target.value)} />
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <Label>Pris pr {baseUnit || "enhet"} (NOK)</Label>
-                  <Input type="number" step="0.01" disabled={submitted}
-                    value={r.offered_price ?? ""}
-                    onChange={(e) => update(it.id, "offered_price", e.target.value === "" ? null : Number(e.target.value))} />
-                </div>
-                <div>
-                  <Label>Pakningsstørrelse</Label>
-                  <div className="flex gap-2">
-                    <Input type="number" step="0.01" disabled={submitted}
-                      value={r.offered_package_size ?? ""}
-                      onChange={(e) => update(it.id, "offered_package_size", e.target.value === "" ? null : Number(e.target.value))} />
-                    <Input className="w-24" disabled={submitted}
-                      value={r.offered_package_unit ?? ""} placeholder="sekk"
-                      onChange={(e) => update(it.id, "offered_package_unit", e.target.value)} />
-                  </div>
-                </div>
-                <div>
-                  <Label>Kontraktslengde (mnd)</Label>
-                  <Input type="number" disabled={submitted}
-                    value={r.contract_length_months ?? ""}
-                    onChange={(e) => update(it.id, "contract_length_months", e.target.value === "" ? null : Number(e.target.value))} />
-                </div>
-                <div>
-                  <Label>Min. ordrevolum</Label>
-                  <div className="flex gap-2">
-                    <Input type="number" step="0.01" disabled={submitted}
-                      value={r.min_order_volume ?? ""}
-                      onChange={(e) => update(it.id, "min_order_volume", e.target.value === "" ? null : Number(e.target.value))} />
-                    <Input className="w-24" disabled={submitted}
-                      value={r.min_order_unit ?? ""} placeholder={baseUnit}
-                      onChange={(e) => update(it.id, "min_order_unit", e.target.value)} />
-                  </div>
-                </div>
-                <div>
-                  <Label>Betalingsbetingelser</Label>
-                  <Input disabled={submitted} value={r.payment_terms ?? ""}
-                    onChange={(e) => update(it.id, "payment_terms", e.target.value)} placeholder="Netto 30 dager" />
-                </div>
-                <div>
-                  <Label>Leveringsbetingelser</Label>
-                  <Input disabled={submitted} value={r.delivery_terms ?? ""}
-                    onChange={(e) => update(it.id, "delivery_terms", e.target.value)} placeholder="DDP, 1 lev/uke" />
-                </div>
-                <div className="sm:col-span-2">
-                  <Label>Datablad / deklarasjon / næringsinnhold (PDF)</Label>
-                  {r.datasheet_url ? (
-                    <div className="mt-1 flex items-center justify-between rounded-md border border-line-subtle bg-surface-subtle px-3 py-2 text-sm">
-                      <span className="flex items-center gap-2 truncate">
-                        <FileText className="h-4 w-4 text-ink-secondary" />
-                        <span className="truncate">{r.datasheet_url.split("/").pop()}</span>
-                      </span>
-                      {!submitted && (
-                        <Button variant="ghost" size="sm" onClick={() => update(it.id, "datasheet_url", null)}>
-                          <X className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ) : (
-                    <label className={`mt-1 flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-line-subtle px-3 py-3 text-sm text-ink-secondary hover:bg-surface-subtle ${submitted ? "pointer-events-none opacity-50" : ""}`}>
-                      <Upload className="h-4 w-4" />
-                      <span>Last opp PDF</span>
-                      <input
-                        type="file"
-                        accept="application/pdf"
-                        className="hidden"
-                        disabled={submitted}
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) handleUpload(it.id, f);
-                          e.target.value = "";
-                        }}
-                      />
-                    </label>
-                  )}
-                  <p className="mt-1 text-xs text-ink-secondary">
-                    Vedlegg datablad med deklarasjon, næringsinnhold og allergener for tilbudt vare.
-                  </p>
-                </div>
-                <div className="sm:col-span-2">
-                  <Label>Notater</Label>
-                  <Textarea rows={2} disabled={submitted} value={r.notes ?? ""}
-                    onChange={(e) => update(it.id, "notes", e.target.value)} />
+              <div className="space-y-1.5">
+                <Label htmlFor={fid("pkg")}>Pakningsstørrelse og enhet</Label>
+                <div className="flex gap-2">
+                  <Input id={fid("pkg")} type="number" inputMode="decimal" step="0.01" className="h-[44px] min-w-0 flex-1"
+                    value={r.offered_package_size ?? ""} onChange={(e) => setNum(it.id, "offered_package_size", e.target.value)} />
+                  <Input aria-label={`Pakningsenhet for ${name}`} className="h-[44px] w-28" placeholder={base || "kg"}
+                    value={r.offered_package_unit ?? ""} onChange={(e) => setText(it.id, "offered_package_unit", e.target.value)} />
                 </div>
               </div>
-            </Card>
-          );
-        })}
+              <div className="space-y-1.5">
+                <Label htmlFor={fid("months")}>Kontraktslengde (måneder)</Label>
+                <Input id={fid("months")} type="number" inputMode="numeric" className="h-[44px]"
+                  value={r.contract_length_months ?? ""} onChange={(e) => setNum(it.id, "contract_length_months", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor={fid("min")}>Minste ordrevolum og enhet</Label>
+                <div className="flex gap-2">
+                  <Input id={fid("min")} type="number" inputMode="decimal" step="0.01" className="h-[44px] min-w-0 flex-1"
+                    value={r.min_order_volume ?? ""} onChange={(e) => setNum(it.id, "min_order_volume", e.target.value)} />
+                  <Input aria-label={`Enhet for minste ordrevolum, ${name}`} className="h-[44px] w-28" placeholder={base}
+                    value={r.min_order_unit ?? ""} onChange={(e) => setText(it.id, "min_order_unit", e.target.value)} />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor={fid("pay")}>Betalingsbetingelser</Label>
+                <Input id={fid("pay")} className="h-[44px]" placeholder="Netto 30 dager"
+                  value={r.payment_terms ?? ""} onChange={(e) => setText(it.id, "payment_terms", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor={fid("del")}>Leveringsbetingelser</Label>
+                <Input id={fid("del")} className="h-[44px]" placeholder="DDP, 1 levering/uke"
+                  value={r.delivery_terms ?? ""} onChange={(e) => setText(it.id, "delivery_terms", e.target.value)} />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <span className="text-sm font-medium" id={fid("ds")}>Datablad / deklarasjon / næringsinnhold (PDF)</span>
+                {r.datasheet_url ? (
+                  <div className="flex items-center justify-between gap-2 rounded-[10px] border border-line-subtle bg-surface-sunken px-3 text-body">
+                    <span className="flex min-w-0 items-center gap-2"><FileText className="h-4 w-4 shrink-0 text-ink-secondary" aria-hidden />
+                      <span className="truncate">{r.datasheet_url.split("/").pop()}</span></span>
+                    {!locked && (
+                      <Button variant="ghost" className="h-[44px] w-[44px] p-0" aria-label={`Fjern datablad for ${name}`}
+                        onClick={() => setText(it.id, "datasheet_url", null)}><X className="h-4 w-4" /></Button>
+                    )}
+                  </div>
+                ) : (
+                  <label className="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-[10px] border border-dashed border-line-subtle px-3 text-body text-ink-secondary hover:bg-surface-sunken has-[:disabled]:pointer-events-none has-[:disabled]:opacity-50">
+                    {uploading[it.id] ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Upload className="h-4 w-4" aria-hidden />}
+                    <span>{uploading[it.id] ? "Laster opp …" : "Last opp PDF"}</span>
+                    <input type="file" accept="application/pdf" className="sr-only" aria-labelledby={fid("ds")}
+                      disabled={locked || uploading[it.id] === true}
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleUpload(it.id, f); e.target.value = ""; }} />
+                  </label>
+                )}
+                <p className="text-caption text-ink-secondary">Vedlegg datablad med deklarasjon, næringsinnhold og allergener for tilbudt vare.</p>
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor={fid("notes")}>Notater</Label>
+                <Textarea id={fid("notes")} rows={2} value={r.notes ?? ""} onChange={(e) => setText(it.id, "notes", e.target.value)} />
+              </div>
+            </fieldset>
+          </section>
+        );
+      })}
 
-        {!submitted && (
-          <div className="sticky bottom-4 flex items-center justify-end gap-2 rounded-xl border border-line-subtle bg-surface-raised p-3 shadow-md">
-            <Button variant="outline" onClick={() => save(false)} disabled={loading}>
-              <Save className="mr-2 h-4 w-4" /> Lagre kladd
-            </Button>
-            <Button onClick={() => save(true)} disabled={loading}>
-              <Send className="mr-2 h-4 w-4" /> Send tilbud
-            </Button>
-          </div>
-        )}
-      </div>
-    </div>
+      {!locked && bundle.items.length > 0 && (
+        <PortalActionBar>
+          <Button variant="outline" className="h-[44px]" onClick={() => void save(false)} disabled={loading}>
+            <Save className="mr-2 h-4 w-4" aria-hidden /> Lagre kladd
+          </Button>
+          <Button className="h-[44px]" onClick={() => void save(true)} disabled={loading}>
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : <Send className="mr-2 h-4 w-4" aria-hidden />} Send tilbud
+          </Button>
+        </PortalActionBar>
+      )}
+    </PortalShell>
   );
 }

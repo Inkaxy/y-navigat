@@ -14,7 +14,6 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
-import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
 import { useCreateNegotiation } from "@/ravarer/hooks/useNegotiations";
 import { useLogLiveEvent } from "@/ravarer/hooks/useLiveNegotiation";
 import { paths } from "@/ravarer/lib/paths";
@@ -25,7 +24,6 @@ export default function LiveForhandlingSetup() {
   const navigate = useNavigate();
   const { user } = useRavarer();
   const { data: suppliers = [] } = useSuppliers();
-  const { data: rawMaterials = [] } = useRawMaterials();
   const createNeg = useCreateNegotiation();
   const logEvent = useLogLiveEvent();
 

@@ -1,3 +1,5 @@
+-- SUPERSEDED — NEVER APPLY. Defective proposal. The reviewed, corrected version is LIVE and mirrored in
+-- supabase/live-mirror/negotiation_item_preservation_reviewed.sql. Kept only as historical evidence.
 -- ============================================================================
 -- PENDING PROPOSAL — NOT APPLIED. DO NOT RUN WITHOUT INDEPENDENT REVIEW.
 -- Not in supabase/migrations on purpose (that folder is executed by tooling).

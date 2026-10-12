@@ -213,7 +213,9 @@ export function useUpsertNegotiationItems() {
       if (!canReplaceNegotiationItems(negFresh?.status ?? null, recFresh ?? [])) {
         throw new Error("Råvarelista kan ikke endres etter at lenker er generert. Eksisterende tilbud bevares.");
       }
-      const rows = input.items.map((it, idx) => ({
+      // Kontrakt: p_rows er en jsonb-array der hver rad tilhører p_parent_id (serveren
+      // avviser ellers med 22023, og med 55000 utenfor et uutstedt utkast).
+      const rows: Tables["negotiation_items"]["Insert"][] = input.items.map((it, idx) => ({
         ...it,
         negotiation_id: input.negotiationId,
         sort_order: it.sort_order ?? idx,
@@ -222,9 +224,12 @@ export function useUpsertNegotiationItems() {
         p_table: "negotiation_items",
         p_parent_column: "negotiation_id",
         p_parent_id: input.negotiationId,
-        p_rows: rows as unknown as Json,
+        p_rows: rows satisfies Json,
       });
-      if (error) throw error;
+      if (error) {
+        if (error.code === "55000") throw new Error("Råvarelista er låst fordi lenker er utstedt. Eksisterende tilbud bevares.");
+        throw error;
+      }
       return data;
     },
     onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ["negotiation-items", v.negotiationId] }),
@@ -261,9 +266,17 @@ export function useUpsertNegotiationRecipients() {
       const toInsert = input.recipients.filter((r) => !existingBySupplier.has(r.supplier_id));
       if (toInsert.length > 0) {
         // access_token har databasedefault (genereres på serveren), men typegenereringen
-        // markerer kolonnen som påkrevd. Klienten skal aldri sette eller se tokenet.
-        type RecipientInsert = Database["public"]["Tables"]["negotiation_recipients"]["Insert"];
-        const insertRows = toInsert.map((r) => ({ ...r, negotiation_id: input.negotiationId })) as unknown as RecipientInsert[];
+        // markerer kolonnen som påkrevd. Klienten setter aldri tokenet: radene typesjekkes
+        // som Insert uten access_token, og bare den ene kolonnen innsnevres mot API-typen.
+        type RecipientInsert = Tables["negotiation_recipients"]["Insert"];
+        type ServerTokenInsert = Omit<RecipientInsert, "access_token">;
+        const typed: ServerTokenInsert[] = toInsert.map((r) => ({
+          supplier_id: r.supplier_id,
+          contact_email: r.contact_email ?? null,
+          contact_name: r.contact_name ?? null,
+          negotiation_id: input.negotiationId,
+        }));
+        const insertRows = typed as RecipientInsert[];
         const { error: insErr } = await supabase.from("negotiation_recipients").insert(insertRows);
         if (insErr) throw insErr;
       }
