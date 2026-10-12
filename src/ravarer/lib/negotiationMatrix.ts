@@ -1,5 +1,5 @@
 import { NEGOTIATION_STATUS_LABEL } from "@/ravarer/lib/labels";
-import { toBaseFactor } from "@/fakturaer/lib/units";
+import { isBaseUnit, normalizeUnit, toBaseFactor } from "@/fakturaer/lib/units";
 
 /**
  * Norske etiketter for statusene i forhandlingsmodulen. Rå enum-verdier skal
@@ -41,7 +41,7 @@ export interface OfferInput {
   offeredPackageUnit?: string | null;
   /** Varens grunnenhet (kg, l, stk …). */
   baseUnit: string | null | undefined;
-  /** Antall grunnenheter per pakning fra leverandørkoblingen, som reserve. */
+  /** Antall grunnenheter per emballasjeenhet fra DENNE leverandørens bekreftede kobling — aldri råvarens globale tall. */
   linkBaseUnitsPerPackage?: number | null;
 }
 
@@ -62,33 +62,30 @@ export interface OfferPerBaseUnit {
  * - Mangler begge deler, returneres null i stedet for et gjett.
  */
 export function offerPricePerBaseUnit(input: OfferInput): OfferPerBaseUnit {
-  const price = Number(input.offeredPrice);
-  if (!Number.isFinite(price)) return { value: null, reason: "Ingen pris" };
+  // Ingen tvang via Number(): null/tom pris blir aldri 0. Eksplisitt endelig 0 er en pris.
+  const raw = input.offeredPrice;
+  if (typeof raw !== "number" || !Number.isFinite(raw) || raw < 0) return { value: null, reason: "Ingen pris" };
+  const price = raw;
+  const base = normalizeUnit(input.baseUnit);
+  if (!base) return { value: null, reason: "Ukjent grunnenhet" };
 
-  const size = input.offeredPackageSize == null ? null : Number(input.offeredPackageSize);
-  const hasSize = size != null && Number.isFinite(size) && size > 0;
+  const size = typeof input.offeredPackageSize === "number" && Number.isFinite(input.offeredPackageSize) ? input.offeredPackageSize : null;
+  const hasSize = size != null && size > 0;
+  const unitRaw = input.offeredPackageUnit?.trim() ? input.offeredPackageUnit : null;
 
-  if (hasSize && input.offeredPackageUnit) {
-    const factor = toBaseFactor(input.offeredPackageUnit, input.baseUnit);
-    if (factor != null && factor > 0) {
-      const baseUnits = size * factor;
-      if (baseUnits > 0) return { value: price / baseUnits, reason: null };
-    }
-  }
+  // Ingen pakning oppgitt: prisen gjelder én grunnenhet (portalens kontrakt).
+  if (!hasSize && !unitRaw) return { value: price, reason: null };
+  if (!hasSize || !unitRaw) return { value: null, reason: "Ufullstendig pakning" };
 
-  const linkUnits = input.linkBaseUnitsPerPackage == null ? null : Number(input.linkBaseUnitsPerPackage);
-  if (hasSize && linkUnits != null && Number.isFinite(linkUnits) && linkUnits > 0) {
-    return { value: price / linkUnits, reason: null };
-  }
+  const unit = normalizeUnit(unitRaw);
+  const factor = toBaseFactor(unit, base);
+  if (factor != null && factor > 0) return { value: price / (size * factor), reason: null };
+  // Målt enhet i en annen dimensjon (l mot kg): aldri omregning via noe pakningstall.
+  if (unit && isBaseUnit(unit)) return { value: null, reason: "Annen målestørrelse enn grunnenheten" };
 
-  // Ingen pakning oppgitt: prisen er allerede per grunnenhet (portalen spør om
-  // «pris per <grunnenhet>»).
-  if (!hasSize && !input.offeredPackageUnit) return { value: price, reason: null };
-
-  if (linkUnits != null && Number.isFinite(linkUnits) && linkUnits > 0) {
-    return { value: price / linkUnits, reason: null };
-  }
-
+  // Emballasjeenhet (sekk, kartong): bare leverandørspesifikt, bekreftet antall grunnenheter.
+  const linkUnits = typeof input.linkBaseUnitsPerPackage === "number" && Number.isFinite(input.linkBaseUnitsPerPackage) ? input.linkBaseUnitsPerPackage : null;
+  if (linkUnits != null && linkUnits > 0) return { value: price / (size * linkUnits), reason: null };
   return { value: null, reason: "Ukjent pakningsenhet" };
 }
 
