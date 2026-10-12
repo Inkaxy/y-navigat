@@ -304,12 +304,12 @@ export default function ForhandlingWizard() {
         <Card className="space-y-4 p-6">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <Label>Tittel *</Label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Mel-forhandling 2026" />
+              <Label htmlFor="wiz-title">Tittel *</Label>
+              <Input id="wiz-title" className="min-h-[44px]" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Mel-forhandling 2026" />
             </div>
             <div>
-              <Label>Svarfrist</Label>
-              <Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+              <Label htmlFor="wiz-deadline">Svarfrist</Label>
+              <Input id="wiz-deadline" className="min-h-[44px]" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
             </div>
             <div className="md:col-span-2">
               <Label>Formål / bakgrunn</Label>
