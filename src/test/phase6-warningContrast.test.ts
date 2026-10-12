@@ -5,8 +5,10 @@ const css = readFileSync("src/index.css", "utf8");
 
 type Rgb = [number, number, number];
 function token(name: string, dark = false): string {
-  const src = dark ? css.slice(css.indexOf(".dark {")) : css;
-  const m = src.match(new RegExp(`--${name}:\\s*([^;]+);`));
+  const re = new RegExp(`--${name}:\\s*([^;]+);`);
+  const darkBlock = css.slice(css.indexOf(".dark {"), css.indexOf("}", css.indexOf(".dark {")));
+  // Mørkt tema arver :root-verdien når .dark ikke overstyrer (CSS-kaskade).
+  const m = (dark ? darkBlock.match(re) : null) ?? css.match(re);
   if (!m) throw new Error(`mangler --${name}`);
   const v = m[1].trim();
   const ref = v.match(/^var\(--([\w-]+)\)$/);
