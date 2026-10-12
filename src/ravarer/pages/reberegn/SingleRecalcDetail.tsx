@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import type { PreviewState, PreviewTarget } from "@/ravarer/hooks/useSingleRecalcPreview";
@@ -99,14 +99,10 @@ export function SingleRecalcDetail({ state, onClose, onRetry }: { state: Preview
   const target = state.status === "closed" ? null : state.target;
   // Åpneren huskes ved åpning og får fokus tilbake ved lukk/Escape hvis den fortsatt finnes.
   const opener = useRef<HTMLElement | null>(null);
-  const wasOpen = useRef(false);
-  useLayoutEffect(() => {
-    if (open && !wasOpen.current) opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    wasOpen.current = open;
-  }, [open]);
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-xl"
+        onOpenAutoFocus={() => { opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; }}
         onCloseAutoFocus={(e) => { const el = opener.current; if (el && el.isConnected) { e.preventDefault(); el.focus(); } }}>
         <SheetHeader className="pr-12">
           <SheetTitle className="break-words">Serverens regnestykke nå{target?.name ? ` — ${target.name}` : ""}</SheetTitle>
