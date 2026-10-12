@@ -526,3 +526,19 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 31. **Død kode:** `QueueTable`, `Vareminne.tsx`, aliaset `n` i `useRmSuppliers`, gamle bannere og DecisionNav. Utløpsfargene dupliserer `agreementStatus.ts`.
 32. **Mobil** fungerer bare i varelisten, og der uten massehandlinger og inline-redigering.
 33. **Forbehold:** NutritionTab, DatasheetSection, DeclarationNameCard, RecipesTab og StockTab er lest fra et eldre øyeblikksbilde. Les dem på nytt før fase 4.
+
+## Fase 6 — delleveranse (fra 4bba6f06)
+
+Ingen ID er massemerket ferdig. Statuskolonnen over er historisk. Denne leveransen legger til bevis for disse punktene (Bygget + kildekontrollert + mock-testet, ikke brukstestet innlogget):
+
+| Område | Komponent / URL | Bevis |
+|---|---|---|
+| Prisstatus: kø, avbrudd, inaktiv eier | `src/fakturaer/hooks/useInvoicePriceSafety.ts`; `/ravarer/priskontroll?fane=gjore` (`GjoreWorkspace` monterer panelet bare ved ≥1280 px) | `src/test/phase6-priceSafetyLifecycle.test.tsx` (20/4-kø, forhåndsavbrudd, signal til fakturaoppslag, ekte QueryClient med skjult + synlig observatør) |
+| Komplette radversjoner | samme hook (eksakt antall + id-keyset, side 500) | 2501 linjer bak servertak 1000; feil på side 2 gir ingen delvis liste |
+| Streng versjonsnøkkel | `src/fakturaer/lib/priceSafety.ts` `versionKey` (også brukt av dokumentversjon) | 13 ugyldige former avvises; skuddår/mikrosekund/sone positive kontroller |
+| Gammel `filter=klar` | `src/ravarer/lib/legacyRoutes.ts` → `/ravarer/priskontroll?fane=fakturaer&visning=klar` | `src/test/phase6-legacyFilterKlar.test.ts` (resolver → `parseVisning`) |
+| Lukk-knapp i sidepanel | `src/components/ui/sheet.tsx` («Lukk», 44 px) | kilde |
+| Veiviserfelt | `ForhandlingWizard.tsx` steg 1/4: fire datofelt, formål, e-posttekst med `htmlFor` + 44 px | kilde |
+| Tekst | per-linje-avvik «uten stort avvik»; kreditnota «Lagret lesing beholder fortegnet …»; AI-innstillinger uten udokumentert modellrangering; norske feltnavn | eksisterende tester oppdatert |
+
+Gjenstår i fase 6: synlig rettehandling i PALS-forhåndsvisning/«Rett sumavvik», norsk desimal i sumfeil, mobile 44 px i fakturaflate, allergenvurdert-status i varelisten, avviksetikett «Siste faktura mot kostpris», per-ID-kobling av alle 313 punkter, dødkoderydding og innlogget nettlesergjennomgang.
