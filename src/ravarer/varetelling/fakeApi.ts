@@ -15,13 +15,15 @@ export interface FakeState {
   units: Map<string, SnapUnit[]>;
   /** Neste kall kaster ukjent utfall ETTER å ha utført (simulerer tapt svar). */
   loseNextResponse: boolean;
+  /** Linjer med godkjent prisavklaring (satt av syntetisk trinn 3). */
+  clarified: Set<string>;
 }
 const BASE: readonly string[] = ["kg", "g", "l", "ml", "stk"];
 const isBase = (u: string | null): u is BaseUnit => u !== null && BASE.includes(u);
 
 export function createFakeVtApi(opts: { available?: boolean; today?: string; seed?: boolean } = {}): VtApi & { _state: FakeState } {
   const today = opts.today ?? "2026-10-12";
-  const st: FakeState = { locations: [], templates: [], tlines: [], materials: [], counts: [], lists: [], lines: [], seq: 0, ops: new Map(), prices: new Map(), units: new Map(), loseNextResponse: false };
+  const st: FakeState = { locations: [], templates: [], tlines: [], materials: [], counts: [], lists: [], lines: [], seq: 0, ops: new Map(), prices: new Map(), units: new Map(), loseNextResponse: false, clarified: new Set() };
   const id = (p: string) => `${p}-${++st.seq}`;
   const now = () => new Date(Date.UTC(2026, 9, 12, 8, 0, st.seq)).toISOString();
   const key = (m: string, l: string | null) => `${m}|${l ?? ""}`;
@@ -253,7 +255,7 @@ export function createFakeVtApi(opts: { available?: boolean; today?: string; see
           if (ls.length === 0) throw new VtRejectedError("Tom telling kan ikke avsluttes", "55000");
           if (lists.some(l => l.status !== "godkjent" || !ls.some(x => x.count_list_id === l.id))) throw new VtRejectedError("Alle lister må ha varer og være godkjent", "55000");
           if (ls.some(l => l.state === "ikke_talt" || l.state === "ma_kontrolleres")) throw new VtRejectedError("Linjer er ikke talt eller må kontrolleres", "55000");
-          if (ls.some(l => l.state === "talt" && l.snap_price_per_base == null)) throw new VtRejectedError("Verdien er ufullstendig: talte varer mangler dokumentert pris", "55000");
+          if (ls.some(l => l.state === "talt" && l.snap_price_per_base == null && !st.clarified.has(l.id))) throw new VtRejectedError("Verdien er ufullstendig: talte varer mangler dokumentert eller avklart pris", "55000");
           c.finished_at = now();
         }
         if (i.to === "avbrutt") {
