@@ -222,7 +222,8 @@ export function GjoreWorkspace() {
     </div>
   );
 
-  const panelBody = sel ? (
+  // Panelet (med prisstatus-polling) monteres bare når det faktisk er synlig (bred visning).
+  const panelBody = sel && wide ? (
     <div data-gjore-panel tabIndex={-1} className="outline-none" key={valgt ?? ""} onPointerDown={() => { viaKeyboard.current = null; }}>
       {sel.type === "varekort"
         ? <VarekortPanel supplierId={sel.supplierId} itemKey={sel.itemKey} onDone={onDone} onNext={goNext} onSkip={() => select(stepKey(items, valgt, 1))} onClose={() => select(null)} />
