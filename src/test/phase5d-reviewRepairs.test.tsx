@@ -50,7 +50,8 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.f
 vi.mock("@/ravarer/lib/invalidate", () => ({ invalidateRawMaterial: vi.fn() }));
 
 import { useUpsertNegotiationItems, NegotiationContextChangedError, NegotiationUncertainReceiptError } from "@/ravarer/hooks/useNegotiations";
-import { LiveConfirmationStatus, __resetLiveRecoveryMemory } from "@/ravarer/pages/forhandlinger/detail/LiveConfirmationStatus";
+import { LiveConfirmationStatus } from "@/ravarer/pages/forhandlinger/detail/LiveConfirmationStatus";
+import { __resetLiveRecoveryMemory } from "@/ravarer/pages/forhandlinger/detail/liveRecoveryMemory";
 import { SavingsValue } from "@/ravarer/pages/forhandlinger/detail/SavingsValue";
 import { offerPricePerBaseUnit } from "@/ravarer/lib/negotiationMatrix";
 import { canReplaceNegotiationItems, classifyApplyOutcome, estimateSavings, negotiationListReturn, parseRfqCredentials } from "@/ravarer/lib/negotiationOps";
