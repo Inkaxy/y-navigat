@@ -23,6 +23,8 @@ export default function LiveConfirmationPortal() {
   const [bundle, setBundle] = useState<LiveBundle | null>(null);
   const [states, setStates] = useState<Record<string, LiveLineDraft>>({});
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
+  // Synkron sperre: pågående opplastinger per linje, bundet til lenkens epoke. State er bare visning.
+  const uploadingIds = useRef<{ epoch: number; ids: Set<string> }>({ epoch: 0, ids: new Set() });
   const [paymentDays, setPaymentDays] = useState("");
   const [submitted, setSubmitted] = useState<null | { allConfirmed: boolean }>(null);
   const [unknownSubmit, setUnknownSubmit] = useState(false);
@@ -33,6 +35,7 @@ export default function LiveConfirmationPortal() {
     epoch.current += 1;
     busy.current = false;
     setBundle(null); setStates({}); setPaymentDays(""); setSubmitted(null); setUnknownSubmit(false); setPassword(""); setError(null); setLoading(false); setUploading({});
+    uploadingIds.current = { epoch: epoch.current, ids: new Set() };
     // Avmontering/lenkebytte gjør alle pågående svar foreldet (også opplastinger før PUT).
     return () => { epoch.current += 1; };
   }, [token]);
@@ -101,9 +104,13 @@ export default function LiveConfirmationPortal() {
 
   async function uploadDatasheet(item: LiveItem, file: File) {
     const my = epoch.current;
+    if (uploadingIds.current.epoch !== my) uploadingIds.current = { epoch: my, ids: new Set() };
+    if (uploadingIds.current.ids.has(item.id)) return;
+    uploadingIds.current.ids.add(item.id);
     setUploading((u) => ({ ...u, [item.id]: true }));
     const path = await uploadPdf("request-live-datasheet-upload", { token, password }, item.id, file, () => my === epoch.current);
     if (my !== epoch.current || path === "cancelled") return;
+    if (uploadingIds.current.epoch === my) uploadingIds.current.ids.delete(item.id);
     setUploading((u) => ({ ...u, [item.id]: false }));
     if (!path) { toast.error("Opplasting feilet. Prøv igjen."); return; }
     update(item.id, { datasheet_path: path, datasheet_skipped: false, uploadedName: file.name });
@@ -112,7 +119,7 @@ export default function LiveConfirmationPortal() {
 
   async function submitAll() {
     if (!bundle || busy.current || unknownSubmit) return;
-    if (Object.values(uploading).some(Boolean)) { toast.error("Vent til opplastingen er ferdig."); return; }
+    if ((uploadingIds.current.epoch === epoch.current && uploadingIds.current.ids.size > 0) || Object.values(uploading).some(Boolean)) { toast.error("Vent til opplastingen er ferdig."); return; }
     // Låste linjer valideres eller sendes aldri på nytt.
     const editable = bundle.items.filter((it) => it.live_status !== "confirmed");
     if (!editable.length) { toast.info("Alle linjer er allerede bekreftet og låst."); return; }

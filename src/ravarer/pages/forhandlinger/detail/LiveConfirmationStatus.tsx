@@ -10,6 +10,7 @@ import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { classifyApplyOutcome, readEdgeErrorBody } from "@/ravarer/lib/negotiationOps";
 import { formatDate as formatDateTime } from "@/ravarer/lib/constants";
 import { LiveItemStatusPill } from "@/ravarer/components/forhandlinger/NegotiationPills";
+import { restore, tabRecovery } from "./liveRecoveryMemory";
 import type { NegotiationItemRow, NegotiationRecipientRow, NegotiationRow } from "@/ravarer/hooks/useNegotiations";
 
 export interface LiveConfirmationStatusProps {
@@ -27,23 +28,9 @@ export interface LiveConfirmationStatusProps {
  *   OG brukeren eksplisitt tillater et nytt forsøk.
  * - followup: prisene er bekreftet aktivert, bare merkingen av de frosne linjene gjenstår.
  */
-type Recovery =
+export type Recovery =
   | { kind: "uncertain"; negotiationId: string; text: string | null; reread: "idle" | "pending" | "ok" | "failed"; readAt: string | null }
   | { kind: "followup"; negotiationId: string; targetIds: string[]; retrying: boolean };
-
-/**
- * Fanens minne (ikke varig): gjenoppretting per forhandling overlever navigasjon og
- * avmontering i samme fane, slik at A åpnet på nytt viser sin egen status/oppfølging.
- */
-const tabRecovery = new Map<string, Recovery>();
-/** Kun for tester. */
-export function __resetLiveRecoveryMemory() { tabRecovery.clear(); }
-function restore(id: string): Recovery | null {
-  const r = tabRecovery.get(id);
-  if (!r) return null;
-  // Et pågående steg i en tidligere visning er ikke lenger aktivt her.
-  return r.kind === "uncertain" ? { ...r, reread: r.reread === "pending" || r.reread === "ok" ? "idle" : r.reread, readAt: null } : { ...r, retrying: false };
-}
 
 /**
  * Bekreftelsesstatus for en avsluttet live-forhandling, med aktivering.

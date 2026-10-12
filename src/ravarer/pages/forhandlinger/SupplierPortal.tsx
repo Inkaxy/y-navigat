@@ -45,7 +45,7 @@ export default function SupplierPortal() {
   useEffect(() => {
     epoch.current += 1;
     busy.current = false;
-    setBundle(null); setResponses({}); setSubmission("none"); setUnknownSave(null); setPassword(""); setError(null); setLoading(false); setUploading({});
+    setBundle(null); setResponses({}); setSubmission("none"); setUnknownSave(null); setPassword(""); setError(null); setLoading(false); setUploading({}); setSaving(false);
     // Avmontering/lenkebytte: pågående kall er foreldet og ny signert PUT startes ikke.
     return () => { epoch.current += 1; };
   }, [token]);

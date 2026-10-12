@@ -32,7 +32,7 @@ export function RematchAllDialog({ open, onOpenChange, legalEntityId, canWrite }
         <DialogHeader>
           <DialogTitle>Beregn alle åpne fakturaer på nytt</DialogTitle>
           <DialogDescription>
-            Alle åpne fakturaer legges i kø og kjøres gjennom matchemotoren med dagens innstillinger, koblinger og priser. Avstemte fakturaer røres ikke. Køen arbeider i bakgrunnen — du kan lukke vinduet.
+            Inntil 500 åpne fakturaer (eldste først) legges i kø per gang og kjøres gjennom matchemotoren med dagens innstillinger, koblinger og priser. Avstemte fakturaer røres ikke. Køen arbeider i bakgrunnen — du kan lukke vinduet.
           </DialogDescription>
         </DialogHeader>
         <div role="status" className="rounded-md bg-muted/40 p-3 text-sm tabular-nums">
@@ -47,7 +47,7 @@ export function RematchAllDialog({ open, onOpenChange, legalEntityId, canWrite }
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Lukk</Button>
           <Button disabled={!canWrite || !legalEntityId || busy || run.isPending} onClick={() => run.mutate()}>
             {(run.isPending || busy) && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />}
-            {busy ? "Omberegning pågår …" : "Legg alle åpne i kø"}
+            {busy ? "Omberegning pågår …" : "Legg inntil 500 åpne i kø"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -61,6 +61,7 @@ export interface LinkedRecipe {
 
 export interface ProductRecipeLinkRow extends RecipeLinkSettings {
   id: string | null;
+  product_id?: string | null;
   recipe_id: string;
   is_primary?: boolean | null;
   notes?: string | null;
@@ -168,7 +169,7 @@ export function useProductRecipeLink(productId: string | null | undefined) {
       const { data, error } = await supabase
         .from("product_recipe_links")
         .select(
-          `id, recipe_id, is_primary, notes, created_at, updated_at,
+          `id, product_id, recipe_id, is_primary, notes, created_at, updated_at,
            units_per_batch_override, yield_weight_g_override,
            sales_unit_basis, units_per_sales_unit, sales_unit_weight_g,
            sales_unit_confirmed_at, sales_unit_confirmed_by,

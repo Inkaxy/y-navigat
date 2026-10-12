@@ -1,0 +1,1 @@
+- Oppskriftskoblingen (`product_recipe_links`) skrives bare via `recipeLinkWrite.ts`: én betinget UPDATE/DELETE med id+product_id+recipe_id+rå `updated_at`+nøyaktige innstillinger (null via `is`), og nøyaktig én returnert rad er eneste suksess; salgsenhetskladden eier sin aksepterte basis. Why: oppdatering på bare id lot en gammel kladd skrive over en ny oppskrift.
