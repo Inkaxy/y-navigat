@@ -7,3 +7,6 @@
 - Every report surface (screen totals, archive, printed report, CSV/PDF, email gate) reads lines only through `useClarifiedLines`, and output is blocked unless its `status` is `ready`. Why: the printed report read raw lines and ignored approved prices.
 - OCR batches: every claim/continue issues a new `attempt_id` (ownership token). Auto-continue only after the previous batch is durably released; an in-flight batch past its deadline becomes `ukjent_ai_utfall` (stored pages kept) and needs approver confirmation. If all pages are stored, finalize from them without re-reading. Why: an expired lease could still have a running paid call, and a late write could overwrite a newer batch.
 - Original viewing uses the server-stored `page_sources`/proposal `source` (file + PDF page + preserved original), never the printed page number as an index. Why: reordered uploads, multi-page PDFs and WEBP pairs showed the wrong page.
+
+## Live-status (12.10.2026)
+- Grunnlag (rev. 2), stage3 (rev. 4), lagringspolicyer og Edge `vt-count-ocr`/`vt-count-report-email` v1 er LIVE (root). Speil i `supabase/live-mirror/`. Fremtidige endringer krever ny additiv migrasjon/ny gjennomgått Edge-versjon — aldri kjør `CREATE TABLE`-filene i `supabase/pending/` på nytt. Why: objektene finnes live; gjenkjøring feiler eller overskriver.
