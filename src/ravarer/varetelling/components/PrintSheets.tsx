@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 import { ArrowLeft, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useVtCount } from "../hooks";
-import { formatAmount, formatKr, LINE_STATE_LABEL, paginate, priceReasonLabel, summarize, summarizeGroups } from "../logic";
+import { formatAmount, formatKr, LINE_STATE_LABEL, priceReasonLabel, summarize, summarizeGroups } from "../logic";
 import { isFinalReport, lineValueOre, listDeepLink, reportTitle, sheetIdentity } from "../report";
 import type { VtCount, VtCountLine, VtCountList } from "../types";
 import { paginateSheet, rowCodeOf, rowUnits, VT_SHEET_CAPACITY } from "../../../../supabase/pending/functions/vt-count-ocr/ocrCore";

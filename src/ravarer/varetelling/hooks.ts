@@ -82,11 +82,11 @@ export type OpOutcome<O> = { kind: "ok"; value: O } | { kind: "rejected"; messag
  */
 export function useOpAction<P, O>(key: string, need: "write" | "approve", run: (opId: string, payload: P) => Promise<O>) {
   const store = usePendingStore(); const scope = useScopeRef(); const qc = useQueryClient();
-  const captured = useRef(scope.current.entity);
+  const captured = useRef({ entity: scope.current.entity, userId: scope.current.userId });
   const state = usePendingOp(key);
   const execute = useCallback(async (payload: P, sig: string): Promise<OpOutcome<O>> => {
     const s = scope.current;
-    if (s.entity !== captured.current || (need === "write" ? !s.canWrite : !s.canApprove)) return { kind: "rejected", message: "Du mangler tilgang til denne handlingen nå." };
+    if (s.entity !== captured.current.entity || s.userId !== captured.current.userId || (need === "write" ? !s.canWrite : !s.canApprove)) return { kind: "rejected", message: "Du mangler tilgang til denne handlingen nå." };
     if (!store.tryLock(key)) return { kind: "busy" };
     let op = store.get(key) as PendingOp<P> | undefined;
     try {
@@ -102,7 +102,7 @@ export function useOpAction<P, O>(key: string, need: "write" | "approve", run: (
       return { kind: "unknown", message: e instanceof VtUnknownOutcomeError ? e.message : new VtUnknownOutcomeError().message };
     } finally {
       store.unlock(key);
-      void qc.invalidateQueries({ queryKey: vtKeys.all(captured.current) });
+      void qc.invalidateQueries({ queryKey: vtKeys.all(captured.current.entity) });
     }
   }, [store, key, need, run, scope, qc]);
   return { execute, pending: state.op, busy: state.locked };
@@ -128,12 +128,12 @@ export const lineKey = (lineId: string) => `line:${lineId}`;
  */
 export function useLineSaver(countId: string) {
   const api = useVtApi(); const qc = useQueryClient(); const store = usePendingStore(); const scope = useScopeRef();
-  const captured = useRef(scope.current.entity);
+  const captured = useRef({ entity: scope.current.entity, userId: scope.current.userId });
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   return useCallback(async (payload: LinePayload | null, lineId: string): Promise<LineSaveStatus> => {
     const s = scope.current;
-    if (s.entity !== captured.current || !s.canWrite) return { kind: "avvist", message: "Du mangler skrivetilgang nå." };
+    if (s.entity !== captured.current.entity || s.userId !== captured.current.userId || !s.canWrite) return { kind: "avvist", message: "Du mangler skrivetilgang nå." };
     const key = lineKey(lineId);
     if (!store.tryLock(key)) return { kind: "lagrer" };
     const existing = store.get(key) as PendingOp<LinePayload> | undefined;
@@ -157,12 +157,13 @@ export function useLineSaver(countId: string) {
       }
       store.remove(key, op.opId);
       const fresh = result.kind === "saved" ? result.line : result.current;
-      qc.setQueryData(vtKeys.count(captured.current, countId), (old: { lines: VtCountLine[] } & Record<string, unknown> | undefined) => {
+      // Bare samme bruker/firma får resultatet inn i sin visning.
+      if (scope.current.entity === captured.current.entity && scope.current.userId === captured.current.userId) qc.setQueryData(vtKeys.count(captured.current.entity, countId), (old: { lines: VtCountLine[] } & Record<string, unknown> | undefined) => {
         if (!old) return old;
         return { ...old, lines: old.lines.map(l => (l.id === fresh.id && fresh.revision >= l.revision ? fresh : l)) };
       });
       // Alltid fersk telling (listestatus endres ved første lagring; summer/oppsummering må følge).
-      void qc.invalidateQueries({ queryKey: vtKeys.count(captured.current, countId) });
+      void qc.invalidateQueries({ queryKey: vtKeys.count(captured.current.entity, countId) });
       return result.kind === "saved" ? { kind: "lagret" } : { kind: "konflikt", current: result.current };
     } finally {
       store.unlock(key);
