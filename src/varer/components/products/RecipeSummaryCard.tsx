@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -51,6 +51,11 @@ import {
   type SalesUnitBasis,
 } from "@/varer/lib/recipeLinkBasis";
 import { LinkRecipeDialog, type RecipeLinkSelection } from "./LinkRecipeDialog";
+import { SalesUnitSettings, type SalesUnitValues } from "./SalesUnitSettings";
+import {
+  conditionalLinkDelete, conditionalLinkUpdate, linkBaseFrom, linkWriteMessage,
+  type LinkBase, type LinkWriteResult,
+} from "@/varer/lib/recipeLinkWrite";
 
 interface Props {
   productId: string;
@@ -80,11 +85,32 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
   const qc = useQueryClient();
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [confirmUnlink, setConfirmUnlink] = useState(false);
-  const [savingSettings, setSavingSettings] = useState(false);
+  // Én synkron lås for innstillinger, oppskriftsbytte og frakobling.
+  const opLock = useRef(false);
+  const [pending, setPending] = useState(false);
+  const [resetSignal, setResetSignal] = useState(0);
+  const productRef = useRef(productId);
+  productRef.current = productId;
+  const canWriteRef = useRef(canWrite);
+  canWriteRef.current = canWrite;
+  function acquire(): boolean {
+    if (opLock.current || !canWriteRef.current) return false;
+    opLock.current = true; setPending(true); return true;
+  }
+  function release() { opLock.current = false; setPending(false); }
+  /** Revisjonslogg etter BEVIST databaseendring; feil rulles ikke tilbake og skriving gjentas ikke. */
+  async function auditAfterWrite(entry: Parameters<typeof logAudit>[0]): Promise<boolean> {
+    try { await logAudit(entry); return true; } catch (e) {
+      console.warn("[oppskriftskobling] logg feilet", e instanceof Error ? e.name : "ukjent");
+      toast.warning("Endringen er lagret, men kunne ikke loggføres.");
+      return false;
+    }
+  }
 
   const { bundle, isLoading, hasRecipe } = useProductRecipeLink(productId);
   const trackedQuery = useStockTrackedRawMaterials();
   const { link, recipe, lines, basis, cost } = bundle;
+  const linkBase: LinkBase | null = link ? linkBaseFrom(productId, link as unknown as Record<string, unknown>) : null;
 
   const approvedQuery = useQuery({
     queryKey: ["recipe-approved-declaration", recipe?.id],
@@ -140,77 +166,76 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
   }
 
   async function handleLinkConfirm(sel: RecipeLinkSelection) {
+    if (link?.id && !linkBase) { toast.error("Koblingen er ikke fullstendig lest. Last inn på nytt før du bytter."); return; }
+    if (!acquire()) return;
+    const forProduct = productId;
+    const frozen = linkBase;
+    // Bytte er en bekreftet ny salgsenhet: overstyrt batch fra forrige oppskrift arves aldri stille.
     const payload = {
       sales_unit_basis: sel.salesUnitBasis,
       units_per_sales_unit: sel.unitsPerSalesUnit,
       sales_unit_weight_g: sel.salesUnitWeightG,
+      units_per_batch_override: null,
       sales_unit_confirmed_at: new Date().toISOString(),
     };
     const previousRecipeId = link?.recipe_id ?? null;
-
-    if (link?.id) {
-      const { error } = await supabase
-        .from("product_recipe_links")
-        .update({ recipe_id: sel.recipeId, ...payload } as never)
-        .eq("id", link.id);
-      if (error) {
-        toast.error(linkErrorMessage(error));
-        return;
+    try {
+      if (frozen) {
+        const res = await conditionalLinkUpdate(frozen, { recipe_id: sel.recipeId, ...payload }, sel.recipeId);
+        if (productRef.current !== forProduct) return;
+        if (res.kind !== "saved") { toast.error(linkWriteMessage(res)); await invalidate(); return; }
+      } else {
+        const { data, error } = await supabase
+          .from("product_recipe_links")
+          .insert({ product_id: productId, recipe_id: sel.recipeId, is_primary: true, ...payload } as never)
+          .select("id,product_id,recipe_id");
+        if (productRef.current !== forProduct) return;
+        if (error) { toast.error(linkErrorMessage(error)); return; }
+        const row = Array.isArray(data) && data.length === 1 ? (data[0] as { product_id?: unknown; recipe_id?: unknown }) : null;
+        if (!row || row.product_id !== productId || row.recipe_id !== sel.recipeId) {
+          toast.error("Vi vet ikke om koblingen ble lagret. Last inn på nytt og kontroller.");
+          await invalidate();
+          return;
+        }
       }
-    } else {
-      const { error } = await supabase
-        .from("product_recipe_links")
-        .insert({ product_id: productId, recipe_id: sel.recipeId, is_primary: true, ...payload } as never);
-      if (error) {
-        toast.error(linkErrorMessage(error));
-        return;
-      }
+      await auditAfterWrite({
+        action: previousRecipeId ? "update" : "create",
+        entity_type: "product_recipe_link",
+        entity_id: productId,
+        entity_display_reference: productName,
+        changes: {
+          recipe_id: { from: previousRecipeId, to: sel.recipeId },
+          sales_unit_basis: { from: link?.sales_unit_basis ?? null, to: sel.salesUnitBasis },
+          units_per_sales_unit: { from: link?.units_per_sales_unit ?? null, to: sel.unitsPerSalesUnit },
+        },
+      });
+      toast.success(previousRecipeId ? "Oppskriften er byttet" : `«${sel.recipeName}» er koblet til varen`);
+      await invalidate();
+      setResetSignal((n) => n + 1);
+    } finally {
+      release();
     }
-
-    await logAudit({
-      action: previousRecipeId ? "update" : "create",
-      entity_type: "product_recipe_link",
-      entity_id: productId,
-      entity_display_reference: productName,
-      changes: {
-        recipe_id: { from: previousRecipeId, to: sel.recipeId },
-        sales_unit_basis: { from: link?.sales_unit_basis ?? null, to: sel.salesUnitBasis },
-        units_per_sales_unit: { from: link?.units_per_sales_unit ?? null, to: sel.unitsPerSalesUnit },
-      },
-    });
-    toast.success(previousRecipeId ? "Oppskriften er byttet" : `«${sel.recipeName}» er koblet til varen`);
-    await invalidate();
   }
 
-  async function saveSettings(next: {
-    sales_unit_basis?: SalesUnitBasis | null;
-    units_per_sales_unit?: number | null;
-    sales_unit_weight_g?: number | null;
-    units_per_batch_override?: number | null;
-  }) {
-    if (!link?.id) {
-      toast.error("Koblingen må lagres før innstillingene kan endres. Bytt oppskrift for å opprette koblingen.");
-      return;
+  async function saveSettings(frozen: LinkBase, next: SalesUnitValues): Promise<LinkWriteResult> {
+    if (frozen.productId !== productId) return { kind: "conflict" };
+    if (!acquire()) return { kind: "error", code: null, message: "Annen lagring pågår." };
+    try {
+      const res = await conditionalLinkUpdate(frozen, { ...next, sales_unit_confirmed_at: new Date().toISOString() }, frozen.recipeId);
+      if (res.kind !== "saved") { await invalidate(); return res; }
+      await auditAfterWrite({
+        action: "update",
+        entity_type: "product_recipe_link",
+        entity_id: frozen.productId,
+        entity_display_reference: productName,
+        changes: next as unknown as Record<string, unknown>,
+      });
+      if (productRef.current === frozen.productId) toast.success("Koblingens innstillinger er lagret");
+      await invalidate();
+      return res;
+    } finally {
+      release();
     }
-    setSavingSettings(true);
-    const { error } = await supabase
-      .from("product_recipe_links")
-      .update({ ...next, sales_unit_confirmed_at: new Date().toISOString() } as never)
-      .eq("id", link.id);
-    setSavingSettings(false);
-    if (error) {
-      toast.error(linkErrorMessage(error));
-      return;
-    }
-    await logAudit({
-      action: "update",
-      entity_type: "product_recipe_link",
-      entity_id: productId,
-      entity_display_reference: productName,
-      changes: next as Record<string, unknown>,
-    });
-    toast.success("Koblingens innstillinger er lagret");
-    await invalidate();
   }
 
   async function removeLink() {
@@ -219,20 +244,24 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
       toast.error("Denne varen har en gammel direktekobling. Åpne oppskriften for å endre den.");
       return;
     }
-    const { error } = await supabase.from("product_recipe_links").delete().eq("id", link.id);
-    if (error) {
-      toast.error(linkErrorMessage(error));
-      return;
+    if (!linkBase) { toast.error("Koblingen er ikke fullstendig lest. Last inn på nytt."); return; }
+    if (!acquire()) return;
+    const frozen = linkBase;
+    try {
+      const res = await conditionalLinkDelete(frozen);
+      if (res.kind !== "deleted") { toast.error(linkWriteMessage(res)); await invalidate(); return; }
+      await auditAfterWrite({
+        action: "delete",
+        entity_type: "product_recipe_link",
+        entity_id: frozen.productId,
+        entity_display_reference: productName,
+        changes: { recipe_id: { from: frozen.recipeId, to: null } },
+      });
+      toast.success("Koblingen er fjernet. Oppskriften er ikke slettet.");
+      await invalidate();
+    } finally {
+      release();
     }
-    await logAudit({
-      action: "delete",
-      entity_type: "product_recipe_link",
-      entity_id: productId,
-      entity_display_reference: productName,
-      changes: { recipe_id: { from: link.recipe_id, to: null } },
-    });
-    toast.success("Koblingen er fjernet. Oppskriften er ikke slettet.");
-    await invalidate();
   }
 
   if (isLoading) {
@@ -252,7 +281,7 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
             <p className="text-sm text-muted-foreground">Ingen oppskrift koblet til denne varen.</p>
             {canWrite && (
               <div className="flex flex-col gap-2 sm:flex-row">
-                <Button onClick={() => setLinkDialogOpen(true)}>
+                <Button onClick={() => setLinkDialogOpen(true)} disabled={pending}>
                   <Link2 className="mr-2 h-4 w-4" /> Koble eksisterende oppskrift
                 </Button>
                 <Button variant="outline" onClick={createRecipe}>
@@ -297,10 +326,10 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
             </Button>
             {canWrite && (
               <>
-                <Button variant="outline" size="sm" onClick={() => setLinkDialogOpen(true)}>
+                <Button variant="outline" size="sm" onClick={() => setLinkDialogOpen(true)} disabled={pending}>
                   <Repeat className="mr-1.5 h-3.5 w-3.5" /> Bytt oppskrift
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setConfirmUnlink(true)}>
+                <Button variant="outline" size="sm" onClick={() => setConfirmUnlink(true)} disabled={pending}>
                   <Link2Off className="mr-1.5 h-3.5 w-3.5" /> Fjern kobling
                 </Button>
               </>
@@ -355,9 +384,11 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
       )}
 
       <SalesUnitSettings
-        link={link}
+        key={productId}
+        base={linkBase}
         canWrite={canWrite}
-        saving={savingSettings}
+        pending={pending}
+        resetSignal={resetSignal}
         onSave={saveSettings}
       />
 
@@ -470,125 +501,11 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Avbryt</AlertDialogCancel>
-            <AlertDialogAction onClick={removeLink}>Fjern kobling</AlertDialogAction>
+            <AlertDialogAction onClick={() => void removeLink()} disabled={pending}>Fjern kobling</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-function SalesUnitSettings({
-  link,
-  canWrite,
-  saving,
-  onSave,
-}: {
-  link: { sales_unit_basis?: string | null; units_per_sales_unit?: number | string | null; sales_unit_weight_g?: number | string | null; units_per_batch_override?: number | string | null; sales_unit_confirmed_at?: string | null } | null;
-  canWrite: boolean;
-  saving: boolean;
-  onSave: (next: {
-    sales_unit_basis?: SalesUnitBasis | null;
-    units_per_sales_unit?: number | null;
-    sales_unit_weight_g?: number | null;
-    units_per_batch_override?: number | null;
-  }) => Promise<void>;
-}) {
-  const [basis, setBasis] = useState<SalesUnitBasis | "">(
-    isSalesUnitBasis(link?.sales_unit_basis) ? (link!.sales_unit_basis as SalesUnitBasis) : "",
-  );
-  const [units, setUnits] = useState(link?.units_per_sales_unit != null ? String(link.units_per_sales_unit) : "");
-  const [weight, setWeight] = useState(link?.sales_unit_weight_g != null ? String(link.sales_unit_weight_g) : "");
-  const [batch, setBatch] = useState(
-    link?.units_per_batch_override != null ? String(link.units_per_batch_override) : "",
-  );
-
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">Koblingens innstillinger</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-xs text-muted-foreground">
-          Bekreft hvordan oppskriftens utbytte svarer til varens salgsenhet. Ingenting utledes fra varenavnet.
-          {link?.sales_unit_confirmed_at
-            ? ` Sist bekreftet ${formatTimestamp(link.sales_unit_confirmed_at)}.`
-            : " Ikke bekreftet ennå."}
-        </p>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Grunnlag</Label>
-            <Select value={basis} onValueChange={(v) => setBasis(v as SalesUnitBasis)} disabled={!canWrite}>
-              <SelectTrigger aria-label="Grunnlag for salgsenhet">
-                <SelectValue placeholder="Velg grunnlag" />
-              </SelectTrigger>
-              <SelectContent>
-                {(["stk", "flerpakk", "vekt"] as SalesUnitBasis[]).map((b) => (
-                  <SelectItem key={b} value={b}>
-                    {SALES_UNIT_BASIS_LABEL[b]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {basis ? <p className="text-[11px] text-muted-foreground">{SALES_UNIT_BASIS_HELP[basis]}</p> : null}
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs" htmlFor="settings-units">
-              Enheter per salgsenhet
-            </Label>
-            <Input
-              id="settings-units"
-              inputMode="decimal"
-              value={units}
-              onChange={(e) => setUnits(e.target.value)}
-              disabled={!canWrite || basis === "vekt"}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs" htmlFor="settings-weight">
-              Vekt per salgsenhet (g)
-            </Label>
-            <Input
-              id="settings-weight"
-              inputMode="decimal"
-              value={weight}
-              onChange={(e) => setWeight(e.target.value)}
-              disabled={!canWrite}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs" htmlFor="settings-batch">
-              Emner per batch (overstyrt)
-            </Label>
-            <Input
-              id="settings-batch"
-              inputMode="decimal"
-              value={batch}
-              onChange={(e) => setBatch(e.target.value)}
-              disabled={!canWrite}
-              placeholder="Følger oppskriften"
-            />
-          </div>
-        </div>
-        {canWrite && (
-          <Button
-            size="sm"
-            disabled={saving || !basis}
-            onClick={() =>
-              onSave({
-                sales_unit_basis: basis || null,
-                units_per_sales_unit: basis === "vekt" ? null : units === "" ? (basis === "stk" ? 1 : null) : Number(units),
-                sales_unit_weight_g: weight === "" ? null : Number(weight),
-                units_per_batch_override: batch === "" ? null : Number(batch),
-              })
-            }
-          >
-            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Lagre innstillinger
-          </Button>
-        )}
-      </CardContent>
-    </Card>
   );
 }
 
