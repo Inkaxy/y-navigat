@@ -17,7 +17,7 @@ const stage3Test = readFileSync(join(dir, "20261012_varetelling_stage3.test.sql"
 const all = test + "\n" + stage3Test;
 const db = new PGlite();
 let oks = 0;
-const onNotice = (n) => { if (String(n.message).startsWith("OK")) oks++; };
+const onNotice = (n) => { if (String(n.message).startsWith("OK")) oks++; if (String(n.message).startsWith("DBG")) console.log(n.message); };
 try {
   const res = await db.exec(all, { onNotice });
   const last = res.at(-1)?.rows?.[0];
