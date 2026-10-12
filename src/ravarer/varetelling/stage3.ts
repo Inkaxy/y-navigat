@@ -38,7 +38,8 @@ export interface Stage3Api {
   listUnits(entity: string): Promise<VtUnit[]>;
 }
 export const Stage3Context = createContext<Stage3Api | null>(null);
-export function useStage3Api(): Stage3Api { const a = useContext(Stage3Context); if (!a) throw new Error("Stage3Context mangler"); return a; }
+/** Null når inngangen ikke har trinn 3 (da vises funksjonene som ikke tilgjengelige). */
+export function useStage3Api(): Stage3Api | null { return useContext(Stage3Context); }
 
 // ---------- parsere ----------
 const JOB_ST = ["opprettet", "behandler", "ukjent_ai_utfall", "klar", "feilet"] as const;
