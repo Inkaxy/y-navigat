@@ -66,8 +66,11 @@ export default function ForhandlingWizard() {
   const [deadline, setDeadline] = useState("");
 
   const { data: existing } = useNegotiation(negotiationId ?? undefined);
+  /** Skjemaet fylles fra serveren bare én gang per forhandlings-ID; bakgrunnsoppdatering overskriver aldri brukerens kladd. */
+  const hydratedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (!existing) return;
+    if (!existing || hydratedFor.current === existing.id) return;
+    hydratedFor.current = existing.id;
     setTitle(existing.title ?? "");
     setPurpose(existing.purpose ?? "");
     setContractStart(existing.contract_start ?? "");
@@ -178,7 +181,7 @@ export default function ForhandlingWizard() {
   const [genUnknown, setGenUnknown] = useState(false);
   const [confirmRegen, setConfirmRegen] = useState(false);
   const genLock = useRef(false);
-  const itemsLocked = !canReplaceNegotiationItems(existing?.status ?? "draft", recipients);
+  const itemsLocked = !canReplaceNegotiationItems(existing?.status ?? "draft", recipients, existing?.rfq_issued_at ?? null);
 
   async function handleSend() {
     if (!negotiationId || genLock.current) return;
@@ -207,7 +210,7 @@ export default function ForhandlingWizard() {
   }
 
   function copyEmail(c: RfqCredential) {
-    const body = `${emailIntro}\n\nLenke: ${c.portal_url}\nPassord: ${c.password}\n`;
+    const body = `${emailIntro}\n\nLenke: ${portalUrlFor(window.location.origin, "tilbud", c)}\nPassord: ${c.password}\n`;
     const subject = `RFQ – ${title}`;
     const mail = `Til: ${c.contact_email ?? ""}\nEmne: ${subject}\n\n${body}`;
     navigator.clipboard.writeText(mail);
@@ -215,14 +218,27 @@ export default function ForhandlingWizard() {
   }
 
   // ---- nav ----
+  /** Synkron lås: to klikk i samme render gir bare én lagring. Steget fryses ved klikk. */
+  const nextLock = useRef(false);
+  const [advancing, setAdvancing] = useState(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   async function next() {
+    if (nextLock.current) return;
+    nextLock.current = true;
+    setAdvancing(true);
+    const from = step;
     try {
-      if (step === 1) await persistStep1();
-      if (step === 2) await persistStep2();
-      if (step === 3) await persistStep3();
-      if (step < 5) setStep((s) => (s + 1) as Step);
+      if (from === 1) await persistStep1();
+      if (from === 2) await persistStep2();
+      if (from === 3) await persistStep3();
+      // Bare fra det frosne steget, og bare om brukeren fortsatt står der.
+      if (mounted.current && from < 5) setStep((s) => (s === from ? ((from + 1) as Step) : s));
     } catch (e) {
-      toast.error(`Lagring feilet: ${e instanceof Error ? e.message : "ukjent feil"}`);
+      if (mounted.current) toast.error(`Lagring feilet: ${e instanceof Error ? e.message : "ukjent feil"}`);
+    } finally {
+      nextLock.current = false;
+      if (mounted.current) setAdvancing(false);
     }
   }
   function back() {
@@ -514,7 +530,7 @@ fakturahistorikk, og uten den finnes verken volum eller prisgrunnlag. */}
                       <div className="truncate text-xs text-ink-secondary">{c.contact_email ?? "(mangler e-post)"}</div>
                       <div className="mt-1 flex items-center gap-2 text-xs">
                         <Badge variant="outline">Passord: {c.password}</Badge>
-                        <span className="truncate text-ink-secondary">{c.portal_url}</span>
+                        <span className="truncate text-ink-secondary">{portalUrlFor(window.location.origin, "tilbud", c)}</span>
                       </div>
                     </div>
                     <Button size="sm" variant="outline" onClick={() => copyEmail(c)}>
