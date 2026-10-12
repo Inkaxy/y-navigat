@@ -10,6 +10,7 @@ import {
   buildChanges, CORRECTION_FIELDS, CORRECTION_FIELD_LABEL, correctionLockReason, draftFrom, LINE_KIND_OPTIONS, PRICE_BASIS_OPTIONS,
   NUMERIC_FIELDS, type CorrectionDraft, type CorrectionField, type CorrectionResult,
 } from "@/fakturaer/lib/lineCorrection";
+import { formatMachineNumbersNb } from "@/fakturaer/lib/sumDirection";
 import { lineReadIssues, parseNorwegianNumber } from "@/fakturaer/lib/invoiceReadCheck";
 import { useCorrectionLine, useCorrectLine } from "./useLineCorrection";
 import { ExtractionExamplesList } from "./ExtractionExamplesList";
@@ -132,7 +133,7 @@ export function CorrectLineDialog({ open, onOpenChange, lineId, invoice, canWrit
               {q.data.issues.length > 0 && (
                 <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
                   <p className="font-medium">Lesevarsler på linjen</p>
-                  <ul className="list-disc pl-5">{q.data.issues.map((i) => <li key={i.code + i.message}>{i.message}</li>)}</ul>
+                  <ul className="list-disc pl-5">{q.data.issues.map((i) => <li key={i.code + i.message}>{formatMachineNumbersNb(i.message)}</li>)}</ul>
                 </div>
               )}
               <div className="grid gap-3 sm:grid-cols-2">{CORRECTION_FIELDS.map(field)}</div>
@@ -146,7 +147,7 @@ export function CorrectLineDialog({ open, onOpenChange, lineId, invoice, canWrit
               )}
               {preview.length > 0 ? (
                 <div className="space-y-2 rounded-md border border-border px-3 py-2 text-sm">
-                  <p>Etter rettelsen: {preview.map((p) => p.message).join(" ")}</p>
+                  <p>Etter rettelsen: {preview.map((p) => formatMachineNumbersNb(p.message)).join(" ")}</p>
                   <label className="flex items-start gap-2"><Checkbox checked={acceptIssues} onCheckedChange={(v) => setAcceptIssues(v === true)} disabled={!!lock} />
                     <span>Tallene er kontrollert mot originalen og stemmer likevel. Registrer heller rabatt og prisgrunnlag over når det er mulig.</span></label>
                   {acceptIssues && learn && <p className="text-caption text-ink-secondary">Rettelser med godtatte avvik blir aldri brukt ved senere lesing. Rett tallene og prisgrunnlaget i stedet hvis du vil lære av linjen.</p>}
