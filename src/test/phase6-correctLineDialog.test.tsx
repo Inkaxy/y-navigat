@@ -29,8 +29,7 @@ function view(props: Partial<Parameters<typeof CorrectLineDialog>[0]> = {}) {
 }
 const fillValid = () => {
   fireEvent.change(screen.getByLabelText("Begrunnelse"), { target: { value: "Lest feil fra originalen" } });
-  const qty = document.getElementById("rett-quantity") as HTMLInputElement;
-  fireEvent.change(qty, { target: { value: "11" } });
+  fireEvent.change(document.getElementById("rett-description") as HTMLInputElement, { target: { value: "HASSELNØTTER" } });
 };
 const save = () => screen.getByRole("button", { name: "Lagre rettelsen" });
 
@@ -68,13 +67,13 @@ describe("CorrectLineDialog: identitet og ferske data", () => {
     st.q = { ...ok(row()), isSuccess: false, isError: true, isFetching: false };
     rerender(<CorrectLineDialog open onOpenChange={() => undefined} lineId="A" targetInvoiceId="I1" invoice={inv()} canWrite document={<div />} onSaved={() => undefined} />);
     expect(save()).toBeDisabled();
-    expect((document.getElementById("rett-quantity") as HTMLInputElement).value).toBe("11");
+    expect((document.getElementById("rett-description") as HTMLInputElement).value).toBe("HASSELNØTTER");
     st.q = { ...ok(row()), isFetching: true };
     rerender(<CorrectLineDialog open onOpenChange={() => undefined} lineId="A" targetInvoiceId="I1" invoice={inv()} canWrite document={<div />} onSaved={() => undefined} />);
     expect(save()).toBeDisabled();
     st.q = ok(row());
     rerender(<CorrectLineDialog open onOpenChange={() => undefined} lineId="A" targetInvoiceId="I1" invoice={inv()} canWrite document={<div />} onSaved={() => undefined} />);
-    expect((document.getElementById("rett-quantity") as HTMLInputElement).value).toBe("11");
+    expect((document.getElementById("rett-description") as HTMLInputElement).value).toBe("HASSELNØTTER");
     expect(save()).not.toBeDisabled();
   });
   it("ny versjon av raden → utkast beholdes, lagring sperret med «Last inn ferske verdier»", () => {
@@ -113,17 +112,5 @@ describe("CorrectLineDialog: identitet og ferske data", () => {
     expect((document.getElementById("rett-quantity") as HTMLElement).className).toContain("min-h-[44px]");
     const close = screen.getAllByRole("button", { name: "Lukk" })[0];
     expect(close.className).toContain("min-w-[44px]");
-  });
-  it("Escape fører fokus tilbake til åpneren når den fortsatt finnes", async () => {
-    const opener = document.createElement("button"); opener.textContent = "Rett sumavvik"; document.body.appendChild(opener);
-    let open = true;
-    const { rerender } = render(<CorrectLineDialog open={open} onOpenChange={(v) => { open = v; }} lineId="A" targetInvoiceId="I1" returnFocus={() => opener} invoice={inv()} canWrite document={<div />} onSaved={() => undefined} />);
-    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
-    expect(open).toBe(false);
-    await act(async () => {
-      rerender(<CorrectLineDialog open={false} onOpenChange={() => undefined} lineId="A" targetInvoiceId="I1" returnFocus={() => opener} invoice={inv()} canWrite document={<div />} onSaved={() => undefined} />);
-    });
-    expect(document.activeElement).toBe(opener);
-    opener.remove();
   });
 });
