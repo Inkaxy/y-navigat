@@ -70,7 +70,7 @@ export function ListActions({ list, open, canWrite, canApprove, summary }: { lis
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span>Listen: {summary.lines - summary.notCounted} / {summary.lines} registrert</span>
-        {canWrite && !pending && (list.status === "ikke_startet" || list.status === "under_telling") && <Button variant="outline" className="min-h-[48px]" disabled={busy || unsynced > 0} onClick={() => go("til_kontroll")}>Send liste til kontroll</Button>}
+        {canWrite && !pending && (list.status === "ikke_startet" || list.status === "under_telling") && <Button variant="outline" className="min-h-[48px]" disabled={busy} onClick={() => go("til_kontroll")}>Send liste til kontroll</Button>}
         {canWrite && !pending && list.status === "til_kontroll" && <Button variant="outline" className="min-h-[48px]" disabled={busy} onClick={() => go("under_telling")}>Tilbake til telling</Button>}
         {canApprove && !pending && list.status === "til_kontroll" && <Button className="min-h-[48px]" disabled={busy} onClick={() => go("godkjent")}>Godkjenn liste</Button>}
         {canApprove && !pending && list.status === "godkjent" && <Button variant="outline" className="min-h-[48px]" disabled={busy} onClick={() => go("under_telling")}>Gjenåpne liste</Button>}
