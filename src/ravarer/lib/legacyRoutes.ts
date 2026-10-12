@@ -15,7 +15,7 @@ function merge(search: string, extra: [string, string][], rename: Record<string,
     if (k in rename) {
       const to = rename[k];
       const mapped = values[k] ? values[k][v] : v;
-      if (to && mapped && !out.has(to)) out.set(to, mapped);
+      if (to && mapped && !out.has(to) && !src.has(to)) out.set(to, mapped);
       return;
     }
     if (!out.has(k)) out.set(k, v);
