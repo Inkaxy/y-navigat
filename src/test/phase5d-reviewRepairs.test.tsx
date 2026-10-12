@@ -14,6 +14,7 @@ const st = vi.hoisted(() => ({
   invoke: vi.fn(),
   updates: [] as Array<{ table: string; patch: unknown; filters: Array<[string, unknown]> }>,
   updateError: null as null | { message: string },
+  inv: { loading: false, canWrite: true },
 }));
 vi.mock("@/integrations/supabase/client", () => {
   const from = (table: string) => {
@@ -44,11 +45,12 @@ vi.mock("@/integrations/supabase/client", () => {
   } };
 });
 vi.mock("@/ravarer/context/RavarerContext", () => ({ useRavarer: () => ({ legalEntityId: st.entity, user: { id: "U" }, canWrite: true }) }));
+vi.mock("@/fakturaer/hooks/useInvoiceRights", () => ({ useInvoiceRights: () => ({ ...st.inv, canApprove: false }) }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 vi.mock("@/ravarer/lib/invalidate", () => ({ invalidateRawMaterial: vi.fn() }));
 
 import { useUpsertNegotiationItems, NegotiationContextChangedError, NegotiationUncertainReceiptError } from "@/ravarer/hooks/useNegotiations";
-import { LiveConfirmationStatus } from "@/ravarer/pages/forhandlinger/detail/LiveConfirmationStatus";
+import { LiveConfirmationStatus, __resetLiveRecoveryMemory } from "@/ravarer/pages/forhandlinger/detail/LiveConfirmationStatus";
 import { SavingsValue } from "@/ravarer/pages/forhandlinger/detail/SavingsValue";
 import { offerPricePerBaseUnit } from "@/ravarer/lib/negotiationMatrix";
 import { canReplaceNegotiationItems, classifyApplyOutcome, estimateSavings, negotiationListReturn, parseRfqCredentials } from "@/ravarer/lib/negotiationOps";
@@ -58,7 +60,7 @@ function client() { return new QueryClient({ defaultOptions: { mutations: { retr
 function wrap(qc = client()) {
   return ({ children }: { children: ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
 }
-beforeEach(() => { st.entity = "A"; st.rpcData = 1; st.rpc.mockClear(); st.statusRead = null; st.invoke.mockReset(); st.updates = []; st.updateError = null; });
+beforeEach(() => { st.entity = "A"; st.rpcData = 1; st.rpc.mockClear(); st.statusRead = null; st.invoke.mockReset(); st.updates = []; st.updateError = null; st.inv = { loading: false, canWrite: true }; __resetLiveRecoveryMemory(); });
 
 describe("tilbudsomregning og besparelse", () => {
   it("manglende pris blir aldri 0 og slår aldri et gyldig tilbud", () => {
@@ -182,5 +184,69 @@ describe("LiveConfirmationStatus — gjenoppretting", () => {
     const last = st.updates[st.updates.length - 1];
     expect(last.filters).toContainEqual(["id", ["t1"]]);
     expect(last.filters).toContainEqual(["negotiation_id", "n1"]);
+  });
+});
+
+describe("ae8e-rettelser", () => {
+  it("fakturaspesifikk skriverett: lasting og tilbakekalling midt i lesing stopper før skriving", async () => {
+    st.inv = { loading: true, canWrite: false };
+    const a = renderHook(() => useUpsertNegotiationItems(), { wrapper: wrap() });
+    await act(async () => {
+      await expect(a.result.current.mutateAsync({ negotiationId: "N", items: [{ raw_material_id: "m" }] })).rejects.toBeInstanceOf(NegotiationContextChangedError);
+    });
+    st.inv = { loading: false, canWrite: true };
+    let release = () => undefined as void;
+    st.statusRead = new Promise<void>((r) => { release = r; });
+    const { result, rerender } = renderHook(() => useUpsertNegotiationItems(), { wrapper: wrap() });
+    let p: Promise<unknown> = Promise.resolve();
+    st.reads = 0;
+    act(() => { p = result.current.mutateAsync({ negotiationId: "N", items: [{ raw_material_id: "m" }] }); });
+    await waitFor(() => expect(st.reads).toBe(1));
+    st.inv = { loading: false, canWrite: false }; // modulens canWrite er fortsatt true
+    rerender();
+    await act(async () => { release(); await expect(p).rejects.toBeInstanceOf(NegotiationContextChangedError); });
+    expect(st.rpc).not.toHaveBeenCalled();
+  });
+
+  it("ugyldig oppgitt pakningsstørrelse og emballasje som grunnenhet er ukjent", () => {
+    expect(offerPricePerBaseUnit({ offeredPrice: 100, offeredPackageSize: -1, baseUnit: "kg" }).value).toBeNull();
+    expect(offerPricePerBaseUnit({ offeredPrice: 100, offeredPackageSize: 0, baseUnit: "kg" }).value).toBeNull();
+    expect(offerPricePerBaseUnit({ offeredPrice: 100, offeredPackageSize: Number.NaN, baseUnit: "kg" }).value).toBeNull();
+    expect(offerPricePerBaseUnit({ offeredPrice: 100, baseUnit: "sekk" }).value).toBeNull();
+    expect(offerPricePerBaseUnit({ offeredPrice: 100, offeredPackageSize: null, baseUnit: "kg" }).value).toBe(100);
+    expect(offerPricePerBaseUnit({ offeredPrice: 0, baseUnit: "kg" }).value).toBe(0);
+    expect(offerPricePerBaseUnit({ offeredPrice: 100, offeredPackageSize: 500, offeredPackageUnit: "g", baseUnit: "kg" }).value).toBe(200);
+  });
+
+  it("navigering til B under bekreftet aktivering av A fullfører As frosne statussteg uten å vise A i B", async () => {
+    let resolve: (v: unknown) => void = () => undefined;
+    st.invoke.mockReturnValue(new Promise((r) => { resolve = r; }));
+    const qc = client();
+    const ui = (n: NegotiationRow, its: NegotiationItemRow[]) => <QueryClientProvider client={qc}><LiveConfirmationStatus neg={n} items={its} recipients={recipients} rmName={() => "Mel"} supName={() => "Lev"} canWrite /></QueryClientProvider>;
+    const { rerender } = render(ui(neg, items));
+    fireEvent.click(screen.getByRole("button", { name: /Aktiver alle uansett/ }));
+    const negB = { ...neg, id: "n2" } as NegotiationRow;
+    const itemsB = [{ id: "tB", raw_material_id: "m9", live_status: "tentatively_agreed", live_agreed_price: 3 }] as NegotiationItemRow[];
+    rerender(ui(negB, itemsB));
+    await act(async () => { resolve({ data: { success: true, applied: 2 }, error: null }); });
+    await waitFor(() => expect(st.updates).toHaveLength(1));
+    expect(st.updates[0].filters).toContainEqual(["id", ["t1"]]);
+    expect(st.updates[0].filters).toContainEqual(["negotiation_id", "n1"]);
+    expect(screen.queryByText(/Prisene sendes ikke på nytt/)).toBeNull();
+  });
+
+  it("feilet statussteg etter navigasjon huskes for A og vises når A åpnes igjen", async () => {
+    let resolve: (v: unknown) => void = () => undefined;
+    st.invoke.mockReturnValue(new Promise((r) => { resolve = r; }));
+    st.updateError = { message: "x" };
+    const first = renderStatus();
+    fireEvent.click(screen.getByRole("button", { name: /Aktiver alle uansett/ }));
+    first.unmount();
+    await act(async () => { resolve({ data: { success: true, applied: 2 }, error: null }); });
+    await waitFor(() => expect(st.updates).toHaveLength(1));
+    renderStatus();
+    expect(await screen.findByText(/Prisene sendes ikke på nytt/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Merk bare gjenstående linjer/ })).toBeTruthy();
+    expect(st.invoke).toHaveBeenCalledTimes(1);
   });
 });

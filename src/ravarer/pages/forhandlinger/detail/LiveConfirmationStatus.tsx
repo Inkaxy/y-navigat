@@ -32,6 +32,20 @@ type Recovery =
   | { kind: "followup"; negotiationId: string; targetIds: string[]; retrying: boolean };
 
 /**
+ * Fanens minne (ikke varig): gjenoppretting per forhandling overlever navigasjon og
+ * avmontering i samme fane, slik at A åpnet på nytt viser sin egen status/oppfølging.
+ */
+const tabRecovery = new Map<string, Recovery>();
+/** Kun for tester. */
+export function __resetLiveRecoveryMemory() { tabRecovery.clear(); }
+function restore(id: string): Recovery | null {
+  const r = tabRecovery.get(id);
+  if (!r) return null;
+  // Et pågående steg i en tidligere visning er ikke lenger aktivt her.
+  return r.kind === "uncertain" ? { ...r, reread: r.reread === "pending" || r.reread === "ok" ? "idle" : r.reread, readAt: null } : { ...r, retrying: false };
+}
+
+/**
  * Bekreftelsesstatus for en avsluttet live-forhandling, med aktivering.
  * Aktivering (motoren) og merking av ubekreftede linjer er to separate steg;
  * feil i det andre steget vises eksplisitt etter at prisene er aktivert.
@@ -40,14 +54,19 @@ export function LiveConfirmationStatus({ neg, items, recipients, rmName, supName
   const qc = useQueryClient();
   const [activeRecipientId, setActiveRecipientId] = useState("");
   const [activating, setActivating] = useState(false);
-  const [recoveryState, setRecovery] = useState<Recovery | null>(null);
+  const [recoveryState, setRecoveryState] = useState<Recovery | null>(() => restore(neg.id));
   const lock = useRef(false);
   const ctx = useRef({ negotiationId: neg.id, mounted: true });
   ctx.current.negotiationId = neg.id;
   useEffect(() => { const c = ctx.current; c.mounted = true; return () => { c.mounted = false; }; }, []);
-  useEffect(() => { setRecovery(null); }, [neg.id]);
+  useEffect(() => { setRecoveryState(restore(neg.id)); }, [neg.id]);
   /** Et sent svar for en annen forhandling eller etter avmontering vises aldri. */
   const stillCurrent = (id: string) => ctx.current.mounted && ctx.current.negotiationId === id;
+  /** Lagrer i fanens minne for forhandlingen; vises bare hvis den fortsatt er åpen her. */
+  const setRecovery = (rec: Recovery | null, id: string = rec?.negotiationId ?? neg.id) => {
+    if (rec) tabRecovery.set(id, rec); else tabRecovery.delete(id);
+    if (stillCurrent(id)) setRecoveryState(rec);
+  };
   const recovery = recoveryState && recoveryState.negotiationId === neg.id ? recoveryState : null;
   const selectedRecipient = recipients.find((r) => r.id === activeRecipientId) ?? (recipients.length === 1 ? recipients[0] : undefined);
 
@@ -95,8 +114,8 @@ export function LiveConfirmationStatus({ neg, items, recipients, rmName, supName
       invalidateRawMaterial(qc);
       qc.invalidateQueries({ queryKey: ["negotiation-items", negotiationId] });
       qc.invalidateQueries({ queryKey: ["negotiation", negotiationId] });
-      if (!stillCurrent(negotiationId)) return;
-      if (outcome.kind === "rejected") { toast.error(outcome.message); return; }
+      // Utfallet registreres for A selv om brukeren har gått videre; bare visning/toast gates.
+      if (outcome.kind === "rejected") { if (stillCurrent(negotiationId)) toast.error(outcome.message); return; }
       if (outcome.kind === "partial") {
         setRecovery({ kind: "uncertain", negotiationId, reread: "idle", readAt: null,
           text: `${outcome.linksOpen ? "Forhandlingen er avsluttet, men lenkene er ikke stengt. " : ""}${outcome.failures.join("; ")}`.trim() || null });
@@ -104,14 +123,15 @@ export function LiveConfirmationStatus({ neg, items, recipients, rmName, supName
       }
       if (outcome.kind === "unknown") { setRecovery({ kind: "uncertain", negotiationId, text: null, reread: "idle", readAt: null }); return; }
       if (!onlyConfirmed && frozenTentativeIds.length > 0) {
+        // Bekreftet aktivering: det allerede godkjente statussteget fullføres for As frosne linjer,
+        // også etter navigasjon. Feil huskes som oppfølging for A.
         const ok = await markRemaining(negotiationId, frozenTentativeIds);
-        if (!stillCurrent(negotiationId)) return;
         if (!ok) { setRecovery({ kind: "followup", negotiationId, targetIds: frozenTentativeIds, retrying: false }); return; }
       }
-      toast.success("Aktivert");
+      if (stillCurrent(negotiationId)) toast.success("Aktivert");
     } catch (e) {
       console.warn("[live-aktivering] ukjent utfall", e instanceof Error ? e.name : "ukjent");
-      if (stillCurrent(negotiationId)) setRecovery({ kind: "uncertain", negotiationId, text: null, reread: "idle", readAt: null });
+      setRecovery({ kind: "uncertain", negotiationId, text: null, reread: "idle", readAt: null });
     } finally {
       lock.current = false;
       setActivating(false);
@@ -141,8 +161,7 @@ export function LiveConfirmationStatus({ neg, items, recipients, rmName, supName
     const r = recovery;
     setRecovery({ ...r, retrying: true });
     const ok = await markRemaining(r.negotiationId, r.targetIds);
-    if (!stillCurrent(r.negotiationId)) return;
-    if (ok) { setRecovery(null); toast.success("Gjenstående linjer er merket"); }
+    if (ok) { setRecovery(null, r.negotiationId); if (stillCurrent(r.negotiationId)) toast.success("Gjenstående linjer er merket"); }
     else setRecovery({ ...r, retrying: false });
   }
 
@@ -158,7 +177,7 @@ export function LiveConfirmationStatus({ neg, items, recipients, rmName, supName
       if (stillCurrent(r.negotiationId)) setRecovery({ ...r, reread: "ok", readAt: new Date().toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit" }) });
     } catch (e) {
       console.warn("[live-aktivering] ny lesing feilet", e instanceof Error ? e.name : "ukjent");
-      if (stillCurrent(r.negotiationId)) setRecovery({ ...r, reread: "failed" });
+      setRecovery({ ...r, reread: "failed" });
     }
   }
 
@@ -233,7 +252,7 @@ export function LiveConfirmationStatus({ neg, items, recipients, rmName, supName
               Les status på nytt
             </Button>
             {canWrite && recovery.reread === "ok" && (
-              <Button size="sm" variant="ghost" className="min-h-[44px]" onClick={() => setRecovery(null)}>
+              <Button size="sm" variant="ghost" className="min-h-[44px]" onClick={() => setRecovery(null, neg.id)}>
                 Jeg har kontrollert — tillat nytt forsøk
               </Button>
             )}

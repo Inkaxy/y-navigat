@@ -81,3 +81,11 @@ To-økts samtidighetsverifisering i PostgreSQL er ikke gjort.
 | Fil | md5 |
 |---|---|
 | live-mirror/negotiation_item_preservation_reviewed.sql | b87992c0f5d036d9e2e7fca22ec86b0c |
+
+## Offentlige portalfunksjoner — ALLEREDE LIVE (v141, 2026-10-12 07:00 UTC)
+
+`supabase/functions/validate-rfq-access/index.ts` og `supabase/functions/submit-negotiation-response/index.ts`
+er byte-like de gjennomgåtte og utrullede v141-entrypointene (rot-utrullet etter uavhengig gjennomgang).
+Eneste forskjell fra v140: tre SELECT-feilvern (varelinjer, svar, eksisterende svar). Avhengigheter,
+verify_jwt=false og token+passord-autentisering er uendret. ALDRI utrull på nytt herfra; filene speiler live.
+Repo-innholdet var allerede identisk ved speiling, så ingen filendring og ingen automatisk utrulling skjedde.

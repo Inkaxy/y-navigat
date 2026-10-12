@@ -74,15 +74,17 @@ Deno.serve(async (req) => {
     } as any);
 
     // Load full bundle: items + existing draft responses + supplier name + raw materials
-    const { data: items } = await admin
+    const { data: items, error: itemsError } = await admin
       .from("negotiation_items")
       .select(RFQ_ITEM_SELECT)
       .eq("negotiation_id", row.negotiation_id)
       .order("sort_order");
-    const { data: responses } = await admin
+    if (itemsError) throw itemsError;
+    const { data: responses, error: responsesError } = await admin
       .from("negotiation_responses")
       .select(RFQ_RESPONSE_SELECT)
       .eq("recipient_id", row.recipient_id);
+    if (responsesError) throw responsesError;
     const { data: supplier } = await admin
       .from("suppliers")
       .select("name")

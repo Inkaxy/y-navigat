@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, ArrowRight, Send, Loader2, Copy, CheckCircle2, Handshake } from "lucide-react";
 import { toast } from "sonner";
 import { ModulePage } from "@/ravarer/ui/ModulePage";
+import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useInvoiceRights } from "@/fakturaer/hooks/useInvoiceRights";
 import { useAllRawMaterialPurchaseStats } from "@/ravarer/hooks/usePurchaseStats";
 import { baselineFromStats, type BaselineStats } from "@/ravarer/lib/negotiationOps";
@@ -43,12 +44,25 @@ const STEPS: Array<{ n: Step; label: string }> = [
   { n: 5, label: "Generer lenker" },
 ];
 
+/**
+ * Eier per rute-forhandling og selskap: bytte av :id eller selskap monterer en helt ny
+ * veiviser (kladd, steg, låser og ventende operasjoner tilhører den gamle eieren og
+ * kan ikke lenger endre visning eller sende nye skrivinger).
+ */
 export default function ForhandlingWizard() {
-  const navigate = useNavigate();
   const { id: routeId } = useParams<{ id?: string }>();
+  const { legalEntityId } = useRavarer();
+  return <WizardOwner key={`${legalEntityId ?? "-"}:${routeId ?? "ny"}`} routeId={routeId} />;
+}
+
+function WizardOwner({ routeId }: { routeId: string | undefined }) {
+  const navigate = useNavigate();
   const [negotiationId, setNegotiationId] = useState<string | null>(routeId ?? null);
   const [step, setStep] = useState<Step>(1);
   const rights = useInvoiceRights();
+  const rightsRef = useRef(rights);
+  rightsRef.current = rights;
+  const canWriteNow = () => !rightsRef.current.loading && rightsRef.current.canWrite;
 
   // ---- step 1 state ----
   const [title, setTitle] = useState("");
@@ -225,6 +239,8 @@ export default function ForhandlingWizard() {
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   async function next() {
     if (nextLock.current) return;
+    // Synlig deaktivert knapp er ikke eneste vern: gjeldende fakturaskriverett kreves før utsending.
+    if (!canWriteNow()) { toast.error("Du har ikke skrivetilgang til forhandlinger."); return; }
     nextLock.current = true;
     setAdvancing(true);
     const from = step;
@@ -233,7 +249,7 @@ export default function ForhandlingWizard() {
       if (from === 2) await persistStep2();
       if (from === 3) await persistStep3();
       // Bare fra det frosne steget, og bare om brukeren fortsatt står der.
-      if (mounted.current && from < 5) setStep((s) => (s === from ? ((from + 1) as Step) : s));
+      if (mounted.current && canWriteNow() && from < 5) setStep((s) => (s === from ? ((from + 1) as Step) : s));
     } catch (e) {
       if (mounted.current) toast.error(`Lagring feilet: ${e instanceof Error ? e.message : "ukjent feil"}`);
     } finally {
