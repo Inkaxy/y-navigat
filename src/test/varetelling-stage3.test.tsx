@@ -113,8 +113,8 @@ function mount(opts: FakeStage3Opts = {}, url = "/", scope: Partial<VtScope> = {
     <MemoryRouter initialEntries={[u]}><QueryClientProvider client={qc}><VtApiContext.Provider value={api}><Stage3Context.Provider value={s3}>
       <VtScopeContext.Provider value={full}><VaretellingWorkspace legacy={<p>x</p>} /></VtScopeContext.Provider>
     </Stage3Context.Provider></VtApiContext.Provider></QueryClientProvider></MemoryRouter>);
-  const r = render(ui(url));
-  return { api, s3, qc, ...r, remount: (u: string) => { r.unmount(); return render(ui(u)); } };
+  let cur = render(ui(url));
+  return { api, s3, qc, remount: (u: string) => { cur.unmount(); cur = render(ui(u)); return cur; } };
 }
 async function started(api: ReturnType<typeof createFakeVtApi>, ids = ["t1"]) {
   const { countId } = await api.createCount({ opId: crypto.randomUUID(), entity: "e1", name: "T", plannedDate: "2026-10-12", valuationMode: "ved_start", valuationDate: null, templateIds: ids });
