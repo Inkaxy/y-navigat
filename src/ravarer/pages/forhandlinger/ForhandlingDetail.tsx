@@ -1,403 +1,251 @@
-import { setPrimarySupplier } from "@/ravarer/lib/supplierLinkRpc";
-import { classifyApplyOutcome, readEdgeErrorBody, runPrimaryTasks, type ApplyOutcome, type PrimaryTask } from "@/ravarer/lib/negotiationOps";
-import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useNavigate, useParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Flag, Handshake, History, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Trophy, Check, X, Loader2, Flag, History, Send, FileCheck, Clock, AlertTriangle } from "lucide-react";
-import { toast } from "sonner";
-import { UnitPriceHint } from "@/ravarer/components/forhandlinger/UnitPriceHint";
-import { LiveTidslinjeDrawer } from "./components/LiveTidslinjeDrawer";
-import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
+import { Card } from "@/components/ui/card";
+import { QueryState } from "@/components/common/QueryState";
+import { ModulePage } from "@/ravarer/ui/ModulePage";
+import { DataTable, type Column } from "@/ravarer/ui/DataTable";
+import { NegotiationStatusPill, RecipientStatusPill } from "@/ravarer/components/forhandlinger/NegotiationPills";
+import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
+import { useInvoiceRights } from "@/fakturaer/hooks/useInvoiceRights";
 import {
   useNegotiation,
   useNegotiationItems,
   useNegotiationRecipients,
+  useNegotiationResponses,
+  type NegotiationRecipientRow,
 } from "@/ravarer/hooks/useNegotiations";
 import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
-import { formatDate, formatNok, formatNumber } from "@/ravarer/lib/constants";
-import {
-  offerPricePerBaseUnit,
-  bestOfferRecipient,
-  negotiationStatusLabel,
-  recipientStatusLabel,
-  isNegotiationClosed,
-} from "@/ravarer/lib/negotiationMatrix";
+import { formatDate, formatNok } from "@/ravarer/lib/constants";
+import { bestOfferRecipient, isNegotiationClosed, offerPricePerBaseUnit } from "@/ravarer/lib/negotiationMatrix";
+import { estimateSavings } from "@/ravarer/lib/negotiationOps";
 import { paths } from "@/ravarer/lib/paths";
+import { LiveTidslinjeDrawer } from "./components/LiveTidslinjeDrawer";
+import { ConcludeDialog } from "./detail/ConcludeDialog";
+import { LiveConfirmationStatus } from "./detail/LiveConfirmationStatus";
+import { OfferComparison } from "./detail/OfferComparison";
+
+function Kpi({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <Card className="p-3 sm:p-4">
+      <p className="text-caption uppercase tracking-wide text-ink-secondary">{label}</p>
+      <div className="mt-1 text-sm">{children}</div>
+    </Card>
+  );
+}
 
 export default function ForhandlingDetail() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { id = "" } = useParams<{ id: string }>();
-  const { data: neg } = useNegotiation(id);
-  const { data: items = [] } = useNegotiationItems(id);
-  const { data: recipients = [] } = useNegotiationRecipients(id);
+  const rights = useInvoiceRights();
+  const negQ = useNegotiation(id);
+  const itemsQ = useNegotiationItems(id);
+  const recipientsQ = useNegotiationRecipients(id);
+  const responsesQ = useNegotiationResponses(id);
   const { data: rawMaterials = [] } = useRawMaterials();
   const { data: suppliers = [] } = useSuppliers();
+  const neg = negQ.data ?? null;
+  const items = useMemo(() => itemsQ.data ?? [], [itemsQ.data]);
+  const recipients = useMemo(() => recipientsQ.data ?? [], [recipientsQ.data]);
+  const responses = useMemo(() => responsesQ.data ?? [], [responsesQ.data]);
 
-  interface ResponseRow {
-    id: string;
-    negotiation_item_id: string;
-    recipient_id: string;
-    offered_price: number | null;
-    offered_package_size: number | null;
-    offered_package_unit: string | null;
-    status: string;
-  }
-
-  const { data: responses = [] } = useQuery({
-    queryKey: ["negotiation-responses", id],
-    enabled: !!id,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("negotiation_responses" as any)
-        .select("*")
-        .eq("negotiation_id", id);
-      if (error) throw error;
-      return (data ?? []) as unknown as ResponseRow[];
-    },
-  });
-
-  const rmName = (rid: string) => rawMaterials.find((r) => r.id === rid)?.name ?? "—";
-  const rmBaseUnit = (rid: string) => rawMaterials.find((r) => r.id === rid)?.base_unit ?? null;
-  const rmCost = (rid: string) => {
-    const c = rawMaterials.find((r) => r.id === rid)?.current_cost_price;
-    return c == null ? null : Number(c);
-  };
-  const rmBaseUnitsPerPackage = (rid: string) => {
-    const v = rawMaterials.find((r) => r.id === rid)?.base_units_per_package;
-    return v == null ? null : Number(v);
-  };
+  const rmById = useMemo(() => new Map(rawMaterials.map((r) => [r.id, r])), [rawMaterials]);
+  const rmName = (rid: string) => rmById.get(rid)?.name ?? "—";
+  const rmBaseUnit = (rid: string) => rmById.get(rid)?.base_unit ?? null;
+  const rmCost = (rid: string) => { const c = rmById.get(rid)?.current_cost_price; return c == null ? null : Number(c); };
   const supName = (sid: string) => suppliers.find((s) => s.id === sid)?.name ?? "—";
-  const recById = (rcId: string) => recipients.find((r) => r.id === rcId);
 
-  // Build comparison matrix: per item, per recipient
-  const matrix = useMemo(() => {
-    const map = new Map<string, Map<string, any>>();
-    for (const it of items) map.set(it.id, new Map());
-    for (const r of responses) {
-      const m = map.get(r.negotiation_item_id);
-      if (m) m.set(r.recipient_id, r);
-    }
-    return map;
-  }, [items, responses]);
+  const responseIndex = useMemo(() => {
+    const m = new Map<string, (typeof responses)[number]>();
+    for (const r of responses) m.set(`${r.negotiation_item_id}:${r.recipient_id}`, r);
+    return m;
+  }, [responses]);
 
-  /**
-   * Alle tilbud regnes om til pris per grunnenhet før de sammenlignes.
-   * Tidligere ble rå «offered_price» sammenlignet, slik at et tilbud per sekk
-   * så billigere ut enn et tilbud per kilo.
-   */
+  /** Alle tilbud regnes om til pris per grunnenhet før sammenligning; ukjent pakning = null. */
   const perBaseByItem = useMemo(() => {
     const out = new Map<string, Map<string, number | null>>();
     for (const it of items) {
+      const rm = rmById.get(it.raw_material_id);
       const inner = new Map<string, number | null>();
       for (const r of responses) {
         if (r.negotiation_item_id !== it.id || r.status !== "submitted") continue;
-        const conv = offerPricePerBaseUnit({
+        inner.set(r.recipient_id, offerPricePerBaseUnit({
           offeredPrice: r.offered_price,
           offeredPackageSize: r.offered_package_size,
           offeredPackageUnit: r.offered_package_unit,
-          baseUnit: rmBaseUnit(it.raw_material_id),
-          linkBaseUnitsPerPackage: rmBaseUnitsPerPackage(it.raw_material_id),
-        });
-        inner.set(r.recipient_id, conv.value);
+          baseUnit: rm?.base_unit ?? null,
+          linkBaseUnitsPerPackage: rm?.base_units_per_package == null ? null : Number(rm.base_units_per_package),
+        }).value);
       }
       out.set(it.id, inner);
     }
     return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, responses, rawMaterials]);
+  }, [items, responses, rmById]);
 
-  // Best per item by lowest price per grunnenhet
   const bestByItem = useMemo(() => {
     const out = new Map<string, string | null>();
     for (const it of items) {
-      const inner = perBaseByItem.get(it.id);
-      const offers = Array.from(inner?.entries() ?? []).map(([recipientId, pricePerBaseUnit]) => ({
-        recipientId,
-        pricePerBaseUnit,
-      }));
+      const offers = Array.from(perBaseByItem.get(it.id)?.entries() ?? []).map(([recipientId, pricePerBaseUnit]) => ({ recipientId, pricePerBaseUnit }));
       out.set(it.id, bestOfferRecipient(offers));
     }
     return out;
   }, [items, perBaseByItem]);
 
-  // Total potential savings
-  const totalSavings = useMemo(() => {
-    let saved = 0;
-    for (const it of items) {
-      const winner = bestByItem.get(it.id);
-      if (!winner || !it.actual_volume_baseline || !it.actual_cost_baseline) continue;
-      const perBase = perBaseByItem.get(it.id)?.get(winner) ?? null;
-      if (perBase == null) continue;
-      const newCost = Number(it.actual_volume_baseline) * perBase;
-      saved += Number(it.actual_cost_baseline) - newCost;
-    }
-    return saved;
-  }, [items, perBaseByItem, bestByItem]);
+  const savings = useMemo(() => estimateSavings(items.map((it) => {
+    const winner = bestByItem.get(it.id) ?? null;
+    return {
+      hasWinner: !!winner || (perBaseByItem.get(it.id)?.size ?? 0) > 0,
+      winnerPerBase: winner ? perBaseByItem.get(it.id)?.get(winner) ?? null : null,
+      volumeBaseline: it.actual_volume_baseline,
+      costBaseline: it.actual_cost_baseline,
+    };
+  })), [items, bestByItem, perBaseByItem]);
 
-  // Conclusion modal
   const [concludeOpen, setConcludeOpen] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
-  const [activating, setActivating] = useState(false);
-  /** Hvilken mottaker live-avtalen gjelder. Tidligere ble alltid den første brukt. */
-  const [activeRecipientId, setActiveRecipientId] = useState<string>("");
-  const selectedRecipient =
-    recipients.find((r) => r.id === activeRecipientId) ?? (recipients.length === 1 ? recipients[0] : undefined);
-
-  const isLive = (neg as any)?.negotiation_mode === "live";
+  const isLive = neg?.negotiation_mode === "live";
 
   useEffect(() => {
-    if (
-      neg &&
-      isLive &&
-      neg.status !== "concluded" &&
-      neg.status !== "cancelled" &&
-      neg.status !== "awaiting_confirmation"
-    ) {
+    if (neg && isLive && neg.status !== "concluded" && neg.status !== "cancelled" && neg.status !== "awaiting_confirmation") {
       navigate(paths.liveForhandling(id), { replace: true });
     }
   }, [neg, id, navigate, isLive]);
 
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["negotiation", id] });
+    qc.invalidateQueries({ queryKey: ["negotiations"] });
+    qc.invalidateQueries({ queryKey: ["negotiation-items", id] });
+    invalidateRawMaterial(qc);
+  };
+
+  const back = (
+    <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={() => navigate(paths.forhandlinger())}>
+      <ArrowLeft className="mr-1 h-4 w-4" aria-hidden /> Forhandlinger
+    </Button>
+  );
+
   if (!neg) {
     return (
-      <div className="p-6">
-        <Button variant="ghost" onClick={() => navigate(paths.forhandlinger())}>
-          <ArrowLeft className="mr-1 h-4 w-4" /> Tilbake
-        </Button>
+      <div className="mx-auto max-w-[1280px] space-y-4 p-4 sm:p-6">
+        {back}
+        <QueryState
+          isLoading={negQ.isLoading}
+          isError={negQ.isError}
+          error={negQ.error}
+          onRetry={() => void negQ.refetch()}
+          isEmpty
+          emptyTitle="Fant ikke forhandlingen"
+          emptyDescription="Den finnes ikke, tilhører et annet selskap, eller du mangler tilgang."
+        >
+          {null}
+        </QueryState>
       </div>
     );
   }
 
+  const recipientColumns: Column<NegotiationRecipientRow>[] = [
+    { id: "sup", header: "Leverandør", alwaysVisible: true, cell: (r) => <span className="font-medium">{supName(r.supplier_id)}</span> },
+    { id: "status", header: "Status", cell: (r) => <RecipientStatusPill status={r.status} /> },
+    { id: "seen", header: "Sist sett", cell: (r) => formatDate(r.last_viewed_at) },
+    { id: "exp", header: "Lenken utløper", cell: (r) => formatDate(r.expires_at) },
+  ];
+
   return (
-    <div className="mx-auto max-w-[1280px] space-y-6 p-6">
-      <Button variant="ghost" size="sm" onClick={() => navigate(paths.forhandlinger())}>
-        <ArrowLeft className="mr-1 h-4 w-4" /> Forhandlinger
-      </Button>
-
-      <RavarerHeaderBanner
+    <div className="mx-auto max-w-[1280px] space-y-4 p-4 sm:p-6">
+      {back}
+      <ModulePage
+        eyebrow={isLive ? "Live-forhandling" : "Forespørsel"}
         title={neg.title}
-        subtitle={neg.purpose ?? "Forhandling"}
+        subtitle={neg.purpose ?? undefined}
+        icon={Handshake}
+        embedsPage={false}
         actions={
-          <>
-            <Badge variant="outline">{negotiationStatusLabel(neg.status)}</Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <NegotiationStatusPill status={neg.status} />
             {isLive && (
-              <Button size="sm" variant="outline" className="rounded-full" onClick={() => setTimelineOpen(true)}>
-                <History className="mr-1.5 h-4 w-4" /> Tidslinje
+              <Button size="sm" variant="outline" className="min-h-[44px] rounded-full" onClick={() => setTimelineOpen(true)}>
+                <History className="mr-1.5 h-4 w-4" aria-hidden /> Tidslinje
               </Button>
             )}
-            {!isLive && !isNegotiationClosed(neg.status) && (
-              <Button size="sm" variant="outline" className="rounded-full"
-                onClick={() => navigate(paths.forhandlingRediger(id))}>
-                Rediger
+            {rights.canWrite && !isLive && !isNegotiationClosed(neg.status) && (
+              <Button size="sm" variant="outline" className="min-h-[44px] rounded-full" onClick={() => navigate(paths.forhandlingRediger(id))}>
+                <Pencil className="mr-1.5 h-4 w-4" aria-hidden /> Rediger
               </Button>
             )}
-            {!isLive && neg.status !== "concluded" && neg.status !== "cancelled" && (
-              <Button size="sm" className="rounded-full" onClick={() => setConcludeOpen(true)}>
-                <Flag className="mr-1.5 h-4 w-4" /> Avslutt
+            {rights.canWrite && !isLive && !isNegotiationClosed(neg.status) && (
+              <Button size="sm" className="min-h-[44px] rounded-full" onClick={() => setConcludeOpen(true)}>
+                <Flag className="mr-1.5 h-4 w-4" aria-hidden /> Avslutt
               </Button>
             )}
-          </>
+          </div>
         }
-      />
+      >
+        {isLive && (
+          <LiveConfirmationStatus neg={neg} items={items} recipients={recipients} rmName={rmName} supName={supName} canWrite={rights.canWrite} />
+        )}
 
-      {isLive && <LiveConfirmationStatus
-        neg={neg}
-        items={items}
-        recipients={recipients}
-        selectedRecipient={selectedRecipient}
-        activeRecipientId={activeRecipientId}
-        onSelectRecipient={setActiveRecipientId}
-        rmName={rmName}
-        supName={supName}
-        activating={activating}
-        onActivate={async (onlyConfirmed: boolean) => {
-          setActivating(true);
-          try {
-            const targets = onlyConfirmed
-              ? items.filter((i) => i.live_status === "confirmed")
-              : items.filter((i) => i.live_status === "confirmed" || i.live_status === "tentatively_agreed");
-            if (targets.length === 0) { toast.info("Ingen linjer å aktivere"); return; }
-            const rec = selectedRecipient;
-            if (!rec) { toast.error("Velg hvilken leverandør avtalen gjelder"); return; }
-            const outcomes = targets.map((it: any) => ({
-              negotiation_item_id: it.id,
-              winner_recipient_id: rec?.id ?? null,
-              winner_response_id: null,
-              // Send prisen slik den ble avtalt, sammen med enheten den gjelder for.
-              // Serveren regner om til pris per baseenhet — vi gjetter aldri her.
-              agreed_price: it.live_agreed_price,
-              agreed_price_unit: it.live_agreed_price_unit ?? null,
-              agreed_package_size: it.live_agreed_package_size,
-              agreed_package_unit: it.live_agreed_package_unit,
-              set_as_primary: false,
-              apply_to_supplier: true,
-            }));
-            const { data, error } = await supabase.functions.invoke("apply-negotiation-outcome", {
-              body: { negotiation_id: id, outcomes },
-            });
-            const outcome = classifyApplyOutcome(data, error, error ? await readEdgeErrorBody(error) : null);
-            invalidateRawMaterial(qc);
-            qc.invalidateQueries({ queryKey: ["negotiation-items", id] });
-            qc.invalidateQueries({ queryKey: ["negotiation", id] });
-            if (outcome.kind === "rejected") { toast.error(outcome.message); return; }
-            if (outcome.kind === "partial") {
-              toast.error(`Noen endringer kan være lagret. ${outcome.linksOpen ? "Forhandlingen er avsluttet, men lenkene er ikke stengt. " : ""}${outcome.failures.join("; ")}`.trim());
-              return;
-            }
-            if (outcome.kind === "unknown") {
-              toast.error("Utfallet er ukjent — noen endringer kan være lagret. Kontroller status før du prøver igjen.");
-              return;
-            }
-            // Aktiveringen er lagret. Statusmerkingen av ubekreftede linjer er et eget steg.
-            if (!onlyConfirmed) {
-              const { error: followErr } = await supabase
-                .from("negotiation_items")
-                .update({ live_status: "unconfirmed_active" })
-                .eq("negotiation_id", id)
-                .eq("live_status", "tentatively_agreed");
-              qc.invalidateQueries({ queryKey: ["negotiation-items", id] });
-              if (followErr) {
-                toast.error("Prisene er aktivert, men ubekreftede linjer kunne ikke merkes som «aktiv uten bekreftelse».");
-                return;
-              }
-            }
-            toast.success("Aktivert");
-          } catch (e: any) {
-            toast.error(e?.message ?? "Aktivering feilet");
-          } finally {
-            setActivating(false);
-          }
-        }}
-      />}
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Kpi label="Svarfrist">{formatDate(neg.response_deadline)}</Kpi>
+          <Kpi label="Kontraktsperiode">{formatDate(neg.contract_start)} – {formatDate(neg.contract_end)}</Kpi>
+          <Kpi label="Baseline">{formatDate(neg.baseline_period_start)} – {formatDate(neg.baseline_period_end)}</Kpi>
+          <Kpi label="Estimert besparelse">
+            <span className={`font-semibold tabular-nums ${savings.value > 0 ? "text-success" : "text-ink-primary"}`}>
+              {savings.known === 0 && savings.unknown > 0 ? "Ukjent" : formatNok(savings.value)}
+            </span>
+            {savings.unknown > 0 && (
+              <span className="block text-caption text-ink-secondary">{savings.unknown} råvare{savings.unknown === 1 ? "" : "r"} med ukjent pakning eller baseline er ikke regnet med</span>
+            )}
+          </Kpi>
+        </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="p-4">
-          <p className="text-xs uppercase tracking-wide text-ink-secondary">Svarfrist</p>
-          <p className="mt-1 font-medium">{formatDate(neg.response_deadline)}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs uppercase tracking-wide text-ink-secondary">Kontraktsperiode</p>
-          <p className="mt-1 text-sm">{formatDate(neg.contract_start)} — {formatDate(neg.contract_end)}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs uppercase tracking-wide text-ink-secondary">Baseline</p>
-          <p className="mt-1 text-sm">{formatDate(neg.baseline_period_start)} — {formatDate(neg.baseline_period_end)}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs uppercase tracking-wide text-ink-secondary">Estimert besparelse</p>
-          <p className={`mt-1 font-semibold tabular-nums ${totalSavings > 0 ? "text-success" : "text-ink-primary"}`}>
-            {formatNok(totalSavings)}
-          </p>
-        </Card>
-      </div>
+        <section className="space-y-2" aria-labelledby="mottakere">
+          <h2 id="mottakere" className="font-semibold">Mottakere ({recipients.length})</h2>
+          <DataTable
+            ariaLabel="Mottakere"
+            rows={recipients}
+            columns={recipientColumns}
+            getId={(r) => r.id}
+            isLoading={recipientsQ.isLoading}
+            error={recipientsQ.error}
+            onRetry={() => void recipientsQ.refetch()}
+            emptyText="Ingen leverandører er lagt til."
+            renderMobileCard={(r) => (
+              <div className="space-y-1 rounded-lg border border-border bg-card p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-medium">{supName(r.supplier_id)}</span>
+                  <RecipientStatusPill status={r.status} />
+                </div>
+                <div className="text-caption text-ink-secondary">Sist sett {formatDate(r.last_viewed_at)} · Utløper {formatDate(r.expires_at)}</div>
+              </div>
+            )}
+          />
+        </section>
 
-      {/* Recipient status */}
-      <Card className="overflow-hidden">
-        <div className="border-b border-line-subtle p-4 font-semibold">Mottakere ({recipients.length})</div>
-        <table className="w-full text-sm">
-          <thead className="bg-surface-muted/50 text-xs uppercase tracking-wide text-ink-secondary">
-            <tr>
-              <th className="px-4 py-2 text-left">Leverandør</th>
-              <th className="px-4 py-2 text-left">Status</th>
-              <th className="px-4 py-2 text-left">Sist sett</th>
-              <th className="px-4 py-2 text-left">Utløper</th>
-            </tr>
-          </thead>
-          <tbody>
-            {recipients.map((r) => (
-              <tr key={r.id} className="border-t border-line-subtle">
-                <td className="px-4 py-2 font-medium">{supName(r.supplier_id)}</td>
-                <td className="px-4 py-2"><Badge variant="outline">{recipientStatusLabel(r.status)}</Badge></td>
-                <td className="px-4 py-2 text-ink-secondary">{formatDate(r.last_viewed_at)}</td>
-                <td className="px-4 py-2 text-ink-secondary">{formatDate(r.expires_at)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
-
-      {/* Comparison matrix - only RFQ */}
-      {!isLive && <Card className="overflow-x-auto">
-        <div className="border-b border-line-subtle p-4 font-semibold">Tilbudssammenligning</div>
-        <table className="w-full text-sm">
-          <thead className="bg-surface-muted/50 text-xs uppercase tracking-wide text-ink-secondary">
-            <tr>
-              <th className="px-4 py-2 text-left">Råvare</th>
-              <th className="px-4 py-2 text-right">Snittpris baseline</th>
-              {recipients.map((r) => (
-                <th key={r.id} className="px-4 py-2 text-right">{supName(r.supplier_id)}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((it) => {
-              const winner = bestByItem.get(it.id);
-              return (
-                <tr key={it.id} className="border-t border-line-subtle">
-                  <td className="px-4 py-2 font-medium">
-                    <div>{rmName(it.raw_material_id)}</div>
-                    <UnitPriceHint
-                      rawMaterialId={it.raw_material_id}
-                      pricePerBase={it.actual_avg_price_baseline == null ? null : Number(it.actual_avg_price_baseline)}
-                      baseUnit={rmBaseUnit(it.raw_material_id)}
-                    />
-                  </td>
-                  <td className="px-4 py-2 text-right tabular-nums text-ink-secondary">
-                    {formatNok(it.actual_avg_price_baseline)}
-                  </td>
-                  {recipients.map((r) => {
-                    const cell = matrix.get(it.id)?.get(r.id);
-                    const perBase = perBaseByItem.get(it.id)?.get(r.id) ?? null;
-                    if (!cell?.offered_price) {
-                      return <td key={r.id} className="px-4 py-2 text-right text-ink-muted">—</td>;
-                    }
-                    if (perBase == null) {
-                      return (
-                        <td key={r.id} className="px-4 py-2 text-right text-xs text-ink-secondary">
-                          {formatNok(cell.offered_price)}
-                          <p>Mangler pakning — kan ikke sammenlignes</p>
-                        </td>
-                      );
-                    }
-                    const isBest = winner === r.id;
-                    const reference = rmCost(it.raw_material_id) ??
-                      (it.actual_avg_price_baseline == null ? null : Number(it.actual_avg_price_baseline));
-                    const better = reference != null && perBase < reference;
-                    const delta = reference == null ? null : perBase - reference;
-                    return (
-                      <td key={r.id} className={`px-4 py-2 text-right tabular-nums ${isBest ? "bg-success/10 font-semibold text-success" : better ? "text-success" : "text-destructive"}`}>
-                        <div className="flex items-center justify-end gap-1">
-                          {isBest && <Trophy className="h-3.5 w-3.5" />}
-                          {!isBest && better && <Check className="h-3.5 w-3.5" />}
-                          {!better && !isBest && <X className="h-3.5 w-3.5" />}
-                          {formatNok(perBase)}
-                          <span className="text-xs font-normal opacity-70">
-                            /{rmBaseUnit(it.raw_material_id) ?? "enhet"}
-                          </span>
-                        </div>
-                        {delta != null && (
-                          <p className="text-xs font-normal opacity-80">
-                            {delta > 0 ? "+" : ""}{formatNok(delta)} mot dagens kost
-                          </p>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </Card>}
+        {!isLive && (
+          <QueryState
+            isLoading={itemsQ.isLoading || responsesQ.isLoading}
+            isError={itemsQ.isError || responsesQ.isError}
+            error={itemsQ.error ?? responsesQ.error}
+            onRetry={() => { void itemsQ.refetch(); void responsesQ.refetch(); }}
+          >
+            <OfferComparison
+              items={items}
+              recipients={recipients}
+              responseFor={(i, r) => responseIndex.get(`${i}:${r}`)}
+              perBase={(i, r) => perBaseByItem.get(i)?.get(r) ?? null}
+              bestByItem={bestByItem}
+              rmName={rmName}
+              rmBaseUnit={rmBaseUnit}
+              rmCost={rmCost}
+              supName={supName}
+            />
+          </QueryState>
+        )}
+      </ModulePage>
 
       <ConcludeDialog
         open={concludeOpen}
@@ -410,12 +258,7 @@ export default function ForhandlingDetail() {
         rmBaseUnit={rmBaseUnit}
         supName={supName}
         negotiationId={id}
-        onSuccess={() => {
-          qc.invalidateQueries({ queryKey: ["negotiation", id] });
-          qc.invalidateQueries({ queryKey: ["negotiations"] });
-          qc.invalidateQueries({ queryKey: ["negotiation-items", id] });
-          invalidateRawMaterial(qc);
-        }}
+        onRefresh={refresh}
       />
 
       {isLive && (
@@ -428,272 +271,5 @@ export default function ForhandlingDetail() {
         />
       )}
     </div>
-  );
-}
-
-function LiveConfirmationStatus({ neg, items, recipients, selectedRecipient, activeRecipientId, onSelectRecipient, rmName, supName, activating, onActivate }: any) {
-  const tentative = items.filter((i: any) => i.live_status === "tentatively_agreed");
-  const confirmed = items.filter((i: any) => i.live_status === "confirmed");
-  const disputed = items.filter((i: any) => i.live_supplier_note && i.live_status === "tentatively_agreed");
-  const unconfActive = items.filter((i: any) => i.live_status === "unconfirmed_active");
-  const total = tentative.length + confirmed.length + unconfActive.length;
-  const recipient = selectedRecipient ?? null;
-  const deadline = neg.live_confirmation_deadline;
-  const overdue = deadline && new Date(deadline) < new Date();
-  const allConfirmed = tentative.length === 0;
-
-  const mailtoBody = encodeURIComponent(
-    `Hei,\n\nVennligst bekreft de avtalte prisene fra forhandlingen vår.\n\nFrist: ${deadline ? new Date(deadline).toLocaleDateString("nb-NO") : "—"}\n\nMvh.`
-  );
-  const mailtoSubject = encodeURIComponent(`Påminnelse: Bekreft forhandling - ${neg.title}`);
-
-  return (
-    <Card className="space-y-4 p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-ink-secondary">Bekreftelses-status</p>
-          {recipients.length > 1 && (
-            <div className="mt-2 max-w-xs">
-              <Select value={activeRecipientId} onValueChange={onSelectRecipient}>
-                <SelectTrigger aria-label="Leverandør avtalen gjelder">
-                  <SelectValue placeholder="Velg leverandør" />
-                </SelectTrigger>
-                <SelectContent>
-                  {recipients.map((r: { id: string; supplier_id: string }) => (
-                    <SelectItem key={r.id} value={r.id}>{supName(r.supplier_id)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          <p className="mt-1 text-lg font-semibold">
-            {confirmed.length} av {total} bekreftet
-            {disputed.length > 0 && <span className="ml-2 text-warning">· {disputed.length} med innsigelse</span>}
-          </p>
-          {deadline && (
-            <p className={`mt-0.5 text-xs ${overdue ? "text-destructive" : "text-ink-secondary"}`}>
-              <Clock className="mr-1 inline h-3 w-3" />
-              Frist: {new Date(deadline).toLocaleDateString("nb-NO")}{overdue ? " (utløpt)" : ""}
-            </p>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {recipient?.contact_email && !allConfirmed && (
-            <Button asChild size="sm" variant="outline">
-              <a href={`mailto:${recipient.contact_email}?subject=${mailtoSubject}&body=${mailtoBody}`}>
-                <Send className="mr-1.5 h-4 w-4" /> Send påminnelse
-              </a>
-            </Button>
-          )}
-          {confirmed.length > 0 && tentative.length > 0 && neg.status !== "concluded" && (
-            <Button size="sm" variant="outline" onClick={() => onActivate(true)} disabled={activating}>
-              {activating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Aktiver kun bekreftede ({confirmed.length})
-            </Button>
-          )}
-          {tentative.length > 0 && neg.status !== "concluded" && (
-            <Button size="sm" onClick={() => onActivate(false)} disabled={activating}>
-              {activating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Aktiver alle uansett
-            </Button>
-          )}
-        </div>
-      </div>
-
-      <ul className="divide-y divide-line-subtle">
-        {[...confirmed, ...tentative, ...unconfActive].map((it: any) => {
-          const isConfirmed = it.live_status === "confirmed";
-          const isUnconf = it.live_status === "unconfirmed_active";
-          const hasDispute = !!it.live_supplier_note;
-          return (
-            <li key={it.id} className="flex items-start justify-between gap-3 py-2 text-sm">
-              <div className="flex items-start gap-2">
-                {isConfirmed ? (
-                  <FileCheck className="mt-0.5 h-4 w-4 text-success" />
-                ) : isUnconf || hasDispute ? (
-                  <AlertTriangle className="mt-0.5 h-4 w-4 text-warning" />
-                ) : (
-                  <Clock className="mt-0.5 h-4 w-4 text-ink-muted" />
-                )}
-                <div>
-                  <div className="font-medium">{rmName(it.raw_material_id)}</div>
-                  {it.live_supplier_note && (
-                    <div className="text-xs text-warning">"{it.live_supplier_note}"</div>
-                  )}
-                  {it.live_datasheet_path && (
-                    <div className="text-xs text-ink-muted">📎 Datablad mottatt</div>
-                  )}
-                  {it.live_datasheet_skipped && (
-                    <div className="text-xs text-ink-muted">Datablad sendes separat</div>
-                  )}
-                </div>
-              </div>
-              <div className="text-xs text-ink-secondary">
-                {isConfirmed ? "Bekreftet" : isUnconf ? "Aktivert uten bekreftelse" : "Venter"}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </Card>
-  );
-}
-
-function ConcludeDialog({
-  open, onOpenChange, items, responses, recipients, bestByItem, rmName, rmBaseUnit, supName, negotiationId, onSuccess,
-}: any) {
-  const [picks, setPicks] = useState<Record<string, { winner_recipient_id: string | null; set_as_primary: boolean; apply_to_supplier: boolean }>>({});
-
-  // Initialise on open
-  function initIfNeeded() {
-    if (Object.keys(picks).length === 0 && items.length > 0) {
-      const init: any = {};
-      for (const it of items) {
-        init[it.id] = {
-          winner_recipient_id: bestByItem.get(it.id) ?? null,
-          set_as_primary: false,
-          apply_to_supplier: true,
-        };
-      }
-      setPicks(init);
-    }
-  }
-  if (open) initIfNeeded();
-
-  const apply = useMutation({
-    mutationFn: async () => {
-      const outcomes = items.map((it: any) => {
-        const p = picks[it.id];
-        const winnerResp = (responses as any[]).find((r) => r.recipient_id === p?.winner_recipient_id && r.negotiation_item_id === it.id);
-        return {
-          negotiation_item_id: it.id,
-          winner_recipient_id: p?.winner_recipient_id ?? null,
-          winner_response_id: winnerResp?.id ?? null,
-          agreed_price: winnerResp?.offered_price ?? null,
-          // Leverandørportalen ber om «Pris pr {baseenhet}» — RFQ-tilbud er ALLTID
-          // per grunnenhet. Vi sender varens baseenhet slik at prisen ikke deles på
-          // pakningsstørrelsen en gang til.
-          agreed_price_unit: rmBaseUnit?.(it.raw_material_id) ?? null,
-          agreed_package_size: winnerResp?.offered_package_size ?? null,
-          agreed_package_unit: winnerResp?.offered_package_unit ?? null,
-          set_as_primary: p?.set_as_primary ?? false,
-          apply_to_supplier: p?.apply_to_supplier ?? false,
-        };
-      });
-      // Frys primæroppgavene før kallet, så et senere valg i skjemaet ikke endrer dem.
-      const tasks: PrimaryTask[] = [];
-      for (const it of items) {
-        const p = picks[it.id];
-        if (!p?.set_as_primary || !p.winner_recipient_id) continue;
-        const rec = recipients.find((r: { id: string; supplier_id: string }) => r.id === p.winner_recipient_id);
-        if (rec?.supplier_id && it.raw_material_id) tasks.push({ rawMaterialId: it.raw_material_id, supplierId: rec.supplier_id });
-      }
-      const { data, error } = await supabase.functions.invoke("apply-negotiation-outcome", {
-        body: { negotiation_id: negotiationId, outcomes },
-      });
-      const outcome = classifyApplyOutcome(data, error, error ? await readEdgeErrorBody(error) : null);
-      if (outcome.kind !== "success") return { outcome, failedPrimary: [] as PrimaryTask[] };
-      // Primær settes via eneste skrivevei etter hovedskrivingen; feil her er et eget, avgrenset steg.
-      const { failed } = await runPrimaryTasks(tasks, setPrimarySupplier);
-      return { outcome, failedPrimary: failed };
-    },
-    onSuccess: ({ outcome, failedPrimary }) => {
-      onSuccess();
-      if (outcome.kind === "rejected") { toast.error(outcome.message); return; }
-      if (outcome.kind === "partial" || outcome.kind === "unknown") { setSplit(outcome); return; }
-      if (failedPrimary.length > 0) { setRemainingPrimary(failedPrimary); return; }
-      toast.success("Forhandling avsluttet");
-      onOpenChange(false);
-    },
-    onError: () => setSplit({ kind: "unknown" }),
-  });
-  const [split, setSplit] = useState<ApplyOutcome | null>(null);
-  const [remainingPrimary, setRemainingPrimary] = useState<PrimaryTask[] | null>(null);
-  const retryPrimary = useMutation({
-    mutationFn: async (tasks: PrimaryTask[]) => runPrimaryTasks(tasks, setPrimarySupplier),
-    onSuccess: ({ failed }) => {
-      onSuccess();
-      if (failed.length > 0) { setRemainingPrimary(failed); toast.error("Primærleverandør kunne fortsatt ikke settes for alle varer."); return; }
-      setRemainingPrimary(null);
-      toast.success("Primærleverandør satt");
-      onOpenChange(false);
-    },
-  });
-  const locked = split !== null || remainingPrimary !== null;
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader><DialogTitle>Avslutt forhandling</DialogTitle></DialogHeader>
-        <div className="max-h-[60vh] overflow-auto space-y-3">
-          {items.map((it: any) => {
-            const p = picks[it.id] ?? { winner_recipient_id: null, set_as_primary: false, apply_to_supplier: true };
-            const offers = (responses as any[]).filter((r) => r.negotiation_item_id === it.id && r.status === "submitted");
-            return (
-              <div key={it.id} className="rounded-md border border-line-subtle p-3">
-                <div className="font-medium">{rmName(it.raw_material_id)}</div>
-                <div className="mt-2 grid gap-2 sm:grid-cols-3 sm:items-center">
-                  <Select value={p.winner_recipient_id ?? "none"}
-                    onValueChange={(v) => setPicks({ ...picks, [it.id]: { ...p, winner_recipient_id: v === "none" ? null : v } })}>
-                    <SelectTrigger><SelectValue placeholder="Vinner" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Ingen vinner</SelectItem>
-                      {offers.map((o: any) => {
-                        const rec = recipients.find((rr: any) => rr.id === o.recipient_id);
-                        return (
-                          <SelectItem key={o.recipient_id} value={o.recipient_id}>
-                            {supName(rec?.supplier_id)} — {formatNok(o.offered_price)}
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  <label className="flex items-center gap-2 text-sm">
-                    <Checkbox checked={p.apply_to_supplier} onCheckedChange={(v) => setPicks({ ...picks, [it.id]: { ...p, apply_to_supplier: !!v } })} />
-                    Oppdater leverandør-pris
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <Checkbox checked={p.set_as_primary} onCheckedChange={(v) => setPicks({ ...picks, [it.id]: { ...p, set_as_primary: !!v } })} />
-                    Sett som primær
-                  </label>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        {split && (
-          <div role="alert" className="space-y-1 rounded-md border border-warning/30 bg-warning/10 p-3 text-sm">
-            <p className="font-medium">Noen endringer kan være lagret.</p>
-            {split.kind === "partial" && split.linksOpen && <p>Forhandlingen er avsluttet, men leverandørlenkene er ikke stengt.</p>}
-            {split.kind === "partial" && split.failures.length > 0 && (
-              <ul className="list-disc pl-5">{split.failures.map((f, i) => <li key={i}>{f}</li>)}</ul>
-            )}
-            {split.kind === "unknown" && <p>Utfallet er ukjent. Status er lest på nytt; kontroller den før du gjør noe mer.</p>}
-            <p>Ingenting prøves på nytt automatisk.</p>
-          </div>
-        )}
-        {remainingPrimary && (
-          <div role="alert" className="space-y-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-sm">
-            <p className="font-medium">Utfallet er lagret, men primærleverandør ble ikke satt for:</p>
-            <ul className="list-disc pl-5">
-              {remainingPrimary.map((t) => (
-                <li key={t.rawMaterialId}>{rmName(t.rawMaterialId)} → {supName(t.supplierId)}</li>
-              ))}
-            </ul>
-            <Button size="sm" className="min-h-[44px]" disabled={retryPrimary.isPending} onClick={() => retryPrimary.mutate(remainingPrimary)}>
-              {retryPrimary.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Sett gjenstående primærleverandør
-            </Button>
-          </div>
-        )}
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>{locked ? "Lukk" : "Avbryt"}</Button>
-          <Button onClick={() => apply.mutate()} disabled={apply.isPending || locked}>
-            {apply.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Avslutt og lagre
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
