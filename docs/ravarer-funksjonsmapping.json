@@ -3923,7 +3923,7 @@
    "route_owner_path": "src/ravarer/pages/ReberegnKostpriser.tsx",
    "action_component_paths": [
     "src/ravarer/pages/ReberegnKostpriser.tsx",
-    "src/ravarer/pages/reberegn/reberegnColumns.tsx"
+    "src/ravarer/pages/reberegn/reberegnModel.tsx"
    ],
    "handler_or_render_evidence": [
     {
@@ -3933,7 +3933,7 @@
      "reached_from_owner": true
     },
     {
-     "file": "src/ravarer/pages/reberegn/reberegnColumns.tsx",
+     "file": "src/ravarer/pages/reberegn/reberegnModel.tsx",
      "evidence": "BUCKETS",
      "note": "Fire grupper",
      "reached_from_owner": true
@@ -13162,14 +13162,29 @@
    "route_owner_path": "src/ravarer/pages/ReberegnKostpriser.tsx",
    "action_component_paths": [
     "src/ravarer/pages/ReberegnKostpriser.tsx",
-    "src/ravarer/pages/reberegn/reberegnColumns.tsx"
+    "src/ravarer/pages/reberegn/reberegnColumns.tsx",
+    "src/ravarer/pages/reberegn/SingleRecalcDetail.tsx",
+    "src/ravarer/hooks/useSingleRecalcPreview.ts"
    ],
-   "handler_or_render_evidence": [],
+   "handler_or_render_evidence": [
+    {
+     "file": "src/ravarer/pages/reberegn/SingleRecalcDetail.tsx",
+     "evidence": "Serverens regnestykke nå",
+     "note": "Eksplisitt skrivebeskyttet enkeltforslag (recalc_raw_material_cost, p_dry_run true) per vare fra forslag/kvittering/feil; dagens forslag, ikke frosset kvitteringsspor",
+     "reached_from_owner": true
+    },
+    {
+     "file": "src/ravarer/hooks/useSingleRecalcPreview.ts",
+     "evidence": "p_dry_run: true",
+     "note": "Én forespørsel om gangen, frosset selskap+vare+generasjon",
+     "reached_from_owner": true
+    }
+   ],
    "preservation_gap": null,
    "canonical_url_templates": [
     "/ravarer/priskontroll/verktoy/reberegn"
    ],
-   "mapping_status": "eier_og_barn_verifisert_ved_import",
+   "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "importert_fra_eier",
    "source_review": "partial_with_findings",
    "mocked_test": "not_item_verified",
@@ -13311,14 +13326,21 @@
     "src/ravarer/pages/ReberegnKostpriser.tsx",
     "src/ravarer/pages/reberegn/reberegnColumns.tsx"
    ],
-   "handler_or_render_evidence": [],
+   "handler_or_render_evidence": [
+    {
+     "file": "src/ravarer/pages/reberegn/reberegnColumns.tsx",
+     "evidence": "paths.pakninger",
+     "note": "Pakningslenke per vare",
+     "reached_from_owner": true
+    }
+   ],
    "preservation_gap": null,
    "canonical_url_templates": [
     "/ravarer/priskontroll/verktoy/reberegn",
     "/ravarer/varer?liste=pakning&valgt=:id",
     "/ravarer/varer/:id?seksjon=pris"
    ],
-   "mapping_status": "eier_og_barn_verifisert_ved_import",
+   "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "importert_fra_eier",
    "source_review": "partial_with_findings",
    "mocked_test": "not_item_verified",
