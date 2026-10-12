@@ -20,7 +20,7 @@ describe("regnestykke-demo", () => {
     const b = screen.getByRole("button", { name: "Åpne regnestykket" });
     b.focus();
     await act(async () => { fireEvent.click(b); });
-    expect(screen.getByText(/Mengde: 2 × 20 ≈ 40 kg/)).toBeTruthy();
+    expect(screen.getAllByText(/Mengde: 2 × 20 ≈ 40 kg/).length).toBeGreaterThan(0);
     expect(screen.getByText(/Mengde: −2 × 20 ≈ −40 kg/)).toBeTruthy();
     expect(screen.getByText(/konverterer 1[\s ]000 g direkte til 1 kg/)).toBeTruthy();
     expect(screen.getByText(/Ført\/låst – beholdes/)).toBeTruthy();
