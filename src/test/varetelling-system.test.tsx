@@ -195,7 +195,7 @@ describe("varetelling – skjermer", () => {
     fireEvent.change(screen.getByLabelText("Hvetemel (demo): antall kg"), { target: { value: "7,5" } });
     const card = input.closest("[data-testid='vt-line']");
     if (!(card instanceof HTMLElement)) throw new Error("kort");
-    fireEvent.click(within(card).getByRole("button", { name: "Lagre" }));
+    fireEvent.click(within(card).getByRole("button", { name: "Lagre og neste" }));
     await waitFor(() => expect(api._state.lines.find(l => l.raw_material_id === "m1")?.counted_base).toBe(82.5));
     expect(api._state.lines.find(l => l.raw_material_id === "m1")?.entry[0].label).toBe("sekk 25 kg");
   });
@@ -210,7 +210,7 @@ describe("varetelling – skjermer", () => {
     fireEvent.change(input, { target: { value: "4" } });
     const card = input.closest("[data-testid='vt-line']");
     if (!(card instanceof HTMLElement)) throw new Error("kort");
-    fireEvent.click(within(card).getByRole("button", { name: "Lagre" }));
+    fireEvent.click(within(card).getByRole("button", { name: "Lagre og neste" }));
     const resend = await within(card).findByRole("button", { name: "Send samme på nytt" });
     expect(within(card).getByRole("button", { name: "0 på lager" })).toHaveProperty("disabled", true);
     fireEvent.click(resend);
@@ -234,7 +234,7 @@ describe("varetelling – skjermer", () => {
     expect((screen.getByLabelText("Smør usaltet (demo): antall kg") as HTMLInputElement).value).toBe("5");
     const card = screen.getByLabelText("Smør usaltet (demo): antall kg").closest("[data-testid='vt-line']");
     if (!(card instanceof HTMLElement)) throw new Error("kort");
-    expect(within(card).getByRole("button", { name: "Lagre" })).toHaveProperty("disabled", true);
+    expect(within(card).getByRole("button", { name: "Lagre og neste" })).toHaveProperty("disabled", true);
     fireEvent.click(within(card).getByRole("button", { name: "Bruk lagret verdi" }));
     expect((screen.getByLabelText("Smør usaltet (demo): antall kg") as HTMLInputElement).value).toBe("9");
     expect((screen.getByLabelText("Kommentar for Smør usaltet (demo)") as HTMLInputElement).value).toBe("B");
@@ -250,7 +250,7 @@ describe("varetelling – skjermer", () => {
     fireEvent.change(input, { target: { value: "4" } });
     m.rerenderScope({ canWrite: false });
     // Kortet blir skrivebeskyttet; ingen lagring sendes.
-    await waitFor(() => expect(screen.queryAllByRole("button", { name: "Lagre" })).toHaveLength(0));
+    await waitFor(() => expect(screen.queryAllByRole("button", { name: "Lagre og neste" })).toHaveLength(0));
     expect(spy).not.toHaveBeenCalled();
   });
 
