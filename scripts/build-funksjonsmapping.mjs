@@ -114,6 +114,17 @@ for (const [ids, source, mock, browser, reports, next] of psv("docs/funksjonsmap
   for (const id of ids.split(",")) evidence.set(id, { source_review: source, mocked_test: mock, browser_check: browser, reports: reports.split(",").map((r) => `audit-2026-10-11/${r}`), outstanding_gate: next });
 }
 
+// ---------- handlingsspor (per ID, maskinverifisert) ----------
+// docs/funksjonsmapping/action-trace.psv: ID|fil|ordrett bevis-substring|merknad, eller ID|GAP|grunn.
+// Beviset må finnes ordrett i fila, og fila må nås fra eierfila (eller være den).
+const traces = new Map();
+if (existsSync("docs/funksjonsmapping/action-trace.psv")) {
+  for (const [id, file, ev, note] of psv("docs/funksjonsmapping/action-trace.psv")) {
+    if (!traces.has(id)) traces.set(id, []);
+    traces.get(id).push(file === "GAP" ? { gap: ev } : { file, ev, note: note ?? "" });
+  }
+}
+
 // ---------- poster ----------
 const errors = [];
 const owners = psv("docs/funksjonsmapping/review-owners.psv");
@@ -135,6 +146,16 @@ const recs = owners.map(([id, ownerRaw, urlsRaw, childRaw]) => {
   if (!o) errors.push(`${id}: mangler i original funksjonsliste`);
   if (!c) errors.push(`${id}: mangler i dagens funksjonsliste`);
   const ev = evidence.get(id);
+  const tr = traces.get(id) ?? [];
+  const gap = tr.find((t) => t.gap)?.gap ?? null;
+  const handler = [];
+  for (const t of tr.filter((x) => !x.gap)) {
+    if (!existsSync(t.file)) { errors.push(`${id}: sporfil finnes ikke (${t.file})`); continue; }
+    if (!read(t.file).includes(t.ev)) { errors.push(`${id}: bevis «${t.ev}» finnes ikke i ${t.file}`); continue; }
+    const reach = t.file === owner || reaches(owner, t.file, 8) > 0;
+    handler.push({ file: t.file, evidence: t.ev, note: t.note, reached_from_owner: reach });
+  }
+  const traced = handler.length > 0 && handler.some((h) => h.reached_from_owner);
   return {
     id,
     section: c?.section ?? o?.section ?? "",
@@ -143,9 +164,11 @@ const recs = owners.map(([id, ownerRaw, urlsRaw, childRaw]) => {
     current_feature: c?.feature ?? "",
     current_location_or_disposition: c?.location ?? "",
     route_owner_path: owner,
-    action_component_paths: child ? [owner, child] : [owner],
+    action_component_paths: [...new Set([owner, ...(child ? [child] : []), ...handler.map((h) => h.file)])],
+    handler_or_render_evidence: handler,
+    preservation_gap: gap,
     canonical_url_templates: urls,
-    mapping_status: !ownerOk || urlErrors.length ? "feil" : childStatus === "importert_fra_eier" ? "eier_og_barn_verifisert_ved_import" : childStatus === "ikke_importert_fra_eier" ? "barn_ikke_sporet" : "eier_verifisert_handling_ikke_sporet",
+    mapping_status: !ownerOk || urlErrors.length ? "feil" : gap ? "bevaringsgap" : traced ? "handling_sporet_i_kilde" : childStatus === "importert_fra_eier" ? "eier_og_barn_verifisert_ved_import" : childStatus === "ikke_importert_fra_eier" ? "barn_ikke_sporet" : "eier_verifisert_handling_ikke_sporet",
     child_import_check: childStatus,
     source_review: ev?.source_review ?? "ukjent",
     mocked_test: ev?.mocked_test ?? "ukjent",
@@ -171,7 +194,7 @@ const doc = {
     inspected_base_sha: BASE,
     original_feature_text_sha: ORIGINAL_SHA,
     generated_by: "scripts/build-funksjonsmapping.mjs",
-    inputs: ["docs/ravarer-funksjonsliste.md", "docs/funksjonsmapping/review-owners.psv", "docs/funksjonsmapping/prior-evidence.psv"],
+    inputs: ["docs/ravarer-funksjonsliste.md", "docs/funksjonsmapping/review-owners.psv", "docs/funksjonsmapping/prior-evidence.psv", "docs/funksjonsmapping/action-trace.psv"],
     note: "Artefaktets egen commit finnes via git-historikk; den skrives ikke inn her. Kartlegging er ikke aksept.",
   },
   records: recs,

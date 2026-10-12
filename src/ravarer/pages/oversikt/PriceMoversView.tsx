@@ -1,3 +1,4 @@
+import { formatSignedPct } from "@/fakturaer/lib/sumDirection";
 import { Link } from "react-router-dom";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -21,9 +22,8 @@ function fmtPrice(n: number | null, base: string | null): string {
 }
 
 function fmtPct(n: number | null): { text: string; up: boolean; strong: boolean; neg: boolean } {
-  if (n == null) return { text: "—", up: false, strong: false, neg: false };
-  const up = n > 0;
-  return { text: `${up ? "+" : ""}${n.toFixed(1)} %`, up, strong: isPriceWarning(n), neg: n < 0 };
+  if (n == null || !Number.isFinite(n)) return { text: "—", up: false, strong: false, neg: false };
+  return { text: formatSignedPct(n), up: n > 0, strong: isPriceWarning(n), neg: n < 0 };
 }
 
 function Sparkline({ item }: { item: PriceMover }) {

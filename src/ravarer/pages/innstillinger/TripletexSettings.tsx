@@ -555,7 +555,7 @@ function EntityConfig({ legalEntityId, onState }: { legalEntityId: string; onSta
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Sync-historikk</CardTitle>
+          <CardTitle className="text-base">Synkroniseringshistorikk</CardTitle>
         </CardHeader>
         <CardContent>
           {!isConfigured ? (
