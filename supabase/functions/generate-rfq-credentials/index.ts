@@ -79,18 +79,24 @@ Deno.serve(async (req) => {
     const credentials: any[] = [];
 
     for (const r of recipients as any[]) {
-      // Generate password via SECURITY DEFINER RPC
-      const { data: pw, error: pwErr } = await supabaseAdmin.rpc("set_rfq_password", {
+      // Generate password via SECURITY DEFINER RPC. Must run as the caller (user client):
+      // set_rfq_password checks has_ravarer_invoice_access(…,'write') against auth.uid(),
+      // which the service-role client does not carry.
+      const { data: pw, error: pwErr } = await supabase.rpc("set_rfq_password", {
         p_recipient_id: r.id,
       });
       if (pwErr) throw pwErr;
+      if (typeof pw !== "string" || pw.length === 0) throw new Error("password_missing");
 
       // Read token back via service role (column is revoked from authenticated)
-      const { data: tok } = await supabaseAdmin
+      const { data: tok, error: tokErr } = await supabaseAdmin
         .from("negotiation_recipients")
         .select("access_token")
         .eq("id", r.id)
         .single();
+      if (tokErr || typeof tok?.access_token !== "string" || tok.access_token.length === 0) {
+        throw new Error("token_missing");
+      }
 
       credentials.push({
         recipient_id: r.id,
@@ -103,12 +109,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Move negotiation to invited if currently draft
+    // Move negotiation to invited only if it is STILL draft (compare-and-set). Never
+    // overwrite a status that advanced concurrently (e.g. awaiting_confirmation) from
+    // the stale value read above. Once the pending SQL promotes draft→invited inside
+    // set_rfq_password, this becomes a no-op.
     if (neg.status === "draft") {
-      await supabaseAdmin
+      const { error: promoteErr } = await supabaseAdmin
         .from("negotiations")
         .update({ status: "invited" })
-        .eq("id", negotiationId);
+        .eq("id", negotiationId)
+        .eq("status", "draft");
+      if (promoteErr) console.error("generate-rfq-credentials: status promote failed", promoteErr.code);
     }
 
     // Audit log
@@ -126,8 +137,7 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
-    console.error("generate-rfq-credentials error", e);
-    console.error("generate-rfq-credentials", e);
+    console.error("generate-rfq-credentials error", e instanceof Error ? e.message : "unknown");
     return new Response(JSON.stringify({ error: "internal_error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
