@@ -22,7 +22,7 @@ const row = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 const ok = (data: unknown): Q => ({ data, isSuccess: true, isFetching: false, isError: false, isLoading: false, refetch: st.refetch });
-const inv = (id = "I1") => ({ id, status: "pending", approved: false, supplier_id: "S1", supplier_name: "PALS" });
+const inv = (id = "I1") => ({ id, status: "needs_review", approved: false, supplier_id: "S1", supplier_name: "PALS" });
 
 function view(props: Partial<Parameters<typeof CorrectLineDialog>[0]> = {}) {
   return render(<CorrectLineDialog open onOpenChange={() => undefined} lineId="A" targetInvoiceId="I1" invoice={inv()} canWrite document={<div />} onSaved={() => undefined} {...props} />);
