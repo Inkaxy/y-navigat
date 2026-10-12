@@ -47,30 +47,33 @@ Forklaring: **[x]** bygget og testet i kode/lokal database · **[~]** delvis · 
 - [ ] Lagret utskriftsversjon i databasen (identitet er i dag avledet av liste-ID + malversjon, som er uforanderlig etter start)
 - [ ] Sammenligning mellom tellinger
 
-### Trinn 3 – revisjon 2, foreslått, IKKE kjørt/utrullet (revisjon 1 ble ikke akseptert)
-- [x] SQL `supabase/pending/20261012_varetelling_stage3.PENDING.sql` (rev. 2, erstatter aldri-kjørt rev. 1) + `..._stage3_storage.PENDING.sql`; test `..._stage3.test.sql` kjøres etter grunnlaget: 166 kontroller i seriell PGlite (111 + 55). Lagringsregler er ikke testet (PGlite har ikke storage-skjema). Eksplisitte GRANT til authenticated/service_role på nye tabeller og funksjoner, uavhengig av standard-ACL.
-- [x] Edge-kilde (utenfor `supabase/functions`): `supabase/pending/functions/vt-count-ocr/`, `.../vt-count-report-email/`, felles `.../_shared/vtReport.ts`. `deno check` kjørt i isolert kopi med ekte avhengighetsoppløsning: ingen feil i de nye filene. Eksisterende `_shared/crypto.ts`, `m365-crypto.ts`, `graph-mail.ts` gir allerede typefeil under `deno check` (urørt). Eksisterende fakturafunksjoner og `microsoft-graph-send` er uendret.
-- [x] ÉN rapportkontrakt (`_shared/vtReport.ts`) for skjerm, nedlastet PDF/CSV og e-post: eksakt desimal half-up per linje (1 × 1,005 = 1,01; 10,075 = 10,08), samme tilstander (bare talt med pris og «0 på lager» har verdi; må kontrolleres/talt uten pris/ikke talt = ukjent), alle «0» = fullstendig verdi 0, totaler per liste/avdeling/alt, CSV-formelvern også for tellingsnavn, «registrert etter verdsettelsesdato» i alle eksporter. Felles innholdsblokker og A4-oppsett: sidebrudd før hver brutte linje, «Side X av Y», ingen tekst kastes (testet med 55 lange navn målt med jsPDF).
-- [x] E-post: koherent øyeblikksbilde (`vt_report_snapshot`, én setning, ingen radgrense), versjons-hash over nøyaktige vedlegg; forhåndsvisning med nedlasting av CSV/PDF og visning av CSV-innhold. Reservasjon lagrer øyeblikksbilde + vedlegg; sending bruker LAGREDE vedlegg. Lagret op sjekkes FØR ny bygging; «Sjekk status» er skrivebeskyttet; «Fullfør samme sending» bare for «reservert». Uavklart sending holdes per bruker/firma/telling i nettleseren til kjent utfall eller eksplisitt «Jeg har kontrollert». Avsender = allerede koblet Microsoft 365-postboks (`microsoft_oauth_tokens.account_email`); ingen ny hemmelighet.
-- [x] Lesing: flere filer i valgt rekkefølge → én jobb per liste; alle originaler lagres; serveren verifiserer SHA-256/størrelse og bygger PDF av JPEG/PNG selv; én avgrenset AI-kjøring per side (maks 20); leasing med attempt_id (gammelt forsøk kan ikke overskrive), skrivebeskyttet status med utløpt frist, godkjenner kan eksplisitt tillate ny betalt lesing i UI.
-- [x] Identitet: deterministisk, versjonert sideoppsett (`VT2`, radhøyde etter navnelengde/telleenheter) brukt av både utskrift og manifest; 10-tegns radkoder med kollisjonskontroll; streng parser (ekte booleans, `complete` per side); manglende/duplikat/fremmede rader, ufullstendig side, feil liste/versjon/eldre utskrift ⇒ ikke godkjennbart.
-- [x] Godkjenning: hvert felt må ha verdi + kjent enhet eller begrunnet utelatelse; ukjent pakning må velges eksplisitt (aldri base). SQL: egen op med forslags-ID, avledet op for linjelagring, lås telling → liste → linje → forslag → jobb, alt avgjørende sjekkes under lås, lagring og revisjonsspor i samme transaksjon; avvisning likt låst. Original vises ved siden av forslagene (sidevalg, 100–300 %), tydelig «hel side — ingen utsnitt».
-- [x] Kontekst: lagringer bundet til bruker+firma; opplasting stopper før hvert steg ved byttet liste/bruker/firma/tilgang eller avmontering; synkron lås mot dobbeltklikk; avvisning via op-kø; lagringsfeil for ventende sendinger vises; «Send til kontroll»/«Avslutt» sperres ved lokale utkast/ukjente sendinger.
-- [x] Fullstendig henting med keyset + eksakt antall for forslag, jobber, tildelinger og enheter.
-- [x] Tildeling kan ikke endres for avsluttet/avbrutt telling.
-- [ ] Varig lagret utskriftsmanifest (i dag deterministisk avledet av uforanderlige linjer + versjonert oppsett) og fysisk A4-kontroll i nettleser/skriver
-- [ ] WEBP: gjøres om til PNG i nettleseren; WEBP-originalen lagres ikke separat (dokumentert)
-- [ ] Bevis på at et bilde «tilhører» papirarket utover lagret fil + trykt identitet finnes ikke
-- [ ] Integrasjonstest av RLS/lagring/Edge mot en ekte Supabase-instans; ekte AI-lesing og Graph-sending er ikke kjørt (tester bruker syntetiske motparter)
-- [ ] Kjørt/utrullet (krever uavhengig gjennomgang og eksplisitt autorisasjon)
+### Trinn 3 – revisjon 3, foreslått, IKKE kjørt/utrullet (rev. 1–2 ikke akseptert)
+- [x] SQL `20261012_varetelling_stage3.PENDING.sql` + `..._storage.PENDING.sql`; test `..._stage3.test.sql`: 196 kontroller i seriell PGlite (111 grunnlag + 85). Lagringsregler ikke testet (PGlite mangler storage). Testen etterligner Supabase sin service_role (BYPASSRLS).
+- [x] Edge-kilde utenfor `supabase/functions`: `vt-count-ocr/`, `vt-count-report-email/`, `_shared/vtReport.ts`. `deno check` med ekte avhengigheter: ingen feil i de nye filene (7 kjente feil i urørte `_shared/crypto.ts`, `m365-crypto.ts`, `graph-mail.ts`).
+- [x] **Tillitsgrense e-post:** `vt_report_mail_reserve` er service-only; Edge verifiserer aktør via JWT, bygger øyeblikksbilde/vedlegg/hash selv, og SQL krever at øyeblikksbildet er identisk med gjeldende `_vt_report_snapshot_data`. Gjentatt op må være identisk i alt (aktør, versjon, hash, vedlegg, mottaker, emne, melding, avsender). Gjenopptak (`claim`) krever opprinnelig aktør eller godkjenner og identisk forespørsel. Status bare for eier/godkjenner, uten vedlegg; RLS skjuler andres sendinger. Ukjent utfall sendes aldri på nytt automatisk.
+- [x] Felles rapportkontrakt (eksakt desimal half-up per linje, tilstander, totaler, A4, CSV-formelvern) — uendret, nå med prisavklaring.
+- [x] **Prisavklaring per telling:** godkjenner angir pris per baseenhet, kilde (faktura/leverandørpris/prisliste/manuell vurdering), referanse og begrunnelse (≥ 10 tegn) for linjer uten dokumentert startpris, bare før avslutning, med revisjonskontroll mot gjeldende avklaring. Forrige avklaring bevares som erstattet. Startgrunnlag og globale priser endres aldri. Skjerm, nedlastet PDF/CSV, e-post og avslutningsregelen bruker samme verdsettelse (stage3 erstatter `vt_transition_count` med eneste endring at avklart pris godtas).
+- [x] **Utstedte utskriftsmanifester:** utskrift registrerer sideinndelingen (hver linje nøyaktig én gang, første utstedelse uforanderlig). Lesing krever utstedt manifest og validerer mot det.
+- [x] **WEBP-original bevart** som egen fil (rolle «original»); PNG-avledning er siden som leses. Begge SHA-256-verifiseres av serveren.
+- [x] **Lesing avgrenset og gjenopptakbar:** maks 20 sider per jobb; høyst 3 sider per Edge-kall, hver side lagres før neste; klienten fortsetter samme forsøk (`vt_ocr_continue`, kort kall-lås + lease 15 min). Flere sider enn utstedt utskrift avvises før noen kostnad. Ukjent AI-utfall ⇒ stopp, ingen automatisk ny kjøring. Lesing er aldri 100 % sikker; alle verdier bekreftes av en person, usikre felt står tomme.
+- [x] **Mobil/iPad:** telleøkten har fire visninger (Telle/Oversikt/Papir/Kontroll); Telle er standard med kompakt status, fast listevalg og kort øverst; instruksjon vises én gang; to kolonner i liggende nettbrett/desktop. Kalender: romslig agenda på mobil, måned fra nettbrett.
+- [x] Varer uten liste: søk, flervalg og tilføying til valgt mal/plassering via samme revisjonskontrollerte lagring (duplikat på samme plassering sperres). Kontroll viser aktive varer som ikke er med i tellingen.
+- [x] Godkjenner kan tildele andre tellere/kontrollør fra firmaets brukere med skrivetilgang (`vt_assignable_users` + eksisterende `rm_user_names`).
+- [x] Arkiv viser frosne totaler per telling og liste (startgrunnlag + avklaringer), aldri dagens pris.
+- [x] Syntetisk demo i `/forhandsvisning/varetelling`: ferdig telling med flersides prøveark (SVG), utstedt manifest og ferdige lese-forslag med usikre felt og ukjent pakning — uten filvelger, nettverk eller ekte AI.
+- [ ] Positiv test av avslutning med avklart pris i SQL (avslutning krever godkjente lister; bare avvisningsstiene er testet i SQL, positiv sti i syntetisk klient)
+- [ ] Syntetisk klient (fake) tillater lesing uten utstedt manifest (serveren gjør det ikke)
+- [ ] Ekte samtidighet, RLS/lagring/Edge mot ekte Supabase, ekte AI-lesing og Graph-sending er ikke kjørt
+- [ ] Bevis på at et bilde tilhører papirarket utover lagret fil + trykt identitet finnes ikke; radutsnitt ikke bygget (hel side vises)
+- [ ] Kjørt/utrullet (krever gjennomgang og eksplisitt autorisasjon)
 
 ### Gjenstår (neste leveranser)
 - [ ] Flytt vare mellom maler direkte fra duplikatvarselet (i dag: varsel + endre plassering/fjern)
 - [ ] Gjentakende planlegging og påminnelser (kalenderen er bare visning)
 - [ ] Offline-kø med testet kaldstart — IKKE bygget, ikke lovet (utkast og ventende innslag i nettleseren er ikke offline-støtte)
 - [ ] Bevegelseskontroll i tellevindu og «Oppdater lagerbeholdning» — IKKE bygget (ingen automatisk lagerjustering; skal vurderes separat)
-- [ ] Revisjon av avsluttet telling; manuell/historisk prisavklaring med begrunnelse adskilt fra startgrunnlaget — IKKE bygget
-- [ ] Brukervelger for å tildele andre; kontrollørrolle i UI
+- [ ] Rapportkorreksjon av avsluttet telling som ny revisjon — IKKE bygget
+- [ ] Planredigering før start (dato/navn/omfang med CAS) — IKKE bygget
 - [ ] Sammenligning mellom tellinger
 - [ ] Kontroll i ekte nettleser 390/768/1440, A4/svart-hvitt-utskrift og innlogget produksjon (root)
 
