@@ -94,10 +94,10 @@ export default function AiServicesSettings() {
         </AlertDescription>
       </Alert>
 
-      {configs.isSuccess ? (
+      {configs.data ? (
         <ExtractionConfigCard
           existing={invoiceConfig ?? null}
-          onSaved={() => qc.invalidateQueries({ queryKey: ["ai-configs"] })}
+          onSaved={async () => { const r = await configs.refetch(); return r.isSuccess && !r.isError; }}
         />
       ) : (
         <QueryState scope="AI-konfigurasjon" isLoading={configs.isLoading} isError={configs.isError} error={configs.error}
@@ -113,7 +113,7 @@ export default function AiServicesSettings() {
   );
 }
 
-function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null; onSaved: () => Promise<unknown> }) {
+function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null; onSaved: () => Promise<boolean> }) {
   const qc = useQueryClient();
   // Kladd: null = følg lagret konfigurasjon. Lagret modell beholdes selv om den ikke står i listen.
   const [draft, setDraft] = useState<{ rev: number; value: AiDraft } | null>(null);
@@ -124,6 +124,8 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
   const [confirmDelete, setConfirmDelete] = useState(false);
   const busy = useRef(false);
   const [saving, setSaving] = useState(false);
+  /** Ukjent lagringsutfall: lagring forblir sperret til gjeldende konfigurasjon faktisk er lest på nytt. */
+  const [recon, setRecon] = useState<null | "reading" | "failed">(null);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
@@ -199,11 +201,12 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
   };
 
   const save = async () => {
-    if (busy.current || saveBlock || maxTokens == null || temperature == null) return;
+    if (busy.current || recon || saveBlock || maxTokens == null || temperature == null) return;
     busy.current = true;
     setSaving(true);
     const frozen = { rev: draft?.rev ?? 0, key: apiKey };
     setSaveOutcome(null);
+    let unknown = false;
     try {
       const { data, error } = await supabase.functions.invoke("ai-config", {
         body: {
@@ -218,8 +221,7 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
       if (error && status === 400) {
         setSaveOutcome({ kind: "rejected", message: "Lagringen ble avvist (ugyldige felt eller nøkkel). Ingenting er endret." });
       } else if (error || !parseAiSaveResult(data)) {
-        // Lagring skjer i flere steg uten transaksjon: forrige konfigurasjon kan være deaktivert.
-        setSaveOutcome({ kind: "unknown", message: "Utfallet er ukjent eller delvis — forrige konfigurasjon kan være deaktivert. Gjeldende konfigurasjon er lest på nytt; kontroller den før du lagrer igjen." });
+        unknown = true;
       } else {
         setApiKey((k) => (k === frozen.key ? "" : k));
         setDraft((cur) => (cur && cur.rev === frozen.rev ? null : cur));
@@ -227,12 +229,38 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
       }
     } catch (e) {
       console.warn("[ai-config] lagring: ukjent utfall", e instanceof Error ? e.name : "ukjent");
-      if (mounted.current) setSaveOutcome({ kind: "unknown", message: "Utfallet er ukjent. Kontroller konfigurasjonen før du lagrer igjen." });
-    } finally {
+      unknown = true;
+    }
+    if (unknown) {
+      // Lagring skjer i flere steg uten transaksjon: forrige konfigurasjon kan være deaktivert.
+      // Sperren holdes til gjeldende konfigurasjon er lest; aldri automatisk nytt forsøk.
+      if (mounted.current) setSaving(false);
+      await reconcile();
+    } else {
       busy.current = false;
       if (mounted.current) setSaving(false);
       await onSaved();
-      void qc.invalidateQueries({ queryKey: ["ai-usage"] });
+    }
+    void qc.invalidateQueries({ queryKey: ["ai-usage"] });
+  };
+
+  /** Leser gjeldende konfigurasjon etter ukjent utfall. Frigjør bare ved vellykket lesing. */
+  const reconcile = async () => {
+    busy.current = true;
+    if (mounted.current) {
+      setRecon("reading");
+      setSaveOutcome({ kind: "unknown", message: "Utfallet av lagringen er ukjent. Leser gjeldende konfigurasjon …" });
+    }
+    let ok = false;
+    try { ok = await onSaved(); } catch (e) { console.warn("[ai-config] avstemming feilet", e instanceof Error ? e.name : "ukjent"); }
+    if (!mounted.current) return;
+    if (ok) {
+      busy.current = false;
+      setRecon(null);
+      setSaveOutcome({ kind: "unknown", message: "Utfallet av lagringen er fortsatt ukjent (ingen kvittering). Det som vises nå er gjeldende lagret konfigurasjon — kontroller den før du lagrer igjen." });
+    } else {
+      setRecon("failed");
+      setSaveOutcome({ kind: "unknown", message: "Utfallet av lagringen er ukjent, og gjeldende konfigurasjon kunne ikke leses. Lagring er sperret til den er lest." });
     }
   };
 
@@ -341,6 +369,12 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
             <AlertDescription className="text-sm">{saveOutcome.message}</AlertDescription>
           </Alert>
         )}
+        {recon && (
+          <div className="flex flex-wrap items-center gap-2" data-testid="ai-reconcile">
+            <span className="text-sm">{recon === "reading" ? "Leser gjeldende konfigurasjon …" : "Gjeldende konfigurasjon er ikke lest."}</span>
+            {recon === "failed" && <Button variant="outline" className="min-h-[44px]" onClick={() => void reconcile()}>Les konfigurasjonen på nytt</Button>}
+          </div>
+        )}
         {dirty && saveBlock && <p role="note" className="text-sm text-warning">{saveBlock}</p>}
 
         <div className="flex flex-wrap items-center gap-2 pt-2">
@@ -355,8 +389,8 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
           )}
           {testBlock && storedTestOnly && existing && dirty && <span className="text-caption text-ink-secondary">{testBlock}</span>}
         </div>
-        <SettingsSaveBar dirty={dirty} saving={saving} canSave={dirty && !saveBlock && !saving}
-          onSave={() => void save()} onCancel={() => { if (busy.current) return; setDraft(null); setApiKey(""); setSaveOutcome(null); }}
+        <SettingsSaveBar dirty={dirty} saving={saving} canSave={dirty && !saveBlock && !saving && !recon}
+          onSave={() => void save()} onCancel={() => { if (busy.current || recon) return; setDraft(null); setApiKey(""); setSaveOutcome(null); }}
           saveLabel={existing ? "Erstatt konfigurasjon" : "Lagre konfigurasjon"} />
       </CardContent>
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
