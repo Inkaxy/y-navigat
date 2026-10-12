@@ -190,7 +190,7 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Pris">
             <div className="flex gap-2">
-              <Input className="min-h-[44px]" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.00" inputMode="decimal" />
+              <Input className="min-h-[44px]" aria-label="Avtalt pris" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.00" inputMode="decimal" />
               {/* Enheten må være kanonisk — «kr/kg» ble avvist av valideringen
                   når avtalen skulle bekreftes. */}
               <Select value={priceUnit} onValueChange={setPriceUnit}>
@@ -218,7 +218,7 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
           </Field>
           <Field label="Pakning">
             <div className="flex gap-2">
-              <Input className="min-h-[44px]" value={pkgSize} onChange={(e) => setPkgSize(e.target.value)} placeholder="0" inputMode="decimal" />
+              <Input className="min-h-[44px]" aria-label="Pakningsstørrelse" value={pkgSize} onChange={(e) => setPkgSize(e.target.value)} placeholder="0" inputMode="decimal" />
               <Select value={pkgUnit} onValueChange={setPkgUnit}>
                 <SelectTrigger className="min-h-[44px] w-32 shrink-0" aria-label="Pakningsenhet">
                   <SelectValue />
@@ -232,13 +232,13 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
             </div>
           </Field>
           <Field label="Avtale-lengde (mnd)">
-            <Input className="min-h-[44px]" value={months} onChange={(e) => setMonths(e.target.value)} inputMode="numeric" />
+            <Input className="min-h-[44px]" aria-label="Avtalelengde i måneder" value={months} onChange={(e) => setMonths(e.target.value)} inputMode="numeric" />
           </Field>
           <Field label={`Min ordre (${unitLabel})`}>
-            <Input className="min-h-[44px]" value={minVol} onChange={(e) => setMinVol(e.target.value)} inputMode="decimal" />
+            <Input className="min-h-[44px]" aria-label="Minste ordre" value={minVol} onChange={(e) => setMinVol(e.target.value)} inputMode="decimal" />
           </Field>
           <Field label="Betaling (dager)">
-            <Input className="min-h-[44px]" value={pay} onChange={(e) => setPay(e.target.value)} inputMode="numeric" />
+            <Input className="min-h-[44px]" aria-label="Betalingsfrist i dager" value={pay} onChange={(e) => setPay(e.target.value)} inputMode="numeric" />
           </Field>
         </div>
 
