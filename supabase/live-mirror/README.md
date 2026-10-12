@@ -69,3 +69,15 @@ Teksten er SQL-en root oppga som kjørt, inkludert den historiske overskriften �
 opphavet. ALDRI kjør på nytt og ALDRI legg den i `supabase/migrations`. Live-versjonsnummer og md5 mot
 `schema_migrations.statements` er ikke lest i denne økten (agenten har ingen innlogget live-tilgang) — root må kontrollere
 byte-likheten og eventuelt gi filen versjonsprefikset.
+
+## Forhandlinger: vern av utstedte råvarelinjer (root, 2026-10-12)
+
+`negotiation_item_preservation_reviewed` ble anvendt av root direkte mot live 2026-10-12 ~05:49 UTC etter to uavhengige
+gjennomganger (8 forhandlinger/13 linjer/5 mottakere uendret, 3 utstedte markert). Filen er SQL-teksten root leverte, med
+bare «NOT APPLIED»-hodet byttet mot en speilkommentar. ALDRI kjør på nytt. Erstatter det mangelfulle forslaget i
+`supabase/pending/` (aldri anvendt). Innfører skrivebeskyttet markør `negotiations.rfq_issued_at` (monoton).
+To-økts samtidighetsverifisering i PostgreSQL er ikke gjort.
+
+| Fil | md5 |
+|---|---|
+| live-mirror/negotiation_item_preservation_reviewed.sql | b87992c0f5d036d9e2e7fca22ec86b0c |

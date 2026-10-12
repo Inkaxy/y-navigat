@@ -5279,6 +5279,7 @@ export type Database = {
           notes: string | null
           purpose: string | null
           response_deadline: string | null
+          rfq_issued_at: string | null
           status: Database["public"]["Enums"]["negotiation_status"]
           title: string
           updated_at: string
@@ -5306,6 +5307,7 @@ export type Database = {
           notes?: string | null
           purpose?: string | null
           response_deadline?: string | null
+          rfq_issued_at?: string | null
           status?: Database["public"]["Enums"]["negotiation_status"]
           title: string
           updated_at?: string
@@ -5333,6 +5335,7 @@ export type Database = {
           notes?: string | null
           purpose?: string | null
           response_deadline?: string | null
+          rfq_issued_at?: string | null
           status?: Database["public"]["Enums"]["negotiation_status"]
           title?: string
           updated_at?: string
@@ -15870,6 +15873,10 @@ export type Database = {
       _import_upsert_price: {
         Args: { p_price: number; p_price_list_id: string; p_product_id: string }
         Returns: number
+      }
+      _negotiation_items_issued: {
+        Args: { p_negotiation_id: string }
+        Returns: boolean
       }
       _normalize_price_basis: { Args: { p: Json }; Returns: Json }
       _notify_ordre_team: {

@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Plus, Search } from "lucide-react";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 
