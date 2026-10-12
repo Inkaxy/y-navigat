@@ -282,7 +282,7 @@ function EntityConfig({ legalEntityId, onState }: { legalEntityId: string; onSta
     if (ok) {
       busy.current = false;
       setRecon(null);
-      setSaveOutcome({ kind: "unknown", message: "Utfallet av lagringen er fortsatt ukjent (ingen kvittering). Det som vises nå er gjeldende lagret konfigurasjon — kontroller den før du lagrer igjen." });
+      setSaveOutcome({ kind: "unknown", message: "Gjeldende lagret konfigurasjon er lest på nytt, men utfallet av den opprinnelige lagringen er fortsatt ukjent (ingen kvittering). Feltene du har endret er fortsatt en ulagret kladd og kan avvike fra det som er lagret. Trykker du Lagre, sendes en ny, bevisst lagring." });
     } else {
       setRecon("failed");
       setSaveOutcome({ kind: "unknown", message: "Utfallet av lagringen er ukjent, og konfigurasjonen kunne ikke leses. Lagring er sperret til den er lest." });
