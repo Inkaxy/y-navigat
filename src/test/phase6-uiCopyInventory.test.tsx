@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import { fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { readFileSync, existsSync } from "node:fs";
 import { correctionTarget } from "@/ravarer/pages/priskontroll/faktura/correctionTarget";
 import { formatMachineNumbersNb, formatSignedPct, sumDirection, sumDirectionText } from "@/fakturaer/lib/sumDirection";
@@ -95,7 +96,7 @@ describe("fakturahodet: egen sumkontroll og 44 px mål", () => {
   };
   it("menyen har «Vis sumkontroll» adskilt fra retting, og knappene er 44 px", async () => {
     const onMenu = vi.fn(); const onPrimary = vi.fn();
-    render(<MemoryRouter><WorkspaceHeader {...(base as unknown as Parameters<typeof WorkspaceHeader>[0])} onMenu={onMenu} onPrimary={onPrimary} /></MemoryRouter>);
+    render(<QueryClientProvider client={new QueryClient()}><MemoryRouter><WorkspaceHeader {...(base as unknown as Parameters<typeof WorkspaceHeader>[0])} onMenu={onMenu} onPrimary={onPrimary} /></MemoryRouter></QueryClientProvider>);
     const more = screen.getByRole("button", { name: "Flere valg for fakturaen" });
     expect(more.className).toContain("h-[44px]");
     expect(screen.getByRole("button", { name: /Vis dokument/ }).className).toContain("min-h-[44px]");
