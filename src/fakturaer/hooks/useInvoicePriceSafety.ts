@@ -139,17 +139,20 @@ export function gateWithRows(data: SafetyResult | undefined, fresh: boolean, lin
  * oppdatering (også bakgrunnshenting), utløpt frist eller `pending` gir «Prisgrunnlag ikke kontrollert».
  * `rawMaterialId` (varekort) avviser kvitteringer for en annen råvare.
  */
-export function useInvoicePriceSafety(invoiceIds: readonly (string | null | undefined)[], opts?: { pending?: boolean; rawMaterialId?: string | null }) {
+export function useInvoicePriceSafety(invoiceIds: readonly (string | null | undefined)[], opts?: { pending?: boolean; rawMaterialId?: string | null; active?: boolean }) {
   const ids = [...new Set(invoiceIds.filter((x): x is string => !!x))].sort();
   const qs = useQueries({
     queries: ids.map((id) => ({
       queryKey: [PRICE_SAFETY_KEY, id] as const,
       queryFn: ({ signal }: { signal: AbortSignal }) => fetchInvoicePriceSafety(id, signal),
+      // Skjult/inaktiv eier: ingen henting eller polling for denne observatøren. Andre synlige
+      // observatører av samme nøkkel fortsetter uforstyrret (ingen global cancelQueries).
+      enabled: opts?.active !== false,
       staleTime: 15_000,
       refetchInterval: SAFETY_REFETCH_MS,
       refetchIntervalInBackground: false,
       refetchOnWindowFocus: true,
-      retry: 1,
+      retry: (n: number, err: unknown) => n < 1 && !(err instanceof Error && err.name === "AbortError"),
     })),
   });
   // Ny gjengivelse når en kvittering passerer fristen, slik at utløpt status aldri blir stående som godkjent.
@@ -166,7 +169,7 @@ export function useInvoicePriceSafety(invoiceIds: readonly (string | null | unde
   const byId = new Map<string, (typeof qs)[number]>();
   ids.forEach((id, i) => byId.set(id, qs[i]));
   const gateFor: GateFor = (line) => {
-    if (opts?.pending) return UNCHECKED;
+    if (opts?.pending || opts?.active === false) return UNCHECKED;
     const q = byId.get(line.invoice_id);
     if (!q) return UNCHECKED;
     return gateWithRows(q.data, isFresh(q, clock), line, opts?.rawMaterialId);
