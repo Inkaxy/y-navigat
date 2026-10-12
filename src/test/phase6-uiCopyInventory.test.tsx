@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { readFileSync, existsSync } from "node:fs";
 import { correctionTarget } from "@/ravarer/pages/priskontroll/faktura/correctionTarget";
@@ -99,11 +99,11 @@ describe("fakturahodet: egen sumkontroll og 44 px mål", () => {
     expect(screen.getByRole("button", { name: /Vis dokument/ }).className).toContain("min-h-[44px]");
     const primary = screen.getByRole("button", { name: "Rett sumavvik" });
     expect(primary.className).toContain("min-h-[44px]");
-    await userEvent.click(primary);
+    fireEvent.click(primary);
     expect(onPrimary).toHaveBeenCalledTimes(1);
-    await userEvent.click(more);
+    fireEvent.pointerDown(more, { button: 0, ctrlKey: false }); fireEvent.keyDown(more, { key: "Enter" });
     const menu = await screen.findByRole("menu");
-    await userEvent.click(within(menu).getByRole("menuitem", { name: "Vis sumkontroll" }));
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Vis sumkontroll" }));
     expect(onMenu).toHaveBeenCalledWith("facts");
   });
 });
