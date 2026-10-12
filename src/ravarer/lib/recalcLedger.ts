@@ -93,3 +93,14 @@ export function unresolvedIds(l: RecalcLedger): Set<string> {
 export function acknowledgeUndoUnknown(l: RecalcLedger, batchId: string): RecalcLedger {
   return { ...l, batches: l.batches.map((b) => (b.batchId === batchId ? { ...b, undoUnknown: false } : b)) };
 }
+
+/**
+ * Avvisninger som beviser at transaksjonen ble rullet tilbake/aldri startet (konservativ liste).
+ * Tilkoblings-/fullføringskoder (08xxx, 40003, 57Pxx, XX…) og alle ukjente koder er UKJENT utfall.
+ * Delt av kjøring og angring.
+ */
+const KNOWN_REJECTION = new Set(["42501", "28000", "P0001", "P0002", "22023", "22P02", "22004", "23502", "23503", "23505", "23514", "40001", "40P01"]);
+export function isKnownRecalcRejection(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code;
+  return typeof code === "string" && KNOWN_REJECTION.has(code);
+}
