@@ -126,7 +126,7 @@ export default function SupplierPortal() {
         </PortalNotice>
       )}
       {!submitted && !unknownSave && (
-        <p className="text-body text-ink-secondary">Prisen gjelder pakningen du oppgir. Fyll ut det du kan, lagre kladd underveis, og send når tilbudet er komplett.</p>
+        <p className="text-body text-ink-secondary">Prisen gjelder pakningen du oppgir. Oppgir du ingen pakning, gjelder prisen per grunnenhet (for eksempel kg). Fyll ut det du kan, lagre kladd underveis, og send når tilbudet er komplett.</p>
       )}
       {bundle.items.length === 0 && <PortalNotice tone="info">Forespørselen har ingen varelinjer.</PortalNotice>}
 
@@ -149,7 +149,9 @@ export default function SupplierPortal() {
               <div className="space-y-1.5">
                 <Label htmlFor={fid("price")}>Pris per pakning (NOK, eks. mva)</Label>
                 <Input id={fid("price")} type="number" inputMode="decimal" step="0.01" className="h-[44px]"
+                  aria-describedby={fid("price-hint")}
                   value={r.offered_price ?? ""} onChange={(e) => setNum(it.id, "offered_price", e.target.value)} />
+                <p id={fid("price-hint")} className="text-caption text-ink-secondary">Uten pakning: pris per {base || "grunnenhet"}.</p>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor={fid("pkg")}>Pakningsstørrelse og enhet</Label>
