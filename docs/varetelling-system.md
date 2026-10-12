@@ -1,58 +1,63 @@
 # Varetellingssystem – spesifikasjon og fremdrift
 
-Baseline: `e29ad95e8e372578ffa8f205c2560633f0e8ef9b`. Godkjent spesifikasjon er gjengitt i sin helhet nederst.
+Baseline: `e29ad95e8e372578ffa8f205c2560633f0e8ef9b`. Revisjon 2 bygget på `755eeaca7f3caca7017438c1d64018a18d78ecd4` etter roots gjennomgang. Godkjent spesifikasjon er gjengitt i sin helhet nederst.
 
 ## Fremdrift (sannferdig sjekkliste)
 
-Forklaring: **[x]** bygget og testet i kode · **[~]** delvis · **[ ]** ikke bygget. Ingenting er i drift før SQL-en er godkjent og kjørt.
+Forklaring: **[x]** bygget og testet i kode/lokal database · **[~]** delvis · **[ ]** ikke bygget. Ingenting er i drift før SQL-en er godkjent og kjørt. Grunnlaget er **ikke akseptert** av root ennå.
 
-### Databasegrunnlag – foreslått, IKKE kjørt mot live
-- [x] `supabase/pending/20261012_varetelling_foundation.PENDING.sql` (additivt, kun `vt_*`)
-- [x] Atferdstest `supabase/pending/20261012_varetelling_foundation.test.sql`, kjøres med `node scripts/test-varetelling-sql.mjs` (innebygd PGlite, 45 kontroller)
-- [x] RLS per firma via `has_ravarer_access` (read/write/approve); PUBLIC/anon tilbakekalt; ingen klientskriving i tellinger/linjer
-- [x] Startgrunnlag (navn, varenummer, sted, enheter, pris, priskilde, tidspunkt) låst av trigger
-- [x] Avsluttet/avbrutt telling uforanderlig; tellinger/linjer kan ikke slettes
+### Databasegrunnlag – foreslått, IKKE kjørt mot live (revisjon 2)
+- [x] `supabase/pending/20261012_varetelling_foundation.PENDING.sql` (additivt, kun `vt_*`/`_vt_*`; erstatter aldri-kjørt revisjon 1)
+- [x] Atferdstest `supabase/pending/20261012_varetelling_foundation.test.sql` via `node scripts/test-varetelling-sql.mjs` (PGlite i minnet, 111 kontroller, seriell). Kanonisk prisvelger og tilgangsfunksjoner er stubbet.
+- [x] Pris: `_vt_price_evidence` brukes av både dekning og start. «Ved start» = nyeste `_rm_cost_candidates(id, dagens Oslo-dato)` OG råvaren bundet til nøyaktig den kandidaten (verifisert, samme history_id, samme pris). `verifisert` alene gir ikke pris. Uten fakturalesetilgang: ingen pris. Ukjent baseenhet: ingen enhet (aldri «stk») og ingen pris. Kilde, virkningsdato, registreringstidspunkt, as-of og årsakskode lagres.
+- [x] Historisk verdsettelse må velges eksplisitt med dato før i dag; nyeste kandidat med virkningsdato ≤ datoen; «registrert etter verdsettelsesdato» merkes. Fremtidig dato avvises. (Kandidatvelgerens gyldighetsregler vurderes slik de står i dag — dokumentert begrensning.)
+- [x] Alle aktive varer kan telles uavhengig av `stock_tracking`; lagerføring endres aldri.
+- [x] Mengde beregnes av serveren fra frosne enheter: forfalskede faktorer/etiketter ignoreres; NaN/Infinity, negative, > 1e9, duplikat/ukjent enhet, feil form, > 11 deler og avvikende `p_counted_base` avvises. CHECK: endelig pris > 0 og endelig mengde ≥ 0.
+- [x] Låsrekkefølge telling → liste → linje i alle muterende RPC-er; start låser telling → maler → steder før validering/kopi; malredigering mal → steder. Avslutning krever minst én linje, alle lister med varer og godkjent, alle linjer avklart og talte varer med pris. Tom mal/telling kan ikke startes/avsluttes.
+- [x] Felles op-reservasjon (`vt_ops`) for alle skrivinger: normalisert innhold + bruker + firma + type; samme op med annet innhold = 23505; null revisjon/op/status avvises.
+- [x] Ingen direkte klientskriving: alle tabeller `REVOKE ALL … FROM PUBLIC, anon, authenticated` og bare `SELECT` tilbake; steder/maler via RPC; sammensatte FK-er sikrer firmaintegritet; identitet/firma/created_by uforanderlig; arkiverte steder og fremmede enheter avvises.
+- [x] Startgrunnlag og avsluttede tellinger låst av triggere for alle roller.
+- [ ] Ekte samtidighetstest med to økter (PGlite er seriell; låsrekkefølgen er resonnert, ikke bevist parallelt)
 - [ ] Kjørt mot live (krever uavhengig gjennomgang og eksplisitt autorisasjon)
 
 ### Fase 1 – grunnlag og arbeidsflate
-- [x] Arbeidsflate under Lager › Varetelling (`?vt=tellinger|maler|uten-liste|dagstelling`, `?telling=<id>`)
+- [x] Arbeidsflate under Lager › Varetelling (`?vt=…`, `?telling=`, `?liste=`, `?utskrift=blank|rapport`)
 - [x] Eksisterende dagstelling bevart uendret som «Dagstelling»
-- [x] «Ikke tatt i bruk»-melding når databasedelen mangler; ingen falsk lagring
-- [x] Avdelinger og fysiske steder (opprett/arkiver, unik per firma)
-- [x] Listemaler: opprett, arkiver, legg til/fjern varer med plassering, versjon øker ved endring
-- [x] Duplikatvarsel (samme sted = feil, annet sted = lovlig info), serverhåndhevet unikhet i mal og telling
-- [x] Varer uten liste (aktive lagerførte), manglende enhet/pris markert
-- [x] Planlagt telling (navn, telledato) idempotent på op-id
-- [x] Dekningskontroll før start (duplikater, manglende pris, manglende plassering)
-- [x] Start: atomisk kopi av valgte maler og frosset grunnlag; idempotent; duplikat stopper start
-- [x] Pris = bare `cost_basis_status='verifisert'` (samme kontrakt som `rm_usable_cost`); ellers «mangler»
-- [x] Tilbakedatert telledato: ingen pris, kilde «historisk_ikke_tilgjengelig» (ingen oppdiktet historikk)
-- [~] Verdsettelsesdato lagres separat, men settes lik telledato i UI (eget valg ikke bygget)
-- [x] Telefon/iPad-registrering: store felt, desimalkomma, flere telleenheter, eksplisitt 0, «Ikke på stedet», «Må kontrolleres», kommentar, «Neste vare», gjenstår-filter
-- [x] Forventet beholdning vises ikke under registrering
-- [x] Linjelagring med CAS (revisjon) og op-id; konflikt viser begge verdier, ingen stille overskriving
-- [x] Ukjent utfall: samme registrering sendes på nytt med samme op-id
-- [x] Sammendrag: registrert, må kontrolleres, 0/ikke på stedet, foreløpig verdi av talt omfang, ufullstendig ved manglende pris
-- [x] Samme vare på flere steder summeres én gang
-- [x] Listestatus (til kontroll / godkjent / gjenåpne), godkjenning krever approve
-- [x] Telling: til kontroll ↔ pågår, avslutt (approve; stoppes av ikke talt / må kontrolleres / manglende pris), avbryt med begrunnelse
-- [x] Arkiv med søk; åpning viser frosset grunnlag
-- [x] Syntetisk forhåndsvisning `/forhandsvisning/varetelling` (`?utilgjengelig=1`) med faktiske komponenter
+- [x] Sonde på `vt_backend_version()` (versjon 2); «ikke tatt i bruk» og «annen versjon» blokkerer all skriving
+- [x] Fullstendig lesing via felles `fetchAllCounted` (eksakt antall, keyset, duplikat/overskudd, antall på nytt), også for lister/linjer i én telling
+- [x] Avdelinger (forslag fra aktive produksjonsavdelinger) og fysiske steder (opprett/arkiver)
+- [x] Listemaler: opprett, rediger navn/avdeling/standardsted, arkiver, kopier, legg til via søk eller kategori (flervalg), plassering per linje, manuell rekkefølge (opp/ned), kladd med Lagre/Forkast; revisjon øker ved hver endring
+- [x] Duplikatvarsel (samme sted = feil, annet sted = lovlig), serverhåndhevet i mal og ved start
+- [x] Varer uten liste: alle aktive varer, ukjent baseenhet og «ikke lagerført» markert
+- [x] Planlagt telling med prisgrunnlag «ved start» eller eksplisitt historisk dato
+- [x] Dekningskontroll før start med prisårsaker (samme bevis som start)
+- [x] Telefon/iPad-registrering; forventet beholdning vises ikke
+- [x] Utkast bundet til grunnrevisjon; fersk serverversjon tas bare inn når kortet er rent; endring fra andre vises med valg «Bruk lagret verdi» / «Behold min»
+- [x] Ventende operasjoner per bruker+firma i nettleserlagring (overlever avmontering og omlasting) med synkron lås; ukjent utfall sendes bare på nytt med samme op-id; firma/skriverett kontrolleres rett før kall — gjelder linjer, opprett, start, liste- og tellingsstatus, maler og steder
+- [x] Strenge kvitteringer bundet til forventet ID, status, revisjon og antall
+- [x] Sammendrag per telling, avdeling og liste; samme vare på flere steder summeres
+- [x] Listestatus med revisjon; telling til kontroll/avslutt/avbryt
+- [x] Arkiv med søk
+- [x] Syntetisk forhåndsvisning `/forhandsvisning/varetelling` med faktiske skjermer
+
+### Fase 3 (delvis) – papir og rapport
+- [x] A4 blanke tellelister, 14 linjer per side, aldri delt linje, side X av Y, malversjon, maskinlesbar identitet `VT1|telling|liste|rversjon|sX/Y`, kort linjekode per rad og alle linje-ID-er per side (for kommende skjemalesing)
+- [x] QR per liste og side til innlogget telleside (`/ravarer/lager?fane=telling&telling=…&liste=…`); QR gir ingen tilgang i seg selv
+- [x] Rapport (utskrift/«lagre som PDF»), PDF-fil (jsPDF) og CSV (semikolon, norsk desimal, formelvern) med frosne verdier; «Foreløpig» + tidspunkt før avslutning; manglende pris listes, aldri 0
+- [ ] Lagret utskriftsversjon i databasen (identitet er i dag avledet av liste-ID + malversjon, som er uforanderlig etter start)
+- [ ] Sammenligning mellom tellinger
 
 ### Gjenstår (neste leveranser)
 - [ ] Tilordning av tellere/ansvarlige per liste og filteret «Mine lister»
-- [ ] Manuell sortering (dra) og kopiering av listemal; kategori-utvalg ved opprettelse
-- [ ] Flytt vare mellom maler direkte fra duplikatvarselet
+- [ ] Flytt vare mellom maler direkte fra duplikatvarselet (i dag: varsel + endre plassering/fjern)
+- [ ] Valg av telleenheter per malinje i UI (servermodellen støtter det)
 - [ ] Kalender og gjentakende planlegging, påminnelser
-- [ ] Offline-kø (holdbar lagring, gjenoppretting) – IKKE bygget, ikke lovet
-- [ ] Papirlister A4, QR per telleliste, utskriftsversjoner
-- [ ] Rapport (PDF/regneark), sammenligning mellom tellinger
-- [ ] E-post-forhåndsvisning og sending – IKKE bygget
-- [ ] Dokumentlesing/OCR av utfylte skjemaer – IKKE bygget
-- [ ] Bevegelseskontroll i tellevindu og «Oppdater lagerbeholdning» – IKKE bygget (ingen automatisk lagerjustering)
-- [ ] Revisjon av avsluttet telling
-- [ ] Manuell prisavklaring med begrunnelse
-- [ ] Kontroll i ekte nettleser 390/768/1440 og utskrift (root)
+- [ ] Offline-kø med testet gjenoppretting — IKKE bygget, ikke lovet (ventende innslag i nettleseren er ikke offline-støtte)
+- [ ] E-post-forhåndsvisning og sending — IKKE bygget
+- [ ] Dokumentlesing/OCR av utfylte skjemaer — IKKE bygget
+- [ ] Bevegelseskontroll i tellevindu og «Oppdater lagerbeholdning» — IKKE bygget (ingen automatisk lagerjustering)
+- [ ] Revisjon av avsluttet telling; manuell prisavklaring med begrunnelse
+- [ ] Kontroll i ekte nettleser 390/768/1440, A4/svart-hvitt-utskrift og innlogget produksjon (root)
 
 ---
 
