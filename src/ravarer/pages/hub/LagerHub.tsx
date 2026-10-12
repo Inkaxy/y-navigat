@@ -11,7 +11,7 @@ import { LAGER_TAB_PARAMS, LAGER_TABS, lagerTabs, RAVARER_EYEBROW, type LagerTab
 
 const Lager = lazy(() => import("@/ravarer/pages/Lager"));
 const Varemottak = lazy(() => import("@/ravarer/pages/Varemottak"));
-const Varetelling = lazy(() => import("@/ravarer/pages/Varetelling"));
+const Varetelling = lazy(() => import("@/ravarer/varetelling/VaretellingRoot"));
 const StockLedger = lazy(() => import("@/ravarer/components/stock/StockLedger").then(m => ({ default: m.StockLedger })));
 const MarginTable = lazy(() => import("@/ravarer/components/stock/MarginTable").then(m => ({ default: m.MarginTable })));
 const ReorderSuggestions = lazy(() => import("@/ravarer/components/stock/ReorderSuggestions").then(m => ({ default: m.ReorderSuggestions })));
