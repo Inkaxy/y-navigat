@@ -48,7 +48,7 @@ describe("ConcludeDialog", () => {
     for (const cb of screen.getAllByRole("checkbox", { name: /Sett som primær/ })) fireEvent.click(cb);
     fireEvent.click(screen.getByRole("button", { name: /^Avslutt/ }));
     expect(await screen.findByText(/primærleverandør ble ikke satt/)).toBeInTheDocument();
-    expect(screen.getByText(/Sukker/)).toBeInTheDocument();
+    expect(screen.getByText(/Sukker →/)).toBeInTheDocument();
     setPrimary.mockReset().mockResolvedValue(undefined);
     fireEvent.click(screen.getByRole("button", { name: /Sett gjenstående primærleverandør/ }));
     await waitFor(() => expect(setPrimary).toHaveBeenCalledTimes(1));
