@@ -342,6 +342,8 @@ export default function ForhandlingWizard() {
                         <td className="px-3 py-2">
                           <Checkbox
                             checked={checked}
+                            disabled={itemsLocked}
+                            aria-label={`Velg ${r.name}`}
                             onCheckedChange={(v) => {
                               const next = new Set(selectedRm);
                               if (v) next.add(r.id);
