@@ -14956,6 +14956,832 @@ export type Database = {
         }
         Relationships: []
       }
+      vt_count_lines: {
+        Row: {
+          count_id: string
+          count_list_id: string
+          counted_base: number | null
+          entry: Json
+          id: string
+          legal_entity_id: string
+          location_id: string | null
+          note: string | null
+          raw_material_id: string
+          revision: number
+          snap_base_unit: string | null
+          snap_currency: string
+          snap_location_name: string | null
+          snap_name: string
+          snap_price_as_of: string
+          snap_price_effective_date: string | null
+          snap_price_excl_vat: boolean
+          snap_price_history_id: string | null
+          snap_price_known_after_valuation: boolean
+          snap_price_per_base: number | null
+          snap_price_reason: string | null
+          snap_price_recorded_at: string | null
+          snap_price_source: string
+          snap_price_source_kind: string | null
+          snap_sku: string | null
+          snap_taken_at: string
+          snap_units: Json
+          sort_order: number
+          state: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          count_id: string
+          count_list_id: string
+          counted_base?: number | null
+          entry?: Json
+          id?: string
+          legal_entity_id: string
+          location_id?: string | null
+          note?: string | null
+          raw_material_id: string
+          revision?: number
+          snap_base_unit?: string | null
+          snap_currency?: string
+          snap_location_name?: string | null
+          snap_name: string
+          snap_price_as_of: string
+          snap_price_effective_date?: string | null
+          snap_price_excl_vat?: boolean
+          snap_price_history_id?: string | null
+          snap_price_known_after_valuation?: boolean
+          snap_price_per_base?: number | null
+          snap_price_reason?: string | null
+          snap_price_recorded_at?: string | null
+          snap_price_source: string
+          snap_price_source_kind?: string | null
+          snap_sku?: string | null
+          snap_taken_at: string
+          snap_units?: Json
+          sort_order?: number
+          state?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          count_id?: string
+          count_list_id?: string
+          counted_base?: number | null
+          entry?: Json
+          id?: string
+          legal_entity_id?: string
+          location_id?: string | null
+          note?: string | null
+          raw_material_id?: string
+          revision?: number
+          snap_base_unit?: string | null
+          snap_currency?: string
+          snap_location_name?: string | null
+          snap_name?: string
+          snap_price_as_of?: string
+          snap_price_effective_date?: string | null
+          snap_price_excl_vat?: boolean
+          snap_price_history_id?: string | null
+          snap_price_known_after_valuation?: boolean
+          snap_price_per_base?: number | null
+          snap_price_reason?: string | null
+          snap_price_recorded_at?: string | null
+          snap_price_source?: string
+          snap_price_source_kind?: string | null
+          snap_sku?: string | null
+          snap_taken_at?: string
+          snap_units?: Json
+          sort_order?: number
+          state?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vt_count_lines_count_id_legal_entity_id_fkey"
+            columns: ["count_id", "legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "vt_counts"
+            referencedColumns: ["id", "legal_entity_id"]
+          },
+          {
+            foreignKeyName: "vt_count_lines_count_list_id_legal_entity_id_fkey"
+            columns: ["count_list_id", "legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "vt_count_lists"
+            referencedColumns: ["id", "legal_entity_id"]
+          },
+        ]
+      }
+      vt_count_lists: {
+        Row: {
+          count_id: string
+          created_at: string
+          department: string
+          id: string
+          legal_entity_id: string
+          name: string
+          revision: number
+          sort_order: number
+          source_template_id: string
+          source_template_revision: number
+          status: string
+        }
+        Insert: {
+          count_id: string
+          created_at?: string
+          department: string
+          id?: string
+          legal_entity_id: string
+          name: string
+          revision?: number
+          sort_order?: number
+          source_template_id: string
+          source_template_revision: number
+          status?: string
+        }
+        Update: {
+          count_id?: string
+          created_at?: string
+          department?: string
+          id?: string
+          legal_entity_id?: string
+          name?: string
+          revision?: number
+          sort_order?: number
+          source_template_id?: string
+          source_template_revision?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vt_count_lists_count_id_legal_entity_id_fkey"
+            columns: ["count_id", "legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "vt_counts"
+            referencedColumns: ["id", "legal_entity_id"]
+          },
+        ]
+      }
+      vt_counts: {
+        Row: {
+          cancel_reason: string | null
+          cancelled_at: string | null
+          created_at: string
+          created_by: string
+          finished_at: string | null
+          finished_by: string | null
+          id: string
+          legal_entity_id: string
+          name: string
+          planned_date: string
+          revision: number
+          started_at: string | null
+          started_by: string | null
+          status: string
+          template_ids: string[]
+          updated_at: string
+          valuation_date: string | null
+          valuation_mode: string
+        }
+        Insert: {
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          created_at?: string
+          created_by: string
+          finished_at?: string | null
+          finished_by?: string | null
+          id?: string
+          legal_entity_id: string
+          name: string
+          planned_date: string
+          revision?: number
+          started_at?: string | null
+          started_by?: string | null
+          status?: string
+          template_ids: string[]
+          updated_at?: string
+          valuation_date?: string | null
+          valuation_mode: string
+        }
+        Update: {
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          created_at?: string
+          created_by?: string
+          finished_at?: string | null
+          finished_by?: string | null
+          id?: string
+          legal_entity_id?: string
+          name?: string
+          planned_date?: string
+          revision?: number
+          started_at?: string | null
+          started_by?: string | null
+          status?: string
+          template_ids?: string[]
+          updated_at?: string
+          valuation_date?: string | null
+          valuation_mode?: string
+        }
+        Relationships: []
+      }
+      vt_list_assignments: {
+        Row: {
+          assigned_at: string
+          assigned_by: string
+          count_list_id: string
+          id: string
+          legal_entity_id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by: string
+          count_list_id: string
+          id?: string
+          legal_entity_id: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string
+          count_list_id?: string
+          id?: string
+          legal_entity_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vt_list_assignments_count_list_id_legal_entity_id_fkey"
+            columns: ["count_list_id", "legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "vt_count_lists"
+            referencedColumns: ["id", "legal_entity_id"]
+          },
+        ]
+      }
+      vt_locations: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          created_by: string
+          department: string
+          id: string
+          legal_entity_id: string
+          name: string
+          revision: number
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          created_by: string
+          department: string
+          id?: string
+          legal_entity_id: string
+          name: string
+          revision?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          created_by?: string
+          department?: string
+          id?: string
+          legal_entity_id?: string
+          name?: string
+          revision?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      vt_ocr_jobs: {
+        Row: {
+          attempt_id: string | null
+          attempts: number
+          count_id: string
+          count_list_id: string
+          created_at: string
+          created_by: string
+          detail: string | null
+          document_ok: boolean | null
+          files_key: string
+          finished_at: string | null
+          id: string
+          issues: Json
+          lease_until: string | null
+          legal_entity_id: string
+          line_revisions: Json
+          originals: Json
+          page_count: number | null
+          page_results: Json
+          page_sources: Json
+          processing_until: string | null
+          status: string
+          template_revision: number
+        }
+        Insert: {
+          attempt_id?: string | null
+          attempts?: number
+          count_id: string
+          count_list_id: string
+          created_at?: string
+          created_by: string
+          detail?: string | null
+          document_ok?: boolean | null
+          files_key: string
+          finished_at?: string | null
+          id?: string
+          issues?: Json
+          lease_until?: string | null
+          legal_entity_id: string
+          line_revisions: Json
+          originals: Json
+          page_count?: number | null
+          page_results?: Json
+          page_sources?: Json
+          processing_until?: string | null
+          status?: string
+          template_revision: number
+        }
+        Update: {
+          attempt_id?: string | null
+          attempts?: number
+          count_id?: string
+          count_list_id?: string
+          created_at?: string
+          created_by?: string
+          detail?: string | null
+          document_ok?: boolean | null
+          files_key?: string
+          finished_at?: string | null
+          id?: string
+          issues?: Json
+          lease_until?: string | null
+          legal_entity_id?: string
+          line_revisions?: Json
+          originals?: Json
+          page_count?: number | null
+          page_results?: Json
+          page_sources?: Json
+          processing_until?: string | null
+          status?: string
+          template_revision?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vt_ocr_jobs_count_id_legal_entity_id_fkey"
+            columns: ["count_id", "legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "vt_counts"
+            referencedColumns: ["id", "legal_entity_id"]
+          },
+          {
+            foreignKeyName: "vt_ocr_jobs_count_list_id_legal_entity_id_fkey"
+            columns: ["count_list_id", "legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "vt_count_lists"
+            referencedColumns: ["id", "legal_entity_id"]
+          },
+        ]
+      }
+      vt_ocr_proposals: {
+        Row: {
+          accepted_entry: Json | null
+          accepted_exclusions: Json | null
+          accepted_state: string | null
+          crop: Json | null
+          decided_at: string | null
+          decided_by: string | null
+          decision_note: string | null
+          entries: Json
+          id: string
+          job_id: string
+          legal_entity_id: string
+          line_id: string
+          line_revision_at_job: number
+          page: number
+          reasons: Json
+          row_code: string
+          save_op_id: string | null
+          source: Json | null
+          status: string
+          upload_index: number | null
+        }
+        Insert: {
+          accepted_entry?: Json | null
+          accepted_exclusions?: Json | null
+          accepted_state?: string | null
+          crop?: Json | null
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_note?: string | null
+          entries: Json
+          id?: string
+          job_id: string
+          legal_entity_id: string
+          line_id: string
+          line_revision_at_job: number
+          page: number
+          reasons?: Json
+          row_code: string
+          save_op_id?: string | null
+          source?: Json | null
+          status?: string
+          upload_index?: number | null
+        }
+        Update: {
+          accepted_entry?: Json | null
+          accepted_exclusions?: Json | null
+          accepted_state?: string | null
+          crop?: Json | null
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_note?: string | null
+          entries?: Json
+          id?: string
+          job_id?: string
+          legal_entity_id?: string
+          line_id?: string
+          line_revision_at_job?: number
+          page?: number
+          reasons?: Json
+          row_code?: string
+          save_op_id?: string | null
+          source?: Json | null
+          status?: string
+          upload_index?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vt_ocr_proposals_job_id_legal_entity_id_fkey"
+            columns: ["job_id", "legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "vt_ocr_jobs"
+            referencedColumns: ["id", "legal_entity_id"]
+          },
+          {
+            foreignKeyName: "vt_ocr_proposals_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "vt_count_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vt_ops: {
+        Row: {
+          created_at: string
+          created_by: string
+          kind: string
+          legal_entity_id: string
+          op_id: string
+          request: Json
+          result: Json | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          kind: string
+          legal_entity_id: string
+          op_id: string
+          request: Json
+          result?: Json | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          kind?: string
+          legal_entity_id?: string
+          op_id?: string
+          request?: Json
+          result?: Json | null
+        }
+        Relationships: []
+      }
+      vt_price_clarifications: {
+        Row: {
+          count_id: string
+          decided_at: string
+          decided_by: string
+          id: string
+          legal_entity_id: string
+          line_id: string
+          price_per_base: number
+          reason: string
+          source_kind: string
+          source_ref: string | null
+          superseded_at: string | null
+          superseded_by: string | null
+        }
+        Insert: {
+          count_id: string
+          decided_at?: string
+          decided_by: string
+          id?: string
+          legal_entity_id: string
+          line_id: string
+          price_per_base: number
+          reason: string
+          source_kind: string
+          source_ref?: string | null
+          superseded_at?: string | null
+          superseded_by?: string | null
+        }
+        Update: {
+          count_id?: string
+          decided_at?: string
+          decided_by?: string
+          id?: string
+          legal_entity_id?: string
+          line_id?: string
+          price_per_base?: number
+          reason?: string
+          source_kind?: string
+          source_ref?: string | null
+          superseded_at?: string | null
+          superseded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vt_price_clarifications_count_id_legal_entity_id_fkey"
+            columns: ["count_id", "legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "vt_counts"
+            referencedColumns: ["id", "legal_entity_id"]
+          },
+          {
+            foreignKeyName: "vt_price_clarifications_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "vt_count_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vt_print_manifests: {
+        Row: {
+          count_id: string
+          count_list_id: string
+          id: string
+          issued_at: string
+          issued_by: string
+          layout_version: number
+          legal_entity_id: string
+          pages: Json
+          template_revision: number
+        }
+        Insert: {
+          count_id: string
+          count_list_id: string
+          id?: string
+          issued_at?: string
+          issued_by: string
+          layout_version: number
+          legal_entity_id: string
+          pages: Json
+          template_revision: number
+        }
+        Update: {
+          count_id?: string
+          count_list_id?: string
+          id?: string
+          issued_at?: string
+          issued_by?: string
+          layout_version?: number
+          legal_entity_id?: string
+          pages?: Json
+          template_revision?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vt_print_manifests_count_list_id_legal_entity_id_fkey"
+            columns: ["count_list_id", "legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "vt_count_lists"
+            referencedColumns: ["id", "legal_entity_id"]
+          },
+        ]
+      }
+      vt_report_mail_ops: {
+        Row: {
+          attachment_base: string
+          count_id: string
+          count_revision: number
+          created_at: string
+          created_by: string
+          csv: string
+          detail: string | null
+          final: boolean
+          legal_entity_id: string
+          message: string
+          op_id: string
+          pdf_b64: string
+          recipient: string
+          report_hash: string
+          sender: string
+          snapshot: Json
+          state: string
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          attachment_base: string
+          count_id: string
+          count_revision: number
+          created_at?: string
+          created_by: string
+          csv: string
+          detail?: string | null
+          final: boolean
+          legal_entity_id: string
+          message: string
+          op_id: string
+          pdf_b64: string
+          recipient: string
+          report_hash: string
+          sender: string
+          snapshot: Json
+          state?: string
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          attachment_base?: string
+          count_id?: string
+          count_revision?: number
+          created_at?: string
+          created_by?: string
+          csv?: string
+          detail?: string | null
+          final?: boolean
+          legal_entity_id?: string
+          message?: string
+          op_id?: string
+          pdf_b64?: string
+          recipient?: string
+          report_hash?: string
+          sender?: string
+          snapshot?: Json
+          state?: string
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vt_report_mail_ops_count_id_legal_entity_id_fkey"
+            columns: ["count_id", "legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "vt_counts"
+            referencedColumns: ["id", "legal_entity_id"]
+          },
+        ]
+      }
+      vt_template_lines: {
+        Row: {
+          count_unit_ids: string[]
+          created_at: string
+          id: string
+          legal_entity_id: string
+          location_id: string | null
+          raw_material_id: string
+          sort_order: number
+          template_id: string
+        }
+        Insert: {
+          count_unit_ids?: string[]
+          created_at?: string
+          id?: string
+          legal_entity_id: string
+          location_id?: string | null
+          raw_material_id: string
+          sort_order: number
+          template_id: string
+        }
+        Update: {
+          count_unit_ids?: string[]
+          created_at?: string
+          id?: string
+          legal_entity_id?: string
+          location_id?: string | null
+          raw_material_id?: string
+          sort_order?: number
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vt_template_lines_location_id_legal_entity_id_fkey"
+            columns: ["location_id", "legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "vt_locations"
+            referencedColumns: ["id", "legal_entity_id"]
+          },
+          {
+            foreignKeyName: "vt_template_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_declaration_worklist"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "vt_template_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "vt_template_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_package_worklist"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vt_template_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "vt_template_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "raw_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vt_template_lines_raw_material_id_fkey"
+            columns: ["raw_material_id"]
+            isOneToOne: false
+            referencedRelation: "resale_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "vt_template_lines_template_id_legal_entity_id_fkey"
+            columns: ["template_id", "legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "vt_templates"
+            referencedColumns: ["id", "legal_entity_id"]
+          },
+        ]
+      }
+      vt_templates: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          created_by: string
+          default_location_id: string | null
+          department: string
+          id: string
+          legal_entity_id: string
+          name: string
+          revision: number
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          created_by: string
+          default_location_id?: string | null
+          department: string
+          id?: string
+          legal_entity_id: string
+          name: string
+          revision?: number
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          created_by?: string
+          default_location_id?: string | null
+          department?: string
+          id?: string
+          legal_entity_id?: string
+          name?: string
+          revision?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vt_templates_default_location_id_legal_entity_id_fkey"
+            columns: ["default_location_id", "legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "vt_locations"
+            referencedColumns: ["id", "legal_entity_id"]
+          },
+        ]
+      }
       weather_cache: {
         Row: {
           expires_at: string
@@ -15952,6 +16778,70 @@ export type Database = {
           resolved_product_id: string
           resolved_unit_price: number
         }[]
+      }
+      _vt_finite: { Args: { p: number }; Returns: boolean }
+      _vt_ocr_attempt: {
+        Args: { p_attempt: string; p_job_id: string }
+        Returns: {
+          attempt_id: string | null
+          attempts: number
+          count_id: string
+          count_list_id: string
+          created_at: string
+          created_by: string
+          detail: string | null
+          document_ok: boolean | null
+          files_key: string
+          finished_at: string | null
+          id: string
+          issues: Json
+          lease_until: string | null
+          legal_entity_id: string
+          line_revisions: Json
+          originals: Json
+          page_count: number | null
+          page_results: Json
+          page_sources: Json
+          processing_until: string | null
+          status: string
+          template_revision: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "vt_ocr_jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      _vt_op_begin: {
+        Args: {
+          p_entity: string
+          p_kind: string
+          p_op: string
+          p_request: Json
+          p_uid: string
+        }
+        Returns: Json
+      }
+      _vt_op_finish: { Args: { p_op: string; p_result: Json }; Returns: Json }
+      _vt_price_evidence: {
+        Args: {
+          p_as_of: string
+          p_entity: string
+          p_invoice_access: boolean
+          p_mode: string
+          p_rm_id: string
+        }
+        Returns: Json
+      }
+      _vt_report_snapshot_data: { Args: { p_count_id: string }; Returns: Json }
+      _vt_require: {
+        Args: { p_entity: string; p_level: string }
+        Returns: string
+      }
+      _vt_validate_template_lines: {
+        Args: { p_entity: string; p_lines: Json; p_template_id: string }
+        Returns: undefined
       }
       accept_invoice_line_price_variance: {
         Args: { p_line_id: string; p_observed: Json }
@@ -18664,6 +19554,238 @@ export type Database = {
       }
       verify_cron_secret: { Args: { p_secret: string }; Returns: boolean }
       verify_gtin: { Args: { p_gtin: string }; Returns: boolean }
+      vt_assign_list: {
+        Args: {
+          p_list_id: string
+          p_op_id: string
+          p_remove: boolean
+          p_role: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      vt_assignable_users: {
+        Args: { p_legal_entity_id: string }
+        Returns: {
+          user_id: string
+        }[]
+      }
+      vt_backend_version: { Args: never; Returns: Json }
+      vt_check_coverage: {
+        Args: {
+          p_legal_entity_id: string
+          p_template_ids: string[]
+          p_valuation_date: string
+          p_valuation_mode: string
+        }
+        Returns: Json
+      }
+      vt_clarify_price: {
+        Args: {
+          p_expected_clarification: string
+          p_line_id: string
+          p_op_id: string
+          p_price: number
+          p_reason: string
+          p_source_kind: string
+          p_source_ref: string
+        }
+        Returns: Json
+      }
+      vt_copy_template: {
+        Args: {
+          p_expected_revision: number
+          p_legal_entity_id: string
+          p_name: string
+          p_op_id: string
+          p_source_id: string
+        }
+        Returns: Json
+      }
+      vt_create_count: {
+        Args: {
+          p_legal_entity_id: string
+          p_name: string
+          p_op_id: string
+          p_planned_date: string
+          p_template_ids: string[]
+          p_valuation_date: string
+          p_valuation_mode: string
+        }
+        Returns: Json
+      }
+      vt_issue_print_manifest: {
+        Args: { p_layout_version: number; p_list_id: string; p_pages: Json }
+        Returns: Json
+      }
+      vt_ocr_accept: {
+        Args: {
+          p_counted_base: number
+          p_entry: Json
+          p_exclusions: Json
+          p_expected_revision: number
+          p_note: string
+          p_op_id: string
+          p_proposal_id: string
+          p_state: string
+        }
+        Returns: Json
+      }
+      vt_ocr_claim: { Args: { p_job_id: string }; Returns: Json }
+      vt_ocr_continue: { Args: { p_job_id: string }; Returns: Json }
+      vt_ocr_create_job: {
+        Args: { p_files: Json; p_list_id: string; p_op_id: string }
+        Returns: Json
+      }
+      vt_ocr_job_status: { Args: { p_job_id: string }; Returns: Json }
+      vt_ocr_record_failure: {
+        Args: { p_attempt_id: string; p_job_id: string; p_reason: string }
+        Returns: undefined
+      }
+      vt_ocr_record_page: {
+        Args: {
+          p_attempt_id: string
+          p_index: number
+          p_job_id: string
+          p_page: Json
+          p_release: boolean
+          p_source: Json
+        }
+        Returns: number
+      }
+      vt_ocr_record_page_count: {
+        Args: { p_attempt_id: string; p_job_id: string; p_pages: number }
+        Returns: undefined
+      }
+      vt_ocr_record_result: {
+        Args: {
+          p_attempt_id: string
+          p_document_ok: boolean
+          p_issues: Json
+          p_job_id: string
+          p_proposals: Json
+        }
+        Returns: Json
+      }
+      vt_ocr_record_unknown: {
+        Args: { p_attempt_id: string; p_detail: string; p_job_id: string }
+        Returns: undefined
+      }
+      vt_ocr_reject: {
+        Args: { p_note: string; p_op_id: string; p_proposal_id: string }
+        Returns: Json
+      }
+      vt_ocr_reset_unknown: {
+        Args: {
+          p_confirm_paid_rerun: boolean
+          p_job_id: string
+          p_op_id: string
+        }
+        Returns: Json
+      }
+      vt_report_mail_claim: {
+        Args: {
+          p_actor: string
+          p_count_id: string
+          p_message: string
+          p_op_id: string
+          p_recipient: string
+          p_subject: string
+        }
+        Returns: Json
+      }
+      vt_report_mail_finish: {
+        Args: { p_detail: string; p_op_id: string; p_state: string }
+        Returns: undefined
+      }
+      vt_report_mail_reserve: {
+        Args: {
+          p_actor: string
+          p_attachment_base: string
+          p_count_id: string
+          p_count_revision: number
+          p_csv: string
+          p_final: boolean
+          p_message: string
+          p_op_id: string
+          p_pdf_b64: string
+          p_recipient: string
+          p_report_hash: string
+          p_sender: string
+          p_snapshot: Json
+          p_subject: string
+        }
+        Returns: Json
+      }
+      vt_report_mail_status: { Args: { p_op_id: string }; Returns: Json }
+      vt_report_snapshot: { Args: { p_count_id: string }; Returns: Json }
+      vt_save_line: {
+        Args: {
+          p_counted_base: number
+          p_entry: Json
+          p_expected_revision: number
+          p_line_id: string
+          p_note: string
+          p_op_id: string
+          p_state: string
+        }
+        Returns: Json
+      }
+      vt_save_location: {
+        Args: {
+          p_archived: boolean
+          p_department: string
+          p_expected_revision: number
+          p_legal_entity_id: string
+          p_location_id: string
+          p_name: string
+          p_op_id: string
+          p_sort_order: number
+        }
+        Returns: Json
+      }
+      vt_save_template: {
+        Args: {
+          p_archived: boolean
+          p_default_location_id: string
+          p_department: string
+          p_expected_revision: number
+          p_legal_entity_id: string
+          p_lines: Json
+          p_name: string
+          p_op_id: string
+          p_template_id: string
+        }
+        Returns: Json
+      }
+      vt_set_list_status: {
+        Args: {
+          p_expected_revision: number
+          p_list_id: string
+          p_op_id: string
+          p_status: string
+        }
+        Returns: Json
+      }
+      vt_stage3_version: { Args: never; Returns: Json }
+      vt_start_count: {
+        Args: {
+          p_count_id: string
+          p_expected_revision: number
+          p_op_id: string
+        }
+        Returns: Json
+      }
+      vt_transition_count: {
+        Args: {
+          p_count_id: string
+          p_expected_revision: number
+          p_op_id: string
+          p_reason: string
+          p_to: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       access_level: "none" | "read" | "write" | "approve" | "admin"
