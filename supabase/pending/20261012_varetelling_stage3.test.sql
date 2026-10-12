@@ -6,6 +6,9 @@ INSERT INTO user_positions (user_id, legal_entity_id) VALUES ('00000000-0000-000
  ('00000000-0000-0000-0000-0000000000a3','aaaaaaaa-0000-0000-0000-000000000000'), ('00000000-0000-0000-0000-0000000000a4','aaaaaaaa-0000-0000-0000-000000000000'),
  ('00000000-0000-0000-0000-0000000000b1','bbbbbbbb-0000-0000-0000-000000000000');
 \i 20261012_varetelling_stage3.PENDING.sql
+-- Etterlign Supabase: service_role omgår RLS og kan lese grunnlagstabellene.
+ALTER ROLE service_role BYPASSRLS;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO service_role;
 
 SET ROLE authenticated; SELECT set_config('test.uid','00000000-0000-0000-0000-0000000000a1',false);
 SELECT set_config('test.c3', (vt_create_count(gen_random_uuid(),'aaaaaaaa-0000-0000-0000-000000000000','OCR-test','2026-10-12','ved_start',null,ARRAY[current_setting('test.t2')]::uuid[])->>'count_id'), false);
@@ -133,7 +136,6 @@ SET ROLE service_role;
 SELECT pg_temp.expect_error($q$SELECT pg_temp.reserve(gen_random_uuid(), '00000000-0000-0000-0000-0000000000a3')$q$, '42501');
 SELECT pg_temp.expect_error($q$SELECT pg_temp.reserve(gen_random_uuid(), '00000000-0000-0000-0000-0000000000b1')$q$, '42501');
 SELECT pg_temp.expect_error($q$SELECT vt_report_mail_reserve(gen_random_uuid(), '00000000-0000-0000-0000-0000000000a1', current_setting('test.c3')::uuid, (SELECT revision FROM vt_counts WHERE id=current_setting('test.c3')::uuid), repeat('1',64), 'x@nottero-bakeri.no', 'R', '', jsonb_set(_vt_report_snapshot_data(current_setting('test.c3')::uuid), '{lines,0,counted_base}', '999'), 'c', 'eA==', 'b', false, 'p@x.no')$q$, '40001');
-DO $d$ DECLARE a jsonb := _vt_report_snapshot_data(current_setting('test.c3')::uuid); BEGIN RAISE NOTICE 'DBG rev % snaprev % eq %', (SELECT revision FROM vt_counts WHERE id=current_setting('test.c3')::uuid), a->'count'->>'revision', a = _vt_report_snapshot_data(current_setting('test.c3')::uuid); END $d$;
 SELECT pg_temp.ok((pg_temp.reserve('99999999-1111-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a1')->>'state') = 'reservert', 'service-reservasjon med verifisert aktør og gjeldende øyeblikksbilde');
 SELECT pg_temp.ok((pg_temp.reserve('99999999-1111-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a1')->>'replayed')::boolean, 'identisk gjentakelse = lagret');
 SELECT pg_temp.expect_error($q$SELECT pg_temp.reserve('99999999-1111-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a1', 'henrik@nottero-bakeri.no', 'ANNET VEDLEGG')$q$, '23505');
