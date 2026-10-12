@@ -29,7 +29,6 @@ vi.mock("@/ravarer/context/RavarerContext", () => ({ useRavarer: () => ({ legalE
 vi.mock("@/ravarer/lib/invalidate", () => ({ invalidateRawMaterial: vi.fn() }));
 
 import { useCostRecalc, APPLY_CHUNK, __resetCostRecalcMemory } from "@/fakturaer/hooks/useCostRecalc";
-import { parseRecalcEnvelope, parseUndoEnvelope } from "@/ravarer/lib/recalcContract";
 
 const writes = () => st.rpc.mock.calls.filter((c) => c[0] !== "refresh_purchase_stats").length;
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;

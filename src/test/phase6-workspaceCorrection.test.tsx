@@ -140,7 +140,7 @@ import { correctionHref } from "@/ravarer/pages/priskontroll/faktura/correctionT
 import { paths } from "@/ravarer/lib/paths";
 import { RETURN_PARAM } from "@/ravarer/pages/priskontroll/fakturaer/visning";
 describe("forhåndsvisningens rettelenke", () => {
-  const has = (l: { issue?: boolean }) => !!l.issue;
+  const has = (l: { id: string; issue?: boolean }) => !!l.issue;
   it("eksakt faktura, linje med lesevarsel og listekontekst som retur", () => {
     const href = correctionHref(paths.faktura, "I1", [{ id: "a" }, { id: "b", issue: true }], has, "?fane=gjore&valgt=x", RETURN_PARAM);
     const u = new URL(href, "http://x");
