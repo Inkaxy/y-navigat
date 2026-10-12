@@ -380,51 +380,69 @@ BEGIN
   RETURN _vt_op_finish(p_op_id, jsonb_build_object('ok', true, 'kind', 'ocr_reject', 'proposal_id', p_proposal_id));
 END $$;
 
--- ---------- RPC: rapport-e-post ----------
-CREATE OR REPLACE FUNCTION public.vt_report_mail_reserve(p_op_id uuid, p_count_id uuid, p_count_revision integer, p_report_hash text,
+-- ---------- RPC: rapport-e-post (tillitsgrense: bare Edge/service reserverer og sender) ----------
+-- Edge verifiserer innlogget bruker (p_actor), bygger øyeblikksbilde/vedlegg/hash selv fra vt_report_snapshot og kaller
+-- reserve som service. Klienter kan aldri sende inn vedlegg, avsender eller øyeblikksbilde.
+CREATE OR REPLACE FUNCTION public.vt_report_mail_reserve(p_op_id uuid, p_actor uuid, p_count_id uuid, p_count_revision integer, p_report_hash text,
   p_recipient text, p_subject text, p_message text, p_snapshot jsonb, p_csv text, p_pdf_b64 text, p_attachment_base text, p_final boolean, p_sender text) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v_c vt_counts; v_uid uuid; v_op vt_report_mail_ops;
+DECLARE v_c vt_counts; v_op vt_report_mail_ops;
 BEGIN
-  SELECT * INTO v_c FROM vt_counts WHERE id = p_count_id;
-  v_uid := _vt_require(v_c.legal_entity_id, 'write');
-  IF p_op_id IS NULL OR p_snapshot IS NULL OR p_csv IS NULL OR p_pdf_b64 IS NULL OR p_final IS NULL OR coalesce(p_sender, '') !~ '@' THEN
+  SELECT * INTO v_c FROM vt_counts WHERE id = p_count_id FOR SHARE;
+  IF p_actor IS NULL OR v_c.id IS NULL OR has_ravarer_access(p_actor, v_c.legal_entity_id, 'write') IS NOT TRUE THEN
+    RAISE EXCEPTION 'Mangler tilgang' USING ERRCODE = '42501'; END IF;
+  IF p_op_id IS NULL OR p_snapshot IS NULL OR p_csv IS NULL OR p_pdf_b64 IS NULL OR p_final IS NULL OR coalesce(p_sender, '') !~ '@'
+     OR coalesce(p_report_hash, '') !~ '^[0-9a-f]{64}$' THEN
     RAISE EXCEPTION 'Ufullstendig sending' USING ERRCODE = '22023'; END IF;
   SELECT * INTO v_op FROM vt_report_mail_ops WHERE op_id = p_op_id FOR UPDATE;
   IF FOUND THEN
-    IF v_op.count_id <> p_count_id OR v_op.created_by <> v_uid OR v_op.report_hash <> p_report_hash OR v_op.recipient <> btrim(p_recipient)
-       OR v_op.subject <> btrim(p_subject) OR v_op.message <> p_message THEN
+    -- Uforanderlig binding: hele forespørselen må være identisk (aktør, telling, versjon, hash, vedlegg, mottaker, emne, melding, avsender).
+    IF v_op.created_by <> p_actor OR v_op.count_id <> p_count_id OR v_op.count_revision <> p_count_revision OR v_op.report_hash <> p_report_hash
+       OR v_op.recipient <> btrim(p_recipient) OR v_op.subject <> btrim(p_subject) OR v_op.message <> p_message OR v_op.sender <> p_sender
+       OR v_op.csv <> p_csv OR v_op.pdf_b64 <> p_pdf_b64 OR v_op.snapshot <> p_snapshot THEN
       RAISE EXCEPTION 'Operasjons-ID er brukt med annet innhold' USING ERRCODE = '23505'; END IF;
     RETURN jsonb_build_object('op_id', p_op_id, 'state', v_op.state, 'replayed', true);
   END IF;
-  IF v_c.status = 'planlagt' OR v_c.revision <> p_count_revision OR (p_snapshot->'count'->>'id') IS DISTINCT FROM p_count_id::text THEN
+  IF v_c.status = 'planlagt' OR v_c.revision <> p_count_revision OR (p_snapshot->'count'->>'id') IS DISTINCT FROM p_count_id::text
+     OR (p_snapshot->'count'->>'revision')::int IS DISTINCT FROM p_count_revision THEN
     RAISE EXCEPTION 'Rapporten er endret' USING ERRCODE = '40001'; END IF;
+  -- Øyeblikksbildet må være det gjeldende (samme innhold som vt_report_snapshot nå, uten tilgangssjekk mot auth.uid()).
+  IF p_snapshot IS DISTINCT FROM _vt_report_snapshot_data(p_count_id) THEN RAISE EXCEPTION 'Rapporten er endret' USING ERRCODE = '40001'; END IF;
   INSERT INTO vt_report_mail_ops (op_id, legal_entity_id, count_id, count_revision, report_hash, recipient, subject, message, snapshot, csv, pdf_b64,
                                   attachment_base, final, sender, created_by)
   VALUES (p_op_id, v_c.legal_entity_id, p_count_id, p_count_revision, p_report_hash, btrim(p_recipient), btrim(p_subject), p_message, p_snapshot, p_csv, p_pdf_b64,
-          left(p_attachment_base, 120), p_final, p_sender, v_uid);
+          left(p_attachment_base, 120), p_final, p_sender, p_actor);
   RETURN jsonb_build_object('op_id', p_op_id, 'state', 'reservert', 'replayed', false);
 END $$;
 
-/** Skrivebeskyttet: status for egen/firmaets sending. Sender aldri. */
+/** Skrivebeskyttet status: bare for den som opprettet sendingen eller godkjenner. Ingen vedlegg/innhold returneres. */
 CREATE OR REPLACE FUNCTION public.vt_report_mail_status(p_op_id uuid) RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
-DECLARE v vt_report_mail_ops;
+DECLARE v vt_report_mail_ops; v_uid uuid := auth.uid();
 BEGIN
-  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Mangler tilgang' USING ERRCODE = '42501'; END IF;
+  IF v_uid IS NULL THEN RAISE EXCEPTION 'Mangler tilgang' USING ERRCODE = '42501'; END IF;
   SELECT * INTO v FROM vt_report_mail_ops WHERE op_id = p_op_id;
   IF NOT FOUND THEN RETURN jsonb_build_object('found', false); END IF;
-  PERFORM _vt_require(v.legal_entity_id, 'read');
-  RETURN jsonb_build_object('found', true, 'state', v.state, 'detail', v.detail, 'count_id', v.count_id, 'report_hash', v.report_hash);
+  IF v.created_by <> v_uid AND has_ravarer_access(v_uid, v.legal_entity_id, 'approve') IS NOT TRUE THEN
+    RAISE EXCEPTION 'Mangler tilgang' USING ERRCODE = '42501'; END IF;
+  RETURN jsonb_build_object('found', true, 'state', v.state, 'detail', v.detail, 'count_id', v.count_id, 'own', v.created_by = v_uid);
 END $$;
 
-/** Service: bare «reservert» → «sender», med LAGREDE vedlegg. Alt annet returneres uendret (aldri ny sending). */
-CREATE OR REPLACE FUNCTION public.vt_report_mail_claim(p_op_id uuid) RETURNS jsonb
+/**
+ * Service: bare «reservert» → «sender», med LAGREDE vedlegg. Krever opprinnelig aktør eller godkjenner, og at
+ * forespørselen (telling, mottaker, emne, melding) er den lagrede. Alt annet returneres uendret (aldri ny sending).
+ */
+CREATE OR REPLACE FUNCTION public.vt_report_mail_claim(p_op_id uuid, p_actor uuid, p_count_id uuid, p_recipient text, p_subject text, p_message text) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE v vt_report_mail_ops;
 BEGIN
   SELECT * INTO v FROM vt_report_mail_ops WHERE op_id = p_op_id FOR UPDATE;
   IF NOT FOUND THEN RETURN jsonb_build_object('claimed', false, 'state', 'ukjent'); END IF;
+  IF p_actor IS NULL OR (v.created_by <> p_actor AND has_ravarer_access(p_actor, v.legal_entity_id, 'approve') IS NOT TRUE)
+     OR has_ravarer_access(p_actor, v.legal_entity_id, 'write') IS NOT TRUE THEN
+    RAISE EXCEPTION 'Mangler tilgang' USING ERRCODE = '42501'; END IF;
+  IF v.count_id <> p_count_id OR v.recipient <> btrim(coalesce(p_recipient, '')) OR v.subject <> btrim(coalesce(p_subject, '')) OR v.message <> coalesce(p_message, '') THEN
+    RAISE EXCEPTION 'Forespørselen samsvarer ikke med lagret sending' USING ERRCODE = '23505'; END IF;
   IF v.state <> 'reservert' THEN RETURN jsonb_build_object('claimed', false, 'state', v.state); END IF;
   UPDATE vt_report_mail_ops SET state = 'sender', updated_at = now() WHERE op_id = p_op_id;
   RETURN jsonb_build_object('claimed', true, 'state', 'sender', 'recipient', v.recipient, 'subject', v.subject, 'message', v.message,
@@ -435,6 +453,82 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   IF p_state NOT IN ('akseptert_av_tjenesten','avvist','ukjent') THEN RAISE EXCEPTION 'Ugyldig utfall' USING ERRCODE = '22023'; END IF;
   UPDATE vt_report_mail_ops SET state = p_state, detail = left(p_detail, 300), updated_at = now() WHERE op_id = p_op_id AND state = 'sender';
+END $$;
+
+-- ---------- RPC: utstede utskriftsmanifest ----------
+-- Klienten sender sideinndelingen den trykker; serveren krever at hver linje i listen står nøyaktig én gang.
+-- Første utstedelse per (liste, oppsettversjon) lagres og er uforanderlig; senere avvikende inndeling avvises.
+CREATE OR REPLACE FUNCTION public.vt_issue_print_manifest(p_list_id uuid, p_layout_version integer, p_pages jsonb) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_l vt_count_lists; v_uid uuid; v_m vt_print_manifests; v_ids uuid[]; v_cs text;
+BEGIN
+  SELECT * INTO v_l FROM vt_count_lists WHERE id = p_list_id;
+  v_uid := _vt_require(v_l.legal_entity_id, 'read');
+  SELECT status INTO v_cs FROM vt_counts WHERE id = v_l.count_id FOR SHARE;
+  IF v_cs = 'planlagt' THEN RAISE EXCEPTION 'Tellingen er ikke startet' USING ERRCODE = '55000'; END IF;
+  IF p_layout_version IS NULL OR p_layout_version NOT BETWEEN 1 AND 100 OR p_pages IS NULL OR jsonb_typeof(p_pages) <> 'array'
+     OR jsonb_array_length(p_pages) NOT BETWEEN 1 AND 200
+     OR EXISTS (SELECT 1 FROM jsonb_array_elements(p_pages) pg WHERE jsonb_typeof(pg) <> 'array' OR jsonb_array_length(pg) NOT BETWEEN 0 AND 40) THEN
+    RAISE EXCEPTION 'Ugyldig sideinndeling' USING ERRCODE = '22023'; END IF;
+  SELECT array_agg(x::uuid) INTO v_ids FROM jsonb_array_elements(p_pages) pg, jsonb_array_elements_text(pg) x;
+  IF coalesce(cardinality(v_ids), 0) <> (SELECT count(*) FROM vt_count_lines WHERE count_list_id = p_list_id)
+     OR coalesce(cardinality(v_ids), 0) <> (SELECT count(DISTINCT x) FROM unnest(v_ids) x)
+     OR EXISTS (SELECT 1 FROM unnest(v_ids) x WHERE NOT EXISTS (SELECT 1 FROM vt_count_lines WHERE id = x AND count_list_id = p_list_id)) THEN
+    RAISE EXCEPTION 'Sideinndelingen må inneholde hver linje i listen nøyaktig én gang' USING ERRCODE = '22023'; END IF;
+  SELECT * INTO v_m FROM vt_print_manifests WHERE count_list_id = p_list_id AND layout_version = p_layout_version;
+  IF FOUND THEN
+    IF v_m.pages <> p_pages THEN RAISE EXCEPTION 'Utstedt sideinndeling er annerledes' USING ERRCODE = '23505'; END IF;
+    RETURN jsonb_build_object('manifest_id', v_m.id, 'issued_at', v_m.issued_at, 'replayed', true);
+  END IF;
+  INSERT INTO vt_print_manifests (legal_entity_id, count_id, count_list_id, template_revision, layout_version, pages, issued_by)
+  VALUES (v_l.legal_entity_id, v_l.count_id, p_list_id, v_l.source_template_revision, p_layout_version, p_pages, v_uid)
+  ON CONFLICT (count_list_id, layout_version) DO NOTHING RETURNING * INTO v_m;
+  IF v_m.id IS NULL THEN
+    SELECT * INTO v_m FROM vt_print_manifests WHERE count_list_id = p_list_id AND layout_version = p_layout_version;
+    IF v_m.pages <> p_pages THEN RAISE EXCEPTION 'Utstedt sideinndeling er annerledes' USING ERRCODE = '23505'; END IF;
+  END IF;
+  RETURN jsonb_build_object('manifest_id', v_m.id, 'issued_at', v_m.issued_at, 'replayed', false);
+END $$;
+
+-- ---------- RPC: prisavklaring per telling ----------
+-- Bare for linjer UTEN frosset dokumentert pris, bare før avslutning, bare godkjenner. Ny avklaring erstatter forrige
+-- (som beholdes med superseded_at). Globale priser (raw_materials/prishistorikk/oppskrifter) endres aldri.
+CREATE OR REPLACE FUNCTION public.vt_clarify_price(p_op_id uuid, p_line_id uuid, p_expected_clarification uuid, p_price numeric,
+  p_source_kind text, p_source_ref text, p_reason text) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_line vt_count_lines; v_uid uuid; v_prev jsonb; v_cs text; v_cur uuid; v_new uuid;
+BEGIN
+  SELECT * INTO v_line FROM vt_count_lines WHERE id = p_line_id;
+  v_uid := _vt_require(v_line.legal_entity_id, 'approve');
+  IF p_price IS NULL OR NOT _vt_finite(p_price) OR p_price <= 0 OR p_price > 1000000 OR length(btrim(coalesce(p_reason, ''))) < 10
+     OR p_source_kind NOT IN ('faktura','leverandorpris','prisliste','manuell_vurdering') THEN
+    RAISE EXCEPTION 'Pris, kilde og begrunnelse (minst 10 tegn) kreves' USING ERRCODE = '22023'; END IF;
+  v_prev := _vt_op_begin(p_op_id, 'clarify_price', v_line.legal_entity_id, v_uid, jsonb_build_object('line_id', p_line_id,
+    'expected', p_expected_clarification, 'price', p_price::text, 'kind', p_source_kind, 'ref', p_source_ref, 'reason', btrim(p_reason)));
+  IF v_prev IS NOT NULL THEN RETURN v_prev; END IF;
+  SELECT status INTO v_cs FROM vt_counts WHERE id = v_line.count_id FOR SHARE;
+  PERFORM 1 FROM vt_count_lists WHERE id = v_line.count_list_id FOR UPDATE;
+  SELECT * INTO v_line FROM vt_count_lines WHERE id = p_line_id FOR UPDATE;
+  IF v_cs NOT IN ('pagar','til_kontroll') THEN RAISE EXCEPTION 'Tellingen er ikke åpen' USING ERRCODE = '55000'; END IF;
+  IF v_line.snap_price_per_base IS NOT NULL THEN RAISE EXCEPTION 'Linjen har dokumentert pris fra start' USING ERRCODE = '55000'; END IF;
+  IF v_line.snap_base_unit IS NULL THEN RAISE EXCEPTION 'Varen mangler gyldig baseenhet' USING ERRCODE = '55000'; END IF;
+  SELECT id INTO v_cur FROM vt_price_clarifications WHERE line_id = p_line_id AND superseded_at IS NULL FOR UPDATE;
+  IF v_cur IS DISTINCT FROM p_expected_clarification THEN RAISE EXCEPTION 'Prisavklaringen er endret av andre' USING ERRCODE = '40001'; END IF;
+  v_new := gen_random_uuid();
+  UPDATE vt_price_clarifications SET superseded_at = now(), superseded_by = v_new WHERE id = v_cur;
+  INSERT INTO vt_price_clarifications (id, legal_entity_id, count_id, line_id, price_per_base, source_kind, source_ref, reason, decided_by)
+  VALUES (v_new, v_line.legal_entity_id, v_line.count_id, p_line_id, p_price, p_source_kind, nullif(btrim(coalesce(p_source_ref, '')), ''), btrim(p_reason), v_uid);
+  RETURN _vt_op_finish(p_op_id, jsonb_build_object('ok', true, 'kind', 'clarify_price', 'line_id', p_line_id, 'clarification_id', v_new));
+END $$;
+
+-- ---------- Brukere som kan tildeles (godkjenner) ----------
+CREATE OR REPLACE FUNCTION public.vt_assignable_users(p_legal_entity_id uuid) RETURNS TABLE(user_id uuid)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  PERFORM _vt_require(p_legal_entity_id, 'approve');
+  RETURN QUERY SELECT DISTINCT up.user_id FROM user_positions up
+   WHERE up.legal_entity_id = p_legal_entity_id AND up.valid_from <= now() AND (up.valid_to IS NULL OR up.valid_to > now())
+     AND has_ravarer_access(up.user_id, p_legal_entity_id, 'write') ORDER BY 1;
 END $$;
 
 -- ---------- RPC: tildeling (bare mens tellingen er planlagt/pågår/til kontroll; historikk endres ikke etterpå) ----------
