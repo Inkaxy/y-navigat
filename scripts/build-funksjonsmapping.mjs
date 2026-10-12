@@ -114,6 +114,11 @@ for (const [ids, source, mock, browser, reports, next] of psv("docs/funksjonsmap
   for (const id of ids.split(",")) evidence.set(id, { source_review: source, mocked_test: mock, browser_check: browser, reports: reports.split(",").map((r) => `audit-2026-10-11/${r}`), outstanding_gate: next });
 }
 
+// ---------- historisk delvis kildegjennomgang (108, eget sett; overskriver ikke annet bevis) ----------
+const HP = JSON.parse(read("docs/funksjonsmapping/historical-partial-108.json"));
+if (HP.count !== HP.ids.length || new Set(HP.ids).size !== HP.ids.length) throw new Error("historical-partial-108: antall/duplikat");
+const historicalPartial = new Set(HP.ids);
+
 // ---------- handlingsspor (per ID, maskinverifisert) ----------
 // docs/funksjonsmapping/action-trace.psv: ID|fil|ordrett bevis-substring|merknad, eller ID|GAP|grunn.
 // Beviset må finnes ordrett i fila, og fila må nås fra eierfila (eller være den).
@@ -181,6 +186,7 @@ const recs = owners.map(([id, ownerRaw, urlsRaw, childRaw]) => {
       prior_evidence_ledger: ev ? { dated: "2026-10-11", source: "docs/funksjonsmapping/prior-evidence.psv", source_review: ev.source_review, mocked_test: ev.mocked_test, browser_check: ev.browser_check, reports: ev.reports, outstanding_gate: ev.outstanding_gate } : null,
       list_status_note: c?.status || o?.status || null,
       list_status_is_partial: /kilde|komponenttest|ikke nettleser|ikke innlogget/i.test(c?.status ?? ""),
+      historical_partial_source_review: historicalPartial.has(id) ? { source_review: HP.source_review, source: HP.provenance.source, extracted_at: HP.provenance.extracted_at, reports: HP.reports, not_current_acceptance: true } : null,
     },
     acceptance: "ikke akseptert",
   };
@@ -201,7 +207,7 @@ const doc = {
     inspected_base_sha: BASE,
     original_feature_text_sha: ORIGINAL_SHA,
     generated_by: "scripts/build-funksjonsmapping.mjs",
-    inputs: ["docs/ravarer-funksjonsliste.md", "docs/funksjonsmapping/review-owners.psv", "docs/funksjonsmapping/prior-evidence.psv", "docs/funksjonsmapping/action-trace.psv"],
+    inputs: ["docs/ravarer-funksjonsliste.md", "docs/funksjonsmapping/review-owners.psv", "docs/funksjonsmapping/prior-evidence.psv", "docs/funksjonsmapping/historical-partial-108.json", "docs/funksjonsmapping/action-trace.psv"],
     note: "Artefaktets egen commit finnes via git-historikk; den skrives ikke inn her. Kartlegging er ikke aksept.",
   },
   records: recs,

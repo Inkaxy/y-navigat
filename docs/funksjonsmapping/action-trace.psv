@@ -87,10 +87,8 @@ F71|src/ravarer/pages/priskontroll/fakturaer/FakturaerDialogs.tsx|kind: "flag"; 
 F71|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|kind: "unflag", inv: data|Fjern flagg
 F71|src/ravarer/pages/priskontroll/faktura/WorkspaceHeader.tsx|Flagg …|Flagg
 F72|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|kind: "reconcile", inv:|Avstem
-F73|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|ControlSummary|Faktasone (lesesikkerhet)
 F74|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|recheckInvoiceLinesSum|Sjekk på nytt
 F74|src/ravarer/pages/priskontroll/faktura/SumOverrideDialog.tsx|SumOverrideDialog|Overstyr sumavvik
-F75|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|ControlSummary|Faktasone (Tripletex-felter ikke sporet i detalj)
 F76|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|repairVatMessage|Mva-melding
 F76|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|rm_repair_invoice_vat|Mva-forslag
 F77|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|useRematchWait|Omberegning
@@ -103,8 +101,6 @@ F80|src/fakturaer/components/supplier-item/OpenSupplierItemButton.tsx|OpenSuppli
 F80|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|editMaterial|Endre råvare
 F80|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|Rett fakturalinje|Radhandling
 F81|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|paths.registrerLinjer(data.id)|Registrer linjer
-F82|src/ravarer/pages/hub/PriskontrollPage.tsx|FakturaerTab|Fakturalisten (filtre/sortering ikke sporet i detalj)
-F83|src/ravarer/pages/hub/PriskontrollPage.tsx|FakturaerTab|Fakturalisten (kolonner ikke sporet i detalj)
 F85|src/ravarer/pages/priskontroll/godkjenning/GodkjenningTab.tsx|Søk fakturanr eller leverandør|Søk/filter
 F86|src/ravarer/pages/priskontroll/godkjenning/GodkjenningTab.tsx|blockerLabel|Blokkeringer
 F87|src/ravarer/pages/priskontroll/godkjenning/GodkjenningTab.tsx|Godkjenn valgte|Intern godkjenning
@@ -114,8 +110,6 @@ F88|src/ravarer/pages/priskontroll/godkjenning/GodkjenningTab.tsx|Før kostpris 
 F89|src/ravarer/pages/priskontroll/godkjenning/ApprovalHistorySheet.tsx|ApprovalHistorySheet|Historikk/tilbaketrekking
 F9|src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx|Søk vare, leverandør eller faktura|Søk/filter
 F90|src/ravarer/pages/priskontroll/saker/SakerTab.tsx|SUPPLIER_CASE_STATUS_LABELS|Saksliste med status
-F91|src/fakturaer/pages/SupplierCase.tsx|SupplierCaseDetail|Saksdetalj (kreditfordeling ikke sporet i detalj)
-F92|src/fakturaer/pages/SupplierCase.tsx|SupplierCaseDetail|Saksdetalj (statushandlinger ikke sporet i detalj)
 F93|src/ravarer/pages/priskontroll/fakturaer/FakturaerDialogs.tsx|FlagInvoiceDialog|Flagg med begrunnelse
 F94|src/ravarer/pages/priskontroll/fakturaer/FakturaerDialogs.tsx|kind: "credit"; inv:|Kreditnota-dialog
 F94|src/ravarer/pages/priskontroll/gjore/FakturasakPanel.tsx|Koble kreditnota|Kreditnota
@@ -276,7 +270,6 @@ R86|src/ravarer/pages/varemottak/InvoiceReceiptPanel.tsx|Avvik|Avvik
 R87|src/ravarer/pages/varemottak/InvoiceReceiptPanel.tsx|Sett pakning|Pakning
 R88|src/ravarer/pages/Varemottak.tsx|Manuelt mottak|Manuelt mottak
 F31|src/fakturaer/components/inbox/task/LineTask.tsx|Bekreft råvare|Bekreft råvare (og pakning) i ett steg
-F33|src/fakturaer/components/inbox/task/LineTask.tsx|Husk varenummer|Aliaslæring (varetekst-variant ikke funnet som egen tekst)
 F34|src/fakturaer/components/inbox/task/LineTask.tsx|Prisen er riktig|Godta pris per linje
 F35|src/fakturaer/components/inbox/task/LineTask.tsx|Rett avtalepris|Rett avtalepris
 F36|src/fakturaer/components/inbox/task/LineTask.tsx|Kontroller pakningen|Fra prissteget
@@ -287,7 +280,24 @@ F46|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|nbhub.faktura.do
 F49|src/fakturaer/components/inbox/task/LineTask.tsx|Ny råvare …|Opprett ny vare
 F54|src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx|WorkListView|Listerader/mobilkort (kolonnene er listerader)
 F84|src/ravarer/pages/priskontroll/fakturaer/FakturaerTab.tsx|TripletexStatusCard|Tripletex-statuskort
-F27|src/ravarer/pages/priskontroll/gjore/bulkGjore.ts|på tvers av fakturaer|Gruppert per varekort på tvers av fakturaer (grensen 200 ikke sporet)
 R192|src/ravarer/pages/reberegn/SingleRecalcDetail.tsx|Serverens regnestykke nå|Eksplisitt skrivebeskyttet enkeltforslag (recalc_raw_material_cost, p_dry_run true) per vare fra forslag/kvittering/feil; dagens forslag, ikke frosset kvitteringsspor
 R192|src/ravarer/hooks/useSingleRecalcPreview.ts|p_dry_run: true|Én forespørsel om gangen, frosset selskap+vare+generasjon
 R195|src/ravarer/pages/reberegn/reberegnColumns.tsx|paths.pakninger|Pakningslenke per vare
+F27|src/fakturaer/hooks/useSupplierItems.ts|p_limit: 200|Grouped cross-invoice item inspection retains up-to-200 request
+F27|src/ravarer/pages/priskontroll/gjore/VarekortPanel.tsx|<SupplierItemHistory lines={lines}|All returned grouped invoice lines shown; current replacement for former flat queue
+F27|src/fakturaer/components/supplier-item/SupplierItemHistory.tsx|to={paths.faktura(l.invoice_id)}|Each history line links to its own invoice
+F33|src/fakturaer/components/inbox/task/LineTask.tsx|Husk leverandørens varetekst|Separate varetekst choice exists; delete false not-found note
+F33|src/fakturaer/hooks/useLineMatchForm.ts|rejectedRawMaterialIds: suggestions|acceptMatch receives rememberSku/rememberName plus rejected alternatives
+F73|src/fakturaer/components/invoice-detail/InvoiceFactsCard.tsx|readingReliability({ confidence: conf|Rendered reading status, not merely ControlSummary import
+F75|src/fakturaer/components/invoice-detail/InvoiceFactsCard.tsx|<Row k="Bilagsnr">|InvoiceFactsView renders amount/VAT/net/voucher/paid/line sum/variance/reliability/attempts/source
+F75|src/ravarer/pages/priskontroll/faktura/ControlSummary.tsx|<InvoiceFactsView invoice={data} details={headerFacts(data)}|Actual current workspace consumer
+F82|src/ravarer/pages/priskontroll/fakturaer/FakturaerTab.tsx|const { data: company } = useCompany();|Shared company context; no separate table company selector claimed
+F82|src/ravarer/pages/priskontroll/fakturaer/FakturaerFilters.tsx|<SelectTrigger className="w-[140px]" aria-label="Betalt">|Actual supplier/status/paid/source/date/deviation/text controls in this component
+F82|src/ravarer/pages/priskontroll/fakturaer/useFakturaListe.ts|rows: list.slice(from, from + FAKTURA_PAGE_SIZE)|Client page handling; server branch uses range; sorting through sortInvoices/server order
+F83|src/ravarer/pages/priskontroll/fakturaer/fakturaColumns.tsx|export function fakturaColumns(|Actual source/paid/status/delivery columns
+F83|src/ravarer/pages/priskontroll/fakturaer/fakturaColumns.tsx|export function InvoiceRowFlags(|Extraction-failure/low-confidence/sum-mismatch flags in status cell
+F91|src/ravarer/pages/priskontroll/saker/SupplierCaseDetail.tsx|<CaseCreditForm d={d} invoices={invoices}|Current case child mount under documented-claim/write/open guards
+F91|src/ravarer/pages/priskontroll/saker/CaseCreditForm.tsx|clientRef: ref|Credit invoice/target invoice/amount allocation preserves operation reference on failure
+F91|src/fakturaer/lib/supplierCases.ts|p_client_ref: args.clientRef|Existing allocation RPC idempotency parameter; not a new DB test
+F92|src/ravarer/pages/priskontroll/saker/CaseRecovery.tsx|mutationFn: (v: { id: string; status: Status; note: string })|Actual status callback for resolve/cancel/reopen with required reason
+F92|src/fakturaer/lib/supplierCases.ts|p_status: status, p_note: note|Existing set_supplier_deviation_case_status RPC arguments
