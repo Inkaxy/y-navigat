@@ -1,44 +1,70 @@
-// Ren kjerne for tellelistelesing (ingen Deno/nett). Brukes av vt-count-ocr og testes i vitest.
-// Prinsipp: modellen gir bare FORSLAG. Identitet bevises av trykte koder sammenlignet med
-// serverens uforanderlige utskriftsmanifest — forventede ID-er sendes ALDRI i prompten.
+// Ren kjerne for tellelistelesing (ingen Deno/nett). Brukes av vt-count-ocr, utskriften og vitest.
+// Prinsipp: modellen gir bare FORSLAG. Identitet bevises av trykte koder sammenlignet med manifestet,
+// som er deterministisk avledet av uforanderlige linjer + versjonert sideoppsett. Forventede ID-er sendes aldri.
 
-export const VT_SHEET_LINES_PER_PAGE = 14;
+/** Versjon av sideoppsettet. Endres hvis radhøyder/kapasitet endres — står i den trykte identiteten. */
+export const VT_SHEET_LAYOUT = 2;
+/** Kapasitet per A4-side i rad-enheter (én enhet = fast radhøyde i utskriften). */
+export const VT_SHEET_CAPACITY = 14;
+/** Tegn per navnelinje i navnekolonnen (konservativt for liten skrift). */
+export const VT_NAME_CHARS_PER_LINE = 30;
+/** Maks sider i én lesejobb (hver side leses i eget, avgrenset kall). */
+export const VT_OCR_MAX_PAGES = 20;
+
+export interface SheetLine { id: string; snap_name: string; snap_units: { id: string; label: string; units_in_base: number }[] }
+/** Rad-enheter: to navnelinjer og én pakningslinje per enhet; aldri mindre enn 1. */
+export function rowUnits(l: Pick<SheetLine, "snap_name" | "snap_units">): number {
+  const nameLines = Math.max(1, Math.ceil(l.snap_name.length / VT_NAME_CHARS_PER_LINE));
+  return Math.min(VT_SHEET_CAPACITY, Math.max(1, Math.ceil(nameLines / 2), l.snap_units.length));
+}
+/** Deterministisk sideinndeling etter rad-enheter. Samme input ⇒ samme sider (utskrift og lesing). */
+export function paginateSheet<T extends Pick<SheetLine, "snap_name" | "snap_units">>(sorted: T[]): T[][] {
+  const pages: T[][] = []; let cur: T[] = []; let used = 0;
+  for (const l of sorted) {
+    const u = rowUnits(l);
+    if (cur.length && used + u > VT_SHEET_CAPACITY) { pages.push(cur); cur = []; used = 0; }
+    cur.push(l); used += u;
+  }
+  if (cur.length || pages.length === 0) pages.push(cur);
+  return pages;
+}
+export const sheetIdentityOf = (countId: string, listId: string, rev: number, page: number, pages: number) =>
+  `VT${VT_SHEET_LAYOUT}|${countId}|${listId}|r${rev}|s${page}/${pages}`;
+/** Radkode trykt på arket: 10 tegn (kollisjoner oppdages og gjør siden ugyldig). */
+export const rowCodeOf = (lineId: string) => lineId.replace(/-/g, "").slice(0, 10);
 
 export const VT_OCR_SYSTEM_PROMPT = [
-  "Du leser fotograferte eller skannede håndskrevne tellelister fra et bakeri.",
+  "Du leser ÉN fotografert eller skannet side av en håndskrevet telleliste fra et bakeri.",
   "Returner KUN JSON med formen:",
-  '{"pages":[{"printed_identity":string|null,"printed_page":string|null,"rows":[{"row_code":string|null,"amounts":[{"column":"pakninger"|"los","unit_label":string|null,"raw":string|null}],"crossed_out":boolean,"unclear":boolean,"comment":string|null}]}]}',
-  "printed_identity er den TRYKTE teksten som starter med «VT1|» øverst på siden, avskrevet tegn for tegn. Hvis den ikke kan leses sikkert: null.",
-  "row_code er den trykte koden i kolonnen «Kode» (8 tegn). Ikke gjett; null hvis uleselig.",
+  '{"printed_identity":string|null,"rows":[{"row_code":string|null,"amounts":[{"column":"pakninger"|"los","unit_label":string|null,"raw":string|null}],"crossed_out":boolean,"unclear":boolean,"comment":string|null}],"complete":boolean}',
+  "printed_identity er den TRYKTE teksten som starter med «VT» øverst, avskrevet tegn for tegn. Uleselig: null.",
+  "Ta med HVER trykte rad i rekkefølge, også tomme rader. row_code er den trykte koden i kolonnen «Kode». Ikke gjett; null hvis uleselig.",
   "raw er nøyaktig det som er håndskrevet i feltet, uten tolkning. Tomt felt: null. Ikke gjør om tomt til 0.",
-  "Overstrøket tall: crossed_out=true. Usikker håndskrift: unclear=true. Ikke regn ut summer. Ikke finn på rader.",
+  "crossed_out og unclear SKAL alltid være true eller false. complete=true bare hvis alle rader på siden er tatt med.",
+  "Ikke regn ut summer. Ikke finn på rader.",
 ].join("\n");
 
 export interface OcrAmount { column: "pakninger" | "los"; unit_label: string | null; raw: string | null }
 export interface OcrRow { row_code: string | null; amounts: OcrAmount[]; crossed_out: boolean; unclear: boolean; comment: string | null }
-export interface OcrPage { printed_identity: string | null; printed_page: string | null; rows: OcrRow[] }
+export interface OcrPage { printed_identity: string | null; rows: OcrRow[]; complete: boolean }
 export interface OcrDoc { pages: OcrPage[] }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
-const strN = (v: unknown): string | null => (typeof v === "string" ? v.slice(0, 200) : null);
+const strN = (v: unknown, k: string): string | null => { if (v == null) return null; if (typeof v !== "string") throw new Error(`Ugyldig lesesvar: ${k}`); return v.slice(0, 200); };
+const boolStrict = (v: unknown, k: string): boolean => { if (typeof v !== "boolean") throw new Error(`Ugyldig lesesvar: ${k} mangler`); return v; };
 
-/** Streng parser. Ukjent form gir feil — aldri tom suksess. */
-export function parseOcrOutput(v: unknown): OcrDoc {
-  if (!isObj(v) || !Array.isArray(v.pages) || v.pages.length === 0 || v.pages.length > 40) throw new Error("Ugyldig lesesvar: sider mangler");
+/** Streng parser for ÉN side. Manglende/feil type (også booleans) gir feil — aldri stille standardverdi. */
+export function parseOcrPage(v: unknown): OcrPage {
+  if (!isObj(v) || !Array.isArray(v.rows) || v.rows.length > 80) throw new Error("Ugyldig lesesvar: side");
   return {
-    pages: v.pages.map((p): OcrPage => {
-      if (!isObj(p) || !Array.isArray(p.rows) || p.rows.length > 60) throw new Error("Ugyldig lesesvar: side");
+    printed_identity: strN(v.printed_identity, "identitet"), complete: boolStrict(v.complete, "complete"),
+    rows: v.rows.map((r): OcrRow => {
+      if (!isObj(r) || !Array.isArray(r.amounts) || r.amounts.length > 12) throw new Error("Ugyldig lesesvar: rad");
       return {
-        printed_identity: strN(p.printed_identity), printed_page: strN(p.printed_page),
-        rows: p.rows.map((r): OcrRow => {
-          if (!isObj(r) || !Array.isArray(r.amounts) || r.amounts.length > 12) throw new Error("Ugyldig lesesvar: rad");
-          return {
-            row_code: strN(r.row_code), crossed_out: r.crossed_out === true, unclear: r.unclear === true, comment: strN(r.comment),
-            amounts: r.amounts.map((a): OcrAmount => {
-              if (!isObj(a) || (a.column !== "pakninger" && a.column !== "los")) throw new Error("Ugyldig lesesvar: felt");
-              return { column: a.column, unit_label: strN(a.unit_label), raw: strN(a.raw) };
-            }),
-          };
+        row_code: strN(r.row_code, "radkode"), crossed_out: boolStrict(r.crossed_out, "crossed_out"), unclear: boolStrict(r.unclear, "unclear"), comment: strN(r.comment, "kommentar"),
+        amounts: r.amounts.map((a): OcrAmount => {
+          if (!isObj(a) || (a.column !== "pakninger" && a.column !== "los")) throw new Error("Ugyldig lesesvar: felt");
+          return { column: a.column, unit_label: strN(a.unit_label, "enhet"), raw: strN(a.raw, "verdi") };
         }),
       };
     }),
@@ -46,8 +72,6 @@ export function parseOcrOutput(v: unknown): OcrDoc {
 }
 
 export type AmountRead = { kind: "tom" } | { kind: "tall"; value: number } | { kind: "usikker"; reason: string };
-
-/** Tolker håndskrevet mengde. Tvetydige skilletegn og alt annet enn rene tall er usikkert. */
 export function readHandwrittenAmount(raw: string | null): AmountRead {
   if (raw == null) return { kind: "tom" };
   const t = raw.replace(/\s+/g, "");
@@ -60,69 +84,90 @@ export function readHandwrittenAmount(raw: string | null): AmountRead {
   return { kind: "usikker", reason: "Uleselig eller ikke et tall" };
 }
 
-export interface ManifestLine { id: string; revision: number; snap_base_unit: string | null; snap_units: { id: string; label: string; units_in_base: number }[] }
+export interface ManifestLine extends SheetLine { revision: number; snap_base_unit: string | null }
 export interface ManifestPage { page: number; pages: number; identity: string; lines: ManifestLine[] }
-
-/** Samme identitet som utskriften (report.ts sheetIdentity) og samme sideinndeling. */
-export function buildManifest(countId: string, listId: string, templateRevision: number, sortedLines: ManifestLine[], perPage = VT_SHEET_LINES_PER_PAGE): ManifestPage[] {
-  const chunks: ManifestLine[][] = [];
-  for (let i = 0; i < sortedLines.length; i += perPage) chunks.push(sortedLines.slice(i, i + perPage));
-  return chunks.map((lines, i) => ({ page: i + 1, pages: chunks.length, identity: `VT1|${countId}|${listId}|r${templateRevision}|s${i + 1}/${chunks.length}`, lines }));
+export function buildManifest(countId: string, listId: string, templateRevision: number, sortedLines: ManifestLine[]): ManifestPage[] {
+  const chunks = paginateSheet(sortedLines);
+  return chunks.map((lines, i) => ({ page: i + 1, pages: chunks.length, identity: sheetIdentityOf(countId, listId, templateRevision, i + 1, chunks.length), lines }));
 }
 
-export interface ProposalEntry { unit_id: string | null; label: string; value: number | null; reason: string | null; raw: string | null }
+/** Ett felt i et forslag. unit_id er bare gyldig når unit_known=true; ukjent pakning må velges av brukeren. */
+export interface ProposalEntry { unit_id: string | null; unit_known: boolean; label: string; value: number | null; reason: string | null; raw: string | null }
 export interface Proposal { line_id: string; line_revision_at_job: number; page: number; row_code: string; entries: ProposalEntry[]; reasons: string[] }
 export interface MatchResult { document_ok: boolean; issues: string[]; proposals: Proposal[]; pages_seen: number[] }
 
 /**
- * Sammenligner lest dokument med manifestet for NØYAKTIG én liste. Feil/ukjent identitet,
- * duplikat- eller manglende sider gir document_ok=false (ingen forslag kan godkjennes).
- * Rader med koder utenfor siden avvises. Usikre felter forblir uten verdi med årsak.
+ * Sammenligner leste sider (i opplastingsrekkefølge) med manifestet for NØYAKTIG én liste.
+ * Ugyldig ⇒ document_ok=false (ingen forslag kan godkjennes): feil/uleselig identitet, duplikat/manglende side,
+ * siden ikke fullstendig lest, kolliderende radkoder, manglende eller dobbeltleste rader.
  */
 export function matchDocument(doc: OcrDoc, manifest: ManifestPage[]): MatchResult {
-  const issues: string[] = []; const proposals: Proposal[] = []; const seen = new Map<number, number>();
+  const issues: string[] = []; const blocking: string[] = []; const proposals: Proposal[] = []; const seen = new Map<number, number>();
+  const block = (s: string) => { issues.push(s); blocking.push(s); };
+  if (manifest.length === 0) block("Listen har ingen linjer");
   doc.pages.forEach((p, idx) => {
     const id = p.printed_identity?.trim() ?? null;
-    const m = id ? manifest.find(x => x.identity === id) : undefined;
-    if (!id) { issues.push(`Bilde/side ${idx + 1}: trykt identitet kunne ikke leses`); return; }
+    if (!id) { block(`Opplastet side ${idx + 1}: trykt identitet kunne ikke leses`); return; }
+    const m = manifest.find(x => x.identity === id);
     if (!m) {
-      const parts = id.split("|");
-      const mp = manifest[0];
-      const why = !mp ? "listen har ingen linjer" : parts[1] !== mp.identity.split("|")[1] ? "annen telling" : parts[2] !== mp.identity.split("|")[2] ? "annen liste" : parts[3] !== mp.identity.split("|")[3] ? "annen malversjon" : "ukjent side";
-      issues.push(`Bilde/side ${idx + 1}: tilhører ikke denne listen (${why})`); return;
+      const parts = id.split("|"); const mp = manifest[0]?.identity.split("|") ?? [];
+      const why = parts[0] !== mp[0] ? "annet sideoppsett/eldre utskrift" : parts[1] !== mp[1] ? "annen telling" : parts[2] !== mp[2] ? "annen liste" : parts[3] !== mp[3] ? "annen malversjon" : "ukjent side";
+      block(`Opplastet side ${idx + 1}: tilhører ikke denne listen (${why})`); return;
     }
     seen.set(m.page, (seen.get(m.page) ?? 0) + 1);
-    if ((seen.get(m.page) ?? 0) > 1) { issues.push(`Side ${m.page} er lastet opp mer enn én gang`); return; }
-    const codes = new Map(m.lines.map(l => [l.id.slice(0, 8), l]));
-    const used = new Set<string>();
+    if ((seen.get(m.page) ?? 0) > 1) { block(`Side ${m.page} er lastet opp mer enn én gang`); return; }
+    if (!p.complete) block(`Side ${m.page}: lesingen er ikke fullstendig`);
+    const byCode = new Map<string, ManifestLine[]>();
+    for (const l of m.lines) byCode.set(rowCodeOf(l.id), [...(byCode.get(rowCodeOf(l.id)) ?? []), l]);
+    for (const [code, ls] of byCode) if (ls.length > 1) block(`Side ${m.page}: radkode «${code}» er ikke entydig`);
+    const used = new Map<string, number>();
+    for (const r of p.rows) { const c = r.row_code?.trim(); if (c) used.set(c, (used.get(c) ?? 0) + 1); }
+    for (const [code, n] of used) {
+      if (!byCode.has(code)) block(`Side ${m.page}: radkode «${code}» hører ikke til siden`);
+      else if (n > 1) block(`Side ${m.page}: radkode «${code}» lest ${n} ganger`);
+    }
+    if (p.rows.some(r => !r.row_code?.trim())) block(`Side ${m.page}: rad uten lesbar radkode`);
+    for (const code of byCode.keys()) if (!used.has(code)) block(`Side ${m.page}: rad «${code}» ble ikke lest`);
     for (const r of p.rows) {
-      const code = r.row_code?.trim() ?? "";
-      const line = codes.get(code);
-      if (!line) { if (code) issues.push(`Side ${m.page}: radkode «${code}» hører ikke til siden — ignorert`); continue; }
-      if (used.has(code)) { issues.push(`Side ${m.page}: radkode «${code}» lest to ganger — ingen forslag`); { const at = proposals.findIndex(x => x.row_code === code && x.page === m.page); if (at >= 0) proposals.splice(at, 1); } continue; }
-      used.add(code);
+      const code = r.row_code?.trim() ?? ""; const ls = byCode.get(code);
+      if (!ls || ls.length !== 1 || used.get(code) !== 1) continue;
+      const line = ls[0];
       const reasons: string[] = [];
-      if (r.crossed_out) reasons.push("Overstrøket");
-      if (r.unclear) reasons.push("Utydelig håndskrift");
+      if (r.crossed_out) reasons.push("Overstrøket"); if (r.unclear) reasons.push("Utydelig håndskrift");
       const entries: ProposalEntry[] = [];
       for (const a of r.amounts) {
         const read = readHandwrittenAmount(a.raw);
         if (read.kind === "tom") continue;
         const unit = a.column === "los"
           ? (line.snap_base_unit ? { id: null, label: line.snap_base_unit } : null)
-          : (line.snap_units.length === 1 && (!a.unit_label || a.unit_label === line.snap_units[0].label) ? line.snap_units[0]
-            : line.snap_units.find(u => u.label === a.unit_label) ?? null);
-        const base = { unit_id: unit ? unit.id : null, label: unit ? unit.label : a.unit_label ?? "ukjent enhet", raw: a.raw };
-        if (!unit) entries.push({ ...base, value: null, reason: "Enheten kan ikke knyttes til listens telleenheter" });
+          : line.snap_units.length === 1 && (!a.unit_label || a.unit_label === line.snap_units[0].label) ? line.snap_units[0]
+          : line.snap_units.find(u => u.label === a.unit_label) ?? null;
+        const base = { unit_id: unit ? unit.id : null, unit_known: !!unit, label: unit ? unit.label : a.unit_label ?? "ukjent pakning", raw: a.raw };
+        if (!unit) entries.push({ ...base, value: read.kind === "tall" ? read.value : null, reason: "Pakningen kan ikke knyttes til listens telleenheter — velg enhet" });
         else if (read.kind === "usikker") entries.push({ ...base, value: null, reason: read.reason });
         else if (r.crossed_out || r.unclear) entries.push({ ...base, value: null, reason: reasons.join(", ") });
         else entries.push({ ...base, value: read.value, reason: null });
       }
-      if (entries.length === 0 && !r.crossed_out) continue; // tomt = ikke talt, ingen forslag
+      if (entries.length === 0 && !r.crossed_out) continue;
       proposals.push({ line_id: line.id, line_revision_at_job: line.revision, page: m.page, row_code: code, entries, reasons });
     }
   });
-  for (const m of manifest) if (!seen.has(m.page)) issues.push(`Side ${m.page} av ${m.pages} mangler`);
-  const identityBad = issues.some(i => /tilhører ikke|identitet|mer enn én gang|mangler$/.test(i));
-  return { document_ok: !identityBad && manifest.length > 0, issues, proposals, pages_seen: [...seen.keys()].sort((a, b) => a - b) };
+  for (const m of manifest) if (!seen.has(m.page)) block(`Side ${m.page} av ${m.pages} mangler`);
+  return { document_ok: blocking.length === 0, issues, proposals, pages_seen: [...seen.keys()].sort((a, b) => a - b) };
+}
+
+/** Et forslag kan godkjennes bare når hvert felt er avklart: gyldig verdi + kjent enhet, eller eksplisitt utelatt med begrunnelse. */
+export interface EntryDecision { value: number | null; unit_id: string | null; unit_chosen: boolean; excluded: boolean; exclude_reason: string }
+export function proposalResolution(entries: ProposalEntry[], decisions: EntryDecision[]): { ok: boolean; problems: string[] } {
+  const problems: string[] = [];
+  entries.forEach((e, i) => {
+    const d = decisions[i];
+    if (!d) { problems.push(`${e.label}: ikke vurdert`); return; }
+    if (d.excluded) { if (d.exclude_reason.trim().length < 3) problems.push(`${e.label}: begrunn hvorfor feltet utelates`); return; }
+    if (d.value == null || !Number.isFinite(d.value) || d.value < 0) problems.push(`${e.label}: skriv inn verdi eller utelat med begrunnelse`);
+    if (!e.unit_known && !d.unit_chosen) problems.push(`${e.label}: velg enhet`);
+  });
+  const units = decisions.filter(d => !d.excluded).map(d => d.unit_id ?? "base");
+  if (new Set(units).size !== units.length) problems.push("Samme enhet er brukt i to felt");
+  return { ok: problems.length === 0 && entries.length > 0, problems };
 }

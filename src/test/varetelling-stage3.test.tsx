@@ -3,118 +3,150 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { jsPDF } from "jspdf";
 import { VtApiContext } from "@/ravarer/varetelling/api";
 import { createFakeVtApi } from "@/ravarer/varetelling/fakeApi";
 import { VtScopeContext, type VtScope } from "@/ravarer/varetelling/hooks";
-import { resetPendingStores } from "@/ravarer/varetelling/pendingStore";
+import { PendingStore, resetPendingStores } from "@/ravarer/varetelling/pendingStore";
 import { DraftStore, resetDraftStores } from "@/ravarer/varetelling/draftStore";
-import { createFakeStage3, Stage3Context, type FakeStage3Opts } from "@/ravarer/varetelling/stage3";
+import { createFakeStage3, Stage3Context, VtStaleContextError, type FakeStage3Opts } from "@/ravarer/varetelling/stage3";
 import { VaretellingWorkspace } from "@/ravarer/varetelling/components/VaretellingWorkspace";
-import { buildManifest, matchDocument, parseOcrOutput, readHandwrittenAmount, VT_OCR_SYSTEM_PROMPT, type ManifestLine, type OcrDoc } from "../../supabase/pending/functions/vt-count-ocr/ocrCore";
-import { buildReportCsv, buildSimplePdf, classifyGraph, reportTotals, sha256Hex, validateMail, type ReportLine } from "../../supabase/pending/functions/vt-count-report-email/reportCore";
+import { buildManifest, matchDocument, paginateSheet, parseOcrPage, proposalResolution, readHandwrittenAmount, rowCodeOf, rowUnits, VT_OCR_SYSTEM_PROMPT, VT_SHEET_CAPACITY, type ManifestLine, type OcrPage } from "../../supabase/pending/functions/vt-count-ocr/ocrCore";
+import { buildReportCsv, layoutA4, lineValueOre, mulToOreHalfUp, reportBlocks, summarizeLines, type VtReportData, type VtReportLine } from "../../supabase/pending/functions/_shared/vtReport";
+import { buildReportPdf, classifyGraph, validateMail } from "../../supabase/pending/functions/vt-count-report-email/reportCore";
 
 vi.mock("qrcode", () => ({ default: { toDataURL: async (t: string) => `data:qr,${encodeURIComponent(t)}` } }));
-
 beforeEach(() => { localStorage.clear(); resetPendingStores(); resetDraftStores(); });
 afterEach(() => cleanup());
 
-const L = (id: string, rev = 0, units: ManifestLine["snap_units"] = []): ManifestLine => ({ id, revision: rev, snap_base_unit: "kg", snap_units: units });
+// ---------- rapportkontrakt ----------
+const RL = (id: string, p: Partial<VtReportLine> = {}): VtReportLine => ({ id, count_list_id: "L", raw_material_id: id, sort_order: 1, snap_name: id, snap_sku: null, snap_location_name: null, snap_base_unit: "kg",
+  snap_price_per_base: 10, snap_price_source: "dokumentert_kostpris", snap_price_reason: null, snap_price_effective_date: "2026-10-01", snap_price_known_after_valuation: false,
+  state: "talt", counted_base: 1, note: null, revision: 1, ...p });
+const count = { id: "c", name: "Telling", planned_date: "2026-10-12", status: "til_kontroll", revision: 4, valuation_mode: "ved_start", valuation_date: "2026-10-12", finished_at: null };
+const D = (lines: VtReportLine[], c = count): VtReportData => ({ count: c, lists: [{ id: "L", name: "Tørr", department: "Bakeri", status: "til_kontroll", sort_order: 0, source_template_revision: 1 }], lines, generatedAt: "data per x" });
+
+describe("felles rapportkontrakt", () => {
+  it("eksakt desimal half-up per linje: 1×1,005=1,01; 10,075=10,08; 3×0,1 = 0,30", () => {
+    expect(mulToOreHalfUp(1, 1.005)).toBe(101); expect(mulToOreHalfUp(10.075, 1)).toBe(1008); expect(mulToOreHalfUp(3, 0.1)).toBe(30);
+    expect(mulToOreHalfUp(1e-7, 1e7)).toBe(100); expect(mulToOreHalfUp(2.675, 1)).toBe(268);
+  });
+  it("alle linjer «0 på lager» = fullstendig og verdi 0 (ikke null)", () => {
+    const s = summarizeLines(Array.from({ length: 55 }, (_, i) => RL(`l${i}`, { state: "null", counted_base: 0, snap_price_per_base: null })));
+    expect(s).toMatchObject({ complete: true, value: 0 });
+  });
+  it("«må kontrolleres» og talt uten pris gir ukjent verdi, aldri 0; summert per linje", () => {
+    const ls = [RL("a", { counted_base: 1, snap_price_per_base: 1.005 }), RL("b", { counted_base: 1, snap_price_per_base: 1.005 }), RL("c", { state: "ma_kontrolleres", counted_base: 5 }), RL("d", { snap_price_per_base: null })];
+    expect(lineValueOre(ls[2])).toBeNull(); expect(summarizeLines(ls)).toMatchObject({ value: 2.02, complete: false, countedWithoutPrice: 1, review: 1 });
+  });
+  it("CSV: formelvern (også tellingsnavn), tilstandsbevisst mengde, sen pris merket", () => {
+    const csv = buildReportCsv(D([RL("=HYPERLINK(x)", { snap_name: "=cmd|calc" }), RL("h", { state: "ikke_her", counted_base: null }), RL("k", { state: "ma_kontrolleres", counted_base: 2 }), RL("p", { snap_price_known_after_valuation: true })], { ...count, name: "+SUM(A1)" }));
+    expect(csv).toContain("'=cmd|calc"); expect(csv).toContain("'+SUM(A1)"); expect(csv).not.toMatch(/;=|;\+S/);
+    expect(csv).toContain("UKJENT (må kontrolleres)"); expect(csv).toContain("(registrert etter verdsettelsesdato)");
+  });
+  const longLines = Array.from({ length: 55 }, (_, i) => RL(`id-${String(i).padStart(3, "0")}-${"x".repeat(20)}`, { snap_name: `Vare ${i} med et svært langt navn som må brytes over flere linjer uten å forsvinne ${"ÆØÅ æøå ".repeat(6)}` }));
+  it("A4-oppsett: ingen tekst utenfor arket, alt innhold bevart, flere sider (målt med jsPDF)", () => {
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const lay = layoutA4(reportBlocks(D(longLines)), (t, size, bold) => { doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setFontSize(size); return doc.getTextWidth(t); });
+    expect(lay.pages).toBeGreaterThan(1);
+    for (const l of lay.lines) { expect(l.y).toBeGreaterThanOrEqual(16); expect(l.y).toBeLessThanOrEqual(280); expect(doc.getTextWidth(l.text)).toBeLessThanOrEqual(182.01); }
+    const all = lay.lines.map(l => l.text).join(" ");
+    for (const l of longLines) expect(all.replace(/\s+/g, "")).toContain(l.id.replace(/\s+/g, ""));
+    expect(all).toContain("æøå");
+  });
+  it("e-post-PDF fra samme blokker: gyldig, paginert med «Side X av Y», norske tegn bevart (WinAnsi)", () => {
+    const pdf = buildReportPdf(D(longLines)); const txt = Array.from(pdf, c => String.fromCharCode(c)).join("");
+    expect(txt.startsWith("%PDF-1.4")).toBe(true); expect(txt).toMatch(/Side 2 av \d+/); expect(txt).toContain("ÆØÅ");
+    for (const l of longLines) expect(txt).toContain(l.id.slice(0, 7));
+  });
+  it("Graph 202 = akseptert (ikke levert); mottaker valideres", () => {
+    expect(classifyGraph(202)).toBe("akseptert_av_tjenesten"); expect(classifyGraph(null)).toBe("ukjent"); expect(classifyGraph(429)).toBe("ukjent"); expect(classifyGraph(400)).toBe("avvist");
+    expect(validateMail({ recipient: "a@b.no, c@d.no", subject: "x", message: "" })).not.toBeNull();
+  });
+});
+
+// ---------- lesing ----------
+const ML = (id: string, units = 0, name = "Vare"): ManifestLine => ({ id, revision: 0, snap_name: name, snap_base_unit: "kg", snap_units: Array.from({ length: units }, (_, i) => ({ id: `${id}-u${i}`, label: `pk${i}`, units_in_base: 10 })) });
 const C = "c0000000-0000-0000-0000-000000000000"; const LIST = "a1111111-0000-0000-0000-000000000000";
-const lines = Array.from({ length: 16 }, (_, i) => L(`${String(i).padStart(8, "0")}-line`));
+const lines = Array.from({ length: 16 }, (_, i) => ML(`${String(i).padStart(10, "0")}-line`));
 const man = buildManifest(C, LIST, 3, lines);
-const page = (n: number, rows: OcrDoc["pages"][number]["rows"], identity = man[n - 1].identity) => ({ printed_identity: identity, printed_page: null, rows });
-const row = (code: string, raw: string | null, extra: Partial<{ crossed_out: boolean; unclear: boolean }> = {}) =>
-  ({ row_code: code, amounts: [{ column: "los" as const, unit_label: null, raw }], crossed_out: false, unclear: false, comment: null, ...extra });
+const row = (l: ManifestLine, raw: string | null, extra: Partial<{ crossed_out: boolean; unclear: boolean; column: "los" | "pakninger"; unit: string | null }> = {}) =>
+  ({ row_code: rowCodeOf(l.id), amounts: [{ column: extra.column ?? "los", unit_label: extra.unit ?? null, raw }], crossed_out: extra.crossed_out ?? false, unclear: extra.unclear ?? false, comment: null });
+const fullPage = (n: number, over: Record<number, ReturnType<typeof row>> = {}, identity = man[n - 1].identity): OcrPage =>
+  ({ printed_identity: identity, complete: true, rows: man[n - 1].lines.map((l, i) => over[i] ?? row(l, null)) });
 
 describe("lesing av papirliste – kjerne", () => {
-  it("prompten inneholder ingen forventede ID-er", () => {
-    expect(VT_OCR_SYSTEM_PROMPT).not.toContain(C); expect(VT_OCR_SYSTEM_PROMPT).not.toContain(LIST);
+  it("prompten har ingen forventede ID-er; parser krever ekte booleans", () => {
+    expect(VT_OCR_SYSTEM_PROMPT).not.toContain(C);
+    expect(() => parseOcrPage({ printed_identity: "x", complete: true, rows: [{ row_code: "a", amounts: [], unclear: false }] })).toThrow(/crossed_out/);
+    expect(() => parseOcrPage({ printed_identity: "x", complete: true, rows: [{ row_code: "a", amounts: [], unclear: "false", crossed_out: false }] })).toThrow();
+    expect(() => parseOcrPage({ printed_identity: "x", rows: [] })).toThrow(/complete/);
   });
-  it("manifest: 14 linjer per side, identitet lik utskriften", () => {
-    expect(man).toHaveLength(2); expect(man[1].identity).toBe(`VT1|${C}|${LIST}|r3|s2/2`); expect(man[0].lines).toHaveLength(14);
+  it("sideoppsett: lange navn og mange enheter gir flere sider, aldri over kapasitet; unike identiteter", () => {
+    const heavy = Array.from({ length: 30 }, (_, i) => ML(`h${i}`, i % 4, "Svært langt varenavn ".repeat(1 + (i % 5))));
+    const pages = paginateSheet(heavy);
+    for (const p of pages) expect(p.reduce((s, l) => s + rowUnits(l), 0)).toBeLessThanOrEqual(VT_SHEET_CAPACITY);
+    expect(pages.flat()).toHaveLength(30);
+    const ids = buildManifest(C, LIST, 1, heavy).map(p => p.identity); expect(new Set(ids).size).toBe(ids.length); expect(ids[0]).toMatch(/^VT2\|/);
   });
-  it("riktige sider: forslag; tomt felt gir ingen forslag (ikke 0); 0 foreslås men må bekreftes", () => {
-    const r = matchDocument({ pages: [page(1, [row("00000000", "12,5"), row("00000001", null), row("00000002", "0")]), page(2, [])] }, man);
-    expect(r.document_ok).toBe(true);
-    expect(r.proposals.map(p => [p.line_id, p.entries[0].value])).toEqual([["00000000-line", 12.5], ["00000002-line", 0]]);
+  it("komplette riktige sider: forslag; tomt felt er ikke 0", () => {
+    const r = matchDocument({ pages: [fullPage(1, { 0: row(man[0].lines[0], "12,5"), 2: row(man[0].lines[2], "0") }), fullPage(2)] }, man);
+    expect(r.document_ok).toBe(true); expect(r.proposals.map(p => p.entries[0].value)).toEqual([12.5, 0]);
   });
-  it("annen liste / annen malversjon / annen telling avvises med forklaring", () => {
-    for (const [bad, why] of [[`VT1|${C}|b2222222-0000-0000-0000-000000000000|r3|s1/2`, "annen liste"], [`VT1|${C}|${LIST}|r2|s1/2`, "annen malversjon"], [`VT1|d0000000-0000-0000-0000-000000000000|${LIST}|r3|s1/2`, "annen telling"]] as const) {
-      const r = matchDocument({ pages: [page(1, [row("00000000", "1")], bad), page(2, [])] }, man);
-      expect(r.document_ok).toBe(false); expect(r.issues.join()).toContain(why); expect(r.proposals).toHaveLength(0);
-    }
+  it("feil liste/versjon/eldre utskrift, duplikat/manglende side og ufullstendig lest side ⇒ ikke godkjennbart", () => {
+    expect(matchDocument({ pages: [fullPage(1, {}, `VT1|${C}|${LIST}|r3|s1/2`), fullPage(2)] }, man).issues.join()).toContain("eldre utskrift");
+    expect(matchDocument({ pages: [fullPage(1, {}, `VT2|${C}|${LIST}|r2|s1/2`), fullPage(2)] }, man).issues.join()).toContain("annen malversjon");
+    expect(matchDocument({ pages: [fullPage(1), fullPage(1)] }, man).document_ok).toBe(false);
+    expect(matchDocument({ pages: [fullPage(1)] }, man).document_ok).toBe(false);
+    expect(matchDocument({ pages: [{ ...fullPage(1), complete: false }, fullPage(2)] }, man).issues.join()).toContain("ikke fullstendig");
   });
-  it("duplikat side og manglende side gjør dokumentet ikke godkjennbart", () => {
-    expect(matchDocument({ pages: [page(1, []), page(1, [])] }, man).issues.join()).toMatch(/mer enn én gang.*Side 2 av 2 mangler/);
-    expect(matchDocument({ pages: [page(1, [row("00000000", "1")])] }, man).document_ok).toBe(false);
+  it("manglende rad, dobbeltlest rad, fremmed kode og kolliderende koder ⇒ ikke godkjennbart", () => {
+    const p1 = fullPage(1); p1.rows.pop();
+    expect(matchDocument({ pages: [p1, fullPage(2)] }, man).issues.join()).toContain("ble ikke lest");
+    const p2 = fullPage(1); p2.rows.push(p2.rows[0]);
+    expect(matchDocument({ pages: [p2, fullPage(2)] }, man).document_ok).toBe(false);
+    const coll = buildManifest(C, LIST, 1, [ML("0000000000-a"), ML("0000000000-b")]);
+    expect(matchDocument({ pages: [{ printed_identity: coll[0].identity, complete: true, rows: [] }] }, coll).issues.join()).toContain("ikke entydig");
   });
-  it("uleselig identitet avvises selv om rader ser riktige ut", () => {
-    expect(matchDocument({ pages: [page(1, [row("00000000", "1")], ""), page(2, [])] }, man).document_ok).toBe(false);
+  it("tvetydig/overstrøket/utydelig ⇒ uten verdi; ukjent pakning ⇒ unit_known=false (aldri base)", () => {
+    expect(readHandwrittenAmount("1.500").kind).toBe("usikker"); expect(readHandwrittenAmount(" 3,25 ")).toEqual({ kind: "tall", value: 3.25 });
+    const m = buildManifest(C, LIST, 1, [ML("p0000000000x", 2)]);
+    const r = matchDocument({ pages: [{ printed_identity: m[0].identity, complete: true, rows: [{ row_code: rowCodeOf("p0000000000x"), amounts: [{ column: "pakninger", unit_label: "kasse", raw: "2" }], crossed_out: false, unclear: false, comment: null }] }] }, m);
+    expect(r.proposals[0].entries[0]).toMatchObject({ unit_known: false, unit_id: null, value: 2 });
   });
-  it("radkode fra annen side/liste ignoreres; dobbeltlest rad gir ingen forslag", () => {
-    const r = matchDocument({ pages: [page(1, [row("00000015", "4"), row("ffffffff", "4"), row("00000003", "1"), row("00000003", "2")]), page(2, [])] }, man);
-    expect(r.proposals).toHaveLength(0); expect(r.issues.filter(i => /hører ikke|lest to ganger/.test(i))).toHaveLength(3);
-  });
-  it("tvetydige tall, brøk, overstrøket og utydelig blir usikre uten verdi — confidence brukes ikke", () => {
-    expect(readHandwrittenAmount("1.500")).toEqual({ kind: "usikker", reason: expect.stringContaining("tusenskille") });
-    expect(readHandwrittenAmount("1/2").kind).toBe("usikker"); expect(readHandwrittenAmount("abc").kind).toBe("usikker");
-    expect(readHandwrittenAmount(" 3,25 ")).toEqual({ kind: "tall", value: 3.25 }); expect(readHandwrittenAmount("").kind).toBe("tom");
-    const r = matchDocument({ pages: [page(1, [row("00000000", "5", { crossed_out: true }), row("00000001", "6", { unclear: true }), row("00000002", "1.500")]), page(2, [])] }, man);
-    expect(r.proposals.every(p => p.entries.every(e => e.value === null && e.reason))).toBe(true);
-  });
-  it("enhet som ikke finnes på linjen blir usikker", () => {
-    const m = buildManifest(C, LIST, 1, [L("00000000-x", 0, [{ id: "u1", label: "sekk 25 kg", units_in_base: 25 }, { id: "u2", label: "pose", units_in_base: 1 }])]);
-    const r = matchDocument({ pages: [{ printed_identity: m[0].identity, printed_page: null, rows: [{ row_code: "00000000", amounts: [{ column: "pakninger", unit_label: "kasse", raw: "2" }], crossed_out: false, unclear: false, comment: null }] }] }, m);
-    expect(r.proposals[0].entries[0]).toMatchObject({ value: null, unit_id: null });
-  });
-  it("streng parser avviser feil form", () => {
-    expect(() => parseOcrOutput({})).toThrow(); expect(() => parseOcrOutput({ pages: [{ rows: [{ amounts: [{ column: "x" }] }] }] })).toThrow();
-  });
-});
-
-describe("rapport-e-post – kjerne", () => {
-  const count = { id: "c", name: "Telling", planned_date: "2026-10-12", status: "til_kontroll", revision: 4, valuation_mode: "ved_start", valuation_date: "2026-10-12" };
-  const ln = (id: string, qty: number | null, price: number | null, state = "talt"): ReportLine => ({ id, count_list_id: "l", sort_order: 1, snap_name: id, snap_sku: null, snap_location_name: null, snap_base_unit: "kg", snap_price_per_base: price, snap_price_source: price ? "dokumentert_kostpris" : "mangler_pris", snap_price_reason: price ? null : "ingen_verifisert_kostpris", state, counted_base: qty, revision: 1 });
-  it("deterministisk CSV/hash; foreløpig merket; talt uten pris markeres, 0 uten pris er greit", async () => {
-    const ls = [ln("b", 2, 10), ln("a", 3, null), ln("z", 0, null, "null")];
-    const csv = buildReportCsv(count, [{ id: "l", name: "Tørr", department: "Bakeri", status: "til_kontroll" }], ls);
-    expect(csv).toContain("Foreløpig"); expect(csv).toContain("UTEN PRIS"); expect(csv.split("UTEN PRIS")).toHaveLength(2);
-    expect(await sha256Hex(csv)).toBe(await sha256Hex(buildReportCsv(count, [{ id: "l", name: "Tørr", department: "Bakeri", status: "til_kontroll" }], [...ls].reverse())));
-    expect(reportTotals(ls)).toMatchObject({ valued: 20, unpricedPositive: 1 });
-  });
-  it("Graph: 202 = akseptert av tjenesten (ikke levert); tidsavbrudd = ukjent", () => {
-    expect(classifyGraph(202)).toBe("akseptert_av_tjenesten"); expect(classifyGraph(null)).toBe("ukjent"); expect(classifyGraph(503)).toBe("ukjent");
-    expect(classifyGraph(429)).toBe("ukjent"); expect(classifyGraph(400)).toBe("avvist");
-  });
-  it("mottaker valideres; PDF er gyldig PDF", () => {
-    expect(validateMail({ recipient: "a@b.no, c@d.no", subject: "x", message: "" })).not.toBeNull();
-    expect(validateMail({ recipient: "henrik@nottero-bakeri.no", subject: "x", message: "" })).toBeNull();
-    const pdf = buildSimplePdf("Tittel", ["linje æøå"]); expect(String.fromCharCode(...pdf.slice(0, 8))).toBe("%PDF-1.4");
+  it("forslag kan bare godkjennes når HVERT felt er avklart (verdi+enhet eller begrunnet utelatelse)", () => {
+    const entries = [{ unit_id: "u", unit_known: true, label: "sekk", value: 2, reason: null, raw: "2" }, { unit_id: null, unit_known: true, label: "kg", value: null, reason: "tvetydig", raw: "1.500" }];
+    const d = (value: number | null, excluded = false, reason = "") => ({ value, unit_id: null as string | null, unit_chosen: true, excluded, exclude_reason: reason });
+    expect(proposalResolution(entries, [{ ...d(2), unit_id: "u" }, d(null)]).ok).toBe(false);
+    expect(proposalResolution(entries, [{ ...d(2), unit_id: "u" }, d(null, true, "")]).ok).toBe(false);
+    expect(proposalResolution(entries, [{ ...d(2), unit_id: "u" }, d(null, true, "Uleselig, telt på nytt")]).ok).toBe(true);
+    expect(proposalResolution(entries, [{ ...d(2), unit_id: "u" }, d(1.5)]).ok).toBe(true);
+    expect(proposalResolution([{ ...entries[0], unit_known: false, unit_id: null }], [{ ...d(2), unit_chosen: false }]).ok).toBe(false);
   });
 });
 
-describe("holdbare utkast", () => {
-  it("overlever ny butikk (omlasting) og gjør lagringsfeil synlig", () => {
+describe("holdbar lagring", () => {
+  it("utkast overlever ny butikk; lagringsfeil synlig for utkast og ventende sendinger", () => {
     const a = new DraftStore("k", localStorage);
     a.put({ countId: "c", lineId: "l", baseRevision: 2, baseTexts: [""], baseNote: "", texts: ["5"], note: "", at: "t" });
     expect(new DraftStore("k", localStorage).get("l")?.texts).toEqual(["5"]);
     const broken = { getItem: () => null, setItem: () => { throw new Error("full"); } } as unknown as Storage;
-    const b = new DraftStore("k2", broken); b.put({ countId: "c", lineId: "l", baseRevision: 0, baseTexts: [], baseNote: "", texts: [], note: "x", at: "t" });
-    expect(b.lastError).toMatch(/kan ikke lagres/); expect(b.get("l")?.note).toBe("x");
+    const p = new PendingStore("p", broken); p.put({ key: "x", opId: "o", sig: "s", payload: 1, state: "inflight", at: "t" });
+    expect(p.lastError).toMatch(/kan ikke lagres/); expect(p.get("x")?.opId).toBe("o");
   });
 });
 
 // ---------- komponenter ----------
-function mount(opts: FakeStage3Opts = {}, url = "/", scope: Partial<VtScope> = {}) {
+function setup(opts: FakeStage3Opts = {}) {
   const api = createFakeVtApi(); const s3 = createFakeStage3(api, opts);
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const full: VtScope = { entity: "e1", userId: "u1", canWrite: true, canApprove: true, ...scope };
+  const full: VtScope = { entity: "e1", userId: "u1", canWrite: true, canApprove: true };
   const ui = (u: string) => (
     <MemoryRouter initialEntries={[u]}><QueryClientProvider client={qc}><VtApiContext.Provider value={api}><Stage3Context.Provider value={s3}>
       <VtScopeContext.Provider value={full}><VaretellingWorkspace legacy={<p>x</p>} /></VtScopeContext.Provider>
     </Stage3Context.Provider></VtApiContext.Provider></QueryClientProvider></MemoryRouter>);
-  let cur = render(ui(url));
-  return { api, s3, qc, remount: (u: string) => { cur.unmount(); cur = render(ui(u)); return cur; } };
+  let cur: ReturnType<typeof render> | null = null;
+  return { api, s3, qc, open: (u: string) => { cur?.unmount(); cur = render(ui(u)); return cur; } };
 }
 async function started(api: ReturnType<typeof createFakeVtApi>, ids = ["t1"]) {
   const { countId } = await api.createCount({ opId: crypto.randomUUID(), entity: "e1", name: "T", plannedDate: "2026-10-12", valuationMode: "ved_start", valuationDate: null, templateIds: ids });
@@ -122,108 +154,141 @@ async function started(api: ReturnType<typeof createFakeVtApi>, ids = ["t1"]) {
   return countId;
 }
 const cardOf = (el: HTMLElement) => { const c = el.closest("[data-testid='vt-line']"); if (!(c instanceof HTMLElement)) throw new Error("kort"); return c; };
+const jpg = (c = "a") => new File([c], "side.jpg", { type: "image/jpeg" });
 
-describe("tellekort – utkast og nettleserfunn", () => {
-  it("3×25+7,5 lagret, så «0 på lager»: feltene tømmes, ingen gammel 82,5-sum; listestatus oppdateres", async () => {
-    const m = mount(); const id = await started(m.api);
-    m.remount(`/?telling=${id}&liste=${m.api._state.lists[0].id}`);
+describe("tellekort", () => {
+  it("3×25+7,5 lagret, så «0 på lager»: felt tømmes, ingen gammel 82,5-sum; listestatus fersk", async () => {
+    const m = setup(); const id = await started(m.api);
+    m.open(`/?telling=${id}&liste=${m.api._state.lists[0].id}`);
     const sack = await screen.findByLabelText("Hvetemel (demo): antall sekk 25 kg");
-    fireEvent.change(sack, { target: { value: "3" } });
-    fireEvent.change(screen.getByLabelText("Hvetemel (demo): antall kg"), { target: { value: "7,5" } });
+    fireEvent.change(sack, { target: { value: "3" } }); fireEvent.change(screen.getByLabelText("Hvetemel (demo): antall kg"), { target: { value: "7,5" } });
     fireEvent.click(within(cardOf(sack)).getByRole("button", { name: "Lagre og neste" }));
     await waitFor(() => expect(m.api._state.lines.find(l => l.raw_material_id === "m1")?.counted_base).toBe(82.5));
     await screen.findByRole("option", { name: /Under telling/ });
     fireEvent.click(within(cardOf(screen.getByLabelText("Hvetemel (demo): antall kg"))).getByRole("button", { name: "0 på lager" }));
     await waitFor(() => expect(m.api._state.lines.find(l => l.raw_material_id === "m1")?.state).toBe("null"));
-    const card = cardOf(screen.getByLabelText("Hvetemel (demo): antall kg"));
     await waitFor(() => expect((screen.getByLabelText("Hvetemel (demo): antall kg") as HTMLInputElement).value).toBe(""));
-    expect(within(card).queryByText(/82,5/)).toBeNull();
-    expect(within(card).getByText(/flytter til neste vare/)).toBeTruthy();
+    expect(within(cardOf(screen.getByLabelText("Hvetemel (demo): antall kg"))).queryByText(/82,5/)).toBeNull();
   });
-  it("utkast overlever bytte av liste og omlasting; ingenting sendes", async () => {
-    const m = mount(); const id = await started(m.api, ["t1", "t2"]);
+  it("utkast overlever liste-/visningsbytte og omlasting; avslutning sperres mens utkast finnes", async () => {
+    const m = setup(); const id = await started(m.api, ["t1", "t2"]);
     const spy = vi.spyOn(m.api, "saveLine");
-    const list1 = m.api._state.lists.find(l => l.source_template_id === "t1")!;
-    m.remount(`/?telling=${id}&liste=${list1.id}`);
+    const list1 = m.api._state.lists.find(l => l.source_template_id === "t1");
+    if (!list1) throw new Error("liste");
+    m.open(`/?telling=${id}&liste=${list1.id}`);
     fireEvent.change(await screen.findByLabelText("Sukker (demo): antall kg"), { target: { value: "4,2" } });
     await screen.findByText(/Utkast — ikke lagret/);
-    m.remount(`/?telling=${id}`); // annen liste / omlasting
+    m.open(`/?telling=${id}`);
     expect((await screen.findAllByText(/utkast som ikke er sendt/)).length).toBeGreaterThan(0);
-    m.remount(`/?telling=${id}&liste=${list1.id}`);
+    expect(screen.getByText(/har utkast eller sending med ukjent utfall/)).toBeTruthy();
+    m.open(`/?telling=${id}&liste=${list1.id}`);
     expect(((await screen.findByLabelText("Sukker (demo): antall kg")) as HTMLInputElement).value).toBe("4,2");
     expect(spy).not.toHaveBeenCalled();
   });
 });
 
-describe("opplasting – syntetisk lesing", () => {
-  const pdf = (content = "a") => new File([content], "liste.pdf", { type: "application/pdf" });
-  it("usikre felt står tomme; bekreftelse lagrer; samme fil = duplikat uten ny lesing", async () => {
-    const m = mount(); const id = await started(m.api);
-    const list = m.api._state.lists[0];
-    m.remount(`/?telling=${id}&liste=${list.id}`);
-    const input = await screen.findByLabelText(/Last opp utfylt liste/);
-    fireEvent.change(input, { target: { files: [pdf()] } });
+describe("opplasting – syntetisk lesing (IKKE ekte AI)", () => {
+  it("flere filer i rekkefølge; usikkert løst-felt må avklares før godkjenning; samme sider = duplikat", async () => {
+    const m = setup(); const id = await started(m.api);
+    m.open(`/?telling=${id}&liste=${m.api._state.lists[0].id}`);
+    fireEvent.change(await screen.findByLabelText(/Velg sider/), { target: { files: [jpg()] } });
+    fireEvent.click(await screen.findByRole("button", { name: /Last opp 1 side og les/ }));
     const cards = await screen.findAllByTestId("vt-proposal");
-    expect(cards.length).toBeGreaterThan(0);
-    const uncertain = cards.find(c => /usikkert/.test(c.textContent ?? ""));
-    if (uncertain) expect(within(uncertain).getAllByRole("textbox").every(i => (i as HTMLInputElement).value === "")).toBe(true);
-    const first = cards[0];
-    fireEvent.click(within(first).getByRole("button", { name: /Bekreft/ }));
-    await within(first).findByText(/Bekreftet og lagret/);
-    const jobs = m.s3._jobs.length;
-    fireEvent.change(screen.getByLabelText(/Last opp utfylt liste/), { target: { files: [pdf()] } });
-    await waitFor(() => expect(m.s3._jobs.length).toBe(jobs));
+    const flour = cards.find(c => /Hvetemel/.test(c.textContent ?? ""));
+    if (!flour) throw new Error("forslag");
+    const btn = within(flour).getByRole("button", { name: /Bekreft verdien/ });
+    expect(btn).toHaveProperty("disabled", true);
+    expect(within(flour).getByText(/skriv inn verdi eller utelat/)).toBeTruthy();
+    fireEvent.change(within(flour).getByLabelText(/Hvetemel \(demo\): kg \(bekreft\)/), { target: { value: "1,5" } });
+    await waitFor(() => expect(within(flour).getByRole("button", { name: /Bekreft verdien/ })).toHaveProperty("disabled", false));
+    fireEvent.click(within(flour).getByRole("button", { name: /Bekreft verdien/ }));
+    await within(flour).findByText(/Bekreftet og lagret/);
+    expect(m.api._state.lines.find(l => l.raw_material_id === "m1")?.counted_base).toBe(51.5);
+    const reads = m.s3._counters.aiReads;
+    fireEvent.change(screen.getByLabelText(/Velg sider/), { target: { files: [jpg()] } });
+    fireEvent.click(await screen.findByRole("button", { name: /Last opp 1 side og les/ }));
+    await waitFor(() => expect(m.s3._jobs.length).toBe(1)); expect(m.s3._counters.aiReads).toBe(reads);
   });
-  it("linje endret manuelt etter opplasting: forslaget kan ikke bekreftes", async () => {
-    const m = mount(); const id = await started(m.api);
+  it("ukjent pakning må velges eksplisitt; linje endret etter opplasting avvises; fremmed linje avvises", async () => {
+    const m = setup(); const id = await started(m.api, ["t2"]);
     const list = m.api._state.lists[0];
-    const r = await m.s3.uploadAndRead({ opId: "o", listId: list.id, file: pdf("b") });
-    const p = m.s3._props.find(x => x.job_id === r.jobId && x.entries.some(e => e.value != null))!;
-    const line = m.api._state.lines.find(l => l.id === p.line_id)!;
+    const r = await m.s3.uploadAndRead({ opId: "o", listId: list.id, files: [jpg("b")], guard: () => true });
+    const p = m.s3._props.find(x => x.job_id === r.jobId);
+    if (!p) throw new Error("forslag");
+    const line = m.api._state.lines.find(l => l.id === p.line_id);
+    if (!line) throw new Error("linje");
     await m.api.saveLine({ opId: "s", lineId: line.id, expectedRevision: line.revision, state: "ikke_her", countedBase: null, entry: [], note: null });
-    await expect(m.s3.accept({ opId: "x", proposalId: p.id, lineId: line.id, expectedRevision: p.line_revision_at_job, state: "talt", countedBase: 1, entry: [{ unit_id: null, amount: 1 }], note: null })).rejects.toThrow(/endret etter opplasting/);
-    await expect(m.s3.accept({ opId: "y", proposalId: p.id, lineId: "fremmed", expectedRevision: 0, state: "null", countedBase: 0, entry: [], note: null })).rejects.toThrow(/hører ikke/);
+    await expect(m.s3.accept({ opId: "x", proposalId: p.id, lineId: line.id, expectedRevision: p.line_revision_at_job, state: "talt", countedBase: 1, entry: [{ unit_id: null, amount: 1 }], note: null, exclusions: [] })).rejects.toThrow(/endret etter opplasting/);
+    await expect(m.s3.accept({ opId: "y", proposalId: p.id, lineId: "fremmed", expectedRevision: 0, state: "null", countedBase: 0, entry: [], note: null, exclusions: [] })).rejects.toThrow(/hører ikke/);
   });
-  it("uten utrullet trinn 3: sannferdig melding, ingen opplasting", async () => {
-    const m = mount({ available: false }); const id = await started(m.api);
-    m.remount(`/?telling=${id}&liste=${m.api._state.lists[0].id}`);
-    expect(await screen.findByText(/Opplasting av papirliste er ikke tatt i bruk/)).toBeTruthy();
-    expect(screen.queryByLabelText(/Last opp utfylt liste/)).toBeNull();
+  it("byttet kontekst stopper opplastingen før neste steg (ingen jobb opprettes)", async () => {
+    const m = setup(); await started(m.api);
+    await expect(m.s3.uploadAndRead({ opId: "z", listId: m.api._state.lists[0].id, files: [jpg()], guard: () => false })).rejects.toBeInstanceOf(VtStaleContextError);
+    expect(m.s3._jobs).toHaveLength(0);
+  });
+  it("ukjent lesing: ingen automatisk ny lesing; godkjenner må tillate", async () => {
+    const m = setup({ readOutcome: "ukjent" }); const id = await started(m.api);
+    m.open(`/?telling=${id}&liste=${m.api._state.lists[0].id}`);
+    fireEvent.change(await screen.findByLabelText(/Velg sider/), { target: { files: [jpg()] } });
+    fireEvent.click(await screen.findByRole("button", { name: /Last opp 1 side og les/ }));
+    fireEvent.click((await screen.findAllByRole("button", { name: "Vis" }))[0]);
+    expect(await screen.findByText(/Ukjent om lesingen ble fullført/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Tillat ny lesing/ })).toBeTruthy();
+    expect(m.s3._counters.aiReads).toBe(1);
   });
 });
 
 describe("rapport på e-post", () => {
-  it("ikke konfigurert: forklart, Send er deaktivert", async () => {
-    const m = mount({ mailConfigured: false }); const id = await started(m.api);
-    m.remount(`/?telling=${id}`);
-    fireEvent.click(await screen.findByRole("button", { name: /Send rapport på e-post/ }));
-    expect(await screen.findByText(/E-postsending er ikke konfigurert/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Send" })).toHaveProperty("disabled", true);
-  });
-  it("tapt svar: ukjent beholdes, «Hent utfallet» bruker samme sending (ingen ny e-post)", async () => {
-    const m = mount({ mailConfigured: true, mailOutcome: "tapt_svar" }); const id = await started(m.api);
-    m.remount(`/?telling=${id}`);
+  async function toPreview(m: ReturnType<typeof setup>, id: string) {
+    m.open(`/?telling=${id}`);
     fireEvent.click(await screen.findByRole("button", { name: /Send rapport på e-post/ }));
     fireEvent.change(await screen.findByLabelText(/Mottaker/), { target: { value: "henrik@nottero-bakeri.no" } });
+  }
+  it("ikke satt opp: forklart; vedlegg kan forhåndsvises; Send deaktivert", async () => {
+    const m = setup({ mailConfigured: false }); const id = await started(m.api);
+    await toPreview(m, id);
+    expect(screen.getByText(/E-postsending er ikke satt opp/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Vis CSV-innhold/ }));
+    expect(screen.getByLabelText("CSV-vedlegg").textContent).toContain("Linje-ID");
+    expect(screen.getByRole("button", { name: "Send" })).toHaveProperty("disabled", true);
+  });
+  it("tapt svar ⇒ uavklart overlever lukk/omlasting og endret rapport; statussjekk sender aldri; ingen ny Send", async () => {
+    const m = setup({ mailConfigured: true, mailOutcome: "tapt_svar" }); const id = await started(m.api);
+    await toPreview(m, id);
+    const sendBtn = screen.getByRole("button", { name: "Send" }); fireEvent.click(sendBtn); fireEvent.click(sendBtn);
+    expect(await screen.findByText(/ikke avklart/)).toBeTruthy();
+    await screen.findAllByText(/Ukjent om e-posten ble sendt/);
+    expect(m.s3._counters.graphCalls).toBe(1);
+    const line = m.api._state.lines[0];
+    await m.api.saveLine({ opId: "chg", lineId: line.id, expectedRevision: line.revision, state: "null", countedBase: 0, entry: [], note: null });
+    resetPendingStores(); m.open(`/?telling=${id}`); // omlasting
+    expect(await screen.findByText(/ikke avklart/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Send rapport på e-post/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Sjekk status/ }));
+    expect((await screen.findAllByText(/Ukjent om e-posten ble sendt/)).length).toBeGreaterThan(0);
+    expect(m.s3._counters.graphCalls).toBe(1);
+  });
+  it("reservert men claim/transport feilet ⇒ «Fullfør samme sending» sender lagret sending nøyaktig én gang", async () => {
+    const m = setup({ mailConfigured: true, mailOutcome: "reservert" }); const id = await started(m.api);
+    await toPreview(m, id);
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
-    const again = await screen.findByRole("button", { name: /Hent utfallet/ });
-    expect(m.s3._mail.size).toBe(1);
-    fireEvent.click(again);
-    await screen.findByText(/ikke sendt på nytt/);
-    expect(m.s3._mail.size).toBe(1);
-    expect(screen.getByText(/bekrefter ikke at e-posten er levert/)).toBeTruthy();
+    await screen.findAllByText(/Ukjent om e-posten ble sendt/);
+    fireEvent.click(await screen.findByRole("button", { name: /Sjekk status/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Fullfør samme sending/ }));
+    await waitFor(() => expect(m.s3._counters.graphCalls).toBe(1));
+    expect(await screen.findByText(/bekrefter ikke at e-posten er levert/)).toBeTruthy();
   });
 });
 
 describe("tildeling og kalender", () => {
-  it("Ta listen → vises under Mine lister; kalender viser tellingen på datoen", async () => {
-    const m = mount(); const id = await started(m.api);
-    m.remount(`/?telling=${id}&liste=${m.api._state.lists[0].id}`);
+  it("Ta listen → Mine lister; kalender viser tellingen; avbrutt telling kan ikke endre tildeling", async () => {
+    const m = setup(); const id = await started(m.api);
+    m.open(`/?telling=${id}&liste=${m.api._state.lists[0].id}`);
     fireEvent.click(await screen.findByRole("button", { name: "Ta listen" }));
     await screen.findByText("Listen er tildelt deg.");
-    m.remount("/?vt=mine");
-    expect(await screen.findByRole("button", { name: /Tørrlager \(demo\)/ })).toBeTruthy();
-    m.remount("/?vt=kalender");
-    expect(await screen.findByRole("button", { name: /T, .*12\.10\.2026/ })).toBeTruthy();
+    m.open("/?vt=mine"); expect(await screen.findByRole("button", { name: /Tørrlager \(demo\)/ })).toBeTruthy();
+    m.open("/?vt=kalender"); expect(await screen.findByRole("button", { name: /T, .*12\.10\.2026/ })).toBeTruthy();
+    const c = m.api._state.counts.find(x => x.id === id); if (c) c.status = "avbrutt";
+    await expect(m.s3.assign({ opId: "a", listId: m.api._state.lists[0].id, userId: "u1", role: "teller", remove: true })).rejects.toThrow(/avsluttet/);
   });
 });

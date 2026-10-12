@@ -120,7 +120,7 @@ function SessionBody({ data, listParam, onBack, onList, onPrint }: {
             ))}
             {shown.length === 0 && <p className="text-sm text-muted-foreground">Ingen linjer i dette utvalget.</p>}
           </div>
-          {open && <Lifecycle count={count} lists={lists} canWrite={canWrite} canApprove={canApprove} complete={sum.complete} />}
+          {open && <Lifecycle count={count} lists={lists} canWrite={canWrite} canApprove={canApprove} complete={sum.complete} lineIds={lines.map(l => l.id)} />}
         </>
       )}
     </div>

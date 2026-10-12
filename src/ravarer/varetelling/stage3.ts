@@ -1,38 +1,51 @@
 import { createContext, useContext } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllCounted } from "@/lib/countedPaging";
 import { rejectOrUnknown, VtBackendUnavailableError, VtRejectedError, VtUnknownOutcomeError, type VtApi } from "./api";
 import { parseSaveLine, rec, type EntryInput, type LineState, type SaveLineResult } from "./types";
-import { buildManifest, matchDocument, type OcrDoc, type ProposalEntry } from "../../../supabase/pending/functions/vt-count-ocr/ocrCore";
-import { buildReportCsv, defaultSubject, reportTotals, sha256Hex, validateMail, type ReportTotals } from "../../../supabase/pending/functions/vt-count-report-email/reportCore";
+import { buildManifest, matchDocument, rowCodeOf, type OcrDoc, type ProposalEntry } from "../../../supabase/pending/functions/vt-count-ocr/ocrCore";
+import { buildReportCsv, summarizeLines, type VtReportData, type VtSummary } from "../../../supabase/pending/functions/_shared/vtReport";
 
 /**
- * Trinn 3: listebundet opplasting med lese-FORSLAG, rapport-e-post og tildeling.
- * Egen sonde (vt_stage3_version) — uten utrullet SQL/Edge viser UI at funksjonen ikke er tatt i bruk.
+ * Trinn 3 (revisjon 2): listebundet opplasting med lese-FORSLAG, rapport-e-post og tildeling.
+ * Egen sonde (vt_stage3_version = 2). Uten utrullet SQL/Edge viser UI at funksjonen ikke er tatt i bruk.
  */
 export type OcrJobStatus = "opprettet" | "behandler" | "ukjent_ai_utfall" | "klar" | "feilet";
-export interface VtOcrJob { id: string; count_list_id: string; status: OcrJobStatus; document_ok: boolean | null; issues: string[]; failure_reason: string | null; created_at: string; mime: string; original_path: string }
+export interface VtOriginal { path: string; sha256: string; size: number; mime: string }
+export interface VtOcrJob {
+  id: string; count_list_id: string; status: OcrJobStatus; document_ok: boolean | null; issues: string[]; detail: string | null;
+  created_at: string; originals: VtOriginal[]; attempts: number; lease_until: string | null; page_count: number | null;
+}
 export interface VtOcrProposal {
   id: string; job_id: string; line_id: string; line_revision_at_job: number; page: number; row_code: string;
-  entries: ProposalEntry[]; reasons: string[]; crop: { x: number; y: number; w: number; h: number } | null;
-  status: "foreslatt" | "godkjent" | "avvist"; corrected: boolean | null;
+  entries: ProposalEntry[]; reasons: string[]; status: "foreslatt" | "godkjent" | "avvist";
 }
-export interface ReportPreview { hash: string; countRevision: number; final: boolean; defaultSubject: string; attachments: string[]; totals: ReportTotals; mailConfigured: boolean }
+export interface ReportPreview { hash: string; countRevision: number; final: boolean; defaultSubject: string; attachmentBase: string; csv: string; pdfB64: string; totals: VtSummary; mailConfigured: boolean }
 export type MailState = "akseptert_av_tjenesten" | "avvist" | "ukjent" | "reservert" | "sender";
-export interface VtAssignment { count_list_id: string; user_id: string; role: "teller" | "kontrollor" }
+export interface MailStatus { found: boolean; state: MailState | null; detail: string | null }
+export interface VtAssignment { id: string; count_list_id: string; user_id: string; role: "teller" | "kontrollor" }
 export interface VtUnit { id: string; raw_material_id: string; label: string; units_in_base: number }
+/** Kalles før hvert eksternt steg; false = konteksten er byttet ⇒ stopp uten flere sideeffekter. */
+export type Guard = () => boolean;
+export class VtStaleContextError extends Error { constructor() { super("Visningen er byttet. Ingenting mer ble gjort."); } }
 
 export interface Stage3Api {
   probe(): Promise<"ok" | "missing">;
   listJobs(entity: string, listId: string): Promise<VtOcrJob[]>;
   listProposals(entity: string, jobId: string): Promise<VtOcrProposal[]>;
-  /** Hash, ev. PDF-kopi av bilde, opprett jobb, last opp original, start ÉN lesing. */
-  uploadAndRead(i: { opId: string; listId: string; file: File }): Promise<{ jobId: string; duplicate: boolean; status: string }>;
-  originalUrl(job: VtOcrJob): Promise<string | null>;
-  accept(i: { opId: string; proposalId: string; expectedRevision: number; state: LineState; countedBase: number | null; entry: EntryInput[]; note: string | null; lineId: string }): Promise<SaveLineResult>;
+  /** Sider i rekkefølge → én jobb for listen; originaler lagres; deretter ÉN lesing. Guard sjekkes før hvert steg. */
+  uploadAndRead(i: { opId: string; listId: string; files: File[]; guard: Guard }): Promise<{ jobId: string; duplicate: boolean; status: string }>;
+  jobStatus(jobId: string): Promise<{ status: OcrJobStatus; leaseExpired: boolean; attempts: number; detail: string | null }>;
+  resetUnknown(i: { opId: string; jobId: string }): Promise<void>;
+  originalUrls(job: VtOcrJob): Promise<(string | null)[]>;
+  accept(i: { opId: string; proposalId: string; lineId: string; expectedRevision: number; state: LineState; countedBase: number | null; entry: EntryInput[]; note: string | null; exclusions: { label: string; reason: string }[] }): Promise<SaveLineResult>;
   reject(i: { opId: string; proposalId: string; note: string | null }): Promise<void>;
   previewReport(countId: string): Promise<ReportPreview>;
-  sendReport(i: { opId: string; countId: string; hash: string; countRevision: number; recipient: string; subject: string; message: string }): Promise<{ state: MailState; detail: string | null; replayed: boolean }>;
+  /** Sender eller fullfører en RESERVERT sending med lagrede vedlegg. Finnes op-en, sendes aldri noe nytt. */
+  sendReport(i: { opId: string; countId: string; hash: string; recipient: string; subject: string; message: string }): Promise<{ state: MailState; detail: string | null; replayed: boolean }>;
+  /** Skrivebeskyttet. */
+  mailStatus(opId: string): Promise<MailStatus>;
   listAssignments(entity: string): Promise<VtAssignment[]>;
   assign(i: { opId: string; listId: string; userId: string; role: "teller" | "kontrollor"; remove: boolean }): Promise<void>;
   listUnits(entity: string): Promise<VtUnit[]>;
@@ -43,53 +56,68 @@ export function useStage3Api(): Stage3Api | null { return useContext(Stage3Conte
 
 // ---------- parsere ----------
 const JOB_ST = ["opprettet", "behandler", "ukjent_ai_utfall", "klar", "feilet"] as const;
+const MAIL_ST = ["akseptert_av_tjenesten", "avvist", "ukjent", "reservert", "sender"] as const;
 const s = (v: unknown, k: string) => { if (typeof v !== "string") throw new Error(k); return v; };
 const sN = (v: unknown, k: string) => (v == null ? null : s(v, k));
 const n = (v: unknown, k: string) => { const x = typeof v === "string" ? Number(v) : v; if (typeof x !== "number" || !Number.isFinite(x)) throw new Error(k); return x; };
+const b = (v: unknown, k: string) => { if (typeof v !== "boolean") throw new Error(k); return v; };
+const mailState = (v: unknown): MailState => { const x = MAIL_ST.find(m => m === v); if (!x) throw new VtUnknownOutcomeError(); return x; };
+const parseOriginal = (v: unknown): VtOriginal => { const r = rec(v, "original"); return { path: s(r.path, "path"), sha256: s(r.sha256, "sha"), size: n(r.size, "size"), mime: s(r.mime, "mime") }; };
 export function parseJob(v: unknown): VtOcrJob {
-  const r = rec(v, "jobb"); const st = s(r.status, "status");
-  const status = JOB_ST.find(x => x === st); if (!status) throw new Error("status");
-  const issues = Array.isArray(r.issues) ? r.issues.map(x => s(x, "issue")) : [];
-  return { id: s(r.id, "id"), count_list_id: s(r.count_list_id, "list"), status, document_ok: typeof r.document_ok === "boolean" ? r.document_ok : null, issues,
-    failure_reason: sN(r.failure_reason, "fr"), created_at: s(r.created_at, "ca"), mime: s(r.mime, "mime"), original_path: s(r.original_path, "op") };
+  const r = rec(v, "jobb"); const status = JOB_ST.find(x => x === r.status); if (!status) throw new Error("status");
+  if (!Array.isArray(r.originals) || !Array.isArray(r.issues)) throw new Error("jobb");
+  return { id: s(r.id, "id"), count_list_id: s(r.count_list_id, "list"), status, document_ok: r.document_ok == null ? null : b(r.document_ok, "ok"),
+    issues: r.issues.map(x => s(x, "issue")), detail: sN(r.detail, "detail"), created_at: s(r.created_at, "ca"), originals: r.originals.map(parseOriginal),
+    attempts: n(r.attempts, "attempts"), lease_until: sN(r.lease_until, "lease"), page_count: r.page_count == null ? null : n(r.page_count, "pc") };
 }
 export function parseProposal(v: unknown): VtOcrProposal {
-  const r = rec(v, "forslag");
-  if (!Array.isArray(r.entries)) throw new Error("entries");
+  const r = rec(v, "forslag"); if (!Array.isArray(r.entries)) throw new Error("entries");
   const entries = r.entries.map((e): ProposalEntry => { const x = rec(e, "felt");
-    return { unit_id: sN(x.unit_id, "u"), label: s(x.label, "l"), value: x.value == null ? null : n(x.value, "v"), reason: sN(x.reason, "r"), raw: sN(x.raw, "raw") }; });
-  const crop = r.crop == null ? null : (() => { const c = rec(r.crop, "crop"); return { x: n(c.x, "x"), y: n(c.y, "y"), w: n(c.w, "w"), h: n(c.h, "h") }; })();
-  const st = s(r.status, "status"); if (st !== "foreslatt" && st !== "godkjent" && st !== "avvist") throw new Error("status");
+    return { unit_id: sN(x.unit_id, "u"), unit_known: b(x.unit_known, "uk"), label: s(x.label, "l"), value: x.value == null ? null : n(x.value, "v"), reason: sN(x.reason, "r"), raw: sN(x.raw, "raw") }; });
+  const st = r.status; if (st !== "foreslatt" && st !== "godkjent" && st !== "avvist") throw new Error("status");
   return { id: s(r.id, "id"), job_id: s(r.job_id, "job"), line_id: s(r.line_id, "line"), line_revision_at_job: n(r.line_revision_at_job, "rev"), page: n(r.page, "page"),
-    row_code: s(r.row_code, "rc"), entries, reasons: Array.isArray(r.reasons) ? r.reasons.map(x => s(x, "reason")) : [], crop, status: st,
-    corrected: typeof r.corrected === "boolean" ? r.corrected : null };
+    row_code: s(r.row_code, "rc"), entries, reasons: Array.isArray(r.reasons) ? r.reasons.map(x => s(x, "reason")) : [], status: st };
+}
+function parseSummary(v: unknown): VtSummary {
+  const t = rec(v, "totals");
+  return { lines: n(t.lines, "l"), counted: n(t.counted, "c"), zero: n(t.zero, "z"), notHere: n(t.notHere, "nh"), notCounted: n(t.notCounted, "nc"), review: n(t.review, "r"),
+    value: t.value == null ? null : n(t.value, "v"), countedWithoutPrice: n(t.countedWithoutPrice, "cwp"), complete: b(t.complete, "complete") };
 }
 
+// ---------- filer ----------
 function readBytes(f: Blob): Promise<ArrayBuffer> {
   if (typeof f.arrayBuffer === "function") return f.arrayBuffer();
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => (r.result instanceof ArrayBuffer ? res(r.result) : rej(new Error("fil"))); r.onerror = () => rej(new Error("fil")); r.readAsArrayBuffer(f); });
 }
-async function sha256File(f: Blob): Promise<string> {
+export async function sha256Blob(f: Blob): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", await readBytes(f));
-  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+  return [...new Uint8Array(buf)].map(x => x.toString(16).padStart(2, "0")).join("");
 }
-export const OCR_MIME = ["application/pdf", "image/jpeg", "image/png", "image/webp"] as const;
-export function checkUploadFile(f: File): string | null {
-  if (!OCR_MIME.some(m => m === f.type)) return "Bare PDF eller bilde (JPG, PNG, WEBP).";
-  if (f.size <= 0 || f.size > 20 * 1024 * 1024) return "Filen må være mindre enn 20 MB.";
+export const OCR_ACCEPT = "application/pdf,image/jpeg,image/png,image/webp";
+export const OCR_MAX_FILES = 20;
+export function checkUploadFiles(fs: File[]): string | null {
+  if (fs.length === 0) return "Velg minst én fil.";
+  if (fs.length > OCR_MAX_FILES) return `Maks ${OCR_MAX_FILES} filer per liste.`;
+  for (const f of fs) {
+    if (!["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(f.type)) return `«${f.name}»: bare PDF eller bilde (JPG, PNG, WEBP).`;
+    if (f.size <= 0 || f.size > 20 * 1024 * 1024) return `«${f.name}» må være mindre enn 20 MB.`;
+  }
   return null;
 }
-async function imageToPdf(f: File): Promise<Blob> {
+/**
+ * WEBP gjøres om til PNG i nettleseren (serveren kan sette inn JPEG/PNG direkte). Den normaliserte filen er det som
+ * lagres, leses og vises ved kontroll. Dette er en dokumentert begrensning: WEBP-originalen lagres ikke separat.
+ */
+async function normalize(f: File): Promise<File> {
+  if (f.type !== "image/webp") return f;
   const url = URL.createObjectURL(f);
   try {
     const img = await new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error("bilde")); i.src = url; });
-    const { jsPDF } = await import("jspdf");
-    const portrait = img.height >= img.width;
-    const doc = new jsPDF({ orientation: portrait ? "p" : "l", unit: "pt", format: "a4" });
-    const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
-    const k = Math.min(W / img.width, H / img.height);
-    doc.addImage(img, f.type === "image/png" ? "PNG" : "JPEG", (W - img.width * k) / 2, (H - img.height * k) / 2, img.width * k, img.height * k);
-    return doc.output("blob");
+    const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const ctx = c.getContext("2d"); if (!ctx) throw new Error("canvas");
+    ctx.drawImage(img, 0, 0);
+    const blob = await new Promise<Blob>((res, rej) => c.toBlob(x => (x ? res(x) : rej(new Error("png"))), "image/png"));
+    return new File([blob], f.name.replace(/\.webp$/i, ".png"), { type: "image/png" });
   } finally { URL.revokeObjectURL(url); }
 }
 
@@ -102,170 +130,226 @@ async function rpc(name: string, args: Record<string, unknown>): Promise<unknown
   if (r.error) throw rejectOrUnknown(r.error);
   return r.data;
 }
-async function readRows<T>(q: PromiseLike<{ data: unknown; error: { code?: string } | null; count: number | null }>, parse: (v: unknown) => T): Promise<T[]> {
-  const r = await q;
-  if (r.error) throw r.error.code && MISSING.has(r.error.code) ? new VtBackendUnavailableError() : new Error("Kunne ikke hente data.");
-  if (!Array.isArray(r.data) || r.count == null || r.count !== r.data.length) throw new Error("Ufullstendig henting.");
-  return r.data.map(parse);
+/** Fullstendig henting: eksakt antall + keyset på id, antall kontrolleres på nytt (ingen stille avkutting ved 1000). */
+async function readAllRows<T>(table: string, cols: string, filters: [string, string][], parse: (v: unknown) => T, join = ""): Promise<T[]> {
+  const sel = join ? `${cols}, ${join}` : cols;
+  try {
+    const rows = await fetchAllCounted<{ id: string; raw: unknown }>({
+      count: () => { let q = db.from(table).select(join ? `id, ${join}` : "id", { count: "exact", head: true }); for (const [k, v] of filters) q = q.eq(k, v); return q; },
+      page: (after, size) => {
+        let q = db.from(table).select(sel); for (const [k, v] of filters) q = q.eq(k, v);
+        if (after) q = q.gt("id", after);
+        return q.order("id").limit(size).then(r => ({ data: Array.isArray(r.data) ? r.data.map(x => { const o = rec(x, "rad"); return { id: s(o.id, "id"), raw: o }; }) : null, error: r.error }));
+      },
+    });
+    return rows.map(r => parse(r.raw));
+  } catch (e) {
+    if (typeof e === "object" && e !== null && "code" in e && MISSING.has(String((e as { code: unknown }).code))) throw new VtBackendUnavailableError();
+    throw new Error("Kunne ikke hente alle rader.");
+  }
 }
 async function invoke(fn: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
   let r: { data: unknown; error: unknown };
   try { r = await db.functions.invoke(fn, { body }); } catch { throw new VtUnknownOutcomeError(); }
   if (r.error) {
-    const ctx = (r.error as { context?: Response }).context;
-    const status = ctx?.status ?? null;
+    const ctx = (r.error as { context?: Response }).context; const status = ctx?.status ?? null;
     if (status === 404) throw new VtBackendUnavailableError();
-    let msg: string | null = null; try { const j: unknown = await ctx?.json(); msg = typeof j === "object" && j !== null && typeof (j as { error?: unknown }).error === "string" ? (j as { error: string }).error : null; } catch { msg = null; }
+    let msg: string | null = null;
+    try { const j: unknown = await ctx?.json(); msg = typeof j === "object" && j !== null && typeof (j as { error?: unknown }).error === "string" ? (j as { error: string }).error : null; } catch { msg = null; }
     if (status && status >= 400 && status < 500) throw new VtRejectedError(msg ?? "Forespørselen ble avvist.", String(status));
     if (status === 503) throw new VtRejectedError(msg ?? "Tjenesten er ikke konfigurert.", "503");
     throw new VtUnknownOutcomeError();
   }
   return rec(r.data, "svar");
 }
-const JOB = "id, count_list_id, status, document_ok, issues, failure_reason, created_at, mime, original_path";
-const PROP = "id, job_id, line_id, line_revision_at_job, page, row_code, entries, reasons, crop, status, corrected";
+const JOB = "id, count_list_id, status, document_ok, issues, detail, created_at, originals, attempts, lease_until, page_count";
+const PROP = "id, job_id, line_id, line_revision_at_job, page, row_code, entries, reasons, status";
+const step = (g: Guard) => { if (!g()) throw new VtStaleContextError(); };
 
 export const supabaseStage3Api: Stage3Api = {
-  async probe() { const r = await db.rpc("vt_stage3_version"); if (r.error) { if (r.error.code && MISSING.has(r.error.code)) return "missing"; throw new Error("Kunne ikke kontrollere."); } return "ok"; },
-  listJobs: (e, listId) => readRows(db.from("vt_ocr_jobs").select(JOB, { count: "exact" }).eq("legal_entity_id", e).eq("count_list_id", listId).order("created_at", { ascending: false }).limit(200), parseJob),
-  listProposals: (e, jobId) => readRows(db.from("vt_ocr_proposals").select(PROP, { count: "exact" }).eq("legal_entity_id", e).eq("job_id", jobId).order("page").limit(2000), parseProposal),
-  async uploadAndRead({ opId, listId, file }) {
-    const bad = checkUploadFile(file); if (bad) throw new VtRejectedError(bad, "22023");
-    const sha = await sha256File(file);
-    const pdf = file.type === "application/pdf" ? null : await imageToPdf(file);
-    const res = rec(await rpc("vt_ocr_create_job", { p_op_id: opId, p_list_id: listId, p_sha256: sha, p_mime: file.type, p_size: file.size, p_has_pdf_derivative: pdf != null }), "jobb");
-    const jobId = s(res.job_id, "job_id"); const duplicate = res.duplicate === true; const status = s(res.status, "status");
-    // Duplikat som fortsatt er «opprettet» (forrige opplasting/lesing ble avbrutt): fullfør samme jobb. Ellers ingen ny lesing.
-    if (duplicate && status !== "opprettet") return { jobId, duplicate, status };
-    if (status === "opprettet") {
-      const bucket = db.storage.from("vt-count-uploads");
-      const up = await bucket.upload(s(res.original_path, "op"), file, { upsert: false, contentType: file.type });
-      if (up.error && !/exists/i.test(up.error.message)) throw new VtUnknownOutcomeError();
-      if (pdf) { const up2 = await bucket.upload(s(res.pdf_path, "pp"), pdf, { upsert: false, contentType: "application/pdf" }); if (up2.error && !/exists/i.test(up2.error.message)) throw new VtUnknownOutcomeError(); }
-      const r = await invoke("vt-count-ocr", { job_id: jobId });
-      return { jobId, duplicate, status: typeof r.status === "string" ? r.status : "ukjent" };
-    }
-    return { jobId, duplicate, status };
+  async probe() {
+    const r = await db.rpc("vt_stage3_version");
+    if (r.error) { if (r.error.code && MISSING.has(r.error.code)) return "missing"; throw new Error("Kunne ikke kontrollere."); }
+    const v = typeof r.data === "object" && r.data !== null ? (r.data as { stage3?: unknown }).stage3 : null;
+    return v === 2 ? "ok" : "missing";
   },
-  async originalUrl(job) { const r = await db.storage.from("vt-count-uploads").createSignedUrl(job.original_path, 300); return r.error ? null : r.data.signedUrl; },
-  accept: (i) => rpc("vt_ocr_accept", { p_op_id: i.opId, p_proposal_id: i.proposalId, p_expected_revision: i.expectedRevision, p_state: i.state, p_counted_base: i.countedBase, p_entry: i.entry, p_note: i.note })
-    .then(d => { try { return parseSaveLine(d, i.lineId, i.expectedRevision); } catch { throw new VtUnknownOutcomeError(); } }),
+  listJobs: (e, listId) => readAllRows("vt_ocr_jobs", JOB, [["legal_entity_id", e], ["count_list_id", listId]], parseJob).then(js => js.sort((a, z) => z.created_at.localeCompare(a.created_at))),
+  listProposals: (e, jobId) => readAllRows("vt_ocr_proposals", PROP, [["legal_entity_id", e], ["job_id", jobId]], parseProposal).then(ps => ps.sort((a, z) => a.page - z.page || a.row_code.localeCompare(z.row_code))),
+  async uploadAndRead({ opId, listId, files, guard }) {
+    const bad = checkUploadFiles(files); if (bad) throw new VtRejectedError(bad, "22023");
+    step(guard);
+    const norm: File[] = []; for (const f of files) { norm.push(await normalize(f)); step(guard); }
+    const meta: { sha256: string; size: number; mime: string }[] = [];
+    for (const f of norm) { meta.push({ sha256: await sha256Blob(f), size: f.size, mime: f.type }); step(guard); }
+    const res = rec(await rpc("vt_ocr_create_job", { p_op_id: opId, p_list_id: listId, p_files: meta }), "jobb");
+    const jobId = s(res.job_id, "job_id"); const duplicate = res.duplicate === true; const status = s(res.status, "status");
+    if (!Array.isArray(res.originals)) throw new VtUnknownOutcomeError();
+    const originals = res.originals.map(parseOriginal);
+    if (status !== "opprettet") return { jobId, duplicate, status };
+    const bucket = db.storage.from("vt-count-uploads");
+    for (let i = 0; i < norm.length; i++) {
+      step(guard);
+      const o = originals[i]; if (!o || o.sha256 !== meta[i].sha256) throw new VtUnknownOutcomeError();
+      const up = await bucket.upload(o.path, norm[i], { upsert: false, contentType: norm[i].type });
+      if (up.error && !/exists|duplicate/i.test(up.error.message)) throw new VtUnknownOutcomeError();
+    }
+    step(guard);
+    const r = await invoke("vt-count-ocr", { job_id: jobId });
+    return { jobId, duplicate, status: typeof r.status === "string" ? r.status : "ukjent" };
+  },
+  async jobStatus(jobId) {
+    const r = rec(await rpc("vt_ocr_job_status", { p_job_id: jobId }), "status");
+    const status = JOB_ST.find(x => x === r.status); if (!status) throw new VtUnknownOutcomeError();
+    return { status, leaseExpired: r.lease_expired === true, attempts: n(r.attempts, "a"), detail: sN(r.detail, "d") };
+  },
+  resetUnknown: (i) => rpc("vt_ocr_reset_unknown", { p_op_id: i.opId, p_job_id: i.jobId, p_confirm_paid_rerun: true }).then(d => { if (rec(d, "svar").job_id !== i.jobId) throw new VtUnknownOutcomeError(); }),
+  async originalUrls(job) {
+    const out: (string | null)[] = [];
+    for (const o of job.originals) { const r = await db.storage.from("vt-count-uploads").createSignedUrl(o.path, 600); out.push(r.error ? null : r.data.signedUrl); }
+    return out;
+  },
+  accept: (i) => rpc("vt_ocr_accept", { p_op_id: i.opId, p_proposal_id: i.proposalId, p_expected_revision: i.expectedRevision, p_state: i.state, p_counted_base: i.countedBase,
+    p_entry: i.entry, p_note: i.note, p_exclusions: i.exclusions }).then(d => {
+    if (rec(d, "svar").proposal_id !== i.proposalId) throw new VtUnknownOutcomeError();
+    try { return parseSaveLine(d, i.lineId, i.expectedRevision); } catch { throw new VtUnknownOutcomeError(); }
+  }),
   reject: (i) => rpc("vt_ocr_reject", { p_op_id: i.opId, p_proposal_id: i.proposalId, p_note: i.note }).then(d => { if (rec(d, "svar").proposal_id !== i.proposalId) throw new VtUnknownOutcomeError(); }),
   async previewReport(countId) {
     const r = await invoke("vt-count-report-email", { action: "preview", count_id: countId });
-    const t = rec(r.totals, "totals");
-    return { hash: s(r.hash, "hash"), countRevision: n(r.count_revision, "rev"), final: r.final === true, defaultSubject: s(r.default_subject, "subj"),
-      attachments: Array.isArray(r.attachments) ? r.attachments.map(x => s(x, "att")) : [], mailConfigured: r.mail_configured === true,
-      totals: { valued: n(t.valued, "v"), unpricedPositive: n(t.unpricedPositive, "u"), uncounted: n(t.uncounted, "c"), review: n(t.review, "r"), lines: n(t.lines, "l") } };
+    return { hash: s(r.hash, "hash"), countRevision: n(r.count_revision, "rev"), final: b(r.final, "final"), defaultSubject: s(r.default_subject, "subj"),
+      attachmentBase: s(r.attachment_base, "base"), csv: s(r.csv, "csv"), pdfB64: s(r.pdf_b64, "pdf"), totals: parseSummary(r.totals), mailConfigured: r.mail_configured === true };
   },
   async sendReport(i) {
-    const bad = validateMail(i); if (bad) throw new VtRejectedError(bad, "22023");
-    const r = await invoke("vt-count-report-email", { action: "send", op_id: i.opId, count_id: i.countId, hash: i.hash, count_revision: i.countRevision, recipient: i.recipient, subject: i.subject, message: i.message });
-    const st = s(r.state, "state");
-    if (!["akseptert_av_tjenesten", "avvist", "ukjent", "reservert", "sender"].includes(st)) throw new VtUnknownOutcomeError();
-    return { state: st as MailState, detail: sN(r.detail, "detail"), replayed: r.replayed === true };
+    const r = await invoke("vt-count-report-email", { action: "send", op_id: i.opId, count_id: i.countId, hash: i.hash, recipient: i.recipient, subject: i.subject, message: i.message });
+    return { state: mailState(r.state), detail: sN(r.detail, "detail"), replayed: r.replayed === true };
   },
-  listAssignments: (e) => readRows(db.from("vt_list_assignments").select("count_list_id, user_id, role", { count: "exact" }).eq("legal_entity_id", e).limit(5000), v => {
+  async mailStatus(opId) {
+    const r = await invoke("vt-count-report-email", { action: "status", op_id: opId });
+    return r.found === true ? { found: true, state: mailState(r.state), detail: sN(r.detail, "d") } : { found: false, state: null, detail: null };
+  },
+  listAssignments: (e) => readAllRows("vt_list_assignments", "id, count_list_id, user_id, role", [["legal_entity_id", e]], v => {
     const r = rec(v, "tildeling"); const role = r.role === "kontrollor" ? "kontrollor" : r.role === "teller" ? "teller" : null; if (!role) throw new Error("role");
-    return { count_list_id: s(r.count_list_id, "l"), user_id: s(r.user_id, "u"), role };
+    return { id: s(r.id, "id"), count_list_id: s(r.count_list_id, "l"), user_id: s(r.user_id, "u"), role };
   }),
   assign: (i) => rpc("vt_assign_list", { p_op_id: i.opId, p_list_id: i.listId, p_user_id: i.userId, p_role: i.role, p_remove: i.remove }).then(d => { if (rec(d, "svar").list_id !== i.listId) throw new VtUnknownOutcomeError(); }),
-  listUnits: (e) => readRows(db.from("raw_material_units").select("id, raw_material_id, unit_label, units_in_base, raw_materials!inner(legal_entity_id)", { count: "exact" }).eq("raw_materials.legal_entity_id", e).limit(10000), v => {
+  listUnits: (e) => readAllRows("raw_material_units", "id, raw_material_id, unit_label, units_in_base", [["raw_materials.legal_entity_id", e]], v => {
     const r = rec(v, "enhet"); return { id: s(r.id, "id"), raw_material_id: s(r.raw_material_id, "rm"), label: s(r.unit_label, "label"), units_in_base: n(r.units_in_base, "uib") };
-  }),
+  }, "raw_materials!inner(legal_entity_id)"),
 };
 
-// ---------- Syntetisk (forhåndsvisning/tester) ----------
+// ---------- Syntetisk (forhåndsvisning/tester) — ingen nettverk, IKKE ekte AI ----------
 type FakeBase = VtApi & { _state: import("./fakeApi").FakeState };
-export interface FakeStage3Opts { available?: boolean; mailConfigured?: boolean; mailOutcome?: MailState | "tapt_svar"; userId?: string }
-export function createFakeStage3(base: FakeBase, opts: FakeStage3Opts = {}): Stage3Api & { _jobs: VtOcrJob[]; _props: VtOcrProposal[]; _mail: Map<string, { sig: string; state: MailState }>; _assign: VtAssignment[] } {
+export interface FakeStage3Opts { available?: boolean; mailConfigured?: boolean; mailOutcome?: MailState | "tapt_svar"; readOutcome?: "ok" | "ukjent" }
+export function createFakeStage3(base: FakeBase, opts: FakeStage3Opts = {}) {
   const st = base._state; let seq = 0;
-  const jobs: VtOcrJob[] = []; const props: VtOcrProposal[] = []; const sha = new Map<string, string>(); const mail = new Map<string, { sig: string; state: MailState }>();
-  const assign: VtAssignment[] = []; const ops = new Set<string>();
+  const jobs: VtOcrJob[] = []; const props: VtOcrProposal[] = []; const keys = new Map<string, string>(); const urls = new Map<string, string[]>();
+  const mail = new Map<string, { sig: string; state: MailState; csv: string }>(); const assign: VtAssignment[] = []; const ops = new Map<string, unknown>();
+  const counters = { graphCalls: 0, aiReads: 0 };
   const unavailable = () => { if (opts.available === false) throw new VtBackendUnavailableError(); };
-  /** Syntetisk «lest» dokument: riktig identitet for side 1, tall/tvetydig/overstrøket/tomt. Leser bare trykt kode. */
-  const syntheticRead = (listId: string): OcrDoc => {
-    const list = st.lists.find(l => l.id === listId); const lines = st.lines.filter(l => l.count_list_id === listId).sort((a, b) => a.sort_order - b.sort_order);
-    if (!list) return { pages: [] };
+  const data = (countId: string): VtReportData => {
+    const c = st.counts.find(x => x.id === countId); if (!c || c.status === "planlagt") throw new VtRejectedError("Tellingen er ikke startet", "55000");
+    const lines = st.lines.filter(l => l.count_id === countId);
+    const ver = lines.reduce((m, l) => (l.updated_at > m ? l.updated_at : m), c.started_at ?? "");
+    return { count: c, lists: st.lists.filter(l => l.count_id === countId).sort((a, z) => a.sort_order - z.sort_order), lines, generatedAt: `data per ${ver} (rev ${c.revision})` };
+  };
+  /** Syntetisk «lest» side: tall, tvetydig, tomt, overstrøket, ukjent pakning. Leser bare trykte koder. */
+  const syntheticRead = (listId: string, pageCount: number): OcrDoc => {
+    const list = st.lists.find(l => l.id === listId); if (!list) return { pages: [] };
+    const lines = st.lines.filter(l => l.count_list_id === listId).sort((a, z) => a.sort_order - z.sort_order);
     const m = buildManifest(list.count_id, list.id, list.source_template_revision, lines);
     const raws = ["2", "1.500", null, "3,5", "x?"];
-    return { pages: m.map(p => ({ printed_identity: p.identity, printed_page: `${p.page}/${p.pages}`, rows: p.lines.map((l, i) => ({
-      row_code: l.id.slice(0, 8), crossed_out: i === 3, unclear: false, comment: null,
-      amounts: [{ column: (l.snap_units.length ? "pakninger" : "los") as "pakninger" | "los", unit_label: l.snap_units[0]?.label ?? null, raw: raws[i % raws.length] }],
+    return { pages: m.slice(0, pageCount).map(p => ({ printed_identity: p.identity, complete: true, rows: p.lines.map((l, i) => ({
+      row_code: rowCodeOf(l.id), crossed_out: i === 3, unclear: false, comment: null,
+      amounts: l.snap_units.length
+        ? [{ column: "pakninger" as const, unit_label: i === 0 ? l.snap_units[0].label : "kasse", raw: raws[i % raws.length] }, { column: "los" as const, unit_label: null, raw: i === 0 ? "1.500" : null }]
+        : [{ column: "los" as const, unit_label: null, raw: raws[i % raws.length] }],
     })) })) };
   };
   const preview = async (countId: string): Promise<ReportPreview> => {
-      unavailable();
-      const c = st.counts.find(x => x.id === countId); if (!c || c.status === "planlagt") throw new VtRejectedError("Tellingen er ikke startet", "55000");
-      const lists = st.lists.filter(l => l.count_id === countId).sort((a, b) => a.sort_order - b.sort_order);
-      const lines = st.lines.filter(l => l.count_id === countId);
-      const csv = buildReportCsv(c, lists, lines);
-      const base0 = `varetelling-${c.planned_date}-r${c.revision}`;
-      return { hash: await sha256Hex(csv), countRevision: c.revision, final: c.status === "avsluttet", defaultSubject: defaultSubject(c), attachments: [`${base0}.csv`, `${base0}.pdf`], totals: reportTotals(lines), mailConfigured: opts.mailConfigured === true };
-    };
-  return {
-    _jobs: jobs, _props: props, _mail: mail, _assign: assign,
+    const d = data(countId); const csv = buildReportCsv(d);
+    const hash = await sha256Blob(new Blob([csv]));
+    return { hash, countRevision: d.count.revision, final: d.count.status === "avsluttet", defaultSubject: `Tellerapport: ${d.count.name}`, attachmentBase: `varetelling-${d.count.planned_date}-r${d.count.revision}`,
+      csv, pdfB64: "", totals: summarizeLines(d.lines), mailConfigured: opts.mailConfigured === true };
+  };
+  const api: Stage3Api = {
     async probe() { return opts.available === false ? "missing" : "ok"; },
-    async listJobs(_e, listId) { unavailable(); return jobs.filter(j => j.count_list_id === listId).map(j => ({ ...j, issues: [...j.issues] })); },
+    async listJobs(_e, listId) { unavailable(); return jobs.filter(j => j.count_list_id === listId).map(j => ({ ...j, issues: [...j.issues], originals: [...j.originals] })); },
     async listProposals(_e, jobId) { unavailable(); return props.filter(p => p.job_id === jobId).map(p => ({ ...p, entries: p.entries.map(e => ({ ...e })) })); },
-    async uploadAndRead({ listId, file }) {
-      unavailable();
-      const bad = checkUploadFile(file); if (bad) throw new VtRejectedError(bad, "22023");
+    async uploadAndRead({ opId, listId, files, guard }) {
+      unavailable(); const bad = checkUploadFiles(files); if (bad) throw new VtRejectedError(bad, "22023");
+      step(guard);
+      if (ops.has(opId)) return ops.get(opId) as { jobId: string; duplicate: boolean; status: string };
       const list = st.lists.find(l => l.id === listId); const c = st.counts.find(x => x.id === list?.count_id);
       if (!list || !c || !["pagar", "til_kontroll"].includes(c.status) || list.status === "godkjent") throw new VtRejectedError("Listen er ikke åpen for registrering", "55000");
-      const h = await sha256File(file); const k = `${listId}|${h}`;
-      const existing = sha.get(k); if (existing) return { jobId: existing, duplicate: true, status: jobs.find(j => j.id === existing)?.status ?? "klar" };
-      const lines = st.lines.filter(l => l.count_list_id === listId).sort((a, b) => a.sort_order - b.sort_order);
-      const jobId = `job-${++seq}`; sha.set(k, jobId);
-      const revs = new Map(lines.map(l => [l.id, l.revision]));
-      const r = matchDocument(syntheticRead(listId), buildManifest(list.count_id, list.id, list.source_template_revision, lines.map(l => ({ id: l.id, revision: revs.get(l.id) ?? 0, snap_base_unit: l.snap_base_unit, snap_units: l.snap_units }))));
-      jobs.unshift({ id: jobId, count_list_id: listId, status: "klar", document_ok: r.document_ok, issues: r.issues, failure_reason: null, created_at: new Date().toISOString(), mime: file.type, original_path: `demo/${jobId}` });
-      r.proposals.forEach((p, i) => props.push({ ...p, id: `${jobId}-p${i}`, job_id: jobId, crop: null, status: "foreslatt", corrected: null }));
-      return { jobId, duplicate: false, status: "klar" };
+      const shas: string[] = []; for (const f of files) { shas.push(`${await sha256Blob(f)}:${f.size}`); step(guard); }
+      const k = `${listId}|${shas.join("|")}`;
+      const existing = keys.get(k);
+      if (existing) { const r = { jobId: existing, duplicate: true, status: jobs.find(j => j.id === existing)?.status ?? "klar" }; ops.set(opId, r); return r; }
+      const lines = st.lines.filter(l => l.count_list_id === listId).sort((a, z) => a.sort_order - z.sort_order);
+      const jobId = `job-${++seq}`; keys.set(k, jobId);
+      urls.set(jobId, files.map(f => (typeof URL.createObjectURL === "function" ? URL.createObjectURL(f) : "")));
+      const job: VtOcrJob = { id: jobId, count_list_id: listId, status: "behandler", document_ok: null, issues: [], detail: null, created_at: new Date().toISOString(),
+        originals: files.map((f, i) => ({ path: `demo/${jobId}/side-${i + 1}`, sha256: shas[i].split(":")[0], size: f.size, mime: f.type })), attempts: 1, lease_until: null, page_count: files.length };
+      jobs.unshift(job);
+      counters.aiReads++;
+      if (opts.readOutcome === "ukjent") { job.status = "ukjent_ai_utfall"; job.detail = "Syntetisk: AI-kall fikk ukjent utfall"; }
+      else {
+        const r = matchDocument(syntheticRead(listId, files.length), buildManifest(list.count_id, list.id, list.source_template_revision, lines));
+        job.status = "klar"; job.document_ok = r.document_ok; job.issues = r.issues;
+        r.proposals.forEach((p, i) => props.push({ ...p, id: `${jobId}-p${i}`, job_id: jobId, status: "foreslatt" }));
+      }
+      const res = { jobId, duplicate: false, status: job.status }; ops.set(opId, res); return res;
     },
-    async originalUrl() { return null; },
+    async jobStatus(jobId) { const j = jobs.find(x => x.id === jobId); if (!j) throw new VtRejectedError("Mangler tilgang", "42501"); return { status: j.status, leaseExpired: false, attempts: j.attempts, detail: j.detail }; },
+    async resetUnknown({ jobId }) { const j = jobs.find(x => x.id === jobId); if (!j || j.status !== "ukjent_ai_utfall") throw new VtRejectedError("Jobben har ikke ukjent utfall", "55000"); j.status = "opprettet"; },
+    async originalUrls(job) { return (urls.get(job.id) ?? []).map(u => u || null); },
     async accept(i) {
       unavailable();
-      const p = props.find(x => x.id === i.proposalId); const job = jobs.find(j => j.id === p?.job_id);
-      const line = st.lines.find(l => l.id === p?.line_id);
-      if (ops.has(i.opId)) return base.saveLine({ opId: i.opId, lineId: i.lineId, expectedRevision: i.expectedRevision, state: i.state, countedBase: i.countedBase, entry: i.entry, note: i.note });
+      if (ops.has(i.opId)) return ops.get(i.opId) as SaveLineResult;
+      const p = props.find(x => x.id === i.proposalId); const job = jobs.find(j => j.id === p?.job_id); const line = st.lines.find(l => l.id === p?.line_id);
       if (!p || !job || !line || line.id !== i.lineId || line.count_list_id !== job.count_list_id) throw new VtRejectedError("Linjen hører ikke til listen", "42501");
-      if (job.document_ok !== true) throw new VtRejectedError("Dokumentets identitet er ikke bekreftet", "55000");
+      if (job.status !== "klar" || job.document_ok !== true) throw new VtRejectedError("Dokumentets identitet er ikke bekreftet", "55000");
       if (p.status !== "foreslatt") throw new VtRejectedError("Forslaget er allerede avgjort", "55000");
+      if (i.exclusions.some(x => x.reason.trim().length < 3)) throw new VtRejectedError("Utelatt felt må begrunnes", "22023");
       if (i.expectedRevision !== p.line_revision_at_job || line.revision !== p.line_revision_at_job) throw new VtRejectedError("Linjen er endret etter opplasting — kontroller manuelt", "40001");
-      ops.add(i.opId);
-      const res = await base.saveLine({ opId: i.opId, lineId: i.lineId, expectedRevision: i.expectedRevision, state: i.state, countedBase: i.countedBase, entry: i.entry, note: i.note });
-      if (res.kind === "saved") {
-        const proposed = p.entries.filter(e => e.value != null).map(e => `${e.unit_id}:${e.value}`).sort().join();
-        p.status = "godkjent"; p.corrected = proposed !== i.entry.map(e => `${e.unit_id}:${e.amount}`).sort().join();
-      }
-      return res;
+      const res = await base.saveLine({ opId: `${i.opId}:ocr-save`, lineId: i.lineId, expectedRevision: i.expectedRevision, state: i.state, countedBase: i.countedBase, entry: i.entry, note: i.note });
+      if (res.kind !== "saved") throw new VtRejectedError("Linjen kunne ikke lagres", "40001");
+      p.status = "godkjent"; ops.set(i.opId, res); return res;
     },
-    async reject(i) { unavailable(); const p = props.find(x => x.id === i.proposalId); if (!p || p.status !== "foreslatt") throw new VtRejectedError("Forslaget er allerede avgjort", "55000"); p.status = "avvist"; },
-    previewReport: (countId) => preview(countId),
+    async reject(i) {
+      unavailable(); if (ops.has(i.opId)) return;
+      const p = props.find(x => x.id === i.proposalId); if (!p || p.status !== "foreslatt") throw new VtRejectedError("Forslaget er allerede avgjort", "55000");
+      p.status = "avvist"; ops.set(i.opId, true);
+    },
+    previewReport: (countId) => { unavailable(); return preview(countId); },
     async sendReport(i) {
       unavailable();
-      const bad = validateMail(i); if (bad) throw new VtRejectedError(bad, "22023");
-      if (opts.mailConfigured !== true) throw new VtRejectedError("Avsender for tellerapporter er ikke konfigurert.", "503");
-      const sig = JSON.stringify([i.countId, i.hash, i.countRevision, i.recipient.trim(), i.subject.trim(), i.message]);
       const prev = mail.get(i.opId);
-      if (prev) { if (prev.sig !== sig) throw new VtRejectedError("Operasjons-ID er brukt med annet innhold", "23505"); return { state: prev.state, detail: null, replayed: true }; }
+      if (prev) {
+        if (prev.state !== "reservert") return { state: prev.state, detail: null, replayed: true };
+        counters.graphCalls++; prev.state = "akseptert_av_tjenesten"; return { state: prev.state, detail: null, replayed: false };
+      }
+      if (opts.mailConfigured !== true) throw new VtRejectedError("Microsoft 365-avsender er ikke koblet til.", "503");
       const cur = await preview(i.countId);
-      if (cur.hash !== i.hash || cur.countRevision !== i.countRevision) throw new VtRejectedError("Rapporten er endret siden forhåndsvisningen. Åpne forhåndsvisningen på nytt.", "409");
+      if (cur.hash !== i.hash) throw new VtRejectedError("Rapporten er endret siden forhåndsvisningen. Åpne forhåndsvisningen på nytt.", "409");
+      const sig = JSON.stringify([i.countId, i.hash, i.recipient.trim(), i.subject.trim(), i.message]);
       const outcome = opts.mailOutcome ?? "akseptert_av_tjenesten";
-      if (outcome === "tapt_svar") { mail.set(i.opId, { sig, state: "akseptert_av_tjenesten" }); throw new VtUnknownOutcomeError(); }
-      mail.set(i.opId, { sig, state: outcome });
+      if (outcome === "reservert") { mail.set(i.opId, { sig, state: "reservert", csv: cur.csv }); throw new VtUnknownOutcomeError(); }
+      counters.graphCalls++;
+      if (outcome === "tapt_svar") { mail.set(i.opId, { sig, state: "ukjent", csv: cur.csv }); throw new VtUnknownOutcomeError(); }
+      mail.set(i.opId, { sig, state: outcome, csv: cur.csv });
       return { state: outcome, detail: outcome === "ukjent" ? "Nettverksfeil eller tidsavbrudd" : null, replayed: false };
     },
+    async mailStatus(opId) { unavailable(); const m = mail.get(opId); return m ? { found: true, state: m.state, detail: null } : { found: false, state: null, detail: null }; },
     async listAssignments() { unavailable(); return assign.map(a => ({ ...a })); },
     async assign(i) {
       unavailable();
+      const list = st.lists.find(l => l.id === i.listId); const c = st.counts.find(x => x.id === list?.count_id);
+      if (!c || !["planlagt", "pagar", "til_kontroll"].includes(c.status)) throw new VtRejectedError("Tellingen er avsluttet — tildeling endres ikke", "55000");
       const at = assign.findIndex(a => a.count_list_id === i.listId && a.user_id === i.userId && a.role === i.role);
-      if (i.remove) { if (at >= 0) assign.splice(at, 1); } else if (at < 0) assign.push({ count_list_id: i.listId, user_id: i.userId, role: i.role });
+      if (i.remove) { if (at >= 0) assign.splice(at, 1); } else if (at < 0) assign.push({ id: `as-${++seq}`, count_list_id: i.listId, user_id: i.userId, role: i.role });
     },
-    async listUnits() {
-      unavailable();
-      return [...st.units.entries()].flatMap(([rm, us]) => us.map(u => ({ id: u.id, raw_material_id: rm, label: u.label, units_in_base: u.units_in_base })));
-    },
+    async listUnits() { unavailable(); return [...st.units.entries()].flatMap(([rm, us]) => us.map(u => ({ id: u.id, raw_material_id: rm, label: u.label, units_in_base: u.units_in_base }))); },
   };
+  return Object.assign(api, { _jobs: jobs, _props: props, _mail: mail, _assign: assign, _counters: counters });
 }

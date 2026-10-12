@@ -10,10 +10,11 @@ export function UnsyncedPanel({ countId, lines, onGoTo }: { countId: string; lin
   const byId = new Map(lines.map(l => [l.id, l]));
   const unknown = lines.filter(l => pending.get(lineKey(l.id)));
   const draftLines = drafts.forCount(countId).map(d => byId.get(d.lineId)).filter((l): l is VtCountLine => !!l && !pending.get(lineKey(l.id)));
-  if (!unknown.length && !draftLines.length && !drafts.lastError) return null;
+  if (!unknown.length && !draftLines.length && !drafts.lastError && !pending.lastError) return null;
   return (
     <Notice tone="warning" title="Ikke bekreftet lagret">
       {drafts.lastError && <p role="alert">{drafts.lastError}</p>}
+      {pending.lastError && <p role="alert">{pending.lastError}</p>}
       {unknown.length > 0 && <p>{unknown.length} sending(er) med ukjent utfall — åpne linjen og trykk «Send samme på nytt».</p>}
       {draftLines.length > 0 && <p>{draftLines.length} utkast som ikke er sendt.</p>}
       <ul className="mt-1 space-y-1">
