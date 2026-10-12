@@ -9,13 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -43,12 +36,8 @@ import {
   useProductRecipeLink,
 } from "@/varer/hooks/useProductRecipeLink";
 import {
-  SALES_UNIT_BASIS_HELP,
-  SALES_UNIT_BASIS_LABEL,
   approvedDeclarationNeedsReview,
-  isSalesUnitBasis,
   recipeChangedSinceConfirm,
-  type SalesUnitBasis,
 } from "@/varer/lib/recipeLinkBasis";
 import { LinkRecipeDialog, type RecipeLinkSelection } from "./LinkRecipeDialog";
 import { SalesUnitSettings, type SalesUnitValues } from "./SalesUnitSettings";

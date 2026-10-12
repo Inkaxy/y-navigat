@@ -18,7 +18,7 @@ export interface SalesUnitValues {
 interface Draft { key: string; base: LinkBase | null; basis: SalesUnitBasis | ""; units: string; weight: string; batch: string }
 
 /** Identitet for en akseptert serverversjon: kobling, oppskrift, rå token og nøyaktige innstillinger. */
-export function baseKey(b: LinkBase | null): string {
+function baseKey(b: LinkBase | null): string {
   return b ? JSON.stringify([b.productId, b.linkId, b.recipeId, b.updatedAt, b.settings]) : "none";
 }
 const str = (v: string | number | null) => (v == null ? "" : String(v));

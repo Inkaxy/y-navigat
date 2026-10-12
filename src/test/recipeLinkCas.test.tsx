@@ -105,7 +105,7 @@ describe("SalesUnitSettings", () => {
 
   it("lagring sender den frosne basisen; sen fullføring etter oppskriftsbytte endrer ikke B", async () => {
     let resolve: (v: unknown) => void = () => undefined;
-    const onSave = vi.fn(() => new Promise((r) => { resolve = r; }));
+    const onSave = vi.fn((_b: LinkBase, _v: unknown) => new Promise((r) => { resolve = r; }));
     const { rerender } = render(ui(baseA, 0, onSave as never));
     fireEvent.change(screen.getByLabelText("Vekt per salgsenhet (g)"), { target: { value: "620" } });
     fireEvent.click(screen.getByRole("button", { name: /Lagre innstillinger/ }));
