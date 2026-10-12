@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
+import { fetchCategoryTolerances, useMatchTolerances } from "@/fakturaer/hooks/useMatchTolerances";
 import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
 import { draftFrom, parseDraft, planIsEmpty, planSave, type CatRow, type PriceDraft, type SavePlan } from "@/ravarer/lib/priceSettingsDraft";
 
@@ -27,16 +27,7 @@ export function usePriceSettingsDraft(legalEntityId: string | null, canEdit: boo
   const rowsQuery = useQuery({
     queryKey: [CAT_KEY, legalEntityId],
     enabled: !!legalEntityId,
-    queryFn: async (): Promise<CatRow[]> => {
-      const { data, error } = await supabase
-        .from("invoice_match_category_tolerances")
-        .select("id, category, price_tolerance_pct")
-        .eq("legal_entity_id", legalEntityId!)
-        .order("category")
-        .limit(1000);
-      if (error) throw error;
-      return (data ?? []).map((r) => ({ id: r.id, category: r.category, price_tolerance_pct: Number(r.price_tolerance_pct) }));
-    },
+    queryFn: (): Promise<CatRow[]> => fetchCategoryTolerances(legalEntityId!),
   });
 
   const [state, setState] = useState<{ entity: string; rev: number; value: PriceDraft } | null>(null);
@@ -82,7 +73,7 @@ export function usePriceSettingsDraft(legalEntityId: string | null, canEdit: boo
 
   const save = useCallback(async () => {
     if (busy.current || !legalEntityId || !scoped || !plan || planIsEmpty(plan) || needsReread) return;
-    if (!live.current.canEdit) return;
+    if (!live.current.canEdit || !live.current.mounted) return;
     busy.current = true;
     setSaving(true);
     setResult(null);
@@ -92,8 +83,8 @@ export function usePriceSettingsDraft(legalEntityId: string | null, canEdit: boo
       const { data: auth } = await supabase.auth.getUser();
       const userId = auth.user?.id ?? null;
       const run = async (label: string, op: () => PromiseLike<{ error: unknown }>) => {
-        // Ingen ny skriving hvis tilgangen er tapt eller selskapet byttet underveis.
-        if (!live.current.canEdit || live.current.entity !== frozen.entity) { steps.push({ label, ok: false }); return; }
+        // Ingen ny skriving etter avmontering, tapt tilgang eller selskapsbytte underveis.
+        if (!live.current.mounted || !live.current.canEdit || live.current.entity !== frozen.entity) { steps.push({ label, ok: false }); return; }
         try {
           const { error } = await op();
           steps.push({ label, ok: !error });
@@ -126,7 +117,7 @@ export function usePriceSettingsDraft(legalEntityId: string | null, canEdit: boo
       // Les faktisk lagret tilstand for det frosne selskapet, uansett utfall.
       invalidateRavarerCounts(qc);
       void qc.invalidateQueries({ queryKey: ["invoice-match-tolerances"] });
-      const rereadOk = live.current.entity === frozen.entity ? await reread() : false;
+      const rereadOk = live.current.mounted && live.current.entity === frozen.entity ? await reread() : false;
       if (live.current.entity !== frozen.entity) void qc.invalidateQueries({ queryKey: [CAT_KEY, frozen.entity] });
       busy.current = false;
       if (live.current.mounted) {
