@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { toast } from "sonner";
+import { canReplaceNegotiationItems } from "@/ravarer/lib/negotiationOps";
 
 export type NegotiationStatus = "draft" | "invited" | "in_progress" | "awaiting_confirmation" | "concluded" | "cancelled";
 
@@ -205,7 +206,23 @@ export function useUpsertNegotiationItems() {
       negotiationId: string;
       items: Array<Partial<NegotiationItemRow> & { raw_material_id: string }>;
     }) => {
-      // Replace all items for this negotiation atomically (delete + insert in one transaction)
+      // Erstatning (slett + sett inn) sletter svar/utfall/live-hendelser i kaskade.
+      // Les gjeldende status og mottakere ferskt rett før, og nekt utenfor ekte utkast.
+      // Serveren må håndheve samme regel (se supabase/pending/); dette er klientvernet.
+      const { data: negFresh, error: negErr } = await supabase
+        .from("negotiations")
+        .select("status")
+        .eq("id", input.negotiationId)
+        .maybeSingle();
+      if (negErr) throw negErr;
+      const { data: recFresh, error: recErr } = await supabase
+        .from("negotiation_recipients")
+        .select("invited_at, password_set_at")
+        .eq("negotiation_id", input.negotiationId);
+      if (recErr) throw recErr;
+      if (!canReplaceNegotiationItems(negFresh?.status ?? null, recFresh ?? [])) {
+        throw new Error("Råvarelista kan ikke endres etter at lenker er generert. Eksisterende tilbud bevares.");
+      }
       const rows = input.items.map((it, idx) => ({
         ...it,
         negotiation_id: input.negotiationId,
