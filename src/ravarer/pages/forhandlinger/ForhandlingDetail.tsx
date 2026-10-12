@@ -1,4 +1,5 @@
 import { setPrimarySupplier } from "@/ravarer/lib/supplierLinkRpc";
+import { classifyApplyOutcome, readEdgeErrorBody, runPrimaryTasks, type ApplyOutcome, type PrimaryTask } from "@/ravarer/lib/negotiationOps";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -243,19 +244,32 @@ export default function ForhandlingDetail() {
             const { data, error } = await supabase.functions.invoke("apply-negotiation-outcome", {
               body: { negotiation_id: id, outcomes },
             });
-            if (error) throw error;
-            if (!data?.success) throw new Error(data?.error ?? "Feil");
+            const outcome = classifyApplyOutcome(data, error, error ? await readEdgeErrorBody(error) : null);
             invalidateRawMaterial(qc);
-            // Mark unconfirmed tentative items as unconfirmed_active
-            if (!onlyConfirmed) {
-              await supabase
-                .from("negotiation_items" as any)
-                .update({ live_status: "unconfirmed_active" } as any)
-                .eq("negotiation_id", id)
-                .eq("live_status", "tentatively_agreed");
-            }
             qc.invalidateQueries({ queryKey: ["negotiation-items", id] });
             qc.invalidateQueries({ queryKey: ["negotiation", id] });
+            if (outcome.kind === "rejected") { toast.error(outcome.message); return; }
+            if (outcome.kind === "partial") {
+              toast.error(`Noen endringer kan være lagret. ${outcome.linksOpen ? "Forhandlingen er avsluttet, men lenkene er ikke stengt. " : ""}${outcome.failures.join("; ")}`.trim());
+              return;
+            }
+            if (outcome.kind === "unknown") {
+              toast.error("Utfallet er ukjent — noen endringer kan være lagret. Kontroller status før du prøver igjen.");
+              return;
+            }
+            // Aktiveringen er lagret. Statusmerkingen av ubekreftede linjer er et eget steg.
+            if (!onlyConfirmed) {
+              const { error: followErr } = await supabase
+                .from("negotiation_items")
+                .update({ live_status: "unconfirmed_active" })
+                .eq("negotiation_id", id)
+                .eq("live_status", "tentatively_agreed");
+              qc.invalidateQueries({ queryKey: ["negotiation-items", id] });
+              if (followErr) {
+                toast.error("Prisene er aktivert, men ubekreftede linjer kunne ikke merkes som «aktiv uten bekreftelse».");
+                return;
+              }
+            }
             toast.success("Aktivert");
           } catch (e: any) {
             toast.error(e?.message ?? "Aktivering feilet");
@@ -399,8 +413,8 @@ export default function ForhandlingDetail() {
         onSuccess={() => {
           qc.invalidateQueries({ queryKey: ["negotiation", id] });
           qc.invalidateQueries({ queryKey: ["negotiations"] });
+          qc.invalidateQueries({ queryKey: ["negotiation-items", id] });
           invalidateRawMaterial(qc);
-          toast.success("Forhandling avsluttet");
         }}
       />
 
@@ -566,22 +580,46 @@ function ConcludeDialog({
           apply_to_supplier: p?.apply_to_supplier ?? false,
         };
       });
-      const { data, error } = await supabase.functions.invoke("apply-negotiation-outcome", {
-        body: { negotiation_id: negotiationId, outcomes },
-      });
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error ?? "Feil");
-      // Primær settes atomisk (råvare + alle koblinger) etter hovedskrivingen.
+      // Frys primæroppgavene før kallet, så et senere valg i skjemaet ikke endrer dem.
+      const tasks: PrimaryTask[] = [];
       for (const it of items) {
         const p = picks[it.id];
         if (!p?.set_as_primary || !p.winner_recipient_id) continue;
         const rec = recipients.find((r: { id: string; supplier_id: string }) => r.id === p.winner_recipient_id);
-        if (rec?.supplier_id && it.raw_material_id) await setPrimarySupplier(it.raw_material_id, rec.supplier_id);
+        if (rec?.supplier_id && it.raw_material_id) tasks.push({ rawMaterialId: it.raw_material_id, supplierId: rec.supplier_id });
       }
+      const { data, error } = await supabase.functions.invoke("apply-negotiation-outcome", {
+        body: { negotiation_id: negotiationId, outcomes },
+      });
+      const outcome = classifyApplyOutcome(data, error, error ? await readEdgeErrorBody(error) : null);
+      if (outcome.kind !== "success") return { outcome, failedPrimary: [] as PrimaryTask[] };
+      // Primær settes via eneste skrivevei etter hovedskrivingen; feil her er et eget, avgrenset steg.
+      const { failed } = await runPrimaryTasks(tasks, setPrimarySupplier);
+      return { outcome, failedPrimary: failed };
     },
-    onSuccess: () => { onOpenChange(false); onSuccess(); },
-    onError: (e: any) => toast.error(e?.message ?? "Avslutning feilet"),
+    onSuccess: ({ outcome, failedPrimary }) => {
+      onSuccess();
+      if (outcome.kind === "rejected") { toast.error(outcome.message); return; }
+      if (outcome.kind === "partial" || outcome.kind === "unknown") { setSplit(outcome); return; }
+      if (failedPrimary.length > 0) { setRemainingPrimary(failedPrimary); return; }
+      toast.success("Forhandling avsluttet");
+      onOpenChange(false);
+    },
+    onError: () => setSplit({ kind: "unknown" }),
   });
+  const [split, setSplit] = useState<ApplyOutcome | null>(null);
+  const [remainingPrimary, setRemainingPrimary] = useState<PrimaryTask[] | null>(null);
+  const retryPrimary = useMutation({
+    mutationFn: async (tasks: PrimaryTask[]) => runPrimaryTasks(tasks, setPrimarySupplier),
+    onSuccess: ({ failed }) => {
+      onSuccess();
+      if (failed.length > 0) { setRemainingPrimary(failed); toast.error("Primærleverandør kunne fortsatt ikke settes for alle varer."); return; }
+      setRemainingPrimary(null);
+      toast.success("Primærleverandør satt");
+      onOpenChange(false);
+    },
+  });
+  const locked = split !== null || remainingPrimary !== null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -623,9 +661,34 @@ function ConcludeDialog({
             );
           })}
         </div>
+        {split && (
+          <div role="alert" className="space-y-1 rounded-md border border-warning/30 bg-warning/10 p-3 text-sm">
+            <p className="font-medium">Noen endringer kan være lagret.</p>
+            {split.kind === "partial" && split.linksOpen && <p>Forhandlingen er avsluttet, men leverandørlenkene er ikke stengt.</p>}
+            {split.kind === "partial" && split.failures.length > 0 && (
+              <ul className="list-disc pl-5">{split.failures.map((f, i) => <li key={i}>{f}</li>)}</ul>
+            )}
+            {split.kind === "unknown" && <p>Utfallet er ukjent. Status er lest på nytt; kontroller den før du gjør noe mer.</p>}
+            <p>Ingenting prøves på nytt automatisk.</p>
+          </div>
+        )}
+        {remainingPrimary && (
+          <div role="alert" className="space-y-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-sm">
+            <p className="font-medium">Utfallet er lagret, men primærleverandør ble ikke satt for:</p>
+            <ul className="list-disc pl-5">
+              {remainingPrimary.map((t) => (
+                <li key={t.rawMaterialId}>{rmName(t.rawMaterialId)} → {supName(t.supplierId)}</li>
+              ))}
+            </ul>
+            <Button size="sm" className="min-h-[44px]" disabled={retryPrimary.isPending} onClick={() => retryPrimary.mutate(remainingPrimary)}>
+              {retryPrimary.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Sett gjenstående primærleverandør
+            </Button>
+          </div>
+        )}
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Avbryt</Button>
-          <Button onClick={() => apply.mutate()} disabled={apply.isPending}>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{locked ? "Lukk" : "Avbryt"}</Button>
+          <Button onClick={() => apply.mutate()} disabled={apply.isPending || locked}>
             {apply.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Avslutt og lagre
           </Button>

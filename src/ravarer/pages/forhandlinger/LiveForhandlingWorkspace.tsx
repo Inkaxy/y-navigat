@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { parseRfqCredentials, portalUrlFor, isKnownRejection } from "@/ravarer/lib/negotiationOps";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,7 +62,10 @@ export default function LiveForhandlingWorkspace() {
   const [autoApply, setAutoApply] = useState(true);
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [pausing, setPausing] = useState(false);
-  const [credentials, setCredentials] = useState<{ url: string; password: string; email: string | null } | null>(null);
+  const [credentials, setCredentials] = useState<{ recipientId: string; url: string; password: string; email: string | null; supplierName: string } | null>(null);
+  /** Ukjent genereringsutfall: passord kan være endret. Ingen automatisk nytt forsøk. */
+  const [credUnknown, setCredUnknown] = useState(false);
+  const endLock = useRef(false);
 
   // Alle mottakere vises — en live-forhandling kan ha flere leverandører i rommet.
   const supplierNames = recipients
@@ -252,6 +256,12 @@ export default function LiveForhandlingWorkspace() {
   }
 
   async function handleEndSession() {
+    if (endLock.current) return;
+    // Frys mottakeren nå: lenke, passord, e-postadresse og mailto skal alltid gjelde samme mottaker.
+    const frozen = selectedRecipient;
+    if (!frozen) { toast.error("Velg hvilken leverandør bekreftelsen gjelder"); return; }
+    const expected = recipients.map((r) => ({ id: r.id, supplier_id: r.supplier_id }));
+    endLock.current = true;
     setEnding(true);
     try {
       const days = Math.max(1, Number(deadlineDays) || 14);
@@ -270,12 +280,24 @@ export default function LiveForhandlingWorkspace() {
         "generate-rfq-credentials",
         { body: { negotiation_id: id } },
       );
-      if (credErr) throw credErr;
-      const cred = credRes?.credentials?.[0];
-      if (cred) {
-        const url = `${window.location.origin}/bekreftelse/${cred.access_token}`;
-        setCredentials({ url, password: cred.password, email: cred.contact_email ?? null });
+      if (credErr) {
+        if (!isKnownRejection(credErr)) setCredUnknown(true);
+        throw credErr;
       }
+      const parsed = parseRfqCredentials(credRes, expected);
+      const cred = parsed.kind === "ok" ? parsed.byRecipient.get(frozen.id) : undefined;
+      if (!cred) {
+        setCredUnknown(true);
+        throw new Error("Svaret kunne ikke knyttes sikkert til valgt leverandør. Passord kan være endret.");
+      }
+      setCredUnknown(false);
+      setCredentials({
+        recipientId: cred.recipient_id,
+        url: portalUrlFor(window.location.origin, "bekreftelse", cred),
+        password: cred.password,
+        email: cred.contact_email,
+        supplierName: suppliers.find((s) => s.id === cred.supplier_id)?.name ?? cred.supplier_name,
+      });
       await logEvent.mutateAsync({
         negotiation_id: id,
         event_type: "session_ended",
@@ -284,6 +306,7 @@ export default function LiveForhandlingWorkspace() {
     } catch (e: any) {
       toast.error(e?.message ?? "Kunne ikke avslutte");
     } finally {
+      endLock.current = false;
       setEnding(false);
     }
   }
@@ -291,7 +314,7 @@ export default function LiveForhandlingWorkspace() {
   function summaryText() {
     const lines: string[] = [];
     lines.push(`Forhandling: ${neg?.title ?? ""}`);
-    lines.push(`Leverandør: ${supplierName}`);
+    lines.push(`Leverandør: ${credentials ? credentials.supplierName : supplierName}`);
     lines.push("");
     lines.push("Avtalte poster (venter bekreftelse):");
     for (const it of items.filter((i) => i.live_status === "tentatively_agreed" || i.live_status === "agreed" || i.live_status === "confirmed")) {
@@ -539,6 +562,12 @@ export default function LiveForhandlingWorkspace() {
             <DialogTitle>{credentials ? "Send bekreftelse til leverandør" : "Avslutt forhandling"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 text-sm">
+            {credUnknown && !credentials && (
+              <p role="alert" className="rounded-md border border-warning/30 bg-warning/10 p-3 text-xs">
+                Utfallet av lenkegenereringen er ukjent. Passord kan allerede være endret, og ingenting prøves
+                på nytt automatisk. Prøver du igjen, lages nye passord for alle mottakere.
+              </p>
+            )}
             {!credentials && (
               <>
                 <p>
@@ -564,7 +593,8 @@ export default function LiveForhandlingWorkspace() {
             )}
             {credentials && (
               <div className="space-y-2 rounded-md border border-success/30 bg-success/5 p-3 text-xs">
-                <p className="font-semibold text-success">Lenke og passord generert</p>
+                <p className="font-semibold text-success">Lenke og passord generert — ingenting er sendt</p>
+                <p>Passordet gjelder i 5 minutter.</p>
                 <p>Send til: <strong>{credentials.email ?? "—"}</strong></p>
                 <p className="break-all">Lenke: <code>{credentials.url}</code></p>
                 <p>Passord (separat e-post): <code className="rounded bg-surface-muted px-1 py-0.5">{credentials.password}</code></p>
@@ -584,14 +614,14 @@ export default function LiveForhandlingWorkspace() {
               >
                 Kopier sammendrag
               </Button>
-              {selectedRecipient?.contact_email && credentials && (
+              {credentials?.email && (
                 <Button asChild variant="outline" size="sm">
                   <a
-                    href={`mailto:${selectedRecipient.contact_email}?subject=${encodeURIComponent(
+                    href={`mailto:${credentials.email}?subject=${encodeURIComponent(
                       "Bekreftelse av avtaler: " + (neg.title ?? "")
                     )}&body=${encodeURIComponent(summaryText())}`}
                   >
-                    Send på e-post
+                    Åpne e-postutkast
                   </a>
                 </Button>
               )}
@@ -602,7 +632,7 @@ export default function LiveForhandlingWorkspace() {
               {credentials ? "Lukk" : "Avbryt"}
             </Button>
             {!credentials && (
-              <Button onClick={handleEndSession} disabled={ending}>
+              <Button onClick={handleEndSession} disabled={ending || !selectedRecipient}>
                 {ending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Avslutt og generer lenke
               </Button>
