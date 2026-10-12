@@ -33,6 +33,8 @@ export function useSingleRecalcPreview() {
   const [state, setState] = useState<PreviewState>({ status: "closed" });
   const gen = useRef(0);
   const inFlight = useRef(false);
+  // Identiteten til forespørselen som er på vei (for å ignorere dobbeltklikk på samme mål).
+  const active = useRef<{ id: string; origin: PreviewTarget["origin"]; entity: string; gen: number } | null>(null);
   const live = useRef({ ready, entity: legalEntityId, mounted: true });
   live.current.ready = ready;
   live.current.entity = legalEntityId;
@@ -52,12 +54,16 @@ export function useSingleRecalcPreview() {
 
   const open = useCallback(async (target: PreviewTarget) => {
     const l = live.current;
+    const a = active.current;
+    // Samme mål, samme opphav og selskap mens den gyldige forespørselen fortsatt er på vei: ignorer uten ny generasjon.
+    if (inFlight.current && a && a.gen === gen.current && a.id === target.rawMaterialId && a.origin === target.origin && a.entity === l.entity) return;
     gen.current += 1;
     const myGen = gen.current;
     if (!l.ready || !l.entity) { setState({ status: "unavailable", target, reason: "access" }); return; }
     if (inFlight.current) { setState({ status: "busy", target }); return; }
     const frozen = { entity: l.entity, id: target.rawMaterialId, gen: myGen };
     inFlight.current = true;
+    active.current = { id: frozen.id, origin: target.origin, entity: frozen.entity, gen: myGen };
     setState({ status: "loading", target });
     let next: PreviewState;
     try {
@@ -76,6 +82,7 @@ export function useSingleRecalcPreview() {
       next = { status: "unavailable", target, reason: "transport" };
     } finally {
       inFlight.current = false;
+      active.current = null;
     }
     const now = live.current;
     if (!now.mounted || gen.current !== frozen.gen || !now.ready || now.entity !== frozen.entity) return;
