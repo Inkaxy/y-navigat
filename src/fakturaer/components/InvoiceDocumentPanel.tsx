@@ -85,7 +85,7 @@ export function InvoiceDocumentPanel({ invoiceId, invoice, line, onClose, classN
   const cur = fig.currency;
   const mismatch = showSumWarning && invoice?.lines_sum_status === "mismatch";
   const gate = line ? gateIn ?? null : null;
-  const open = <InvoiceDocumentButton path={path} label="Åpne originalen i ny fane" variant="outline" />;
+  const open = <InvoiceDocumentButton path={path} label="Åpne originalen i ny fane" variant="outline" className="min-h-[44px]" />;
 
   return (
     <div className={cn("flex h-full flex-col overflow-hidden rounded-xl border border-line-subtle bg-card", className)}>
@@ -96,8 +96,8 @@ export function InvoiceDocumentPanel({ invoiceId, invoice, line, onClose, classN
             {invoice?.supplier_name ?? "—"} • {formatDate(invoice?.invoice_date)}
           </div>
         </div>
-        <InvoiceDocumentButton path={path} label="Åpne i ny fane" variant="ghost" />
-        <Button type="button" size="icon" variant="ghost" onClick={onClose} aria-label="Lukk dokumentpanel">
+        <InvoiceDocumentButton path={path} label="Åpne i ny fane" variant="ghost" className="min-h-[44px]" />
+        <Button type="button" size="icon" variant="ghost" className="min-h-[44px] min-w-[44px]" onClick={onClose} aria-label="Lukk dokumentpanel">
           <X className="h-4 w-4" />
         </Button>
       </div>
@@ -137,14 +137,14 @@ export function InvoiceDocumentPanel({ invoiceId, invoice, line, onClose, classN
         ) : ver.revoked ? (
           <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm text-ink-secondary">
             <span>Originalen er endret eller kunne ikke kontrolleres. Ingenting fra den gamle versjonen vises.</span>
-            <Button size="sm" variant="outline" className="min-h-11" onClick={() => ver.refresh()}>
+            <Button size="sm" variant="outline" className="min-h-[44px]" onClick={() => ver.refresh()}>
               <RefreshCw className="h-4 w-4" /> Hent på nytt
             </Button>
           </div>
         ) : error ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm text-ink-secondary">
             <span>Kunne ikke hente dokumentet.</span>
-            <Button size="sm" variant="outline" onClick={() => refetch()}>
+            <Button size="sm" variant="outline" className="min-h-[44px]" onClick={() => refetch()}>
               <RefreshCw className="h-4 w-4" /> Prøv igjen
             </Button>
             {!metaError && current && open}
