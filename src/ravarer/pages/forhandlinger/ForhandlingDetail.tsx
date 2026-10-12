@@ -19,7 +19,7 @@ import {
 } from "@/ravarer/hooks/useNegotiations";
 import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
-import { formatDate, formatNok } from "@/ravarer/lib/constants";
+import { formatDate } from "@/ravarer/lib/constants";
 import { bestOfferRecipient, isNegotiationClosed, offerPricePerBaseUnit } from "@/ravarer/lib/negotiationMatrix";
 import { estimateSavings, negotiationListReturn } from "@/ravarer/lib/negotiationOps";
 import { paths } from "@/ravarer/lib/paths";
