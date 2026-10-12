@@ -9,9 +9,9 @@ fordi den mappen kjøres av verktøyet. Root kjører eksakt godkjent fil, aldri 
 | `20261012_varetelling_foundation.PENDING.sql` | **TIL GJENNOMGANG, IKKE KJØRT.** Revisjon 2 (erstatter aldri-kjørt revisjon 1 i samme fil). Kjør bare etter roots godkjenning av eksakt fil. |
 | `20261012_varetelling_foundation.test.sql` | Lokal PGlite-test (`node scripts/test-varetelling-sql.mjs`), 111 kontroller, seriell — ikke parallell samtidighet. |
 | `20261012_negotiation_item_preservation.test.sql` | Historisk isolert enkeltøkt-test skrevet mot det erstattede forslaget. Beholdt som bevis; dekker ikke `rfq_issued_at`. Samtidighet i to økter er ikke verifisert. |
-| `20261012_varetelling_stage3.PENDING.sql` | **TIL GJENNOMGANG, IKKE KJØRT.** Krever grunnlaget (rev. 2) først. |
+| `20261012_varetelling_stage3.PENDING.sql` | **TIL GJENNOMGANG, IKKE KJØRT.** Revisjon 2 (rev. 1 ikke akseptert). Krever grunnlaget (rev. 2) først. |
 | `20261012_varetelling_stage3_storage.PENDING.sql` | **TIL GJENNOMGANG, IKKE KJØRT.** Privat bøtte `vt-count-uploads` og regler; ikke testbar i PGlite. |
-| `20261012_varetelling_stage3.test.sql` | Lokal PGlite-test, kjøres etter grunnlagets test i samme skript (totalt 148 kontroller), seriell. |
-| `functions/vt-count-ocr/`, `functions/vt-count-report-email/` | **Edge-kilde, IKKE UTRULLET.** Ligger her for at ingen automatisk utrulling skal skje. Flyttes til `supabase/functions/` bare etter godkjenning. E-post krever hemmeligheten `VT_REPORT_MAIL_FROM`. |
+| `20261012_varetelling_stage3.test.sql` | Lokal PGlite-test, kjøres etter grunnlagets test i samme skript (totalt 166 kontroller), seriell. |
+| `functions/vt-count-ocr/`, `functions/vt-count-report-email/`, `functions/_shared/vtReport.ts` | **Edge-kilde, IKKE UTRULLET.** Ligger her for at ingen automatisk utrulling skal skje. Ved godkjenning flyttes funksjonene til `supabase/functions/` og `vtReport.ts` til `supabase/functions/_shared/`. Ingen ny hemmelighet (bruker koblet Microsoft 365-postboks). Bøtten `vt-count-uploads` opprettes med lagringsverktøyet. |
 
 Edge `generate-rfq-credentials` er allerede utrullet live (v141, kilde lik b845). Skal ikke rulles ut på nytt fra denne mappen.
