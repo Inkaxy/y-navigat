@@ -76,14 +76,14 @@ function CountRow({ c, onOpen }: { c: VtCount; onOpen: (id: string) => void }) {
 function ArchiveTotals({ countId }: { countId: string }) {
   const q = useVtCount(countId);
   const clar = useClarifiedLines(countId, q.data?.lines ?? []);
-  if (q.isLoading) return <Loading />;
+  if (q.isLoading || clar.status === "loading") return <Loading label="Henter frosne totaler …" />;
   if (q.error || !q.data) return <Notice tone="danger" title="Kunne ikke hente tellingen." />;
+  if (clar.status === "error") return <Notice tone="danger" title="Prisavklaringer kunne ikke hentes.">Totalene vises ikke før avklaringene er lest, så de ikke blir for lave.</Notice>;
   const all = summarize(clar.lines); const g = summarizeGroups(q.data.lists, clar.lines);
   const line = (s: ReturnType<typeof summarize>) => `${s.lines - s.notCounted}/${s.lines} registrert · ${s.value == null ? "verdi ukjent" : formatKr(s.value)}${s.complete ? "" : " (ufullstendig)"}`;
   return (
     <div className="space-y-1 text-sm" aria-label="Frosne totaler">
       <p className="font-medium">Hele tellingen: {line(all)}</p>
-      {clar.error && <p className="text-xs text-destructive">Prisavklaringer kunne ikke hentes — verdien kan være for lav.</p>}
       <ul className="text-xs">{g.byList.map(x => <li key={x.key}>{x.label}: {line(x.summary)}</li>)}</ul>
     </div>
   );

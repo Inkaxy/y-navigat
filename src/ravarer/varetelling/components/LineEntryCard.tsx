@@ -96,7 +96,7 @@ export function LineEntryCard({ line, countId, readOnly, active, onFocus, onNext
   const blocked = readOnly || busy || !!pending || status?.kind === "konflikt" || (stale && dirty);
 
   return (
-    <Card className={"p-4 " + (active ? "ring-2 ring-ring" : "")} data-testid="vt-line" onFocusCapture={onFocus}>
+    <Card className={"p-3 sm:p-4 " + (active ? "ring-2 ring-ring" : "")} data-testid="vt-line" onFocusCapture={onFocus}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-base font-semibold break-words">{line.snap_name}</p>
@@ -115,12 +115,12 @@ export function LineEntryCard({ line, countId, readOnly, active, onFocus, onNext
           </label>
         ))}
       </div>
-      <p className="mt-2 text-sm" aria-live="polite">
+      <p className="mt-2 text-sm empty:hidden" aria-live="polite">
         {invalid ? <span className="text-destructive">Ugyldig tall — bruk siffer og komma.</span>
           : total != null ? <>Sum: <strong>{formatAmount(total)} {line.snap_base_unit}</strong>
             {total === 0 && <span className="block text-xs">Mengde 0 — bruk «0 på lager».</span>}
             {line.snap_price_per_base != null && total > 0 && <span className="text-muted-foreground"> · {formatKr(total * line.snap_price_per_base)}</span>}</>
-          : <span className="text-muted-foreground">Tomt felt betyr ikke talt — ikke 0.</span>}
+          : null}
         {line.snap_price_per_base == null && <span className="block text-xs text-muted-foreground">Uten pris: {priceReasonLabel(line.snap_price_reason)}</span>}
       </p>
       <Input disabled={blocked} value={note} onChange={e => setNote(e.target.value)} placeholder="Kommentar"
@@ -136,7 +136,7 @@ export function LineEntryCard({ line, countId, readOnly, active, onFocus, onNext
       )}
       <div className="mt-2 text-sm" aria-live="polite">
         {busy && <span className="text-muted-foreground">Lagrer …</span>}
-        {!busy && dirty && !pending && <span className="block text-xs">Utkast — ikke lagret ennå (huskes i denne nettleseren).</span>}
+        {!busy && dirty && !pending && <span className="block text-xs">Utkast — ikke lagret.</span>}
         {!busy && status?.kind === "lagret" && <span>Lagret</span>}
         {!busy && status?.kind === "avvist" && <span className="text-destructive">Kunne ikke lagre: {status.message}</span>}
         {!busy && pending && (

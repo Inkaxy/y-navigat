@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
 
   if (b.action === "preview") {
     return json(200, { hash, count_revision: data.count.revision, final: isFinal(data.count), default_subject: defaultSubject(data), attachment_base: attachmentBase(data),
-      csv, pdf_b64: pdfB64, totals: summarizeLines(data.lines), mail_configured: sender != null });
+      csv, pdf_b64: pdfB64, totals: summarizeLines(data.lines), mail_configured: sender != null, sender });
   }
   if (b.action !== "send") return json(400, { error: "Ukjent handling" });
   const mail = { recipient: String(b.recipient ?? ""), subject: String(b.subject ?? ""), message: String(b.message ?? "") };

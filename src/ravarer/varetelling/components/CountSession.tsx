@@ -108,7 +108,7 @@ function SessionBody({ data, listParam, onBack, onList, onPrint }: {
                 <p className="text-xs text-muted-foreground" aria-live="polite">{list ? `${list.name}: ` : ""}{listSum.lines - listSum.notCounted}/{listSum.lines} registrert · {shown.length} vises</p>
               </div>
               <p id="vt-next-hint" className="text-xs text-muted-foreground">Tomt felt betyr ikke talt — ikke 0. «Lagre og neste», «0 på lager» og «Ikke på stedet» flytter til neste vare som ikke er talt. Forventet beholdning vises ikke.</p>
-              <div className="grid gap-3 landscape:lg:grid-cols-2 xl:grid-cols-2">
+              <div className="grid gap-3 md:landscape:grid-cols-2 2xl:grid-cols-3" data-testid="vt-line-grid">
                 {shown.map(l => (
                   <div key={l.id} data-line={l.id}>
                     <LineEntryCard line={l} countId={count.id} active={activeId === l.id} onFocus={() => setActiveId(l.id)}
@@ -122,22 +122,24 @@ function SessionBody({ data, listParam, onBack, onList, onPrint }: {
 
           {view === "oversikt" && (
             <>
-              <Summary s={sum} label="Hele tellingen" final={count.status === "avsluttet"} />
+              {clar.status === "ready" ? <Summary s={sum} label="Hele tellingen" final={count.status === "avsluttet"} />
+                : clar.status === "loading" ? <Loading label="Henter prisavklaringer …" /> : null}
+              {clar.status !== "ready" && <p className="text-xs text-muted-foreground" role="status">Rapport, eksport og e-post er sperret til prisavklaringene er lest.</p>}
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" className="min-h-[48px]" onClick={() => onPrint("rapport")}><Printer className="h-4 w-4" aria-hidden /> Rapport</Button>
-                <Button variant="outline" className="min-h-[48px]" onClick={() => downloadBlob(new Blob([buildCsv(reportData())], { type: "text/csv;charset=utf-8" }), `${reportFileBase(count)}.csv`)}>
+                <Button variant="outline" className="min-h-[48px]" disabled={clar.status !== "ready"} onClick={() => onPrint("rapport")}><Printer className="h-4 w-4" aria-hidden /> Rapport</Button>
+                <Button variant="outline" className="min-h-[48px]" disabled={clar.status !== "ready"} onClick={() => downloadBlob(new Blob([buildCsv(reportData())], { type: "text/csv;charset=utf-8" }), `${reportFileBase(count)}.csv`)}>
                   <FileDown className="h-4 w-4" aria-hidden /> CSV</Button>
-                <Button variant="outline" className="min-h-[48px]" disabled={exporting} onClick={async () => {
+                <Button variant="outline" className="min-h-[48px]" disabled={exporting || clar.status !== "ready"} onClick={async () => {
                   setExporting(true);
                   try { downloadBlob(await buildPdf(reportData()), `${reportFileBase(count)}.pdf`); } catch { toast.error("Kunne ikke lage PDF."); } finally { setExporting(false); }
                 }}><FileDown className="h-4 w-4" aria-hidden /> PDF</Button>
               </div>
               {count.status !== "avsluttet" && <p className="text-xs text-muted-foreground">Rapport og eksport før avslutning merkes «Foreløpig» med tidspunkt.</p>}
-              <MailPanel count={count} />
+              {clar.status === "ready" && <MailPanel count={count} />}
               <Card className="p-3 text-sm">
                 <p className="font-medium">Per avdeling og liste</p>
-                <GroupTable title="Avdeling" rows={groups.byDepartment} />
-                <GroupTable title="Liste" rows={groups.byList} />
+                <GroupTable title="Avdeling" rows={clar.status === "ready" ? groups.byDepartment : []} />
+                <GroupTable title="Liste" rows={clar.status === "ready" ? groups.byList : []} />
               </Card>
               {multi.length > 0 && (
                 <Card className="p-3 text-sm"><p className="font-medium">Varer talt på flere steder (summert én gang)</p>

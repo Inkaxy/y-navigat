@@ -58,6 +58,7 @@ export function MailPanel({ count }: { count: VtCount }) {
   const send = async (p: SendP) => {
     if (!api || !canWrite || !store.tryLock(key)) return;
     let o = store.get(key) as PendingOp<SendP & { lastState: MailState | null }> | undefined;
+    const fresh = !o;
     try {
       if (!o) { o = { key, opId: crypto.randomUUID(), sig: JSON.stringify(p), payload: { ...p, lastState: null }, state: "inflight", at: new Date().toISOString() }; store.put(o); }
       setBusy(true);
@@ -66,7 +67,8 @@ export function MailPanel({ count }: { count: VtCount }) {
       if (same()) setMsg(MAIL_STATE_TEXT[r.state] + (r.replayed ? " (lagret utfall — ingenting sendt på nytt)" : ""));
     } catch (e) {
       // Kjent avvisning fra serveren skjer bare FØR reservasjon (ingenting lagret/sendt) ⇒ trygt å fjerne op-en.
-      if (o && e instanceof VtRejectedError) { store.remove(key, o.opId); if (same()) setMsg(e.message); }
+      // Ved gjenopptak kan en reservasjon finnes på serveren ⇒ behold op-en (ukjent) selv ved avvisning.
+      if (o && fresh && e instanceof VtRejectedError) { store.remove(key, o.opId); if (same()) setMsg(e.message); }
       else if (o) { record(o.payload.lastState ?? "ukjent", o); if (same()) setMsg(MAIL_STATE_TEXT.ukjent); }
     } finally { store.unlock(key); setBusy(false); }
   };
@@ -77,7 +79,7 @@ export function MailPanel({ count }: { count: VtCount }) {
       if (!same()) return;
       if (!r.found) { setMsg("Serveren har ingen registrering av denne sendingen. Ingenting er sendt. Du kan forkaste den lokale registreringen."); store.put({ ...op, payload: { ...op.payload, lastState: null } }); return; }
       if (r.state) { record(r.state, op); setMsg(MAIL_STATE_TEXT[r.state] + (r.detail ? ` (${r.detail})` : "")); }
-    } catch { if (same()) setMsg("Kunne ikke hente status. Ingenting er sendt."); } finally { setBusy(false); }
+    } catch { if (same()) setMsg("Kunne ikke hente status. Utfallet er fortsatt ukjent — ingenting er sendt på nytt herfra."); } finally { setBusy(false); }
   };
 
   if (op) {
@@ -122,6 +124,7 @@ export function MailPanel({ count }: { count: VtCount }) {
         <Button variant="ghost" className="min-h-[44px]" onClick={() => setCsvOpen(v => !v)}>{csvOpen ? "Skjul" : "Vis"} CSV-innhold</Button>
       </div>
       {csvOpen && <pre className="max-h-64 overflow-auto rounded border p-2 text-xs" aria-label="CSV-vedlegg">{pv.csv.replace(/^\uFEFF/, "")}</pre>}
+      {pv.mailConfigured && pv.sender && <p className="text-sm" data-testid="vt-mail-sender">Sendes fra: <strong className="break-all">{pv.sender}</strong> (tilkoblet Microsoft 365-postboks)</p>}
       {!pv.mailConfigured && <Notice tone="warning" title="E-postsending er ikke satt opp.">Microsoft 365-postboksen er ikke koblet til. Ingenting kan sendes herfra; last ned vedleggene i stedet.</Notice>}
       <div className="grid gap-2">
         <div><Label htmlFor={`vt-mail-to-${count.id}`}>Mottaker (én adresse)</Label><Input id={`vt-mail-to-${count.id}`} type="email" className="h-12" value={recipient} onChange={e => setRecipient(e.target.value)} /></div>
