@@ -51,10 +51,11 @@ Deno.serve(async (req) => {
     }
 
     // Check if already submitted -> reject unless unlocked
-    const { data: existing } = await admin
+    const { data: existing, error: existingError } = await admin
       .from("negotiation_responses")
       .select("id, status")
       .eq("recipient_id", row.recipient_id);
+    if (existingError) throw existingError;
     const anySubmitted = (existing ?? []).some((r: any) => r.status === "submitted");
     if (anySubmitted) {
       return new Response(JSON.stringify({ result: "already_submitted" }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
