@@ -70,7 +70,7 @@ export function ListActions({ list, open, canWrite, canApprove, summary }: { lis
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span>Listen: {summary.lines - summary.notCounted} / {summary.lines} registrert</span>
-        {canWrite && !pending && (list.status === "ikke_startet" || list.status === "under_telling") && <Button variant="outline" className="min-h-[48px]" disabled={busy} onClick={() => go("til_kontroll")}>Send liste til kontroll</Button>}
+        {canWrite && !pending && (list.status === "ikke_startet" || list.status === "under_telling") && <Button variant="outline" className="min-h-[48px]" disabled={busy || unsynced > 0} onClick={() => go("til_kontroll")}>Send liste til kontroll</Button>}
         {canWrite && !pending && list.status === "til_kontroll" && <Button variant="outline" className="min-h-[48px]" disabled={busy} onClick={() => go("under_telling")}>Tilbake til telling</Button>}
         {canApprove && !pending && list.status === "til_kontroll" && <Button className="min-h-[48px]" disabled={busy} onClick={() => go("godkjent")}>Godkjenn liste</Button>}
         {canApprove && !pending && list.status === "godkjent" && <Button variant="outline" className="min-h-[48px]" disabled={busy} onClick={() => go("under_telling")}>Gjenåpne liste</Button>}
@@ -83,8 +83,11 @@ export function ListActions({ list, open, canWrite, canApprove, summary }: { lis
   );
 }
 
-export function Lifecycle({ count, lists, canWrite, canApprove, complete }: { count: VtCount; lists: VtCountList[]; canWrite: boolean; canApprove: boolean; complete: boolean }) {
+export function Lifecycle({ count, lists, canWrite, canApprove, complete, lineIds = [] }: { count: VtCount; lists: VtCountList[]; canWrite: boolean; canApprove: boolean; complete: boolean; lineIds?: string[] }) {
   const api = useVtApi();
+  // Lokale utkast eller sendinger med ukjent utfall for denne tellingen sperrer avslutning/kontroll.
+  const drafts = useDraftStore(); const pstore = usePendingStore();
+  const unsynced = drafts.forCount(count.id).length + lineIds.filter(id => pstore.get(lineKey(id))).length;
   type P = { countId: string; expectedRevision: number; to: TransitionTarget; reason: string | null };
   const run = (opId: string, p: P) => api.transitionCount({ opId, ...p });
   const trW = useOpAction(`transition:${count.id}`, "write", run);
@@ -100,6 +103,7 @@ export function Lifecycle({ count, lists, canWrite, canApprove, complete }: { co
     <Card className="space-y-3 p-4">
       <p className="font-medium">Avslutning</p>
       <p className="text-xs text-muted-foreground">Avslutning låser tellingen og rapporten. Lagerbeholdningen endres ikke — det blir en egen, senere handling.</p>
+      {unsynced > 0 && <p className="text-sm text-destructive" role="alert">{unsynced} linje(r) har utkast eller sending med ukjent utfall i denne nettleseren. Lagre/avklar dem før tellingen sendes til kontroll eller avsluttes.</p>}
       {(!complete || !allApproved) && <p className="text-sm">Kan ikke avsluttes ennå: alle lister må være godkjent, alle linjer registrert, ingen må kontrolleres, og talte varer må ha pris.</p>}
       <PendingNotice op={pending} onResend={() => {
         const p = pending?.payload as P | undefined;
@@ -107,9 +111,9 @@ export function Lifecycle({ count, lists, canWrite, canApprove, complete }: { co
       }} />
       {!pending && (
         <div className="flex flex-wrap gap-2">
-          {canWrite && count.status === "pagar" && <Button variant="outline" className="min-h-[48px]" disabled={busy} onClick={() => go("til_kontroll")}>Send til kontroll</Button>}
+          {canWrite && count.status === "pagar" && <Button variant="outline" className="min-h-[48px]" disabled={busy || unsynced > 0} onClick={() => go("til_kontroll")}>Send til kontroll</Button>}
           {canWrite && count.status === "til_kontroll" && <Button variant="outline" className="min-h-[48px]" disabled={busy} onClick={() => go("pagar")}>Tilbake til telling</Button>}
-          {canApprove && <Button className="min-h-[48px]" disabled={busy || !complete || !allApproved} onClick={() => go("avsluttet")}>Avslutt telling</Button>}
+          {canApprove && <Button className="min-h-[48px]" disabled={busy || !complete || !allApproved || unsynced > 0} onClick={() => go("avsluttet")}>Avslutt telling</Button>}
         </div>
       )}
       {canApprove && !pending && (
