@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database, Json } from "@/integrations/supabase/types";
@@ -65,6 +66,55 @@ function errText(e: unknown): string {
   return e instanceof Error && e.message ? e.message : "ukjent feil";
 }
 
+/** Kastes når selskap/bruker/rettighet/eier endret seg midt i en flerstegs skriving. */
+export class NegotiationContextChangedError extends Error {
+  constructor(public readonly possiblyPartial: boolean) {
+    super(possiblyPartial
+      ? "Arbeidet ble stoppet fordi selskap, bruker eller tilgang endret seg. Noe kan allerede være lagret — kontroller forhandlingen."
+      : "Arbeidet ble stoppet fordi selskap, bruker eller tilgang endret seg. Ingenting ble lagret.");
+    this.name = "NegotiationContextChangedError";
+  }
+}
+/** Svaret fra serveren bekrefter ikke operasjonen. Kan være lagret; prøves aldri automatisk. */
+export class NegotiationUncertainReceiptError extends Error {
+  constructor() {
+    super("Serveren bekreftet ikke lagringen. Den kan være utført — kontroller råvarelista før du prøver igjen.");
+    this.name = "NegotiationUncertainReceiptError";
+  }
+}
+
+interface FrozenWriteContext { legalEntityId: string; userId: string }
+/**
+ * Fryser selskap + bruker ved start og kontrollerer før HVER ny skriving at eieren
+ * fortsatt er montert, samme selskap/bruker er valgt og skrivetilgang finnes.
+ * Databasens RLS er fortsatt autoriteten; dette stopper foreldet fortsettelse i UI.
+ */
+function useWriteContext() {
+  const { legalEntityId, user, canWrite } = useRavarer();
+  const live = useRef({ legalEntityId, userId: user?.id ?? "", canWrite, mounted: true });
+  live.current.legalEntityId = legalEntityId;
+  live.current.userId = user?.id ?? "";
+  live.current.canWrite = canWrite;
+  useEffect(() => {
+    const l = live.current;
+    l.mounted = true;
+    return () => { l.mounted = false; };
+  }, []);
+  return {
+    freeze(): FrozenWriteContext {
+      const l = live.current;
+      if (!l.mounted || !l.legalEntityId || !l.userId || !l.canWrite) throw new NegotiationContextChangedError(false);
+      return { legalEntityId: l.legalEntityId, userId: l.userId };
+    },
+    assert(f: FrozenWriteContext, wroteBefore: boolean) {
+      const l = live.current;
+      if (!l.mounted || !l.canWrite || l.legalEntityId !== f.legalEntityId || l.userId !== f.userId) {
+        throw new NegotiationContextChangedError(wroteBefore);
+      }
+    },
+  };
+}
+
 export function useNegotiations(opts?: { archived?: boolean }) {
   const { legalEntityId } = useRavarer();
   return useQuery({
@@ -88,10 +138,12 @@ export function useNegotiations(opts?: { archived?: boolean }) {
 export function useNegotiation(id: string | undefined) {
   const { legalEntityId } = useRavarer();
   return useQuery({
-    queryKey: ["negotiation", id],
-    enabled: !!id,
+    // Selskapet er en del av nøkkelen: bufret data fra selskap A vises aldri under B.
+    // Prefikset ["negotiation", id] bevares for eksisterende invalidering.
+    queryKey: ["negotiation", id, legalEntityId],
+    enabled: !!id && !!legalEntityId,
     queryFn: async () => {
-      const { data, error } = await supabase.from("negotiations").select("*").eq("id", id!).maybeSingle();
+      const { data, error } = await supabase.from("negotiations").select("*").eq("id", id!).eq("legal_entity_id", legalEntityId).maybeSingle();
       if (error) throw error;
       if (!data) return null;
       // Gjeldende selskap: en forhandling fra et annet selskap vises ikke.
@@ -101,10 +153,12 @@ export function useNegotiation(id: string | undefined) {
   });
 }
 
-export function useNegotiationItems(negotiationId: string | undefined) {
+export function useNegotiationItems(negotiationId: string | undefined, opts?: { enabled?: boolean }) {
+  const { legalEntityId } = useRavarer();
   return useQuery({
-    queryKey: ["negotiation-items", negotiationId],
-    enabled: !!negotiationId,
+    // Barnedata hentes bare i gjeldende selskap og når kalleren har en matchende forelder.
+    queryKey: ["negotiation-items", negotiationId, legalEntityId],
+    enabled: !!negotiationId && !!legalEntityId && (opts?.enabled ?? true),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("negotiation_items")
@@ -118,10 +172,12 @@ export function useNegotiationItems(negotiationId: string | undefined) {
   });
 }
 
-export function useNegotiationResponses(negotiationId: string | undefined) {
+export function useNegotiationResponses(negotiationId: string | undefined, opts?: { enabled?: boolean }) {
+  const { legalEntityId } = useRavarer();
   return useQuery({
-    queryKey: ["negotiation-responses", negotiationId],
-    enabled: !!negotiationId,
+    // Barnedata hentes bare i gjeldende selskap og når kalleren har en matchende forelder.
+    queryKey: ["negotiation-responses", negotiationId, legalEntityId],
+    enabled: !!negotiationId && !!legalEntityId && (opts?.enabled ?? true),
     queryFn: async (): Promise<NegotiationResponseRow[]> => {
       const { data, error } = await supabase
         .from("negotiation_responses")
@@ -134,10 +190,12 @@ export function useNegotiationResponses(negotiationId: string | undefined) {
   });
 }
 
-export function useNegotiationRecipients(negotiationId: string | undefined) {
+export function useNegotiationRecipients(negotiationId: string | undefined, opts?: { enabled?: boolean }) {
+  const { legalEntityId } = useRavarer();
   return useQuery({
-    queryKey: ["negotiation-recipients", negotiationId],
-    enabled: !!negotiationId,
+    // Barnedata hentes bare i gjeldende selskap og når kalleren har en matchende forelder.
+    queryKey: ["negotiation-recipients", negotiationId, legalEntityId],
+    enabled: !!negotiationId && !!legalEntityId && (opts?.enabled ?? true),
     queryFn: async (): Promise<NegotiationRecipientRow[]> => {
       const { data, error } = await supabase
         .from("negotiation_recipients")
@@ -176,9 +234,12 @@ export function useCreateNegotiation() {
 
 export function useUpdateNegotiation() {
   const qc = useQueryClient();
+  const wc = useWriteContext();
   return useMutation({
     mutationFn: async (input: { id: string; patch: NegotiationPatch }) => {
-      const { data, error } = await supabase.from("negotiations").update(input.patch).eq("id", input.id).select().single();
+      const f = wc.freeze();
+      const { data, error } = await supabase.from("negotiations").update(input.patch)
+        .eq("id", input.id).eq("legal_entity_id", f.legalEntityId).select().single();
       if (error) throw error;
       return toNegotiationRow(data);
     },
@@ -194,23 +255,27 @@ export type NegotiationItemInput = Omit<Tables["negotiation_items"]["Insert"], "
 
 export function useUpsertNegotiationItems() {
   const qc = useQueryClient();
+  const wc = useWriteContext();
   return useMutation({
     mutationFn: async (input: { negotiationId: string; items: NegotiationItemInput[] }) => {
+      const f = wc.freeze();
       // Erstatning (slett + sett inn) sletter svar/utfall/live-hendelser i kaskade.
       // Les gjeldende status og mottakere ferskt rett før, og nekt utenfor ekte utkast.
       // Serveren må håndheve samme regel (se supabase/pending/); dette er klientvernet.
       const { data: negFresh, error: negErr } = await supabase
         .from("negotiations")
-        .select("status")
+        .select("status, legal_entity_id, rfq_issued_at")
         .eq("id", input.negotiationId)
+        .eq("legal_entity_id", f.legalEntityId)
         .maybeSingle();
       if (negErr) throw negErr;
+      if (!negFresh) throw new Error("Fant ikke forhandlingen i valgt selskap.");
       const { data: recFresh, error: recErr } = await supabase
         .from("negotiation_recipients")
         .select("invited_at, password_set_at")
         .eq("negotiation_id", input.negotiationId);
       if (recErr) throw recErr;
-      if (!canReplaceNegotiationItems(negFresh?.status ?? null, recFresh ?? [])) {
+      if (!canReplaceNegotiationItems(negFresh.status, recFresh ?? [], negFresh.rfq_issued_at)) {
         throw new Error("Råvarelista kan ikke endres etter at lenker er generert. Eksisterende tilbud bevares.");
       }
       // Kontrakt: p_rows er en jsonb-array der hver rad tilhører p_parent_id (serveren
@@ -220,6 +285,7 @@ export function useUpsertNegotiationItems() {
         negotiation_id: input.negotiationId,
         sort_order: it.sort_order ?? idx,
       }));
+      wc.assert(f, false);
       const { data, error } = await supabase.rpc("replace_child_rows", {
         p_table: "negotiation_items",
         p_parent_column: "negotiation_id",
@@ -230,15 +296,19 @@ export function useUpsertNegotiationItems() {
         if (error.code === "55000") throw new Error("Råvarelista er låst fordi lenker er utstedt. Eksisterende tilbud bevares.");
         throw error;
       }
+      // Kontrakt: antall innsatte rader. Alt annet er uklart utfall (kan være lagret).
+      if (typeof data !== "number" || !Number.isInteger(data) || data !== rows.length) throw new NegotiationUncertainReceiptError();
       return data;
     },
-    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ["negotiation-items", v.negotiationId] }),
+    // Les alltid på nytt — også ved uklart utfall.
+    onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: ["negotiation-items", v.negotiationId] }),
     onError: (e: unknown) => toast.error(`Kunne ikke lagre råvarer: ${errText(e)}`),
   });
 }
 
 export function useUpsertNegotiationRecipients() {
   const qc = useQueryClient();
+  const wc = useWriteContext();
   return useMutation({
     mutationFn: async (input: {
       negotiationId: string;
@@ -248,6 +318,18 @@ export function useUpsertNegotiationRecipients() {
       // Do NOT wipe all rows and reinsert — that would destroy tokens for suppliers that
       // are kept. Instead diff by supplier_id: remove suppliers no longer in the list,
       // add new ones, and update contact info for suppliers that remain (tokens untouched).
+      // Sekvensielle skrivinger uten transaksjon: konteksten kontrolleres før hver, og feil
+      // etter en tidligere skriving rapporteres som mulig delvis lagring.
+      const f = wc.freeze();
+      let wrote = false;
+      const partial = (e: unknown): Error => wrote && !(e instanceof NegotiationContextChangedError)
+        ? new Error("Leverandørlista kan være delvis lagret. Kontroller lista før du fortsetter.")
+        : e instanceof Error ? e : new Error("ukjent feil");
+      try {
+      const { data: owner, error: ownerErr } = await supabase.from("negotiations").select("id")
+        .eq("id", input.negotiationId).eq("legal_entity_id", f.legalEntityId).maybeSingle();
+      if (ownerErr) throw ownerErr;
+      if (!owner) throw new Error("Fant ikke forhandlingen i valgt selskap.");
       const { data: existing, error: existErr } = await supabase
         .from("negotiation_recipients")
         .select("id, supplier_id")
@@ -259,8 +341,10 @@ export function useUpsertNegotiationRecipients() {
 
       const toRemove = existingRows.filter((r) => !nextSupplierIds.has(r.supplier_id)).map((r) => r.id);
       if (toRemove.length > 0) {
+        wc.assert(f, wrote);
         const { error: rmErr } = await supabase.from("negotiation_recipients").delete().in("id", toRemove);
         if (rmErr) throw rmErr;
+        wrote = true;
       }
 
       const toInsert = input.recipients.filter((r) => !existingBySupplier.has(r.supplier_id));
@@ -277,18 +361,22 @@ export function useUpsertNegotiationRecipients() {
           negotiation_id: input.negotiationId,
         }));
         const insertRows = typed as RecipientInsert[];
+        wc.assert(f, wrote);
         const { error: insErr } = await supabase.from("negotiation_recipients").insert(insertRows);
         if (insErr) throw insErr;
+        wrote = true;
       }
 
       for (const r of input.recipients) {
         const existingId = existingBySupplier.get(r.supplier_id);
         if (!existingId) continue;
+        wc.assert(f, wrote);
         const { error: updErr } = await supabase
           .from("negotiation_recipients")
           .update({ contact_email: r.contact_email ?? null, contact_name: r.contact_name ?? null })
           .eq("id", existingId);
         if (updErr) throw updErr;
+        wrote = true;
       }
 
       const { data, error } = await supabase
@@ -297,8 +385,11 @@ export function useUpsertNegotiationRecipients() {
         .eq("negotiation_id", input.negotiationId);
       if (error) throw error;
       return data;
+      } catch (e) {
+        throw partial(e);
+      }
     },
-    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ["negotiation-recipients", v.negotiationId] }),
+    onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: ["negotiation-recipients", v.negotiationId] }),
     onError: (e: unknown) => toast.error(`Kunne ikke lagre leverandører: ${errText(e)}`),
   });
 }
