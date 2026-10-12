@@ -11,7 +11,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { getGraphAccessToken } from "../_shared/graph-mail.ts";
 import type { VtReportData } from "../_shared/vtReport.ts";
-import { attachmentBase, attachmentHash, b64, buildGraphMessage, buildReportCsv, buildReportPdf, classifyGraph, defaultSubject, isFinal, summarizeLines, validateMail } from "./reportCore.ts";
+import { attachmentBase, attachmentHash, b64, buildGraphMessage, buildReportCsv, buildReportPdf, defaultSubject, isFinal, previewHash, runStoredSend, summarizeLines, validateMail, type ClaimData } from "./reportCore.ts";
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -29,27 +29,23 @@ async function senderMailbox(admin: Db): Promise<string | null> {
 
 interface Req { countId: string; recipient: string; subject: string; message: string }
 async function sendStored(admin: Db, graph: Admin, opId: string, actor: string, req: Req): Promise<Response> {
-  // Claim krever opprinnelig aktør (eller godkjenner) og at forespørselen er den lagrede — ellers avvist.
-  const claim = await admin.rpc("vt_report_mail_claim", { p_op_id: opId, p_actor: actor, p_count_id: req.countId, p_recipient: req.recipient, p_subject: req.subject, p_message: req.message });
-  if (claim.error && ["42501", "23505"].includes(String((claim.error as { code?: string }).code))) return json(409, { error: "Sendingen tilhører en annen bruker eller forespørselen samsvarer ikke med den lagrede. Ingenting er sendt." });
-  if (claim.error) return json(200, { state: "reservert", detail: "Sendingen kunne ikke startes. Den er fortsatt bare reservert — ingenting er sendt." });
-  const c = claim.data as { claimed: boolean; state: string; recipient?: string; subject?: string; message?: string; csv?: string; pdf_b64?: string; attachment_base?: string; final?: boolean; sender?: string };
-  if (!c.claimed) return json(200, { state: c.state, replayed: true });
-  let status: number | null = null; let detail: string | null = null;
-  try {
-    const token = await getGraphAccessToken(graph);
-    const res = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(String(c.sender))}/sendMail`, {
-      method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify(buildGraphMessage({ recipient: String(c.recipient), subject: String(c.subject), message: String(c.message) }, c.final === true, String(c.csv), String(c.pdf_b64), String(c.attachment_base))),
-    });
-    status = res.status; if (status !== 202) detail = `Microsoft svarte ${status}`; await res.body?.cancel();
-  } catch (e) {
-    if (e instanceof Error && /konfigurert|koblet/.test(e.message)) { status = 400; detail = "Microsoft 365 er ikke konfigurert"; }
-    else detail = "Nettverksfeil eller tidsavbrudd — ukjent om e-posten ble sendt";
-  }
-  const state = classifyGraph(status);
-  const fin = await admin.rpc("vt_report_mail_finish", { p_op_id: opId, p_state: state, p_detail: detail });
-  return json(200, { state: fin.error ? "ukjent" : state, detail });
+  // Claim krever opprinnelig aktør (eller godkjenner) og at forespørselen er den lagrede. Avsender er den LAGREDE.
+  const r = await runStoredSend(opId, {
+    claim: async () => {
+      const c = await admin.rpc("vt_report_mail_claim", { p_op_id: opId, p_actor: actor, p_count_id: req.countId, p_recipient: req.recipient, p_subject: req.subject, p_message: req.message });
+      return { data: (c.data ?? null) as ClaimData | null, error: c.error ? { code: (c.error as { code?: string }).code } : null };
+    },
+    graphSend: async (c) => {
+      const token = await getGraphAccessToken(graph);
+      const res = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(String(c.sender))}/sendMail`, {
+        method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify(buildGraphMessage({ recipient: String(c.recipient), subject: String(c.subject), message: String(c.message) }, c.final === true, String(c.csv), String(c.pdf_b64), String(c.attachment_base))),
+      });
+      await res.body?.cancel(); return res.status;
+    },
+    finish: async (state, detail) => admin.rpc("vt_report_mail_finish", { p_op_id: opId, p_state: state, p_detail: detail }),
+  });
+  return json(r.status, r.body);
 }
 
 Deno.serve(async (req) => {
@@ -88,8 +84,9 @@ Deno.serve(async (req) => {
   const snap = await user.rpc("vt_report_snapshot", { p_count_id: countId });
   if (snap.error) return json((snap.error as { code?: string }).code === "42501" ? 403 : 409, { error: "Kunne ikke lese rapporten." });
   const data = snap.data as VtReportData;
-  const csv = buildReportCsv(data); const pdfB64 = b64(buildReportPdf(data)); const hash = await attachmentHash(csv, pdfB64);
-  const sender = await senderMailbox(admin);
+  const csv = buildReportCsv(data); const pdfB64 = b64(buildReportPdf(data)); const sender = await senderMailbox(admin);
+  // Hash binder vedlegg + valgt avsender: byttet postboks mellom forhåndsvisning og send krever ny forhåndsvisning.
+  const hash = await previewHash(await attachmentHash(csv, pdfB64), sender);
 
   if (b.action === "preview") {
     return json(200, { hash, count_revision: data.count.revision, final: isFinal(data.count), default_subject: defaultSubject(data), attachment_base: attachmentBase(data),
@@ -98,7 +95,7 @@ Deno.serve(async (req) => {
   if (b.action !== "send") return json(400, { error: "Ukjent handling" });
   const mail = { recipient: String(b.recipient ?? ""), subject: String(b.subject ?? ""), message: String(b.message ?? "") };
   const bad = validateMail(mail); if (bad) return json(400, { error: bad });
-  if (b.hash !== hash) return json(409, { error: "Rapporten er endret siden forhåndsvisningen. Åpne forhåndsvisningen på nytt." });
+  if (b.hash !== hash) return json(409, { error: "Rapporten eller avsenderpostboksen er endret siden forhåndsvisningen. Åpne forhåndsvisningen på nytt." });
   if (!sender) return json(503, { error: "Microsoft 365-avsender er ikke koblet til." });
   // Reservasjon er service-only: øyeblikksbilde, vedlegg, hash og avsender er bygget her, aktøren er verifisert over.
   const r = await admin.rpc("vt_report_mail_reserve", { p_op_id: b.op_id, p_actor: actor, p_count_id: countId, p_count_revision: data.count.revision, p_report_hash: hash,

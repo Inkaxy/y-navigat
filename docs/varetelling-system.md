@@ -232,3 +232,5 @@ Tekniske hovedføringer: gjenbruk eksisterende firma- og tilgangsmodell; egne id
 - Root har uavhengig kjørt oppdaterte SQL-tester og positiv avslutning med prisavklaring på stage6 `42b9835d` — bestått.
 - Privat bøtte `vt-count-uploads` opprettet med Storage-API-verktøyet: public=false, 20 MiB (20971520) bekreftet. Tillatte filtyper (pdf/jpeg/png/webp) kunne ikke settes med verktøyet og står NULL; håndheves av `vt_ocr_create_job` og insert-policyen. Kan settes i dashbordet.
 - Storage-policyer (`20261012_varetelling_stage3_storage.PENDING.sql`) er fortsatt ikke kjørt; ingen SQL-migrasjon eller Edge-deploy.
+- E-post (etter root-kontroll): uklar claim-feil (transport/ukjent) gir `ukjent` med op_id og ingen Graph-kall (`runStoredSend` i `reportCore.ts`, testet i `varetelling-mail-claim.test.ts`); kjent avvisning (42501/23505) påstår ikke lenger at den lagrede sendingen aldri ble sendt. Forhåndsvisnings-hash binder vedlegg + valgt avsender — byttet postboks krever ny forhåndsvisning; lagret operasjon beholder sin lagrede avsender.
+- Bøttens MIME-liste: Storage-verktøyet støtter ikke filtypeliste; står NULL (smal jobbvalidering + stipolicy).
