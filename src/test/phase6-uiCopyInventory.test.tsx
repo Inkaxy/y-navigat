@@ -142,6 +142,12 @@ describe("eksakt 313-kartlegging", () => {
     expect(by.get("R14")?.browser_check).toBe("targeted_readonly_pass_9915");
     expect(by.get("R83")?.browser_check).toBe("ukjent");
   });
+  it("ingen ID står igjen som bare «eierfil finnes»; hvert spor har ordrett bevis i fila", () => {
+    for (const r of recs as unknown as Array<Rec & { handler_or_render_evidence: { file: string; evidence: string }[] }>) {
+      expect(r.mapping_status, r.id).not.toBe("eier_verifisert_handling_ikke_sporet");
+      for (const h of r.handler_or_render_evidence ?? []) expect(readFileSync(h.file, "utf8").includes(h.evidence), `${r.id}: ${h.file}`).toBe(true);
+    }
+  });
   it("R192/R195 beholder original funksjonstekst", () => {
     const by = new Map(recs.map((r) => [r.id, r]));
     expect(by.get("R192")?.current_feature).toBe("Visning av før, etter, endring, kilde og regnestykke");
