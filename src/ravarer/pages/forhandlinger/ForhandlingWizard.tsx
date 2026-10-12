@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ import { UnitPriceHint } from "@/ravarer/components/forhandlinger/UnitPriceHint"
 import { osloDateISO } from "@/lib/osloDate";
 import { Link } from "react-router-dom";
 import { paths } from "@/ravarer/lib/paths";
+import { parseRfqCredentials, isKnownRejection, sameItemSet, canReplaceNegotiationItems, type RfqCredential } from "@/ravarer/lib/negotiationOps";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -39,7 +40,7 @@ const STEPS: Array<{ n: Step; label: string }> = [
   { n: 2, label: "Råvarer" },
   { n: 3, label: "Leverandører" },
   { n: 4, label: "E-post" },
-  { n: 5, label: "Send" },
+  { n: 5, label: "Generer lenker" },
 ];
 
 export default function ForhandlingWizard() {
@@ -128,6 +129,8 @@ export default function ForhandlingWizard() {
   const upsertItems = useUpsertNegotiationItems();
   async function persistStep2() {
     if (!negotiationId) return;
+    // Uendret utvalg skriver ingenting (bevarer vare-ID-er og eventuelle svar).
+    if (sameItemSet(items, selectedRm)) return;
     const rows = Array.from(selectedRm).map((rmId, idx) => {
       const s = statsMap.get(rmId);
       return {
@@ -178,16 +181,40 @@ export default function ForhandlingWizard() {
 
   // ---- step 5 — send ----
   const generateMut = useGenerateRfqCredentials();
-  const [credentials, setCredentials] = useState<any[] | null>(null);
+  const [credentials, setCredentials] = useState<RfqCredential[] | null>(null);
+  /** Ukjent utfall: passord kan være rotert. Ingen automatisk nytt forsøk. */
+  const [genUnknown, setGenUnknown] = useState(false);
+  const [confirmRegen, setConfirmRegen] = useState(false);
+  const genLock = useRef(false);
+  const itemsLocked = !canReplaceNegotiationItems(neg?.status ?? "draft", recipients);
 
   async function handleSend() {
-    if (!negotiationId) return;
-    const res = await generateMut.mutateAsync({ negotiationId });
-    setCredentials(res.credentials);
-    toast.success("RFQ generert. Kopier e-postene nedenfor.");
+    if (!negotiationId || genLock.current) return;
+    genLock.current = true;
+    const frozenNeg = negotiationId;
+    const expected = recipients.map((r) => ({ id: r.id, supplier_id: r.supplier_id }));
+    try {
+      const res = await generateMut.mutateAsync({ negotiationId: frozenNeg });
+      const parsed = parseRfqCredentials(res, expected);
+      if (parsed.kind !== "ok") {
+        setCredentials(null);
+        setGenUnknown(true);
+        toast.error("Svaret kunne ikke knyttes sikkert til leverandørene. Passordene kan være endret.");
+        return;
+      }
+      setGenUnknown(false);
+      setConfirmRegen(false);
+      setCredentials(expected.map((r) => parsed.byRecipient.get(r.id)!));
+      toast.success("Lenker generert. Kopier e-postene nedenfor — ingenting er sendt.");
+    } catch (e) {
+      // Bare en kjent avvisning (4xx) beviser at ingenting ble endret.
+      if (!isKnownRejection(e)) setGenUnknown(true);
+    } finally {
+      genLock.current = false;
+    }
   }
 
-  function copyEmail(c: any) {
+  function copyEmail(c: RfqCredential) {
     const body = `${emailIntro}\n\nLenke: ${c.portal_url}\nPassord: ${c.password}\n`;
     const subject = `RFQ – ${title}`;
     const mail = `Til: ${c.contact_email ?? ""}\nEmne: ${subject}\n\n${body}`;
@@ -421,19 +448,35 @@ fakturahistorikk, og uten den finnes verken volum eller prisgrunnlag. */}
                 <li>• {selectedSup.size} leverandører</li>
                 <li>• Frist: {deadline || "ikke satt"}</li>
               </ul>
-              <Button onClick={handleSend} disabled={generateMut.isPending} className="rounded-full">
+              <p className="text-xs text-ink-secondary">
+                Appen sender ingen e-post. Du kopierer e-posten per leverandør og sender den selv.
+                Passordet gjelder i 5 minutter fra det lages.
+              </p>
+              {genUnknown && (
+                <div role="alert" className="space-y-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-sm">
+                  <p>
+                    Utfallet er ukjent. Noen eller alle passord kan allerede være endret, så tidligere
+                    lenker og passord kan være ugyldige. Ingenting prøves på nytt automatisk.
+                  </p>
+                  <label className="flex min-h-[44px] items-center gap-2">
+                    <Checkbox checked={confirmRegen} onCheckedChange={(v) => setConfirmRegen(!!v)} />
+                    Jeg forstår at nye lenker gir alle leverandørene nye passord
+                  </label>
+                </div>
+              )}
+              <Button onClick={handleSend} disabled={generateMut.isPending || (genUnknown && !confirmRegen) || recipients.length === 0} className="min-h-[44px] rounded-full">
                 {generateMut.isPending ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <Send className="mr-2 h-4 w-4" />
                 )}
-                Generer passord og lenker
+                {genUnknown ? "Generer nye lenker" : "Generer lenker"}
               </Button>
             </>
           ) : (
             <>
               <div className="flex items-center gap-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
-                Passordene vises kun én gang. Kopier e-postene nå — de kan ikke hentes fram igjen senere.
+                Passordene vises kun én gang og gjelder i 5 minutter. Ingen e-post er sendt — kopier hver e-post og send den selv.
               </div>
               <div className="space-y-2">
                 {credentials.map((c) => (
