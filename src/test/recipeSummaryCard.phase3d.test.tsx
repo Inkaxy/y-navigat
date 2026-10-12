@@ -66,9 +66,11 @@ describe("RecipeSummaryCard", () => {
     expect(screen.getByRole("alert").textContent).toMatch(/endret siden du åpnet/);
     st.result = { data: [], error: null }; // serveren har B → betinget sletting treffer ingenting
     await act(async () => { fireEvent.click(screen.getAllByRole("button", { name: "Fjern kobling" }).at(-1) as HTMLElement); });
-    expect(st.calls).toContainEqual(["eq", "recipe_id", "RA"]);
-    expect(st.calls).toContainEqual(["eq", "updated_at", rowA.updated_at]);
-    expect(st.calls).not.toContainEqual(["eq", "recipe_id", "RB"]);
+    const del = st.calls.slice(st.calls.findIndex((c) => c[0] === "delete"));
+    expect(del.length).toBeGreaterThan(1);
+    expect(del).toContainEqual(["eq", "recipe_id", "RA"]);
+    expect(del).toContainEqual(["eq", "updated_at", rowA.updated_at]);
+    expect(del).not.toContainEqual(["eq", "recipe_id", "RB"]);
     expect(st.audit).not.toHaveBeenCalled();
   });
 
