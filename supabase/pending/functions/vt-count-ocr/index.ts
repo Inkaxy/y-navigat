@@ -10,12 +10,12 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { PDFDocument } from "npm:pdf-lib@1.17.1";
 import { callAi, extractJson, type AiProvider } from "../_shared/ai-providers.ts";
 import { decryptWithKey } from "../_shared/crypto.ts";
-import { buildManifest, matchDocument, parseOcrPage, VT_OCR_MAX_PAGES, VT_OCR_SYSTEM_PROMPT, type ManifestLine, type OcrPage } from "./ocrCore.ts";
+import { manifestFromIssued, matchDocument, VT_SHEET_LAYOUT, parseOcrPage, VT_OCR_MAX_PAGES, VT_OCR_PAGES_PER_CALL, VT_OCR_SYSTEM_PROMPT, type ManifestLine, type OcrPage } from "./ocrCore.ts";
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-interface Original { path: string; sha256: string; size: number; mime: string }
-interface Claim { attempt_id: string; count_id: string; list_id: string; template_revision: number; originals: Original[]; lines: ManifestLine[] }
+interface Original { path: string; sha256: string; size: number; mime: string; role: "side" | "original" }
+interface Claim { attempt_id: string; count_id: string; list_id: string; template_revision: number; originals: Original[]; lines: ManifestLine[]; manifests: { layout_version: number; pages: string[][] }[] }
 
 async function sha256Hex(b: Uint8Array<ArrayBuffer>): Promise<string> {
   const d = await crypto.subtle.digest("SHA-256", b); return [...new Uint8Array(d)].map(x => x.toString(16).padStart(2, "0")).join("");
@@ -52,28 +52,39 @@ Deno.serve(async (req) => {
   const user = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: auth } } });
   const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-  // 1) Leasing som innlogget bruker (tilgang, åpen telling/liste og status sjekkes under lås i SQL).
-  const { data: claimData, error: claimErr } = await user.rpc("vt_ocr_claim", { p_job_id: jobId });
+  const resume = typeof body === "object" && body !== null && (body as Record<string, unknown>).continue === true;
+  // 1) Leasing (ny) eller fortsettelse av samme forsøk som innlogget bruker; tilgang/åpen liste/status sjekkes under lås i SQL.
+  const { data: claimData, error: claimErr } = await user.rpc(resume ? "vt_ocr_continue" : "vt_ocr_claim", { p_job_id: jobId });
   if (claimErr) {
     const code = (claimErr as { code?: string }).code;
-    return json(code === "42501" ? 403 : code === "55000" ? 409 : 400, { error: code === "55000" ? "Jobben er allerede tatt, lest eller har ukjent utfall. Ingen ny betalt lesing er startet." : "Kunne ikke starte lesingen." });
+    return json(code === "42501" ? 403 : code === "55000" ? 409 : 400, { error: code === "55000" ? "Jobben kan ikke tas eller fortsettes nå (allerede tatt, ferdig, utløpt eller behandles av et annet kall). Ingen ny betalt lesing er startet." : "Kunne ikke starte lesingen." });
   }
-  const c = claimData as Claim; const attempt = c.attempt_id;
+  const c = claimData as Claim & { pages_done: number; page_results?: unknown[] }; const attempt = c.attempt_id;
   const fail = async (reason: string) => { await admin.rpc("vt_ocr_record_failure", { p_job_id: jobId, p_attempt_id: attempt, p_reason: reason }); return json(200, { status: "feilet", reason }); };
 
-  // 2) Filbevis fra privat lagring.
+  // 2) Utstedt manifest for gjeldende sideoppsett må finnes; ellers leses ingenting (ingen kostnad).
+  const issued = c.manifests.find(m => m.layout_version === VT_SHEET_LAYOUT);
+  if (!issued) return fail("Listen er ikke skrevet ut med gjeldende sideoppsett — skriv ut på nytt før opplasting");
+  let manifest;
+  try { manifest = manifestFromIssued(c.count_id, c.list_id, c.template_revision, issued.pages, c.lines); } catch { return fail("Utstedt manifest stemmer ikke med listen"); }
+
+  // 3) Filbevis fra privat lagring (alle filer, også bevarte originaler).
   const files: { o: Original; bytes: Uint8Array<ArrayBuffer> }[] = [];
   for (const o of c.originals) {
     const f = await admin.storage.from("vt-count-uploads").download(o.path);
-    if (f.error || !f.data) return fail("En opplastet side mangler i lagringen");
+    if (f.error || !f.data) return fail("En opplastet fil mangler i lagringen");
     const bytes = new Uint8Array(await f.data.arrayBuffer());
-    if (bytes.length !== o.size || (await sha256Hex(bytes)) !== o.sha256) return fail("En lagret side stemmer ikke med registrert fil (SHA-256/størrelse)");
+    if (bytes.length !== o.size || (await sha256Hex(bytes)) !== o.sha256) return fail("En lagret fil stemmer ikke med registrert fil (SHA-256/størrelse)");
     files.push({ o, bytes });
   }
   let pdfPages: Uint8Array[];
-  try { pdfPages = await pagesFrom(files); } catch { return fail(`Filene kunne ikke gjøres om til sider (maks ${VT_OCR_MAX_PAGES} sider per jobb)`); }
-  const { error: pcErr } = await admin.rpc("vt_ocr_record_page_count", { p_job_id: jobId, p_attempt_id: attempt, p_pages: pdfPages.length });
-  if (pcErr) return json(200, { status: "ukjent_lagring" });
+  try { pdfPages = await pagesFrom(files.filter(f => f.o.role === "side")); } catch { return fail(`Filene kunne ikke gjøres om til sider (maks ${VT_OCR_MAX_PAGES} sider per jobb)`); }
+  // Avvis FØR noen kostnad: flere sider enn utstedt utskrift.
+  if (pdfPages.length > issued.pages.length) return fail(`Opplastingen har ${pdfPages.length} sider, men listen ble skrevet ut med ${issued.pages.length}. Ingenting er lest.`);
+  if (!resume) {
+    const { error: pcErr } = await admin.rpc("vt_ocr_record_page_count", { p_job_id: jobId, p_attempt_id: attempt, p_pages: pdfPages.length });
+    if (pcErr) return json(200, { status: "ukjent_lagring" });
+  }
 
   const { data: cfg } = await admin.from("ai_provider_config").select("provider, model, encrypted_api_key, azure_endpoint, azure_deployment")
     .eq("purpose", "invoice_extraction").eq("is_active", true).maybeSingle();
@@ -81,9 +92,11 @@ Deno.serve(async (req) => {
   let apiKey: string;
   try { apiKey = await decryptWithKey(cfg.encrypted_api_key as string, "AI_CONFIG_ENCRYPTION_KEY"); } catch { return fail("AI-nøkkelen kunne ikke leses"); }
 
-  // 3) Én avgrenset kjøring per side. Første ukjente/ufullstendige utfall stopper jobben.
+  // 4) Høyst VT_OCR_PAGES_PER_CALL sider per kall (holder Edge-kallet kort); hver side lagres før neste.
   const pages: OcrPage[] = [];
-  for (let i = 0; i < pdfPages.length; i++) {
+  try { for (const raw of c.page_results ?? []) pages.push(parseOcrPage(raw)); } catch { return fail("Lagret sideresultat har ugyldig form"); }
+  const start = c.pages_done ?? 0; const end = Math.min(pdfPages.length, start + VT_OCR_PAGES_PER_CALL);
+  for (let i = start; i < end; i++) {
     let raw: string;
     try {
       const r = await callAi({ provider: cfg.provider as AiProvider, apiKey, model: cfg.model as string, maxTokens: 6000, temperature: 0,
@@ -94,12 +107,16 @@ Deno.serve(async (req) => {
       await admin.rpc("vt_ocr_record_unknown", { p_job_id: jobId, p_attempt_id: attempt, p_detail: `AI-kall for side ${i + 1} fikk ukjent utfall` });
       return json(200, { status: "ukjent_ai_utfall" });
     }
-    try { pages.push(parseOcrPage(extractJson(raw))); }
-    catch { return fail(`Lesesvaret for side ${i + 1} var ufullstendig eller hadde ugyldig form`); }
+    let page: OcrPage;
+    try { page = parseOcrPage(extractJson(raw)); } catch { return fail(`Lesesvaret for side ${i + 1} var ufullstendig eller hadde ugyldig form`); }
+    const { error: pe } = await admin.rpc("vt_ocr_record_page", { p_job_id: jobId, p_attempt_id: attempt, p_index: i, p_page: page, p_last: i === end - 1 });
+    if (pe) return json(200, { status: "ukjent_lagring" });
+    pages.push(page);
   }
+  if (end < pdfPages.length) return json(200, { status: "fortsetter", pages_done: end, page_count: pdfPages.length });
 
-  // 4) Identitetskontroll mot manifest og lagring med samme attempt_id.
-  const result = matchDocument({ pages }, buildManifest(c.count_id, c.list_id, c.template_revision, c.lines));
+  // 5) Identitetskontroll mot utstedt manifest og lagring med samme attempt_id.
+  const result = matchDocument({ pages }, manifest);
   const { error: recErr } = await admin.rpc("vt_ocr_record_result", { p_job_id: jobId, p_attempt_id: attempt, p_document_ok: result.document_ok, p_issues: result.issues, p_proposals: result.proposals });
   if (recErr) return json(200, { status: "ukjent_lagring" });
   return json(200, { status: "klar", document_ok: result.document_ok, proposals: result.proposals.length, issues: result.issues.length });

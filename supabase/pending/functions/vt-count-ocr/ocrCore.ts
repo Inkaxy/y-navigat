@@ -10,6 +10,8 @@ export const VT_SHEET_CAPACITY = 14;
 export const VT_NAME_CHARS_PER_LINE = 30;
 /** Maks sider i én lesejobb (hver side leses i eget, avgrenset kall). */
 export const VT_OCR_MAX_PAGES = 20;
+/** Maks sider per Edge-kall; resten fortsettes i nye kall på samme forsøk (gjenopptakbart). */
+export const VT_OCR_PAGES_PER_CALL = 3;
 
 export interface SheetLine { id: string; snap_name: string; snap_units: { id: string; label: string; units_in_base: number }[] }
 /** Rad-enheter: to navnelinjer og én pakningslinje per enhet; aldri mindre enn 1. */
@@ -154,6 +156,17 @@ export function matchDocument(doc: OcrDoc, manifest: ManifestPage[]): MatchResul
   });
   for (const m of manifest) if (!seen.has(m.page)) block(`Side ${m.page} av ${m.pages} mangler`);
   return { document_ok: blocking.length === 0, issues, proposals, pages_seen: [...seen.keys()].sort((a, b) => a - b) };
+}
+
+/**
+ * Manifest fra en UTSTEDT sideinndeling (lagret ved utskrift). Ukjente linje-ID-er eller linjer som mangler gir feil —
+ * historiske ark valideres mot det som faktisk ble trykt, ikke en rekonstruksjon.
+ */
+export function manifestFromIssued(countId: string, listId: string, templateRevision: number, pages: string[][], lines: ManifestLine[]): ManifestPage[] {
+  const byId = new Map(lines.map(l => [l.id, l]));
+  const ids = pages.flat();
+  if (new Set(ids).size !== ids.length || ids.length !== lines.length || ids.some(id => !byId.has(id))) throw new Error("Utstedt manifest stemmer ikke med listen");
+  return pages.map((p, i) => ({ page: i + 1, pages: pages.length, identity: sheetIdentityOf(countId, listId, templateRevision, i + 1, pages.length), lines: p.map(id => byId.get(id) as ManifestLine) }));
 }
 
 /** Et forslag kan godkjennes bare når hvert felt er avklart: gyldig verdi + kjent enhet, eller eksplisitt utelatt med begrunnelse. */

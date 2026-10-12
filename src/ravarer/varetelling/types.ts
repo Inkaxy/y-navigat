@@ -39,6 +39,8 @@ export interface VtCountLine {
   snap_currency: string; snap_taken_at: string;
   state: LineState; counted_base: number | null; entry: EntryPart[]; note: string | null;
   revision: number; updated_at: string;
+  /** Satt bare når en gjeldende prisavklaring i tellingen er flettet inn (trinn 3). snap_* er alltid uendret. */
+  clar_price_per_base?: number | null; clar_source_kind?: string | null; clar_source_ref?: string | null; clar_reason?: string | null; clar_at?: string | null;
 }
 /** Råvare i firmaet. Alle aktive varer kan telles, uavhengig av lagerføring. */
 export interface VtMaterial {

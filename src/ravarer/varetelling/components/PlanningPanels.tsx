@@ -9,7 +9,7 @@ import { COUNT_STATUS_LABEL, LIST_STATUS_LABEL } from "../logic";
 import { useStage3Api } from "../stage3";
 import { s3Keys, useS3Read, useStage3Ready } from "../stage3Hooks";
 import type { VtCount, VtCountList } from "../types";
-import { formatDateNo, Loading, Notice } from "./shared";
+import { formatDateNo, Loading, NativeSelect, Notice } from "./shared";
 
 // ---------- Tildeling på én liste ----------
 export function AssignBar({ list }: { list: VtCountList }) {
@@ -17,20 +17,35 @@ export function AssignBar({ list }: { list: VtCountList }) {
   const s3 = useStage3Ready();
   const q = useS3Read(s3Keys.assignments(entity), () => (api ? api.listAssignments(entity) : Promise.resolve([])));
   const [msg, setMsg] = useState<string | null>(null); const [busy, setBusy] = useState(false);
+  const [pick, setPick] = useState(""); const [role, setRole] = useState<"teller" | "kontrollor">("teller");
+  const users = useS3Read(s3Keys.users(entity), () => (api ? api.listAssignableUsers(entity) : Promise.resolve([])), canApprove);
   if (!s3.ready || !userId) return null;
+  const nameOf = (id: string) => (id === userId ? "deg" : users.data?.find(u => u.id === id)?.name ?? `bruker ${id.slice(0, 6)}`);
   const mine = (q.data ?? []).filter(a => a.count_list_id === list.id);
   const isMine = mine.some(a => a.user_id === userId && a.role === "teller");
-  const act = async (uid: string, remove: boolean) => {
+  const act = async (uid: string, remove: boolean, r: "teller" | "kontrollor" = "teller") => {
     if (!api || busy) return; setBusy(true);
-    try { await api.assign({ opId: crypto.randomUUID(), listId: list.id, userId: uid, role: "teller", remove }); setMsg(remove ? "Fjernet fra listen." : "Listen er tildelt deg."); }
+    try { await api.assign({ opId: crypto.randomUUID(), listId: list.id, userId: uid, role: r, remove }); setMsg(remove ? "Fjernet fra listen." : uid === userId ? "Listen er tildelt deg." : `${nameOf(uid)} er tildelt som ${r === "teller" ? "teller" : "kontrollør"}.`); }
     catch (e) { setMsg(e instanceof Error ? e.message : "Kunne ikke endre tildeling."); }
     finally { setBusy(false); void qc.invalidateQueries({ queryKey: s3Keys.assignments(entity) }); }
   };
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
-      <span>Tellere: {mine.length === 0 ? "ingen tildelt" : mine.map(a => (a.user_id === userId ? "deg" : `bruker ${a.user_id.slice(0, 6)}`)).join(", ")}</span>
+      <span>Tildelt: {mine.length === 0 ? "ingen" : mine.map(a => `${nameOf(a.user_id)}${a.role === "kontrollor" ? " (kontrollør)" : ""}`).join(", ")}</span>
       {canWrite && <Button size="sm" variant="outline" className="min-h-[44px]" disabled={busy} onClick={() => void act(userId, isMine)}>{isMine ? "Forlat listen" : "Ta listen"}</Button>}
-      {canApprove && mine.filter(a => a.user_id !== userId).map(a => <Button key={a.user_id} size="sm" variant="ghost" className="min-h-[44px]" disabled={busy} onClick={() => void act(a.user_id, true)}>Fjern {a.user_id.slice(0, 6)}</Button>)}
+      {canApprove && mine.filter(a => a.user_id !== userId).map(a => <Button key={a.user_id + a.role} size="sm" variant="ghost" className="min-h-[44px]" disabled={busy} onClick={() => void act(a.user_id, true, a.role)}>Fjern {nameOf(a.user_id)}</Button>)}
+      {canApprove && (
+        <span className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <NativeSelect aria-label="Velg person å tildele" className="w-auto" value={pick} onChange={e => setPick(e.target.value)}>
+            <option value="">{users.isLoading ? "Henter brukere …" : users.error ? "Kunne ikke hente brukere" : "Velg person …"}</option>
+            {(users.data ?? []).map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+          </NativeSelect>
+          <NativeSelect aria-label="Rolle" className="w-auto" value={role} onChange={e => setRole(e.target.value === "kontrollor" ? "kontrollor" : "teller")}>
+            <option value="teller">Teller</option><option value="kontrollor">Kontrollør</option>
+          </NativeSelect>
+          <Button size="sm" variant="outline" className="min-h-[44px]" disabled={!pick || busy} onClick={() => void act(pick, false, role)}>Tildel</Button>
+        </span>
+      )}
       {msg && <span aria-live="polite">{msg}</span>}
     </div>
   );
@@ -83,6 +98,8 @@ export function CalendarPanel({ onOpen, today }: { onOpen: (countId: string) => 
   const byDay = new Map<string, VtCount[]>();
   for (const c of counts.data ?? []) { const k = c.planned_date.slice(0, 10); byDay.set(k, [...(byDay.get(k) ?? []), c]); }
   const step = (d: number) => setYm(v => { const m = v.m + d; return { y: v.y + Math.floor(m / 12), m: ((m % 12) + 12) % 12 }; });
+  const monthKey = `${ym.y}-${String(ym.m + 1).padStart(2, "0")}`;
+  const agenda = [...byDay.entries()].filter(([k]) => k.startsWith(monthKey)).sort(([a], [b]) => a.localeCompare(b));
   return (
     <Card className="p-3">
       <div className="mb-2 flex items-center justify-between">
@@ -90,7 +107,18 @@ export function CalendarPanel({ onOpen, today }: { onOpen: (countId: string) => 
         <h3 className="font-medium" aria-live="polite">{MONTHS[ym.m]} {ym.y}</h3>
         <Button variant="ghost" size="icon" className="h-11 w-11" aria-label="Neste måned" onClick={() => step(1)}><ChevronRight className="h-4 w-4" aria-hidden /></Button>
       </div>
-      <div className="grid grid-cols-7 gap-1 text-xs" role="grid" aria-label={`Tellinger ${MONTHS[ym.m]} ${ym.y}`}>
+      {/* Mobil: romslig agenda per dag. Måned vises fra nettbrett/desktop. */}
+      <ul className="space-y-2 md:hidden" aria-label={`Tellinger ${MONTHS[ym.m]} ${ym.y}`}>
+        {agenda.length === 0 && <li className="text-sm text-muted-foreground">Ingen tellinger denne måneden.</li>}
+        {agenda.map(([k, cs]) => (
+          <li key={k} className={"rounded-md border p-2 " + (k === today ? "ring-2 ring-ring" : "")}>
+            <p className="text-sm font-medium">{formatDateNo(k)}{k === today ? " · i dag" : ""}</p>
+            {cs.map(c => <Button key={c.id} variant="outline" className="mt-1 min-h-[48px] w-full justify-between" onClick={() => onOpen(c.id)} aria-label={`${c.name}, ${COUNT_STATUS_LABEL[c.status]}, ${formatDateNo(c.planned_date)}`}>
+              <span className="break-words text-left">{c.name}</span><span className="text-xs">{COUNT_STATUS_LABEL[c.status]}</span></Button>)}
+          </li>
+        ))}
+      </ul>
+      <div className="hidden grid-cols-7 gap-1 text-xs md:grid" role="grid" aria-label={`Tellinger ${MONTHS[ym.m]} ${ym.y}`}>
         {WD.map(w => <div key={w} className="text-center font-medium text-muted-foreground">{w}</div>)}
         {Array.from({ length: days.lead }, (_, i) => <div key={`e${i}`} />)}
         {Array.from({ length: days.n }, (_, i) => { const d = i + 1; const k = iso(d); const cs = byDay.get(k) ?? [];

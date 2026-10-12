@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { osloTodayISO } from "@/lib/osloDate";
 import { useVtApi } from "../api";
-import { useOpAction, useVtCounts, useVtCoverage, useVtScope, useVtTemplates } from "../hooks";
-import { COUNT_STATUS_LABEL, priceReasonLabel } from "../logic";
+import { useOpAction, useVtCount, useVtCounts, useVtCoverage, useVtScope, useVtTemplates } from "../hooks";
+import { useClarifiedLines } from "../stage3Hooks";
+import { COUNT_STATUS_LABEL, formatKr, priceReasonLabel, summarize, summarizeGroups } from "../logic";
 import type { ValuationMode, VtCount } from "../types";
 import { report } from "./CountControls";
 import { formatDateNo, Loading, Notice, PendingNotice } from "./shared";
@@ -49,15 +50,42 @@ export function CountsPanel({ onOpen }: { onOpen: (id: string) => void }) {
 }
 
 function CountRow({ c, onOpen }: { c: VtCount; onOpen: (id: string) => void }) {
+  const [show, setShow] = useState(false);
+  const archived = c.status === "avsluttet" || c.status === "avbrutt";
   return (
-    <button type="button" onClick={() => onOpen(c.id)} className="flex min-h-[56px] w-full flex-wrap items-center justify-between gap-2 rounded-lg border bg-card p-3 text-left">
-      <span className="min-w-0">
-        <span className="block font-medium break-words">{c.name}</span>
-        <span className="text-xs text-muted-foreground">Telledato {formatDateNo(c.planned_date)} · {c.template_ids.length} lister
-          {c.valuation_mode === "historisk" && c.valuation_date && <> · historisk verdsatt {formatDateNo(c.valuation_date)}</>}</span>
-      </span>
-      <Badge variant="outline">{COUNT_STATUS_LABEL[c.status]}</Badge>
-    </button>
+    <div className="rounded-lg border bg-card">
+      <button type="button" onClick={() => onOpen(c.id)} className="flex min-h-[56px] w-full flex-wrap items-center justify-between gap-2 p-3 text-left">
+        <span className="min-w-0">
+          <span className="block font-medium break-words">{c.name}</span>
+          <span className="text-xs text-muted-foreground">Telledato {formatDateNo(c.planned_date)} · {c.template_ids.length} lister
+            {c.valuation_mode === "historisk" && c.valuation_date && <> · historisk verdsatt {formatDateNo(c.valuation_date)}</>}</span>
+        </span>
+        <Badge variant="outline">{COUNT_STATUS_LABEL[c.status]}</Badge>
+      </button>
+      {archived && (
+        <div className="border-t px-3 pb-3">
+          <Button variant="ghost" className="min-h-[44px]" aria-expanded={show} onClick={() => setShow(v => !v)}>{show ? "Skjul totaler" : "Vis frosne totaler"}</Button>
+          {show && <ArchiveTotals countId={c.id} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Frosne totaler (startgrunnlag + godkjente prisavklaringer i tellingen). Bruker aldri dagens pris. */
+function ArchiveTotals({ countId }: { countId: string }) {
+  const q = useVtCount(countId);
+  const clar = useClarifiedLines(countId, q.data?.lines ?? []);
+  if (q.isLoading) return <Loading />;
+  if (q.error || !q.data) return <Notice tone="danger" title="Kunne ikke hente tellingen." />;
+  const all = summarize(clar.lines); const g = summarizeGroups(q.data.lists, clar.lines);
+  const line = (s: ReturnType<typeof summarize>) => `${s.lines - s.notCounted}/${s.lines} registrert · ${s.value == null ? "verdi ukjent" : formatKr(s.value)}${s.complete ? "" : " (ufullstendig)"}`;
+  return (
+    <div className="space-y-1 text-sm" aria-label="Frosne totaler">
+      <p className="font-medium">Hele tellingen: {line(all)}</p>
+      {clar.error && <p className="text-xs text-destructive">Prisavklaringer kunne ikke hentes — verdien kan være for lav.</p>}
+      <ul className="text-xs">{g.byList.map(x => <li key={x.key}>{x.label}: {line(x.summary)}</li>)}</ul>
+    </div>
   );
 }
 

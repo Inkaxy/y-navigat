@@ -12,7 +12,7 @@ import { buildReportCsv, summarizeLines, type VtReportData, type VtSummary } fro
  * Egen sonde (vt_stage3_version = 2). Uten utrullet SQL/Edge viser UI at funksjonen ikke er tatt i bruk.
  */
 export type OcrJobStatus = "opprettet" | "behandler" | "ukjent_ai_utfall" | "klar" | "feilet";
-export interface VtOriginal { path: string; sha256: string; size: number; mime: string }
+export interface VtOriginal { path: string; sha256: string; size: number; mime: string; role: "side" | "original" }
 export interface VtOcrJob {
   id: string; count_list_id: string; status: OcrJobStatus; document_ok: boolean | null; issues: string[]; detail: string | null;
   created_at: string; originals: VtOriginal[]; attempts: number; lease_until: string | null; page_count: number | null;
@@ -26,6 +26,9 @@ export type MailState = "akseptert_av_tjenesten" | "avvist" | "ukjent" | "reserv
 export interface MailStatus { found: boolean; state: MailState | null; detail: string | null }
 export interface VtAssignment { id: string; count_list_id: string; user_id: string; role: "teller" | "kontrollor" }
 export interface VtUnit { id: string; raw_material_id: string; label: string; units_in_base: number }
+export type ClarSource = "faktura" | "leverandorpris" | "prisliste" | "manuell_vurdering";
+export interface VtClarification { id: string; line_id: string; price_per_base: number; source_kind: ClarSource; source_ref: string | null; reason: string; decided_at: string; superseded_at: string | null }
+export interface VtUser { id: string; name: string }
 /** Kalles før hvert eksternt steg; false = konteksten er byttet ⇒ stopp uten flere sideeffekter. */
 export type Guard = () => boolean;
 export class VtStaleContextError extends Error { constructor() { super("Visningen er byttet. Ingenting mer ble gjort."); } }
@@ -49,6 +52,18 @@ export interface Stage3Api {
   listAssignments(entity: string): Promise<VtAssignment[]>;
   assign(i: { opId: string; listId: string; userId: string; role: "teller" | "kontrollor"; remove: boolean }): Promise<void>;
   listUnits(entity: string): Promise<VtUnit[]>;
+  /** Utsteder (idempotent) sideinndelingen som trykkes. Lesing valideres mot dette. */
+  issueManifest(i: { listId: string; layoutVersion: number; pages: string[][] }): Promise<{ manifestId: string; replayed: boolean }>;
+  listClarifications(entity: string, countId: string): Promise<VtClarification[]>;
+  clarifyPrice(i: { opId: string; lineId: string; expectedClarification: string | null; price: number; sourceKind: ClarSource; sourceRef: string | null; reason: string }): Promise<{ clarificationId: string }>;
+  /** Godkjenner: firmaets brukere med skrivetilgang (navn fra eksisterende rm_user_names). */
+  listAssignableUsers(entity: string): Promise<VtUser[]>;
+}
+const CLAR_KINDS = ["faktura", "leverandorpris", "prisliste", "manuell_vurdering"] as const;
+export function parseClarification(v: unknown): VtClarification {
+  const r = rec(v, "avklaring"); const k = CLAR_KINDS.find(x => x === r.source_kind); if (!k) throw new Error("kilde");
+  return { id: s(r.id, "id"), line_id: s(r.line_id, "line"), price_per_base: n(r.price_per_base, "pris"), source_kind: k, source_ref: sN(r.source_ref, "ref"),
+    reason: s(r.reason, "reason"), decided_at: s(r.decided_at, "at"), superseded_at: sN(r.superseded_at, "sup") };
 }
 export const Stage3Context = createContext<Stage3Api | null>(null);
 /** Null når inngangen ikke har trinn 3 (da vises funksjonene som ikke tilgjengelige). */
@@ -62,7 +77,7 @@ const sN = (v: unknown, k: string) => (v == null ? null : s(v, k));
 const n = (v: unknown, k: string) => { const x = typeof v === "string" ? Number(v) : v; if (typeof x !== "number" || !Number.isFinite(x)) throw new Error(k); return x; };
 const b = (v: unknown, k: string) => { if (typeof v !== "boolean") throw new Error(k); return v; };
 const mailState = (v: unknown): MailState => { const x = MAIL_ST.find(m => m === v); if (!x) throw new VtUnknownOutcomeError(); return x; };
-const parseOriginal = (v: unknown): VtOriginal => { const r = rec(v, "original"); return { path: s(r.path, "path"), sha256: s(r.sha256, "sha"), size: n(r.size, "size"), mime: s(r.mime, "mime") }; };
+const parseOriginal = (v: unknown): VtOriginal => { const r = rec(v, "original"); return { path: s(r.path, "path"), sha256: s(r.sha256, "sha"), size: n(r.size, "size"), mime: s(r.mime, "mime"), role: r.role === "original" ? "original" : "side" }; };
 export function parseJob(v: unknown): VtOcrJob {
   const r = rec(v, "jobb"); const status = JOB_ST.find(x => x === r.status); if (!status) throw new Error("status");
   if (!Array.isArray(r.originals) || !Array.isArray(r.issues)) throw new Error("jobb");
@@ -178,9 +193,15 @@ export const supabaseStage3Api: Stage3Api = {
   async uploadAndRead({ opId, listId, files, guard }) {
     const bad = checkUploadFiles(files); if (bad) throw new VtRejectedError(bad, "22023");
     step(guard);
-    const norm: File[] = []; for (const f of files) { norm.push(await normalize(f)); step(guard); }
-    const meta: { sha256: string; size: number; mime: string }[] = [];
-    for (const f of norm) { meta.push({ sha256: await sha256Blob(f), size: f.size, mime: f.type }); step(guard); }
+    // WEBP: original bevares som egen fil (rolle «original»), PNG-avledning er siden som leses (rolle «side»).
+    const norm: File[] = []; const meta: { sha256: string; size: number; mime: string; role: "side" | "original"; original_index?: number }[] = [];
+    for (const f of files) {
+      if (f.type === "image/webp") {
+        const idx = meta.length; norm.push(f); meta.push({ sha256: await sha256Blob(f), size: f.size, mime: f.type, role: "original" }); step(guard);
+        const d = await normalize(f); step(guard); norm.push(d); meta.push({ sha256: await sha256Blob(d), size: d.size, mime: d.type, role: "side", original_index: idx });
+      } else { norm.push(f); meta.push({ sha256: await sha256Blob(f), size: f.size, mime: f.type, role: "side" }); }
+      step(guard);
+    }
     const res = rec(await rpc("vt_ocr_create_job", { p_op_id: opId, p_list_id: listId, p_files: meta }), "jobb");
     const jobId = s(res.job_id, "job_id"); const duplicate = res.duplicate === true; const status = s(res.status, "status");
     if (!Array.isArray(res.originals)) throw new VtUnknownOutcomeError();
@@ -194,7 +215,9 @@ export const supabaseStage3Api: Stage3Api = {
       if (up.error && !/exists|duplicate/i.test(up.error.message)) throw new VtUnknownOutcomeError();
     }
     step(guard);
-    const r = await invoke("vt-count-ocr", { job_id: jobId });
+    let r = await invoke("vt-count-ocr", { job_id: jobId });
+    // Gjenopptakbar lesing: høyst 3 sider per kall; fortsett samme forsøk til ferdig (avgrenset antall kall).
+    for (let k = 0; k < 10 && r.status === "fortsetter"; k++) { step(guard); r = await invoke("vt-count-ocr", { job_id: jobId, continue: true }); }
     return { jobId, duplicate, status: typeof r.status === "string" ? r.status : "ukjent" };
   },
   async jobStatus(jobId) {
@@ -232,6 +255,24 @@ export const supabaseStage3Api: Stage3Api = {
     return { id: s(r.id, "id"), count_list_id: s(r.count_list_id, "l"), user_id: s(r.user_id, "u"), role };
   }),
   assign: (i) => rpc("vt_assign_list", { p_op_id: i.opId, p_list_id: i.listId, p_user_id: i.userId, p_role: i.role, p_remove: i.remove }).then(d => { if (rec(d, "svar").list_id !== i.listId) throw new VtUnknownOutcomeError(); }),
+  issueManifest: (i) => rpc("vt_issue_print_manifest", { p_list_id: i.listId, p_layout_version: i.layoutVersion, p_pages: i.pages }).then(d => {
+    const r = rec(d, "manifest"); return { manifestId: s(r.manifest_id, "id"), replayed: r.replayed === true };
+  }),
+  listClarifications: (e, countId) => readAllRows("vt_price_clarifications", "id, line_id, price_per_base, source_kind, source_ref, reason, decided_at, superseded_at",
+    [["legal_entity_id", e], ["count_id", countId]], parseClarification),
+  clarifyPrice: (i) => rpc("vt_clarify_price", { p_op_id: i.opId, p_line_id: i.lineId, p_expected_clarification: i.expectedClarification, p_price: i.price,
+    p_source_kind: i.sourceKind, p_source_ref: i.sourceRef, p_reason: i.reason }).then(d => {
+    const r = rec(d, "svar"); if (r.line_id !== i.lineId) throw new VtUnknownOutcomeError(); return { clarificationId: s(r.clarification_id, "id") };
+  }),
+  async listAssignableUsers(e) {
+    const ids = await rpc("vt_assignable_users", { p_legal_entity_id: e });
+    if (!Array.isArray(ids)) throw new Error("Kunne ikke hente brukere.");
+    const list = ids.map(x => s(rec(x, "bruker").user_id, "id"));
+    if (list.length === 0) return [];
+    const names = await rpc("rm_user_names", { p_legal_entity_id: e, p_user_ids: list });
+    const byId = new Map(Array.isArray(names) ? names.map(x => { const r = rec(x, "navn"); return [s(r.id, "id"), typeof r.name === "string" && r.name.trim() ? r.name : "Navn mangler"] as const; }) : []);
+    return list.map(id => ({ id, name: byId.get(id) ?? "Navn mangler" })).sort((a, z) => a.name.localeCompare(z.name, "nb"));
+  },
   listUnits: (e) => readAllRows("raw_material_units", "id, raw_material_id, unit_label, units_in_base", [["raw_materials.legal_entity_id", e]], v => {
     const r = rec(v, "enhet"); return { id: s(r.id, "id"), raw_material_id: s(r.raw_material_id, "rm"), label: s(r.unit_label, "label"), units_in_base: n(r.units_in_base, "uib") };
   }, "raw_materials!inner(legal_entity_id)"),
@@ -245,6 +286,7 @@ export function createFakeStage3(base: FakeBase, opts: FakeStage3Opts = {}) {
   const jobs: VtOcrJob[] = []; const props: VtOcrProposal[] = []; const keys = new Map<string, string>(); const urls = new Map<string, string[]>();
   const mail = new Map<string, { sig: string; state: MailState; csv: string }>(); const assign: VtAssignment[] = []; const ops = new Map<string, unknown>();
   const counters = { graphCalls: 0, aiReads: 0 };
+  const manifests = new Map<string, string[][]>(); const clars: VtClarification[] = [];
   const unavailable = () => { if (opts.available === false) throw new VtBackendUnavailableError(); };
   const data = (countId: string): VtReportData => {
     const c = st.counts.find(x => x.id === countId); if (!c || c.status === "planlagt") throw new VtRejectedError("Tellingen er ikke startet", "55000");
@@ -256,7 +298,9 @@ export function createFakeStage3(base: FakeBase, opts: FakeStage3Opts = {}) {
   const syntheticRead = (listId: string, pageCount: number): OcrDoc => {
     const list = st.lists.find(l => l.id === listId); if (!list) return { pages: [] };
     const lines = st.lines.filter(l => l.count_list_id === listId).sort((a, z) => a.sort_order - z.sort_order);
-    const m = buildManifest(list.count_id, list.id, list.source_template_revision, lines);
+    const issued = manifests.get(listId);
+    const m = issued ? issued.map((p, i) => ({ page: i + 1, pages: issued.length, identity: `VT2|${list.count_id}|${list.id}|r${list.source_template_revision}|s${i + 1}/${issued.length}`, lines: p.map(id => lines.find(l => l.id === id)).filter((l): l is (typeof lines)[number] => !!l) }))
+      : buildManifest(list.count_id, list.id, list.source_template_revision, lines);
     const raws = ["2", "1.500", null, "3,5", "x?"];
     return { pages: m.slice(0, pageCount).map(p => ({ printed_identity: p.identity, complete: true, rows: p.lines.map((l, i) => ({
       row_code: rowCodeOf(l.id), crossed_out: i === 3, unclear: false, comment: null,
@@ -289,7 +333,7 @@ export function createFakeStage3(base: FakeBase, opts: FakeStage3Opts = {}) {
       const jobId = `job-${++seq}`; keys.set(k, jobId);
       urls.set(jobId, files.map(f => (typeof URL.createObjectURL === "function" ? URL.createObjectURL(f) : "")));
       const job: VtOcrJob = { id: jobId, count_list_id: listId, status: "behandler", document_ok: null, issues: [], detail: null, created_at: new Date().toISOString(),
-        originals: files.map((f, i) => ({ path: `demo/${jobId}/side-${i + 1}`, sha256: shas[i].split(":")[0], size: f.size, mime: f.type })), attempts: 1, lease_until: null, page_count: files.length };
+        originals: files.map((f, i) => ({ path: `demo/${jobId}/side-${i + 1}`, sha256: shas[i].split(":")[0], size: f.size, mime: f.type, role: "side" as const })), attempts: 1, lease_until: null, page_count: files.length };
       jobs.unshift(job);
       counters.aiReads++;
       if (opts.readOutcome === "ukjent") { job.status = "ukjent_ai_utfall"; job.detail = "Syntetisk: AI-kall fikk ukjent utfall"; }
@@ -349,7 +393,46 @@ export function createFakeStage3(base: FakeBase, opts: FakeStage3Opts = {}) {
       const at = assign.findIndex(a => a.count_list_id === i.listId && a.user_id === i.userId && a.role === i.role);
       if (i.remove) { if (at >= 0) assign.splice(at, 1); } else if (at < 0) assign.push({ id: `as-${++seq}`, count_list_id: i.listId, user_id: i.userId, role: i.role });
     },
+    async issueManifest({ listId, pages }) {
+      unavailable(); const cur = manifests.get(listId);
+      const all = st.lines.filter(l => l.count_list_id === listId).map(l => l.id).sort(); const flat = pages.flat();
+      if (flat.length !== all.length || [...flat].sort().join() !== all.join()) throw new VtRejectedError("Sideinndelingen må inneholde hver linje i listen nøyaktig én gang", "22023");
+      if (cur) { if (JSON.stringify(cur) !== JSON.stringify(pages)) throw new VtRejectedError("Utstedt sideinndeling er annerledes", "23505"); return { manifestId: `m-${listId}`, replayed: true }; }
+      manifests.set(listId, pages.map(p => [...p])); return { manifestId: `m-${listId}`, replayed: false };
+    },
+    async listClarifications(_e, countId) { unavailable(); return clars.filter(c => st.lines.find(l => l.id === c.line_id)?.count_id === countId).map(c => ({ ...c })); },
+    async clarifyPrice(i) {
+      unavailable();
+      if (ops.has(i.opId)) return ops.get(i.opId) as { clarificationId: string };
+      const line = st.lines.find(l => l.id === i.lineId); const c = st.counts.find(x => x.id === line?.count_id);
+      if (!line || !c) throw new VtRejectedError("Mangler tilgang", "42501");
+      if (!["pagar", "til_kontroll"].includes(c.status)) throw new VtRejectedError("Tellingen er ikke åpen", "55000");
+      if (line.snap_price_per_base != null) throw new VtRejectedError("Linjen har dokumentert pris fra start", "55000");
+      if (!Number.isFinite(i.price) || i.price <= 0 || i.price > 1e6 || i.reason.trim().length < 10) throw new VtRejectedError("Pris, kilde og begrunnelse (minst 10 tegn) kreves", "22023");
+      const cur = clars.find(x => x.line_id === i.lineId && x.superseded_at == null);
+      if ((cur?.id ?? null) !== i.expectedClarification) throw new VtRejectedError("Prisavklaringen er endret av andre", "40001");
+      if (cur) cur.superseded_at = new Date().toISOString();
+      const nw: VtClarification = { id: `clar-${++seq}`, line_id: i.lineId, price_per_base: i.price, source_kind: i.sourceKind, source_ref: i.sourceRef, reason: i.reason.trim(), decided_at: new Date().toISOString(), superseded_at: null };
+      clars.push(nw); st.clarified.add(i.lineId);
+      const res = { clarificationId: nw.id }; ops.set(i.opId, res); return res;
+    },
+    async listAssignableUsers() { unavailable(); return [{ id: "u1", name: "Demo Teller" }, { id: "u2", name: "Kari Kontrollør (demo)" }, { id: "u3", name: "Ola Opptelling (demo)" }]; },
     async listUnits() { unavailable(); return [...st.units.entries()].flatMap(([rm, us]) => us.map(u => ({ id: u.id, raw_material_id: rm, label: u.label, units_in_base: u.units_in_base }))); },
   };
-  return Object.assign(api, { _jobs: jobs, _props: props, _mail: mail, _assign: assign, _counters: counters });
+  /** Forhåndsvisning: ferdig syntetisk lesejobb med flersides prøveark (ingen filvelger, ingen nettverk, IKKE ekte AI). */
+  const seedDemo = (listId: string, pageUrls: string[]) => {
+    const list = st.lists.find(l => l.id === listId); if (!list) return null;
+    const lines = st.lines.filter(l => l.count_list_id === listId).sort((a, z) => a.sort_order - z.sort_order);
+    const jobId = `job-demo-${++seq}`; urls.set(jobId, pageUrls);
+    const doc = syntheticRead(listId, pageUrls.length);
+    const issued = manifests.get(listId);
+    const man = issued ? issued.map((p, i) => ({ page: i + 1, pages: issued.length, identity: `VT2|${list.count_id}|${list.id}|r${list.source_template_revision}|s${i + 1}/${issued.length}`, lines: p.map(id => lines.find(l => l.id === id)).filter((l): l is (typeof lines)[number] => !!l) }))
+      : buildManifest(list.count_id, list.id, list.source_template_revision, lines);
+    const r = matchDocument(doc, man);
+    jobs.unshift({ id: jobId, count_list_id: listId, status: "klar", document_ok: r.document_ok, issues: r.issues, detail: "Syntetisk demonstrasjon — ikke ekte lesing", created_at: new Date().toISOString(),
+      originals: pageUrls.map((_, i) => ({ path: `demo/${jobId}/side-${i + 1}`, sha256: "demo", size: 1, mime: "image/svg+xml", role: "side" as const })), attempts: 1, lease_until: null, page_count: pageUrls.length });
+    r.proposals.forEach((p, i) => props.push({ ...p, id: `${jobId}-p${i}`, job_id: jobId, status: "foreslatt" }));
+    return jobId;
+  };
+  return Object.assign(api, { _jobs: jobs, _props: props, _mail: mail, _assign: assign, _counters: counters, _manifests: manifests, _clars: clars, seedDemo });
 }

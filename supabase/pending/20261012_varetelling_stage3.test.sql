@@ -1,7 +1,14 @@
 -- Atferdstest for stage3 revisjon 2. Kjøres etter grunnlagets test (samme økt) av scripts/test-varetelling-sql.mjs.
 -- Seriell; ingen ekte parallellitet. Låsrekkefølge er resonnert, ikke bevist med to økter.
 RESET ROLE;
+CREATE TABLE public.user_positions (user_id uuid, legal_entity_id uuid, valid_from timestamptz DEFAULT now() - interval '1 day', valid_to timestamptz);
+INSERT INTO user_positions (user_id, legal_entity_id) VALUES ('00000000-0000-0000-0000-0000000000a1','aaaaaaaa-0000-0000-0000-000000000000'),
+ ('00000000-0000-0000-0000-0000000000a3','aaaaaaaa-0000-0000-0000-000000000000'), ('00000000-0000-0000-0000-0000000000a4','aaaaaaaa-0000-0000-0000-000000000000'),
+ ('00000000-0000-0000-0000-0000000000b1','bbbbbbbb-0000-0000-0000-000000000000');
 \i 20261012_varetelling_stage3.PENDING.sql
+-- Etterlign Supabase: service_role omgår RLS og kan lese grunnlagstabellene.
+ALTER ROLE service_role BYPASSRLS;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO service_role;
 
 SET ROLE authenticated; SELECT set_config('test.uid','00000000-0000-0000-0000-0000000000a1',false);
 SELECT set_config('test.c3', (vt_create_count(gen_random_uuid(),'aaaaaaaa-0000-0000-0000-000000000000','OCR-test','2026-10-12','ved_start',null,ARRAY[current_setting('test.t2')]::uuid[])->>'count_id'), false);
@@ -9,7 +16,7 @@ SELECT vt_start_count(gen_random_uuid(), current_setting('test.c3')::uuid, 1);
 SELECT set_config('test.list3', (SELECT id::text FROM vt_count_lists WHERE count_id=current_setting('test.c3')::uuid LIMIT 1), false);
 SELECT set_config('test.line3', (SELECT id::text FROM vt_count_lines WHERE count_list_id=current_setting('test.list3')::uuid AND snap_base_unit IS NOT NULL ORDER BY sort_order LIMIT 1), false);
 CREATE FUNCTION pg_temp.files(c text, n int DEFAULT 1) RETURNS jsonb LANGUAGE sql AS $$
-  SELECT jsonb_agg(jsonb_build_object('sha256', repeat(c,63) || i, 'size', 1000, 'mime', 'image/jpeg')) FROM generate_series(1, n) i $$;
+  SELECT jsonb_agg(jsonb_build_object('sha256', repeat(c,63) || i, 'size', 1000, 'mime', 'image/jpeg', 'role', 'side')) FROM generate_series(1, n) i $$;
 GRANT EXECUTE ON FUNCTION pg_temp.files(text,int) TO authenticated, service_role;
 
 -- ===== Rapport-øyeblikksbilde =====
@@ -22,6 +29,12 @@ SELECT set_config('test.uid','00000000-0000-0000-0000-0000000000a1',false);
 -- ===== Jobb: flere sider, duplikat, ugyldige filer, tilgang =====
 SELECT set_config('test.job', (vt_ocr_create_job('88888888-0000-0000-0000-000000000001', current_setting('test.list3')::uuid, pg_temp.files('a', 2))->>'job_id'), false);
 SELECT pg_temp.ok((SELECT jsonb_array_length(originals) = 2 AND originals->1->>'path' LIKE 'aaaaaaaa-0000-0000-0000-000000000000/%/side-2.jpg' FROM vt_ocr_jobs WHERE id=current_setting('test.job')::uuid), 'to sider i én jobb; stier bestemt av server');
+-- WEBP: original bevares som egen fil, PNG-avledning er siden som leses.
+SELECT set_config('test.jobW', vt_ocr_create_job(gen_random_uuid(), current_setting('test.list3')::uuid,
+  '[{"sha256":"7777777777777777777777777777777777777777777777777777777777777777","size":10,"mime":"image/webp","role":"original"},{"sha256":"8888888888888888888888888888888888888888888888888888888888888888","size":20,"mime":"image/png","role":"side","original_index":0}]')->>'job_id', false);
+SELECT pg_temp.ok((SELECT originals->0->>'role' = 'original' AND originals->0->>'path' LIKE '%/original-1.webp' AND originals->1->>'role' = 'side' FROM vt_ocr_jobs WHERE id = current_setting('test.jobW')::uuid), 'WEBP-original bevart separat fra avledet side');
+SELECT pg_temp.expect_error($q$SELECT vt_ocr_create_job(gen_random_uuid(), current_setting('test.list3')::uuid, '[{"sha256":"7777777777777777777777777777777777777777777777777777777777777777","size":10,"mime":"image/webp","role":"original"}]')$q$, '22023');
+SELECT pg_temp.expect_error($q$SELECT vt_ocr_create_job(gen_random_uuid(), current_setting('test.list3')::uuid, (SELECT jsonb_agg(jsonb_build_object('sha256', repeat('6',63) || (i % 10), 'size', i, 'mime', 'image/jpeg', 'role', 'side')) FROM generate_series(1, 21) i))$q$, '22023');
 SELECT pg_temp.ok((vt_ocr_create_job(gen_random_uuid(), current_setting('test.list3')::uuid, pg_temp.files('a', 2))->>'duplicate')::boolean, 'samme sider (SHA+størrelse) på samme liste = eksisterende jobb');
 SELECT pg_temp.expect_error($q$SELECT vt_ocr_create_job(gen_random_uuid(), current_setting('test.list3')::uuid, '[{"sha256":"x","size":1,"mime":"image/jpeg"}]')$q$, '22023');
 SELECT pg_temp.expect_error($q$SELECT vt_ocr_create_job(gen_random_uuid(), current_setting('test.list3')::uuid, '[{"sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":1,"mime":"image/webp"}]')$q$, '22023');
@@ -36,7 +49,7 @@ SELECT set_config('test.uid','00000000-0000-0000-0000-0000000000a1',false);
 SELECT pg_temp.expect_error($q$UPDATE vt_ocr_jobs SET status='klar'$q$, '42501');
 SELECT pg_temp.expect_error($q$SELECT csv FROM vt_report_mail_ops$q$, '42501');
 SELECT pg_temp.expect_error($q$SELECT vt_ocr_record_result(current_setting('test.job')::uuid, gen_random_uuid(), true, '[]', '[]')$q$, '42501');
-SELECT pg_temp.expect_error($q$SELECT vt_report_mail_claim(gen_random_uuid())$q$, '42501');
+SELECT pg_temp.expect_error($q$SELECT vt_report_mail_claim(gen_random_uuid(), auth.uid(), gen_random_uuid(), 'a', 'b', 'c')$q$, '42501');
 
 -- ===== Lease og forsøksidentitet =====
 SELECT set_config('test.att1', vt_ocr_claim(current_setting('test.job')::uuid)->>'attempt_id', false);
@@ -111,26 +124,72 @@ SELECT pg_temp.expect_error($q$SELECT vt_ocr_accept(gen_random_uuid(), current_s
 SELECT vt_ocr_reject(gen_random_uuid(), current_setting('test.prop2')::uuid, 'feil');
 SELECT pg_temp.expect_error($q$SELECT vt_ocr_accept(gen_random_uuid(), current_setting('test.prop2')::uuid, 0, 'null', 0, '[]', null, '[]')$q$, '55000');
 
--- ===== E-post =====
-CREATE FUNCTION pg_temp.reserve(op uuid, rcpt text DEFAULT 'henrik@nottero-bakeri.no', rev int DEFAULT NULL) RETURNS jsonb LANGUAGE sql AS $$
-  SELECT vt_report_mail_reserve(op, current_setting('test.c3')::uuid, coalesce(rev, (SELECT revision FROM vt_counts WHERE id=current_setting('test.c3')::uuid)), repeat('1',64),
-    rcpt, 'Rapport', 'Hei', vt_report_snapshot(current_setting('test.c3')::uuid), 'csv', 'cGRm', 'varetelling', false, 'post@nottero-bakeri.no') $$;
-GRANT EXECUTE ON FUNCTION pg_temp.reserve(uuid,text,int) TO authenticated;
-SELECT pg_temp.ok((pg_temp.reserve('99999999-1111-0000-0000-000000000001')->>'state') = 'reservert', 'reservert med øyeblikksbilde og vedlegg');
-SELECT pg_temp.ok((vt_report_mail_status('99999999-1111-0000-0000-000000000001')->>'state') = 'reservert', 'status er skrivebeskyttet oppslag');
-SELECT pg_temp.ok((pg_temp.reserve('99999999-1111-0000-0000-000000000001')->>'replayed')::boolean, 'samme reservasjon gjentatt');
-SELECT pg_temp.expect_error($q$SELECT pg_temp.reserve('99999999-1111-0000-0000-000000000001', 'annen@nottero-bakeri.no')$q$, '23505');
-SELECT pg_temp.expect_error($q$SELECT pg_temp.reserve(gen_random_uuid(), 'henrik@nottero-bakeri.no', 999)$q$, '40001');
-SELECT pg_temp.expect_error($q$SELECT pg_temp.reserve(gen_random_uuid(), 'ikke-en-adresse')$q$, '23514');
-SELECT set_config('test.uid','00000000-0000-0000-0000-0000000000b1',false);
-SELECT pg_temp.expect_error($q$SELECT pg_temp.reserve(gen_random_uuid())$q$, '42501');
-SELECT pg_temp.expect_error($q$SELECT vt_report_mail_status('99999999-1111-0000-0000-000000000001')$q$, '42501');
--- Linje endres etter reservasjon: lagret vedlegg gjelder fortsatt (reservasjonen er uendret).
+-- ===== E-post: reservasjon bare via service med verifisert aktør =====
+CREATE FUNCTION pg_temp.reserve(op uuid, actor uuid, rcpt text DEFAULT 'henrik@nottero-bakeri.no', csv text DEFAULT 'csv') RETURNS jsonb LANGUAGE sql AS $$
+  SELECT vt_report_mail_reserve(op, actor, current_setting('test.c3')::uuid, (SELECT revision FROM vt_counts WHERE id=current_setting('test.c3')::uuid), repeat('1',64),
+    rcpt, 'Rapport', 'Hei', _vt_report_snapshot_data(current_setting('test.c3')::uuid), csv, 'cGRm', 'varetelling', false, 'post@nottero-bakeri.no') $$;
+GRANT EXECUTE ON FUNCTION pg_temp.reserve(uuid,uuid,text,text) TO authenticated, service_role;
+-- Forfalsket direkte reservasjon fra innlogget klient (egne vedlegg/avsender) avvises.
+SELECT pg_temp.expect_error($q$SELECT vt_report_mail_reserve(gen_random_uuid(), '00000000-0000-0000-0000-0000000000a1', current_setting('test.c3')::uuid, 1, repeat('1',64), 'x@nottero-bakeri.no', 'R', '', '{}', 'FORFALSKET', 'eA==', 'b', true, 'falsk@x.no')$q$, '42501');
+SELECT pg_temp.expect_error($q$SELECT _vt_report_snapshot_data(current_setting('test.c3')::uuid)$q$, '42501');
 SET ROLE service_role;
-SELECT pg_temp.ok((vt_report_mail_claim('99999999-1111-0000-0000-000000000001')->>'csv') = 'csv', 'claim returnerer LAGRET vedlegg');
-SELECT pg_temp.ok(NOT (vt_report_mail_claim('99999999-1111-0000-0000-000000000001')->>'claimed')::boolean, 'andre claim sender ikke');
+SELECT pg_temp.expect_error($q$SELECT pg_temp.reserve(gen_random_uuid(), '00000000-0000-0000-0000-0000000000a3')$q$, '42501');
+SELECT pg_temp.expect_error($q$SELECT pg_temp.reserve(gen_random_uuid(), '00000000-0000-0000-0000-0000000000b1')$q$, '42501');
+SELECT pg_temp.expect_error($q$SELECT vt_report_mail_reserve(gen_random_uuid(), '00000000-0000-0000-0000-0000000000a1', current_setting('test.c3')::uuid, (SELECT revision FROM vt_counts WHERE id=current_setting('test.c3')::uuid), repeat('1',64), 'x@nottero-bakeri.no', 'R', '', jsonb_set(_vt_report_snapshot_data(current_setting('test.c3')::uuid), '{lines,0,counted_base}', '999'), 'c', 'eA==', 'b', false, 'p@x.no')$q$, '40001');
+SELECT pg_temp.ok((pg_temp.reserve('99999999-1111-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a1')->>'state') = 'reservert', 'service-reservasjon med verifisert aktør og gjeldende øyeblikksbilde');
+SELECT pg_temp.ok((pg_temp.reserve('99999999-1111-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a1')->>'replayed')::boolean, 'identisk gjentakelse = lagret');
+SELECT pg_temp.expect_error($q$SELECT pg_temp.reserve('99999999-1111-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a1', 'henrik@nottero-bakeri.no', 'ANNET VEDLEGG')$q$, '23505');
+SELECT pg_temp.expect_error($q$SELECT pg_temp.reserve('99999999-1111-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a2')$q$, '23505');
+SELECT pg_temp.expect_error($q$SELECT pg_temp.reserve(gen_random_uuid(), '00000000-0000-0000-0000-0000000000a1', 'ikke-en-adresse')$q$, '23514');
+-- Gjenoppta: annen skriver uten godkjenning avvises; feil forespørsel avvises; opprinnelig aktør kan.
+SELECT pg_temp.expect_error($q$SELECT vt_report_mail_claim('99999999-1111-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a4', current_setting('test.c3')::uuid, 'henrik@nottero-bakeri.no', 'Rapport', 'Hei')$q$, '42501');
+SELECT pg_temp.expect_error($q$SELECT vt_report_mail_claim('99999999-1111-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a1', current_setting('test.c3')::uuid, 'annen@nottero-bakeri.no', 'Rapport', 'Hei')$q$, '23505');
+SELECT pg_temp.ok((vt_report_mail_claim('99999999-1111-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a1', current_setting('test.c3')::uuid, 'henrik@nottero-bakeri.no', 'Rapport', 'Hei')->>'csv') = 'csv', 'claim returnerer LAGRET vedlegg');
+SELECT pg_temp.ok(NOT (vt_report_mail_claim('99999999-1111-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a2', current_setting('test.c3')::uuid, 'henrik@nottero-bakeri.no', 'Rapport', 'Hei')->>'claimed')::boolean, 'andre claim (også godkjenner) sender ikke');
 SELECT vt_report_mail_finish('99999999-1111-0000-0000-000000000001', 'ukjent', 'Tidsavbrudd');
-SELECT pg_temp.ok((vt_report_mail_claim('99999999-1111-0000-0000-000000000001')->>'state') = 'ukjent', 'ukjent utfall sendes aldri automatisk på nytt');
+SELECT pg_temp.ok((vt_report_mail_claim('99999999-1111-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a1', current_setting('test.c3')::uuid, 'henrik@nottero-bakeri.no', 'Rapport', 'Hei')->>'state') = 'ukjent', 'ukjent utfall sendes aldri automatisk på nytt');
+RESET ROLE;
+-- Status: eier og godkjenner, ikke andre skrivere; ingen vedlegg i svaret; ingen vedleggskolonner for klient.
+SET ROLE authenticated;
+SELECT set_config('test.uid','00000000-0000-0000-0000-0000000000a1',false);
+SELECT pg_temp.ok((SELECT (s->>'own')::boolean AND NOT s ? 'csv' FROM vt_report_mail_status('99999999-1111-0000-0000-000000000001') s), 'eier ser status uten vedlegg');
+SELECT set_config('test.uid','00000000-0000-0000-0000-0000000000a4',false);
+SELECT pg_temp.expect_error($q$SELECT vt_report_mail_status('99999999-1111-0000-0000-000000000001')$q$, '42501');
+SELECT pg_temp.ok((SELECT count(*) = 0 FROM vt_report_mail_ops), 'annen skriver ser ikke andres sendinger');
+SELECT set_config('test.uid','00000000-0000-0000-0000-0000000000a2',false);
+SELECT pg_temp.ok(NOT (vt_report_mail_status('99999999-1111-0000-0000-000000000001')->>'own')::boolean, 'godkjenner ser status');
+SELECT pg_temp.expect_error($q$SELECT pdf_b64 FROM vt_report_mail_ops$q$, '42501');
+
+-- ===== Utskriftsmanifest =====
+SELECT set_config('test.uid','00000000-0000-0000-0000-0000000000a1',false);
+SELECT set_config('test.pages', (SELECT jsonb_build_array(jsonb_agg(id ORDER BY sort_order, id)) FROM vt_count_lines WHERE count_list_id=current_setting('test.list3')::uuid)::text, false);
+SELECT pg_temp.ok(NOT (vt_issue_print_manifest(current_setting('test.list3')::uuid, 2, current_setting('test.pages')::jsonb)->>'replayed')::boolean, 'manifest utstedt');
+SELECT pg_temp.ok((vt_issue_print_manifest(current_setting('test.list3')::uuid, 2, current_setting('test.pages')::jsonb)->>'replayed')::boolean, 'samme manifest = gjentakelse');
+SELECT pg_temp.expect_error($q$SELECT vt_issue_print_manifest(current_setting('test.list3')::uuid, 2, '[[]]')$q$, '22023');
+SELECT pg_temp.expect_error($q$SELECT vt_issue_print_manifest(current_setting('test.list3')::uuid, 2, jsonb_build_array(current_setting('test.pages')::jsonb->0, '[]'::jsonb))$q$, '23505');
+SELECT pg_temp.expect_error($q$SELECT vt_issue_print_manifest(current_setting('test.list3')::uuid, 3, jsonb_build_array(current_setting('test.pages')::jsonb->0 || (current_setting('test.pages')::jsonb->0->0)))$q$, '22023');
+SELECT pg_temp.ok((SELECT jsonb_array_length(vt_ocr_claim(current_setting('test.jobL')::uuid)->'manifests') = 1), 'lesing får utstedt manifest');
+
+-- ===== Prisavklaring =====
+SELECT set_config('test.lineP', (SELECT id::text FROM vt_count_lines WHERE count_id=current_setting('test.c3')::uuid AND snap_price_per_base IS NULL AND snap_base_unit IS NOT NULL LIMIT 1), false);
+SELECT pg_temp.ok(current_setting('test.lineP') <> '', 'testlinje uten pris finnes');
+SELECT set_config('test.uid','00000000-0000-0000-0000-0000000000a1',false);
+SELECT pg_temp.expect_error($q$SELECT vt_clarify_price(gen_random_uuid(), current_setting('test.lineP')::uuid, null, 12, 'faktura', 'F-1', 'Faktura 1234 fra leverandør')$q$, '42501');
+SELECT set_config('test.uid','00000000-0000-0000-0000-0000000000a2',false);
+SELECT pg_temp.expect_error($q$SELECT vt_clarify_price(gen_random_uuid(), current_setting('test.lineP')::uuid, null, 12, 'faktura', 'F-1', 'kort')$q$, '22023');
+SELECT pg_temp.expect_error($q$SELECT vt_clarify_price(gen_random_uuid(), current_setting('test.lineP')::uuid, null, 'Infinity', 'faktura', 'F-1', 'Faktura 1234 fra leverandør')$q$, '22023');
+SELECT pg_temp.expect_error($q$SELECT vt_clarify_price(gen_random_uuid(), (SELECT id FROM vt_count_lines WHERE snap_price_per_base IS NOT NULL LIMIT 1), null, 12, 'faktura', 'F-1', 'Faktura 1234 fra leverandør')$q$, '55000');
+SELECT set_config('test.clar1', vt_clarify_price(gen_random_uuid(), current_setting('test.lineP')::uuid, null, 12.5, 'faktura', 'F-1', 'Faktura 1234 fra leverandør')->>'clarification_id', false);
+SELECT pg_temp.expect_error($q$SELECT vt_clarify_price(gen_random_uuid(), current_setting('test.lineP')::uuid, null, 13, 'faktura', 'F-2', 'Ny faktura 1235 fra leverandør')$q$, '40001');
+SELECT vt_clarify_price(gen_random_uuid(), current_setting('test.lineP')::uuid, current_setting('test.clar1')::uuid, 13, 'prisliste', 'PL-2026', 'Prisliste 2026 bekreftet av innkjøp');
+SELECT pg_temp.ok((SELECT count(*) = 2 AND count(*) FILTER (WHERE superseded_at IS NULL) = 1 FROM vt_price_clarifications WHERE line_id=current_setting('test.lineP')::uuid), 'revisjonsspor: forrige avklaring bevart som erstattet');
+SELECT pg_temp.ok((SELECT snap_price_per_base IS NULL AND snap_price_source = 'mangler_pris' FROM vt_count_lines WHERE id=current_setting('test.lineP')::uuid), 'opprinnelig startgrunnlag uendret');
+SELECT pg_temp.ok((SELECT (x->>'clar_price_per_base')::numeric = 13 FROM jsonb_array_elements(vt_report_snapshot(current_setting('test.c3')::uuid)->'lines') x WHERE x->>'id' = current_setting('test.lineP')), 'rapporten bruker gjeldende avklaring');
+
+-- ===== Brukere som kan tildeles =====
+SELECT pg_temp.ok((SELECT array_agg(user_id ORDER BY user_id) = ARRAY['00000000-0000-0000-0000-0000000000a1','00000000-0000-0000-0000-0000000000a4']::uuid[] FROM vt_assignable_users('aaaaaaaa-0000-0000-0000-000000000000')), 'bare firmaets brukere med skrivetilgang');
+SELECT set_config('test.uid','00000000-0000-0000-0000-0000000000a1',false);
+SELECT pg_temp.expect_error($q$SELECT * FROM vt_assignable_users('aaaaaaaa-0000-0000-0000-000000000000')$q$, '42501');
 RESET ROLE;
 
 -- ===== Tildeling og historikk =====
@@ -142,6 +201,7 @@ SELECT pg_temp.expect_error($q$SELECT vt_assign_list(gen_random_uuid(), current_
 SELECT vt_assign_list(gen_random_uuid(), current_setting('test.list3')::uuid, '00000000-0000-0000-0000-0000000000a4', 'teller', false);
 SELECT pg_temp.ok((SELECT count(*) = 2 FROM vt_list_assignments WHERE count_list_id=current_setting('test.list3')::uuid), 'to tellere tildelt');
 SELECT vt_transition_count(gen_random_uuid(), current_setting('test.c3')::uuid, (SELECT revision FROM vt_counts WHERE id=current_setting('test.c3')::uuid), 'avbrutt', 'testavbrudd');
+SELECT pg_temp.expect_error($q$SELECT vt_clarify_price(gen_random_uuid(), current_setting('test.lineP')::uuid, (SELECT id FROM vt_price_clarifications WHERE line_id=current_setting('test.lineP')::uuid AND superseded_at IS NULL), 14, 'faktura', 'F', 'Etter avbrudd skal ikke gå')$q$, '55000');
 SELECT pg_temp.expect_error($q$SELECT vt_assign_list(gen_random_uuid(), current_setting('test.list3')::uuid, '00000000-0000-0000-0000-0000000000a4', 'teller', true)$q$, '55000');
 SELECT pg_temp.expect_error($q$SELECT vt_ocr_claim(current_setting('test.jobL')::uuid)$q$, '55000');
 RESET ROLE;

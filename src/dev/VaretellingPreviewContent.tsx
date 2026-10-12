@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { seedVaretellingDemo } from "./varetellingDemoSeed";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ModuleScope } from "@/providers/ModuleScope";
 import { VtApiContext } from "@/ravarer/varetelling/api";
@@ -17,6 +18,9 @@ export default function VaretellingPreviewContent() {
   // E-post er IKKE konfigurert i demonstrasjonen: skjermen viser sannferdig at ingenting kan sendes.
   const [s3] = useState(() => createFakeStage3(api, { available: !unavailable, mailConfigured: false }));
   const [qc] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
+  const [seeded, setSeeded] = useState<boolean>(unavailable);
+  // Ferdig syntetisk scenario (flersides prøveark + forslag) slik at kontroll ikke krever filvelger.
+  useEffect(() => { if (unavailable) return; let alive = true; void seedVaretellingDemo(api, s3).finally(() => { if (alive) setSeeded(true); }); return () => { alive = false; }; }, [api, s3, unavailable]);
   return (
     <ModuleScope appCode="ravarer">
       <QueryClientProvider client={qc}>
@@ -26,7 +30,8 @@ export default function VaretellingPreviewContent() {
             <main className="mx-auto max-w-5xl space-y-4 p-4">
               <p role="note" className="rounded-md border p-3 text-sm font-medium">Demonstrasjon – syntetiske data. Ingenting lagres.</p>
               <h1 className="text-2xl font-semibold">Varetelling</h1>
-              <VaretellingWorkspace legacy={<p className="text-sm text-muted-foreground">Dagstellingen vises ikke i demonstrasjonen.</p>} />
+              {!seeded ? <p role="status">Lager demonstrasjonsdata …</p> : <VaretellingWorkspace legacy={<p className="text-sm text-muted-foreground">Dagstellingen vises ikke i demonstrasjonen.</p>} />}
+              <p className="text-xs text-muted-foreground">Åpne «Demo: papir og prisavklaring» → Papir → listen → «Vis» for flersides prøveark med syntetiske lese-forslag (ikke ekte AI), eller Kontroll for prisavklaring.</p>
             </main>
           </VtScopeContext.Provider>
           </Stage3Context.Provider>
