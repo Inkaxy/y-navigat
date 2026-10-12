@@ -41,7 +41,7 @@ export function RecipesTab({ rm }: Props) {
               {data.map((r) => (
                 <tr key={r.recipeId} className="border-t border-line-subtle align-top">
                   <td className="py-2">
-                    <Link to={`/varer/oppskrifter/${r.recipeId}`} className="font-medium text-app underline-offset-2 hover:underline">
+                    <Link to={`/varer/oppskrifter/${r.recipeId}`} className="font-medium text-primary underline-offset-2 hover:underline">
                       {r.recipeName}
                     </Link>
                   </td>

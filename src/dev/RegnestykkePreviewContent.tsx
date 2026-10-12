@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ModuleScope } from "@/providers/ModuleScope";
 import { SingleRecalcDetail } from "@/ravarer/pages/reberegn/SingleRecalcDetail";
 import { parseSingleRecalcPreview, type SinglePreview } from "@/ravarer/lib/singleRecalcPreview";
 import type { PreviewState, PreviewTarget } from "@/ravarer/hooks/useSingleRecalcPreview";
@@ -18,10 +19,10 @@ const line = (n: number, over: Record<string, unknown>) => ({
 });
 const changes = [
   line(1, { description: "Hvetemel siktet spesial 20 kg sekk (demo)" }),
-  line(2, { description: "Kreditert hvetemel 20 kg (demo)", quantity: -2, total_amount: -100, new_base_qty: -40, factor_source: "variant_varenr" }),
+  line(2, { description: "Returjustert mengde hvetemel 20 kg (demo)", quantity: -2, total_amount: -100, new_base_qty: -40, factor_source: "variant_varenr" }),
   line(3, { description: "Hvetemel løsvekt i gram (demo)", quantity: 1000, unit: "g", total_amount: 10, new_base_qty: 1, new_ppb: 10, old_ppb: 10, method: "direkte", factor_source: "ravare" }),
   line(4, { description: "Ført linje, låst (demo)", old_ppb: 7, new_ppb: 7, locked: true, applies: false, factor_source: SUPPLIER_FALLBACK }),
-  line(5, { description: "Prøvepose med svært liten mengde (demo)", quantity: 0.0000001, unit: "g", total_amount: 1, new_base_qty: 0, new_ppb: 10000000, method: "direkte", applies: false, preview_reason: "Pakning ikke bekreftet", factor_source: "linje_ulest" }),
+  line(5, { description: "Prøvepose med svært liten mengde (demo)", quantity: 0.0000001, unit: "kg", total_amount: 1, new_base_qty: 0, new_ppb: 10000000, method: "direkte", applies: false, preview_reason: "Pakning ikke bekreftet", factor_source: "linje_ulest" }),
   line(6, { description: "Ukjent enhet «kartong» uten pakning (demo)", unit: "kartong", new_base_qty: null, new_ppb: null, method: "ukjent_enhet", factor: null, factor_source: null, applies: null }),
   line(7, { description: "Langt varenavn: Økologisk steinmalt sammalt spelt med særlig høy proteinandel, pakket i papirsekk med plastforing (demo)", total_amount: null, new_ppb: null }),
 ];
@@ -38,6 +39,7 @@ const target: PreviewTarget = { rawMaterialId: id(99), name: envelope.raw_materi
 export default function RegnestykkePreviewContent() {
   const [state, setState] = useState<PreviewState>({ status: "closed" });
   return (
+    <ModuleScope appCode="ravarer">
     <main className="mx-auto max-w-3xl space-y-4 p-4">
       <p role="note" className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm font-semibold">Demonstrasjon – syntetiske data</p>
       <h1 className="text-xl font-semibold text-ink-primary">Serverens regnestykke (forhåndsvisning)</h1>
@@ -50,5 +52,6 @@ export default function RegnestykkePreviewContent() {
       </div>
       <SingleRecalcDetail state={state} onClose={() => setState({ status: "closed" })} onRetry={() => undefined} />
     </main>
+    </ModuleScope>
   );
 }

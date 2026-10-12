@@ -302,7 +302,7 @@ export function PriceTimeline({
                     {r.invoiceId ? (
                       <button
                         type="button"
-                        className="font-mono text-xs text-app underline-offset-2 hover:underline"
+                        className="font-mono text-xs text-primary underline-offset-2 hover:underline"
                         onClick={() => navigate(paths.faktura(r.invoiceId))}
                       >
                         {r.invoiceNumber ?? "Åpne"}

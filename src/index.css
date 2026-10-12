@@ -261,6 +261,26 @@
     font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; font-size: 10px;
   }
 
+  /* Råvarer: semantisk primær (espresso/cream, snur med tema) og lesbar eyebrow. App-fargen beholdes til dekor.
+     Satt på <html> via ModuleScope, så portalerte dialoger arver det. Andre apper berøres ikke. */
+  html[data-active-app="ravarer"] {
+    --primary: var(--text-primary);
+    --primary-foreground: var(--surface-canvas);
+    --ring: var(--text-primary);
+    --rm-eyebrow-ink: var(--brand-bronze-deep);
+  }
+  html.dark[data-active-app="ravarer"] {
+    --primary: var(--text-primary);
+    --primary-foreground: var(--surface-canvas);
+    --ring: var(--text-primary);
+    --rm-eyebrow-ink: var(--brand-bronze-soft);
+  }
+  html[data-active-app="ravarer"] [data-page-eyebrow],
+  html[data-active-app="ravarer"] .eyebrow,
+  html[data-active-app="ravarer"] .label-rule {
+    color: hsl(var(--rm-eyebrow-ink));
+  }
+
   .eyebrow {
     font-family: 'Inter', sans-serif;
     font-weight: 600;

@@ -58,7 +58,7 @@ export function CostDeviationsCard() {
         <div className="text-caption text-ink-secondary">
           {r.sourceDate ? formatDate(r.sourceDate) : "Ingen gyldig kilde"}
           {r.supplierName && <> · {r.supplierName}</>}
-          {r.invoiceId && <> · <Link className="text-app hover:underline" to={paths.faktura(r.invoiceId)}>{r.invoiceNumber ?? "faktura"}</Link></>}
+          {r.invoiceId && <> · <Link className="text-primary hover:underline" to={paths.faktura(r.invoiceId)}>{r.invoiceNumber ?? "faktura"}</Link></>}
         </div>
       </div>
       <dl className="grid grid-cols-2 gap-x-4 text-right tabular-nums">

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, type ReactNode } from "r
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { hexToHslParts, hslString, mixWithBlack } from "@/lib/colors";
+import { ModuleScope } from "@/providers/ModuleScope";
 
 /**
  * AppColorProvider
@@ -64,7 +65,7 @@ export function AppColorProvider({ appCode = "nbhub", children }: Props) {
   return (
     <AppColorContext.Provider value={value}>
       <div style={cssVars} className="contents">
-        {children}
+        <ModuleScope appCode={appCode}>{children}</ModuleScope>
       </div>
     </AppColorContext.Provider>
   );

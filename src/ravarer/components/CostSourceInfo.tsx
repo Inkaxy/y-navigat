@@ -25,7 +25,7 @@ export function CostSourceInfo({ rawMaterialId }: { rawMaterialId: string }) {
           Nyeste gyldige: <span className="tabular-nums">{formatNok(d.source.price)}/{unit}</span> · {formatDate(d.source.effectiveDate)}
           {d.source.supplierName && <> · {d.source.supplierName}</>}
           {d.source.invoiceId ? (
-            <> · <Link className="text-app underline-offset-2 hover:underline" to={paths.faktura(d.source.invoiceId)}>faktura {d.source.invoiceNumber ?? ""}</Link></>
+            <> · <Link className="text-primary underline-offset-2 hover:underline" to={paths.faktura(d.source.invoiceId)}>faktura {d.source.invoiceNumber ?? ""}</Link></>
           ) : <> · {d.source.source === "invoice" ? "faktura" : "manuell dokumentert pris"}</>}
           <span className="block text-caption">Kilde-ID {d.source.historyId}</span>
         </p>

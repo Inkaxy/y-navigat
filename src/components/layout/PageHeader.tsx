@@ -111,7 +111,7 @@ export function PageHeader({
               </nav>
             )}
             {eyebrow && (
-              <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-brand-bronze">
+              <div data-page-eyebrow className="text-[10px] font-medium uppercase tracking-[0.22em] text-brand-bronze">
                 {eyebrow}
               </div>
             )}
