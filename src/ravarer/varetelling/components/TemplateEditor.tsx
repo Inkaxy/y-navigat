@@ -22,7 +22,7 @@ type SaveP = Draft & { id: string; expectedRevision: number; archived: boolean }
 export function TemplateEditor({ template, locations, onCopied, onArchived }: { template: VtTemplate; locations: VtLocation[]; onCopied: (id: string) => void; onArchived: () => void }) {
   const { entity, canWrite } = useVtScope(); const api = useVtApi();
   const tlines = useVtTemplateLines(); const materials = useVtMaterials(); const templates = useVtTemplates();
-  const all = tlines.data ?? [];
+  const all = useMemo(() => tlines.data ?? [], [tlines.data]);
   const initial: Draft = useMemo(() => ({
     name: template.name, department: template.department, defaultLocationId: template.default_location_id,
     lines: all.filter(l => l.template_id === template.id).sort((a, b) => a.sort_order - b.sort_order).map(l => ({ raw_material_id: l.raw_material_id, location_id: l.location_id, count_unit_ids: l.count_unit_ids })),
