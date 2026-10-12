@@ -6,10 +6,13 @@ import { useVtCount } from "../hooks";
 import { formatAmount, formatKr, LINE_STATE_LABEL, paginate, priceReasonLabel, summarize, summarizeGroups } from "../logic";
 import { isFinalReport, lineValueOre, listDeepLink, reportTitle, sheetIdentity } from "../report";
 import type { VtCount, VtCountLine, VtCountList } from "../types";
+import { paginateSheet, rowCodeOf, rowUnits, VT_SHEET_CAPACITY } from "../../../../supabase/pending/functions/vt-count-ocr/ocrCore";
 import { formatDateNo, Loading, Notice } from "./shared";
 
 /** Linjer per A4-side på blankt telleark (store skrivefelt, aldri delt linje). */
-export const LINES_PER_PAGE = 14;
+export const LINES_PER_PAGE = VT_SHEET_CAPACITY;
+/** Fast høyde per rad-enhet (mm). 14 enheter + topp/bunn passer på A4 med marg. */
+const ROW_MM = 13;
 
 /**
  * Utskriftsvisning: blanke tellelister (A4, QR per liste og side) eller rapport. Bruker frosne verdier.
@@ -46,7 +49,8 @@ function useQr(text: string): string | null {
 }
 
 function BlankList({ count, list, lines }: { count: VtCount; list: VtCountList; lines: VtCountLine[] }) {
-  const pages = paginate(lines, LINES_PER_PAGE);
+  // Deterministisk, versjonert sideoppsett — samme inndeling som lesetjenestens manifest.
+  const pages = paginateSheet(lines);
   return <>{pages.map((p, i) => <BlankPage key={i} count={count} list={list} lines={p} page={i + 1} pages={pages.length} />)}</>;
 }
 
@@ -55,7 +59,7 @@ function BlankPage({ count, list, lines, page, pages }: { count: VtCount; list: 
   const qr = useQr(link);
   const identity = sheetIdentity(count.id, list, page, pages);
   return (
-    <section className="vt-sheet mx-auto max-w-[210mm] break-after-page bg-background p-6 text-foreground print:p-0" aria-label={`Telleliste ${list.name} side ${page} av ${pages}`} data-identity={identity}>
+    <section className="vt-sheet mx-auto max-w-[210mm] overflow-hidden break-after-page bg-background p-6 text-foreground print:p-0" aria-label={`Telleliste ${list.name} side ${page} av ${pages}`} data-identity={identity}>
       <header className="flex items-start justify-between gap-4 border-b-2 border-foreground pb-2">
         <div className="min-w-0">
           <p className="text-xs uppercase tracking-wide">Telleark · {count.name}</p>
@@ -74,8 +78,8 @@ function BlankPage({ count, list, lines, page, pages }: { count: VtCount; list: 
         </thead>
         <tbody>
           {lines.map(l => (
-            <tr key={l.id} className="break-inside-avoid border-b border-foreground/60 align-top" data-line-id={l.id}>
-              <td className="py-3 pr-2 font-mono text-[10px]">{l.id.slice(0, 8)}</td>
+            <tr key={l.id} className="break-inside-avoid border-b border-foreground/60 align-top" data-line-id={l.id} style={{ height: `${rowUnits(l) * ROW_MM}mm` }}>
+              <td className="py-2 pr-2 font-mono text-[10px]">{rowCodeOf(l.id)}</td>
               <td className="py-3 pr-2"><span className="font-medium">{l.snap_name}</span>{l.snap_sku ? <span className="block text-xs">{l.snap_sku}</span> : null}</td>
               <td className="py-3 pr-2 text-xs">{l.snap_location_name ?? "—"}</td>
               <td className="py-3 pr-2 text-xs">{l.snap_units.length ? l.snap_units.map(u => <span key={u.id} className="block">____ {u.label}</span>) : "—"}</td>

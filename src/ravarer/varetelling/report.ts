@@ -1,4 +1,5 @@
 import { buildReportCsv, layoutA4, reportBlocks } from "../../../supabase/pending/functions/_shared/vtReport";
+import { sheetIdentityOf } from "../../../supabase/pending/functions/vt-count-ocr/ocrCore";
 import type { VtCount, VtCountLine, VtCountList } from "./types";
 
 /** Frosne verdier til rapport/eksport. Leser aldri dagens pris. */
@@ -37,7 +38,7 @@ export const reportFileBase = (c: VtCount) => `varetelling-${c.planned_date}-${c
 
 /** Maskinlesbar identitet trykt på hver side (for kommende skjemalesing). */
 export function sheetIdentity(countId: string, list: VtCountList, page: number, pages: number): string {
-  return `VT1|${countId}|${list.id}|r${list.source_template_revision}|s${page}/${pages}`;
+  return sheetIdentityOf(countId, list.id, list.source_template_revision, page, pages);
 }
 /** Autentisert lenke til nøyaktig denne tellelisten. QR-koden gir ingen tilgang i seg selv. */
 export function listDeepLink(origin: string, countId: string, list: VtCountList, page?: number): string {
