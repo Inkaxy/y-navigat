@@ -67,15 +67,21 @@ export function offerPricePerBaseUnit(input: OfferInput): OfferPerBaseUnit {
   if (typeof raw !== "number" || !Number.isFinite(raw) || raw < 0) return { value: null, reason: "Ingen pris" };
   const price = raw;
   const base = normalizeUnit(input.baseUnit);
-  if (!base) return { value: null, reason: "Ukjent grunnenhet" };
+  // Grunnenheten må være en målt grunnenhet (kg, l, stk …); emballasjeenhet som «sekk» er ukjent grunnlag.
+  if (!base || !isBaseUnit(base)) return { value: null, reason: "Ukjent grunnenhet" };
 
-  const size = typeof input.offeredPackageSize === "number" && Number.isFinite(input.offeredPackageSize) ? input.offeredPackageSize : null;
-  const hasSize = size != null && size > 0;
+  // Fravær (null/undefined) er «ingen pakning»; en oppgitt, ugyldig størrelse (≤0, NaN) er aldri det.
+  const sizeRaw = input.offeredPackageSize;
+  const sizeAbsent = sizeRaw === null || sizeRaw === undefined;
+  if (!sizeAbsent && !(typeof sizeRaw === "number" && Number.isFinite(sizeRaw) && sizeRaw > 0)) {
+    return { value: null, reason: "Ugyldig pakningsstørrelse" };
+  }
+  const size = sizeAbsent ? null : sizeRaw;
   const unitRaw = input.offeredPackageUnit?.trim() ? input.offeredPackageUnit : null;
 
   // Ingen pakning oppgitt: prisen gjelder én grunnenhet (portalens kontrakt).
-  if (!hasSize && !unitRaw) return { value: price, reason: null };
-  if (!hasSize || !unitRaw) return { value: null, reason: "Ufullstendig pakning" };
+  if (size == null && !unitRaw) return { value: price, reason: null };
+  if (size == null || !unitRaw) return { value: null, reason: "Ufullstendig pakning" };
 
   const unit = normalizeUnit(unitRaw);
   const factor = toBaseFactor(unit, base);
