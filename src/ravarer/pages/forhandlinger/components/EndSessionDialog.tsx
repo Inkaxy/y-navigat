@@ -55,20 +55,35 @@ export function EndSessionDialog(p: EndSessionDialogProps) {
   const [confirmRegen, setConfirmRegen] = useState(false);
   const lock = useRef(false);
   /** Gjeldende kontekst; et svar for en annen kontekst eller etter avmontering forkastes. */
-  const ctx = useRef({ negotiationId: p.negotiationId, legalEntityId: p.legalEntityId, mounted: true, gen: 0 });
+  const ctx = useRef({ negotiationId: p.negotiationId, legalEntityId: p.legalEntityId, open: p.open, mounted: true, gen: 0 });
   ctx.current.negotiationId = p.negotiationId;
   ctx.current.legalEntityId = p.legalEntityId;
+  /** Hvilket steg som er sendt: status → generering → logging. Styrer hvordan en feil tolkes. */
+  const stage = useRef<"idle" | "status" | "generate" | "log">("idle");
+  /** Status er lagret, men ingen lenke ble generert (avbrutt før generering). */
+  const [endedWithoutLink, setEndedWithoutLink] = useState(false);
   useEffect(() => {
     const c = ctx.current;
     c.mounted = true;
     return () => { c.mounted = false; c.gen++; };
   }, []);
   useEffect(() => {
+    ctx.current.open = p.open;
+    if (p.open) return;
+    // Lukk: et sent svar skal aldri vises, og synlige hemmeligheter fjernes.
+    ctx.current.gen++;
+    setCredentials(null);
+    setConfirmRegen(false);
+    // Generering var sendt: passord kan være rotert. Kravet om bevisst ny generering består.
+    if (stage.current === "generate") setCredUnknown(true);
+  }, [p.open]);
+  useEffect(() => {
     // Ny forhandling eller nytt selskap: glem visning og ugyldiggjør pågående svar.
     ctx.current.gen++;
     setCredentials(null);
     setCredUnknown(false);
     setConfirmRegen(false);
+    setEndedWithoutLink(false);
   }, [p.negotiationId, p.legalEntityId]);
 
   async function handleEnd() {
@@ -81,12 +96,13 @@ export function EndSessionDialog(p: EndSessionDialogProps) {
     const frozenEntity = p.legalEntityId;
     const gen = ++ctx.current.gen;
     const current = () =>
-      ctx.current.mounted && ctx.current.gen === gen && ctx.current.negotiationId === frozenNeg && ctx.current.legalEntityId === frozenEntity;
+      ctx.current.mounted && ctx.current.open && ctx.current.gen === gen && ctx.current.negotiationId === frozenNeg && ctx.current.legalEntityId === frozenEntity;
     lock.current = true;
     setEnding(true);
     try {
       const days = Math.max(1, Number(deadlineDays) || 14);
       const deadline = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+      stage.current = "status";
       await updateNeg.mutateAsync({
         id: frozenNeg,
         patch: {
@@ -96,6 +112,12 @@ export function EndSessionDialog(p: EndSessionDialogProps) {
           live_auto_apply_on_confirm: autoApply,
         },
       });
+      // Ny passordrotasjon startes bare om samme dialog/kontekst fortsatt er aktiv.
+      if (!current()) {
+        if (ctx.current.mounted && ctx.current.negotiationId === frozenNeg && ctx.current.legalEntityId === frozenEntity) setEndedWithoutLink(true);
+        return;
+      }
+      stage.current = "generate";
       const { data, error } = await supabase.functions.invoke("generate-rfq-credentials", { body: { negotiation_id: frozenNeg } });
       if (!current()) return;
       if (error) {
@@ -112,6 +134,8 @@ export function EndSessionDialog(p: EndSessionDialogProps) {
       }
       setCredUnknown(false);
       setConfirmRegen(false);
+      setEndedWithoutLink(false);
+      stage.current = "log";
       setCredentials({
         recipientId: cred.recipient_id,
         url: portalUrlFor(window.location.origin, "bekreftelse", cred),
@@ -125,8 +149,20 @@ export function EndSessionDialog(p: EndSessionDialogProps) {
         event_data: { processed: p.processedCount, total: p.totalCount, total_savings: p.savingsValue },
       });
     } catch (e) {
-      if (current()) toast.error(e instanceof Error && e.message ? e.message : "Kunne ikke avslutte");
+      const at = stage.current;
+      if (!current()) return;
+      if (at === "generate") {
+        // Uklassifisert feil etter at genereringen er sendt: passord kan være rotert.
+        setCredUnknown(true);
+        toast.error("Utfallet av lenkegenereringen er ukjent. Passord kan være endret.");
+      } else if (at === "log") {
+        // Lenken er bekreftet generert og vises fortsatt; bare loggingen feilet.
+        toast.error("Lenken er generert, men avslutningen ble ikke logget i tidslinjen.");
+      } else if (!(e instanceof Error && e.message)) {
+        toast.error("Avslutningen ble ikke bekreftet lagret. Kontroller status før du prøver igjen.");
+      }
     } finally {
+      stage.current = "idle";
       lock.current = false;
       if (ctx.current.mounted) setEnding(false);
     }
@@ -146,6 +182,11 @@ export function EndSessionDialog(p: EndSessionDialogProps) {
           <DialogTitle>{credentials ? "Bekreftelse til leverandør" : "Avslutt forhandling"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 text-sm">
+          {endedWithoutLink && !credentials && !credUnknown && (
+            <div role="status" className="rounded-md border border-warning/30 bg-warning/10 p-3 text-caption">
+              Økten kan være avsluttet (statusendringen var sendt), men ingen lenke ble generert fordi dialogen ble lukket eller byttet. Generer lenke bevisst når du er klar.
+            </div>
+          )}
           {credUnknown && !credentials && (
             <div role="alert" className="space-y-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-caption">
               <p>
