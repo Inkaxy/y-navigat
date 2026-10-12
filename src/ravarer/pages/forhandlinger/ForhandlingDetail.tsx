@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Flag, Handshake, History, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,14 +19,15 @@ import {
 } from "@/ravarer/hooks/useNegotiations";
 import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
-import { formatDate, formatNok } from "@/ravarer/lib/constants";
+import { formatDate } from "@/ravarer/lib/constants";
 import { bestOfferRecipient, isNegotiationClosed, offerPricePerBaseUnit } from "@/ravarer/lib/negotiationMatrix";
-import { estimateSavings } from "@/ravarer/lib/negotiationOps";
+import { estimateSavings, negotiationListReturn } from "@/ravarer/lib/negotiationOps";
 import { paths } from "@/ravarer/lib/paths";
 import { LiveTidslinjeDrawer } from "./components/LiveTidslinjeDrawer";
 import { ConcludeDialog } from "./detail/ConcludeDialog";
 import { LiveConfirmationStatus } from "./detail/LiveConfirmationStatus";
 import { OfferComparison } from "./detail/OfferComparison";
+import { SavingsValue } from "./detail/SavingsValue";
 
 function Kpi({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -42,10 +43,14 @@ export default function ForhandlingDetail() {
   const qc = useQueryClient();
   const { id = "" } = useParams<{ id: string }>();
   const rights = useInvoiceRights();
+  const [params] = useSearchParams();
+  const listHref = negotiationListReturn(params.get("retur"));
   const negQ = useNegotiation(id);
-  const itemsQ = useNegotiationItems(id);
-  const recipientsQ = useNegotiationRecipients(id);
-  const responsesQ = useNegotiationResponses(id);
+  // Barn hentes bare når forelderen er lest i gjeldende selskap.
+  const parentOk = !!negQ.data;
+  const itemsQ = useNegotiationItems(id, { enabled: parentOk });
+  const recipientsQ = useNegotiationRecipients(id, { enabled: parentOk });
+  const responsesQ = useNegotiationResponses(id, { enabled: parentOk });
   const { data: rawMaterials = [] } = useRawMaterials();
   const { data: suppliers = [] } = useSuppliers();
   const neg = negQ.data ?? null;
@@ -78,7 +83,7 @@ export default function ForhandlingDetail() {
           offeredPackageSize: r.offered_package_size,
           offeredPackageUnit: r.offered_package_unit,
           baseUnit: rm?.base_unit ?? null,
-          linkBaseUnitsPerPackage: rm?.base_units_per_package == null ? null : Number(rm.base_units_per_package),
+          // Råvarens globale pakningstall er ikke leverandørens bekreftede pakning — sendes ikke.
         }).value);
       }
       out.set(it.id, inner);
@@ -123,7 +128,7 @@ export default function ForhandlingDetail() {
   };
 
   const back = (
-    <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={() => navigate(paths.forhandlinger())}>
+    <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={() => navigate(listHref)}>
       <ArrowLeft className="mr-1 h-4 w-4" aria-hidden /> Forhandlinger
     </Button>
   );
@@ -194,12 +199,13 @@ export default function ForhandlingDetail() {
           <Kpi label="Kontraktsperiode">{formatDate(neg.contract_start)} – {formatDate(neg.contract_end)}</Kpi>
           <Kpi label="Baseline">{formatDate(neg.baseline_period_start)} – {formatDate(neg.baseline_period_end)}</Kpi>
           <Kpi label="Estimert besparelse">
-            <span className={`font-semibold tabular-nums ${savings.value > 0 ? "text-success" : "text-ink-primary"}`}>
-              {savings.known === 0 && savings.unknown > 0 ? "Ukjent" : formatNok(savings.value)}
-            </span>
-            {savings.unknown > 0 && (
-              <span className="block text-caption text-ink-secondary">{savings.unknown} råvare{savings.unknown === 1 ? "" : "r"} med ukjent pakning eller baseline er ikke regnet med</span>
-            )}
+            <SavingsValue
+              loading={itemsQ.isLoading || responsesQ.isLoading || !itemsQ.data || !responsesQ.data}
+              failed={itemsQ.isError || responsesQ.isError}
+              known={savings.known}
+              unknown={savings.unknown}
+              value={savings.value}
+            />
           </Kpi>
         </div>
 

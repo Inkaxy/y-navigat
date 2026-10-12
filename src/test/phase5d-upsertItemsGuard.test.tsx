@@ -18,7 +18,7 @@ vi.mock("@/integrations/supabase/client", () => {
   };
   return { supabase: { from, rpc: (...a: unknown[]) => { state.rpc(...a); return Promise.resolve({ data: 1, error: null }); } } };
 });
-vi.mock("@/ravarer/context/RavarerContext", () => ({ useRavarer: () => ({ legalEntityId: "LE", user: { id: "U" } }) }));
+vi.mock("@/ravarer/context/RavarerContext", () => ({ useRavarer: () => ({ legalEntityId: "LE", user: { id: "U" }, canWrite: true }) }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 import { useUpsertNegotiationItems } from "@/ravarer/hooks/useNegotiations";
 

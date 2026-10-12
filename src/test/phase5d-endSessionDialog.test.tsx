@@ -107,3 +107,49 @@ describe("EndSessionDialog (live-bekreftelse)", () => {
     expect(screen.getByRole("button", { name: /Avslutt og generer lenke/ })).toBeDisabled();
   });
 });
+
+describe("EndSessionDialog — livssyklus etter review", () => {
+  it("lukk under generering: svaret vises ikke ved gjenåpning, og ny generering krever bekreftelse", async () => {
+    const d = deferred<{ data: unknown; error: null }>();
+    invoke.mockReturnValue(d.p);
+    const { rerender, props } = setup();
+    fireEvent.click(screen.getByRole("button", { name: /Avslutt og generer lenke/ }));
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+    rerender(<EndSessionDialog {...props} open={false} />);
+    await act(async () => { d.r({ data: { success: true, credentials: [cred(A, "supA", "pwA"), cred(B, "supB", "pwB")] }, error: null }); });
+    rerender(<EndSessionDialog {...props} open />);
+    expect(screen.queryByTestId("end-credentials")).toBeNull();
+    expect(screen.queryByText(/pwB/)).toBeNull();
+    expect(screen.getByRole("button", { name: /Generer ny lenke/ })).toBeDisabled();
+  });
+
+  it("selskapsbytte mens status lagres: ingen ny passordrotasjon startes", async () => {
+    const d = deferred<undefined>();
+    updateNeg.mockReturnValue(d.p);
+    const { rerender, props } = setup();
+    fireEvent.click(screen.getByRole("button", { name: /Avslutt og generer lenke/ }));
+    await waitFor(() => expect(updateNeg).toHaveBeenCalledTimes(1));
+    rerender(<EndSessionDialog {...props} legalEntityId="e2" />);
+    await act(async () => { d.r(undefined); });
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("kastet genereringskall gir ukjent rotasjon og sperrer nytt kall", async () => {
+    invoke.mockRejectedValue(new Error("boom"));
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: /Avslutt og generer lenke/ }));
+    const regen = await screen.findByRole("button", { name: /Generer ny lenke/ });
+    expect(regen).toBeDisabled();
+    fireEvent.click(regen);
+    expect(invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it("loggfeil etter bekreftet lenke beholder lenken", async () => {
+    invoke.mockResolvedValue({ data: { success: true, credentials: [cred(A, "supA", "pwA"), cred(B, "supB", "pwB")] }, error: null });
+    logEvent.mockRejectedValue(new Error("log"));
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: /Avslutt og generer lenke/ }));
+    expect((await screen.findByTestId("end-credentials")).textContent).toContain("pwB");
+    expect(screen.queryByRole("button", { name: /Generer ny lenke/ })).toBeNull();
+  });
+});

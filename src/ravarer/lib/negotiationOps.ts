@@ -1,4 +1,5 @@
 import { paths } from "@/ravarer/lib/paths";
+import { resolveInternalPath } from "@/lib/safeInternalPath";
 
 /**
  * Forhandlinger: streng lesing av operasjonssvar og identitetsvern.
@@ -66,6 +67,11 @@ export function parseRfqCredentials(data: unknown, expected: readonly ExpectedRe
     if (access_token === "undefined" || access_token === "null" || portal_url.endsWith("/undefined")) {
       return { kind: "malformed", reason: "mangler token" };
     }
+    // Lenken må peke på nøyaktig dette tokenet; en annen mottakers lenke avvises.
+    const lastSegment = portal_url.split(/[?#]/, 1)[0].replace(/\/+$/, "").split("/").pop() ?? "";
+    let decoded = lastSegment;
+    try { decoded = decodeURIComponent(lastSegment); } catch { return { kind: "malformed", reason: "ugyldig lenke" }; }
+    if (decoded !== access_token) return { kind: "malformed", reason: "lenken matcher ikke tokenet" };
     const exp = expectedById.get(recipient_id);
     if (!exp) return { kind: "malformed", reason: "ukjent mottaker" };
     if (exp.supplier_id !== supplier_id) return { kind: "malformed", reason: "feil leverandør for mottaker" };
@@ -118,7 +124,7 @@ export type ApplyOutcome =
 /** Leser utfallsmotorens svar. Krever bare de feltene kontrakten faktisk har. */
 export function classifyApplyOutcome(data: unknown, error: unknown, body: unknown = null): ApplyOutcome {
   if (!error) {
-    if (isRecord(data) && data.success === true && typeof data.applied === "number") return { kind: "success" };
+    if (isRecord(data) && data.success === true && typeof data.applied === "number" && Number.isInteger(data.applied) && data.applied >= 0) return { kind: "success" };
     return { kind: "unknown" };
   }
   const status = edgeErrorStatus(error);
@@ -182,8 +188,10 @@ export async function runPrimaryTasks(
 export function canReplaceNegotiationItems(
   status: string | null | undefined,
   recipients: ReadonlyArray<{ invited_at?: string | null; password_set_at?: string | null }>,
+  /** Varig utstedelsesmarkør (`negotiations.rfq_issued_at`, satt av serveren). */
+  issuedAt?: string | null,
 ): boolean {
-  if (status !== "draft") return false;
+  if (status !== "draft" || issuedAt) return false;
   return recipients.every((r) => !r.invited_at && !r.password_set_at);
 }
 
@@ -206,11 +214,12 @@ export function sameItemSet(existing: ReadonlyArray<{ raw_material_id: string }>
 export function estimateSavings(
   lines: ReadonlyArray<{ volumeBaseline: number | null; costBaseline: number | null; winnerPerBase: number | null; hasWinner: boolean }>,
 ): { value: number; known: number; unknown: number } {
+  // Bare endelige, sammenlignbare tall teller. Linjer uten vinner/tilbud vurderes ikke.
   let value = 0, known = 0, unknown = 0;
   for (const l of lines) {
     if (!l.hasWinner) continue;
     if (l.winnerPerBase == null || l.volumeBaseline == null || l.costBaseline == null ||
-        !Number.isFinite(l.winnerPerBase) || !(l.volumeBaseline > 0)) { unknown++; continue; }
+        !Number.isFinite(l.winnerPerBase) || !Number.isFinite(l.costBaseline) || !Number.isFinite(l.volumeBaseline) || !(l.volumeBaseline > 0)) { unknown++; continue; }
     value += l.costBaseline - l.volumeBaseline * l.winnerPerBase;
     known++;
   }
@@ -226,9 +235,25 @@ export function baselineFromStats(s: { cost_12m: number | null; avg_price_per_ba
 }
 
 /** Hvor en rad åpnes: aktiv live-forhandling går til arbeidsflaten, resten til detalj. */
-export function negotiationHref(n: { id: string; status: string; negotiation_mode: string | null }): string {
+export function negotiationHref(n: { id: string; status: string; negotiation_mode: string | null }, returnTo?: string | null): string {
+  const base = negotiationBaseHref(n);
+  return returnTo ? `${base}?retur=${encodeURIComponent(returnTo)}` : base;
+}
+function negotiationBaseHref(n: { id: string; status: string; negotiation_mode: string | null }): string {
   return n.negotiation_mode === "live" && n.status !== "concluded" && n.status !== "cancelled"
     ? paths.liveForhandling(n.id)
     : paths.forhandling(n.id);
 }
 
+
+/**
+ * Tilbake til forhandlingslista med listekonteksten (søk). Bare trygge interne stier
+ * under forhandlingslista godtas; ellers standardlista.
+ */
+export function negotiationListReturn(raw: string | null | undefined): string {
+  const fallback = paths.forhandlinger();
+  const p = resolveInternalPath(raw);
+  if (!p) return fallback;
+  const listPath = fallback.split("?")[0];
+  return p.split("?")[0] === listPath ? p : fallback;
+}
