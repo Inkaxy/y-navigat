@@ -214,3 +214,11 @@ export function estimateSavings(
   }
   return { value, known, unknown };
 }
+
+/** 12-måneders grunnlag for en råvare i grunnenhet. null = ukjent, aldri 0. */
+export interface BaselineStats { cost: number | null; avgPrice: number | null; volume: number | null }
+export function baselineFromStats(s: { cost_12m: number | null; avg_price_per_base_unit_12m: number | null }): BaselineStats {
+  const cost = s.cost_12m == null || !Number.isFinite(Number(s.cost_12m)) ? null : Number(s.cost_12m);
+  const avg = s.avg_price_per_base_unit_12m == null || !(Number(s.avg_price_per_base_unit_12m) > 0) ? null : Number(s.avg_price_per_base_unit_12m);
+  return { cost, avgPrice: avg, volume: cost != null && avg != null ? cost / avg : null };
+}
