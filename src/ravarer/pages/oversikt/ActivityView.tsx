@@ -30,7 +30,7 @@ function summaryLine(s: Record<string, number>): string {
   add(s.pakning_bekreftet_auto, "pakning bekreftet", "pakninger bekreftet");
   add(s.forste_pris, "første pris", "første priser");
   add(s.gjentatt_pris, "prisendring bekreftet", "prisendringer bekreftet av gjentatte fakturaer");
-  return parts.length ? `Siste 7 dager: ${parts.join(" · ")}` : "Ingen automatiske hendelser siste 7 dager.";
+  return parts.length ? `Utvalgte hendelser siste 7 dager: ${parts.join(" · ")}` : "Ingen hendelser i disse kategoriene siste 7 dager.";
 }
 
 function subjectHref(it: ActivityItem): string | null {
@@ -47,7 +47,7 @@ export function ActivityView({ data, loading }: ActivityViewProps) {
   return (
     <Card className="flex flex-col overflow-hidden">
       <div className="border-b border-border px-5 py-4">
-        <h2 className="font-display text-xl">Skjedde automatisk</h2>
+        <h2 className="font-display text-xl">Siste hendelser</h2>
         <p className="mt-1 text-caption text-ink-secondary">
           {data ? summaryLine(data.summary) : "Laster …"}
         </p>

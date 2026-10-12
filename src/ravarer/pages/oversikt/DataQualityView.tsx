@@ -54,7 +54,6 @@ export function DataQualityView({ dq, stockBelowMin, loading, error, onRetry }: 
     { label: "Deklarasjonsnavn", ok: active - dq.missing_declaration, total: active, to: paths.deklarasjonsnavn() },
     { label: "Næringsdata", ok: active - dq.missing_nutrition, total: active, to: paths.naering() },
     { label: "Stabil pris", ok: active - dq.unstable_price, total: active, to: paths.pakninger({ filter: "ustabil_pris" }) },
-    { label: "Datablad bekreftet", ok: active - dq.datasheet_changes, total: active, to: paths.databladEndringer() },
     { label: "Lager over minimum", ok: Math.max(0, active - stockBelowMin), total: active, to: paths.lager() },
   ];
 
@@ -74,6 +73,13 @@ export function DataQualityView({ dq, stockBelowMin, loading, error, onRetry }: 
             <Bar ok={r.ok} total={r.total} />
           </li>
         ))}
+        <li className="space-y-1">
+          <div className="flex items-baseline justify-between gap-2 text-sm">
+            <Link to={paths.databladEndringer()} className="font-medium hover:underline">Databladendringer til gjennomgang</Link>
+            <span className="tabular-nums text-caption text-ink-secondary">{dq.datasheet_changes}</span>
+          </div>
+          <p className="text-caption text-ink-secondary">Viser ventende endringer, ikke hvor mange varer som har datablad.</p>
+        </li>
       </ul>
     </Card>
   );
