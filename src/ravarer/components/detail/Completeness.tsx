@@ -40,7 +40,7 @@ export function ChecklistCard({ items, hrefFor }: { items: CheckItem[]; hrefFor:
       {open.length === 0 ? (
         <p className="text-sm text-ink-secondary">Alt i sjekklisten er på plass.</p>
       ) : (
-        <p className="text-sm text-ink-secondary">Neste handling: <Link className="text-app underline-offset-2 hover:underline" to={hrefFor(open[0].section)} replace>{open[0].label} — {open[0].detail}</Link></p>
+        <p className="text-sm text-ink-secondary">Neste handling: <Link className="text-primary underline-offset-2 hover:underline" to={hrefFor(open[0].section)} replace>{open[0].label} — {open[0].detail}</Link></p>
       )}
       <ul className="divide-y divide-line-subtle">
         {items.map((c) => {
@@ -51,7 +51,7 @@ export function ChecklistCard({ items, hrefFor }: { items: CheckItem[]; hrefFor:
               <span className="font-medium">{c.label}</span>
               <span className="text-ink-secondary">{c.detail}</span>
               {c.status !== "ok" && (
-                <Link className="ml-auto text-caption text-app underline-offset-2 hover:underline" to={hrefFor(c.section)} replace>Åpne</Link>
+                <Link className="ml-auto text-caption text-primary underline-offset-2 hover:underline" to={hrefFor(c.section)} replace>Åpne</Link>
               )}
             </li>
           );

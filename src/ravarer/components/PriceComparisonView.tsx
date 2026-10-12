@@ -223,7 +223,7 @@ export function PriceComparisonView({
                           {o.invoice_id && (
                             <Link
                               to={paths.faktura(o.invoice_id)}
-                              className="text-app underline-offset-2 hover:underline"
+                              className="text-primary underline-offset-2 hover:underline"
                             >
                               Åpne faktura
                             </Link>

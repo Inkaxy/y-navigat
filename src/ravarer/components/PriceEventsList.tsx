@@ -62,7 +62,7 @@ export function PriceEventsList({ events }: { events: readonly TimelineEvent[]; 
                   </td>
                   <td className="py-2">
                     {e.invoiceId ? (
-                      <Link className="font-mono text-xs text-app underline-offset-2 hover:underline" to={paths.faktura(e.invoiceId)}>
+                      <Link className="font-mono text-xs text-primary underline-offset-2 hover:underline" to={paths.faktura(e.invoiceId)}>
                         {e.invoiceNumber ?? "Åpne"}
                       </Link>
                     ) : "—"}

@@ -68,7 +68,7 @@ export function InvoiceLinesTable({ lines, supplierId, canBulkImport, canMatch, 
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <div className="font-medium">{l.description ?? "—"}</div>
-                        {rm && <Link to={paths.raavare(rm.id)} className="text-caption text-app underline-offset-2 hover:underline">{rm.name}</Link>}
+                        {rm && <Link to={paths.raavare(rm.id)} className="text-caption text-primary underline-offset-2 hover:underline">{rm.name}</Link>}
                       </div>
                       <div className="shrink-0 text-right tabular-nums">{formatMoney(l.total_amount, cur)}</div>
                     </div>
@@ -127,7 +127,7 @@ export function InvoiceLinesTable({ lines, supplierId, canBulkImport, canMatch, 
                               <div className="flex items-center gap-2">
                                 <Link
                                   to={paths.raavare(rm.id)}
-                                  className="font-medium text-app underline-offset-2 hover:underline"
+                                  className="font-medium text-primary underline-offset-2 hover:underline"
                                 >
                                   {rm.name}
                                 </Link>
