@@ -133,6 +133,7 @@ export default function ForhandlingDetail() {
       <div className="mx-auto max-w-[1280px] space-y-4 p-4 sm:p-6">
         {back}
         <QueryState
+          scope="forhandlingen"
           isLoading={negQ.isLoading}
           isError={negQ.isError}
           error={negQ.error}
@@ -227,6 +228,7 @@ export default function ForhandlingDetail() {
 
         {!isLive && (
           <QueryState
+            scope="tilbudene"
             isLoading={itemsQ.isLoading || responsesQ.isLoading}
             isError={itemsQ.isError || responsesQ.isError}
             error={itemsQ.error ?? responsesQ.error}
