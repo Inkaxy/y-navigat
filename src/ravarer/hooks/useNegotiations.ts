@@ -1,3 +1,4 @@
+import { useInvoiceRights } from "@/fakturaer/hooks/useInvoiceRights";
 import { useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -90,7 +91,10 @@ interface FrozenWriteContext { legalEntityId: string; userId: string }
  * Databasens RLS er fortsatt autoriteten; dette stopper foreldet fortsettelse i UI.
  */
 function useWriteContext() {
-  const { legalEntityId, user, canWrite } = useRavarer();
+  const { legalEntityId, user, canWrite: moduleWrite } = useRavarer();
+  // Fakturaspesifikk skriverett (samme regel som has_ravarer_invoice_access); lukket mens den lastes.
+  const invoice = useInvoiceRights();
+  const canWrite = moduleWrite && !invoice.loading && invoice.canWrite;
   const live = useRef({ legalEntityId, userId: user?.id ?? "", canWrite, mounted: true });
   live.current.legalEntityId = legalEntityId;
   live.current.userId = user?.id ?? "";
