@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import type { PreviewState, PreviewTarget } from "@/ravarer/hooks/useSingleRecalcPreview";
@@ -24,7 +25,7 @@ function Formula({ c, baseUnit }: { c: PreviewChange; baseUnit: string }) {
     );
   }
   const qty = c.newBaseQty;
-  let mengde: React.ReactNode = null;
+  let mengde: ReactNode = null;
   if (c.method === "pakning") {
     mengde = c.quantity != null && c.factor != null && qty != null
       ? <>Mengde: {n6(Math.abs(c.quantity))} × {n6(c.factor)} ≈ {n6(qty)} {baseUnit}</>
@@ -36,7 +37,7 @@ function Formula({ c, baseUnit }: { c: PreviewChange; baseUnit: string }) {
   } else {
     mengde = <>{methodLabel(c.method)} — ingen mengde i grunnenhet.</>;
   }
-  let pris: React.ReactNode;
+  let pris: ReactNode;
   if (c.newPpb == null) pris = <>Ingen beregnet enhetspris.</>;
   else if (c.totalAmount != null && qty != null && qty !== 0) pris = <>Enhetspris: {n6(Math.abs(c.totalAmount))} kr / {n6(Math.abs(qty))} {baseUnit} ≈ {kr6(c.newPpb)} / {baseUnit}</>;
   else pris = <>Serverens enhetspris: {kr6(c.newPpb)} / {baseUnit} (avrundet mengde er for liten til å vise delingen).</>;
