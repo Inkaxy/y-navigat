@@ -104,7 +104,7 @@ describe("fakturahodet: egen sumkontroll og 44 px mål", () => {
     expect(primary.className).toContain("min-h-[44px]");
     fireEvent.click(primary);
     expect(onPrimary).toHaveBeenCalledTimes(1);
-    fireEvent.pointerDown(more, { button: 0, ctrlKey: false }); fireEvent.keyDown(more, { key: "Enter" });
+    more.focus(); fireEvent.keyDown(more, { key: "ArrowDown" });
     const menu = await screen.findByRole("menu");
     fireEvent.click(within(menu).getByRole("menuitem", { name: "Vis sumkontroll" }));
     expect(onMenu).toHaveBeenCalledWith("facts");
