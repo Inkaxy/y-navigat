@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { LiveItemStatusPill } from "@/ravarer/components/forhandlinger/NegotiationPills";
 import {
   accessErrorText, callPortal, emptyLiveDraft, formatDeadline, formatNok, liveDraftKey, parseLiveBundle,
-  parseLiveDraft, parsePaymentDays, uploadPdf, type LiveBundle, type LiveItem, type LiveLineDraft,
+  liveSubmitReceipt, parseLiveDraft, parsePaymentDays, uploadPdf, type LiveBundle, type LiveItem, type LiveLineDraft,
 } from "./portal/portalApi";
 import { PortalActionBar, PortalLogin, PortalNotice, PortalShell } from "./portal/PortalShell";
 
@@ -32,8 +32,12 @@ export default function LiveConfirmationPortal() {
   useEffect(() => {
     epoch.current += 1;
     busy.current = false;
-    setBundle(null); setStates({}); setPaymentDays(""); setSubmitted(null); setUnknownSubmit(false); setPassword(""); setError(null); setLoading(false);
+    setBundle(null); setStates({}); setPaymentDays(""); setSubmitted(null); setUnknownSubmit(false); setPassword(""); setError(null); setLoading(false); setUploading({});
+    // Avmontering/lenkebytte gjør alle pågående svar foreldet (også opplastinger før PUT).
+    return () => { epoch.current += 1; };
   }, [token]);
+  const bundleRef = useRef<LiveBundle | null>(null);
+  bundleRef.current = bundle;
 
   async function load(e?: FormEvent) {
     e?.preventDefault();
@@ -47,6 +51,27 @@ export default function LiveConfirmationPortal() {
     setLoading(false);
     const parsed = out.kind === "ok" ? parseLiveBundle(out.body) : null;
     if (!parsed) { setError(accessErrorText(out)); return; }
+    const prior = bundleRef.current;
+    if (prior) {
+      // Statusavstemming i samme kontekst: identitet må stemme, og siste kladd i minnet beholdes
+      // for linjer som fortsatt er åpne. Lokal lagret kladd overskriver aldri nyere endringer.
+      // En vellykket lesing er dagens status — ikke en kvittering for forrige innsending.
+      if (prior.recipient_id !== parsed.recipient_id || prior.negotiation_id !== parsed.negotiation_id) {
+        setError("Lenken svarer nå for en annen mottaker eller forespørsel. Last siden på nytt.");
+        return;
+      }
+      setStates((prev) => {
+        const next: Record<string, LiveLineDraft> = {};
+        for (const it of parsed.items) {
+          next[it.id] = it.live_status === "confirmed"
+            ? { ...(prev[it.id] ?? emptyLiveDraft()), confirmed: true }
+            : prev[it.id] ?? emptyLiveDraft();
+        }
+        return next;
+      });
+      setBundle(parsed); setUnknownSubmit(false);
+      return;
+    }
     const s: Record<string, LiveLineDraft> = {};
     for (const it of parsed.items) s[it.id] = { ...emptyLiveDraft(), confirmed: it.live_status === "confirmed" };
     let restored: ReturnType<typeof parseLiveDraft> = null;
@@ -77,8 +102,8 @@ export default function LiveConfirmationPortal() {
   async function uploadDatasheet(item: LiveItem, file: File) {
     const my = epoch.current;
     setUploading((u) => ({ ...u, [item.id]: true }));
-    const path = await uploadPdf("request-live-datasheet-upload", { token, password }, item.id, file);
-    if (my !== epoch.current) return;
+    const path = await uploadPdf("request-live-datasheet-upload", { token, password }, item.id, file, () => my === epoch.current);
+    if (my !== epoch.current || path === "cancelled") return;
     setUploading((u) => ({ ...u, [item.id]: false }));
     if (!path) { toast.error("Opplasting feilet. Prøv igjen."); return; }
     update(item.id, { datasheet_path: path, datasheet_skipped: false, uploadedName: file.name });
@@ -87,6 +112,7 @@ export default function LiveConfirmationPortal() {
 
   async function submitAll() {
     if (!bundle || busy.current || unknownSubmit) return;
+    if (Object.values(uploading).some(Boolean)) { toast.error("Vent til opplastingen er ferdig."); return; }
     // Låste linjer valideres eller sendes aldri på nytt.
     const editable = bundle.items.filter((it) => it.live_status !== "confirmed");
     if (!editable.length) { toast.info("Alle linjer er allerede bekreftet og låst."); return; }
@@ -111,9 +137,10 @@ export default function LiveConfirmationPortal() {
     if (my !== epoch.current) return;
     busy.current = false;
     setLoading(false);
-    if (out.kind === "ok" && out.body.success === true) {
+    const receipt = out.kind === "ok" ? liveSubmitReceipt(out.body) : null;
+    if (receipt) {
       try { localStorage.removeItem(liveDraftKey(token)); } catch (err) { console.warn("Kladd ble ikke fjernet", err instanceof Error ? err.name : "ukjent"); }
-      const all = out.body.all_confirmed === true;
+      const all = receipt.allConfirmed;
       setSubmitted({ allConfirmed: all });
       toast.success(all ? "Alt bekreftet — takk!" : "Bekreftelse sendt");
       return;
@@ -147,6 +174,7 @@ export default function LiveConfirmationPortal() {
   return (
     <PortalShell eyebrow="Bekreftelse av avtaler" title={bundle.negotiation_title ?? "Avtaler"}
       meta={<>Til {bundle.supplier_name ?? "leverandør"} · Frist {formatDeadline(bundle.confirmation_deadline)}</>}>
+      {error && <PortalNotice tone="danger">Status kunne ikke leses: {error}</PortalNotice>}
       {unknownSubmit ? (
         <PortalNotice tone="warning" action={
           <Button variant="outline" className="h-[44px]" onClick={() => void load()} disabled={loading}>
@@ -242,7 +270,7 @@ export default function LiveConfirmationPortal() {
       {open.length > 0 && !unknownSubmit && (
         <PortalActionBar>
           <Button variant="outline" className="h-[44px]" onClick={saveDraft} disabled={loading}>Lagre kladd</Button>
-          <Button className="h-[44px]" onClick={() => void submitAll()} disabled={loading}>
+          <Button className="h-[44px]" onClick={() => void submitAll()} disabled={loading || Object.values(uploading).some(Boolean)}>
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : <Send className="mr-2 h-4 w-4" aria-hidden />} Send bekreftelse
           </Button>
         </PortalActionBar>
