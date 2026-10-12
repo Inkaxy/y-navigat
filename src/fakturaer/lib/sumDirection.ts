@@ -25,6 +25,10 @@ const nb = (digits: number) => new Intl.NumberFormat("nb-NO", { minimumFractionD
 /** Fortegnet prosent med norsk desimal: +1 230,6 %. */
 export function formatSignedPct(v: number | null | undefined, digits = 1): string {
   if (v == null || !Number.isFinite(v)) return "—";
+  const sign = v > 0 ? "+" : v < 0 ? "−" : "";
+  const min = 1 / 10 ** digits;
+  // Liten, reell endring vises som «<0,1 %» med fortegn — aldri som 0 %.
+  if (v !== 0 && Math.abs(v) < min / 2) return `${sign}<${nb(digits).format(min)} %`;
   const s = nb(digits).format(Math.abs(v));
   return `${v > 0 ? "+" : v < 0 ? "−" : ""}${s} %`;
 }
