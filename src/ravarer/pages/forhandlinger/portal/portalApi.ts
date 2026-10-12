@@ -113,7 +113,8 @@ function rm(v: unknown): { name: string | null; base_unit: string | null } {
 export function parseRfqBundle(b: PortalRecord): RfqBundle | null {
   const recipient = strOrNull(b.recipient_id);
   const negotiation = strOrNull(b.negotiation_id);
-  if (b.result !== "ok" || !recipient || !negotiation || !Array.isArray(b.items)) return null;
+  // Begge listene er påkrevd: manglende svarliste er en feilet lesing, aldri «ingen svar».
+  if (b.result !== "ok" || !recipient || !negotiation || !Array.isArray(b.items) || !Array.isArray(b.responses)) return null;
   const items: RfqItem[] = [];
   for (const raw of b.items) {
     if (!isRecord(raw) || !strOrNull(raw.id)) return null;
@@ -130,12 +131,16 @@ export function parseRfqBundle(b: PortalRecord): RfqBundle | null {
     });
   }
   const ids = new Set(items.map((i) => i.id));
+  if (ids.size !== items.length) return null;
   const responses: RfqResponse[] = [];
-  for (const raw of Array.isArray(b.responses) ? b.responses : []) {
+  const seen = new Set<string>();
+  for (const raw of b.responses) {
     if (!isRecord(raw)) return null;
     const itemId = strOrNull(raw.negotiation_item_id);
     // Svar for linjer som ikke hører til denne forespørselen ignoreres (egen mottaker/egne linjer).
     if (!itemId || !ids.has(itemId)) continue;
+    if (seen.has(itemId)) return null;
+    seen.add(itemId);
     responses.push({
       negotiation_item_id: itemId,
       offered_price: numOrNull(raw.offered_price),
@@ -207,6 +212,7 @@ export function parseLiveBundle(b: PortalRecord): LiveBundle | null {
       base_unit: r.base_unit,
     });
   }
+  if (new Set(items.map((i) => i.id)).size !== items.length) return null;
   return {
     recipient_id: recipient,
     negotiation_id: negotiation,
@@ -272,9 +278,15 @@ export function parseUploadTicket(b: PortalRecord): { path: string; signedUrl: s
   return b.result === "ok" && path && signedUrl ? { path, signedUrl } : null;
 }
 
-/** Laster opp én PDF via signert URL. Gir sti ved suksess, ellers null. */
-export async function uploadPdf(fn: string, auth: PortalRecord, itemId: string, file: File): Promise<string | null> {
+/**
+ * Laster opp én PDF via signert URL. `isCurrent` kontrolleres før den andre skrivingen (PUT):
+ * etter avbrudd (lukk/lenkebytte/lagring) startes ingen ny lagringsskriving. En allerede
+ * sendt PUT kan ikke trekkes tilbake. Gir sti ved suksess, «cancelled» ved avbrudd, ellers null.
+ */
+export async function uploadPdf(fn: string, auth: PortalRecord, itemId: string, file: File, isCurrent: () => boolean): Promise<string | null | "cancelled"> {
+  if (!isCurrent()) return "cancelled";
   const ticket = await callPortal(fn, { ...auth, negotiation_item_id: itemId, filename: file.name });
+  if (!isCurrent()) return "cancelled";
   if (ticket.kind !== "ok") return null;
   const t = parseUploadTicket(ticket.body);
   if (!t) return null;
@@ -293,4 +305,26 @@ export function formatDeadline(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("nb-NO", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+}
+
+/**
+ * `submit-negotiation-response` svarer nøyaktig `{success:true, finalized:boolean}`.
+ * Suksess krever at `finalized` er lik den frosne forespørselen; alt annet er ukjent.
+ * Svaret er ingen kvittering per linje.
+ */
+export function isRfqSubmitReceipt(body: PortalRecord, finalize: boolean): boolean {
+  return body.success === true && typeof body.finalized === "boolean" && body.finalized === finalize;
+}
+
+/** `submit-live-confirmation` svarer `{success:true, all_confirmed:boolean}`. Ufullstendig = ukjent. */
+export function liveSubmitReceipt(body: PortalRecord): { allConfirmed: boolean } | null {
+  return body.success === true && typeof body.all_confirmed === "boolean" ? { allConfirmed: body.all_confirmed } : null;
+}
+
+/** Innsendt-tilstand for gjeldende linjer: alle, noen (delvis/må kontrolleres) eller ingen. */
+export function rfqSubmissionState(items: readonly RfqItem[], responses: readonly RfqResponse[]): "all" | "partial" | "none" {
+  const submitted = new Set(responses.filter((r) => r.status === "submitted").map((r) => r.negotiation_item_id));
+  const n = items.filter((i) => submitted.has(i.id)).length;
+  if (n === 0) return "none";
+  return n === items.length ? "all" : "partial";
 }
