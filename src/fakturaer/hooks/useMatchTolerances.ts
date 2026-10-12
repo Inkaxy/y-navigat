@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRowsExact } from "@/lib/countedPaging";
 
 export const FALLBACK_TOLERANCE_PCT = 3;
 export const DEFAULT_MIN_IMPACT_NOK = 50;
@@ -54,6 +55,25 @@ interface ToleranceData {
   settings: MatchSettings | null;
 }
 
+export interface CategoryToleranceRow { id: string; category: string; price_tolerance_pct: number }
+
+/**
+ * Alle kategoritoleranser for ett selskap, bevist komplette (eksakt antall, stabil rekkefølge
+ * kategori+id). Ufullstendig henting kaster — aldri et avkortet grunnlag som om det var komplett.
+ */
+export async function fetchCategoryTolerances(legalEntityId: string): Promise<CategoryToleranceRow[]> {
+  const rows = await fetchAllRowsExact<{ id: string; category: string; price_tolerance_pct: number | string }>((from, to) =>
+    supabase
+      .from("invoice_match_category_tolerances")
+      .select("id, category, price_tolerance_pct", { count: "exact" })
+      .eq("legal_entity_id", legalEntityId)
+      .order("category")
+      .order("id")
+      .range(from, to),
+  );
+  return rows.map((r) => ({ id: r.id, category: r.category, price_tolerance_pct: Number(r.price_tolerance_pct) }));
+}
+
 /** Henter innstillinger og kategoritoleranser for ett selskap. */
 async function fetchTolerances(legalEntityId: string): Promise<ToleranceData> {
   const [settings, cats] = await Promise.all([
@@ -64,15 +84,11 @@ async function fetchTolerances(legalEntityId: string): Promise<ToleranceData> {
       )
       .eq("legal_entity_id", legalEntityId)
       .maybeSingle(),
-    supabase
-      .from("invoice_match_category_tolerances")
-      .select("category, price_tolerance_pct")
-      .eq("legal_entity_id", legalEntityId),
+    fetchCategoryTolerances(legalEntityId),
   ]);
   if (settings.error) throw settings.error;
-  if (cats.error) throw cats.error;
   const byCategory: Record<string, number> = {};
-  (cats.data ?? []).forEach((c) => {
+  cats.forEach((c) => {
     byCategory[c.category] = Number(c.price_tolerance_pct);
   });
   const s = settings.data;

@@ -15,6 +15,7 @@ const db = vi.hoisted(() => ({
   invoke: [] as { fn: string; body: unknown }[],
   invokeImpl: (async () => ({ data: null, error: null })) as (fn: string, body: unknown) => Promise<{ data: unknown; error: unknown }>,
   cap: 1000,
+  authGate: null as null | Promise<void>,
   access: { canWrite: true, accessLevel: "admin" as string },
 }));
 
@@ -45,7 +46,7 @@ vi.mock("@/integrations/supabase/client", () => {
   return {
     supabase: {
       from: (t: string) => builder(t),
-      auth: { getUser: async () => ({ data: { user: { id: "U" } } }) },
+      auth: { getUser: async () => { if (db.authGate) await db.authGate; return { data: { user: { id: "U" } } }; } },
       rpc: async () => ({ data: [{ has_consumer_token: false, has_employee_token: true }], error: null }),
       functions: { invoke: (fn: string, opts: { body: unknown }) => { db.invoke.push({ fn, body: opts.body }); return db.invokeImpl(fn, opts.body); } },
     },
@@ -88,7 +89,7 @@ beforeEach(() => {
     invoice_match_category_tolerances: [{ id: "C1", category: "Mel og korn", price_tolerance_pct: 4 }],
     raw_materials: [{ id: "r1", category: "Mel og korn", categories: ["Mel og korn", "Drikke"], is_active: true }],
   };
-  db.fail = new Set(); db.writes = []; db.writeFail = new Set(); db.invoke = []; db.cap = 1000;
+  db.fail = new Set(); db.writes = []; db.writeFail = new Set(); db.invoke = []; db.cap = 1000; db.authGate = null;
   db.access = { canWrite: true, accessLevel: "admin" };
   db.invokeImpl = async () => ({ data: null, error: null });
 });
@@ -236,7 +237,7 @@ describe("Tripletex", () => {
     render(<TripletexSettings />, { wrapper: Wrap });
     fireEvent.change(await screen.findByLabelText("API-nøkkel"), { target: { value: "syntetisk" } });
     fireEvent.click(saveBtn());
-    expect(await screen.findByText(/lagringen er ikke bekreftet/)).toBeTruthy();
+    expect(await screen.findByText(/Utfallet av lagringen er/)).toBeTruthy();
     expect((screen.getByLabelText("API-nøkkel") as HTMLInputElement).value).toBe("syntetisk");
   });
 });
@@ -276,7 +277,7 @@ describe("AI-tjenester", () => {
     fireEvent.change(await screen.findByLabelText("API-nøkkel"), { target: { value: "syntetisk-nokkel" } });
     fireEvent.change(screen.getByLabelText("Max tokens"), { target: { value: "2000" } });
     fireEvent.click(screen.getByRole("button", { name: "Erstatt konfigurasjon" }));
-    expect(await screen.findByText(/ukjent eller delvis/)).toBeTruthy();
+    expect(await screen.findByText(/Utfallet av lagringen er/)).toBeTruthy();
     expect((screen.getByLabelText("API-nøkkel") as HTMLInputElement).value).toBe("syntetisk-nokkel");
     expect(db.invoke.filter((c) => (c.body as { action?: string }).action === "save")).toHaveLength(1);
   });
@@ -285,5 +286,94 @@ describe("AI-tjenester", () => {
     render(<AiServicesSettings />, { wrapper: Wrap });
     expect((await screen.findAllByRole("button", { name: /prøv igjen/i })).length).toBeGreaterThan(0);
     expect(screen.queryByText(/Ikke konfigurert/)).toBeNull();
+  });
+});
+
+describe("5C reparasjon", () => {
+  const credRow = { legal_entity_id: "LE", mode: "jwt", sync_enabled: true, sync_frequency_minutes: 240, last_synced_at: null, last_sync_status: null, last_sync_error: null, last_supplier_sync_at: null, last_invoice_synced_date: null, initial_import_done: true };
+
+  it("P1: avmontering mens lagring venter på innlogging starter ingen nye skrivinger", async () => {
+    let releaseAuth!: () => void;
+    db.authGate = new Promise((r) => { releaseAuth = r; });
+    const view = render(<MatchToleranserPage />, { wrapper: Wrap });
+    fireEvent.change(await screen.findByLabelText("Toleranse (%)"), { target: { value: "4" } });
+    fireEvent.click(screen.getByRole("button", { name: "Fjern toleranse for Mel og korn" }));
+    fireEvent.click(saveBtn());
+    view.unmount();
+    await act(async () => { releaseAuth(); await new Promise((r) => setTimeout(r, 10)); });
+    expect(db.writes).toHaveLength(0);
+  });
+
+  it("P2: kategoritoleranser hentes komplett forbi servertaket (201 rader, tak 200)", async () => {
+    db.cap = 200;
+    db.tables.invoice_match_category_tolerances = Array.from({ length: 201 }, (_, i) => ({ id: `C${String(i).padStart(3, "0")}`, category: `Kat ${String(i).padStart(3, "0")}`, price_tolerance_pct: 4 }));
+    render(<MatchToleranserPage />, { wrapper: Wrap });
+    await screen.findByLabelText("Toleranse (%)");
+    expect(await screen.findByRole("button", { name: "Fjern toleranse for Kat 200" })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /^Fjern toleranse for Kat / })).toHaveLength(201);
+  });
+
+  it("P2: feilet kategorilesing gir feil, ikke et avkortet grunnlag", async () => {
+    db.fail.add("invoice_match_category_tolerances");
+    render(<MatchToleranserPage />, { wrapper: Wrap });
+    expect(await screen.findByRole("button", { name: /prøv igjen/i })).toBeTruthy();
+    expect(screen.queryByTestId("settings-save-bar")).toBeNull();
+  });
+
+  it("AI: ukjent utfall holder lagring sperret til ny lesing lykkes; feilet lesing holder sperren, ingen andre lagring", async () => {
+    const cfg = { id: "11111111-1111-4111-8111-111111111111", provider: "openai", model: "gpt-4o", max_tokens: 2000, temperature: 0.1, is_active: true, purpose: "invoice_extraction", azure_endpoint: null, azure_deployment: null, created_at: "", updated_at: "" };
+    let listGate: null | Promise<void> = null; let listFail = false;
+    db.invokeImpl = async (fn, body) => {
+      const a = (body as { action?: string }).action;
+      if (a === "list") { if (listGate) await listGate; return listFail ? { data: null, error: new Error("nede") } : { data: { configs: [cfg] }, error: null }; }
+      if (a === "usage_summary") return { data: { entries: [] }, error: null };
+      if (a === "save") return { data: null, error: new Error("nett") };
+      return { data: null, error: null };
+    };
+    render(<AiServicesSettings />, { wrapper: Wrap });
+    fireEvent.change(await screen.findByLabelText("API-nøkkel"), { target: { value: "syntetisk" } });
+    let releaseList!: () => void;
+    listGate = new Promise((r) => { releaseList = r; }); listFail = true;
+    const btn = () => screen.getByRole("button", { name: "Erstatt konfigurasjon" }) as HTMLButtonElement;
+    fireEvent.click(btn());
+    expect((await screen.findAllByText(/Leser gjeldende konfigurasjon/)).length).toBeGreaterThan(0);
+    expect(btn().disabled).toBe(true);
+    fireEvent.click(btn());
+    await act(async () => { releaseList(); });
+    expect(await screen.findByRole("button", { name: "Les konfigurasjonen på nytt" })).toBeTruthy();
+    expect(btn().disabled).toBe(true);
+    expect((screen.getByLabelText("API-nøkkel") as HTMLInputElement).value).toBe("syntetisk");
+    listGate = null; listFail = false;
+    fireEvent.click(screen.getByRole("button", { name: "Les konfigurasjonen på nytt" }));
+    expect(await screen.findByText(/fortsatt ukjent/)).toBeTruthy();
+    expect(btn().disabled).toBe(false);
+    expect(db.invoke.filter((c) => (c.body as { action?: string }).action === "save")).toHaveLength(1);
+  });
+
+  it("Tripletex: ukjent utfall + feilet ny lesing holder lagring sperret og beholder nøkkel", async () => {
+    db.tables.tripletex_credentials = [credRow]; db.tables.tripletex_sync_log = [];
+    db.invokeImpl = async (fn) => { if (fn === "tripletex-save-credentials") { db.fail.add("tripletex_credentials"); return { data: {}, error: null }; } return { data: null, error: null }; };
+    render(<TripletexSettings />, { wrapper: Wrap });
+    fireEvent.change(await screen.findByLabelText("API-nøkkel"), { target: { value: "syntetisk" } });
+    fireEvent.click(saveBtn());
+    expect(await screen.findByRole("button", { name: "Les konfigurasjonen på nytt" })).toBeTruthy();
+    expect((saveBtn() as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByLabelText("API-nøkkel") as HTMLInputElement).value).toBe("syntetisk");
+    db.fail.delete("tripletex_credentials");
+    fireEvent.click(screen.getByRole("button", { name: "Les konfigurasjonen på nytt" }));
+    expect(await screen.findByText(/fortsatt ukjent/)).toBeTruthy();
+    expect((saveBtn() as HTMLButtonElement).disabled).toBe(false);
+    expect(db.invoke.filter((c) => c.fn === "tripletex-save-credentials")).toHaveLength(1);
+  });
+
+  it("Tripletex: synk-knapper er sperret uten admin og kaller ingenting", async () => {
+    db.access = { canWrite: true, accessLevel: "approve" };
+    db.tables.tripletex_credentials = [credRow]; db.tables.tripletex_sync_log = [];
+    render(<TripletexSettings />, { wrapper: Wrap });
+    const inv = await screen.findByRole("button", { name: "Kjør fakturasynk nå" }) as HTMLButtonElement;
+    const sup = screen.getByRole("button", { name: "Kjør leverandørsynk nå" }) as HTMLButtonElement;
+    expect(inv.disabled && sup.disabled).toBe(true);
+    fireEvent.click(inv); fireEvent.click(sup);
+    expect(db.invoke.some((c) => c.fn.startsWith("tripletex-sync"))).toBe(false);
   });
 });
