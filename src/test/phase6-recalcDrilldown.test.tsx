@@ -3,7 +3,8 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { RecalcDrilldown, costChange } from "@/ravarer/pages/reberegn/reberegnColumns";
+import { RecalcDrilldown } from "@/ravarer/pages/reberegn/reberegnColumns";
+import { costChange } from "@/ravarer/pages/reberegn/reberegnModel";
 
 describe("reberegning: kilde og pakning", () => {
   it("lenker til råvarekortets prisseksjon og pakningslisten med valgt vare", () => {

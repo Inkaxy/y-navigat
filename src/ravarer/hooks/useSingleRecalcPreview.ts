@@ -43,8 +43,9 @@ export function useSingleRecalcPreview() {
     setState({ status: "closed" });
   }, [legalEntityId, ready]);
   useEffect(() => {
-    live.current.mounted = true;
-    return () => { live.current.mounted = false; gen.current += 1; };
+    const l = live.current;
+    l.mounted = true;
+    return () => { l.mounted = false; gen.current += 1; };
   }, []);
 
   const close = useCallback(() => { gen.current += 1; setState({ status: "closed" }); }, []);
