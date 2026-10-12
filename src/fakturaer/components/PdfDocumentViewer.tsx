@@ -85,7 +85,7 @@ export function PdfDocumentViewer({ url, cacheKey, version, title, fallback, cla
     return (
       <div role="alert" className={cn("flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm", className)}>
         <span>Originalen er endret mens den ble hentet. Ingenting fra den gamle versjonen vises.</span>
-        <Button size="sm" variant="outline" className="min-h-11" onClick={() => { onIdentityChanged?.(); void q.refetch(); }}><RefreshCw className="h-4 w-4" /> Hent på nytt</Button>
+        <Button size="sm" variant="outline" className="min-h-[44px]" onClick={() => { onIdentityChanged?.(); void q.refetch(); }}><RefreshCw className="h-4 w-4" /> Hent på nytt</Button>
       </div>
     );
   }
@@ -106,7 +106,7 @@ function Failed({ className, fallback, onRetry, busy }: { className?: string; fa
   return (
     <div className={cn("flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm text-ink-secondary", className)}>
       <span>Dokumentet kunne ikke vises her.</span>
-      <Button size="sm" variant="outline" disabled={busy} onClick={onRetry}><RefreshCw className="h-4 w-4" /> Prøv igjen</Button>
+      <Button size="sm" variant="outline" className="min-h-[44px]" disabled={busy} onClick={onRetry}><RefreshCw className="h-4 w-4" /> Prøv igjen</Button>
       {fallback}
     </div>
   );
@@ -191,14 +191,14 @@ function DocumentView({ data, title, fallback, className, onReload }: { data: Do
     <div className={cn("flex h-full min-h-0 flex-col", className)}>
       {doc && (
         <div className="flex flex-wrap items-center gap-1 border-b border-line-subtle px-2 py-1 text-sm">
-          <Button size="icon" variant="ghost" aria-label="Forrige side" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+          <Button size="icon" variant="ghost" className="min-h-[44px] min-w-[44px]" aria-label="Forrige side" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
           <span className="tabular-nums" aria-live="polite">Side {Math.min(page, pages)} av {pages}</span>
-          <Button size="icon" variant="ghost" aria-label="Neste side" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
+          <Button size="icon" variant="ghost" className="min-h-[44px] min-w-[44px]" aria-label="Neste side" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
           <span className="ml-auto" />
-          <Button size="icon" variant="ghost" aria-label="Zoom ut" onClick={() => step(-0.25)}><Minus className="h-4 w-4" /></Button>
+          <Button size="icon" variant="ghost" className="min-h-[44px] min-w-[44px]" aria-label="Zoom ut" onClick={() => step(-0.25)}><Minus className="h-4 w-4" /></Button>
           <span className="w-14 text-center tabular-nums">{zoomPct == null ? "Bredde" : `${zoomPct} %`}</span>
-          <Button size="icon" variant="ghost" aria-label="Zoom inn" onClick={() => step(0.25)}><Plus className="h-4 w-4" /></Button>
-          <Button size="icon" variant="ghost" aria-label="Tilpass bredde" aria-pressed={zoom === "fit"} onClick={() => setZoom("fit")}><Maximize2 className="h-4 w-4" /></Button>
+          <Button size="icon" variant="ghost" className="min-h-[44px] min-w-[44px]" aria-label="Zoom inn" onClick={() => step(0.25)}><Plus className="h-4 w-4" /></Button>
+          <Button size="icon" variant="ghost" className="min-h-[44px] min-w-[44px]" aria-label="Tilpass bredde" aria-pressed={zoom === "fit"} onClick={() => setZoom("fit")}><Maximize2 className="h-4 w-4" /></Button>
         </div>
       )}
       <div ref={wrapRef} className="min-h-0 flex-1 overflow-auto bg-muted/30 p-2">

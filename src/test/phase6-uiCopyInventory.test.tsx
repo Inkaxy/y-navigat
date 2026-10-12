@@ -4,7 +4,7 @@ import { render, screen, within } from "@testing-library/react";
 import { fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, statSync } from "node:fs";
 import { correctionTarget } from "@/ravarer/pages/priskontroll/faktura/correctionTarget";
 import { formatMachineNumbersNb, formatSignedPct, sumDirection, sumDirectionText } from "@/fakturaer/lib/sumDirection";
 import { formatVariancePct } from "@/fakturaer/lib/linesSum";
@@ -111,23 +111,48 @@ describe("fakturahodet: egen sumkontroll og 44 px mål", () => {
 });
 
 describe("eksakt 313-kartlegging", () => {
-  const recs = JSON.parse(readFileSync("docs/ravarer-funksjonsmapping.json", "utf8")) as Array<Record<string, string>>;
+  type Rec = { id: string; route_owner_path: string; action_component_paths: string[]; canonical_url_templates: string[]; original_feature: string; current_feature: string; mapping_status: string; acceptance: string; browser_check: string; source_review: string };
+  const doc = JSON.parse(readFileSync("docs/ravarer-funksjonsmapping.json", "utf8")) as { provenance: { inspected_base_sha: string }; records: Rec[] };
+  const recs = doc.records;
   it("R1–R203 og F1–F110, ingen duplikater eller hull", () => {
     const ids = recs.map((r) => r.id);
     expect(new Set(ids).size).toBe(ids.length);
     const want = [...Array.from({ length: 203 }, (_, i) => `R${i + 1}`), ...Array.from({ length: 110 }, (_, i) => `F${i + 1}`)];
     expect([...ids].sort()).toEqual([...want].sort());
   });
-  it("samme ID-er som funksjonslisten, alle felt fylt, ingen falsk aksept", () => {
+  it("eksakte filer (ingen mapper), URL-er som liste uten sammenslåtte strenger, ingen falsk aksept", () => {
+    expect(doc.provenance.inspected_base_sha).toMatch(/^[0-9a-f]{40}$/);
     const md = readFileSync("docs/ravarer-funksjonsliste.md", "utf8").split("## Fase 6")[0];
     const mdIds = new Set([...md.matchAll(/^\| ([RF]\d+(?:, [RF]\d+)*) \|/gm)].flatMap((m) => m[1].split(", ")));
     expect(mdIds.size).toBe(313);
     for (const r of recs) {
       expect(mdIds.has(r.id)).toBe(true);
-      for (const k of ["route_owner", "component_path", "canonical_url_template", "section_or_action", "source_sha", "mapping_evidence"]) expect(r[k], `${r.id}.${k}`).toBeTruthy();
-      expect(existsSync(r.component_path), r.component_path).toBe(true);
-      expect(r.accepted).toBe("ikke akseptert");
-      expect(r.browser).toBe("ukjent");
+      expect(r.original_feature, r.id).toBeTruthy();
+      for (const f of [r.route_owner_path, ...r.action_component_paths]) {
+        expect(existsSync(f) && statSync(f).isFile(), `${r.id}: ${f}`).toBe(true);
+      }
+      expect(r.canonical_url_templates.length).toBeGreaterThan(0);
+      for (const u of r.canonical_url_templates) expect(u, r.id).toMatch(/^\/[^|· ]*$/);
+      expect(r.acceptance).toBe("ikke akseptert");
+      expect(r.mapping_status).not.toBe("feil");
     }
+  });
+  it("tidligere bevis bevares per ID og nullstilles ikke globalt", () => {
+    const by = new Map(recs.map((r) => [r.id, r]));
+    expect(by.get("R14")?.browser_check).toBe("targeted_readonly_pass_9915");
+    expect(by.get("R83")?.browser_check).toBe("ukjent");
+  });
+  it("R192/R195 beholder original funksjonstekst", () => {
+    const by = new Map(recs.map((r) => [r.id, r]));
+    expect(by.get("R192")?.current_feature).toBe("Visning av før, etter, endring, kilde og regnestykke");
+    expect(by.get("R195")?.current_feature).toBe("Lenker til Pakninger og fakturaer");
+  });
+  it("kontrollerte adresser: mottak/godkjenning/innstillinger/import bruker parserens verdier", () => {
+    const by = new Map(recs.map((r) => [r.id, r]));
+    expect(by.get("R81")?.canonical_url_templates).toEqual(["/ravarer/lager?fane=varemottak"]);
+    expect(by.get("F85")?.canonical_url_templates).toEqual(["/ravarer/priskontroll?fane=godkjenning"]);
+    expect(by.get("R187")?.canonical_url_templates).toEqual(["/ravarer/innstillinger?seksjon=tripletex"]);
+    expect(by.get("F96")?.canonical_url_templates).toEqual(["/ravarer/priskontroll?importer=pdf"]);
+    expect(by.get("R79")?.canonical_url_templates).toEqual(["/ravarer/priskontroll?fane=gjore&visning=mengde"]);
   });
 });

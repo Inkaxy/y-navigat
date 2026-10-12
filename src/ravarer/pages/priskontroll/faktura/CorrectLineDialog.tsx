@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,10 @@ type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   lineId: string | null;
+  /** Fakturaen målet ble frosset for. Avviker den fra `invoice.id`, er dialogen ikke redigerbar. */
+  targetInvoiceId: string | null;
+  /** Elementet som åpnet dialogen; fokus føres tilbake bare hvis det fortsatt er koblet til siden. */
+  returnFocus?: () => HTMLElement | null;
   invoice: { id: string; status: string | null; approved: boolean; supplier_id: string | null; supplier_name: string | null };
   canWrite: boolean;
   /** Originaldokumentet, vist ved siden av skjemaet. */
@@ -29,8 +33,11 @@ type Props = {
 const show = (v: string | number | null | undefined) => (v == null || v === "" ? "–" : String(v));
 
 /** «Rett fakturalinje»: før/etter, begrunnelse og valgfri læring. Lagres i én server-RPC. */
-export function CorrectLineDialog({ open, onOpenChange, lineId, invoice, canWrite, document, onSaved }: Props) {
+export function CorrectLineDialog({ open, onOpenChange, lineId, targetInvoiceId, returnFocus, invoice, canWrite, document, onSaved }: Props) {
   const q = useCorrectionLine(open ? lineId : null);
+  // Grunnlaget utkastet ble laget fra (frosset ved første vellykkede lesing for denne linjen).
+  const [base, setBase] = useState<{ lineId: string; updatedAt: string } | null>(null);
+  const submitting = useRef(false);
   const save = useCorrectLine();
   const [draft, setDraft] = useState<CorrectionDraft | null>(null);
   const [reason, setReason] = useState("");
@@ -39,9 +46,18 @@ export function CorrectLineDialog({ open, onOpenChange, lineId, invoice, canWrit
   const [showDoc, setShowDoc] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // Eksakt identitet: frosset faktura = gjeldende faktura, og fersk rad = frosset linje på den fakturaen.
+  const identityOk = !!q.data && !!lineId && q.data.id === lineId && q.data.invoice_id === invoice.id && targetInvoiceId === invoice.id;
+  // Utkastet lages én gang per linje; ny lesing (også «Prøv igjen») beholder brukerens utkast.
   useEffect(() => {
-    if (open && q.data) { setDraft(draftFrom(q.data.values)); setReason(""); setLearn(false); setAcceptIssues(false); setErr(null); }
-  }, [open, q.data]);
+    if (!open || !q.data || !identityOk || base?.lineId === q.data.id) return;
+    setDraft(draftFrom(q.data.values)); setBase({ lineId: q.data.id, updatedAt: q.data.updated_at });
+    setReason(""); setLearn(false); setAcceptIssues(false); setErr(null);
+  }, [open, q.data, identityOk, base]);
+  // Raden er endret siden utkastet ble laget: utkastet beholdes, men kan ikke lagres mot ny versjon.
+  const versionChanged = !!base && !!q.data && q.data.updated_at !== base.updatedAt;
+  // Bare et vellykket, ferdig og gjeldende svar (rad + kostprisføring) kan ligge til grunn for lagring.
+  const settled = q.isSuccess && !q.isFetching && !q.isError;
 
   const result = useMemo(() => (q.data && draft ? buildChanges(q.data.values, draft) : null), [q.data, draft]);
   const preview = useMemo(() => {
@@ -57,10 +73,14 @@ export function CorrectLineDialog({ open, onOpenChange, lineId, invoice, canWrit
   const lock = q.data ? correctionLockReason({ status: invoice.status, approved: invoice.approved, costPosted: q.data.costPosted }) : null;
   const changedKeys = result ? (Object.keys(result.changes) as CorrectionField[]) : [];
   const hasErrors = !!result && Object.keys(result.errors).length > 0;
-  const canSave = canWrite && !lock && !hasErrors && reason.trim().length >= 3 && (changedKeys.length > 0 || acceptIssues) && !save.isPending;
+  const ready = identityOk && settled && !versionChanged && !!base;
+  const canSave = ready && canWrite && !lock && !hasErrors && reason.trim().length >= 3 && (changedKeys.length > 0 || acceptIssues) && !save.isPending;
 
   async function submit() {
-    if (!q.data || !result) return;
+    // Synkron kontroll ved innsending, ikke bare via deaktivert knapp.
+    if (submitting.current || !canSave || !q.data || !result || !lineId) return;
+    if (q.data.id !== lineId || q.data.invoice_id !== invoice.id || targetInvoiceId !== invoice.id) return;
+    submitting.current = true;
     setErr(null);
     try {
       const r = await save.mutateAsync({
@@ -72,8 +92,11 @@ export function CorrectLineDialog({ open, onOpenChange, lineId, invoice, canWrit
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Rettelsen ble ikke lagret. Prøv igjen.");
       void q.refetch();
+    } finally {
+      submitting.current = false;
     }
   }
+  const reloadFresh = () => { setBase(null); void q.refetch(); };
 
   const field = (f: CorrectionField) => {
     if (!draft) return null;
@@ -84,7 +107,7 @@ export function CorrectLineDialog({ open, onOpenChange, lineId, invoice, canWrit
         <div key={f} className="sm:col-span-2">
           <Label htmlFor={id} className="mb-1 block">{CORRECTION_FIELD_LABEL[f]}</Label>
           <Select value={draft.line_kind || "vare"} onValueChange={(v) => setDraft({ ...draft, line_kind: v })} disabled={!!lock}>
-            <SelectTrigger id={id}><SelectValue /></SelectTrigger>
+            <SelectTrigger id={id} className="min-h-[44px]"><SelectValue /></SelectTrigger>
             <SelectContent>{LINE_KIND_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
           </Select>
           {hint && <p className="mt-1 text-caption text-ink-secondary">{hint}</p>}
@@ -96,7 +119,7 @@ export function CorrectLineDialog({ open, onOpenChange, lineId, invoice, canWrit
         <div key={f}>
           <Label htmlFor={id} className="mb-1 block">{CORRECTION_FIELD_LABEL[f]}</Label>
           <Select value={draft.unit_price_basis || "ukjent"} onValueChange={(v) => setDraft({ ...draft, unit_price_basis: v === "ukjent" ? "" : v })} disabled={!!lock}>
-            <SelectTrigger id={id}><SelectValue /></SelectTrigger>
+            <SelectTrigger id={id} className="min-h-[44px]"><SelectValue /></SelectTrigger>
             <SelectContent>{PRICE_BASIS_OPTIONS.map((o) => <SelectItem key={o.value || "ukjent"} value={o.value || "ukjent"}>{o.label}</SelectItem>)}</SelectContent>
           </Select>
         </div>
@@ -106,7 +129,7 @@ export function CorrectLineDialog({ open, onOpenChange, lineId, invoice, canWrit
     return (
       <div key={f} className={f === "description" ? "sm:col-span-2" : undefined}>
         <Label htmlFor={id} className="mb-1 block">{CORRECTION_FIELD_LABEL[f]}</Label>
-        <Input id={id} value={draft[f]} inputMode={NUMERIC_FIELDS.includes(f) ? "decimal" : undefined} disabled={!!lock}
+        <Input id={id} className="min-h-[44px]" value={draft[f]} inputMode={NUMERIC_FIELDS.includes(f) ? "decimal" : undefined} disabled={!!lock}
           aria-invalid={!!e} onChange={(ev) => setDraft({ ...draft, [f]: ev.target.value })} />
         {e && <p className="mt-1 text-caption text-destructive">{e}</p>}
       </div>
@@ -115,20 +138,31 @@ export function CorrectLineDialog({ open, onOpenChange, lineId, invoice, canWrit
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto">
+      <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto" closeClassName="flex min-h-[44px] min-w-[44px] items-center justify-center right-2 top-2"
+        onCloseAutoFocus={(e) => { const el = returnFocus?.(); if (el && el.isConnected) { e.preventDefault(); el.focus(); } }}>
         <DialogHeader>
           <DialogTitle>Rett fakturalinje{q.data?.line_number != null ? ` ${q.data.line_number}` : ""}</DialogTitle>
           <DialogDescription>Les av originalen og rett det som er lest feil. Rettelsen lagres med før/etter, begrunnelse, hvem og når. Kobling og prisvurdering beregnes på nytt.</DialogDescription>
         </DialogHeader>
         {q.isLoading && <p className="text-sm text-ink-secondary">Henter linjen …</p>}
-        {q.isError && <p className="text-sm text-destructive">Kunne ikke hente linjen. <button type="button" className="underline" onClick={() => void q.refetch()}>Prøv igjen</button></p>}
-        {q.data && draft && (
+        {q.isError && (
+          <p role="alert" className="text-sm text-destructive">Kunne ikke hente linjen{draft ? ". Utkastet ditt er beholdt, men kan ikke lagres før linjen er hentet på nytt" : ""}.{" "}
+            <button type="button" className="min-h-[44px] underline" onClick={() => void q.refetch()}>Prøv igjen</button></p>
+        )}
+        {q.data && !identityOk && (
+          <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm">Linjen hører ikke til fakturaen som vises. Lukk og åpne rettingen på nytt fra riktig faktura.</p>
+        )}
+        {versionChanged && (
+          <p role="alert" className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">Linjen er endret siden du åpnet den. Utkastet kan ikke lagres mot den nye versjonen.{" "}
+            <button type="button" className="min-h-[44px] underline" onClick={reloadFresh}>Last inn ferske verdier</button></p>
+        )}
+        {q.data && identityOk && draft && (
           <div className="grid gap-4 lg:grid-cols-2">
             <div className={showDoc ? "block" : "hidden lg:block"}>
               <div className="h-[60vh] overflow-hidden rounded-lg border border-border">{document}</div>
             </div>
             <div className="space-y-4">
-              <Button type="button" variant="outline" size="sm" className="lg:hidden" onClick={() => setShowDoc(!showDoc)}>{showDoc ? "Skjul original" : "Vis original"}</Button>
+              <Button type="button" variant="outline" size="sm" className="min-h-[44px] lg:hidden" onClick={() => setShowDoc(!showDoc)}>{showDoc ? "Skjul original" : "Vis original"}</Button>
               {lock && <p role="note" className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">{lock}</p>}
               {q.data.issues.length > 0 && (
                 <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
@@ -148,7 +182,7 @@ export function CorrectLineDialog({ open, onOpenChange, lineId, invoice, canWrit
               {preview.length > 0 ? (
                 <div className="space-y-2 rounded-md border border-border px-3 py-2 text-sm">
                   <p>Etter rettelsen: {preview.map((p) => formatMachineNumbersNb(p.message)).join(" ")}</p>
-                  <label className="flex items-start gap-2"><Checkbox checked={acceptIssues} onCheckedChange={(v) => setAcceptIssues(v === true)} disabled={!!lock} />
+                  <label className="flex min-h-[44px] items-start gap-2 py-2"><Checkbox checked={acceptIssues} onCheckedChange={(v) => setAcceptIssues(v === true)} disabled={!!lock} />
                     <span>Tallene er kontrollert mot originalen og stemmer likevel. Registrer heller rabatt og prisgrunnlag over når det er mulig.</span></label>
                   {acceptIssues && learn && <p className="text-caption text-ink-secondary">Rettelser med godtatte avvik blir aldri brukt ved senere lesing. Rett tallene og prisgrunnlaget i stedet hvis du vil lære av linjen.</p>}
                 </div>
@@ -156,7 +190,7 @@ export function CorrectLineDialog({ open, onOpenChange, lineId, invoice, canWrit
                 <div className="space-y-2">
                   <p className="text-caption text-ink-secondary">Regnestykket går opp med disse tallene.</p>
                   {q.data.issues.length > 0 && (
-                    <label className="flex items-start gap-2 rounded-md border border-border px-3 py-2 text-sm"><Checkbox checked={acceptIssues} onCheckedChange={(v) => setAcceptIssues(v === true)} disabled={!!lock} />
+                    <label className="flex min-h-[44px] items-start gap-2 rounded-md border border-border px-3 py-2 text-sm"><Checkbox checked={acceptIssues} onCheckedChange={(v) => setAcceptIssues(v === true)} disabled={!!lock} />
                       <span>Jeg har kontrollert lesevarslene over mot originalen, og linjen stemmer. Varslene lukkes med begrunnelsen og blir aldri brukt til læring.</span></label>
                   )}
                 </div>
@@ -165,7 +199,7 @@ export function CorrectLineDialog({ open, onOpenChange, lineId, invoice, canWrit
                 <Label htmlFor="rett-begrunnelse" className="mb-1 block">Begrunnelse</Label>
                 <Textarea id="rett-begrunnelse" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="F.eks. «Linjesum lest som 30, står 300 på originalen»" disabled={!!lock} />
               </div>
-              <label className="flex items-start gap-2 text-sm">
+              <label className="flex min-h-[44px] items-start gap-2 py-2 text-sm">
                 <Checkbox checked={learn} onCheckedChange={(v) => setLearn(v === true)} disabled={!!lock || !invoice.supplier_id || changedKeys.length === 0} />
                 <span>
                   <span className="font-medium">Bruk rettelsen ved senere lesing</span>
@@ -181,8 +215,8 @@ export function CorrectLineDialog({ open, onOpenChange, lineId, invoice, canWrit
           </div>
         )}
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={save.isPending}>Avbryt</Button>
-          <Button onClick={() => void submit()} disabled={!canSave}>{save.isPending ? "Lagrer …" : "Lagre rettelsen"}</Button>
+          <Button variant="outline" className="min-h-[44px]" onClick={() => onOpenChange(false)} disabled={save.isPending}>Avbryt</Button>
+          <Button className="min-h-[44px]" onClick={() => void submit()} disabled={!canSave}>{save.isPending ? "Lagrer …" : "Lagre rettelsen"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

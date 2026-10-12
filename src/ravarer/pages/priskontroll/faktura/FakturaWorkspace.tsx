@@ -76,7 +76,9 @@ export default function FakturaWorkspace() {
   const tolerances = useMatchTolerances(data?.legal_entity_id ?? null);
   // Serverens prisstatus; ukjent mens noe lagres eller detaljene hentes på nytt.
   const safety = useInvoicePriceSafety([id ?? null], { pending: s.busy || detail.isFetching });
-  const [correctFor, setCorrectFor] = useState<string | null>(null);
+  // Rettemålet fryses som selskap + faktura + linje; et mål for en annen faktura vises aldri.
+  const [correctTarget, setCorrectTarget] = useState<{ entityId: string | null; invoiceId: string; lineId: string } | null>(null);
+  const correctOpener = useRef<{ invoiceId: string; el: HTMLElement | null } | null>(null);
   const fetchLines = useFetchInvoiceLines();
   const rematch = useRematchWait(data?.legal_entity_id ?? null, () => { void detail.refetch(); q.refresh(); });
   const confirmMany = useConfirmMany();
@@ -96,6 +98,24 @@ export default function FakturaWorkspace() {
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [zone, setZone] = useState<"dokument" | "linjer" | "kontroll">("linjer");
 
+  const routeEntity = data?.legal_entity_id ?? null;
+  // Rute- eller selskapsbytte lukker og nullstiller rettingen straks (fokus føres ikke tilbake til forrige faktura).
+  useEffect(() => { setCorrectTarget(null); correctOpener.current = null; }, [id, routeEntity]);
+  const correctFor = correctTarget && correctTarget.invoiceId === id && data?.id === id && correctTarget.entityId === routeEntity ? correctTarget.lineId : null;
+  const startCorrection = (lineId: string) => {
+    if (!data) return;
+    const ae = typeof document !== "undefined" ? document.activeElement : null;
+    // Menyvalg forsvinner når menyen lukkes; da brukes hovedknappen på samme faktura som trygg reserve.
+    const el = ae instanceof HTMLElement && ae !== document.body && !ae.closest('[role="menu"]') ? ae : null;
+    correctOpener.current = { invoiceId: data.id, el };
+    setCorrectTarget({ entityId: data.legal_entity_id ?? null, invoiceId: data.id, lineId });
+  };
+  const correctionReturnFocus = (): HTMLElement | null => {
+    const o = correctOpener.current;
+    if (!o || o.invoiceId !== id) return null;
+    if (o.el && o.el.isConnected) return o.el;
+    return document.querySelector<HTMLElement>("[data-primary-action]:not([disabled])");
+  };
   const final = data?.status === "reconciled" || data?.status === "flagged";
   // Linjene kan bare endres med skrivetilgang og når fakturaen ikke er avstemt/flagget.
   const lineWrite = s.canWrite && !final;
@@ -178,7 +198,7 @@ export default function FakturaWorkspace() {
       return;
     }
     // Originalen vises i selve rettedialogen (samme linje); ingen ekstra dokumentark åpnes bak den.
-    setCorrectFor(t.id);
+    startCorrection(t.id);
   };
 
   const runPrimary = () => {
@@ -220,7 +240,7 @@ export default function FakturaWorkspace() {
     else setHistoryOpen(true);
   };
 
-  const anyDialog = !!dialog || !!lineDialog || historyOpen || helpOpen || overrideOpen || !!q.bulkLink;
+  const anyDialog = !!dialog || !!lineDialog || !!correctFor || historyOpen || helpOpen || overrideOpen || !!q.bulkLink;
   const keys = useMemo(() => ({
     enabled: !!data && !anyDialog,
     canWrite: lineWrite,
@@ -296,7 +316,7 @@ export default function FakturaWorkspace() {
           onRegister={() => navigate(paths.registrerLinjer(data.id))}
           tolerancePct={tolerances.defaultPct}
           settings={tolerances.settings}
-          onCorrect={lineWrite ? (id) => setCorrectFor(id) : undefined}
+          onCorrect={lineWrite ? (lid) => startCorrection(lid) : undefined}
           invoice={{ currency: data.currency }}
           gateOf={gateFor}
           compact={isMobile || (showDocZone && !threeZones)}
@@ -348,7 +368,7 @@ export default function FakturaWorkspace() {
           onInspectorOpenChange={setInspectorOpen}
           inspectorNote={active ? (
             <div className="space-y-2">
-              <Button variant="outline" size="sm" className="min-h-[44px]" onClick={() => setCorrectFor(active.id)}>Rett fakturalinje</Button>
+              <Button variant="outline" size="sm" className="min-h-[44px]" onClick={() => startCorrection(active.id)}>Rett fakturalinje</Button>
               <SupplierItemScopeNote supplierId={data.supplier_id} line={active} />
             </div>
           ) : null}
@@ -432,11 +452,13 @@ export default function FakturaWorkspace() {
       {confirmMany.dialog}
       <CorrectLineDialog
         open={!!correctFor}
-        onOpenChange={(v) => { if (!v) setCorrectFor(null); }}
+        onOpenChange={(v) => { if (!v) setCorrectTarget(null); }}
         lineId={correctFor}
+        targetInvoiceId={correctFor ? correctTarget?.invoiceId ?? null : null}
+        returnFocus={correctionReturnFocus}
         invoice={{ id: data.id, status: data.status, approved: !!s.steps?.find((x) => x.key === "godkjent")?.done, supplier_id: data.supplier_id, supplier_name: data.suppliers?.name ?? null }}
         canWrite={s.canWrite}
-        key={correctFor ?? "lukket"}
+        key={correctFor ? `${correctTarget?.invoiceId}:${correctFor}` : "lukket"}
         document={correctDocEl}
         onSaved={(r) => { q.refresh(); void detail.refetch(); s.setResult({ title: "Fakturalinjen er rettet", items: [
           `${r.changed.length} ${r.changed.length === 1 ? "felt" : "felt"} endret. Kobling og pris beregnes på nytt.`,

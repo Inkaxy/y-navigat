@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
@@ -58,8 +58,9 @@ vi.mock("@/fakturaer/components/InvoiceDocumentPanel", () => ({
   InvoiceDocumentPanel: ({ line }: { line: { id: string } | null }) => <div data-testid="original" data-line={line?.id ?? ""} />,
 }));
 vi.mock("@/ravarer/pages/priskontroll/faktura/CorrectLineDialog", () => ({
-  CorrectLineDialog: ({ open, lineId, document, onOpenChange, canWrite }: { open: boolean; lineId: string | null; document: ReactNode; onOpenChange: (v: boolean) => void; canWrite: boolean }) =>
-    open ? <div role="dialog" aria-label="Rett fakturalinje" data-line={lineId ?? ""} data-can-write={String(canWrite)}>{document}<button onClick={() => onOpenChange(false)}>Avbryt</button></div> : null,
+  CorrectLineDialog: ({ open, lineId, targetInvoiceId, invoice, returnFocus, document, onOpenChange, canWrite }: { open: boolean; lineId: string | null; targetInvoiceId: string | null; invoice: { id: string }; returnFocus?: () => HTMLElement | null; document: ReactNode; onOpenChange: (v: boolean) => void; canWrite: boolean }) =>
+    open ? <div role="dialog" aria-label="Rett fakturalinje" data-line={lineId ?? ""} data-target={targetInvoiceId ?? ""} data-invoice={invoice.id} data-can-write={String(canWrite)}>{document}
+      <button onClick={() => { onOpenChange(false); returnFocus?.()?.focus(); }}>Avbryt</button></div> : null,
 }));
 vi.mock("@/ravarer/pages/priskontroll/faktura/LineDialogs", () => ({ LineDialogs: () => null }));
 vi.mock("@/ravarer/pages/priskontroll/fakturaer/FakturaerDialogs", () => ({ FakturaerDialogs: () => null }));
@@ -71,11 +72,17 @@ import FakturaWorkspace from "@/ravarer/pages/priskontroll/faktura/FakturaWorksp
 
 const L = (id: string, issue = false): Line => ({ id, description: `Linje ${id}`, extraction_issues: issue ? [{ code: "regnestykke", message: "Mengde × pris (1130000.00) stemmer ikke" }] : null, raw_material_id: null, matched_raw_material: null });
 
+function GoTo() {
+  const nav = useNavigate();
+  return <button onClick={() => nav("/ravarer/priskontroll/faktura/I2")}>Gå til I2</button>;
+}
+
 function mount(path = "/ravarer/priskontroll/faktura/I1") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[path]}>
+        <GoTo />
         <Routes><Route path="/ravarer/priskontroll/faktura/:id" element={<FakturaWorkspace />} /></Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -127,6 +134,28 @@ describe("FakturaWorkspace: «Rett sumavvik» åpner vaktet retting", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Rett sumavvik" }));
     expect(screen.queryByRole("dialog", { name: "Rett fakturalinje" })).toBeNull();
     expect(st.setResult).toHaveBeenCalledWith(expect.objectContaining({ title: "Linjene kan ikke rettes her", error: true }));
+  });
+  it("frosset mål: dialogen får samme faktura som målet; rutebytte lukker og viser aldri gammel linje med ny faktura", async () => {
+    st.active = st.lines[2];
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "Rett sumavvik" }));
+    const dlg = await screen.findByRole("dialog", { name: "Rett fakturalinje" });
+    expect(dlg.getAttribute("data-target")).toBe("I1");
+    expect(dlg.getAttribute("data-invoice")).toBe("I1");
+    fireEvent.click(screen.getByRole("button", { name: "Gå til I2" }));
+    await screen.findByRole("button", { name: "Rett sumavvik" });
+    for (const d of screen.queryAllByRole("dialog", { name: "Rett fakturalinje" })) expect(d.getAttribute("data-invoice")).toBe(d.getAttribute("data-target"));
+    expect(screen.queryByRole("dialog", { name: "Rett fakturalinje" })).toBeNull();
+    expect(st.rpc).not.toHaveBeenCalled();
+  });
+  it("Avbryt fører fokus tilbake til «Rett sumavvik»", async () => {
+    st.active = st.lines[2];
+    mount();
+    const btn = await screen.findByRole("button", { name: "Rett sumavvik" });
+    btn.focus();
+    fireEvent.click(btn);
+    fireEvent.click(await screen.findByRole("button", { name: "Avbryt" }));
+    expect(document.activeElement).toBe(btn);
   });
   it("lesetilgang → ingen dialog", async () => {
     st.canWrite = false; st.active = st.lines[0];
