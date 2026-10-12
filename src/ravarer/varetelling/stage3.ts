@@ -188,6 +188,15 @@ export function createFakeStage3(base: FakeBase, opts: FakeStage3Opts = {}): Sta
       amounts: [{ column: (l.snap_units.length ? "pakninger" : "los") as "pakninger" | "los", unit_label: l.snap_units[0]?.label ?? null, raw: raws[i % raws.length] }],
     })) })) };
   };
+  const preview = async (countId: string): Promise<ReportPreview> => {
+      unavailable();
+      const c = st.counts.find(x => x.id === countId); if (!c || c.status === "planlagt") throw new VtRejectedError("Tellingen er ikke startet", "55000");
+      const lists = st.lists.filter(l => l.count_id === countId).sort((a, b) => a.sort_order - b.sort_order);
+      const lines = st.lines.filter(l => l.count_id === countId);
+      const csv = buildReportCsv(c, lists, lines);
+      const base0 = `varetelling-${c.planned_date}-r${c.revision}`;
+      return { hash: await sha256Hex(csv), countRevision: c.revision, final: c.status === "avsluttet", defaultSubject: defaultSubject(c), attachments: [`${base0}.csv`, `${base0}.pdf`], totals: reportTotals(lines), mailConfigured: opts.mailConfigured === true };
+    };
   return {
     _jobs: jobs, _props: props, _mail: mail, _assign: assign,
     async probe() { return opts.available === false ? "missing" : "ok"; },
@@ -227,15 +236,7 @@ export function createFakeStage3(base: FakeBase, opts: FakeStage3Opts = {}): Sta
       return res;
     },
     async reject(i) { unavailable(); const p = props.find(x => x.id === i.proposalId); if (!p || p.status !== "foreslatt") throw new VtRejectedError("Forslaget er allerede avgjort", "55000"); p.status = "avvist"; },
-    async previewReport(countId) {
-      unavailable();
-      const c = st.counts.find(x => x.id === countId); if (!c || c.status === "planlagt") throw new VtRejectedError("Tellingen er ikke startet", "55000");
-      const lists = st.lists.filter(l => l.count_id === countId).sort((a, b) => a.sort_order - b.sort_order);
-      const lines = st.lines.filter(l => l.count_id === countId);
-      const csv = buildReportCsv(c, lists, lines);
-      const base0 = `varetelling-${c.planned_date}-r${c.revision}`;
-      return { hash: await sha256Hex(csv), countRevision: c.revision, final: c.status === "avsluttet", defaultSubject: defaultSubject(c), attachments: [`${base0}.csv`, `${base0}.pdf`], totals: reportTotals(lines), mailConfigured: opts.mailConfigured === true };
-    },
+    previewReport: (countId) => preview(countId),
     async sendReport(i) {
       unavailable();
       const bad = validateMail(i); if (bad) throw new VtRejectedError(bad, "22023");
@@ -243,7 +244,7 @@ export function createFakeStage3(base: FakeBase, opts: FakeStage3Opts = {}): Sta
       const sig = JSON.stringify([i.countId, i.hash, i.countRevision, i.recipient.trim(), i.subject.trim(), i.message]);
       const prev = mail.get(i.opId);
       if (prev) { if (prev.sig !== sig) throw new VtRejectedError("Operasjons-ID er brukt med annet innhold", "23505"); return { state: prev.state, detail: null, replayed: true }; }
-      const cur = await this.previewReport(i.countId);
+      const cur = await preview(i.countId);
       if (cur.hash !== i.hash || cur.countRevision !== i.countRevision) throw new VtRejectedError("Rapporten er endret siden forhåndsvisningen. Åpne forhåndsvisningen på nytt.", "409");
       const outcome = opts.mailOutcome ?? "akseptert_av_tjenesten";
       if (outcome === "tapt_svar") { mail.set(i.opId, { sig, state: "akseptert_av_tjenesten" }); throw new VtUnknownOutcomeError(); }
