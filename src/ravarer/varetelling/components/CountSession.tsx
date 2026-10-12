@@ -32,12 +32,16 @@ function SessionBody({ data, listParam, onBack, onList, onPrint }: {
   const listId = listParam && lists.some(l => l.id === listParam) ? listParam : "alle";
   const [filter, setFilter] = useState<Filter>("gjenstar");
   const [activeId, setActiveId] = useState<string | null>(null);
-  // Filteret beregnes fra et stabilt utvalg så et kort ikke forsvinner mens man skriver.
-  const [keepIds, setKeepIds] = useState<Set<string>>(new Set());
+  // «Gjenstår» er et stabilt øyeblikksbilde: et kort forsvinner ikke mens noen skriver i det,
+  // heller ikke når en annen teller lagrer samme linje.
+  const [snap, setSnap] = useState<{ key: string; ids: Set<string> } | null>(null);
   const open = count.status === "pagar" || count.status === "til_kontroll";
   const listOf = (l: VtCountLine) => lists.find(x => x.id === l.count_list_id);
   const inList = useMemo(() => (listId === "alle" ? lines : lines.filter(l => l.count_list_id === listId)), [lines, listId]);
-  const shown = filter === "alle" ? inList : filter === "kontroll" ? inList.filter(l => l.state === "ma_kontrolleres") : inList.filter(l => l.state === "ikke_talt" || keepIds.has(l.id));
+  const snapKey = `${listId}|${filter}`;
+  const keepIds = snap && snap.key === snapKey ? snap.ids : new Set(inList.filter(l => l.state === "ikke_talt").map(l => l.id));
+  if (filter === "gjenstar" && (!snap || snap.key !== snapKey)) setSnap({ key: snapKey, ids: keepIds });
+  const shown = filter === "alle" ? inList : filter === "kontroll" ? inList.filter(l => l.state === "ma_kontrolleres") : inList.filter(l => keepIds.has(l.id));
   const sum = summarize(lines);
   const groups = summarizeGroups(lists, lines);
   const multi = [...totalsByMaterial(lines).values()].filter(t => t.places > 1);
@@ -48,7 +52,7 @@ function SessionBody({ data, listParam, onBack, onList, onPrint }: {
   const goNext = (from: string | null) => {
     const n = nextUncounted(inList, from);
     if (!n) { toast.success("Alle varer i utvalget er registrert"); return; }
-    setKeepIds(s => new Set(s).add(n.id));
+    setSnap(cur => (cur ? { key: cur.key, ids: new Set(cur.ids).add(n.id) } : cur));
     setActiveId(n.id);
     requestAnimationFrame(() => document.querySelector<HTMLInputElement>(`[data-line="${n.id}"] input`)?.focus());
   };
@@ -89,11 +93,11 @@ function SessionBody({ data, listParam, onBack, onList, onPrint }: {
               <ul>{multi.map(t => <li key={t.name}>{t.name}: {formatAmount(t.total)} {t.unit} fra {t.places} steder</li>)}</ul></Card>
           )}
           <div className="grid gap-2 sm:grid-cols-2">
-            <NativeSelect aria-label="Velg liste" value={listId} onChange={e => { onList(e.target.value === "alle" ? null : e.target.value); setKeepIds(new Set()); }}>
+            <NativeSelect aria-label="Velg liste" value={listId} onChange={e => { onList(e.target.value === "alle" ? null : e.target.value); setSnap(null); }}>
               <option value="alle">Alle lister ({lines.length})</option>
               {lists.map(l => <option key={l.id} value={l.id}>{l.department} · {l.name} — {LIST_STATUS_LABEL[l.status]}</option>)}
             </NativeSelect>
-            <NativeSelect aria-label="Filter" value={filter} onChange={e => { const v = e.target.value; setFilter(v === "kontroll" ? "kontroll" : v === "alle" ? "alle" : "gjenstar"); setKeepIds(new Set()); }}>
+            <NativeSelect aria-label="Filter" value={filter} onChange={e => { const v = e.target.value; setFilter(v === "kontroll" ? "kontroll" : v === "alle" ? "alle" : "gjenstar"); setSnap(null); }}>
               <option value="gjenstar">Gjenstår</option><option value="kontroll">Må kontrolleres</option><option value="alle">Alle linjer</option>
             </NativeSelect>
           </div>
