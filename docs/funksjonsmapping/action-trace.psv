@@ -28,7 +28,7 @@ F17|src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx|AUTO_NEXT_MS|Auto-ne
 F18|src/ravarer/pages/priskontroll/gjore/VarekortPanel.tsx|Varekortet er endret siden du åpnet det|Frys
 F19|src/ravarer/pages/priskontroll/fakturaer/visning.ts|FAKTURA_VISNINGER|Hurtigfiltre
 F2|src/components/layout/SubAppNav.tsx|rm_work_summary|Badgekilde
-F20|src/ravarer/pages/priskontroll/fakturaer/FakturaerTab.tsx|Søk vare, leverandør eller faktura|Søk («Vis flere» erstattet av sideblading)
+F20|src/ravarer/pages/priskontroll/fakturaer/FakturaerFilters.tsx|Søk leverandør, fakturanr eller bilagsnr|Søk («Vis flere» erstattet av sideblading)
 F21|src/ravarer/components/RematchAllDialog.tsx|rm_rematch_invoices|Kø
 F22|src/ravarer/pages/priskontroll/fakturaer/FakturaRowActions.tsx|Hent linjer|Hovedknapp
 F22|src/ravarer/pages/priskontroll/fakturaer/FakturaRowActions.tsx|Koble kreditnota|Kreditnota
@@ -72,7 +72,7 @@ F64|src/ravarer/pages/priskontroll/gjore/VarekortPanel.tsx|Ferdig — neste|Avsl
 F64|src/ravarer/ui/ResultBox.tsx|ResultBox|Resultat
 F65|src/fakturaer/components/supplier-item/SupplierItemHistory.tsx|SupplierItemHistory|Historikk per linje
 F65|src/ravarer/pages/priskontroll/gjore/VarekortPanel.tsx|SupplierItemHistory|Historikk per linje
-F66|src/ravarer/pages/RawMaterialDetail.tsx|seksjon === "leverandorer"|Fra råvarekortets leverandørseksjon (lenke fra vareliste-peek ikke sporet)
+F66|src/ravarer/pages/RawMaterialDetail.tsx|section === "leverandorer"|Fra råvarekortets leverandørseksjon (lenke fra vareliste-peek ikke sporet)
 F67|src/ravarer/lib/labels.ts|reconciled_auto: { label: "Avstemt automatisk"|Etikett for automatisk avstemming
 F67|src/ravarer/pages/priskontroll/faktura/WorkspaceHeader.tsx|InvoiceStatusBadge|Status
 F68|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|side="bottom" className="h-[90vh] p-0"|Bunnark
@@ -197,7 +197,7 @@ R194|src/ravarer/pages/ReberegnKostpriser.tsx|Angre|Angre
 R196|src/varer/components/products/RawMaterialAutocomplete.tsx|RawMaterialOption|Velg råvare
 R2|src/components/layout/SubAppNav.tsx|badge: summary?.todo_total|Badge
 R200|src/varer/components/products/StockLinkNote.tsx|Trekker fra lager|Lagertrekk
-R201|src/ravarer/pages/RawMaterialDetail.tsx|seksjon === "leverandorer"|Leverandørseksjon
+R201|src/ravarer/pages/RawMaterialDetail.tsx|section === "leverandorer"|Leverandørseksjon
 R202|src/ravarer/editors/createSheetLogic.ts|link-supplier-item|Kobling
 R202|src/ravarer/pages/priskontroll/faktura/invoiceSteps.ts|rm_post_safe_line_costs|Kostpris
 R203|src/App.tsx|/bekreftelse/:token|Portalruter
@@ -205,13 +205,12 @@ R3|src/ravarer/routes.tsx|InvoiceAccessGuard|Rutevakt
 R31|src/ravarer/pages/RawMaterialDetail.tsx|lagerReturnHref|Tilbake med kontekst
 R32|src/ravarer/pages/RawMaterialDetail.tsx|Forrige råvare|[
 R32|src/ravarer/pages/RawMaterialDetail.tsx|Neste råvare|]
-R33|src/ravarer/pages/RawMaterialDetail.tsx|Endre navn|Endre navn
+R33|src/ravarer/components/detail/RawMaterialDetailHeader.tsx|Endre navn|Endre navn
 R34|src/ravarer/components/detail/Completeness.tsx|Komplett-sjekkliste|Statuschips/sjekkliste med hopp til løsning
 R34|src/ravarer/lib/rawMaterialSections.ts|completenessChecklist|Sjekk av aktiv/kategori/deklarasjon/datablad/allergener/næring
 R35|src/ravarer/components/RawMaterialKpiStrip.tsx|Primærleverandør|KPI-stripe med lenke til primærleverandør (sporer melder 8 KPI-er, original sa 9)
 R36|src/ravarer/lib/rawMaterialSections.ts|LEGACY_TAB|Gammel ?tab= oversettes til ?seksjon=
 R37|src/ravarer/pages/RawMaterialDetail.tsx|mod: true|Hurtigtast med modifikator
-R37|src/ravarer/pages/RawMaterialDetail.tsx|Ulagrede endringer|Ulagret-vakt
 R38|src/ravarer/components/tabs/OverviewTab.tsx|Deklarasjonsnavn|Grunndata
 R38|src/ravarer/components/tabs/OverviewTab.tsx|Flere kategorier|Grunndata
 R39|src/ravarer/components/tabs/OverviewTab.tsx|Endre pakning|Pakning
