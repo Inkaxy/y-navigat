@@ -131,16 +131,17 @@ export const supabaseStage3Api: Stage3Api = {
     const pdf = file.type === "application/pdf" ? null : await imageToPdf(file);
     const res = rec(await rpc("vt_ocr_create_job", { p_op_id: opId, p_list_id: listId, p_sha256: sha, p_mime: file.type, p_size: file.size, p_has_pdf_derivative: pdf != null }), "jobb");
     const jobId = s(res.job_id, "job_id"); const duplicate = res.duplicate === true; const status = s(res.status, "status");
-    if (duplicate) return { jobId, duplicate, status };
+    // Duplikat som fortsatt er «opprettet» (forrige opplasting/lesing ble avbrutt): fullfør samme jobb. Ellers ingen ny lesing.
+    if (duplicate && status !== "opprettet") return { jobId, duplicate, status };
     if (status === "opprettet") {
       const bucket = db.storage.from("vt-count-uploads");
       const up = await bucket.upload(s(res.original_path, "op"), file, { upsert: false, contentType: file.type });
       if (up.error && !/exists/i.test(up.error.message)) throw new VtUnknownOutcomeError();
       if (pdf) { const up2 = await bucket.upload(s(res.pdf_path, "pp"), pdf, { upsert: false, contentType: "application/pdf" }); if (up2.error && !/exists/i.test(up2.error.message)) throw new VtUnknownOutcomeError(); }
       const r = await invoke("vt-count-ocr", { job_id: jobId });
-      return { jobId, duplicate: false, status: typeof r.status === "string" ? r.status : "ukjent" };
+      return { jobId, duplicate, status: typeof r.status === "string" ? r.status : "ukjent" };
     }
-    return { jobId, duplicate: false, status };
+    return { jobId, duplicate, status };
   },
   async originalUrl(job) { const r = await db.storage.from("vt-count-uploads").createSignedUrl(job.original_path, 300); return r.error ? null : r.data.signedUrl; },
   accept: (i) => rpc("vt_ocr_accept", { p_op_id: i.opId, p_proposal_id: i.proposalId, p_expected_revision: i.expectedRevision, p_state: i.state, p_counted_base: i.countedBase, p_entry: i.entry, p_note: i.note })
