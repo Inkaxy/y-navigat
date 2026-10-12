@@ -314,6 +314,11 @@ export default function ForhandlingWizard() {
         <Card className="overflow-hidden">
           <div className="border-b border-line-subtle p-4 text-sm text-ink-secondary">
             Velg råvarer som skal inngå i RFQ. Baseline-tall kommer fra siste 12 måneder.
+            {itemsLocked && (
+              <p role="status" className="mt-2 text-warning">
+                Lenker er allerede generert. Råvarelista kan ikke endres her, fordi det ville slettet tilbud som er knyttet til varene.
+              </p>
+            )}
           </div>
           <div className="max-h-[480px] overflow-auto">
             <table className="w-full text-sm">
