@@ -13,13 +13,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
-import { fetchAllRows } from "@/lib/supabasePaging";
+import { fetchAllCounted } from "@/lib/countedPaging";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { chunkRawMaterialIds, isNonFatalPermissionError, MAX_RECALC_BATCH_SIZE } from "@/ravarer/lib/recalcBatch";
 import { parseRecalcEnvelope, parseUndoEnvelope, type RecalcOkItem } from "@/ravarer/lib/recalcContract";
 import {
   EMPTY_LEDGER, acknowledgeUnknownApply, addAppliedBatch, addUnknownApply, applyUndoResult, closeBatch,
-  markUndoUnknown, outstanding, type RecalcLedger,
+  markUndoUnknown, outstanding, unresolvedIds, type RecalcLedger,
 } from "@/ravarer/lib/recalcLedger";
 
 export const APPLY_CHUNK = 10;
@@ -57,6 +57,28 @@ export interface ApplySummary {
   statsRefreshed: boolean | null;
 }
 
+/** Blokkert kjøring: valgte varer har uavklart utfall som må kontrolleres eksplisitt først. */
+export type ApplyBlock = { blockedIds: string[] };
+
+/**
+ * Fanehukommelse per selskap: kvitteringer, uavklarte utfall og siste sammendrag lever under
+ * det frosne selskapet de ble skrevet for, og vises bare når det selskapet er gjeldende.
+ */
+type EntityMemory = { ledger: RecalcLedger; summary: ApplySummary | null };
+const memory = new Map<string, EntityMemory>();
+function mem(entity: string): EntityMemory {
+  let m = memory.get(entity);
+  if (!m) { m = { ledger: EMPTY_LEDGER, summary: null }; memory.set(entity, m); }
+  return m;
+}
+/** Kun for tester. */
+export function __resetCostRecalcMemory() { memory.clear(); }
+/** SQLSTATE (5 tegn) = kjent avvisning; alt annet er ukjent utfall. */
+const isKnownRejection = (err: unknown) => {
+  const code = (err as { code?: unknown } | null)?.code;
+  return typeof code === "string" && /^[0-9A-Z]{5}$/.test(code);
+};
+
 interface MaterialRow { id: string; name: string; sku: string | null; base_unit: string | null; current_cost_price: number | null }
 
 const IDLE: RecalcProgress = { phase: "idle", done: 0, total: 0, label: "" };
@@ -69,65 +91,73 @@ export function bucketOf(p: RecalcOkItem | null): RecalcBucket {
 }
 
 export function useCostRecalc() {
-  const { legalEntityId, canWrite } = useRavarer();
+  const { legalEntityId, canWrite, loading } = useRavarer();
   const qc = useQueryClient();
-  const [rows, setRows] = useState<RecalcRow[] | null>(null);
+  const [preview, setPreview] = useState<{ entity: string; rows: RecalcRow[] } | null>(null);
   const [progress, setProgress] = useState<RecalcProgress>(IDLE);
-  const [summary, setSummary] = useState<ApplySummary | null>(null);
-  const [ledger, setLedger] = useState<RecalcLedger>(EMPTY_LEDGER);
+  const [, setVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<null | "scan" | "apply" | "undo">(null);
 
   const op = useRef<null | "scan" | "apply" | "undo">(null);
   const opSeq = useRef(0);
   const cancelRef = useRef(false);
-  const live = useRef({ entity: legalEntityId, canWrite, mounted: true });
+  const live = useRef({ entity: legalEntityId, canWrite, loading, mounted: true });
   live.current.entity = legalEntityId;
   live.current.canWrite = canWrite;
+  live.current.loading = loading;
   useEffect(() => {
     const l = live.current;
     l.mounted = true;
     return () => { l.mounted = false; };
   }, []);
-  const ledgerRef = useRef(ledger);
-  ledgerRef.current = ledger;
-  const commit = (fn: (l: RecalcLedger) => RecalcLedger) => {
-    ledgerRef.current = fn(ledgerRef.current);
-    if (live.current.mounted) setLedger(ledgerRef.current);
+  const bump = () => { if (live.current.mounted) setVersion((v) => v + 1); };
+  /** Skriver alltid til det FROSNE selskapets minne, også etter navigasjon/bytte. */
+  const commit = (entity: string, fn: (l: RecalcLedger) => RecalcLedger) => {
+    const m = mem(entity); m.ledger = fn(m.ledger); bump();
   };
+  const ownsWrite = () => live.current.mounted && !live.current.loading && live.current.canWrite && !!live.current.entity;
 
-  function begin(kind: "scan" | "apply" | "undo", needsWrite: boolean): { entity: string; id: number } | null {
-    if (op.current) return null;
-    const entity = live.current.entity;
-    if (!entity || (needsWrite && !live.current.canWrite)) return null;
+  /** Synkron inngang: montert, ferdig lastet tilgang, skriverett (alle RPC-ene krever rm_can_write). */
+  function begin(kind: "scan" | "apply" | "undo"): { entity: string; id: number } | null {
+    if (op.current || !ownsWrite()) return null;
+    const entity = live.current.entity as string;
     op.current = kind; opSeq.current += 1; cancelRef.current = false;
     setBusy(kind); setError(null);
     return { entity, id: opSeq.current };
   }
   function end() { op.current = null; if (live.current.mounted) setBusy(null); }
-  const stillOwns = (f: { entity: string; id: number }, needsWrite: boolean) =>
-    live.current.mounted && live.current.entity === f.entity && opSeq.current === f.id && (!needsWrite || live.current.canWrite);
+  const stillOwns = (f: { entity: string; id: number }) =>
+    ownsWrite() && live.current.entity === f.entity && opSeq.current === f.id;
 
   const cancel = useCallback(() => { cancelRef.current = true; }, []);
 
   const scan = useCallback(async () => {
-    const f = begin("scan", false);
+    const f = begin("scan");
     if (!f) return;
-    setRows(null);
+    setPreview(null);
     setProgress({ phase: "laster", done: 0, total: 0, label: "Henter råvarer …" });
     try {
-      const materials = await fetchAllRows<MaterialRow>((from, to) =>
-        supabase.from("raw_materials").select("id, name, sku, base_unit, current_cost_price")
-          .eq("legal_entity_id", f.entity).eq("is_active", true).order("id", { ascending: true }).range(from, to));
-      if (!stillOwns(f, false)) return;
+      // Eksakt antall + keyset: en kort side (servertak) betyr ikke at alle varer er med.
+      const materials = await fetchAllCounted<MaterialRow>({
+        count: () => supabase.from("raw_materials").select("id", { count: "exact", head: true }).eq("legal_entity_id", f.entity).eq("is_active", true),
+        page: (after, size) => {
+          let q = supabase.from("raw_materials").select("id, name, sku, base_unit, current_cost_price")
+            .eq("legal_entity_id", f.entity).eq("is_active", true).order("id", { ascending: true }).limit(size);
+          if (after) q = q.gt("id", after);
+          return q;
+        },
+      });
+      if (!stillOwns(f)) return;
       const byId = new Map(materials.map((m) => [m.id, m]));
       const chunks = chunkRawMaterialIds(materials.map((m) => m.id), MAX_RECALC_BATCH_SIZE);
       const out: RecalcRow[] = [];
       for (let i = 0; i < chunks.length; i++) {
+        if (!stillOwns(f)) return;
         if (cancelRef.current) { setProgress({ phase: "avbrutt", done: out.length, total: materials.length, label: "Avbrutt — forslaget er ufullstendig og vises ikke" }); return; }
         setProgress({ phase: "beregner", done: out.length, total: materials.length, label: `Serveren beregner forslag … ${out.length} av ${materials.length}` });
         const { data, error: err } = await supabase.rpc("recalc_raw_material_costs", { p_raw_material_ids: chunks[i], p_reason: "Forhåndsvisning av reberegning", p_dry_run: true });
-        if (!stillOwns(f, false)) return;
+        if (!stillOwns(f)) return;
         if (err) throw new Error("Forhåndsvisningen kunne ikke hentes.");
         const env = parseRecalcEnvelope(data, { ids: chunks[i], dryRun: true });
         if (!env) throw new Error("Forhåndsvisningen hadde et uventet svar.");
@@ -147,52 +177,63 @@ export function useCostRecalc() {
         }
       }
       out.sort((a, b) => (b.proposal?.linesChanged ?? -1) - (a.proposal?.linesChanged ?? -1) || a.name.localeCompare(b.name, "nb"));
-      setRows(out);
+      setPreview({ entity: f.entity, rows: out });
       setProgress({ phase: "ferdig", done: out.length, total: out.length, label: `${out.length} råvarer vurdert av serveren` });
     } catch (e) {
-      if (live.current.mounted) { setError(e instanceof Error ? e.message : "Forhåndsvisningen feilet."); setProgress(IDLE); }
+      const msg = e instanceof Error && !e.message.startsWith("Ufullstendig") ? e.message : "Råvarelisten kunne ikke hentes komplett. Forslaget vises ikke.";
+      if (live.current.mounted) { setError(msg); setProgress(IDLE); }
     } finally {
       end();
     }
   }, []);
 
-  const apply = useCallback(async (ids: readonly string[]) => {
+  const apply = useCallback(async (ids: readonly string[]): Promise<ApplyBlock | void> => {
     const unique = [...new Set(ids)];
     if (unique.length === 0) return;
-    const f = begin("apply", true);
+    const entity = live.current.entity;
+    if (!entity) return;
+    // Uavklart utfall for samme vare: aldri ny skriving før eksplisitt kontroll.
+    const unresolved = unresolvedIds(mem(entity).ledger);
+    const blockedIds = unique.filter((id) => unresolved.has(id));
+    if (blockedIds.length > 0) {
+      if (live.current.mounted) setError("Noen valgte råvarer har uavklart utfall fra en tidligere kjøring. Kontroller og bekreft dem før du kjører igjen.");
+      return { blockedIds };
+    }
+    const f = begin("apply");
     if (!f) return;
     const chunks = chunkRawMaterialIds(unique, APPLY_CHUNK);
     const s: ApplySummary = { requested: unique.length, succeeded: 0, failed: 0, linesChanged: 0, unknownIds: [], notStartedIds: [], stopped: null, statsRefreshed: null };
-    setSummary(null);
+    mem(f.entity).summary = null; bump();
     setProgress({ phase: "skriver", done: 0, total: unique.length, label: `Reberegner … 0 av ${unique.length}` });
     let i = 0;
     try {
       for (; i < chunks.length; i++) {
         if (cancelRef.current) { s.stopped = "avbrutt"; break; }
-        if (!stillOwns(f, true)) { s.stopped = "kontekst"; break; }
+        if (!stillOwns(f)) { s.stopped = "kontekst"; break; }
         const chunk = chunks[i];
         let env = null;
         try {
           const { data, error: err } = await supabase.rpc("recalc_raw_material_costs", { p_raw_material_ids: chunk, p_reason: `Reberegning av kostpris (${unique.length} varer)`, p_dry_run: false });
           // Avvisning med SQL-kode er kjent avvist (ingenting skrevet i dette kallet).
-          if (err && (err as { code?: string }).code) { s.failed += chunk.length; continue; }
+          if (err && isKnownRejection(err)) { s.failed += chunk.length; continue; }
           if (!err) env = parseRecalcEnvelope(data, { ids: chunk, dryRun: false });
         } catch { env = null; }
         if (!env) {
           // Ukjent: kan være skrevet. Beholdes for kontroll; ingen nye bolker startes.
           s.unknownIds.push(...chunk);
-          commit((l) => addUnknownApply(l, { opId: f.id, rawMaterialIds: chunk }));
+          commit(f.entity, (l) => addUnknownApply(l, { opId: f.id, rawMaterialIds: chunk }));
           s.stopped = "ukjent";
           i++;
           break;
         }
         const confirmed = env;
-        commit((l) => addAppliedBatch(l, confirmed));
+        commit(f.entity, (l) => addAppliedBatch(l, confirmed));
         s.succeeded += confirmed.succeeded; s.failed += confirmed.failed; s.linesChanged += confirmed.linesChanged;
         if (live.current.mounted) setProgress({ phase: "skriver", done: s.succeeded + s.failed, total: unique.length, label: `Reberegner … ${s.succeeded + s.failed} av ${unique.length}` });
       }
       s.notStartedIds = chunks.slice(i).flat();
-      if (s.succeeded > 0) {
+      // Statistikk oppdateres bare i samme kontekst; ellers står den som ikke kjørt (null).
+      if (s.succeeded > 0 && stillOwns(f) && !cancelRef.current) {
         try {
           const { error: rpcErr } = await supabase.rpc("refresh_purchase_stats");
           s.statsRefreshed = !rpcErr || isNonFatalPermissionError(rpcErr);
@@ -200,8 +241,8 @@ export function useCostRecalc() {
       }
     } finally {
       if (s.succeeded > 0 || s.unknownIds.length > 0) invalidateRawMaterial(qc);
-      if (live.current.mounted) {
-        setSummary(s);
+      mem(f.entity).summary = s; bump();
+      if (live.current.mounted && live.current.entity === f.entity) {
         setProgress({ phase: s.stopped === "avbrutt" ? "avbrutt" : "ferdig", done: s.succeeded + s.failed, total: unique.length, label: s.stopped ? "Stoppet" : "Ferdig" });
       }
       end();
@@ -209,25 +250,28 @@ export function useCostRecalc() {
   }, [qc]);
 
   const undoBatch = useCallback(async (batchId: string) => {
-    const batch = ledgerRef.current.batches.find((b) => b.batchId === batchId);
-    if (!batch || outstanding(batch).length === 0) return;
-    const f = begin("undo", true);
-    if (!f) return;
+    const entity = live.current.entity;
+    if (!entity) return;
+    // Bare gjeldende selskaps kvitteringer kan angres herfra.
+    const batch = mem(entity).ledger.batches.find((b) => b.batchId === batchId);
+    if (!batch || outstanding(batch).length === 0 || batch.undoUnknown) return;
+    const f = begin("undo");
+    if (!f || f.entity !== entity) { if (f) end(); return; }
     setProgress({ phase: "angrer", done: 0, total: 1, label: "Angrer …" });
     try {
       let env = null;
       try {
         const { data, error: err } = await supabase.rpc("undo_raw_material_recalcs", { p_batch_id: batchId });
-        if (err && (err as { code?: string }).code) { if (live.current.mounted) setError("Angringen ble avvist. Ingenting er endret i kvitteringen."); return; }
+        if (err && isKnownRejection(err)) { if (live.current.mounted) setError("Angringen ble avvist. Ingenting er endret i kvitteringen."); return; }
         if (!err) env = parseUndoEnvelope(data, batchId);
       } catch { env = null; }
       if (!env) {
-        commit((l) => markUndoUnknown(l, batchId));
+        commit(f.entity, (l) => markUndoUnknown(l, batchId));
         if (live.current.mounted) setError("Vi vet ikke om angringen ble utført. Kvitteringen er beholdt — kontroller råvarene før du prøver igjen.");
         return;
       }
       const confirmed = env;
-      commit((l) => applyUndoResult(l, batchId, confirmed));
+      commit(f.entity, (l) => applyUndoResult(l, batchId, confirmed));
       if (confirmed.succeeded > 0) invalidateRawMaterial(qc);
     } finally {
       if (live.current.mounted) setProgress(IDLE);
@@ -238,11 +282,28 @@ export function useCostRecalc() {
   /** Nullstiller bare forhåndsvisningen; kvitteringer og uavklarte utfall beholdes. */
   const reset = useCallback(() => {
     if (op.current) return;
-    setRows(null); setSummary(null); setError(null); setProgress(IDLE);
+    setPreview(null); setError(null); setProgress(IDLE);
+    const e = live.current.entity;
+    if (e) { mem(e).summary = null; bump(); }
   }, []);
 
-  const acknowledgeUnknown = useCallback((opId: number) => commit((l) => acknowledgeUnknownApply(l, opId)), []);
-  const dismissBatch = useCallback((batchId: string) => commit((l) => closeBatch(l, batchId)), []);
+  /** Eksplisitt kontroll av ukjent kjøreutfall, bundet til gjeldende selskap. */
+  const acknowledgeUnknown = useCallback((opId: number) => {
+    const e = live.current.entity;
+    if (!e || op.current || !live.current.mounted) return;
+    commit(e, (l) => acknowledgeUnknownApply(l, opId));
+  }, []);
+  /** Eksplisitt (etter bekreftelse i UI): fjern kvittering; angring herfra blir da umulig. */
+  const dismissBatch = useCallback((batchId: string) => {
+    const e = live.current.entity;
+    if (!e || op.current || !live.current.mounted) return;
+    commit(e, (l) => closeBatch(l, batchId));
+  }, []);
 
-  return { rows, progress, summary, ledger, error, busy, canWrite, scan, apply, undoBatch, cancel, reset, acknowledgeUnknown, dismissBatch };
+  const current = legalEntityId ? memory.get(legalEntityId) : undefined;
+  const ledger = current?.ledger ?? EMPTY_LEDGER;
+  const summary = current?.summary ?? null;
+  const rows = preview && preview.entity === legalEntityId ? preview.rows : null;
+  const writeReady = !loading && canWrite && !!legalEntityId;
+  return { rows, progress, summary, ledger, error, busy, canWrite: writeReady, accessLoading: loading, scan, apply, undoBatch, cancel, reset, acknowledgeUnknown, dismissBatch };
 }
