@@ -51,7 +51,7 @@ function base(over: Record<string, unknown> = {}) {
   };
 }
 const page = () => <MemoryRouter><ReberegnKostpriser /></MemoryRouter>;
-const btn = (name: string) => screen.getByRole("button", { name: `Se serverens regnestykke for ${name}` });
+const btn = (name: string) => screen.getByRole("button", { name: `Se serverens regnestykke for ${name}`, hidden: true });
 function deferred() { let resolve!: (v: unknown) => void; const p = new Promise((r) => { resolve = r; }); return { p, resolve }; }
 const ok = (data: unknown) => ({ data, error: null });
 
