@@ -95,7 +95,7 @@ export function StartPriceCandidatesCard({
           <table className="w-full text-sm">
             <thead className="text-left text-xs uppercase tracking-wider text-ink-secondary">
               <tr>
-                <th className="w-11 py-2"><span className="sr-only">Velg</span></th>
+                <th className="w-[52px] min-w-[52px] py-2"><span className="sr-only">Velg</span></th>
                 <th className="py-2">Vare</th>
                 <th className="py-2">Leverandør</th>
                 <th className="py-2">Kilde</th>
@@ -108,8 +108,8 @@ export function StartPriceCandidatesCard({
                 const failure = rejected.find((f) => f.id === r.invoice_line_id);
                 return (
                   <tr key={r.invoice_line_id} className="border-t border-line-subtle align-top">
-                    <td className="py-0">
-                      <label className="-ml-3 flex h-[44px] w-[44px] cursor-pointer items-center justify-center">
+                    <td className="w-[52px] min-w-[52px] py-0 pr-2">
+                      <label className="flex h-[44px] w-[44px] shrink-0 cursor-pointer items-center justify-center">
                       <Checkbox
                         checked={!!selected[r.invoice_line_id]}
                         disabled={!canWrite}
