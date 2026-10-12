@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { correctionHref } from "@/ravarer/pages/priskontroll/faktura/correctionTarget";
-import { parseReadIssues } from "@/fakturaer/lib/readIssues";
+import { parseReadIssues } from "@/fakturaer/lib/lineCorrection";
 import { RETURN_PARAM } from "@/ravarer/pages/priskontroll/fakturaer/visning";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFetchInvoiceLines } from "@/ravarer/pages/priskontroll/faktura/useInvoiceActions";
