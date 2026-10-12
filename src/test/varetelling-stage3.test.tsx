@@ -294,3 +294,89 @@ describe("tildeling og kalender", () => {
     await expect(m.s3.assign({ opId: "a", listId: m.api._state.lists[0].id, userId: "u1", role: "teller", remove: true })).rejects.toThrow(/avsluttet/);
   });
 });
+
+describe("prisavklaring per telling", () => {
+  it("rapportkontrakt: avklart pris gir verdi og er merket; opprinnelig snapshot uendret", () => {
+    const l = RL("x", { snap_price_per_base: null, snap_price_source: "mangler_pris", snap_price_reason: "ingen_dokumentert_pris", counted_base: 2, clar_price_per_base: 1.005, clar_source_kind: "faktura", clar_source_ref: "F-9", clar_reason: "Faktura 9 fra leverandør", clar_at: "12.10.2026" });
+    expect(lineValueOre(l)).toBe(201); expect(summarizeLines([l])).toMatchObject({ complete: true, countedWithoutPrice: 0 });
+    const csv = buildReportCsv(D([l])); expect(csv).toContain("Avklart i tellingen (Faktura: F-9)"); expect(csv).toContain("Faktura 9 fra leverandør");
+    expect(l.snap_price_per_base).toBeNull();
+  });
+  it("godkjenner avklarer talt vare uten pris med begrunnelse; oversikt bruker avklaringen; startgrunnlag bevart", async () => {
+    const m = setup(); const id = await started(m.api);
+    const sugar = m.api._state.lines.find(l => l.raw_material_id === "m2" && l.count_id === id);
+    if (!sugar) throw new Error("linje");
+    await m.api.saveLine({ opId: "s1", lineId: sugar.id, expectedRevision: sugar.revision, state: "talt", countedBase: 4, entry: [{ unit_id: null, amount: 4 }], note: null });
+    m.open(`/?telling=${id}`); await tab("Kontroll");
+    const row = (await screen.findAllByTestId("vt-clar-row")).find(r => /Sukker/.test(r.textContent ?? ""));
+    if (!row) throw new Error("rad");
+    fireEvent.click(within(row).getByRole("button", { name: "Avklar pris" }));
+    fireEvent.change(within(row).getByLabelText(/Pris per kg/), { target: { value: "12,5" } });
+    fireEvent.change(within(row).getByLabelText(/Begrunnelse/), { target: { value: "kort" } });
+    expect(within(row).getByRole("button", { name: "Lagre avklaring" })).toHaveProperty("disabled", true);
+    fireEvent.change(within(row).getByLabelText(/Begrunnelse/), { target: { value: "Faktura 4711 fra leverandør, oktober" } });
+    fireEvent.click(within(row).getByRole("button", { name: "Lagre avklaring" }));
+    await within(row).findByText(/Startgrunnlaget er uendret/);
+    expect(m.s3._clars).toHaveLength(1);
+    expect(m.api._state.lines.find(l => l.id === sugar.id)?.snap_price_per_base).toBeNull();
+    await tab("Oversikt");
+    await waitFor(() => expect(screen.getByLabelText("Sammendrag Hele tellingen").textContent).toContain("50,00"));
+  });
+  it("avklaring krever riktig forventet revisjon (ingen stille overskriving) og åpen telling", async () => {
+    const m = setup(); const id = await started(m.api);
+    const l = m.api._state.lines.find(x => x.count_id === id && x.snap_price_per_base == null && x.snap_base_unit);
+    if (!l) throw new Error("linje");
+    const a = await m.s3.clarifyPrice({ opId: "c1", lineId: l.id, expectedClarification: null, price: 10, sourceKind: "faktura", sourceRef: null, reason: "Faktura 1 bekreftet" });
+    await expect(m.s3.clarifyPrice({ opId: "c2", lineId: l.id, expectedClarification: null, price: 11, sourceKind: "faktura", sourceRef: null, reason: "Faktura 2 bekreftet" })).rejects.toThrow(/endret av andre/);
+    await m.s3.clarifyPrice({ opId: "c3", lineId: l.id, expectedClarification: a.clarificationId, price: 11, sourceKind: "prisliste", sourceRef: null, reason: "Prisliste bekreftet" });
+    expect(m.s3._clars.filter(c => c.line_id === l.id)).toHaveLength(2);
+    const priced = m.api._state.lines.find(x => x.count_id === id && x.snap_price_per_base != null);
+    if (priced) await expect(m.s3.clarifyPrice({ opId: "c4", lineId: priced.id, expectedClarification: null, price: 1, sourceKind: "faktura", sourceRef: null, reason: "Skal ikke gå an" })).rejects.toThrow(/dokumentert pris/);
+  });
+});
+
+describe("utskriftsmanifest og demonstrasjon", () => {
+  it("manifest utstedes én gang; avvikende sideinndeling avvises", async () => {
+    const m = setup(); await started(m.api);
+    const list = m.api._state.lists[0]; const ids = m.api._state.lines.filter(l => l.count_list_id === list.id).map(l => l.id);
+    expect((await m.s3.issueManifest({ listId: list.id, layoutVersion: 2, pages: [ids] })).replayed).toBe(false);
+    expect((await m.s3.issueManifest({ listId: list.id, layoutVersion: 2, pages: [ids] })).replayed).toBe(true);
+    await expect(m.s3.issueManifest({ listId: list.id, layoutVersion: 2, pages: [ids.slice(0, 1), ids.slice(1)] })).rejects.toThrow(/annerledes/);
+    await expect(m.s3.issueManifest({ listId: list.id, layoutVersion: 2, pages: [ids.slice(1)] })).rejects.toThrow(/nøyaktig én gang/);
+  });
+  it("syntetisk demo: flersides prøveark med utstedt manifest og usikre forslag uten filvelger", async () => {
+    const { seedVaretellingDemo } = await import("@/dev/varetellingDemoSeed");
+    const m = setup(); const id = await seedVaretellingDemo(m.api, m.s3);
+    expect(id).toBeTruthy();
+    const job = m.s3._jobs[0];
+    expect(job.originals.length).toBeGreaterThan(1); expect(job.document_ok).toBe(true);
+    const props = m.s3._props.filter(p => p.job_id === job.id);
+    expect(props.length).toBeGreaterThan(3);
+    expect(props.some(p => p.entries.some(e => e.value == null && e.reason))).toBe(true);
+    expect(props.some(p => p.entries.some(e => !e.unit_known))).toBe(true);
+    expect(m.api._state.lines.filter(l => l.count_id === id).every(l => l.state === "ikke_talt")).toBe(true);
+  });
+});
+
+describe("varer uten liste og tildeling", () => {
+  it("valgt vare legges trygt i valgt mal (revisjonskontrollert lagring)", async () => {
+    const m = setup();
+    m.open("/?vt=uten-liste");
+    const before = m.api._state.tlines.filter(l => l.template_id === "t1").length;
+    fireEvent.click(await screen.findByLabelText(/Velg Kakeesker/));
+    fireEvent.change(screen.getByLabelText("Legg til i listemal"), { target: { value: "t1" } });
+    fireEvent.click(screen.getByRole("button", { name: /Legg 1 i malen/ }));
+    await waitFor(() => expect(m.api._state.tlines.filter(l => l.template_id === "t1").length).toBe(before + 1));
+    expect(m.api._state.templates.find(t => t.id === "t1")?.revision).toBe(4);
+  });
+  it("godkjenner kan tildele en annen bruker som kontrollør", async () => {
+    const m = setup(); const id = await started(m.api);
+    m.open(`/?telling=${id}&liste=${m.api._state.lists[0].id}`); await tab("Kontroll");
+    const sel = await screen.findByLabelText("Velg person å tildele");
+    await waitFor(() => expect(within(sel).getAllByRole("option").length).toBeGreaterThan(1));
+    fireEvent.change(sel, { target: { value: "u2" } }); fireEvent.change(screen.getByLabelText("Rolle"), { target: { value: "kontrollor" } });
+    fireEvent.click(screen.getByRole("button", { name: "Tildel" }));
+    await screen.findByText(/Kari Kontrollør \(demo\) er tildelt som kontrollør/);
+    expect(m.s3._assign).toContainEqual(expect.objectContaining({ user_id: "u2", role: "kontrollor" }));
+  });
+});
