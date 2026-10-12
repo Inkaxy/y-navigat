@@ -542,3 +542,16 @@ Ingen ID er massemerket ferdig. Statuskolonnen over er historisk. Denne leverans
 | Tekst | per-linje-avvik «uten stort avvik»; kreditnota «Lagret lesing beholder fortegnet …»; AI-innstillinger uten udokumentert modellrangering; norske feltnavn | eksisterende tester oppdatert |
 
 Gjenstår i fase 6: synlig rettehandling i PALS-forhåndsvisning/«Rett sumavvik», norsk desimal i sumfeil, mobile 44 px i fakturaflate, allergenvurdert-status i varelisten, avviksetikett «Siste faktura mot kostpris», per-ID-kobling av alle 313 punkter, dødkoderydding og innlogget nettlesergjennomgang.
+
+## Fase 6 — UI/tekst/inventar (fra 75c9eda5)
+
+Status her er kildeendring + komponent-/hjelpetester med falske data. Ingen nettlesermåling, ingen innlogget kontroll, ingen ekte skriving.
+
+- «Rett sumavvik» åpner nå den eksisterende rettedialogen (`openCorrection` i `FakturaWorkspace.tsx`, mål via `correctionTarget.ts`): valgt linje på denne fakturaen, ellers første linje med lesevarsel, ellers «Velg linjen som skal rettes» og linjelisten. Aldri første linje eller linje fra en annen faktura. Menyens «Rett linjer mot originalen …» bruker samme vei. Egen skrivebeskyttet «Vis sumkontroll» i menyen. Lese-/avstemt-/flagget-faktura gir forklaring, ingen skriving. Forhåndsvisningen (peek) har ikke fått egen rettelenke i denne runden.
+- Sumtekst er retningsbestemt (`src/fakturaer/lib/sumDirection.ts`): for høy / for lav / «Summen må kontrolleres». Brukt i `ControlSummary` og `LinesSumMismatchAlert`. Prosent og maskintall i lesevarsler vises på norsk (visning; lagrede varsler og `invoiceReadCheck.ts` uendret). Små reelle endringer vises «<0,1 %».
+- 44 px: fakturahodets tilbake, angre, dokument, primærknapp, «Flere valg», «Vis som tabell», «Rett fakturalinje», mobil primærknapp.
+- Allergener: listen skiller vurdert (`allergens_reviewed_at`) fra registrert (`allergenState.ts`); CSV-statusen har egne verdier; ukjent vurdering vises aldri som vurdert.
+- Prisfanen merker ubekreftet avtalepris («Registrert avtalepris — ikke bekreftet») som KPI-stripen allerede gjorde.
+- Bruk-tabellen viser kort «Ukjent» med henvisning til én felles forklaringsliste; andel med norsk komma. Tidslinjen viser fortegnet norsk prosent. CSV-eksporten er ikke endret.
+- 313-kartlegging: `docs/ravarer-funksjonsmapping.json` (én post per ID, bygges av `scripts/build-funksjonsmapping.mjs <sha>`), kontrollert av `src/test/phase6-uiCopyInventory.test.tsx`. Kartlegging er på seksjonsnivå + «Ny plassering»; `mocked_test`/`browser` = ukjent og `accepted` = ikke akseptert for alle 313.
+- Dødkode: ingen filer slettet. SupplierCase er levende (rute `/ravarer/priskontroll/saker/:id`). Ingen kandidat ble ført til full bevis for null bruk i denne runden.
