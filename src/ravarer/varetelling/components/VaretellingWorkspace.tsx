@@ -8,7 +8,7 @@ import { PrintSheets } from "./PrintSheets";
 import { TemplatesPanel } from "./TemplatesPanel";
 import { UncoveredPanel } from "./UncoveredPanel";
 import { CalendarPanel, MyListsPanel } from "./PlanningPanels";
-import { osloToday } from "@/lib/osloDate";
+import { osloTodayISO } from "@/lib/osloDate";
 import { Loading, Notice } from "./shared";
 
 export const VT_SECTIONS = [
@@ -68,7 +68,7 @@ export function VaretellingWorkspace({ legacy }: { legacy: ReactNode }) {
           </Notice>
         )
         : section === "mine" ? <MyListsPanel onOpen={(c, l) => nav({ vt: null, telling: c, liste: l })} />
-        : section === "kalender" ? <CalendarPanel today={osloToday()} onOpen={c => nav({ vt: null, telling: c })} />
+        : section === "kalender" ? <CalendarPanel today={osloTodayISO()} onOpen={c => nav({ vt: null, telling: c })} />
         : section === "maler" ? <TemplatesPanel />
         : section === "uten-liste" ? <UncoveredPanel />
         : countId && print ? <PrintSheets countId={countId} kind={print} listId={listId} onBack={() => nav({ utskrift: null })} />
