@@ -84,6 +84,44 @@ describe("R192 komponent", () => {
     fireEvent.click(btn("Mel")); fireEvent.click(btn("Mel"));
     expect(h.rpc).toHaveBeenCalledTimes(1);
     await act(async () => { d.resolve(ok(env([change()]))); });
+    // samme mål: første gyldige svar beholdes, ingen «annen lesing pågår»
+    expect(screen.getByText(/2 × 20 ≈ 40 kg/)).toBeTruthy();
+    expect(screen.queryByText(/En annen lesing pågår/)).toBeNull();
+  });
+
+  it("lukk og gjenåpne samme mål under henting forkaster det gamle svaret og sender ikke nytt kall", async () => {
+    const d = deferred(); h.rpc.mockReturnValue(d.p);
+    render(page());
+    fireEvent.click(btn("Mel"));
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    fireEvent.click(btn("Mel"));
+    expect(h.rpc).toHaveBeenCalledTimes(1);
+    await act(async () => { d.resolve(ok(env([change()]))); });
+    expect(screen.queryByText(/2 × 20/)).toBeNull();
+  });
+
+  it.each([
+    ["negativ mengde", { quantity: -2, new_base_qty: -40 }],
+    ["negativ mengde og beløp", { quantity: -2, new_base_qty: -40, total_amount: -100 }],
+  ])("%s: fortegn bevares i mengde, delingen bruker absoluttverdier", async (_n, over) => {
+    h.rpc.mockResolvedValue(ok(env([change(over)])));
+    render(page());
+    await act(async () => { fireEvent.click(btn("Mel")); });
+    expect(screen.getByText(/Mengde: −2 × 20 ≈ −40 kg/)).toBeTruthy();
+    expect(screen.getByText(/100 kr \/ 40 kg ≈ 2,5 kr \/ kg/)).toBeTruthy();
+    expect(screen.queryByText(/Mengde: 2 × 20/)).toBeNull();
+  });
+
+  it("Escape lukker og gir fokus tilbake til knappen", async () => {
+    h.rpc.mockResolvedValue(ok(env([change()])));
+    render(page());
+    const b = btn("Mel");
+    b.focus();
+    await act(async () => { fireEvent.click(b); });
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    await act(async () => { fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" }); });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(b);
   });
 
   it("sen A etter bytte til B fyller ikke B", async () => {
