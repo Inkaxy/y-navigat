@@ -1,5 +1,3 @@
-import { createContext, useContext, useEffect, type ReactNode } from "react";
-
 /**
  * Rent presentasjonelt modul-omfang: setter `data-active-app` på <html> slik at portalerte dialoger
  * og innhold arver modulens semantiske fargeregler (index.css). Ingen henting, ingen tilgang.
@@ -35,11 +33,3 @@ export function claimActiveApp(code: string, depth: number): () => void {
 /** Bare for tester. */
 export function __resetModuleScope() { claims.length = 0; apply(); }
 
-const DepthCtx = createContext(0);
-
-/** Presentasjonelt omfang for én modul. Brukes av AppColorProvider og av inerte forhåndsvisninger. */
-export function ModuleScope({ appCode, children }: { appCode: string; children: ReactNode }) {
-  const depth = useContext(DepthCtx) + 1;
-  useEffect(() => claimActiveApp(appCode, depth), [appCode, depth]);
-  return <DepthCtx.Provider value={depth}>{children}</DepthCtx.Provider>;
-}
