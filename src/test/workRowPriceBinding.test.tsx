@@ -13,15 +13,17 @@ let lineLookupFails = false;
 vi.mock("@/integrations/supabase/client", () => {
   const chain = (table: string) => {
     let cols = "";
+    let head = false;
     const c = {
-      select: (s: string) => { cols = s; return c; },
-      eq: () => c, limit: () => c,
+      select: (s: string, o?: { head?: boolean }) => { cols = s; head = !!o?.head; return c; },
+      eq: () => c, limit: () => c, order: () => c, gt: () => c,
       abortSignal: (s: AbortSignal) => { if (table === "invoice_lines" && cols === "id, invoice_id") lineLookupSignal = s; return c; },
       maybeSingle: () => c,
       then: (ok: (v: unknown) => unknown, bad?: (e: unknown) => unknown) => {
         let v: unknown;
         if (table === "invoices") v = { data: { id: "inv1", legal_entity_id: "le" }, error: null };
         else if (cols === "id, invoice_id") v = lineLookupFails ? { data: null, error: { message: "x", code: "500" } } : { data: { id: "l1", invoice_id: "inv1" }, error: null };
+        else if (head) v = { count: 1, error: null };
         else v = { data: [{ id: "l1", updated_at: V, raw_material_id: lineRm }], error: null };
         return Promise.resolve(v).then(ok, bad);
       },

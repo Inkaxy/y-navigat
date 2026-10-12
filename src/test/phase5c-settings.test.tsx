@@ -256,8 +256,8 @@ describe("AI-tjenester", () => {
     setup();
     render(<AiServicesSettings />, { wrapper: Wrap });
     await screen.findByText(/gpt-5-egen \(lagret\)/, { selector: "span" });
-    expect((screen.getByLabelText("Max tokens") as HTMLInputElement).value).toBe("0");
-    fireEvent.change(screen.getByLabelText("Max tokens"), { target: { value: "3000" } });
+    expect((screen.getByLabelText(/Maks antall tokens/) as HTMLInputElement).value).toBe("0");
+    fireEvent.change(screen.getByLabelText(/Maks antall tokens/), { target: { value: "3000" } });
     expect(screen.getByText(/krever at API-nøkkelen limes inn på nytt/)).toBeTruthy();
     expect((screen.getByRole("button", { name: "Erstatt konfigurasjon" }) as HTMLButtonElement).disabled).toBe(true);
   });
@@ -275,7 +275,7 @@ describe("AI-tjenester", () => {
     setup();
     render(<AiServicesSettings />, { wrapper: Wrap });
     fireEvent.change(await screen.findByLabelText("API-nøkkel"), { target: { value: "syntetisk-nokkel" } });
-    fireEvent.change(screen.getByLabelText("Max tokens"), { target: { value: "2000" } });
+    fireEvent.change(screen.getByLabelText(/Maks antall tokens/), { target: { value: "2000" } });
     fireEvent.click(screen.getByRole("button", { name: "Erstatt konfigurasjon" }));
     expect(await screen.findByText(/Utfallet av lagringen er/)).toBeTruthy();
     expect((screen.getByLabelText("API-nøkkel") as HTMLInputElement).value).toBe("syntetisk-nokkel");
