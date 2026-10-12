@@ -146,13 +146,12 @@ CREATE POLICY vt_list_assignments_read ON public.vt_list_assignments FOR SELECT 
 
 -- ---------- Rapport: koherent øyeblikksbilde (én setning, ingen radgrense) ----------
 -- generatedAt = dataversjonen (siste endring), så samme data gir byte-like vedlegg og samme hash.
-CREATE OR REPLACE FUNCTION public.vt_report_snapshot(p_count_id uuid) RETURNS jsonb
+/** Internt: øyeblikksbildets innhold (ingen tilgangssjekk; bare kalt etter autorisasjon eller fra service-reserve). */
+CREATE OR REPLACE FUNCTION public._vt_report_snapshot_data(p_count_id uuid) RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_c vt_counts; v jsonb;
 BEGIN
   SELECT * INTO v_c FROM vt_counts WHERE id = p_count_id;
-  PERFORM _vt_require(v_c.legal_entity_id, 'read');
-  IF v_c.status = 'planlagt' THEN RAISE EXCEPTION 'Tellingen er ikke startet' USING ERRCODE = '55000'; END IF;
   SELECT jsonb_build_object(
     'count', jsonb_build_object('id', v_c.id, 'name', v_c.name, 'planned_date', v_c.planned_date, 'status', v_c.status, 'revision', v_c.revision,
        'valuation_mode', v_c.valuation_mode, 'valuation_date', v_c.valuation_date, 'finished_at', v_c.finished_at),
@@ -172,6 +171,15 @@ BEGIN
        AT TIME ZONE 'Europe/Oslo', 'DD.MM.YYYY HH24:MI:SS') || ' (rev ' || v_c.revision || ')')
   INTO v;
   RETURN v;
+END $$;
+CREATE OR REPLACE FUNCTION public.vt_report_snapshot(p_count_id uuid) RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_c vt_counts;
+BEGIN
+  SELECT * INTO v_c FROM vt_counts WHERE id = p_count_id;
+  PERFORM _vt_require(v_c.legal_entity_id, 'read');
+  IF v_c.status = 'planlagt' THEN RAISE EXCEPTION 'Tellingen er ikke startet' USING ERRCODE = '55000'; END IF;
+  RETURN _vt_report_snapshot_data(p_count_id);
 END $$;
 
 -- ---------- RPC: opprett opplastingsjobb (én jobb per liste med alle sider) ----------
@@ -554,17 +562,73 @@ BEGIN
   RETURN _vt_op_finish(p_op_id, jsonb_build_object('ok', true, 'kind', 'assign_list', 'list_id', p_list_id, 'user_id', p_user_id, 'role', p_role, 'removed', p_remove));
 END $$;
 
+-- ---------- Avslutning: grunnlagets regel, men avklart pris godtas (eneste endring) ----------
+CREATE OR REPLACE FUNCTION public.vt_transition_count(
+  p_op_id uuid, p_count_id uuid, p_expected_revision integer, p_to text, p_reason text
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_uid uuid; v_prev jsonb; v_entity uuid; v_c vt_counts; v_need text;
+BEGIN
+  SELECT legal_entity_id INTO v_entity FROM vt_counts WHERE id = p_count_id;
+  v_need := CASE WHEN p_to IN ('avsluttet','avbrutt') THEN 'approve' ELSE 'write' END;
+  v_uid := _vt_require(v_entity, v_need);
+  v_prev := _vt_op_begin(p_op_id, 'transition', v_entity, v_uid, jsonb_build_object('count_id', p_count_id,
+    'expected_revision', p_expected_revision, 'to', p_to, 'reason', nullif(btrim(coalesce(p_reason, '')), '')));
+  IF v_prev IS NOT NULL THEN RETURN v_prev; END IF;
+  IF p_expected_revision IS NULL OR p_to IS NULL THEN RAISE EXCEPTION 'Revisjon eller status mangler' USING ERRCODE = '22023'; END IF;
+  SELECT * INTO v_c FROM vt_counts WHERE id = p_count_id FOR UPDATE;   -- utelukker samtidige linje-/listeskrivinger
+  IF v_c.revision <> p_expected_revision THEN RAISE EXCEPTION 'Tellingen er endret av andre' USING ERRCODE = '40001'; END IF;
+  IF p_to = 'til_kontroll' AND v_c.status <> 'pagar' THEN RAISE EXCEPTION 'Ugyldig overgang' USING ERRCODE = '55000';
+  ELSIF p_to = 'pagar' AND v_c.status <> 'til_kontroll' THEN RAISE EXCEPTION 'Ugyldig overgang' USING ERRCODE = '55000';
+  ELSIF p_to = 'avsluttet' THEN
+    IF v_c.status NOT IN ('pagar','til_kontroll') THEN RAISE EXCEPTION 'Ugyldig overgang' USING ERRCODE = '55000'; END IF;
+    PERFORM 1 FROM vt_count_lists WHERE count_id = v_c.id ORDER BY id FOR SHARE;
+    IF NOT EXISTS (SELECT 1 FROM vt_count_lines WHERE count_id = v_c.id) THEN
+      RAISE EXCEPTION 'Tom telling kan ikke avsluttes' USING ERRCODE = '55000';
+    END IF;
+    IF EXISTS (SELECT 1 FROM vt_count_lists cl WHERE cl.count_id = v_c.id
+                AND (cl.status <> 'godkjent' OR NOT EXISTS (SELECT 1 FROM vt_count_lines ln WHERE ln.count_list_id = cl.id))) THEN
+      RAISE EXCEPTION 'Alle lister må ha varer og være godkjent' USING ERRCODE = '55000';
+    END IF;
+    IF EXISTS (SELECT 1 FROM vt_count_lines WHERE count_id = v_c.id AND state NOT IN ('talt','null','ikke_her')) THEN
+      RAISE EXCEPTION 'Linjer er ikke talt eller må kontrolleres' USING ERRCODE = '55000';
+    END IF;
+    -- Trinn 3: godkjent prisavklaring i tellingen teller som pris; startgrunnlaget er uendret.
+    PERFORM 1 FROM vt_price_clarifications WHERE count_id = v_c.id ORDER BY id FOR SHARE;
+    IF EXISTS (SELECT 1 FROM vt_count_lines ln WHERE ln.count_id = v_c.id AND ln.state = 'talt' AND ln.snap_price_per_base IS NULL
+                AND NOT EXISTS (SELECT 1 FROM vt_price_clarifications pc WHERE pc.line_id = ln.id AND pc.superseded_at IS NULL)) THEN
+      RAISE EXCEPTION 'Verdien er ufullstendig: talte varer mangler dokumentert eller avklart pris' USING ERRCODE = '55000';
+    END IF;
+  ELSIF p_to = 'avbrutt' THEN
+    IF v_c.status NOT IN ('planlagt','pagar','til_kontroll') THEN RAISE EXCEPTION 'Ugyldig overgang' USING ERRCODE = '55000'; END IF;
+    IF length(btrim(coalesce(p_reason, ''))) < 3 THEN RAISE EXCEPTION 'Begrunnelse kreves' USING ERRCODE = '22023'; END IF;
+  ELSIF p_to NOT IN ('til_kontroll','pagar') THEN
+    RAISE EXCEPTION 'Ugyldig status' USING ERRCODE = '22023';
+  END IF;
+  UPDATE vt_counts SET status = p_to, revision = revision + 1,
+         finished_at = CASE WHEN p_to = 'avsluttet' THEN now() ELSE finished_at END,
+         finished_by = CASE WHEN p_to = 'avsluttet' THEN v_uid ELSE finished_by END,
+         cancelled_at = CASE WHEN p_to = 'avbrutt' THEN now() ELSE cancelled_at END,
+         cancel_reason = CASE WHEN p_to = 'avbrutt' THEN btrim(p_reason) ELSE cancel_reason END
+   WHERE id = v_c.id RETURNING * INTO v_c;
+  RETURN _vt_op_finish(p_op_id, jsonb_build_object('ok', true, 'kind', 'transition', 'count_id', v_c.id,
+    'status', v_c.status, 'revision', v_c.revision));
+END $$;
+
 -- ---------- Rettigheter: eksakt minimum, eksplisitt for alle roller ----------
 REVOKE ALL ON FUNCTION public.vt_stage3_version(), public.vt_report_snapshot(uuid), public.vt_ocr_create_job(uuid,uuid,jsonb), public.vt_ocr_claim(uuid),
   public._vt_ocr_attempt(uuid,uuid), public.vt_ocr_record_page_count(uuid,uuid,integer), public.vt_ocr_record_unknown(uuid,uuid,text),
   public.vt_ocr_record_failure(uuid,uuid,text), public.vt_ocr_record_result(uuid,uuid,boolean,jsonb,jsonb), public.vt_ocr_job_status(uuid),
   public.vt_ocr_reset_unknown(uuid,uuid,boolean), public.vt_ocr_accept(uuid,uuid,integer,text,numeric,jsonb,text,jsonb), public.vt_ocr_reject(uuid,uuid,text),
-  public.vt_report_mail_reserve(uuid,uuid,integer,text,text,text,text,jsonb,text,text,text,boolean,text), public.vt_report_mail_status(uuid),
-  public.vt_report_mail_claim(uuid), public.vt_report_mail_finish(uuid,text,text), public.vt_assign_list(uuid,uuid,uuid,text,boolean)
+  public.vt_report_mail_reserve(uuid,uuid,uuid,integer,text,text,text,text,jsonb,text,text,text,boolean,text), public.vt_report_mail_status(uuid),
+  public.vt_report_mail_claim(uuid,uuid,uuid,text,text,text), public.vt_report_mail_finish(uuid,text,text), public.vt_assign_list(uuid,uuid,uuid,text,boolean),
+  public._vt_report_snapshot_data(uuid), public.vt_issue_print_manifest(uuid,integer,jsonb), public.vt_clarify_price(uuid,uuid,uuid,numeric,text,text,text),
+  public.vt_assignable_users(uuid)
   FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.vt_stage3_version(), public.vt_report_snapshot(uuid), public.vt_ocr_create_job(uuid,uuid,jsonb), public.vt_ocr_claim(uuid),
   public.vt_ocr_job_status(uuid), public.vt_ocr_reset_unknown(uuid,uuid,boolean), public.vt_ocr_accept(uuid,uuid,integer,text,numeric,jsonb,text,jsonb),
-  public.vt_ocr_reject(uuid,uuid,text), public.vt_report_mail_reserve(uuid,uuid,integer,text,text,text,text,jsonb,text,text,text,boolean,text),
-  public.vt_report_mail_status(uuid), public.vt_assign_list(uuid,uuid,uuid,text,boolean) TO authenticated;
+  public.vt_ocr_reject(uuid,uuid,text), public.vt_report_mail_status(uuid), public.vt_assign_list(uuid,uuid,uuid,text,boolean),
+  public.vt_issue_print_manifest(uuid,integer,jsonb), public.vt_clarify_price(uuid,uuid,uuid,numeric,text,text,text), public.vt_assignable_users(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.vt_ocr_record_page_count(uuid,uuid,integer), public.vt_ocr_record_unknown(uuid,uuid,text), public.vt_ocr_record_failure(uuid,uuid,text),
-  public.vt_ocr_record_result(uuid,uuid,boolean,jsonb,jsonb), public.vt_report_mail_claim(uuid), public.vt_report_mail_finish(uuid,text,text) TO service_role;
+  public.vt_ocr_record_result(uuid,uuid,boolean,jsonb,jsonb), public.vt_report_mail_reserve(uuid,uuid,uuid,integer,text,text,text,text,jsonb,text,text,text,boolean,text),
+  public.vt_report_mail_claim(uuid,uuid,uuid,text,text,text), public.vt_report_mail_finish(uuid,text,text), public.vt_report_snapshot(uuid) TO service_role;
