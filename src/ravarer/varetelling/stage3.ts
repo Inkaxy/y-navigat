@@ -333,7 +333,7 @@ export function createFakeStage3(base: FakeBase, opts: FakeStage3Opts = {}) {
       const jobId = `job-${++seq}`; keys.set(k, jobId);
       urls.set(jobId, files.map(f => (typeof URL.createObjectURL === "function" ? URL.createObjectURL(f) : "")));
       const job: VtOcrJob = { id: jobId, count_list_id: listId, status: "behandler", document_ok: null, issues: [], detail: null, created_at: new Date().toISOString(),
-        originals: files.map((f, i) => ({ path: `demo/${jobId}/side-${i + 1}`, sha256: shas[i].split(":")[0], size: f.size, mime: f.type })), attempts: 1, lease_until: null, page_count: files.length };
+        originals: files.map((f, i) => ({ path: `demo/${jobId}/side-${i + 1}`, sha256: shas[i].split(":")[0], size: f.size, mime: f.type, role: "side" as const })), attempts: 1, lease_until: null, page_count: files.length };
       jobs.unshift(job);
       counters.aiReads++;
       if (opts.readOutcome === "ukjent") { job.status = "ukjent_ai_utfall"; job.detail = "Syntetisk: AI-kall fikk ukjent utfall"; }
