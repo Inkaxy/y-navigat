@@ -275,3 +275,16 @@ R85|src/ravarer/pages/varemottak/InvoiceReceiptPanel.tsx|rm_receive_invoice_line
 R86|src/ravarer/pages/varemottak/InvoiceReceiptPanel.tsx|Avvik|Avvik
 R87|src/ravarer/pages/varemottak/InvoiceReceiptPanel.tsx|Sett pakning|Pakning
 R88|src/ravarer/pages/Varemottak.tsx|Manuelt mottak|Manuelt mottak
+F31|src/fakturaer/components/inbox/task/LineTask.tsx|Bekreft råvare|Bekreft råvare (og pakning) i ett steg
+F33|src/fakturaer/components/inbox/task/LineTask.tsx|Husk varenummer|Aliaslæring (varetekst-variant ikke funnet som egen tekst)
+F34|src/fakturaer/components/inbox/task/LineTask.tsx|Prisen er riktig|Godta pris per linje
+F35|src/fakturaer/components/inbox/task/LineTask.tsx|Rett avtalepris|Rett avtalepris
+F36|src/fakturaer/components/inbox/task/LineTask.tsx|Kontroller pakningen|Fra prissteget
+F37|src/fakturaer/components/inbox/task/LineTask.tsx|Beregn prisen på nytt|Beregn på nytt
+F39|src/fakturaer/components/inbox/task/LineTask.tsx|Hent AI-forslag|AI-forslag
+F43|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|SimilarLinesHint|Like linjer etter kobling
+F46|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|nbhub.faktura.docpanel.v2|Dokumentpanelets tilstand huskes
+F49|src/fakturaer/components/inbox/task/LineTask.tsx|Ny råvare …|Opprett ny vare
+F54|src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx|WorkListView|Listerader/mobilkort (kolonnene er listerader)
+F84|src/ravarer/pages/priskontroll/fakturaer/FakturaerTab.tsx|TripletexStatusCard|Tripletex-statuskort
+F27|src/ravarer/pages/priskontroll/gjore/bulkGjore.ts|på tvers av fakturaer|Gruppert per varekort på tvers av fakturaer (grensen 200 ikke sporet)

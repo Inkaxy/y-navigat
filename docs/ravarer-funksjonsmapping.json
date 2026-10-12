@@ -893,14 +893,22 @@
    "current_location_or_disposition": "?fane=gjore (gruppert per varekort på tvers av fakturaer)",
    "route_owner_path": "src/ravarer/pages/hub/PriskontrollPage.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/hub/PriskontrollPage.tsx"
+    "src/ravarer/pages/hub/PriskontrollPage.tsx",
+    "src/ravarer/pages/priskontroll/gjore/bulkGjore.ts"
    ],
-   "handler_or_render_evidence": [],
+   "handler_or_render_evidence": [
+    {
+     "file": "src/ravarer/pages/priskontroll/gjore/bulkGjore.ts",
+     "evidence": "på tvers av fakturaer",
+     "note": "Gruppert per varekort på tvers av fakturaer (grensen 200 ikke sporet)",
+     "reached_from_owner": true
+    }
+   ],
    "preservation_gap": null,
    "canonical_url_templates": [
     "/ravarer/priskontroll?fane=gjore"
    ],
-   "mapping_status": "eier_verifisert_handling_ikke_sporet",
+   "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
    "source_review": "ukjent",
    "mocked_test": "ukjent",
@@ -1020,14 +1028,22 @@
    "current_location_or_disposition": "Linjeinspektør › hovedknapp",
    "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx"
+    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+    "src/fakturaer/components/inbox/task/LineTask.tsx"
    ],
-   "handler_or_render_evidence": [],
+   "handler_or_render_evidence": [
+    {
+     "file": "src/fakturaer/components/inbox/task/LineTask.tsx",
+     "evidence": "Bekreft råvare",
+     "note": "Bekreft råvare (og pakning) i ett steg",
+     "reached_from_owner": true
+    }
+   ],
    "preservation_gap": null,
    "canonical_url_templates": [
     "/ravarer/priskontroll/faktura/:id?linje=:linje"
    ],
-   "mapping_status": "eier_verifisert_handling_ikke_sporet",
+   "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
    "source_review": "ukjent",
    "mocked_test": "ukjent",
@@ -1078,14 +1094,22 @@
    "current_location_or_disposition": "Linjeinspektør › «Dette lagres»",
    "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx"
+    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+    "src/fakturaer/components/inbox/task/LineTask.tsx"
    ],
-   "handler_or_render_evidence": [],
+   "handler_or_render_evidence": [
+    {
+     "file": "src/fakturaer/components/inbox/task/LineTask.tsx",
+     "evidence": "Husk varenummer",
+     "note": "Aliaslæring (varetekst-variant ikke funnet som egen tekst)",
+     "reached_from_owner": true
+    }
+   ],
    "preservation_gap": null,
    "canonical_url_templates": [
     "/ravarer/priskontroll/faktura/:id?linje=:linje"
    ],
-   "mapping_status": "eier_verifisert_handling_ikke_sporet",
+   "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
    "source_review": "ukjent",
    "mocked_test": "ukjent",
@@ -1103,14 +1127,22 @@
    "current_location_or_disposition": "Linjeinspektør › Pris",
    "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx"
+    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+    "src/fakturaer/components/inbox/task/LineTask.tsx"
    ],
-   "handler_or_render_evidence": [],
+   "handler_or_render_evidence": [
+    {
+     "file": "src/fakturaer/components/inbox/task/LineTask.tsx",
+     "evidence": "Prisen er riktig",
+     "note": "Godta pris per linje",
+     "reached_from_owner": true
+    }
+   ],
    "preservation_gap": null,
    "canonical_url_templates": [
     "/ravarer/priskontroll/faktura/:id?linje=:linje"
    ],
-   "mapping_status": "eier_verifisert_handling_ikke_sporet",
+   "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
    "source_review": "ukjent",
    "mocked_test": "ukjent",
@@ -1128,14 +1160,22 @@
    "current_location_or_disposition": "Linjeinspektør › Pris (+ Prisblokk i varekort-panel)",
    "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx"
+    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+    "src/fakturaer/components/inbox/task/LineTask.tsx"
    ],
-   "handler_or_render_evidence": [],
+   "handler_or_render_evidence": [
+    {
+     "file": "src/fakturaer/components/inbox/task/LineTask.tsx",
+     "evidence": "Rett avtalepris",
+     "note": "Rett avtalepris",
+     "reached_from_owner": true
+    }
+   ],
    "preservation_gap": null,
    "canonical_url_templates": [
     "/ravarer/priskontroll/faktura/:id?linje=:linje"
    ],
-   "mapping_status": "eier_verifisert_handling_ikke_sporet",
+   "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
    "source_review": "ukjent",
    "mocked_test": "ukjent",
@@ -1153,14 +1193,22 @@
    "current_location_or_disposition": "Linjeinspektør › Pris",
    "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx"
+    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+    "src/fakturaer/components/inbox/task/LineTask.tsx"
    ],
-   "handler_or_render_evidence": [],
+   "handler_or_render_evidence": [
+    {
+     "file": "src/fakturaer/components/inbox/task/LineTask.tsx",
+     "evidence": "Kontroller pakningen",
+     "note": "Fra prissteget",
+     "reached_from_owner": true
+    }
+   ],
    "preservation_gap": null,
    "canonical_url_templates": [
     "/ravarer/priskontroll/faktura/:id?linje=:linje"
    ],
-   "mapping_status": "eier_verifisert_handling_ikke_sporet",
+   "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
    "source_review": "ukjent",
    "mocked_test": "ukjent",
@@ -1178,14 +1226,22 @@
    "current_location_or_disposition": "Linjeinspektør (via køen)",
    "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx"
+    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+    "src/fakturaer/components/inbox/task/LineTask.tsx"
    ],
-   "handler_or_render_evidence": [],
+   "handler_or_render_evidence": [
+    {
+     "file": "src/fakturaer/components/inbox/task/LineTask.tsx",
+     "evidence": "Beregn prisen på nytt",
+     "note": "Beregn på nytt",
+     "reached_from_owner": true
+    }
+   ],
    "preservation_gap": null,
    "canonical_url_templates": [
     "/ravarer/priskontroll/faktura/:id?linje=:linje"
    ],
-   "mapping_status": "eier_verifisert_handling_ikke_sporet",
+   "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
    "source_review": "ukjent",
    "mocked_test": "ukjent",
@@ -1236,14 +1292,22 @@
    "current_location_or_disposition": "Linjeinspektør › AI",
    "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx"
+    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+    "src/fakturaer/components/inbox/task/LineTask.tsx"
    ],
-   "handler_or_render_evidence": [],
+   "handler_or_render_evidence": [
+    {
+     "file": "src/fakturaer/components/inbox/task/LineTask.tsx",
+     "evidence": "Hent AI-forslag",
+     "note": "AI-forslag",
+     "reached_from_owner": true
+    }
+   ],
    "preservation_gap": null,
    "canonical_url_templates": [
     "/ravarer/priskontroll/faktura/:id?linje=:linje"
    ],
-   "mapping_status": "eier_verifisert_handling_ikke_sporet",
+   "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
    "source_review": "ukjent",
    "mocked_test": "ukjent",
@@ -1362,12 +1426,19 @@
    "action_component_paths": [
     "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx"
    ],
-   "handler_or_render_evidence": [],
+   "handler_or_render_evidence": [
+    {
+     "file": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+     "evidence": "SimilarLinesHint",
+     "note": "Like linjer etter kobling",
+     "reached_from_owner": true
+    }
+   ],
    "preservation_gap": null,
    "canonical_url_templates": [
     "/ravarer/priskontroll/faktura/:id?linje=:linje"
    ],
-   "mapping_status": "eier_verifisert_handling_ikke_sporet",
+   "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
    "source_review": "ukjent",
    "mocked_test": "ukjent",
@@ -1383,9 +1454,9 @@
    "original_location": "Å gjøre: J/K, Enter, L, P, G, X, U, `?`; linjeinspektør: m, n, x, u",
    "current_feature": "Hurtigtaster ↑/↓, Enter, m, n, x, u, Esc",
    "current_location_or_disposition": "Å gjøre: J/K, Enter, L, P, G, X, U, `?`; linjeinspektør: m, n, x, u",
-   "route_owner_path": "src/ravarer/pages/hub/PriskontrollPage.tsx",
+   "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/hub/PriskontrollPage.tsx",
+    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
     "src/ravarer/pages/priskontroll/faktura/useWorkspaceHotkeys.ts"
    ],
    "handler_or_render_evidence": [
@@ -1393,14 +1464,14 @@
      "file": "src/ravarer/pages/priskontroll/faktura/useWorkspaceHotkeys.ts",
      "evidence": "useWorkspaceHotkeys",
      "note": "Hurtigtaster",
-     "reached_from_owner": false
+     "reached_from_owner": true
     }
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll?fane=gjore"
+    "/ravarer/priskontroll/faktura/:id"
    ],
-   "mapping_status": "eier_verifisert_handling_ikke_sporet",
+   "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
    "source_review": "ukjent",
    "mocked_test": "ukjent",
@@ -1416,9 +1487,8 @@
    "original_location": "U / «Angre» i resultatboks og linjeinspektør",
    "current_feature": "Angre siste linjehandling",
    "current_location_or_disposition": "U / «Angre» i resultatboks og linjeinspektør",
-   "route_owner_path": "src/ravarer/pages/hub/PriskontrollPage.tsx",
+   "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/hub/PriskontrollPage.tsx",
     "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx"
    ],
    "handler_or_render_evidence": [
@@ -1426,14 +1496,14 @@
      "file": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
      "evidence": "q.undo()",
      "note": "Angre",
-     "reached_from_owner": false
+     "reached_from_owner": true
     }
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll?fane=gjore"
+    "/ravarer/priskontroll/faktura/:id"
    ],
-   "mapping_status": "eier_verifisert_handling_ikke_sporet",
+   "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
    "source_review": "ukjent",
    "mocked_test": "ukjent",
@@ -1453,12 +1523,19 @@
    "action_component_paths": [
     "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx"
    ],
-   "handler_or_render_evidence": [],
+   "handler_or_render_evidence": [
+    {
+     "file": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+     "evidence": "nbhub.faktura.docpanel.v2",
+     "note": "Dokumentpanelets tilstand huskes",
+     "reached_from_owner": true
+    }
+   ],
    "preservation_gap": null,
    "canonical_url_templates": [
     "/ravarer/priskontroll/faktura/:id"
    ],
-   "mapping_status": "eier_verifisert_handling_ikke_sporet",
+   "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
    "source_review": "ukjent",
    "mocked_test": "ukjent",
@@ -1541,14 +1618,22 @@
    "current_location_or_disposition": "Linjeinspektør → RawMaterialCreateSheet / varekort-panel",
    "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx"
+    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+    "src/fakturaer/components/inbox/task/LineTask.tsx"
    ],
-   "handler_or_render_evidence": [],
+   "handler_or_render_evidence": [
+    {
+     "file": "src/fakturaer/components/inbox/task/LineTask.tsx",
+     "evidence": "Ny råvare …",
+     "note": "Opprett ny vare",
+     "reached_from_owner": true
+    }
+   ],
    "preservation_gap": null,
    "canonical_url_templates": [
     "/ravarer/priskontroll/faktura/:id?linje=:linje"
    ],
-   "mapping_status": "eier_verifisert_handling_ikke_sporet",
+   "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
    "source_review": "ukjent",
    "mocked_test": "ukjent",
@@ -1695,12 +1780,19 @@
    "action_component_paths": [
     "src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx"
    ],
-   "handler_or_render_evidence": [],
+   "handler_or_render_evidence": [
+    {
+     "file": "src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx",
+     "evidence": "WorkListView",
+     "note": "Listerader/mobilkort (kolonnene er listerader)",
+     "reached_from_owner": true
+    }
+   ],
    "preservation_gap": null,
    "canonical_url_templates": [
     "/ravarer/priskontroll?fane=gjore"
    ],
-   "mapping_status": "eier_verifisert_handling_ikke_sporet",
+   "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
    "source_review": "ukjent",
    "mocked_test": "ukjent",
@@ -2786,14 +2878,22 @@
    "current_location_or_disposition": "?fane=fakturaer › header-tellere + TripletexStatusCard",
    "route_owner_path": "src/ravarer/pages/hub/PriskontrollPage.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/hub/PriskontrollPage.tsx"
+    "src/ravarer/pages/hub/PriskontrollPage.tsx",
+    "src/ravarer/pages/priskontroll/fakturaer/FakturaerTab.tsx"
    ],
-   "handler_or_render_evidence": [],
+   "handler_or_render_evidence": [
+    {
+     "file": "src/ravarer/pages/priskontroll/fakturaer/FakturaerTab.tsx",
+     "evidence": "TripletexStatusCard",
+     "note": "Tripletex-statuskort",
+     "reached_from_owner": true
+    }
+   ],
    "preservation_gap": null,
    "canonical_url_templates": [
     "/ravarer/priskontroll?fane=fakturaer"
    ],
-   "mapping_status": "eier_verifisert_handling_ikke_sporet",
+   "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
    "source_review": "ukjent",
    "mocked_test": "ukjent",
@@ -8238,9 +8338,8 @@
    "original_location": "→ /varer/:id?seksjon=leverandorer",
    "current_feature": "Radklikk åpner råvarens prisfane",
    "current_location_or_disposition": "→ /varer/:id?seksjon=leverandorer",
-   "route_owner_path": "src/ravarer/pages/RawMaterialDetail.tsx",
+   "route_owner_path": "src/ravarer/pages/Avtaler.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/RawMaterialDetail.tsx",
     "src/ravarer/pages/Avtaler.tsx"
    ],
    "handler_or_render_evidence": [
@@ -8248,14 +8347,15 @@
      "file": "src/ravarer/pages/Avtaler.tsx",
      "evidence": "seksjon: \"leverandorer\"",
      "note": "Til råvarens leverandører",
-     "reached_from_owner": false
+     "reached_from_owner": true
     }
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
+    "/ravarer/leverandorer?fane=avtaler",
     "/ravarer/varer/:id?seksjon=leverandorer"
    ],
-   "mapping_status": "eier_verifisert_handling_ikke_sporet",
+   "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
    "source_review": "ukjent",
    "mocked_test": "ukjent",

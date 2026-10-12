@@ -88,7 +88,7 @@ R135|P/LeverandorDetail.tsx|/ravarer/leverandorer/:id?seksjon=aliaser|C/supplier
 R136|P/LeverandorDetail.tsx|/ravarer/leverandorer/:id|-
 R137|P/Avtaler.tsx|/ravarer/leverandorer?fane=avtaler|-
 R138|P/Avtaler.tsx|/ravarer/leverandorer?fane=avtaler|-
-R139|P/RawMaterialDetail.tsx|/ravarer/varer/:id?seksjon=leverandorer|-
+R139|P/Avtaler.tsx|/ravarer/leverandorer?fane=avtaler,/ravarer/varer/:id?seksjon=leverandorer|-
 R140|P/Avtaler.tsx|/ravarer/leverandorer?fane=avtaler|-
 R141|P/Avtaler.tsx|/ravarer/leverandorer?fane=avtaler|-
 R155|P/forhandlinger/ForhandlingerList.tsx|/ravarer/leverandorer?fane=forhandlinger|-
@@ -274,8 +274,8 @@ F18|P/hub/PriskontrollPage.tsx|/ravarer/priskontroll?fane=gjore|-
 F26|P/hub/PriskontrollPage.tsx|/ravarer/priskontroll?fane=gjore|-
 F27|P/hub/PriskontrollPage.tsx|/ravarer/priskontroll?fane=gjore|-
 F28|P/hub/PriskontrollPage.tsx|/ravarer/priskontroll?fane=gjore|-
-F44|P/hub/PriskontrollPage.tsx|/ravarer/priskontroll?fane=gjore|-
-F45|P/hub/PriskontrollPage.tsx|/ravarer/priskontroll?fane=gjore|-
+F44|P/priskontroll/faktura/FakturaWorkspace.tsx|/ravarer/priskontroll/faktura/:id|-
+F45|P/priskontroll/faktura/FakturaWorkspace.tsx|/ravarer/priskontroll/faktura/:id|-
 F29|P/priskontroll/faktura/FakturaWorkspace.tsx|/ravarer/priskontroll/faktura/:id?linje=:linje|-
 F30|P/priskontroll/faktura/FakturaWorkspace.tsx|/ravarer/priskontroll/faktura/:id?linje=:linje|-
 F31|P/priskontroll/faktura/FakturaWorkspace.tsx|/ravarer/priskontroll/faktura/:id?linje=:linje|-
