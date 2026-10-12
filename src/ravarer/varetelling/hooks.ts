@@ -1,6 +1,6 @@
 import { createContext, useContext, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useVtApi } from "./api";
+import { useVtApi, VtBackendUnavailableError, VtRejectedError } from "./api";
 import type { EntryPart, LineState, SaveLineResult, VtCountLine } from "./types";
 
 export interface VtScope { entity: string; canWrite: boolean; canApprove: boolean }
@@ -82,10 +82,9 @@ export function useLineSaver(countId: string) {
       });
       return result.kind === "saved" ? { status: { kind: "lagret" }, result } : { status: { kind: "konflikt", current: result.current }, result };
     } catch (e) {
-      const name = e instanceof Error ? e.constructor.name : "";
-      if (name === "VtRejectedError" || name === "VtBackendUnavailableError") {
+      if (e instanceof VtRejectedError || e instanceof VtBackendUnavailableError) {
         pending.current.delete(line.id);
-        return { status: { kind: "avvist", message: e instanceof Error ? e.message : "Avvist." } };
+        return { status: { kind: "avvist", message: e.message } };
       }
       return { status: { kind: "ukjent", message: e instanceof Error ? e.message : "Ukjent utfall." } };
     } finally {
@@ -93,4 +92,3 @@ export function useLineSaver(countId: string) {
     }
   };
 }
-export function hasPendingOp(saver: unknown): boolean { return saver != null; }
