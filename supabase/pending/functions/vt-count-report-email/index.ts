@@ -17,22 +17,24 @@ const json = (status: number, body: unknown) => new Response(JSON.stringify(body
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Samme klienttype som felles graph-mail forventer (den filen endres ikke). */
 type Admin = Parameters<typeof getGraphAccessToken>[0];
+const mkClient = (u: string, k: string) => createClient(u, k);
+type Db = ReturnType<typeof mkClient>;
 
-async function senderMailbox(admin: Admin): Promise<string | null> {
+async function senderMailbox(admin: Db): Promise<string | null> {
   if (!Deno.env.get("MICROSOFT_GRAPH_TENANT_ID") || !Deno.env.get("MICROSOFT_GRAPH_CLIENT_ID") || !Deno.env.get("MICROSOFT_GRAPH_CLIENT_SECRET")) return null;
   const { data } = await admin.from("microsoft_oauth_tokens").select("account_email").order("updated_at", { ascending: false }).limit(1).maybeSingle();
   const m = (data as { account_email?: unknown } | null)?.account_email;
   return typeof m === "string" && m.includes("@") ? m : null;
 }
 
-async function sendStored(admin: Admin, opId: string): Promise<Response> {
+async function sendStored(admin: Db, graph: Admin, opId: string): Promise<Response> {
   const claim = await admin.rpc("vt_report_mail_claim", { p_op_id: opId });
   if (claim.error) return json(200, { state: "reservert", detail: "Sendingen kunne ikke startes. Den er fortsatt bare reservert — ingenting er sendt." });
   const c = claim.data as { claimed: boolean; state: string; recipient?: string; subject?: string; message?: string; csv?: string; pdf_b64?: string; attachment_base?: string; final?: boolean; sender?: string };
   if (!c.claimed) return json(200, { state: c.state, replayed: true });
   let status: number | null = null; let detail: string | null = null;
   try {
-    const token = await getGraphAccessToken(admin);
+    const token = await getGraphAccessToken(graph);
     const res = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(String(c.sender))}/sendMail`, {
       method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify(buildGraphMessage({ recipient: String(c.recipient), subject: String(c.subject), message: String(c.message) }, c.final === true, String(c.csv), String(c.pdf_b64), String(c.attachment_base))),
@@ -55,7 +57,8 @@ Deno.serve(async (req) => {
   let b: Record<string, unknown>; try { const v = await req.json(); if (typeof v !== "object" || v === null) throw 0; b = v as Record<string, unknown>; } catch { return json(400, { error: "Ugyldig forespørsel" }); }
   const url = Deno.env.get("SUPABASE_URL")!;
   const user = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: auth } } });
-  const admin: Admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!) as Admin;
+  const admin = mkClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const graph = admin as Admin; // samme klient; typen kommer fra felles graph-mail (uendret)
 
   // Lagret operasjon først — både for status og send.
   if (b.action === "status" || b.action === "send") {
@@ -64,7 +67,7 @@ Deno.serve(async (req) => {
     if (st.error) return json((st.error as { code?: string }).code === "42501" ? 403 : 500, { error: "Kunne ikke lese sendingen." });
     const found = st.data as { found: boolean; state?: string; detail?: string | null } | null;
     if (b.action === "status") return json(200, found?.found ? { found: true, state: found.state, detail: found.detail ?? null } : { found: false });
-    if (found?.found) return found.state === "reservert" ? sendStored(admin, b.op_id) : json(200, { state: found.state, detail: found.detail ?? null, replayed: true });
+    if (found?.found) return found.state === "reservert" ? sendStored(admin, graph, b.op_id) : json(200, { state: found.state, detail: found.detail ?? null, replayed: true });
   }
 
   const countId = b.count_id;
@@ -90,5 +93,5 @@ Deno.serve(async (req) => {
     p_recipient: mail.recipient.trim(), p_subject: mail.subject.trim(), p_message: mail.message, p_snapshot: data, p_csv: csv, p_pdf_b64: pdfB64,
     p_attachment_base: attachmentBase(data), p_final: isFinal(data.count), p_sender: sender });
   if (r.error) return json((r.error as { code?: string }).code === "42501" ? 403 : 409, { error: "Kunne ikke reservere sendingen. Ingenting er sendt." });
-  return sendStored(admin, String(b.op_id));
+  return sendStored(admin, graph, String(b.op_id));
 });
