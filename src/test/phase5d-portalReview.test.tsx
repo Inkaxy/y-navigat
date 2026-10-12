@@ -187,3 +187,41 @@ describe("LiveConfirmationPortal gjennomgangsrettelser", () => {
     expect(calls.filter((c) => c.fn === "submit-live-confirmation")).toHaveLength(1);
   });
 });
+
+describe("23e2-restfunn", () => {
+  it("lenkebytte under ventende kladdlagring låser ikke den nye lenken", async () => {
+    const { createMemoryRouter, RouterProvider } = await import("react-router-dom");
+    const router = createMemoryRouter([{ path: "/tilbud/:token", element: <SupplierPortal /> }], { initialEntries: ["/tilbud/t1"] });
+    render(<RouterProvider router={router} />);
+    queue.push({ status: 200, body: rfq([]) });
+    await login();
+    await screen.findByText("Vare i1");
+    let release: (r: Reply) => void = () => undefined;
+    queue.push(new Promise<Reply>((res) => { release = res; }));
+    fireEvent.click(screen.getByRole("button", { name: /Lagre kladd/ }));
+    await act(async () => { await router.navigate("/tilbud/t2"); });
+    queue.push({ status: 200, body: { ...rfq([]), recipient_id: "rec-B", negotiation_id: "n2" } });
+    await login();
+    await screen.findByText("Vare i1");
+    expect(priceInputs()[0].matches(":disabled")).toBe(false);
+    expect(screen.getByRole("button", { name: /Lagre kladd/ })).toBeTruthy();
+    await act(async () => { release({ status: 200, body: { success: true, finalized: false } }); });
+    expect(priceInputs()[0].matches(":disabled")).toBe(false);
+  });
+
+  it("opplasting og innsending i samme render: innsending sperres synkront", async () => {
+    mount("/bekreftelse/t1", <LiveConfirmationPortal />, "/bekreftelse/:token");
+    queue.push({ status: 200, body: { result: "ok", recipient_id: "rec-A", negotiation_id: "n1", negotiation_title: "Live", confirmation_deadline: null, supplier_name: "Lev",
+      items: [{ id: "a", live_agreed_price: 1, live_status: "tentatively_agreed", raw_materials: { name: "Mel", base_unit: "kg" } }] } });
+    await login();
+    await screen.findByText("Live");
+    queue.push(new Promise<Reply>(() => undefined)); // billett henger
+    const file = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const send = screen.getByRole("button", { name: /Send bekreftelse/ });
+    act(() => {
+      fireEvent.change(file, { target: { files: [new File(["%PDF"], "a.pdf", { type: "application/pdf" })] } });
+      fireEvent.click(send);
+    });
+    expect(calls.some((c) => c.fn === "submit-live-confirmation")).toBe(false);
+  });
+});
