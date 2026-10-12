@@ -1,10 +1,10 @@
--- FORSLAG — IKKE KJØRT. Varetelling trinn 3 (revisjon 2): listebundet opplasting med lese-FORSLAG, rapport-e-post,
+-- FORSLAG — IKKE KJØRT. Varetelling trinn 3 (revisjon 3; erstatter aldri-kjørte rev. 1–2): listebundet opplasting med lese-FORSLAG, rapport-e-post,
 -- tildeling. Krever 20261012_varetelling_foundation.PENDING.sql (revisjon 2). Endrer ingen eksisterende funksjoner.
 -- Lagringsbøtte/-regler: 20261012_varetelling_stage3_storage.PENDING.sql (ikke testbar i PGlite).
 -- Låsrekkefølge (som grunnlaget): telling → liste → linje → forslag/jobb. E-postoperasjoner låses alene.
 
 CREATE OR REPLACE FUNCTION public.vt_stage3_version() RETURNS jsonb
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$ SELECT jsonb_build_object('stage3', 2) $$;
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$ SELECT jsonb_build_object('stage3', 3) $$;
 
 -- ---------- Opplasting/lesing ----------
 CREATE TABLE public.vt_ocr_jobs (
@@ -51,6 +51,41 @@ CREATE TABLE public.vt_ocr_proposals (
   FOREIGN KEY (job_id, legal_entity_id) REFERENCES public.vt_ocr_jobs (id, legal_entity_id)
 );
 
+-- ---------- Utstedte utskriftsmanifester (uforanderlige) ----------
+-- Én rad per liste og sideoppsett-versjon. Sider = ordnede linje-ID-er slik de ble trykt. Lesing valideres mot
+-- dette, ikke mot en rekonstruksjon. Første utstedelse vinner; senere kall må være identiske.
+CREATE TABLE public.vt_print_manifests (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  legal_entity_id uuid NOT NULL,
+  count_id uuid NOT NULL,
+  count_list_id uuid NOT NULL,
+  template_revision integer NOT NULL,
+  layout_version integer NOT NULL CHECK (layout_version BETWEEN 1 AND 100),
+  pages jsonb NOT NULL,            -- [[line_id, ...], ...]
+  issued_by uuid NOT NULL,
+  issued_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (count_list_id, layout_version),
+  FOREIGN KEY (count_list_id, legal_entity_id) REFERENCES public.vt_count_lists (id, legal_entity_id)
+);
+
+-- ---------- Prisavklaring per telling (eget revisjonsspor; startgrunnlaget røres aldri) ----------
+CREATE TABLE public.vt_price_clarifications (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  legal_entity_id uuid NOT NULL,
+  count_id uuid NOT NULL,
+  line_id uuid NOT NULL REFERENCES public.vt_count_lines (id),
+  price_per_base numeric NOT NULL CHECK (public._vt_finite(price_per_base) AND price_per_base > 0 AND price_per_base <= 1000000),
+  source_kind text NOT NULL CHECK (source_kind IN ('faktura','leverandorpris','prisliste','manuell_vurdering')),
+  source_ref text CHECK (source_ref IS NULL OR length(source_ref) <= 200),
+  reason text NOT NULL CHECK (length(btrim(reason)) BETWEEN 10 AND 1000),
+  decided_by uuid NOT NULL,
+  decided_at timestamptz NOT NULL DEFAULT now(),
+  superseded_at timestamptz,
+  superseded_by uuid,
+  FOREIGN KEY (count_id, legal_entity_id) REFERENCES public.vt_counts (id, legal_entity_id)
+);
+CREATE UNIQUE INDEX vt_price_clarifications_active ON public.vt_price_clarifications (line_id) WHERE superseded_at IS NULL;
+
 -- ---------- Rapport-e-post (lagrer nøyaktig øyeblikksbilde og vedlegg) ----------
 CREATE TABLE public.vt_report_mail_ops (
   op_id uuid PRIMARY KEY,
@@ -89,8 +124,13 @@ CREATE TABLE public.vt_list_assignments (
 );
 
 -- Eksplisitte rettigheter, uavhengig av standard-ACL: klient leser via RLS; bare service skriver direkte.
-REVOKE ALL ON public.vt_ocr_jobs, public.vt_ocr_proposals, public.vt_report_mail_ops, public.vt_list_assignments FROM PUBLIC, anon, authenticated;
-GRANT SELECT ON public.vt_ocr_jobs, public.vt_ocr_proposals, public.vt_list_assignments TO authenticated;
+REVOKE ALL ON public.vt_ocr_jobs, public.vt_ocr_proposals, public.vt_report_mail_ops, public.vt_list_assignments, public.vt_print_manifests, public.vt_price_clarifications FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.vt_ocr_jobs, public.vt_ocr_proposals, public.vt_list_assignments, public.vt_print_manifests, public.vt_price_clarifications TO authenticated;
+GRANT ALL ON public.vt_print_manifests, public.vt_price_clarifications TO service_role;
+ALTER TABLE public.vt_print_manifests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vt_price_clarifications ENABLE ROW LEVEL SECURITY;
+CREATE POLICY vt_print_manifests_read ON public.vt_print_manifests FOR SELECT TO authenticated USING (public.has_ravarer_access(auth.uid(), legal_entity_id, 'read'));
+CREATE POLICY vt_price_clarifications_read ON public.vt_price_clarifications FOR SELECT TO authenticated USING (public.has_ravarer_access(auth.uid(), legal_entity_id, 'read'));
 GRANT SELECT (op_id, legal_entity_id, count_id, count_revision, report_hash, recipient, subject, state, detail, created_by, created_at, updated_at)
   ON public.vt_report_mail_ops TO authenticated;
 GRANT ALL ON public.vt_ocr_jobs, public.vt_ocr_proposals, public.vt_report_mail_ops, public.vt_list_assignments TO service_role;
@@ -100,7 +140,8 @@ ALTER TABLE public.vt_report_mail_ops ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.vt_list_assignments ENABLE ROW LEVEL SECURITY;
 CREATE POLICY vt_ocr_jobs_read ON public.vt_ocr_jobs FOR SELECT TO authenticated USING (public.has_ravarer_access(auth.uid(), legal_entity_id, 'read'));
 CREATE POLICY vt_ocr_proposals_read ON public.vt_ocr_proposals FOR SELECT TO authenticated USING (public.has_ravarer_access(auth.uid(), legal_entity_id, 'read'));
-CREATE POLICY vt_report_mail_ops_read ON public.vt_report_mail_ops FOR SELECT TO authenticated USING (public.has_ravarer_access(auth.uid(), legal_entity_id, 'read'));
+CREATE POLICY vt_report_mail_ops_read ON public.vt_report_mail_ops FOR SELECT TO authenticated
+  USING (created_by = auth.uid() OR public.has_ravarer_access(auth.uid(), legal_entity_id, 'approve'));
 CREATE POLICY vt_list_assignments_read ON public.vt_list_assignments FOR SELECT TO authenticated USING (public.has_ravarer_access(auth.uid(), legal_entity_id, 'read'));
 
 -- ---------- Rapport: koherent øyeblikksbilde (én setning, ingen radgrense) ----------
@@ -117,12 +158,17 @@ BEGIN
        'valuation_mode', v_c.valuation_mode, 'valuation_date', v_c.valuation_date, 'finished_at', v_c.finished_at),
     'lists', coalesce((SELECT jsonb_agg(jsonb_build_object('id', id, 'name', name, 'department', department, 'status', status, 'sort_order', sort_order,
        'source_template_revision', source_template_revision) ORDER BY sort_order, id) FROM vt_count_lists WHERE count_id = p_count_id), '[]'::jsonb),
-    'lines', coalesce((SELECT jsonb_agg(jsonb_build_object('id', id, 'count_list_id', count_list_id, 'raw_material_id', raw_material_id, 'sort_order', sort_order,
-       'snap_name', snap_name, 'snap_sku', snap_sku, 'snap_location_name', snap_location_name, 'snap_base_unit', snap_base_unit,
-       'snap_price_per_base', snap_price_per_base, 'snap_price_source', snap_price_source, 'snap_price_reason', snap_price_reason,
-       'snap_price_effective_date', snap_price_effective_date, 'snap_price_known_after_valuation', snap_price_known_after_valuation,
-       'state', state, 'counted_base', counted_base, 'note', note, 'revision', revision) ORDER BY sort_order, id) FROM vt_count_lines WHERE count_id = p_count_id), '[]'::jsonb),
-    'generatedAt', 'data per ' || to_char(greatest(v_c.started_at, v_c.finished_at, (SELECT max(updated_at) FROM vt_count_lines WHERE count_id = p_count_id))
+    'lines', coalesce((SELECT jsonb_agg(jsonb_build_object('id', l.id, 'count_list_id', l.count_list_id, 'raw_material_id', l.raw_material_id, 'sort_order', l.sort_order,
+       'snap_name', l.snap_name, 'snap_sku', l.snap_sku, 'snap_location_name', l.snap_location_name, 'snap_base_unit', l.snap_base_unit,
+       'snap_price_per_base', l.snap_price_per_base, 'snap_price_source', l.snap_price_source, 'snap_price_reason', l.snap_price_reason,
+       'snap_price_effective_date', l.snap_price_effective_date, 'snap_price_known_after_valuation', l.snap_price_known_after_valuation,
+       'state', l.state, 'counted_base', l.counted_base, 'note', l.note, 'revision', l.revision,
+       'clar_price_per_base', c.price_per_base, 'clar_source_kind', c.source_kind, 'clar_source_ref', c.source_ref, 'clar_reason', c.reason,
+       'clar_at', to_char(c.decided_at AT TIME ZONE 'Europe/Oslo', 'DD.MM.YYYY HH24:MI'))
+       ORDER BY l.sort_order, l.id)
+       FROM vt_count_lines l LEFT JOIN vt_price_clarifications c ON c.line_id = l.id AND c.superseded_at IS NULL WHERE l.count_id = p_count_id), '[]'::jsonb),
+    'generatedAt', 'data per ' || to_char(greatest(v_c.started_at, v_c.finished_at, (SELECT max(updated_at) FROM vt_count_lines WHERE count_id = p_count_id),
+       (SELECT max(coalesce(superseded_at, decided_at)) FROM vt_price_clarifications WHERE count_id = p_count_id))
        AT TIME ZONE 'Europe/Oslo', 'DD.MM.YYYY HH24:MI:SS') || ' (rev ' || v_c.revision || ')')
   INTO v;
   RETURN v;
@@ -136,19 +182,24 @@ DECLARE v_uid uuid; v_prev jsonb; v_list vt_count_lists; v_count vt_counts; v_jo
 BEGIN
   SELECT * INTO v_list FROM vt_count_lists WHERE id = p_list_id;
   v_uid := _vt_require(v_list.legal_entity_id, 'write');
-  IF p_files IS NULL OR jsonb_typeof(p_files) <> 'array' OR jsonb_array_length(p_files) NOT BETWEEN 1 AND 20 THEN
+  IF p_files IS NULL OR jsonb_typeof(p_files) <> 'array' OR jsonb_array_length(p_files) NOT BETWEEN 1 AND 40 THEN
     RAISE EXCEPTION 'Last opp 1–20 sider' USING ERRCODE = '22023'; END IF;
   FOR f IN SELECT x FROM jsonb_array_elements(p_files) x LOOP
     v_n := v_n + 1;
     IF jsonb_typeof(f) <> 'object' OR coalesce(f->>'sha256', '') !~ '^[0-9a-f]{64}$' OR jsonb_typeof(f->'size') <> 'number'
        OR (f->>'size')::numeric NOT BETWEEN 1 AND 20971520 OR (f->>'size')::numeric <> trunc((f->>'size')::numeric)
-       OR coalesce(f->>'mime', '') NOT IN ('application/pdf','image/jpeg','image/png') THEN
-      RAISE EXCEPTION 'Ugyldig fil (bare PDF, JPEG eller PNG, maks 20 MB)' USING ERRCODE = '22023'; END IF;
-    v_ext := CASE f->>'mime' WHEN 'application/pdf' THEN 'pdf' WHEN 'image/png' THEN 'png' ELSE 'jpg' END;
-    v_orig := v_orig || jsonb_build_object('path', v_list.legal_entity_id || '/' || v_list.count_id || '/' || p_list_id || '/' || v_id || '/side-' || v_n || '.' || v_ext,
-      'sha256', f->>'sha256', 'size', (f->>'size')::int, 'mime', f->>'mime');
+       OR coalesce(f->>'role', '') NOT IN ('side','original')
+       OR (f->>'role' = 'side' AND coalesce(f->>'mime', '') NOT IN ('application/pdf','image/jpeg','image/png'))
+       OR (f->>'role' = 'original' AND coalesce(f->>'mime', '') <> 'image/webp')
+       OR (f->>'role' = 'side' AND f ? 'original_index' AND jsonb_typeof(f->'original_index') <> 'number') THEN
+      RAISE EXCEPTION 'Ugyldig fil (sider: PDF/JPEG/PNG; WEBP bare som bevart original; maks 20 MB)' USING ERRCODE = '22023'; END IF;
+    v_ext := CASE f->>'mime' WHEN 'application/pdf' THEN 'pdf' WHEN 'image/png' THEN 'png' WHEN 'image/webp' THEN 'webp' ELSE 'jpg' END;
+    v_orig := v_orig || jsonb_build_object('path', v_list.legal_entity_id || '/' || v_list.count_id || '/' || p_list_id || '/' || v_id || '/' || (f->>'role') || '-' || v_n || '.' || v_ext,
+      'sha256', f->>'sha256', 'size', (f->>'size')::int, 'mime', f->>'mime', 'role', f->>'role', 'original_index', f->'original_index');
   END LOOP;
-  SELECT string_agg((x->>'sha256') || ':' || (x->>'size'), '|' ORDER BY o) INTO v_key FROM jsonb_array_elements(p_files) WITH ORDINALITY t(x, o);
+  IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(p_files) x WHERE x->>'role' = 'side') OR (SELECT count(*) FROM jsonb_array_elements(p_files) x WHERE x->>'role' = 'side') > 20 THEN
+    RAISE EXCEPTION 'Last opp 1–20 sider' USING ERRCODE = '22023'; END IF;
+  SELECT string_agg((x->>'role') || ':' || (x->>'sha256') || ':' || (x->>'size'), '|' ORDER BY o) INTO v_key FROM jsonb_array_elements(p_files) WITH ORDINALITY t(x, o);
   v_prev := _vt_op_begin(p_op_id, 'ocr_create_job', v_list.legal_entity_id, v_uid, jsonb_build_object('list_id', p_list_id, 'files', p_files));
   IF v_prev IS NOT NULL THEN RETURN v_prev; END IF;
   SELECT * INTO v_count FROM vt_counts WHERE id = v_list.count_id FOR SHARE;
@@ -186,7 +237,9 @@ BEGIN
            'snap_base_unit', l.snap_base_unit, 'snap_units', l.snap_units) ORDER BY l.sort_order, l.id), '[]'::jsonb)
     INTO v_lines FROM vt_count_lines l WHERE l.count_list_id = v_job.count_list_id;
   RETURN jsonb_build_object('attempt_id', v_attempt, 'count_id', v_job.count_id, 'list_id', v_job.count_list_id, 'template_revision', v_job.template_revision,
-    'originals', v_job.originals, 'lines', v_lines);
+    'originals', v_job.originals, 'lines', v_lines,
+    'manifests', coalesce((SELECT jsonb_agg(jsonb_build_object('layout_version', layout_version, 'pages', pages) ORDER BY layout_version)
+                           FROM vt_print_manifests WHERE count_list_id = v_job.count_list_id), '[]'::jsonb));
 END $$;
 
 -- ---------- Service: registrering bundet til attempt_id (gammelt forsøk kan aldri overskrive nyere) ----------
