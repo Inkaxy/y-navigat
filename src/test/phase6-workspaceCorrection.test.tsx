@@ -137,7 +137,8 @@ describe("FakturaWorkspace: «Rett sumavvik» åpner vaktet retting", () => {
 });
 
 import { correctionHref } from "@/ravarer/pages/priskontroll/faktura/correctionTarget";
-import { paths, RETURN_PARAM } from "@/ravarer/lib/paths";
+import { paths } from "@/ravarer/lib/paths";
+import { RETURN_PARAM } from "@/ravarer/pages/priskontroll/fakturaer/visning";
 describe("forhåndsvisningens rettelenke", () => {
   const has = (l: { issue?: boolean }) => !!l.issue;
   it("eksakt faktura, linje med lesevarsel og listekontekst som retur", () => {
