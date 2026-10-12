@@ -218,3 +218,12 @@ Hver leveranse verifiseres mot faktiske skjermer og handlinger, ikke bare at kod
 - Telefon, iPad stående/liggende, tastatur, A4 med mange sider og svart-hvitt-utskrift er kontrollert.
 
 Tekniske hovedføringer: gjenbruk eksisterende firma- og tilgangsmodell; egne identiteter for telling, listeinstans, linje og import; serverkontrollerte overganger; databasebeskyttet historikk; konfliktkontroll per linje; private originalfiler; sporbare operasjoner og priser. Eksisterende dagsutkast kan ikke være den eneste modellen for den nye funksjonen.
+
+## Herding før utrulling (12.10.2026)
+- Rapport: utskrift, skjermtotaler, arkiv, CSV/PDF og e-postpanel bruker samme flettede avklaringsgrunnlag og er sperret mens avklaringer hentes eller feiler.
+- Lesing: ny attempt_id per del; sene skrivinger avvises; utløpt pågående del = ukjent utfall (lagrede sider bevares, godkjenner bekrefter, «Les gjenstående sider»); ferdigstilling fra lagrede sider uten ny lesing.
+- Originalvisning: serverens kildekobling per lest side (fil, PDF-side, bevart original); fast originalvisning ved siden av forslagene på brede skjermer, hopp og «Tilbake til feltet» på mobil.
+- Telleark: utskrift sperret til manifest er registrert og alle QR-koder er laget; rader har låst høyde.
+- Tildeling: datoregler og eier-/plattformunntak avgjøres av live `has_ravarer_access`; navn hentes i biter à 500.
+- E-post: forhåndsvisning viser tilkoblet avsender; ukjent status beskrives som ukjent.
+- Begrensninger: ingen ekte samtidighetstest (serielle PGlite-tester); A4 kontrollert med faste radhøyder og sidebudsjett, ikke fysisk utskrift; WEBP-original ↔ avledning er klientoppgitt kobling (ikke kryptografisk bevist); 7 Deno-typefeil gjenstår i uendrede delte filer (crypto.ts, m365-crypto.ts, graph-mail.ts).
