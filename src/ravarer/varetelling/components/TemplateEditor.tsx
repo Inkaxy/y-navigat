@@ -10,6 +10,7 @@ import { useOpAction, useVtMaterials, useVtScope, useVtTemplateLines, useVtTempl
 import { findDuplicates, inCategory, materialCategories, moveItem } from "../logic";
 import type { TemplateLineInput, VtLocation, VtTemplate } from "../types";
 import { report } from "./CountControls";
+import { UnitPicker } from "./PlanningPanels";
 import { locName, NativeSelect, Notice, PendingNotice } from "./shared";
 
 type Draft = { name: string; department: string; defaultLocationId: string | null; lines: TemplateLineInput[] };
@@ -96,6 +97,7 @@ export function TemplateEditor({ template, locations, onCopied, onArchived }: { 
                     <option value="">Uten plassering</option>
                     {locations.filter(x => !x.archived_at || x.id === l.location_id).map(x => <option key={x.id} value={x.id}>{x.department} / {x.name}{x.archived_at ? " (arkivert)" : ""}</option>)}
                   </NativeSelect>
+                  <UnitPicker materialId={l.raw_material_id} name={matName(l.raw_material_id)} value={l.count_unit_ids} disabled={!canWrite || busy} onChange={ids => setLine(i, { count_unit_ids: ids })} />
                   {archived && <p className="mt-1 text-xs text-destructive">Stedet er arkivert — velg et aktivt sted før lagring.</p>}
                   {dup.map(h => (
                     <p key={h.templateId} className="mt-1 text-xs">

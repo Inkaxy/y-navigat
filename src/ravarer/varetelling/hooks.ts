@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useSyncExter
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useVtApi, VtBackendUnavailableError, VtRejectedError, VtUnknownOutcomeError } from "./api";
 import { pendingStoreFor, type PendingOp, type PendingStore } from "./pendingStore";
+import { draftStoreFor, type DraftStore } from "./draftStore";
 import type { EntryInput, LineState, SaveLineResult, ValuationMode, VtCountLine } from "./types";
 
 export interface VtScope { entity: string; userId: string | null; canWrite: boolean; canApprove: boolean }
@@ -63,6 +64,13 @@ export function usePendingOp(key: string): { op: PendingOp | undefined; locked: 
   const store = usePendingStore();
   useSyncExternalStore(useCallback(fn => store.subscribe(fn), [store]), () => store.getVersion());
   return { op: store.get(key), locked: store.isLocked(key) };
+}
+
+export function useDraftStore(): DraftStore {
+  const { userId, entity } = useVtScope();
+  const store = draftStoreFor(userId, entity);
+  useSyncExternalStore(useCallback(fn => store.subscribe(fn), [store]), () => store.getVersion());
+  return store;
 }
 
 export type OpOutcome<O> = { kind: "ok"; value: O } | { kind: "rejected"; message: string } | { kind: "unknown"; message: string } | { kind: "busy" };
@@ -153,7 +161,8 @@ export function useLineSaver(countId: string) {
         if (!old) return old;
         return { ...old, lines: old.lines.map(l => (l.id === fresh.id && fresh.revision >= l.revision ? fresh : l)) };
       });
-      if (!mounted.current) void qc.invalidateQueries({ queryKey: vtKeys.count(captured.current, countId) });
+      // Alltid fersk telling (listestatus endres ved første lagring; summer/oppsummering må følge).
+      void qc.invalidateQueries({ queryKey: vtKeys.count(captured.current, countId) });
       return result.kind === "saved" ? { kind: "lagret" } : { kind: "konflikt", current: result.current };
     } finally {
       store.unlock(key);

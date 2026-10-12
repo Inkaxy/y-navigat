@@ -47,19 +47,31 @@ Forklaring: **[x]** bygget og testet i kode/lokal database · **[~]** delvis · 
 - [ ] Lagret utskriftsversjon i databasen (identitet er i dag avledet av liste-ID + malversjon, som er uforanderlig etter start)
 - [ ] Sammenligning mellom tellinger
 
-### Gjenstår (neste leveranser)
-- [ ] Tilordning av tellere/ansvarlige per liste og filteret «Mine lister»
-- [ ] Flytt vare mellom maler direkte fra duplikatvarselet (i dag: varsel + endre plassering/fjern)
-- [ ] Valg av telleenheter per malinje i UI (servermodellen støtter det)
-- [ ] Kalender og gjentakende planlegging, påminnelser
-- [ ] Offline-kø med testet gjenoppretting — IKKE bygget, ikke lovet (ventende innslag i nettleseren er ikke offline-støtte)
-- [ ] E-post-forhåndsvisning og sending — IKKE bygget
-- [ ] Dokumentlesing/OCR av utfylte skjemaer — IKKE bygget
-- [ ] Bevegelseskontroll i tellevindu og «Oppdater lagerbeholdning» — IKKE bygget (ingen automatisk lagerjustering)
-- [ ] Revisjon av avsluttet telling; manuell prisavklaring med begrunnelse
-- [ ] Kontroll i ekte nettleser 390/768/1440, A4/svart-hvitt-utskrift og innlogget produksjon (root)
+### Trinn 3 – foreslått, IKKE kjørt/utrullet
+- [x] SQL-forslag `supabase/pending/20261012_varetelling_stage3.PENDING.sql` (+ `..._stage3_storage.PENDING.sql` for privat bøtte) og atferdstest `..._stage3.test.sql` (kjøres sammen med grunnlaget: 148 kontroller i seriell PGlite; lagringsreglene kan ikke testes i PGlite)
+- [x] Edge-kilde (ikke utrullet, ligger utenfor `supabase/functions`): `supabase/pending/functions/vt-count-ocr/` og `supabase/pending/functions/vt-count-report-email/`. Rene kjerner `ocrCore.ts`/`reportCore.ts` testes i vitest. Eksisterende `extract-invoice-from-pdf`, `reread-invoice-preview`, `_shared/ai-providers.ts`, `_shared/graph-mail.ts` og `microsoft-graph-send` er uendret.
+- [x] Opplasting per liste: jobb bundet til liste, malversjon og linjerevisjoner ved opplasting; SHA-256-duplikat på samme liste gir eksisterende jobb; PDF eller bilde (bilde gjøres om til PDF i nettleseren, original bevares); stier bestemmes av serveren
+- [x] Lesing gir bare forslag. Prompten har ingen forventede ID-er; trykt identitet og radkoder sammenlignes med manifest fra uforanderlige linjer. Feil telling/liste/malversjon, uleselig identitet, duplikat- eller manglende side ⇒ dokumentet kan ikke godkjennes. Fremmede radkoder ignoreres, dobbeltleste rader gir ingen forslag. Tvetydig skilletegn, brøk, overstrøket, utydelig og ukjent enhet ⇒ felt uten verdi med årsak; tomt felt er aldri 0; «confidence» brukes ikke
+- [x] Godkjenning per linje med brukerens bekreftede (ev. rettede) verdier via `vt_save_line` (samme validering/låsing/op-kvittering); avvist hvis linjen er endret etter opplasting (manuell registrering overskrives aldri), fremmed linje, avgjort forslag eller ubekreftet dokument; forslag, godkjent verdi og «rettet» revideres
+- [x] Én betalt lesing per jobb: tidsavbrudd ⇒ «ukjent_ai_utfall», ingen automatisk ny kjøring; ny kjøring krever godkjenner og eksplisitt bekreftelse
+- [ ] Utsnitt per rad (forslaget har `crop`, men lesetjenesten fyller det ikke ennå) — UI viser tydelig «ingen utsnitt — se hel side» og lenke til originalen
+- [x] Rapport-e-post: forhåndsvisning bygges fra lagrede frosne verdier med versjons-hash; eksplisitt «Send»; reservasjon (op-id, hash, mottaker, emne, melding) i SQL; én sending (claim), Graph 202 = «akseptert av e-posttjenesten», ikke levert; nett/tidsfeil ⇒ «ukjent», aldri automatisk ny sending; CSV+PDF-vedlegg; ikke konfigurert ⇒ sannferdig melding. Krever ny hemmelighet `VT_REPORT_MAIL_FROM` (avsenderadresse) ved utrulling. Ingen e-post er sendt som test.
+- [x] Holdbare redigeringsutkast per bruker/firma/telling/linje med grunnrevisjon (overlever liste/filter/fane/omlasting); lagringsfeil vises; panel «Ikke bekreftet lagret» viser utkast og ukjente sendinger med «Gå til»
+- [x] Nettleserfunn rettet: etter bekreftet «0 på lager»/«Ikke på stedet» tømmes feltene (ingen gammel sum); tellingen hentes på nytt etter hver lagring (fersk listestatus); hovedknappen heter «Lagre og neste» med forklaring
+- [x] Tildeling: «Ta listen»/«Forlat listen», godkjenner kan fjerne andre; «Mine lister». Tildeling av andre brukere fra UI krever brukervelger — ikke bygget (serveren støtter det for godkjennere)
+- [x] Kalender (måned) over tellinger etter telledato
+- [x] Telleenheter per malinje i maleditoren (serveren brukte dem allerede ved start)
+- [ ] Kjørt/utrullet (krever uavhengig gjennomgang og eksplisitt autorisasjon); ekte opplasting, AI-lesing og Graph-sending er ikke testet mot live
 
----
+### Gjenstår (neste leveranser)
+- [ ] Flytt vare mellom maler direkte fra duplikatvarselet (i dag: varsel + endre plassering/fjern)
+- [ ] Gjentakende planlegging og påminnelser (kalenderen er bare visning)
+- [ ] Offline-kø med testet kaldstart — IKKE bygget, ikke lovet (utkast og ventende innslag i nettleseren er ikke offline-støtte)
+- [ ] Bevegelseskontroll i tellevindu og «Oppdater lagerbeholdning» — IKKE bygget (ingen automatisk lagerjustering; skal vurderes separat)
+- [ ] Revisjon av avsluttet telling; manuell/historisk prisavklaring med begrunnelse adskilt fra startgrunnlaget — IKKE bygget
+- [ ] Brukervelger for å tildele andre; kontrollørrolle i UI
+- [ ] Sammenligning mellom tellinger
+- [ ] Kontroll i ekte nettleser 390/768/1440, A4/svart-hvitt-utskrift og innlogget produksjon (root)
 
 ## Godkjent spesifikasjon (12. oktober 2026)
 

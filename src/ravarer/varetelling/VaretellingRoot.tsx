@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import Varetelling from "@/ravarer/pages/Varetelling";
 import { supabaseVtApi, VtApiContext } from "./api";
+import { Stage3Context, supabaseStage3Api } from "./stage3";
 import { VtScopeContext } from "./hooks";
 import { VaretellingWorkspace } from "./components/VaretellingWorkspace";
 
@@ -13,7 +14,9 @@ export default function VaretellingRoot() {
   return (
     <VtApiContext.Provider value={supabaseVtApi}>
       <VtScopeContext.Provider value={scope}>
-        <VaretellingWorkspace legacy={<Varetelling />} />
+        <Stage3Context.Provider value={supabaseStage3Api}>
+          <VaretellingWorkspace legacy={<Varetelling />} />
+        </Stage3Context.Provider>
       </VtScopeContext.Provider>
     </VtApiContext.Provider>
   );

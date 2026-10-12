@@ -1,0 +1,2 @@
+- New stock-count Edge functions live as source in `supabase/pending/functions/` until approved; their pure cores (`ocrCore.ts`, `reportCore.ts`) are imported by the synthetic client and vitest. Why: files in `supabase/functions/` may be auto-deployed before review.
+- Paper count-sheet reading stores proposals only; counted values are written solely via `vt_save_line` after user confirmation, and document identity is proven against the print manifest, never by the model echoing expected IDs. Why: AI output is not document evidence.

@@ -7,10 +7,14 @@ import { CountSession } from "./CountSession";
 import { PrintSheets } from "./PrintSheets";
 import { TemplatesPanel } from "./TemplatesPanel";
 import { UncoveredPanel } from "./UncoveredPanel";
+import { CalendarPanel, MyListsPanel } from "./PlanningPanels";
+import { osloTodayISO } from "@/lib/osloDate";
 import { Loading, Notice } from "./shared";
 
 export const VT_SECTIONS = [
   { id: "tellinger", label: "Tellinger" },
+  { id: "mine", label: "Mine lister" },
+  { id: "kalender", label: "Kalender" },
   { id: "maler", label: "Listemaler" },
   { id: "uten-liste", label: "Varer uten liste" },
   { id: "dagstelling", label: "Dagstelling" },
@@ -63,6 +67,8 @@ export function VaretellingWorkspace({ legacy }: { legacy: ReactNode }) {
             Ingenting kan lagres her før versjonene stemmer. Bruk «Dagstelling» som før.
           </Notice>
         )
+        : section === "mine" ? <MyListsPanel onOpen={(c, l) => nav({ vt: null, telling: c, liste: l })} />
+        : section === "kalender" ? <CalendarPanel today={osloTodayISO()} onOpen={c => nav({ vt: null, telling: c })} />
         : section === "maler" ? <TemplatesPanel />
         : section === "uten-liste" ? <UncoveredPanel />
         : countId && print ? <PrintSheets countId={countId} kind={print} listId={listId} onBack={() => nav({ utskrift: null })} />

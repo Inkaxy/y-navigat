@@ -10,6 +10,10 @@ import { buildCsv, buildPdf, downloadBlob, reportFileBase } from "../report";
 import type { VtCountLine } from "../types";
 import { Lifecycle, ListActions, StartPanel } from "./CountControls";
 import { LineEntryCard } from "./LineEntryCard";
+import { UnsyncedPanel } from "./UnsyncedPanel";
+import { OcrPanel } from "./OcrPanel";
+import { MailPanel } from "./MailPanel";
+import { AssignBar } from "./PlanningPanels";
 import { formatDateNo, Loading, NativeSelect, Notice } from "./shared";
 
 type Filter = "gjenstar" | "kontroll" | "alle";
@@ -82,6 +86,7 @@ function SessionBody({ data, listParam, onBack, onList, onPrint }: {
               try { downloadBlob(await buildPdf(reportData()), `${reportFileBase(count)}.pdf`); } catch { toast.error("Kunne ikke lage PDF."); } finally { setExporting(false); }
             }}><FileDown className="h-4 w-4" aria-hidden /> PDF</Button>
           </div>
+          <MailPanel count={count} />
           {count.status !== "avsluttet" && <p className="text-xs text-muted-foreground">Rapport og eksport før avslutning merkes «Foreløpig» med tidspunkt.</p>}
           <details className="rounded-lg border bg-card p-3 text-sm">
             <summary className="min-h-[44px] cursor-pointer py-2 font-medium">Sammendrag per avdeling og liste</summary>
@@ -92,6 +97,8 @@ function SessionBody({ data, listParam, onBack, onList, onPrint }: {
             <Card className="p-3 text-sm"><p className="font-medium">Varer talt på flere steder (summert én gang)</p>
               <ul>{multi.map(t => <li key={t.name}>{t.name}: {formatAmount(t.total)} {t.unit} fra {t.places} steder</li>)}</ul></Card>
           )}
+          <UnsyncedPanel countId={count.id} lines={lines} onGoTo={l => { onList(l.count_list_id); setFilter("alle"); setSnap(null); setActiveId(l.id);
+            requestAnimationFrame(() => document.querySelector<HTMLInputElement>(`[data-line="${l.id}"] input`)?.focus()); }} />
           <div className="grid gap-2 sm:grid-cols-2">
             <NativeSelect aria-label="Velg liste" value={listId} onChange={e => { onList(e.target.value === "alle" ? null : e.target.value); setSnap(null); }}>
               <option value="alle">Alle lister ({lines.length})</option>
@@ -102,6 +109,8 @@ function SessionBody({ data, listParam, onBack, onList, onPrint }: {
             </NativeSelect>
           </div>
           {list && <ListActions list={list} open={open} canWrite={canWrite} canApprove={canApprove} summary={summarize(inList)} />}
+          {list && <AssignBar list={list} />}
+          {list && <OcrPanel list={list} lines={inList} open={open && list.status !== "godkjent"} />}
           <div className="space-y-3">
             {shown.map(l => (
               <div key={l.id} data-line={l.id}>

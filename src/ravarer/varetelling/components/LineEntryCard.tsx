@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { lineKey, useLineSaver, usePendingOp, type LineDraft, type LinePayload, type LineSaveStatus } from "../hooks";
+import { lineKey, useDraftStore, useLineSaver, usePendingOp, type LineDraft, type LinePayload, type LineSaveStatus } from "../hooks";
 import { entryToBase, formatAmount, formatKr, LINE_STATE_LABEL, parseNorwegianAmount, priceReasonLabel } from "../logic";
 import type { EntryInput, LineState, VtCountLine } from "../types";
 
@@ -30,18 +30,30 @@ export function LineEntryCard({ line, countId, readOnly, active, onFocus, onNext
   const save = useLineSaver(countId);
   const { op: pending, locked } = usePendingOp(lineKey(line.id));
   const pendingPayload = pending?.payload as LinePayload | undefined;
+  const drafts = useDraftStore();
   const fields = fieldsOf(line);
-  const [base, setBase] = useState<Baseline>(() => pendingPayload
-    ? { revision: pendingPayload.expectedRevision, texts: textsFrom(line, pendingPayload.draft.entry), note: pendingPayload.draft.note ?? "" }
-    : baselineOf(line));
-  const [texts, setTexts] = useState<string[]>(() => base.texts);
-  const [note, setNote] = useState(() => base.note);
+  // Holdbart utkast (overlever liste/filter/fane/omlasting) vinner over serververdi; sendt-ukjent vinner over utkast.
+  const [initial] = useState(() => {
+    if (pendingPayload) { const t = textsFrom(line, pendingPayload.draft.entry); const n = pendingPayload.draft.note ?? "";
+      return { base: { revision: pendingPayload.expectedRevision, texts: t, note: n }, texts: t, note: n }; }
+    const d = drafts.get(line.id);
+    if (d && d.countId === countId && d.texts.length === fields.length) return { base: { revision: d.baseRevision, texts: d.baseTexts, note: d.baseNote }, texts: d.texts, note: d.note };
+    const b = baselineOf(line); return { base: b, texts: b.texts, note: b.note };
+  });
+  const [base, setBase] = useState<Baseline>(initial.base);
+  const [texts, setTexts] = useState<string[]>(initial.texts);
+  const [note, setNote] = useState(initial.note);
   const [status, setStatus] = useState<LineSaveStatus | null>(() => (pending ? { kind: "ukjent", message: "Forrige lagring har ukjent utfall." } : null));
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   const dirty = JSON.stringify(texts) !== JSON.stringify(base.texts) || note !== base.note;
   const stale = line.revision !== base.revision;
+  useEffect(() => {
+    if (pending) return;
+    if (dirty) drafts.put({ countId, lineId: line.id, baseRevision: base.revision, baseTexts: base.texts, baseNote: base.note, texts, note, at: new Date().toISOString() });
+    else drafts.remove(line.id);
+  }, [dirty, texts, note, base, pending, drafts, countId, line.id]);
   // Ren + ingen ventende sending: ta inn fersk serverversjon (både tall og kommentar).
   useEffect(() => {
     if (stale && !dirty && !pending && status?.kind !== "konflikt") {
@@ -49,7 +61,7 @@ export function LineEntryCard({ line, countId, readOnly, active, onFocus, onNext
     }
   }, [stale, dirty, pending, status, line]);
 
-  const adoptServer = (l: VtCountLine) => { const b = baselineOf(l); setBase(b); setTexts(b.texts); setNote(b.note); setStatus(null); };
+  const adoptServer = (l: VtCountLine) => { const b = baselineOf(l); setBase(b); setTexts(b.texts); setNote(b.note); setStatus(null); drafts.remove(l.id); };
   const keepMineOn = (l: VtCountLine) => { setBase(b => ({ ...b, revision: l.revision })); setStatus(null); };
 
   const parsed = texts.map(t => parseNorwegianAmount(t));
@@ -69,7 +81,13 @@ export function LineEntryCard({ line, countId, readOnly, active, onFocus, onNext
     if (!mounted.current) return;
     setStatus(s);
     if (s.kind === "lagret") {
-      if (payload) setBase(b => ({ revision: b.revision + 1, texts, note: payload.draft.note ?? "" }));
+      if (payload) {
+        // Bekreftet tilstand uten mengde (0/ikke på stedet) tømmer feltene, ellers ville gammel sum bli stående.
+        const kept = payload.draft.entry.length ? texts : fields.map(() => "");
+        const n = payload.draft.note ?? "";
+        setBase({ revision: base.revision + 1, texts: kept, note: n }); setTexts(kept); setNote(n);
+        drafts.remove(line.id);
+      }
       if (state !== "ma_kontrolleres") onNext();
     }
   };
@@ -109,15 +127,17 @@ export function LineEntryCard({ line, countId, readOnly, active, onFocus, onNext
         aria-label={`Kommentar for ${line.snap_name}`} className="mt-2 h-12" maxLength={500} />
       {!readOnly && (
         <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-          <Button className="min-h-[48px]" disabled={blocked || total == null || total <= 0} onClick={() => void send("talt")}>Lagre</Button>
+          <Button className="min-h-[48px]" disabled={blocked || total == null || total <= 0} aria-describedby={`vt-next-${line.id}`} onClick={() => void send("talt")}>Lagre og neste</Button>
           <Button variant="outline" className="min-h-[48px]" disabled={blocked} onClick={() => void send("null")}>0 på lager</Button>
           <Button variant="outline" className="min-h-[48px]" disabled={blocked} onClick={() => void send("ikke_her")}>Ikke på stedet</Button>
           <Button variant="outline" className="min-h-[48px]" disabled={blocked || invalid} onClick={() => void send("ma_kontrolleres")}>Må kontrolleres</Button>
           <Button variant="ghost" className="min-h-[48px]" onClick={onNext}>Neste vare</Button>
+          <p id={`vt-next-${line.id}`} className="col-span-2 text-xs text-muted-foreground">«Lagre og neste», «0 på lager» og «Ikke på stedet» lagrer og flytter til neste vare som ikke er talt. «Må kontrolleres» blir stående.</p>
         </div>
       )}
       <div className="mt-2 text-sm" aria-live="polite">
         {busy && <span className="text-muted-foreground">Lagrer …</span>}
+        {!busy && dirty && !pending && <span className="block text-xs">Utkast — ikke lagret ennå (huskes i denne nettleseren).</span>}
         {!busy && status?.kind === "lagret" && <span>Lagret</span>}
         {!busy && status?.kind === "avvist" && <span className="text-destructive">Kunne ikke lagre: {status.message}</span>}
         {!busy && pending && (
