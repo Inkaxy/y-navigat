@@ -43,7 +43,7 @@ export function csvValue(colId: string, i: RawMaterialListItem): string {
               [
                 i.declarationName ? "dekl" : "",
                 i.hasDatasheet ? "datablad" : "",
-                i.hasAllergens ? "allergen" : "",
+                i.allergensReviewed === true ? (i.hasAllergens ? "allergener-vurdert-registrert" : "allergener-vurdert-ingen") : i.allergensReviewed === false ? "allergener-ikke-vurdert" : "allergener-ukjent",
                 i.hasNutrition ? "næring" : "",
               ]
                 .filter(Boolean)

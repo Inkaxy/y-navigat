@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Check, Minus, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDate, formatNok, formatNumber } from "@/ravarer/lib/constants";
+import { ALLERGEN_STATE_LABEL, allergenState } from "@/ravarer/lib/allergenState";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import type { RawMaterialListItem } from "@/ravarer/lib/rawMaterialViews";
 import { LIST_COLUMNS } from "@/ravarer/lib/varelisteColumns";
@@ -18,10 +19,11 @@ import { paths } from "@/ravarer/lib/paths";
 export type InlineField = "cost" | "agreed" | "category";
 
 export function StatusChips({ item }: { item: RawMaterialListItem }) {
-  const chips: { label: string; ok: boolean }[] = [
+  const aState = allergenState(item.allergensReviewed, item.hasAllergens);
+  const chips: { label: string; ok: boolean; title?: string }[] = [
     { label: "Dekl.", ok: !!item.declarationName?.trim() },
     { label: "Datablad", ok: item.hasDatasheet },
-    { label: "Allergen", ok: item.hasAllergens },
+    { label: "Allergen", ok: aState === "vurdert_ingen" || aState === "vurdert_med", title: ALLERGEN_STATE_LABEL[aState] },
     { label: "Næring", ok: item.hasNutrition },
   ];
   return (
@@ -33,7 +35,8 @@ export function StatusChips({ item }: { item: RawMaterialListItem }) {
             "rounded px-1.5 py-0.5 text-[11px]",
             c.ok ? "bg-success/15 text-success" : "bg-muted text-muted-foreground",
           )}
-          title={c.ok ? `${c.label}: registrert` : `${c.label}: mangler`}
+          title={c.title ?? (c.ok ? `${c.label}: registrert` : `${c.label}: mangler`)}
+          aria-label={c.title ?? (c.ok ? `${c.label}: registrert` : `${c.label}: mangler`)}
         >
           {c.label}
         </span>

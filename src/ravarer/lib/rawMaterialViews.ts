@@ -105,6 +105,8 @@ export interface RawMaterialListItem {
   hasNutrition: boolean;
   hasDatasheet: boolean;
   hasAllergens: boolean;
+  /** Vurdert (`allergens_reviewed_at`); null = ukjent. Adskilt fra om allergener finnes. */
+  allergensReviewed: boolean | null;
   searchText: string;
   aliases: string[];
 }

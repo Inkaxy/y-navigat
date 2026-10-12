@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { reviewedFrom } from "@/ravarer/lib/allergenState";
 import { useRawMaterials, type RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { useAllRawMaterialPurchaseStats } from "@/ravarer/hooks/usePurchaseStats";
@@ -109,6 +110,7 @@ export function useVarelisteItems(options?: { enabled?: boolean }) {
         hasNutrition: index.data?.nutritionIds.has(r.id) ?? false,
         hasDatasheet: index.data?.datasheetIds.has(r.id) ?? false,
         hasAllergens: index.data?.allergenIds.has(r.id) ?? false,
+        allergensReviewed: reviewedFrom(r.allergens_reviewed_at),
         aliases,
         searchText: buildSearchText([
           r.name,
