@@ -31,6 +31,7 @@ vi.mock("@/ravarer/lib/invalidate", () => ({ invalidateRawMaterial: vi.fn() }));
 import { useCostRecalc, APPLY_CHUNK, __resetCostRecalcMemory } from "@/fakturaer/hooks/useCostRecalc";
 import { parseRecalcEnvelope, parseUndoEnvelope } from "@/ravarer/lib/recalcContract";
 
+const writes = () => st.rpc.mock.calls.filter((c) => c[0] !== "refresh_purchase_stats").length;
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const B1 = "11111111-1111-4111-8111-111111111111", B2 = "22222222-2222-4222-8222-222222222222";
 const R = (n: number) => `33333333-3333-4333-8333-${String(n).padStart(12, "0")}`;
@@ -147,15 +148,15 @@ describe("useCostRecalc", () => {
     let block: unknown;
     await act(async () => { block = await result.current.apply([id(11), id(12)]); });
     expect(block).toEqual({ blockedIds: [id(11)] });
-    expect(st.rpc).toHaveBeenCalledTimes(1);
+    expect(writes()).toBe(1);
     expect(result.current.ledger.unknownApplies).toHaveLength(1);
     st.rpc.mockResolvedValueOnce({ data: env([12], false, B2), error: null });
     await act(async () => { await result.current.apply([id(12)]); });
-    expect(st.rpc).toHaveBeenCalledTimes(2);
+    expect(writes()).toBe(2);
     act(() => result.current.acknowledgeUnknown(opId));
     st.rpc.mockResolvedValueOnce({ data: env([11], false, B1), error: null });
     await act(async () => { await result.current.apply([id(11)]); });
-    expect(st.rpc).toHaveBeenCalledTimes(3);
+    expect(writes()).toBe(3);
   });
 
   it("ukjent angring sperrer ny angring til eksplisitt kontroll", async () => {
@@ -198,7 +199,7 @@ describe("useCostRecalc", () => {
     const undo = result.current.undoBatch;
     unmount();
     await undo(B1);
-    expect(st.rpc).toHaveBeenCalledTimes(1);
+    expect(writes()).toBe(1);
   });
 
   it("dupliserte recalc_id-er i kjøresvar er ukjent", () => {
