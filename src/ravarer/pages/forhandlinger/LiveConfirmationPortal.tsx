@@ -174,7 +174,7 @@ export default function LiveConfirmationPortal() {
   return (
     <PortalShell eyebrow="Bekreftelse av avtaler" title={bundle.negotiation_title ?? "Avtaler"}
       meta={<>Til {bundle.supplier_name ?? "leverandør"} · Frist {formatDeadline(bundle.confirmation_deadline)}</>}>
-      {error && <PortalNotice tone="danger">Status kunne ikke leses: {error}</PortalNotice>}
+      {error && <PortalNotice tone="error">Status kunne ikke leses: {error}</PortalNotice>}
       {unknownSubmit ? (
         <PortalNotice tone="warning" action={
           <Button variant="outline" className="h-[44px]" onClick={() => void load()} disabled={loading}>

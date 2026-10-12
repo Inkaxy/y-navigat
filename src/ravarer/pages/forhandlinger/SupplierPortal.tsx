@@ -8,7 +8,7 @@ import { StatusPill } from "@/ordre/components/ui/status-pill";
 import { FileText, Loader2, RefreshCw, Save, Send, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import {
-  accessErrorText, callPortal, emptyResponse, formatDeadline, parseRfqBundle, uploadPdf,
+  accessErrorText, callPortal, emptyResponse, formatDeadline, isRfqSubmitReceipt, parseRfqBundle, rfqSubmissionState, uploadPdf,
   type RfqBundle, type RfqResponse,
 } from "./portal/portalApi";
 import { PortalActionBar, PortalLogin, PortalNotice, PortalShell } from "./portal/PortalShell";
@@ -32,9 +32,12 @@ export default function SupplierPortal() {
   const [error, setError] = useState<string | null>(null);
   const [bundle, setBundle] = useState<RfqBundle | null>(null);
   const [responses, setResponses] = useState<Record<string, RfqResponse>>({});
-  const [submitted, setSubmitted] = useState(false);
+  // "all" = alle gjeldende linjer innsendt; "partial" = noen linjer innsendt (må kontrolleres internt).
+  const [submission, setSubmission] = useState<"none" | "all" | "partial">("none");
+  const submitted = submission !== "none";
   const [unknownSave, setUnknownSave] = useState<null | "draft" | "final">(null);
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
+  const [saving, setSaving] = useState(false);
   // Lenkebytte (ny token) gjør alle pågående svar foreldet.
   const epoch = useRef(0);
   const busy = useRef(false);
@@ -42,8 +45,14 @@ export default function SupplierPortal() {
   useEffect(() => {
     epoch.current += 1;
     busy.current = false;
-    setBundle(null); setResponses({}); setSubmitted(false); setUnknownSave(null); setPassword(""); setError(null); setLoading(false);
+    setBundle(null); setResponses({}); setSubmission("none"); setUnknownSave(null); setPassword(""); setError(null); setLoading(false); setUploading({});
+    // Avmontering/lenkebytte: pågående kall er foreldet og ny signert PUT startes ikke.
+    return () => { epoch.current += 1; };
   }, [token]);
+  const bundleRef = useRef<RfqBundle | null>(null);
+  bundleRef.current = bundle;
+  // Oppdateres hver render: sene opplastinger legges bare til et fortsatt redigerbart skjema.
+  const editableRef = useRef(false);
 
   async function load(e?: FormEvent) {
     e?.preventDefault();
@@ -56,15 +65,26 @@ export default function SupplierPortal() {
     busy.current = false;
     setLoading(false);
     const parsed = out.kind === "ok" ? parseRfqBundle(out.body) : null;
+    // Feilet eller ufullstendig lesing: forrige kladd og ukjent-lås beholdes, årsaken vises.
     if (!parsed) { setError(accessErrorText(out)); return; }
-    const map: Record<string, RfqResponse> = {};
-    let locked = false;
-    for (const it of parsed.items) {
-      const existing = parsed.responses.find((r) => r.negotiation_item_id === it.id);
-      map[it.id] = existing ?? emptyResponse(it.id);
-      if (existing?.status === "submitted") locked = true;
+    const prior = bundleRef.current;
+    if (prior && (prior.recipient_id !== parsed.recipient_id || prior.negotiation_id !== parsed.negotiation_id)) {
+      setError("Lenken svarer nå for en annen mottaker eller forespørsel. Last siden på nytt.");
+      return;
     }
-    setBundle(parsed); setResponses(map); setSubmitted(locked); setUnknownSave(null);
+    const state = rfqSubmissionState(parsed.items, parsed.responses);
+    setResponses((prev) => {
+      const map: Record<string, RfqResponse> = {};
+      for (const it of parsed.items) {
+        const existing = parsed.responses.find((r) => r.negotiation_item_id === it.id);
+        // Ved avstemming i samme kontekst beholdes leverandørens siste redigerte verdier så lenge
+        // ingen linje er innsendt; innsendte/delvise svar vises slik serveren har dem.
+        map[it.id] = prior && state === "none" && prev[it.id] ? prev[it.id] : existing ?? emptyResponse(it.id);
+      }
+      return map;
+    });
+    // Vellykket lesing er dagens status, ikke en kvittering for forrige operasjon.
+    setBundle(parsed); setSubmission(state); setUnknownSave(null);
   }
 
   const setNum = (id: string, f: NumField, v: string) =>
@@ -73,32 +93,39 @@ export default function SupplierPortal() {
     setResponses((p) => ({ ...p, [id]: { ...p[id], [f]: v } }));
 
   async function handleUpload(itemId: string, file: File) {
+    if (!editableRef.current) return;
     const my = epoch.current;
     setUploading((u) => ({ ...u, [itemId]: true }));
-    const path = await uploadPdf("request-rfq-datasheet-upload", { token, password }, itemId, file);
-    if (my !== epoch.current) return;
+    const path = await uploadPdf("request-rfq-datasheet-upload", { token, password }, itemId, file, () => my === epoch.current);
+    if (my !== epoch.current || path === "cancelled") return;
     setUploading((u) => ({ ...u, [itemId]: false }));
     if (!path) { toast.error("Opplasting feilet. Prøv igjen."); return; }
+    if (!editableRef.current) { toast.error("Skjemaet er låst. Vedlegget ble ikke lagt til."); return; }
     setText(itemId, "datasheet_url", path);
     toast.success(`Lastet opp: ${file.name}`);
   }
 
   async function save(finalize: boolean) {
     if (busy.current || submitted || unknownSave) return;
+    if (Object.values(uploading).some(Boolean)) { toast.error("Vent til opplastingen er ferdig."); return; }
     if (finalize && !confirm("Er du sikker? Etter sending kan du ikke endre tilbudet uten å kontakte oss.")) return;
     busy.current = true;
     const my = epoch.current;
     setLoading(true);
-    const out = await callPortal("submit-negotiation-response", { token, password, finalize, responses: Object.values(responses) });
+    setSaving(true);
+    // Frosset øyeblikksbilde; skjemaet er låst mens lagringen pågår.
+    const snapshot = Object.values(responses).map((r) => ({ ...r }));
+    const out = await callPortal("submit-negotiation-response", { token, password, finalize, responses: snapshot });
     if (my !== epoch.current) return;
     busy.current = false;
-    setLoading(false);
-    if (out.kind === "ok" && out.body.success === true) {
-      if (finalize) { setSubmitted(true); toast.success("Tilbud sendt. Takk!"); } else toast.success("Kladd lagret");
+    setLoading(false); setSaving(false);
+    if (out.kind === "ok" && isRfqSubmitReceipt(out.body, finalize)) {
+      if (finalize) { setSubmission("all"); toast.success("Tilbud sendt. Takk!"); } else toast.success("Kladd lagret");
       return;
     }
     if (out.kind === "rejected") {
-      if (out.code === "already_submitted") setSubmitted(true);
+      // Avvist som allerede sendt: dette er ikke en kvittering; les status for å vise faktisk tilstand.
+      if (out.code === "already_submitted") setUnknownSave("final");
       toast.error((out.code && SUBMIT_REJECTIONS[out.code]) || "Lagring ble avvist.");
       return;
     }
@@ -111,11 +138,21 @@ export default function SupplierPortal() {
       password={password} onPassword={setPassword} onSubmit={load} loading={loading} error={error} />;
   }
 
-  const locked = submitted || unknownSave !== null;
+  const locked = submitted || unknownSave !== null || saving;
+  editableRef.current = !locked;
+  const anyUploading = Object.values(uploading).some(Boolean);
   return (
     <PortalShell eyebrow="Tilbudsforespørsel" title={bundle.negotiation_title ?? "Forespørsel"}
-      status={submitted ? <StatusPill label="Sendt — låst" tokenVar="--state-success" size="md" /> : <StatusPill label="Åpen for svar" tokenVar="--state-info" size="md" />}
+      status={submission === "all" ? <StatusPill label="Sendt — låst" tokenVar="--state-success" size="md" />
+        : submission === "partial" ? <StatusPill label="Delvis sendt — må kontrolleres" tokenVar="--state-warning" size="md" /> : <StatusPill label="Åpen for svar" tokenVar="--state-info" size="md" />}
       meta={<>{bundle.supplier_name ?? "Leverandør"} · Svarfrist {formatDeadline(bundle.response_deadline)}</>}>
+      {error && <PortalNotice tone="error">Status kunne ikke leses: {error} Skjemaet forblir låst.</PortalNotice>}
+      {submission === "partial" && (
+        <PortalNotice tone="warning">
+          Bare noen av linjene er registrert som sendt. Skjemaet er låst; resten kan ikke sendes herfra før
+          Nøtterø Bakeri har kontrollert og låst opp forespørselen. Ta kontakt med oss.
+        </PortalNotice>
+      )}
       {unknownSave && (
         <PortalNotice tone="warning" action={
           <Button variant="outline" className="h-[44px]" onClick={() => void load()} disabled={loading}>
@@ -219,10 +256,10 @@ export default function SupplierPortal() {
 
       {!locked && bundle.items.length > 0 && (
         <PortalActionBar>
-          <Button variant="outline" className="h-[44px]" onClick={() => void save(false)} disabled={loading}>
+          <Button variant="outline" className="h-[44px]" onClick={() => void save(false)} disabled={loading || anyUploading}>
             <Save className="mr-2 h-4 w-4" aria-hidden /> Lagre kladd
           </Button>
-          <Button className="h-[44px]" onClick={() => void save(true)} disabled={loading}>
+          <Button className="h-[44px]" onClick={() => void save(true)} disabled={loading || anyUploading}>
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : <Send className="mr-2 h-4 w-4" aria-hidden />} Send tilbud
           </Button>
         </PortalActionBar>
