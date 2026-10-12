@@ -417,3 +417,11 @@
 
   @page { size: A4 portrait; margin: 10mm; }
 }
+
+/* Varetelling: store trykkflater og 16 px tekst i felt (hindrer iOS-zoom). Gjelder bare inne i .vt-scope, ikke resten av Råvarer. */
+@media screen {
+  .vt-scope input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  .vt-scope select,
+  .vt-scope textarea { min-height: 48px; font-size: 16px; }
+  .vt-scope button:not([role="checkbox"]):not([role="switch"]):not([role="tab"]) { min-height: 48px; }
+}

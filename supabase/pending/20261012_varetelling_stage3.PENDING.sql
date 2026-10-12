@@ -22,7 +22,8 @@ CREATE TABLE public.vt_ocr_jobs (
   attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
   page_count integer CHECK (page_count IS NULL OR page_count BETWEEN 1 AND 20),
   page_results jsonb NOT NULL DEFAULT '[]'::jsonb,  -- leste sider i rekkefølge (gjenopptakbar behandling)
-  processing_until timestamptz,                    -- kort lås per Edge-kall (hindrer samtidige kall på samme forsøk)
+  processing_until timestamptz,                    -- satt mens en del (batch) KAN pågå; NULL = forrige del er varig fullført/frigitt
+  page_sources jsonb NOT NULL DEFAULT '[]'::jsonb,  -- per lest side (opplastingsrekkefølge): {file_index, file_page, original_index} fra serveren
   document_ok boolean,
   issues jsonb NOT NULL DEFAULT '[]'::jsonb,
   detail text,
@@ -46,6 +47,8 @@ CREATE TABLE public.vt_ocr_proposals (
   entries jsonb NOT NULL,                        -- [{unit_id, unit_known, label, value|null, reason|null, raw}] — FORSLAG
   reasons jsonb NOT NULL DEFAULT '[]'::jsonb,
   crop jsonb,                                    -- fylles ikke av lesetjenesten ennå; UI viser hel side
+  upload_index integer,                          -- lest side (0-basert, opplastingsrekkefølge) som forslaget kom fra
+  source jsonb,                                  -- serverens kildekobling for siden: {file_index, file_page, original_index}
   status text NOT NULL DEFAULT 'foreslatt' CHECK (status IN ('foreslatt','godkjent','avvist')),
   decided_by uuid, decided_at timestamptz,
   accepted_entry jsonb, accepted_state text, accepted_exclusions jsonb, decision_note text, save_op_id uuid,
@@ -242,7 +245,7 @@ BEGIN
   IF v_cs NOT IN ('pagar','til_kontroll') OR v_ls = 'godkjent' THEN RAISE EXCEPTION 'Listen er ikke åpen' USING ERRCODE = '55000'; END IF;
   IF v_job.status <> 'opprettet' THEN RAISE EXCEPTION 'Jobben er allerede tatt' USING ERRCODE = '55000'; END IF;
   UPDATE vt_ocr_jobs SET status = 'behandler', attempt_id = v_attempt, lease_until = now() + interval '15 minutes', attempts = attempts + 1, detail = NULL,
-         page_results = '[]'::jsonb, page_count = NULL, processing_until = now() + interval '4 minutes'
+         page_results = '[]'::jsonb, page_sources = '[]'::jsonb, page_count = NULL, processing_until = now() + interval '4 minutes'
    WHERE id = p_job_id;
   SELECT coalesce(jsonb_agg(jsonb_build_object('id', l.id, 'revision', (v_job.line_revisions->>(l.id::text))::int, 'snap_name', l.snap_name,
            'snap_base_unit', l.snap_base_unit, 'snap_units', l.snap_units) ORDER BY l.sort_order, l.id), '[]'::jsonb)
@@ -253,10 +256,14 @@ BEGIN
                            FROM vt_print_manifests WHERE count_list_id = v_job.count_list_id), '[]'::jsonb));
 END $$;
 
--- ---------- RPC: fortsett gjenopptakbar lesing (samme forsøk; Edge med brukerens JWT) ----------
+-- ---------- RPC: fortsett gjenopptakbar lesing (Edge med brukerens JWT) ----------
+-- Hver del (batch) får NY attempt_id = eierskapsbevis; sene skrivinger fra en eldre del avvises.
+-- Fortsett automatisk bare når forrige del er varig frigitt (processing_until IS NULL). Utløpt tid er ALDRI trygt:
+-- en del som fortsatt står som pågående etter fristen blir «ukjent_ai_utfall» (lagrede sider bevares) og krever
+-- godkjenners bekreftelse. Unntak: alle sider er varig lagret ⇒ ferdigstilling fra lagrede sider uten ny lesing.
 CREATE OR REPLACE FUNCTION public.vt_ocr_continue(p_job_id uuid) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v_job vt_ocr_jobs; v_cs text; v_ls text; v_lines jsonb;
+DECLARE v_job vt_ocr_jobs; v_cs text; v_ls text; v_lines jsonb; v_att uuid := gen_random_uuid(); v_done int; v_all boolean;
 BEGIN
   SELECT * INTO v_job FROM vt_ocr_jobs WHERE id = p_job_id;
   PERFORM _vt_require(v_job.legal_entity_id, 'write');
@@ -264,16 +271,23 @@ BEGIN
   SELECT status INTO v_ls FROM vt_count_lists WHERE id = v_job.count_list_id FOR SHARE;
   SELECT * INTO v_job FROM vt_ocr_jobs WHERE id = p_job_id FOR UPDATE;
   IF v_cs NOT IN ('pagar','til_kontroll') OR v_ls = 'godkjent' THEN RAISE EXCEPTION 'Listen er ikke åpen' USING ERRCODE = '55000'; END IF;
-  IF v_job.status <> 'behandler' OR v_job.lease_until < now() OR v_job.page_count IS NULL
-     OR jsonb_array_length(v_job.page_results) >= v_job.page_count THEN
-    RAISE EXCEPTION 'Jobben kan ikke fortsettes' USING ERRCODE = '55000'; END IF;
-  IF v_job.processing_until > now() THEN RAISE EXCEPTION 'Et annet kall behandler jobben' USING ERRCODE = '55000'; END IF;
-  UPDATE vt_ocr_jobs SET processing_until = now() + interval '4 minutes', lease_until = now() + interval '15 minutes' WHERE id = p_job_id;
+  IF v_job.status <> 'behandler' OR v_job.page_count IS NULL THEN RAISE EXCEPTION 'Jobben kan ikke fortsettes' USING ERRCODE = '55000'; END IF;
+  v_done := jsonb_array_length(v_job.page_results); v_all := v_done >= v_job.page_count;
+  IF v_job.processing_until IS NOT NULL AND v_job.processing_until > now() THEN
+    RAISE EXCEPTION 'Et annet kall behandler jobben' USING ERRCODE = '55000'; END IF;
+  IF v_job.processing_until IS NOT NULL AND NOT v_all THEN
+    -- Pågående del ble aldri frigitt: betalt utfall er ukjent. Ingen ny lesing; varig markering (ingen exception).
+    UPDATE vt_ocr_jobs SET status = 'ukjent_ai_utfall', attempt_id = NULL, processing_until = NULL,
+           detail = 'En lesedel ble ikke fullført innen fristen; utfallet er ukjent. ' || v_done || ' av ' || v_job.page_count || ' sider er lagret.'
+     WHERE id = p_job_id;
+    RETURN jsonb_build_object('blocked', 'ukjent_ai_utfall', 'pages_done', v_done, 'page_count', v_job.page_count);
+  END IF;
+  UPDATE vt_ocr_jobs SET attempt_id = v_att, processing_until = now() + interval '4 minutes', lease_until = now() + interval '15 minutes' WHERE id = p_job_id;
   SELECT coalesce(jsonb_agg(jsonb_build_object('id', l.id, 'revision', (v_job.line_revisions->>(l.id::text))::int, 'snap_name', l.snap_name,
            'snap_base_unit', l.snap_base_unit, 'snap_units', l.snap_units) ORDER BY l.sort_order, l.id), '[]'::jsonb)
     INTO v_lines FROM vt_count_lines l WHERE l.count_list_id = v_job.count_list_id;
-  RETURN jsonb_build_object('attempt_id', v_job.attempt_id, 'count_id', v_job.count_id, 'list_id', v_job.count_list_id, 'template_revision', v_job.template_revision,
-    'originals', v_job.originals, 'lines', v_lines, 'pages_done', jsonb_array_length(v_job.page_results), 'page_results', v_job.page_results,
+  RETURN jsonb_build_object('attempt_id', v_att, 'count_id', v_job.count_id, 'list_id', v_job.count_list_id, 'template_revision', v_job.template_revision,
+    'originals', v_job.originals, 'lines', v_lines, 'pages_done', v_done, 'page_count', v_job.page_count, 'page_results', v_job.page_results,
     'manifests', coalesce((SELECT jsonb_agg(jsonb_build_object('layout_version', layout_version, 'pages', pages) ORDER BY layout_version)
                            FROM vt_print_manifests WHERE count_list_id = v_job.count_list_id), '[]'::jsonb));
 END $$;
@@ -295,16 +309,26 @@ BEGIN
   IF p_pages IS NULL OR p_pages NOT BETWEEN 1 AND 20 THEN RAISE EXCEPTION 'Ugyldig sideantall' USING ERRCODE = '22023'; END IF;
   UPDATE vt_ocr_jobs SET page_count = p_pages WHERE id = p_job_id;
 END $$;
-/** Service: legg til lest side nr. p_index (må være neste), forleng lease. Gammelt forsøk avvises. */
-CREATE OR REPLACE FUNCTION public.vt_ocr_record_page(p_job_id uuid, p_attempt_id uuid, p_index integer, p_page jsonb, p_last boolean) RETURNS integer
+-- Service: legg til lest side nr. p_index (må være neste) med serverens kildekobling. p_release = delen er ferdig
+-- og flere sider gjenstår ⇒ delen frigis varig (attempt_id/processing_until NULL), så sene skrivinger avvises.
+CREATE OR REPLACE FUNCTION public.vt_ocr_record_page(p_job_id uuid, p_attempt_id uuid, p_index integer, p_page jsonb, p_source jsonb, p_release boolean) RETURNS integer
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v vt_ocr_jobs;
+DECLARE v vt_ocr_jobs; v_n int;
 BEGIN
   v := _vt_ocr_attempt(p_job_id, p_attempt_id);
   IF p_index IS DISTINCT FROM jsonb_array_length(v.page_results) OR p_page IS NULL OR jsonb_typeof(p_page) <> 'object' OR p_index >= coalesce(v.page_count, 0) THEN
     RAISE EXCEPTION 'Feil siderekkefølge' USING ERRCODE = '55000'; END IF;
-  UPDATE vt_ocr_jobs SET page_results = page_results || jsonb_build_array(p_page), lease_until = now() + interval '15 minutes',
-         processing_until = CASE WHEN p_last THEN NULL ELSE processing_until END
+  v_n := jsonb_array_length(v.originals);
+  IF jsonb_typeof(p_source) IS DISTINCT FROM 'object' OR jsonb_typeof(p_source->'file_index') <> 'number' OR jsonb_typeof(p_source->'file_page') <> 'number'
+     OR (p_source->>'file_index')::int NOT BETWEEN 0 AND v_n - 1 OR (p_source->>'file_page')::int < 1
+     OR v.originals->((p_source->>'file_index')::int)->>'role' IS DISTINCT FROM 'side' THEN
+    RAISE EXCEPTION 'Ugyldig kildekobling' USING ERRCODE = '22023'; END IF;
+  UPDATE vt_ocr_jobs SET page_results = page_results || jsonb_build_array(p_page),
+         page_sources = page_sources || jsonb_build_array(jsonb_build_object('file_index', (p_source->>'file_index')::int, 'file_page', (p_source->>'file_page')::int,
+           'original_index', v.originals->((p_source->>'file_index')::int)->'original_index')),
+         lease_until = now() + interval '15 minutes',
+         processing_until = CASE WHEN p_release THEN NULL ELSE processing_until END,
+         attempt_id = CASE WHEN p_release THEN NULL ELSE attempt_id END
    WHERE id = p_job_id;
   RETURN p_index + 1;
 END $$;
@@ -330,16 +354,18 @@ BEGIN
   FOR p IN SELECT * FROM jsonb_array_elements(p_proposals) LOOP
     v_rev := (v_job.line_revisions->>(p->>'line_id'))::int;
     IF v_rev IS NULL OR NOT EXISTS (SELECT 1 FROM vt_count_lines WHERE id = (p->>'line_id')::uuid AND count_list_id = v_job.count_list_id)
-       OR (p->>'line_revision_at_job')::int IS DISTINCT FROM v_rev OR jsonb_typeof(p->'entries') IS DISTINCT FROM 'array' THEN
+       OR (p->>'line_revision_at_job')::int IS DISTINCT FROM v_rev OR jsonb_typeof(p->'entries') IS DISTINCT FROM 'array'
+       OR (jsonb_array_length(v_job.page_sources) > 0 AND (jsonb_typeof(p->'upload_index') IS DISTINCT FROM 'number'
+           OR v_job.page_sources->((p->>'upload_index')::int) IS NULL)) THEN
       v_issues := v_issues || to_jsonb('Forslag for ukjent/fremmed linje avvist'::text); v_ok := false; CONTINUE;
     END IF;
-    INSERT INTO vt_ocr_proposals (job_id, legal_entity_id, line_id, line_revision_at_job, page, row_code, entries, reasons)
+    INSERT INTO vt_ocr_proposals (job_id, legal_entity_id, line_id, line_revision_at_job, page, row_code, entries, reasons, upload_index, source)
     VALUES (v_job.id, v_job.legal_entity_id, (p->>'line_id')::uuid, v_rev, (p->>'page')::int, left(p->>'row_code', 16),
-            p->'entries', coalesce(p->'reasons', '[]'::jsonb))
+            p->'entries', coalesce(p->'reasons', '[]'::jsonb), (p->>'upload_index')::int, v_job.page_sources->((p->>'upload_index')::int))
     ON CONFLICT (job_id, line_id) DO NOTHING;
     v_n := v_n + 1;
   END LOOP;
-  UPDATE vt_ocr_jobs SET status = 'klar', document_ok = v_ok, issues = v_issues, finished_at = now() WHERE id = p_job_id;
+  UPDATE vt_ocr_jobs SET status = 'klar', document_ok = v_ok, issues = v_issues, finished_at = now(), processing_until = NULL WHERE id = p_job_id;
   RETURN jsonb_build_object('proposals', v_n);
 END $$;
 
@@ -350,7 +376,11 @@ DECLARE v vt_ocr_jobs;
 BEGIN
   SELECT * INTO v FROM vt_ocr_jobs WHERE id = p_job_id;
   PERFORM _vt_require(v.legal_entity_id, 'read');
-  RETURN jsonb_build_object('status', v.status, 'lease_expired', v.status = 'behandler' AND v.lease_until < now(), 'attempts', v.attempts, 'detail', v.detail);
+  RETURN jsonb_build_object('status', v.status,
+    -- «utløpt» = en del står som pågående etter fristen ⇒ ukjent utfall (aldri trygg ny lesing).
+    'lease_expired', v.status = 'behandler' AND v.processing_until IS NOT NULL AND v.processing_until < now(),
+    'resumable', v.status = 'behandler' AND v.processing_until IS NULL AND v.page_count IS NOT NULL,
+    'pages_done', jsonb_array_length(v.page_results), 'page_count', v.page_count, 'attempts', v.attempts, 'detail', v.detail);
 END $$;
 
 /** Godkjenner bekrefter ny BETALT lesing etter ukjent utfall eller utløpt lease. Gammelt forsøk blir ugyldig. */
@@ -363,10 +393,17 @@ BEGIN
   IF p_confirm_paid_rerun IS NOT TRUE THEN RAISE EXCEPTION 'Ny kjøring må bekreftes' USING ERRCODE = '22023'; END IF;
   v_prev := _vt_op_begin(p_op_id, 'ocr_reset', v_job.legal_entity_id, v_uid, jsonb_build_object('job_id', p_job_id));
   IF v_prev IS NOT NULL THEN RETURN v_prev; END IF;
-  UPDATE vt_ocr_jobs SET status = 'opprettet', attempt_id = NULL, lease_until = NULL, finished_at = NULL
-   WHERE id = p_job_id AND (status = 'ukjent_ai_utfall' OR (status = 'behandler' AND lease_until < now()));
-  IF NOT FOUND THEN RAISE EXCEPTION 'Jobben har ikke ukjent utfall' USING ERRCODE = '55000'; END IF;
-  RETURN _vt_op_finish(p_op_id, jsonb_build_object('ok', true, 'kind', 'ocr_reset', 'job_id', p_job_id));
+  SELECT * INTO v_job FROM vt_ocr_jobs WHERE id = p_job_id FOR UPDATE;
+  IF NOT (v_job.status = 'ukjent_ai_utfall' OR (v_job.status = 'behandler' AND v_job.processing_until IS NOT NULL AND v_job.processing_until < now())) THEN
+    RAISE EXCEPTION 'Jobben har ikke ukjent utfall' USING ERRCODE = '55000'; END IF;
+  IF v_job.page_count IS NOT NULL AND jsonb_array_length(v_job.page_results) > 0 THEN
+    -- Lagrede sider bevares; bare gjenstående sider leses (betalt) etter bekreftelsen. Gammel del blir ugyldig.
+    UPDATE vt_ocr_jobs SET status = 'behandler', attempt_id = NULL, processing_until = NULL, lease_until = now() + interval '15 minutes', finished_at = NULL
+     WHERE id = p_job_id;
+    RETURN _vt_op_finish(p_op_id, jsonb_build_object('ok', true, 'kind', 'ocr_reset', 'job_id', p_job_id, 'resume', true));
+  END IF;
+  UPDATE vt_ocr_jobs SET status = 'opprettet', attempt_id = NULL, processing_until = NULL, lease_until = NULL, finished_at = NULL WHERE id = p_job_id;
+  RETURN _vt_op_finish(p_op_id, jsonb_build_object('ok', true, 'kind', 'ocr_reset', 'job_id', p_job_id, 'resume', false));
 END $$;
 
 -- ---------- RPC: godkjenn ett forslag ----------
@@ -575,9 +612,11 @@ CREATE OR REPLACE FUNCTION public.vt_assignable_users(p_legal_entity_id uuid) RE
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   PERFORM _vt_require(p_legal_entity_id, 'approve');
-  RETURN QUERY SELECT DISTINCT up.user_id FROM user_positions up
-   WHERE up.legal_entity_id = p_legal_entity_id AND up.valid_from <= now() AND (up.valid_to IS NULL OR up.valid_to > now())
-     AND has_ravarer_access(up.user_id, p_legal_entity_id, 'write') ORDER BY 1;
+  -- Datoregler (valid_from/valid_to er DATE, valid_to inklusiv) og eier-/plattformunntak avgjøres BARE av den kanoniske
+  -- has_ravarer_access; her velges bare kandidater: alle med en stilling i firmaet + innlogget bruker (plattformansvarlig).
+  RETURN QUERY SELECT c.uid FROM (SELECT up.user_id AS uid FROM user_positions up WHERE up.legal_entity_id = p_legal_entity_id
+                                  UNION SELECT auth.uid()) c
+   WHERE c.uid IS NOT NULL AND has_ravarer_access(c.uid, p_legal_entity_id, 'write') ORDER BY 1;
 END $$;
 
 -- ---------- RPC: tildeling (bare mens tellingen er planlagt/pågår/til kontroll; historikk endres ikke etterpå) ----------
@@ -661,7 +700,7 @@ REVOKE ALL ON FUNCTION public.vt_stage3_version(), public.vt_report_snapshot(uui
   public._vt_ocr_attempt(uuid,uuid), public.vt_ocr_record_page_count(uuid,uuid,integer), public.vt_ocr_record_unknown(uuid,uuid,text),
   public.vt_ocr_record_failure(uuid,uuid,text), public.vt_ocr_record_result(uuid,uuid,boolean,jsonb,jsonb), public.vt_ocr_job_status(uuid),
   public.vt_ocr_reset_unknown(uuid,uuid,boolean), public.vt_ocr_accept(uuid,uuid,integer,text,numeric,jsonb,text,jsonb), public.vt_ocr_reject(uuid,uuid,text),
-  public.vt_ocr_continue(uuid), public.vt_ocr_record_page(uuid,uuid,integer,jsonb,boolean),
+  public.vt_ocr_continue(uuid), public.vt_ocr_record_page(uuid,uuid,integer,jsonb,jsonb,boolean),
   public.vt_report_mail_reserve(uuid,uuid,uuid,integer,text,text,text,text,jsonb,text,text,text,boolean,text), public.vt_report_mail_status(uuid),
   public.vt_report_mail_claim(uuid,uuid,uuid,text,text,text), public.vt_report_mail_finish(uuid,text,text), public.vt_assign_list(uuid,uuid,uuid,text,boolean),
   public._vt_report_snapshot_data(uuid), public.vt_issue_print_manifest(uuid,integer,jsonb), public.vt_clarify_price(uuid,uuid,uuid,numeric,text,text,text),
@@ -671,6 +710,6 @@ GRANT EXECUTE ON FUNCTION public.vt_stage3_version(), public.vt_report_snapshot(
   public.vt_ocr_job_status(uuid), public.vt_ocr_reset_unknown(uuid,uuid,boolean), public.vt_ocr_continue(uuid), public.vt_ocr_accept(uuid,uuid,integer,text,numeric,jsonb,text,jsonb),
   public.vt_ocr_reject(uuid,uuid,text), public.vt_report_mail_status(uuid), public.vt_assign_list(uuid,uuid,uuid,text,boolean),
   public.vt_issue_print_manifest(uuid,integer,jsonb), public.vt_clarify_price(uuid,uuid,uuid,numeric,text,text,text), public.vt_assignable_users(uuid) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.vt_ocr_record_page(uuid,uuid,integer,jsonb,boolean), public.vt_ocr_record_page_count(uuid,uuid,integer), public.vt_ocr_record_unknown(uuid,uuid,text), public.vt_ocr_record_failure(uuid,uuid,text),
+GRANT EXECUTE ON FUNCTION public.vt_ocr_record_page(uuid,uuid,integer,jsonb,jsonb,boolean), public.vt_ocr_record_page_count(uuid,uuid,integer), public.vt_ocr_record_unknown(uuid,uuid,text), public.vt_ocr_record_failure(uuid,uuid,text),
   public.vt_ocr_record_result(uuid,uuid,boolean,jsonb,jsonb), public.vt_report_mail_reserve(uuid,uuid,uuid,integer,text,text,text,text,jsonb,text,text,text,boolean,text),
   public.vt_report_mail_claim(uuid,uuid,uuid,text,text,text), public.vt_report_mail_finish(uuid,text,text), public._vt_report_snapshot_data(uuid) TO service_role;

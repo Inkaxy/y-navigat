@@ -1,10 +1,23 @@
 -- Atferdstest for stage3 revisjon 2. Kjøres etter grunnlagets test (samme økt) av scripts/test-varetelling-sql.mjs.
 -- Seriell; ingen ekte parallellitet. Låsrekkefølge er resonnert, ikke bevist med to økter.
 RESET ROLE;
-CREATE TABLE public.user_positions (user_id uuid, legal_entity_id uuid, valid_from timestamptz DEFAULT now() - interval '1 day', valid_to timestamptz);
+-- Som live: valid_from/valid_to er DATE og valid_to er inklusiv (CURRENT_DATE).
+CREATE TABLE public.user_positions (user_id uuid, legal_entity_id uuid, valid_from date DEFAULT CURRENT_DATE - 1, valid_to date);
 INSERT INTO user_positions (user_id, legal_entity_id) VALUES ('00000000-0000-0000-0000-0000000000a1','aaaaaaaa-0000-0000-0000-000000000000'),
  ('00000000-0000-0000-0000-0000000000a3','aaaaaaaa-0000-0000-0000-000000000000'), ('00000000-0000-0000-0000-0000000000a4','aaaaaaaa-0000-0000-0000-000000000000'),
  ('00000000-0000-0000-0000-0000000000b1','bbbbbbbb-0000-0000-0000-000000000000');
+INSERT INTO user_positions (user_id, legal_entity_id, valid_to) VALUES ('00000000-0000-0000-0000-0000000000a5','aaaaaaaa-0000-0000-0000-000000000000', CURRENT_DATE),
+ ('00000000-0000-0000-0000-0000000000a6','aaaaaaaa-0000-0000-0000-000000000000', CURRENT_DATE - 1);
+INSERT INTO test_access (user_id, legal_entity_id, level) VALUES ('00000000-0000-0000-0000-0000000000a5','aaaaaaaa-0000-0000-0000-000000000000','write'),
+ ('00000000-0000-0000-0000-0000000000a6','aaaaaaaa-0000-0000-0000-000000000000','write');
+-- Stubb som etterligner live has_ravarer_access: stillingens datoer avgjør (valid_to inklusiv). Brukere uten stilling
+-- (f.eks. plattformansvarlig innlogget) beholder stubbens nivå.
+CREATE OR REPLACE FUNCTION public.has_ravarer_access(_user_id uuid, _legal_entity_id uuid, _min_level public.access_level)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (SELECT 1 FROM test_access WHERE user_id = _user_id AND legal_entity_id = _legal_entity_id AND level >= _min_level)
+     AND (NOT EXISTS (SELECT 1 FROM user_positions WHERE user_id = _user_id AND legal_entity_id = _legal_entity_id)
+          OR EXISTS (SELECT 1 FROM user_positions WHERE user_id = _user_id AND legal_entity_id = _legal_entity_id
+                      AND valid_from <= CURRENT_DATE AND (valid_to IS NULL OR valid_to >= CURRENT_DATE))) $$;
 \i 20261012_varetelling_stage3.PENDING.sql
 -- Etterlign Supabase: service_role omgår RLS og kan lese grunnlagstabellene.
 ALTER ROLE service_role BYPASSRLS;
@@ -71,7 +84,7 @@ SELECT pg_temp.ok((SELECT state='ikke_talt' FROM vt_count_lines WHERE id=current
 SET ROLE authenticated;
 SELECT set_config('test.jobL', (vt_ocr_create_job(gen_random_uuid(), current_setting('test.list3')::uuid, pg_temp.files('9'))->>'job_id'), false);
 SELECT set_config('test.attL', vt_ocr_claim(current_setting('test.jobL')::uuid)->>'attempt_id', false);
-RESET ROLE; UPDATE vt_ocr_jobs SET lease_until = now() - interval '1 minute' WHERE id = current_setting('test.jobL')::uuid;
+RESET ROLE; UPDATE vt_ocr_jobs SET lease_until = now() - interval '1 minute', processing_until = now() - interval '1 minute' WHERE id = current_setting('test.jobL')::uuid;
 SET ROLE authenticated;
 SELECT pg_temp.ok((vt_ocr_job_status(current_setting('test.jobL')::uuid)->>'lease_expired')::boolean, 'utløpt lease synlig (skrivebeskyttet)');
 SELECT pg_temp.expect_error($q$SELECT vt_ocr_reset_unknown(gen_random_uuid(), current_setting('test.jobL')::uuid, true)$q$, '42501');
@@ -81,6 +94,51 @@ SET ROLE service_role;
 SELECT pg_temp.expect_error($q$SELECT vt_ocr_record_unknown(current_setting('test.jobL')::uuid, current_setting('test.attL')::uuid, 'sen')$q$, '55000');
 RESET ROLE;
 SELECT pg_temp.ok((SELECT status='opprettet' AND attempt_id IS NULL FROM vt_ocr_jobs WHERE id=current_setting('test.jobL')::uuid), 'gammelt forsøk overskriver ikke ny tilstand');
+
+-- ===== Delt lesing: eierskap per del, utløpt del = ukjent (aldri trygg ny lesing), ferdigstilling fra lagrede sider =====
+SET ROLE authenticated; SELECT set_config('test.uid','00000000-0000-0000-0000-0000000000a1',false);
+SELECT set_config('test.jobB', (vt_ocr_create_job(gen_random_uuid(), current_setting('test.list3')::uuid, pg_temp.files('b', 2))->>'job_id'), false);
+SELECT set_config('test.attB1', vt_ocr_claim(current_setting('test.jobB')::uuid)->>'attempt_id', false);
+SET ROLE service_role;
+SELECT vt_ocr_record_page_count(current_setting('test.jobB')::uuid, current_setting('test.attB1')::uuid, 2);
+SELECT pg_temp.expect_error($q$SELECT vt_ocr_record_page(current_setting('test.jobB')::uuid, current_setting('test.attB1')::uuid, 0, '{"a":1}', '{"file_index":9,"file_page":1}', true)$q$, '22023');
+SELECT vt_ocr_record_page(current_setting('test.jobB')::uuid, current_setting('test.attB1')::uuid, 0, '{"a":1}', '{"file_index":0,"file_page":1}', true);
+SELECT pg_temp.expect_error($q$SELECT vt_ocr_record_page(current_setting('test.jobB')::uuid, current_setting('test.attB1')::uuid, 1, '{"a":2}', '{"file_index":1,"file_page":1}', false)$q$, '55000');
+RESET ROLE;
+SELECT pg_temp.ok((SELECT processing_until IS NULL AND attempt_id IS NULL AND page_sources->0->>'file_index' = '0' AND jsonb_array_length(page_results) = 1 FROM vt_ocr_jobs WHERE id=current_setting('test.jobB')::uuid), 'fullført del frigis varig; sen skriving fra frigitt del avvist; kildekobling lagret');
+SET ROLE authenticated;
+SELECT set_config('test.attB2', vt_ocr_continue(current_setting('test.jobB')::uuid)->>'attempt_id', false);
+SELECT pg_temp.ok(current_setting('test.attB2') <> current_setting('test.attB1'), 'ny del får nytt eierskapsbevis');
+SELECT pg_temp.expect_error($q$SELECT vt_ocr_continue(current_setting('test.jobB')::uuid)$q$, '55000');
+RESET ROLE; UPDATE vt_ocr_jobs SET processing_until = now() - interval '1 minute' WHERE id = current_setting('test.jobB')::uuid;
+SET ROLE authenticated;
+SELECT pg_temp.ok((vt_ocr_job_status(current_setting('test.jobB')::uuid)->>'lease_expired')::boolean, 'utløpt pågående del vises som utløpt');
+SELECT pg_temp.ok(vt_ocr_continue(current_setting('test.jobB')::uuid)->>'blocked' = 'ukjent_ai_utfall', 'utløpt pågående del gir ukjent utfall, ingen ny lesing');
+RESET ROLE;
+SELECT pg_temp.ok((SELECT status = 'ukjent_ai_utfall' AND attempt_id IS NULL AND jsonb_array_length(page_results) = 1 FROM vt_ocr_jobs WHERE id=current_setting('test.jobB')::uuid), 'ukjent utfall er varig; lagrede sider bevart');
+SET ROLE service_role;
+SELECT pg_temp.expect_error($q$SELECT vt_ocr_record_page(current_setting('test.jobB')::uuid, current_setting('test.attB2')::uuid, 1, '{"a":2}', '{"file_index":1,"file_page":1}', false)$q$, '55000');
+SELECT pg_temp.expect_error($q$SELECT vt_ocr_record_unknown(current_setting('test.jobB')::uuid, current_setting('test.attB2')::uuid, 'sen')$q$, '55000');
+SET ROLE authenticated;
+SELECT pg_temp.expect_error($q$SELECT vt_ocr_continue(current_setting('test.jobB')::uuid)$q$, '55000');
+SELECT set_config('test.uid','00000000-0000-0000-0000-0000000000a2',false);
+SELECT pg_temp.ok(vt_ocr_reset_unknown(gen_random_uuid(), current_setting('test.jobB')::uuid, true)->>'resume' = 'true', 'godkjenner bekrefter fortsettelse; lagrede sider beholdes');
+SELECT set_config('test.uid','00000000-0000-0000-0000-0000000000a1',false);
+SELECT set_config('test.cB', vt_ocr_continue(current_setting('test.jobB')::uuid)::text, false);
+SELECT pg_temp.ok((current_setting('test.cB')::jsonb->>'pages_done')::int = 1, 'fortsettelse starter etter lagret side');
+SELECT set_config('test.attB3', current_setting('test.cB')::jsonb->>'attempt_id', false);
+SET ROLE service_role;
+SELECT vt_ocr_record_page(current_setting('test.jobB')::uuid, current_setting('test.attB3')::uuid, 1, '{"a":2}', '{"file_index":1,"file_page":1}', false);
+-- Registrering av resultat «feilet» (ikke kalt); delen står som pågående til fristen.
+RESET ROLE; UPDATE vt_ocr_jobs SET processing_until = now() - interval '1 minute' WHERE id = current_setting('test.jobB')::uuid;
+SET ROLE authenticated;
+SELECT set_config('test.cB', vt_ocr_continue(current_setting('test.jobB')::uuid)::text, false);
+SELECT pg_temp.ok(current_setting('test.cB')::jsonb ? 'attempt_id' AND (current_setting('test.cB')::jsonb->>'pages_done')::int = 2 AND (current_setting('test.cB')::jsonb->>'page_count')::int = 2, 'alle sider lagret: ferdigstilling fra lagrede sider uten ny lesing');
+SET ROLE service_role;
+SELECT pg_temp.expect_error($q$SELECT vt_ocr_record_result(current_setting('test.jobB')::uuid, current_setting('test.attB3')::uuid, true, '[]', '[]')$q$, '55000');
+SELECT vt_ocr_record_result(current_setting('test.jobB')::uuid, (current_setting('test.cB')::jsonb->>'attempt_id')::uuid, true, '[]'::jsonb, '[]'::jsonb);
+RESET ROLE;
+SELECT pg_temp.ok((SELECT status = 'klar' AND processing_until IS NULL FROM vt_ocr_jobs WHERE id=current_setting('test.jobB')::uuid), 'ferdigstilt fra lagrede sider');
 
 -- ===== Godkjenning: ny jobb med bekreftet identitet =====
 SET ROLE authenticated; SELECT set_config('test.uid','00000000-0000-0000-0000-0000000000a1',false);
@@ -187,7 +245,7 @@ SELECT pg_temp.ok((SELECT snap_price_per_base IS NULL AND snap_price_source = 'm
 SELECT pg_temp.ok((SELECT (x->>'clar_price_per_base')::numeric = 13 FROM jsonb_array_elements(vt_report_snapshot(current_setting('test.c3')::uuid)->'lines') x WHERE x->>'id' = current_setting('test.lineP')), 'rapporten bruker gjeldende avklaring');
 
 -- ===== Brukere som kan tildeles =====
-SELECT pg_temp.ok((SELECT array_agg(user_id ORDER BY user_id) = ARRAY['00000000-0000-0000-0000-0000000000a1','00000000-0000-0000-0000-0000000000a4']::uuid[] FROM vt_assignable_users('aaaaaaaa-0000-0000-0000-000000000000')), 'bare firmaets brukere med skrivetilgang');
+SELECT pg_temp.ok((SELECT array_agg(user_id ORDER BY user_id) = ARRAY['00000000-0000-0000-0000-0000000000a1','00000000-0000-0000-0000-0000000000a2','00000000-0000-0000-0000-0000000000a4','00000000-0000-0000-0000-0000000000a5']::uuid[] FROM vt_assignable_users('aaaaaaaa-0000-0000-0000-000000000000')), 'skrivetilgang etter kanonisk regel: valid_to i dag inkludert, utløpt i går utelatt, innlogget uten stilling (plattform) med');
 SELECT set_config('test.uid','00000000-0000-0000-0000-0000000000a1',false);
 SELECT pg_temp.expect_error($q$SELECT * FROM vt_assignable_users('aaaaaaaa-0000-0000-0000-000000000000')$q$, '42501');
 RESET ROLE;

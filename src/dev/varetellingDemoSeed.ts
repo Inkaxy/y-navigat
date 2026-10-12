@@ -29,8 +29,19 @@ export async function seedVaretellingDemo(api: ReturnType<typeof createFakeVtApi
   const lines = st.lines.filter(l => l.count_list_id === list.id).sort((a, b) => a.sort_order - b.sort_order);
   const pages = paginateSheet(lines);
   await s3.issueManifest({ listId: list.id, layoutVersion: VT_SHEET_LAYOUT, pages: pages.map(p => p.map(l => l.id)) });
-  const urls = pages.map((p, i) => specimenPage(sheetIdentityOf(countId, list.id, list.source_template_revision, i + 1, pages.length), p, i));
-  s3.seedDemo(list.id, urls);
+  const ident = (i: number) => sheetIdentityOf(countId, list.id, list.source_template_revision, i + 1, pages.length);
+  // Samme kildekobling som ekte opplasting: én PDF med trykte sider i OMVENDT rekkefølge (s. N … 2), deretter
+  // trykt side 1 som bevart WEBP-original + avledet side. Visningen må da finne riktig fil og PDF-side.
+  const files: Parameters<typeof s3.seedDemo>[1] = [];
+  if (pages.length >= 2) {
+    const rest = pages.map((_, i) => i).slice(1).reverse();
+    const pdf = await specimenPdf(rest.map(i => ({ identity: ident(i), lines: pages[i], idx: i })));
+    files.push({ url: pdf, mime: "application/pdf", role: "side", printed: rest.map(i => i + 1) });
+  }
+  const p1 = specimenPage(ident(0), pages[0], 0);
+  files.push({ url: p1, mime: "image/webp", role: "original" });
+  files.push({ url: p1, mime: "image/png", role: "side", original_index: files.length - 1, printed: [1] });
+  s3.seedDemo(list.id, files);
   return countId;
 }
 
@@ -52,4 +63,20 @@ ${i % 5 === 3 ? `<line x1="550" y1="${y - 8}" x2="620" y2="${y - 8}" stroke="#1d
 <text x="40" y="150" font-family="sans-serif" font-size="13">Kode</text><text x="170" y="150" font-family="sans-serif" font-size="13">Vare</text><text x="560" y="150" font-family="sans-serif" font-size="13">Mengde</text>
 ${rows}</svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+/** Syntetisk flersidig PDF (tekst) for visning av riktig PDF-side. Tom streng ved feil (visningen sier da at filen mangler). */
+async function specimenPdf(pages: { identity: string; lines: VtCountLine[]; idx: number }[]): Promise<string> {
+  try {
+    const { jsPDF } = await import("jspdf");
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const hand = ["2", "1.500", "", "3,5", "x?"];
+    pages.forEach((p, k) => {
+      if (k > 0) doc.addPage();
+      doc.setFontSize(14); doc.text("Telleark (syntetisk demonstrasjon)", 14, 18);
+      doc.setFontSize(8); doc.text(p.identity, 14, 26);
+      p.lines.forEach((l, i) => { const y = 40 + i * 14; doc.setFontSize(9); doc.text(rowCodeOf(l.id), 14, y); doc.text(l.snap_name.slice(0, 60), 50, y); doc.setFontSize(13); doc.text(hand[(i + p.idx) % hand.length], 170, y); });
+    });
+    return URL.createObjectURL(doc.output("blob"));
+  } catch { return ""; }
 }

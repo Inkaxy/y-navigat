@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useOpAction, useVtScope } from "../hooks";
 import { entryToBase, formatAmount, moveItem, parseNorwegianAmount } from "../logic";
-import { checkUploadFiles, OCR_ACCEPT, useStage3Api, VtStaleContextError, type VtOcrJob, type VtOcrProposal } from "../stage3";
+import { checkUploadFiles, OCR_ACCEPT, useStage3Api, VtStaleContextError, type VtOcrJob, type VtOcrProposal, type VtPageSource } from "../stage3";
 import { s3Keys, useS3Read, useStage3Ready } from "../stage3Hooks";
 import type { SaveLineResult, VtCountLine, VtCountList } from "../types";
 import { proposalResolution, type EntryDecision } from "../../../../supabase/pending/functions/vt-count-ocr/ocrCore";
@@ -103,26 +103,65 @@ export function OcrPanel({ list, lines, open }: { list: VtCountList; lines: VtCo
   );
 }
 
+/** Hva visningen skal vise for en lest side: kildefil + side i filen (PDF), og bevart original om den finnes. Null = ukjent. */
+export function viewTargetOf(job: VtOcrJob, src: VtPageSource | null): { file: number; page: number; original: number | null } | null {
+  if (!src) return null;
+  const f = job.originals[src.file_index]; if (!f || f.role !== "side") return null;
+  const oi = src.original_index ?? f.original_index; const orig = oi != null && job.originals[oi]?.role === "original" ? oi : null;
+  return { file: src.file_index, page: src.file_page, original: orig };
+}
+const isNarrow = () => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(max-width: 1023px)").matches;
+
 function JobReview({ job, lines, open }: { job: VtOcrJob; lines: VtCountLine[]; open: boolean }) {
-  const api = useStage3Api(); const { entity, canApprove } = useVtScope(); const qc = useQueryClient();
+  const api = useStage3Api(); const { entity, canApprove, canWrite } = useVtScope(); const qc = useQueryClient();
   const props = useS3Read(s3Keys.props(entity, job.id), () => (api ? api.listProposals(entity, job.id) : Promise.resolve([])));
   const [urls, setUrls] = useState<(string | null)[] | null>(null);
-  const [page, setPage] = useState(0); const [zoom, setZoom] = useState(100);
+  const first = viewTargetOf(job, job.page_sources[0] ?? null);
+  const [view, setView] = useState<{ file: number; page: number; showOriginal: boolean }>(() => ({ file: first?.file ?? job.originals.findIndex(o => o.role === "side"), page: first?.page ?? 1, showOriginal: false }));
+  const [zoom, setZoom] = useState(100); const [back, setBack] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const viewer = useRef<HTMLElement | null>(null); const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => { let alive = true; void api?.originalUrls(job).then(u => { if (alive) setUrls(u); }, () => { if (alive) setUrls([]); }); return () => { alive = false; }; }, [api, job]);
   const reset = useOpAction(`ocr-reset:${job.id}`, "approve", (opId, x: { jobId: string }) => (api ? api.resetUnknown({ opId, jobId: x.jobId }) : Promise.reject(new Error("utilgjengelig"))));
-  const url = urls?.[page] ?? null; const orig = job.originals[page];
+  const [resuming, setResuming] = useState(false);
+  const target = viewTargetOf(job, job.page_sources.find(ps => ps.file_index === view.file && ps.file_page === view.page) ?? null);
+  const fileIdx = view.showOriginal && target?.original != null ? target.original : view.file;
+  const url = urls?.[fileIdx] ?? null; const orig = job.originals[fileIdx];
+  const showSource = (p: VtOcrProposal, cardId: string) => {
+    const t = viewTargetOf(job, p.source); if (!t) return;
+    setView({ file: t.file, page: t.page, showOriginal: false }); setBack(cardId);
+    // Mobil: hopp til originalen og fokuser den; «Tilbake til feltet» returnerer. Bred skjerm: originalen står fast ved siden av.
+    requestAnimationFrame(() => { if (isNarrow()) { viewer.current?.scrollIntoView({ block: "start" }); viewer.current?.focus({ preventScroll: true }); } });
+  };
+  const returnToField = () => {
+    const el = back ? document.getElementById(back) : null; if (!el) return;
+    el.scrollIntoView({ block: "center" }); el.querySelector<HTMLElement>("input:not([disabled]),select:not([disabled]),button:not([disabled])")?.focus({ preventScroll: true });
+  };
+  const sideOptions = job.page_sources.length > 0
+    ? job.page_sources.map((ps, i) => ({ key: `${ps.file_index}:${ps.file_page}`, label: `Lest side ${i + 1} (fil ${ps.file_index + 1}${job.originals[ps.file_index]?.mime === "application/pdf" ? `, s. ${ps.file_page}` : ""})`, ps }))
+    : job.originals.flatMap((o, i) => (o.role === "side" ? [{ key: `${i}:1`, label: `Fil ${i + 1}`, ps: { file_index: i, file_page: 1, original_index: o.original_index } }] : []));
   return (
     <div className="space-y-2 border-t pt-3">
       {(job.status === "ukjent_ai_utfall" || job.status === "behandler") && (
         <Notice tone="danger" title={job.status === "behandler" ? "Lesingen pågår eller ble avbrutt." : "Ukjent om lesingen ble fullført."}>
           Den startes ikke automatisk på nytt (den kan være betalt). {job.detail ?? ""}
           <div className="mt-2 flex flex-wrap gap-2">
-            <Button variant="outline" className="min-h-[44px]" onClick={() => void api?.jobStatus(job.id).then(s => setStatus(`${s.status}${s.leaseExpired ? " — tidsfristen er utløpt" : ""} · forsøk ${s.attempts}`), () => setStatus("Kunne ikke hente status."))}>Sjekk status (skrivebeskyttet)</Button>
-            {canApprove && <Button variant="outline" className="min-h-[44px]" disabled={reset.busy} onClick={() => {
-              if (!window.confirm("Bekreft at forrige lesing er kontrollert, og at en ny lesing (kan koste) skal kjøres.")) return;
-              void reset.execute({ jobId: job.id }, job.id).then(r => { setStatus(r.kind === "ok" ? "Klar for ny lesing. Last opp de samme sidene på nytt for å starte." : r.kind === "rejected" || r.kind === "unknown" ? r.message : null); void qc.invalidateQueries({ queryKey: s3Keys.jobs(entity, job.count_list_id) }); });
-            }}>Tillat ny lesing …</Button>}
+            <Button variant="outline" className="min-h-[48px]" onClick={() => void api?.jobStatus(job.id).then(s => setStatus(`${JOB_LABEL[s.status]}${s.leaseExpired ? " — en del ble ikke fullført innen fristen (ukjent utfall)" : ""}${s.pageCount ? ` · ${s.pagesDone} av ${s.pageCount} sider lagret` : ""} · forsøk ${s.attempts}`), () => setStatus("Kunne ikke hente status. Utfallet er fortsatt ukjent."))}>Sjekk status (skrivebeskyttet)</Button>
+            {canApprove && job.status === "ukjent_ai_utfall" || canApprove && job.status === "behandler" ? <Button variant="outline" className="min-h-[48px]" disabled={reset.busy} onClick={() => {
+              if (!window.confirm("Bekreft at forrige lesing er kontrollert, og at gjenstående sider kan leses på nytt (kan koste).")) return;
+              void reset.execute({ jobId: job.id }, job.id).then(r => {
+                setStatus(r.kind === "ok" ? (r.value.resume ? "Bekreftet. Lagrede sider beholdes — trykk «Les gjenstående sider»." : "Klar for ny lesing. Last opp de samme sidene på nytt for å starte.")
+                  : r.kind === "rejected" || r.kind === "unknown" ? r.message : null);
+                void qc.invalidateQueries({ queryKey: s3Keys.jobs(entity, job.count_list_id) });
+              });
+            }}>Tillat ny lesing …</Button> : null}
+            {job.status === "behandler" && canWrite && <Button variant="outline" className="min-h-[48px]" disabled={resuming} onClick={() => {
+              if (!api) return; setResuming(true);
+              void api.resumeRead({ jobId: job.id, guard: () => mounted.current }).then(r => setStatus(r.status === "klar" ? "Lesingen er ferdig." : `Status: ${r.status}. Ingen automatisk ny lesing.`),
+                e => setStatus(e instanceof Error ? e.message : "Ukjent utfall — sjekk status."))
+                .finally(() => { if (mounted.current) setResuming(false); void qc.invalidateQueries({ queryKey: s3Keys.jobs(entity, job.count_list_id) }); });
+            }}>Les gjenstående sider</Button>}
           </div>
           {status && <p className="mt-1" aria-live="polite">{status}</p>}
         </Notice>
@@ -130,36 +169,51 @@ function JobReview({ job, lines, open }: { job: VtOcrJob; lines: VtCountLine[]; 
       {job.status === "feilet" && <Notice tone="danger" title="Filene kunne ikke leses.">{job.detail ?? ""}</Notice>}
       {job.status === "klar" && !job.document_ok && <Notice tone="danger" title="Dokumentet kan ikke godkjennes.">Sider, trykt identitet eller rader stemmer ikke med denne listen. Ingen forslag kan lagres — last opp riktige, komplette sider.</Notice>}
       {job.issues.length > 0 && <ul className="list-disc pl-5 text-sm">{job.issues.map((i, n) => <li key={n}>{i}</li>)}</ul>}
-      <section aria-label="Original" className="space-y-2 rounded-md border p-2">
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="font-medium">Original (hel side — ingen utsnitt)</span>
-          <NativeSelect aria-label="Velg side" className="w-auto" value={String(page)} onChange={e => setPage(Number(e.target.value))}>
-            {job.originals.map((_, i) => <option key={i} value={i}>Fil {i + 1} av {job.originals.length}</option>)}
-          </NativeSelect>
-          <NativeSelect aria-label="Forstørrelse" className="w-auto" value={String(zoom)} onChange={e => setZoom(Number(e.target.value))}>
-            {[100, 150, 200, 300].map(z => <option key={z} value={z}>{z} %</option>)}
-          </NativeSelect>
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
+        <section ref={viewer} tabIndex={-1} aria-label="Original" data-testid="vt-original"
+          className="space-y-2 rounded-md border p-2 outline-none focus-visible:ring-2 focus-visible:ring-ring lg:sticky lg:top-2 lg:order-2">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <NativeSelect aria-label="Velg lest side" className="w-auto" value={`${view.file}:${view.page}`}
+              onChange={e => { const o = sideOptions.find(x => x.key === e.target.value); if (o) setView({ file: o.ps.file_index, page: o.ps.file_page, showOriginal: false }); }}>
+              {sideOptions.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+            </NativeSelect>
+            <NativeSelect aria-label="Forstørrelse" className="w-auto" value={String(zoom)} onChange={e => setZoom(Number(e.target.value))}>
+              {[100, 150, 200, 300].map(z => <option key={z} value={z}>{z} %</option>)}
+            </NativeSelect>
+            {target?.original != null && (
+              <Button variant="outline" size="sm" className="min-h-[48px]" onClick={() => setView(v => ({ ...v, showOriginal: !v.showOriginal }))}>
+                {view.showOriginal ? "Vis lest side" : "Vis bevart original"}
+              </Button>
+            )}
+            {back && <Button variant="ghost" size="sm" className="min-h-[48px] lg:hidden" onClick={returnToField}>Tilbake til feltet</Button>}
+          </div>
+          <p className="text-xs text-muted-foreground" data-testid="vt-original-label">
+            {view.showOriginal && target?.original != null ? `Bevart original (fil ${target.original + 1}) for lest side i fil ${view.file + 1}` : `Fil ${view.file + 1}${orig?.mime === "application/pdf" ? `, side ${view.page}` : ""}`}{target?.original != null && !view.showOriginal ? " · avledet fra bevart original" : ""}
+          </p>
+          <div className="max-h-[70vh] overflow-auto">
+            {urls == null ? <p className="text-sm">Henter original …</p>
+              : !url ? <p className="text-sm text-muted-foreground">Originalen kan ikke vises her (manglende fil eller tilgang).</p>
+              : orig?.mime === "application/pdf" ? <iframe key={`${fileIdx}:${view.page}`} title={`Fil ${fileIdx + 1}, side ${view.page}`} src={`${url}#page=${view.page}`} style={{ width: `${zoom}%`, height: "70vh" }} />
+              : <img src={url} alt={`Fil ${fileIdx + 1}${view.showOriginal ? " (bevart original)" : ""}`} style={{ width: `${zoom}%`, maxWidth: "none" }} />}
+          </div>
+        </section>
+        <div className="space-y-2 lg:order-1">
+          {props.isLoading && <p className="text-sm">Henter forslag …</p>}
+          {(props.data ?? []).map(p => {
+            const line = lines.find(l => l.id === p.line_id);
+            return line ? <ProposalCard key={p.id} p={p} line={line} docOk={job.status === "klar" && job.document_ok === true} open={open}
+                canShow={viewTargetOf(job, p.source) != null} onShowPage={() => showSource(p, `vt-prop-${p.id}`)} />
+              : <p key={p.id} className="text-sm text-destructive">Forslag for linje utenfor listen — ignorert.</p>;
+          })}
+          {props.data && props.data.length === 0 && job.status === "klar" && <p className="text-sm text-muted-foreground">Ingen utfylte rader ble funnet. Tomme felt tolkes ikke som 0.</p>}
         </div>
-        <div className="max-h-[70vh] overflow-auto">
-          {urls == null ? <p className="text-sm">Henter original …</p>
-            : !url ? <p className="text-sm text-muted-foreground">Originalen kan ikke vises her (demonstrasjon uten fil eller manglende tilgang).</p>
-            : orig?.mime === "application/pdf" ? <iframe title={`Original fil ${page + 1}`} src={url} style={{ width: `${zoom}%`, height: "70vh" }} />
-            : <img src={url} alt={`Opplastet side ${page + 1}`} style={{ width: `${zoom}%`, maxWidth: "none" }} />}
-        </div>
-      </section>
-      {props.isLoading && <p className="text-sm">Henter forslag …</p>}
-      {(props.data ?? []).map(p => {
-        const line = lines.find(l => l.id === p.line_id);
-        return line ? <ProposalCard key={p.id} p={p} line={line} docOk={job.status === "klar" && job.document_ok === true} open={open} onShowPage={() => setPage(Math.min(job.originals.length - 1, Math.max(0, p.page - 1)))} />
-          : <p key={p.id} className="text-sm text-destructive">Forslag for linje utenfor listen — ignorert.</p>;
-      })}
-      {props.data && props.data.length === 0 && job.status === "klar" && <p className="text-sm text-muted-foreground">Ingen utfylte rader ble funnet. Tomme felt tolkes ikke som 0.</p>}
+      </div>
     </div>
   );
 }
 
 type AccP = { state: "talt" | "null"; total: number; entry: { unit_id: string | null; amount: number }[]; exclusions: { label: string; reason: string }[] };
-function ProposalCard({ p, line, docOk, open, onShowPage }: { p: VtOcrProposal; line: VtCountLine; docOk: boolean; open: boolean; onShowPage: () => void }) {
+function ProposalCard({ p, line, docOk, open, canShow, onShowPage }: { p: VtOcrProposal; line: VtCountLine; docOk: boolean; open: boolean; canShow: boolean; onShowPage: () => void }) {
   const api = useStage3Api(); const { entity, canWrite } = useVtScope(); const qc = useQueryClient();
   const [dec, setDec] = useState<(Omit<EntryDecision, "value"> & { text: string })[]>(() => p.entries.map(e => ({
     text: e.value != null && e.unit_known ? String(e.value).replace(".", ",") : "", unit_id: e.unit_known ? e.unit_id : null, unit_chosen: e.unit_known, excluded: false, exclude_reason: "",
@@ -185,10 +239,10 @@ function ProposalCard({ p, line, docOk, open, onShowPage }: { p: VtOcrProposal; 
   const set = (i: number, patch: Partial<(typeof dec)[number]>) => setDec(d => d.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   const editable = p.status === "foreslatt" && !stale && open;
   return (
-    <Card className="space-y-2 p-3 text-sm" data-testid="vt-proposal">
+    <Card id={`vt-prop-${p.id}`} className="space-y-2 p-3 text-sm" data-testid="vt-proposal">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div><p className="font-medium break-words">{line.snap_name}</p>
-          <p className="text-xs text-muted-foreground">Side {p.page} · radkode {p.row_code} · <button type="button" className="underline" onClick={onShowPage}>vis siden</button></p></div>
+          <p className="text-xs text-muted-foreground">Trykt side {p.page} · radkode {p.row_code} · {canShow ? <button type="button" className="inline-flex min-h-[44px] items-center underline" onClick={onShowPage}>vis siden</button> : <span>kildeside ukjent</span>}</p></div>
         <Badge variant="outline">{p.status === "godkjent" ? "Bekreftet" : p.status === "avvist" ? "Avvist" : "Forslag"}</Badge>
       </div>
       {p.reasons.length > 0 && <p className="text-destructive">{p.reasons.join(", ")}</p>}

@@ -18,26 +18,34 @@ export const s3Keys = {
 export function useStage3Ready(): { ready: boolean; loading: boolean; missing: boolean } {
   const api = useStage3Api(); const { entity } = useVtScope(); const base = useVtProbe();
   const q = useQuery({ queryKey: s3Keys.probe(entity), queryFn: () => (api ? api.probe() : Promise.resolve("missing" as const)), enabled: !!entity && base.data === "ok", staleTime: 60_000, retry: 1 });
-  return { ready: !!api && q.data === "ok", loading: q.isLoading, missing: !api || q.data === "missing" };
+  return { ready: !!api && q.data === "ok", loading: base.isLoading || q.isLoading, missing: !api || q.data === "missing" };
 }
 export function useS3Read<T>(key: readonly unknown[], fn: () => Promise<T>, enabled = true) {
   const { ready } = useStage3Ready();
   return useQuery({ queryKey: key, queryFn: fn, enabled: ready && enabled });
 }
 
+/** Status for den autoritative verdsettelsen: bare «ready» kan brukes til totaler, utskrift, eksport og e-post. */
+export type ClarStatus = "loading" | "error" | "ready";
 /**
- * Fletter gjeldende prisavklaringer inn i linjene (clar_*). Skjerm, nedlasting og e-post bruker da samme
- * verdsettelse som avslutningsregelen. Uten trinn 3 eller ved feil: linjene uendret + feilen synlig.
+ * Fletter gjeldende prisavklaringer inn i linjene (clar_*). ÉN datakontrakt for skjerm, utskrift, nedlasting, e-post og
+ * avslutning. `status` er «ready» bare når avklaringene er lest (eller trinn 3 beviselig ikke finnes, så ingen kan
+ * finnes). Mens sonden/lesingen pågår eller feilet, er verdiene ikke autoritative og skal ikke vises som endelige.
  */
-export function useClarifiedLines(countId: string, lines: VtCountLine[]): { lines: VtCountLine[]; clarifications: VtClarification[]; error: boolean; loading: boolean } {
-  const api = useStage3Api(); const { entity } = useVtScope();
+export function useClarifiedLines(countId: string, lines: VtCountLine[]): { lines: VtCountLine[]; clarifications: VtClarification[]; error: boolean; loading: boolean; status: ClarStatus } {
+  const api = useStage3Api(); const { entity } = useVtScope(); const s3 = useStage3Ready();
   const q = useS3Read(s3Keys.clars(entity, countId), () => (api ? api.listClarifications(entity, countId) : Promise.resolve([])));
+  const status: ClarStatus = s3.ready ? (q.error ? "error" : q.data ? "ready" : "loading")
+    : s3.loading ? "loading" : s3.missing ? "ready" : "error";
   const all = q.data ?? [];
+  return { lines: mergeClarifications(lines, all), clarifications: all, error: status === "error", loading: status === "loading", status };
+}
+/** Ren fletting (testbar): aktiv avklaring gjelder bare linjer uten frosset pris; snapshot endres aldri. */
+export function mergeClarifications(lines: VtCountLine[], all: VtClarification[]): VtCountLine[] {
   const active = new Map(all.filter(c => c.superseded_at == null).map(c => [c.line_id, c]));
-  const merged = lines.map(l => {
+  return lines.map(l => {
     const c = l.snap_price_per_base == null ? active.get(l.id) : undefined;
     return c ? { ...l, clar_price_per_base: c.price_per_base, clar_source_kind: c.source_kind, clar_source_ref: c.source_ref, clar_reason: c.reason,
       clar_at: new Date(c.decided_at).toLocaleString("nb-NO", { timeZone: "Europe/Oslo" }) } : l;
   });
-  return { lines: merged, clarifications: all, error: !!q.error, loading: q.isLoading };
 }

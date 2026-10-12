@@ -20,7 +20,7 @@ export function AssignBar({ list }: { list: VtCountList }) {
   const [pick, setPick] = useState(""); const [role, setRole] = useState<"teller" | "kontrollor">("teller");
   const users = useS3Read(s3Keys.users(entity), () => (api ? api.listAssignableUsers(entity) : Promise.resolve([])), canApprove);
   if (!s3.ready || !userId) return null;
-  const nameOf = (id: string) => (id === userId ? "deg" : users.data?.find(u => u.id === id)?.name ?? `bruker ${id.slice(0, 6)}`);
+  const nameOf = (id: string) => (id === userId ? "deg" : users.data?.find(u => u.id === id)?.name ?? "ukjent bruker");
   const mine = (q.data ?? []).filter(a => a.count_list_id === list.id);
   const isMine = mine.some(a => a.user_id === userId && a.role === "teller");
   const act = async (uid: string, remove: boolean, r: "teller" | "kontrollor" = "teller") => {

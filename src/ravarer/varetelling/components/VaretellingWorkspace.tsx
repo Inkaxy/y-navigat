@@ -42,7 +42,7 @@ export function VaretellingWorkspace({ legacy }: { legacy: ReactNode }) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="vt-scope space-y-4">
       <nav aria-label="Varetelling" className="flex gap-1 overflow-x-auto border-b print:hidden">
         {VT_SECTIONS.map(s => (
           <button key={s.id} type="button" aria-current={section === s.id ? "page" : undefined}

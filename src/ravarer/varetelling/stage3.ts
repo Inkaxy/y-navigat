@@ -12,16 +12,21 @@ import { buildReportCsv, summarizeLines, type VtReportData, type VtSummary } fro
  * Egen sonde (vt_stage3_version = 2). Uten utrullet SQL/Edge viser UI at funksjonen ikke er tatt i bruk.
  */
 export type OcrJobStatus = "opprettet" | "behandler" | "ukjent_ai_utfall" | "klar" | "feilet";
-export interface VtOriginal { path: string; sha256: string; size: number; mime: string; role: "side" | "original" }
+export interface VtOriginal { path: string; sha256: string; size: number; mime: string; role: "side" | "original"; /** For avledet side: indeks til bevart original (f.eks. WEBP). */ original_index: number | null }
+/** Serverens kobling fra lest side til kildefil og side i filen (1-basert). */
+export interface VtPageSource { file_index: number; file_page: number; original_index: number | null }
 export interface VtOcrJob {
   id: string; count_list_id: string; status: OcrJobStatus; document_ok: boolean | null; issues: string[]; detail: string | null;
   created_at: string; originals: VtOriginal[]; attempts: number; lease_until: string | null; page_count: number | null;
+  /** Per lest side i opplastingsrekkefølge. Tom for eldre/ulest jobb. */ page_sources: VtPageSource[];
 }
 export interface VtOcrProposal {
   id: string; job_id: string; line_id: string; line_revision_at_job: number; page: number; row_code: string;
+  /** Lest side (0-basert) og serverens kildekobling; null = ukjent kilde (vises ikke som en tilfeldig side). */
+  upload_index: number | null; source: VtPageSource | null;
   entries: ProposalEntry[]; reasons: string[]; status: "foreslatt" | "godkjent" | "avvist";
 }
-export interface ReportPreview { hash: string; countRevision: number; final: boolean; defaultSubject: string; attachmentBase: string; csv: string; pdfB64: string; totals: VtSummary; mailConfigured: boolean }
+export interface ReportPreview { hash: string; countRevision: number; final: boolean; defaultSubject: string; attachmentBase: string; csv: string; pdfB64: string; totals: VtSummary; mailConfigured: boolean; /** Tilkoblet Microsoft 365-postboks som vil sende (vises i forhåndsvisningen). */ sender: string | null }
 export type MailState = "akseptert_av_tjenesten" | "avvist" | "ukjent" | "reservert" | "sender";
 export interface MailStatus { found: boolean; state: MailState | null; detail: string | null }
 export interface VtAssignment { id: string; count_list_id: string; user_id: string; role: "teller" | "kontrollor" }
@@ -39,8 +44,11 @@ export interface Stage3Api {
   listProposals(entity: string, jobId: string): Promise<VtOcrProposal[]>;
   /** Sider i rekkefølge → én jobb for listen; originaler lagres; deretter ÉN lesing. Guard sjekkes før hvert steg. */
   uploadAndRead(i: { opId: string; listId: string; files: File[]; guard: Guard }): Promise<{ jobId: string; duplicate: boolean; status: string }>;
-  jobStatus(jobId: string): Promise<{ status: OcrJobStatus; leaseExpired: boolean; attempts: number; detail: string | null }>;
-  resetUnknown(i: { opId: string; jobId: string }): Promise<void>;
+  jobStatus(jobId: string): Promise<{ status: OcrJobStatus; leaseExpired: boolean; resumable: boolean; pagesDone: number; pageCount: number | null; attempts: number; detail: string | null }>;
+  /** Godkjenner bekrefter etter ukjent utfall. resume=true: lagrede sider beholdes, bare gjenstående kan leses. */
+  resetUnknown(i: { opId: string; jobId: string }): Promise<{ resume: boolean }>;
+  /** Eksplisitt fortsettelse av en frigitt/bekreftet jobb (ingen automatisk ny lesing ved ukjent utfall). */
+  resumeRead(i: { jobId: string; guard: Guard }): Promise<{ status: string }>;
   originalUrls(job: VtOcrJob): Promise<(string | null)[]>;
   accept(i: { opId: string; proposalId: string; lineId: string; expectedRevision: number; state: LineState; countedBase: number | null; entry: EntryInput[]; note: string | null; exclusions: { label: string; reason: string }[] }): Promise<SaveLineResult>;
   reject(i: { opId: string; proposalId: string; note: string | null }): Promise<void>;
@@ -77,13 +85,19 @@ const sN = (v: unknown, k: string) => (v == null ? null : s(v, k));
 const n = (v: unknown, k: string) => { const x = typeof v === "string" ? Number(v) : v; if (typeof x !== "number" || !Number.isFinite(x)) throw new Error(k); return x; };
 const b = (v: unknown, k: string) => { if (typeof v !== "boolean") throw new Error(k); return v; };
 const mailState = (v: unknown): MailState => { const x = MAIL_ST.find(m => m === v); if (!x) throw new VtUnknownOutcomeError(); return x; };
-const parseOriginal = (v: unknown): VtOriginal => { const r = rec(v, "original"); return { path: s(r.path, "path"), sha256: s(r.sha256, "sha"), size: n(r.size, "size"), mime: s(r.mime, "mime"), role: r.role === "original" ? "original" : "side" }; };
+const parseOriginal = (v: unknown): VtOriginal => { const r = rec(v, "original"); return { path: s(r.path, "path"), sha256: s(r.sha256, "sha"), size: n(r.size, "size"), mime: s(r.mime, "mime"), role: r.role === "original" ? "original" : "side", original_index: r.original_index == null ? null : n(r.original_index, "oi") }; };
+export function parsePageSource(v: unknown): VtPageSource {
+  const r = rec(v, "kilde"); const fi = n(r.file_index, "fi"); const fp = n(r.file_page, "fp");
+  if (!Number.isInteger(fi) || fi < 0 || !Number.isInteger(fp) || fp < 1) throw new Error("kilde");
+  return { file_index: fi, file_page: fp, original_index: r.original_index == null ? null : n(r.original_index, "oi") };
+}
 export function parseJob(v: unknown): VtOcrJob {
   const r = rec(v, "jobb"); const status = JOB_ST.find(x => x === r.status); if (!status) throw new Error("status");
   if (!Array.isArray(r.originals) || !Array.isArray(r.issues)) throw new Error("jobb");
   return { id: s(r.id, "id"), count_list_id: s(r.count_list_id, "list"), status, document_ok: r.document_ok == null ? null : b(r.document_ok, "ok"),
     issues: r.issues.map(x => s(x, "issue")), detail: sN(r.detail, "detail"), created_at: s(r.created_at, "ca"), originals: r.originals.map(parseOriginal),
-    attempts: n(r.attempts, "attempts"), lease_until: sN(r.lease_until, "lease"), page_count: r.page_count == null ? null : n(r.page_count, "pc") };
+    attempts: n(r.attempts, "attempts"), lease_until: sN(r.lease_until, "lease"), page_count: r.page_count == null ? null : n(r.page_count, "pc"),
+    page_sources: Array.isArray(r.page_sources) ? r.page_sources.map(parsePageSource) : [] };
 }
 export function parseProposal(v: unknown): VtOcrProposal {
   const r = rec(v, "forslag"); if (!Array.isArray(r.entries)) throw new Error("entries");
@@ -91,7 +105,7 @@ export function parseProposal(v: unknown): VtOcrProposal {
     return { unit_id: sN(x.unit_id, "u"), unit_known: b(x.unit_known, "uk"), label: s(x.label, "l"), value: x.value == null ? null : n(x.value, "v"), reason: sN(x.reason, "r"), raw: sN(x.raw, "raw") }; });
   const st = r.status; if (st !== "foreslatt" && st !== "godkjent" && st !== "avvist") throw new Error("status");
   return { id: s(r.id, "id"), job_id: s(r.job_id, "job"), line_id: s(r.line_id, "line"), line_revision_at_job: n(r.line_revision_at_job, "rev"), page: n(r.page, "page"),
-    row_code: s(r.row_code, "rc"), entries, reasons: Array.isArray(r.reasons) ? r.reasons.map(x => s(x, "reason")) : [], status: st };
+    row_code: s(r.row_code, "rc"), upload_index: r.upload_index == null ? null : n(r.upload_index, "ui"), source: r.source == null ? null : parsePageSource(r.source), entries, reasons: Array.isArray(r.reasons) ? r.reasons.map(x => s(x, "reason")) : [], status: st };
 }
 function parseSummary(v: unknown): VtSummary {
   const t = rec(v, "totals");
@@ -177,8 +191,8 @@ async function invoke(fn: string, body: Record<string, unknown>): Promise<Record
   }
   return rec(r.data, "svar");
 }
-const JOB = "id, count_list_id, status, document_ok, issues, detail, created_at, originals, attempts, lease_until, page_count";
-const PROP = "id, job_id, line_id, line_revision_at_job, page, row_code, entries, reasons, status";
+const JOB = "id, count_list_id, status, document_ok, issues, detail, created_at, originals, attempts, lease_until, page_count, page_sources";
+const PROP = "id, job_id, line_id, line_revision_at_job, page, row_code, upload_index, source, entries, reasons, status";
 const step = (g: Guard) => { if (!g()) throw new VtStaleContextError(); };
 
 export const supabaseStage3Api: Stage3Api = {
@@ -223,9 +237,19 @@ export const supabaseStage3Api: Stage3Api = {
   async jobStatus(jobId) {
     const r = rec(await rpc("vt_ocr_job_status", { p_job_id: jobId }), "status");
     const status = JOB_ST.find(x => x === r.status); if (!status) throw new VtUnknownOutcomeError();
-    return { status, leaseExpired: r.lease_expired === true, attempts: n(r.attempts, "a"), detail: sN(r.detail, "d") };
+    return { status, leaseExpired: r.lease_expired === true, resumable: r.resumable === true, pagesDone: r.pages_done == null ? 0 : n(r.pages_done, "pd"),
+      pageCount: r.page_count == null ? null : n(r.page_count, "pc"), attempts: n(r.attempts, "a"), detail: sN(r.detail, "d") };
   },
-  resetUnknown: (i) => rpc("vt_ocr_reset_unknown", { p_op_id: i.opId, p_job_id: i.jobId, p_confirm_paid_rerun: true }).then(d => { if (rec(d, "svar").job_id !== i.jobId) throw new VtUnknownOutcomeError(); }),
+  resetUnknown: (i) => rpc("vt_ocr_reset_unknown", { p_op_id: i.opId, p_job_id: i.jobId, p_confirm_paid_rerun: true }).then(d => {
+    const r = rec(d, "svar"); if (r.job_id !== i.jobId || typeof r.resume !== "boolean") throw new VtUnknownOutcomeError(); return { resume: r.resume };
+  }),
+  async resumeRead({ jobId, guard }) {
+    step(guard);
+    let r = await invoke("vt-count-ocr", { job_id: jobId, continue: true });
+    // Bare videre så lenge serveren svarer «fortsetter» (forrige del varig frigitt). Ukjent utfall stopper.
+    for (let k = 0; k < 10 && r.status === "fortsetter"; k++) { step(guard); r = await invoke("vt-count-ocr", { job_id: jobId, continue: true }); }
+    return { status: typeof r.status === "string" ? r.status : "ukjent" };
+  },
   async originalUrls(job) {
     const out: (string | null)[] = [];
     for (const o of job.originals) { const r = await db.storage.from("vt-count-uploads").createSignedUrl(o.path, 600); out.push(r.error ? null : r.data.signedUrl); }
@@ -240,7 +264,7 @@ export const supabaseStage3Api: Stage3Api = {
   async previewReport(countId) {
     const r = await invoke("vt-count-report-email", { action: "preview", count_id: countId });
     return { hash: s(r.hash, "hash"), countRevision: n(r.count_revision, "rev"), final: b(r.final, "final"), defaultSubject: s(r.default_subject, "subj"),
-      attachmentBase: s(r.attachment_base, "base"), csv: s(r.csv, "csv"), pdfB64: s(r.pdf_b64, "pdf"), totals: parseSummary(r.totals), mailConfigured: r.mail_configured === true };
+      attachmentBase: s(r.attachment_base, "base"), csv: s(r.csv, "csv"), pdfB64: s(r.pdf_b64, "pdf"), totals: parseSummary(r.totals), mailConfigured: r.mail_configured === true, sender: r.mail_configured === true ? s(r.sender, "sender") : null };
   },
   async sendReport(i) {
     const r = await invoke("vt-count-report-email", { action: "send", op_id: i.opId, count_id: i.countId, hash: i.hash, recipient: i.recipient, subject: i.subject, message: i.message });
@@ -269,8 +293,13 @@ export const supabaseStage3Api: Stage3Api = {
     if (!Array.isArray(ids)) throw new Error("Kunne ikke hente brukere.");
     const list = ids.map(x => s(rec(x, "bruker").user_id, "id"));
     if (list.length === 0) return [];
-    const names = await rpc("rm_user_names", { p_legal_entity_id: e, p_user_ids: list });
-    const byId = new Map(Array.isArray(names) ? names.map(x => { const r = rec(x, "navn"); return [s(r.id, "id"), typeof r.name === "string" && r.name.trim() ? r.name : "Navn mangler"] as const; }) : []);
+    // rm_user_names tar høyst 500 ID-er per kall (live-definisjon) ⇒ hent i biter; ugyldig svar er feil, ikke «uten navn».
+    const byId = new Map<string, string>();
+    for (let i = 0; i < list.length; i += 500) {
+      const names = await rpc("rm_user_names", { p_legal_entity_id: e, p_user_ids: list.slice(i, i + 500) });
+      if (!Array.isArray(names)) throw new Error("Kunne ikke hente navn.");
+      for (const x of names) { const r = rec(x, "navn"); if (typeof r.name === "string" && r.name.trim()) byId.set(s(r.id, "id"), r.name); }
+    }
     return list.map(id => ({ id, name: byId.get(id) ?? "Navn mangler" })).sort((a, z) => a.name.localeCompare(z.name, "nb"));
   },
   listUnits: (e) => readAllRows("raw_material_units", "id, raw_material_id, unit_label, units_in_base", [["raw_materials.legal_entity_id", e]], v => {
@@ -295,14 +324,14 @@ export function createFakeStage3(base: FakeBase, opts: FakeStage3Opts = {}) {
     return { count: c, lists: st.lists.filter(l => l.count_id === countId).sort((a, z) => a.sort_order - z.sort_order), lines, generatedAt: `data per ${ver} (rev ${c.revision})` };
   };
   /** Syntetisk «lest» side: tall, tvetydig, tomt, overstrøket, ukjent pakning. Leser bare trykte koder. */
-  const syntheticRead = (listId: string, pageCount: number): OcrDoc => {
+  const syntheticRead = (listId: string, order: number[]): OcrDoc => {
     const list = st.lists.find(l => l.id === listId); if (!list) return { pages: [] };
     const lines = st.lines.filter(l => l.count_list_id === listId).sort((a, z) => a.sort_order - z.sort_order);
     const issued = manifests.get(listId);
     const m = issued ? issued.map((p, i) => ({ page: i + 1, pages: issued.length, identity: `VT2|${list.count_id}|${list.id}|r${list.source_template_revision}|s${i + 1}/${issued.length}`, lines: p.map(id => lines.find(l => l.id === id)).filter((l): l is (typeof lines)[number] => !!l) }))
       : buildManifest(list.count_id, list.id, list.source_template_revision, lines);
     const raws = ["2", "1.500", null, "3,5", "x?"];
-    return { pages: m.slice(0, pageCount).map(p => ({ printed_identity: p.identity, complete: true, rows: p.lines.map((l, i) => ({
+    return { pages: order.map(n => m[n - 1]).filter((p): p is (typeof m)[number] => !!p).map(p => ({ printed_identity: p.identity, complete: true, rows: p.lines.map((l, i) => ({
       row_code: rowCodeOf(l.id), crossed_out: i === 3, unclear: false, comment: null,
       amounts: l.snap_units.length
         ? [{ column: "pakninger" as const, unit_label: i === 0 ? l.snap_units[0].label : "kasse", raw: raws[i % raws.length] }, { column: "los" as const, unit_label: null, raw: i === 0 ? "1.500" : null }]
@@ -313,7 +342,7 @@ export function createFakeStage3(base: FakeBase, opts: FakeStage3Opts = {}) {
     const d = data(countId); const csv = buildReportCsv(d);
     const hash = await sha256Blob(new Blob([csv]));
     return { hash, countRevision: d.count.revision, final: d.count.status === "avsluttet", defaultSubject: `Tellerapport: ${d.count.name}`, attachmentBase: `varetelling-${d.count.planned_date}-r${d.count.revision}`,
-      csv, pdfB64: "", totals: summarizeLines(d.lines), mailConfigured: opts.mailConfigured === true };
+      csv, pdfB64: "", totals: summarizeLines(d.lines), mailConfigured: opts.mailConfigured === true, sender: opts.mailConfigured === true ? "telling@demo.invalid" : null };
   };
   const api: Stage3Api = {
     async probe() { return opts.available === false ? "missing" : "ok"; },
@@ -333,19 +362,21 @@ export function createFakeStage3(base: FakeBase, opts: FakeStage3Opts = {}) {
       const jobId = `job-${++seq}`; keys.set(k, jobId);
       urls.set(jobId, files.map(f => (typeof URL.createObjectURL === "function" ? URL.createObjectURL(f) : "")));
       const job: VtOcrJob = { id: jobId, count_list_id: listId, status: "behandler", document_ok: null, issues: [], detail: null, created_at: new Date().toISOString(),
-        originals: files.map((f, i) => ({ path: `demo/${jobId}/side-${i + 1}`, sha256: shas[i].split(":")[0], size: f.size, mime: f.type, role: "side" as const })), attempts: 1, lease_until: null, page_count: files.length };
+        originals: files.map((f, i) => ({ path: `demo/${jobId}/side-${i + 1}`, sha256: shas[i].split(":")[0], size: f.size, mime: f.type, role: "side" as const, original_index: null })), attempts: 1, lease_until: null, page_count: files.length,
+        page_sources: files.map((_, i) => ({ file_index: i, file_page: 1, original_index: null })) };
       jobs.unshift(job);
       counters.aiReads++;
       if (opts.readOutcome === "ukjent") { job.status = "ukjent_ai_utfall"; job.detail = "Syntetisk: AI-kall fikk ukjent utfall"; }
       else {
-        const r = matchDocument(syntheticRead(listId, files.length), buildManifest(list.count_id, list.id, list.source_template_revision, lines));
+        const r = matchDocument(syntheticRead(listId, files.map((_, i) => i + 1)), buildManifest(list.count_id, list.id, list.source_template_revision, lines));
         job.status = "klar"; job.document_ok = r.document_ok; job.issues = r.issues;
-        r.proposals.forEach((p, i) => props.push({ ...p, id: `${jobId}-p${i}`, job_id: jobId, status: "foreslatt" }));
+        r.proposals.forEach((p, i) => props.push({ ...p, id: `${jobId}-p${i}`, job_id: jobId, status: "foreslatt", source: job.page_sources[p.upload_index] ?? null }));
       }
       const res = { jobId, duplicate: false, status: job.status }; ops.set(opId, res); return res;
     },
-    async jobStatus(jobId) { const j = jobs.find(x => x.id === jobId); if (!j) throw new VtRejectedError("Mangler tilgang", "42501"); return { status: j.status, leaseExpired: false, attempts: j.attempts, detail: j.detail }; },
-    async resetUnknown({ jobId }) { const j = jobs.find(x => x.id === jobId); if (!j || j.status !== "ukjent_ai_utfall") throw new VtRejectedError("Jobben har ikke ukjent utfall", "55000"); j.status = "opprettet"; },
+    async jobStatus(jobId) { const j = jobs.find(x => x.id === jobId); if (!j) throw new VtRejectedError("Mangler tilgang", "42501"); return { status: j.status, leaseExpired: false, resumable: false, pagesDone: 0, pageCount: j.page_count, attempts: j.attempts, detail: j.detail }; },
+    async resetUnknown({ jobId }) { const j = jobs.find(x => x.id === jobId); if (!j || j.status !== "ukjent_ai_utfall") throw new VtRejectedError("Jobben har ikke ukjent utfall", "55000"); j.status = "opprettet"; return { resume: false }; },
+    async resumeRead({ jobId }) { const j = jobs.find(x => x.id === jobId); if (!j || j.status !== "behandler") throw new VtRejectedError("Jobben kan ikke fortsettes", "55000"); return { status: j.status }; },
     async originalUrls(job) { return (urls.get(job.id) ?? []).map(u => u || null); },
     async accept(i) {
       unavailable();
@@ -419,19 +450,26 @@ export function createFakeStage3(base: FakeBase, opts: FakeStage3Opts = {}) {
     async listAssignableUsers() { unavailable(); return [{ id: "u1", name: "Demo Teller" }, { id: "u2", name: "Kari Kontrollør (demo)" }, { id: "u3", name: "Ola Opptelling (demo)" }]; },
     async listUnits() { unavailable(); return [...st.units.entries()].flatMap(([rm, us]) => us.map(u => ({ id: u.id, raw_material_id: rm, label: u.label, units_in_base: u.units_in_base }))); },
   };
-  /** Forhåndsvisning: ferdig syntetisk lesejobb med flersides prøveark (ingen filvelger, ingen nettverk, IKKE ekte AI). */
-  const seedDemo = (listId: string, pageUrls: string[]) => {
+  /**
+   * Forhåndsvisning: ferdig syntetisk lesejobb (ingen filvelger/nettverk, IKKE ekte AI) med samme kildekobling som
+   * serveren: filer i opplastingsrekkefølge, der en «side»-fil kan ha flere trykte sider (PDF) og en avledning kan
+   * peke til bevart original. `printed` = trykte sidenumre i filen, i filens siderekkefølge.
+   */
+  const seedDemo = (listId: string, files: { url: string; mime: string; role: "side" | "original"; original_index?: number; printed?: number[] }[]) => {
     const list = st.lists.find(l => l.id === listId); if (!list) return null;
     const lines = st.lines.filter(l => l.count_list_id === listId).sort((a, z) => a.sort_order - z.sort_order);
-    const jobId = `job-demo-${++seq}`; urls.set(jobId, pageUrls);
-    const doc = syntheticRead(listId, pageUrls.length);
+    const jobId = `job-demo-${++seq}`; urls.set(jobId, files.map(f => f.url));
+    const sources: VtPageSource[] = []; const order: number[] = [];
+    files.forEach((f, fi) => { if (f.role === "side") (f.printed ?? []).forEach((pn, k) => { sources.push({ file_index: fi, file_page: k + 1, original_index: f.original_index ?? null }); order.push(pn); }); });
+    const doc = syntheticRead(listId, order);
     const issued = manifests.get(listId);
     const man = issued ? issued.map((p, i) => ({ page: i + 1, pages: issued.length, identity: `VT2|${list.count_id}|${list.id}|r${list.source_template_revision}|s${i + 1}/${issued.length}`, lines: p.map(id => lines.find(l => l.id === id)).filter((l): l is (typeof lines)[number] => !!l) }))
       : buildManifest(list.count_id, list.id, list.source_template_revision, lines);
     const r = matchDocument(doc, man);
     jobs.unshift({ id: jobId, count_list_id: listId, status: "klar", document_ok: r.document_ok, issues: r.issues, detail: "Syntetisk demonstrasjon — ikke ekte lesing", created_at: new Date().toISOString(),
-      originals: pageUrls.map((_, i) => ({ path: `demo/${jobId}/side-${i + 1}`, sha256: "demo", size: 1, mime: "image/svg+xml", role: "side" as const })), attempts: 1, lease_until: null, page_count: pageUrls.length });
-    r.proposals.forEach((p, i) => props.push({ ...p, id: `${jobId}-p${i}`, job_id: jobId, status: "foreslatt" }));
+      originals: files.map((f, i) => ({ path: `demo/${jobId}/${f.role}-${i + 1}`, sha256: "demo", size: 1, mime: f.mime, role: f.role, original_index: f.original_index ?? null })),
+      attempts: 1, lease_until: null, page_count: sources.length, page_sources: sources });
+    r.proposals.forEach((p, i) => props.push({ ...p, id: `${jobId}-p${i}`, job_id: jobId, status: "foreslatt", source: sources[p.upload_index] ?? null }));
     return jobId;
   };
   return Object.assign(api, { _jobs: jobs, _props: props, _mail: mail, _assign: assign, _counters: counters, _manifests: manifests, _clars: clars, seedDemo });

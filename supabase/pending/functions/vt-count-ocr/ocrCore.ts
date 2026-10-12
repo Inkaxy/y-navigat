@@ -95,7 +95,7 @@ export function buildManifest(countId: string, listId: string, templateRevision:
 
 /** Ett felt i et forslag. unit_id er bare gyldig når unit_known=true; ukjent pakning må velges av brukeren. */
 export interface ProposalEntry { unit_id: string | null; unit_known: boolean; label: string; value: number | null; reason: string | null; raw: string | null }
-export interface Proposal { line_id: string; line_revision_at_job: number; page: number; row_code: string; entries: ProposalEntry[]; reasons: string[] }
+export interface Proposal { line_id: string; line_revision_at_job: number; page: number; /** Lest side (0-basert, opplastingsrekkefølge). */ upload_index: number; row_code: string; entries: ProposalEntry[]; reasons: string[] }
 export interface MatchResult { document_ok: boolean; issues: string[]; proposals: Proposal[]; pages_seen: number[] }
 
 /**
@@ -151,7 +151,7 @@ export function matchDocument(doc: OcrDoc, manifest: ManifestPage[]): MatchResul
         else entries.push({ ...base, value: read.value, reason: null });
       }
       if (entries.length === 0 && !r.crossed_out) continue;
-      proposals.push({ line_id: line.id, line_revision_at_job: line.revision, page: m.page, row_code: code, entries, reasons });
+      proposals.push({ line_id: line.id, line_revision_at_job: line.revision, page: m.page, upload_index: idx, row_code: code, entries, reasons });
     }
   });
   for (const m of manifest) if (!seen.has(m.page)) block(`Side ${m.page} av ${m.pages} mangler`);
