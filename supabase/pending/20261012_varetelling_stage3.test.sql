@@ -171,7 +171,7 @@ SELECT pg_temp.expect_error($q$SELECT vt_issue_print_manifest(current_setting('t
 SELECT pg_temp.ok((SELECT jsonb_array_length(vt_ocr_claim(current_setting('test.jobL')::uuid)->'manifests') = 1), 'lesing får utstedt manifest');
 
 -- ===== Prisavklaring =====
-SELECT set_config('test.lineP', (SELECT id::text FROM vt_count_lines WHERE count_id=current_setting('test.c3')::uuid AND snap_price_per_base IS NULL AND snap_base_unit IS NOT NULL AND id <> current_setting('test.line3')::uuid LIMIT 1), false);
+SELECT set_config('test.lineP', (SELECT id::text FROM vt_count_lines WHERE count_id=current_setting('test.c3')::uuid AND snap_price_per_base IS NULL AND snap_base_unit IS NOT NULL LIMIT 1), false);
 SELECT pg_temp.ok(current_setting('test.lineP') <> '', 'testlinje uten pris finnes');
 SELECT set_config('test.uid','00000000-0000-0000-0000-0000000000a1',false);
 SELECT pg_temp.expect_error($q$SELECT vt_clarify_price(gen_random_uuid(), current_setting('test.lineP')::uuid, null, 12, 'faktura', 'F-1', 'Faktura 1234 fra leverandør')$q$, '42501');
