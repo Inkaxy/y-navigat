@@ -14,3 +14,20 @@ export function correctionTarget<L extends { id: string }>(
   const flagged = lines.find(hasReadIssue);
   return flagged ? { id: flagged.id, reason: "lesevarsel" } : null;
 }
+
+/**
+ * Lenke fra forhåndsvisning til fullflatens eksisterende, vaktede rettevei. Navigasjon skriver ingenting:
+ * bare eksakt faktura, en linje på DENNE fakturaen med lesevarsel (valgfri; flaten validerer `?linje=` på nytt)
+ * og gjeldende listekontekst som retur.
+ */
+export function correctionHref<L extends { id: string }>(
+  fakturaHref: (id: string, q?: Record<string, string | undefined>) => string,
+  invoiceId: string,
+  lines: readonly L[],
+  hasReadIssue: (l: L) => boolean,
+  returnSearch: string,
+  returnParam: string,
+): string {
+  const t = correctionTarget(lines, null, hasReadIssue);
+  return fakturaHref(invoiceId, { linje: t?.id, [returnParam]: returnSearch || undefined });
+}

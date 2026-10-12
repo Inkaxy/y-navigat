@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { correctionHref } from "@/ravarer/pages/priskontroll/faktura/correctionTarget";
+import { parseReadIssues } from "@/fakturaer/lib/lineCorrection";
+import { RETURN_PARAM } from "@/ravarer/pages/priskontroll/fakturaer/visning";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFetchInvoiceLines } from "@/ravarer/pages/priskontroll/faktura/useInvoiceActions";
 import { canFetchLines } from "@/ravarer/pages/priskontroll/faktura/invoiceSteps";
@@ -39,6 +42,7 @@ type Props = { invoiceId: string; kind?: WorkItemKind | null; onDone?: (r: Panel
 /** Fakturasaken: sumavvik, mangler linjer, flagget eller klar til avstemming. */
 export function FakturasakPanel({ invoiceId, kind, onDone, onNext, onSkip }: Props) {
   const qc = useQueryClient();
+  const location = useLocation();
   const { canWrite } = useInvoiceRights();
   const q = useQuery({ queryKey: ["invoice", invoiceId], queryFn: () => fetchInvoiceDetail(invoiceId) });
   const [result, setResult] = useState<PanelResult | null>(null);
@@ -113,6 +117,13 @@ export function FakturasakPanel({ invoiceId, kind, onDone, onNext, onSkip }: Pro
               </div>
             )}
 
+            {k === "faktura_sumavvik" && canWrite && !isFinal && d.invoice_lines.length > 0 && (
+              <Button variant="outline" asChild className="min-h-[44px]">
+                <Link to={correctionHref(paths.faktura, d.id, d.invoice_lines, (l) => parseReadIssues(l.extraction_issues).length > 0, location.search, RETURN_PARAM)}>
+                  Åpne faktura for å rette linjer
+                </Link>
+              </Button>
+            )}
             {k === "faktura_sumavvik" && (
               <LinesSumMismatchAlert invoiceId={d.id} linesSum={d.lines_sum_excl_vat} totalAmount={d.total_amount} totalVat={d.total_vat}
                 variancePct={d.lines_sum_variance_pct} canOverride={canWrite && !isFinal}

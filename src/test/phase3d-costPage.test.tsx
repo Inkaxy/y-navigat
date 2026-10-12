@@ -17,7 +17,7 @@ const proposal = { rawMaterialId: A, ok: true, name: "Mel", recalcId: null, line
 function base(over: Record<string, unknown> = {}) {
   return {
     rows: null, progress: { phase: "idle", done: 0, total: 0, label: "" }, summary: null,
-    ledger: { batches: [], unknownApplies: [] }, error: null, busy: null, canWrite: true, accessLoading: false,
+    ledger: { batches: [], unknownApplies: [] }, pending: [], error: null, busy: null, canWrite: true, accessLoading: false,
     scan: vi.fn(), apply: vi.fn(), undoBatch: vi.fn(), cancel: vi.fn(), reset: vi.fn(),
     acknowledgeUnknown: vi.fn(), acknowledgeUndo: vi.fn(), dismissBatch: vi.fn(), ...over,
   };

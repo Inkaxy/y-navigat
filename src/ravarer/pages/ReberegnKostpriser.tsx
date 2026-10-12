@@ -104,6 +104,12 @@ export default function ReberegnKostpriser() {
           </Card>
         )}
 
+        {r.pending.length > 0 && !busy && (
+          <Card role="status" className="border-warning/40 bg-warning/10 p-4 text-sm">
+            En tidligere {r.pending.some((p) => p.kind === "undo") ? "angring" : "kjøring"} for {new Set(r.pending.flatMap((p) => p.rawMaterialIds)).size} varer venter fortsatt på svar. Disse varene kan ikke kjøres eller angres før svaret er kommet.
+          </Card>
+        )}
+
         {ledger.unknownApplies.map((u) => (
           <Card key={u.opId} role="alert" className="flex flex-wrap items-center justify-between gap-3 border-warning/40 bg-warning/10 p-4 text-sm">
             <span>Ukjent utfall for {u.rawMaterialIds.length} varer: svaret kom ikke fram, så de kan være reberegnet. Ingenting kjøres automatisk på nytt. Kontroller råvarene før en ny kjøring.</span>

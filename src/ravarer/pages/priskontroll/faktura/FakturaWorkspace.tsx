@@ -177,7 +177,7 @@ export default function FakturaWorkspace() {
       s.setResult({ title: "Velg linjen som skal rettes", items: ["Velg linjen i listen og bruk «Rett fakturalinje»."] });
       return;
     }
-    if (!isMobile && !docOpen && data.source_document_url) toggleDoc();
+    // Originalen vises i selve rettedialogen (samme linje); ingen ekstra dokumentark åpnes bak den.
     setCorrectFor(t.id);
   };
 
