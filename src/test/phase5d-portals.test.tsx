@@ -86,13 +86,14 @@ describe("SupplierPortal", () => {
     expect(calls.map((c) => c.fn)).toEqual(["validate-rfq-access", "submit-negotiation-response", "validate-rfq-access"]);
   });
 
-  it("kjent already_submitted låser skjemaet", async () => {
+  it("kjent already_submitted låser skjemaet til status er lest (ingen kvittering antas)", async () => {
     mount("/tilbud/t1", <SupplierPortal />, "/tilbud/:token");
     queue.push({ status: 200, body: rfqOk });
     await login();
     queue.push({ status: 409, body: { result: "already_submitted" } });
     fireEvent.click(await screen.findByRole("button", { name: /Lagre kladd/ }));
-    expect(await screen.findByText("Sendt — låst")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: /Les status på nytt/ })).toBeTruthy();
+    expect(screen.queryByText("Sendt — låst")).toBeNull();
     expect(toast.error).toHaveBeenCalledWith("Tilbudet er allerede sendt og låst.");
   });
 
