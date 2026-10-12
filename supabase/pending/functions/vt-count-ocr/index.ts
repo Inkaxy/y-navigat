@@ -10,12 +10,12 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { PDFDocument } from "npm:pdf-lib@1.17.1";
 import { callAi, extractJson, type AiProvider } from "../_shared/ai-providers.ts";
 import { decryptWithKey } from "../_shared/crypto.ts";
-import { buildManifest, matchDocument, parseOcrPage, VT_OCR_MAX_PAGES, VT_OCR_SYSTEM_PROMPT, type ManifestLine, type OcrPage } from "./ocrCore.ts";
+import { manifestFromIssued, matchDocument, VT_SHEET_LAYOUT, parseOcrPage, VT_OCR_MAX_PAGES, VT_OCR_SYSTEM_PROMPT, type ManifestLine, type OcrPage } from "./ocrCore.ts";
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-interface Original { path: string; sha256: string; size: number; mime: string }
-interface Claim { attempt_id: string; count_id: string; list_id: string; template_revision: number; originals: Original[]; lines: ManifestLine[] }
+interface Original { path: string; sha256: string; size: number; mime: string; role: "side" | "original" }
+interface Claim { attempt_id: string; count_id: string; list_id: string; template_revision: number; originals: Original[]; lines: ManifestLine[]; manifests: { layout_version: number; pages: string[][] }[] }
 
 async function sha256Hex(b: Uint8Array<ArrayBuffer>): Promise<string> {
   const d = await crypto.subtle.digest("SHA-256", b); return [...new Uint8Array(d)].map(x => x.toString(16).padStart(2, "0")).join("");
@@ -70,8 +70,14 @@ Deno.serve(async (req) => {
     if (bytes.length !== o.size || (await sha256Hex(bytes)) !== o.sha256) return fail("En lagret side stemmer ikke med registrert fil (SHA-256/størrelse)");
     files.push({ o, bytes });
   }
+  // Utstedt manifest for gjeldende sideoppsett må finnes; ellers leses ingenting (ingen kostnad).
+  const issued = c.manifests.find(m => m.layout_version === VT_SHEET_LAYOUT);
+  if (!issued) return fail("Listen er ikke skrevet ut med gjeldende sideoppsett — skriv ut på nytt før opplasting");
+  let manifest;
+  try { manifest = manifestFromIssued(c.count_id, c.list_id, c.template_revision, issued.pages, c.lines); } catch { return fail("Utstedt manifest stemmer ikke med listen"); }
   let pdfPages: Uint8Array[];
-  try { pdfPages = await pagesFrom(files); } catch { return fail(`Filene kunne ikke gjøres om til sider (maks ${VT_OCR_MAX_PAGES} sider per jobb)`); }
+  // Bare «side»-filer leses; bevarte originaler (WEBP) er verifisert, men leses ikke.
+  try { pdfPages = await pagesFrom(files.filter(f => f.o.role === "side")); } catch { return fail(`Filene kunne ikke gjøres om til sider (maks ${VT_OCR_MAX_PAGES} sider per jobb)`); }
   const { error: pcErr } = await admin.rpc("vt_ocr_record_page_count", { p_job_id: jobId, p_attempt_id: attempt, p_pages: pdfPages.length });
   if (pcErr) return json(200, { status: "ukjent_lagring" });
 
@@ -99,7 +105,7 @@ Deno.serve(async (req) => {
   }
 
   // 4) Identitetskontroll mot manifest og lagring med samme attempt_id.
-  const result = matchDocument({ pages }, buildManifest(c.count_id, c.list_id, c.template_revision, c.lines));
+  const result = matchDocument({ pages }, manifest);
   const { error: recErr } = await admin.rpc("vt_ocr_record_result", { p_job_id: jobId, p_attempt_id: attempt, p_document_ok: result.document_ok, p_issues: result.issues, p_proposals: result.proposals });
   if (recErr) return json(200, { status: "ukjent_lagring" });
   return json(200, { status: "klar", document_ok: result.document_ok, proposals: result.proposals.length, issues: result.issues.length });

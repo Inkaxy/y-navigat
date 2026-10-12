@@ -156,6 +156,17 @@ export function matchDocument(doc: OcrDoc, manifest: ManifestPage[]): MatchResul
   return { document_ok: blocking.length === 0, issues, proposals, pages_seen: [...seen.keys()].sort((a, b) => a - b) };
 }
 
+/**
+ * Manifest fra en UTSTEDT sideinndeling (lagret ved utskrift). Ukjente linje-ID-er eller linjer som mangler gir feil —
+ * historiske ark valideres mot det som faktisk ble trykt, ikke en rekonstruksjon.
+ */
+export function manifestFromIssued(countId: string, listId: string, templateRevision: number, pages: string[][], lines: ManifestLine[]): ManifestPage[] {
+  const byId = new Map(lines.map(l => [l.id, l]));
+  const ids = pages.flat();
+  if (new Set(ids).size !== ids.length || ids.length !== lines.length || ids.some(id => !byId.has(id))) throw new Error("Utstedt manifest stemmer ikke med listen");
+  return pages.map((p, i) => ({ page: i + 1, pages: pages.length, identity: sheetIdentityOf(countId, listId, templateRevision, i + 1, pages.length), lines: p.map(id => byId.get(id) as ManifestLine) }));
+}
+
 /** Et forslag kan godkjennes bare når hvert felt er avklart: gyldig verdi + kjent enhet, eller eksplisitt utelatt med begrunnelse. */
 export interface EntryDecision { value: number | null; unit_id: string | null; unit_chosen: boolean; excluded: boolean; exclude_reason: string }
 export function proposalResolution(entries: ProposalEntry[], decisions: EntryDecision[]): { ok: boolean; problems: string[] } {
