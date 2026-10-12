@@ -186,7 +186,7 @@ export default function ForhandlingWizard() {
   const [genUnknown, setGenUnknown] = useState(false);
   const [confirmRegen, setConfirmRegen] = useState(false);
   const genLock = useRef(false);
-  const itemsLocked = !canReplaceNegotiationItems(neg?.status ?? "draft", recipients);
+  const itemsLocked = !canReplaceNegotiationItems(existing?.status ?? "draft", recipients);
 
   async function handleSend() {
     if (!negotiationId || genLock.current) return;
