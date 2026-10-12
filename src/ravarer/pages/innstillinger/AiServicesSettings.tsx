@@ -49,7 +49,6 @@ const MODELS: Record<Provider, { value: string; label: string; recommended?: boo
 
 export default function AiServicesSettings() {
   const embedded = useIsEmbedded();
-  const qc = useQueryClient();
 
   const configs = useQuery({
     queryKey: ["ai-configs"],
