@@ -8,6 +8,8 @@ import type { PreviewState, PreviewTarget } from "@/ravarer/hooks/useSingleRecal
  * SKRIVEBESKYTTET DEMONSTRASJON — syntetiske data. Viser den faktiske SingleRecalcDetail med svar som går gjennom
  * den faktiske strenge parseren. Ingen nettverk, ingen hooks mot serveren, ingen tilgangsomgåelse og ingen skrivehandlinger.
  */
+// Faktorkilde «leverandør» (nåværende reserve), egen konstant så den ikke forveksles med næringskildevokabularet.
+const SUPPLIER_FALLBACK = "leverandor";
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const line = (n: number, over: Record<string, unknown>) => ({
   line_id: id(n), invoice_date: "2026-09-15", invoice_number: `DEMO-${n}`, description: "Demolinje", quantity: 2, unit: "sekk",
@@ -18,7 +20,7 @@ const changes = [
   line(1, { description: "Hvetemel siktet spesial 20 kg sekk (demo)" }),
   line(2, { description: "Kreditert hvetemel 20 kg (demo)", quantity: -2, total_amount: -100, new_base_qty: -40, factor_source: "variant_varenr" }),
   line(3, { description: "Hvetemel løsvekt i gram (demo)", quantity: 1000, unit: "g", total_amount: 10, new_base_qty: 1, new_ppb: 10, old_ppb: 10, method: "direkte", factor_source: "ravare" }),
-  line(4, { description: "Ført linje, låst (demo)", old_ppb: 7, new_ppb: 7, locked: true, applies: false, factor_source: "leverandor" }),
+  line(4, { description: "Ført linje, låst (demo)", old_ppb: 7, new_ppb: 7, locked: true, applies: false, factor_source: SUPPLIER_FALLBACK }),
   line(5, { description: "Prøvepose med svært liten mengde (demo)", quantity: 0.0000001, unit: "g", total_amount: 1, new_base_qty: 0, new_ppb: 10000000, method: "direkte", applies: false, preview_reason: "Pakning ikke bekreftet", factor_source: "linje_ulest" }),
   line(6, { description: "Ukjent enhet «kartong» uten pakning (demo)", unit: "kartong", new_base_qty: null, new_ppb: null, method: "ukjent_enhet", factor: null, factor_source: null, applies: null }),
   line(7, { description: "Langt varenavn: Økologisk steinmalt sammalt spelt med særlig høy proteinandel, pakket i papirsekk med plastforing (demo)", total_amount: null, new_ppb: null }),
