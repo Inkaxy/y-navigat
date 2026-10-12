@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useQueryClient } from "@tanstack/react-query";
-import { useOpAction, useVtScope, vtKeys } from "../hooks";
+import { useOpAction, useVtScope } from "../hooks";
 import { entryToBase, formatAmount, parseNorwegianAmount } from "../logic";
 import { checkUploadFile, useStage3Api, type VtOcrJob, type VtOcrProposal } from "../stage3";
 import { s3Keys, useS3Read, useStage3Ready } from "../stage3Hooks";
@@ -161,4 +161,3 @@ function ProposalCard({ p, line, docOk, open }: { p: VtOcrProposal; line: VtCoun
     </Card>
   );
 }
-export { vtKeys };
