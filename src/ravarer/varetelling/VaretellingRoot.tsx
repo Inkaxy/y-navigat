@@ -7,8 +7,9 @@ import { VaretellingWorkspace } from "./components/VaretellingWorkspace";
 
 /** Produksjonsinngang: ekte firma, rettigheter og Supabase. Dagstellingen er uendret. */
 export default function VaretellingRoot() {
-  const { legalEntityId, canWrite, accessLevel } = useRavarer();
-  const scope = useMemo(() => ({ entity: legalEntityId, canWrite, canApprove: accessLevel === "approve" || accessLevel === "admin" }), [legalEntityId, canWrite, accessLevel]);
+  const { legalEntityId, canWrite, accessLevel, user } = useRavarer();
+  const userId = user?.id ?? null;
+  const scope = useMemo(() => ({ entity: legalEntityId, userId, canWrite, canApprove: accessLevel === "approve" || accessLevel === "admin" }), [legalEntityId, userId, canWrite, accessLevel]);
   return (
     <VtApiContext.Provider value={supabaseVtApi}>
       <VtScopeContext.Provider value={scope}>

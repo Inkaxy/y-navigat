@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useSyncExternalStore } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useVtApi, VtBackendUnavailableError, VtRejectedError, VtUnknownOutcomeError } from "./api";
 import { pendingStoreFor, type PendingOp, type PendingStore } from "./pendingStore";
 import type { EntryInput, LineState, SaveLineResult, ValuationMode, VtCountLine } from "./types";
@@ -105,7 +105,6 @@ export function useVtInvalidate() {
   const qc = useQueryClient(); const { entity } = useVtScope();
   return () => qc.invalidateQueries({ queryKey: vtKeys.all(entity) });
 }
-export { useMutation };
 
 // ---------------- Linjelagring ----------------
 export type LineSaveStatus =
