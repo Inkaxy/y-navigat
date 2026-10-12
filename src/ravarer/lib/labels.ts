@@ -74,6 +74,38 @@ export const NEGOTIATION_STATUS_LABEL: Record<string, string> = {
 export type LabelMeta = { label: string; tokenVar: string; hint?: string };
 export type LabelMap = Record<string, LabelMeta>;
 
+/** Forhandlingsstatus med fargetoken (StatusPill). */
+export const NEGOTIATION_STATUS_LABELS: LabelMap = {
+  draft: { label: NEGOTIATION_STATUS_LABEL.draft, tokenVar: "--state-neutral", hint: "Ikke sendt ut ennå." },
+  invited: { label: NEGOTIATION_STATUS_LABEL.invited, tokenVar: "--state-info", hint: "Lenker er generert." },
+  in_progress: { label: NEGOTIATION_STATUS_LABEL.in_progress, tokenVar: "--state-warning" },
+  awaiting_confirmation: { label: NEGOTIATION_STATUS_LABEL.awaiting_confirmation, tokenVar: "--state-info", hint: "Venter på at leverandøren bekrefter." },
+  concluded: { label: NEGOTIATION_STATUS_LABEL.concluded, tokenVar: "--state-success" },
+  cancelled: { label: NEGOTIATION_STATUS_LABEL.cancelled, tokenVar: "--state-danger" },
+};
+
+/** Status per vare i en live-forhandling. */
+export const LIVE_ITEM_STATUS_LABELS: LabelMap = {
+  pending: { label: "Ikke startet", tokenVar: "--state-neutral" },
+  discussing: { label: "Diskuteres", tokenVar: "--state-warning" },
+  tentatively_agreed: { label: "Foreløpig enig", tokenVar: "--state-info" },
+  agreed: { label: "Enig", tokenVar: "--state-success" },
+  declined: { label: "Avslått", tokenVar: "--state-danger" },
+  parked: { label: "Parkert", tokenVar: "--state-neutral" },
+  confirmed: { label: "Bekreftet", tokenVar: "--state-success" },
+  unconfirmed_active: { label: "Aktivert uten bekreftelse", tokenVar: "--state-warning" },
+};
+
+/** Status per mottaker (leverandør) i en forhandling. */
+export const RECIPIENT_STATUS_LABELS: LabelMap = {
+  invited: { label: "Invitert", tokenVar: "--state-info" },
+  viewed: { label: "Åpnet", tokenVar: "--state-info" },
+  responded: { label: "Har svart", tokenVar: "--state-success" },
+  declined: { label: "Takket nei", tokenVar: "--state-danger" },
+  expired: { label: "Utløpt", tokenVar: "--state-neutral" },
+  locked: { label: "Låst", tokenVar: "--state-danger" },
+};
+
 export const FALLBACK_LABEL = "Annen årsak";
 const NEUTRAL = "--state-neutral";
 
