@@ -280,7 +280,7 @@ export default function FakturaWorkspace() {
       {s.result && <ResultBox title={s.result.title} items={s.result.items} onUndo={s.result.undoable && q.undoEntry ? () => { s.setResult(null); void q.undo(); } : undefined} onNext={() => s.setResult(null)} nextLabel="Lukk" />}
       {lastLinked && <SimilarLinesHint rmsId={lastLinked.rmsId} name={lastLinked.name} onOpen={() => q.setBulkLink(lastLinked)} onDismiss={() => setLastLinked(null)} />}
       <div className="flex justify-end">
-        <Button variant="ghost" size="sm" aria-pressed={showTable} onClick={() => { setForceList(false); setTableView(!showTable); }}>{showTable ? "Vis arbeidsliste" : "Vis som tabell"}</Button>
+        <Button variant="ghost" size="sm" className="min-h-[44px]" aria-pressed={showTable} onClick={() => { setForceList(false); setTableView(!showTable); }}>{showTable ? "Vis arbeidsliste" : "Vis som tabell"}</Button>
       </div>
       {showTable ? (
         <InvoiceLinesTable
@@ -348,7 +348,7 @@ export default function FakturaWorkspace() {
           onInspectorOpenChange={setInspectorOpen}
           inspectorNote={active ? (
             <div className="space-y-2">
-              <Button variant="outline" size="sm" onClick={() => setCorrectFor(active.id)}>Rett fakturalinje</Button>
+              <Button variant="outline" size="sm" className="min-h-[44px]" onClick={() => setCorrectFor(active.id)}>Rett fakturalinje</Button>
               <SupplierItemScopeNote supplierId={data.supplier_id} line={active} />
             </div>
           ) : null}
@@ -405,7 +405,7 @@ export default function FakturaWorkspace() {
           {!(zone === "linjer" && inspectorOpen) && (
             <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 py-3 backdrop-blur">
               <p className="mb-1.5 truncate text-caption text-ink-secondary">{s.next.hint}</p>
-              <Button className="w-full" disabled={!s.next.enabled || s.busy || fetchLines.isPending} onClick={runPrimary}>{s.next.label}</Button>
+              <Button className="min-h-[44px] w-full" disabled={!s.next.enabled || s.busy || fetchLines.isPending} onClick={runPrimary}>{s.next.label}</Button>
             </div>
           )}
         </div>

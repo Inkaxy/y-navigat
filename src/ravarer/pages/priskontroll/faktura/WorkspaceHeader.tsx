@@ -110,7 +110,7 @@ export function WorkspaceHeader(p: Props) {
               <DropdownMenuItem onSelect={() => p.onMenu("history")}>Revisjonshistorikk</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button size="sm" className="hidden sm:inline-flex" data-primary-action disabled={!p.next.enabled || p.busy} title={p.next.hint} onClick={p.onPrimary}>
+          <Button size="sm" className="hidden min-h-[44px] sm:inline-flex" data-primary-action disabled={!p.next.enabled || p.busy} title={p.next.hint} onClick={p.onPrimary}>
             {p.busy && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden />}
             {p.next.label}
           </Button>
