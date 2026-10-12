@@ -154,7 +154,6 @@ export function useCostRecalc() {
     } finally {
       end();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const apply = useCallback(async (ids: readonly string[]) => {
@@ -207,7 +206,6 @@ export function useCostRecalc() {
       }
       end();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qc]);
 
   const undoBatch = useCallback(async (batchId: string) => {
@@ -235,7 +233,6 @@ export function useCostRecalc() {
       if (live.current.mounted) setProgress(IDLE);
       end();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qc]);
 
   /** Nullstiller bare forhåndsvisningen; kvitteringer og uavklarte utfall beholdes. */
