@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { classifyApplyOutcome, readEdgeErrorBody } from "@/ravarer/lib/negotiationOps";
-import { formatDateTime } from "@/lib/format";
+import { formatDate as formatDateTime } from "@/ravarer/lib/constants";
 import { LiveItemStatusPill } from "@/ravarer/components/forhandlinger/NegotiationPills";
 import type { NegotiationItemRow, NegotiationRecipientRow, NegotiationRow } from "@/ravarer/hooks/useNegotiations";
 
