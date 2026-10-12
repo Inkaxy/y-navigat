@@ -1,11 +1,18 @@
--- FORSLAG — IKKE KJØRT. Privat bøtte for originale tellelister. Krever stage3-forslaget.
--- Sti: <firma>/<telling>/<liste>/<jobb>/side-N.<pdf|jpg|png> — bestemt av vt_ocr_create_job (originals[].path).
+-- FORSLAG — POLICYENE ER IKKE KJØRT. Krever stage3-forslaget (vt_ocr_jobs).
+-- Sti: <firma>/<telling>/<liste>/<jobb>/side-N.<pdf|jpg|png> og original-N.webp — bestemt av vt_ocr_create_job (originals[].path).
 -- Opplasting bare til sti som tilhører en jobb brukeren selv opprettet og som fortsatt er «opprettet».
 -- Ingen oppdatering/sletting fra klient (originalen bevares som bevis). Serveren verifiserer SHA-256/størrelse før lesing.
--- Merk: bøtten opprettes av root med lagringsverktøyet (ikke SQL-innsetting) ved utrulling; INSERT under er dokumentasjon.
-INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES ('vt-count-uploads', 'vt-count-uploads', false, 20971520, ARRAY['application/pdf','image/jpeg','image/png'])
-ON CONFLICT (id) DO NOTHING;
+--
+-- BØTTE (opprettet 12.10.2026 med Storage-API-verktøyet, ikke SQL; denne filen inneholder bare policyer):
+--   id/name            : vt-count-uploads
+--   public             : false (privat)
+--   file_size_limit    : 20971520 (20 MiB) — bekreftet i storage.buckets
+--   allowed_mime_types : ønsket application/pdf, image/jpeg, image/png, image/webp (WEBP for bevart original).
+--                        IKKE satt: verktøyet støtter ikke MIME-liste, og SQL-oppdatering av storage.buckets er
+--                        ikke tillatt. Står nå NULL (ingen bøttebegrensning). Filtype håndheves av
+--                        vt_ocr_create_job (mime + sti-endelse) og insert-policyen under (eksakt jobbsti).
+--                        Root kan sette listen i Supabase-dashbordet (Storage › vt-count-uploads › Edit).
+
 
 CREATE POLICY vt_uploads_insert ON storage.objects FOR INSERT TO authenticated
 WITH CHECK (bucket_id = 'vt-count-uploads' AND EXISTS (

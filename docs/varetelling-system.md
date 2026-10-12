@@ -227,3 +227,8 @@ Tekniske hovedføringer: gjenbruk eksisterende firma- og tilgangsmodell; egne id
 - Tildeling: datoregler og eier-/plattformunntak avgjøres av live `has_ravarer_access`; navn hentes i biter à 500.
 - E-post: forhåndsvisning viser tilkoblet avsender; ukjent status beskrives som ukjent.
 - Begrensninger: ingen ekte samtidighetstest (serielle PGlite-tester); A4 kontrollert med faste radhøyder og sidebudsjett, ikke fysisk utskrift; WEBP-original ↔ avledning er klientoppgitt kobling (ikke kryptografisk bevist); 7 Deno-typefeil gjenstår i uendrede delte filer (crypto.ts, m365-crypto.ts, graph-mail.ts).
+
+## Lagringsbøtte og uavhengig kontroll (12.10.2026)
+- Root har uavhengig kjørt oppdaterte SQL-tester og positiv avslutning med prisavklaring på stage6 `42b9835d` — bestått.
+- Privat bøtte `vt-count-uploads` opprettet med Storage-API-verktøyet: public=false, 20 MiB (20971520) bekreftet. Tillatte filtyper (pdf/jpeg/png/webp) kunne ikke settes med verktøyet og står NULL; håndheves av `vt_ocr_create_job` og insert-policyen. Kan settes i dashbordet.
+- Storage-policyer (`20261012_varetelling_stage3_storage.PENDING.sql`) er fortsatt ikke kjørt; ingen SQL-migrasjon eller Edge-deploy.
