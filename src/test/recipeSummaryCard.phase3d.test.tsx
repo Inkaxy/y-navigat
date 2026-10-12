@@ -41,7 +41,7 @@ import { RecipeSummaryCard } from "@/varer/components/products/RecipeSummaryCard
 
 const rowA = { id: "L1", product_id: "P1", recipe_id: "RA", updated_at: "2026-10-12T07:08:09.123456+00:00", sales_unit_basis: "flerpakk", units_per_sales_unit: 6, sales_unit_weight_g: 600, units_per_batch_override: 20, sales_unit_confirmed_at: null, sales_unit_confirmed_by: null };
 const rowB = { ...rowA, recipe_id: "RB", updated_at: "2026-10-12T07:09:00.654321+00:00" };
-const nullish = () => new Proxy({}, { get: (_t, k) => (k === "then" ? undefined : null) });
+const nullish = () => new Proxy({}, { get: (_t, k) => (k === "then" ? undefined : k === "missing" ? [] : null) });
 const bundleFor = (link: typeof rowA | null, name: string) => ({
   link, recipe: link ? { id: link.recipe_id, name, version: 1, status: "approved", updated_at: "2026-10-01T00:00:00Z" } : null,
   lines: [], basis: nullish(), cost: nullish(), totalFlourG: 0, hydrationPct: null, totalDoughG: 0, finalWeightG: null, unitCount: null,
