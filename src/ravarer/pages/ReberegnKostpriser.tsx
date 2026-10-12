@@ -16,7 +16,7 @@ import { FilterChips } from "@/ravarer/ui/FilterChips";
 import { RAVARER_EYEBROW } from "@/ravarer/pages/hub/hubTabs";
 import { BUCKETS, RECALC_COLUMNS, UNDO_LABEL, kr } from "@/ravarer/pages/reberegn/reberegnColumns";
 import { useCostRecalc, type RecalcBucket, type RecalcRow } from "@/fakturaer/hooks/useCostRecalc";
-import { outstanding } from "@/ravarer/lib/recalcLedger";
+import { outstanding, unresolvedIds } from "@/ravarer/lib/recalcLedger";
 import { paths } from "@/ravarer/lib/paths";
 import { CostDeviationsCard } from "@/ravarer/components/CostDeviationsCard";
 
@@ -29,6 +29,8 @@ export default function ReberegnKostpriser() {
   const [q, setQ] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [tab, setTab] = useState<RecalcBucket>("endres");
+  const [dismissId, setDismissId] = useState<string | null>(null);
+  const unresolved = useMemo(() => unresolvedIds(ledger), [ledger]);
 
   const byBucket = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -42,6 +44,9 @@ export default function ReberegnKostpriser() {
   const selectable = useMemo(() => (rows ?? []).filter((x) => x.proposal), [rows]);
   const selectedIds = useMemo(() => selectable.filter((x) => checked.has(x.rawMaterialId)).map((x) => x.rawMaterialId), [selectable, checked]);
   const running = busy !== null;
+  const blockedSelected = selectedIds.filter((id) => unresolved.has(id));
+  const dismissBatch = dismissId ? ledger.batches.find((b) => b.batchId === dismissId) ?? null : null;
+  const dismissOpen = dismissBatch ? outstanding(dismissBatch).length : 0;
   const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
 
   return (
@@ -53,8 +58,6 @@ export default function ReberegnKostpriser() {
       actions={<Button asChild variant="ghost" size="sm" className="gap-1"><Link to={paths.priskontroll({ fane: "gjore" })}><ArrowLeft className="h-3.5 w-3.5" aria-hidden />Priskontroll</Link></Button>}
     >
       <div className="space-y-5 px-page pb-6">
-        <CostDeviationsCard />
-
         <Card className="p-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-2xl space-y-1 text-sm text-ink-secondary">
@@ -65,13 +68,14 @@ export default function ReberegnKostpriser() {
                 anslag nå. Ved kjøring settes gjeldende kostpris av den vanlige regelen (nyeste gyldige pris etter dato), og den kan avvike
                 fra forslaget. Den faktiske kostprisen vises i kvitteringen etterpå.
               </p>
-              {!canWrite && <p role="status">Du har lesetilgang. Forslag kan vises, men ikke kjøres eller angres.</p>}
+              {r.accessLoading && <p role="status">Kontrollerer tilgang …</p>}
+              {!r.accessLoading && !canWrite && <p role="status">Du har lesetilgang. Forslag, kjøring og angring krever skrivetilgang til Råvarer, fordi serverens prøvekjøring også gjør det.</p>}
             </div>
             <div className="flex items-center gap-2">
               {running && busy !== "undo" && (
                 <Button variant="ghost" className="min-h-[44px]" onClick={r.cancel}><X className="mr-1.5 h-4 w-4" aria-hidden /> Stopp etter pågående steg</Button>
               )}
-              <Button className="min-h-[44px]" onClick={() => { setChecked(new Set()); void r.scan(); }} disabled={running}>
+              <Button className="min-h-[44px]" onClick={() => { setChecked(new Set()); void r.scan(); }} disabled={running || !canWrite}>
                 <Calculator className="mr-1.5 h-4 w-4" aria-hidden />{rows ? "Hent nytt forslag" : "Hent forslag"}
               </Button>
             </div>
@@ -103,7 +107,7 @@ export default function ReberegnKostpriser() {
         {ledger.unknownApplies.map((u) => (
           <Card key={u.opId} role="alert" className="flex flex-wrap items-center justify-between gap-3 border-warning/40 bg-warning/10 p-4 text-sm">
             <span>Ukjent utfall for {u.rawMaterialIds.length} varer: svaret kom ikke fram, så de kan være reberegnet. Ingenting kjøres automatisk på nytt. Kontroller råvarene før en ny kjøring.</span>
-            <Button variant="outline" size="sm" className="min-h-[44px]" onClick={() => r.acknowledgeUnknown(u.opId)}>Jeg har kontrollert</Button>
+            <Button variant="outline" size="sm" className="min-h-[44px]" disabled={running} onClick={() => r.acknowledgeUnknown(u.opId)}>Jeg har kontrollert</Button>
           </Card>
         ))}
 
@@ -114,15 +118,18 @@ export default function ReberegnKostpriser() {
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-subtle px-4 py-3">
                 <h3 className="text-sm font-semibold text-ink-primary">Kvittering ({b.items.length} reberegnet{b.failures.length ? `, ${b.failures.length} feilet` : ""})</h3>
                 <div className="flex gap-2">
+                  {b.undoUnknown && (
+                    <Button variant="outline" size="sm" className="min-h-[44px]" disabled={running} onClick={() => r.acknowledgeUndo(b.batchId)}>Jeg har kontrollert angringen</Button>
+                  )}
                   {canWrite && open.length > 0 && (
-                    <Button variant="outline" size="sm" className="min-h-[44px]" disabled={running} onClick={() => void r.undoBatch(b.batchId)}>
+                    <Button variant="outline" size="sm" className="min-h-[44px]" disabled={running || b.undoUnknown} onClick={() => void r.undoBatch(b.batchId)}>
                       <Undo2 className="mr-1.5 h-3.5 w-3.5" aria-hidden /> Angre {open.length}
                     </Button>
                   )}
-                  <Button variant="ghost" size="sm" className="min-h-[44px]" disabled={running || b.undoUnknown} onClick={() => r.dismissBatch(b.batchId)}>Fjern kvittering</Button>
+                  <Button variant="ghost" size="sm" className="min-h-[44px]" disabled={running || b.undoUnknown} onClick={() => (open.length > 0 ? setDismissId(b.batchId) : r.dismissBatch(b.batchId))}>Fjern kvittering</Button>
                 </div>
               </div>
-              {b.undoUnknown && <p role="alert" className="px-4 pt-3 text-sm text-ink-secondary">Utfallet av siste angring er ukjent. Kvitteringen er uendret — kontroller råvarene.</p>}
+              {b.undoUnknown && <p role="alert" className="px-4 pt-3 text-sm text-ink-secondary">Utfallet av siste angring er ukjent. Kvitteringen er uendret — kontroller råvarene og bekreft før du angrer på nytt.</p>}
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-surface-sunken text-caption uppercase tracking-wide text-ink-secondary">
@@ -172,8 +179,9 @@ export default function ReberegnKostpriser() {
             />
             {canWrite && (
               <div className="flex flex-wrap items-center justify-end gap-2">
+                {blockedSelected.length > 0 && <span role="alert" className="text-caption text-warning">{blockedSelected.length} valgte har uavklart utfall — kontroller og bekreft dem først.</span>}
                 <span className="text-caption text-ink-secondary">{selectedIds.length} valgt</span>
-                <Button className="min-h-[44px]" disabled={running || selectedIds.length === 0} onClick={() => setConfirmOpen(true)}>Reberegn valgte</Button>
+                <Button className="min-h-[44px]" disabled={running || selectedIds.length === 0 || blockedSelected.length > 0} onClick={() => setConfirmOpen(true)}>Reberegn valgte</Button>
               </div>
             )}
           </Card>
@@ -190,10 +198,28 @@ export default function ReberegnKostpriser() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Avbryt</AlertDialogCancel>
-              <AlertDialogAction disabled={running} onClick={() => void r.apply(selectedIds)}>Reberegn</AlertDialogAction>
+              <AlertDialogAction disabled={running || blockedSelected.length > 0} onClick={() => void r.apply(selectedIds)}>Reberegn</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <AlertDialog open={!!dismissBatch} onOpenChange={(o) => { if (!o) setDismissId(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Fjerne kvitteringen?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {dismissOpen} reberegnede råvarer kan fortsatt angres herfra. Fjerner du kvitteringen, kan de ikke lenger angres fra denne
+                siden. Kostprisene endres ikke av at kvitteringen fjernes.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="min-h-[44px]">Behold</AlertDialogCancel>
+              <AlertDialogAction className="min-h-[44px]" onClick={() => { if (dismissId) r.dismissBatch(dismissId); setDismissId(null); }}>Fjern likevel</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <CostDeviationsCard />
       </div>
     </ModulePage>
   );
