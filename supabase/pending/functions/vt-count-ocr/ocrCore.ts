@@ -10,6 +10,8 @@ export const VT_SHEET_CAPACITY = 14;
 export const VT_NAME_CHARS_PER_LINE = 30;
 /** Maks sider i én lesejobb (hver side leses i eget, avgrenset kall). */
 export const VT_OCR_MAX_PAGES = 20;
+/** Maks sider per Edge-kall; resten fortsettes i nye kall på samme forsøk (gjenopptakbart). */
+export const VT_OCR_PAGES_PER_CALL = 3;
 
 export interface SheetLine { id: string; snap_name: string; snap_units: { id: string; label: string; units_in_base: number }[] }
 /** Rad-enheter: to navnelinjer og én pakningslinje per enhet; aldri mindre enn 1. */
