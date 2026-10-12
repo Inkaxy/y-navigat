@@ -37,7 +37,7 @@ const MODELS: Record<Provider, { value: string; label: string; recommended?: boo
   ],
   openai: [
     { value: "gpt-4o", label: "GPT-4o", recommended: true },
-    { value: "gpt-4o-mini", label: "GPT-4o mini (billigere)" },
+    { value: "gpt-4o-mini", label: "GPT-4o mini" },
     { value: "gpt-4.1", label: "GPT-4.1" },
     { value: "gpt-4.1-mini", label: "GPT-4.1 mini" },
   ],
@@ -88,8 +88,7 @@ export default function AiServicesSettings() {
         <AlertTitle>Bruk din egen AI-API</AlertTitle>
         <AlertDescription className="text-sm mt-2">
           Konfigurer din egen AI-leverandør for full kontroll på kostnader og kvalitet.
-          Anbefalt modell for fakturaekstraksjon: <b>Claude Sonnet 4.5</b> (best ytelse på norske dokumenter)
-          eller <b>GPT-4o</b> (lavere kostnad).
+          Modellvalget er ikke kvalitetsvurdert mot egne fakturaer; velg ut fra leverandørens dokumentasjon og kontroller resultatene.
         </AlertDescription>
       </Alert>
 
@@ -148,8 +147,8 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
 
   const fieldError =
     !model ? "Velg modell." :
-    maxTokens == null || !Number.isInteger(maxTokens) || maxTokens < 1 ? "Max tokens må være et helt tall." :
-    temperature == null || temperature < 0 || temperature > 2 ? "Temperature må være mellom 0 og 2." :
+    maxTokens == null || !Number.isInteger(maxTokens) || maxTokens < 1 ? "Maks antall tokens må være et helt tall." :
+    temperature == null || temperature < 0 || temperature > 2 ? "Temperatur må være mellom 0 og 2." :
     provider === "azure_openai" && (!azureEndpoint.trim() || !azureDeployment.trim()) ? "Azure krever endpoint og deployment." : null;
   // Tjenesten krever alltid ny nøkkel ved lagring — også for ikke-hemmelige endringer (ingen «behold nøkkel»).
   const keyNeeded = !apiKey.trim();
@@ -311,7 +310,7 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
               <SelectContent>
                 {modelOptions.map((m) => (
                   <SelectItem key={m.value} value={m.value}>
-                    {m.label} {"recommended" in m && m.recommended && <span className="ml-1 text-xs text-primary">★ anbefalt</span>}
+                    {m.label}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -347,11 +346,11 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
           )}
 
           <div>
-            <Label htmlFor="ai-max">Max tokens</Label>
+            <Label htmlFor="ai-max">Maks antall tokens (svarlengde)</Label>
             <Input id="ai-max" className="min-h-[44px] md:min-h-10" inputMode="numeric" value={d.maxTokens} onChange={(e) => set({ maxTokens: e.target.value })} />
           </div>
           <div>
-            <Label htmlFor="ai-temp">Temperature</Label>
+            <Label htmlFor="ai-temp">Temperatur (variasjon)</Label>
             <Input id="ai-temp" className="min-h-[44px] md:min-h-10" inputMode="decimal" value={d.temperature} onChange={(e) => set({ temperature: e.target.value })} />
           </div>
         </div>

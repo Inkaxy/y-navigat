@@ -432,9 +432,9 @@ function EntityConfig({ legalEntityId, onState }: { legalEntityId: string; onSta
           </div>
 
           <div className="space-y-2">
-            <Label>Sync-frekvens</Label>
+            <Label>Synkroniseringsfrekvens</Label>
             <Select value={String(frequency)} disabled={inputsDisabled} onValueChange={(v) => setFrequency(Number(v))}>
-              <SelectTrigger aria-label="Sync-frekvens"><SelectValue /></SelectTrigger>
+              <SelectTrigger aria-label="Synkroniseringsfrekvens"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="15">Hvert 15. minutt</SelectItem>
                 <SelectItem value="60">Hver time</SelectItem>

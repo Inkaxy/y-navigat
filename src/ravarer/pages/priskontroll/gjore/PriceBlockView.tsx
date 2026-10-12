@@ -84,7 +84,7 @@ export function PriceBlockView(p: PriceBlockViewProps) {
             <PriceDeviationNote actual={chosen[0].price_per_base_unit} expected={chosen[0].expected_price_per_base_unit} baseQuantity={chosen[0].base_quantity} tolerancePct={p.tolerancePct} settings={p.settings} />
           ) : (() => {
             const d = perLineDeviation(chosen, (l) => evaluatePriceDeviation({ actual: l.price_per_base_unit, expected: l.expected_price_per_base_unit, baseQuantity: l.base_quantity, tolPct: p.tolerancePct, minImpactNok: p.settings?.price_min_impact_nok ?? DEFAULT_MIN_IMPACT_NOK, hardCapPct: p.settings?.price_hard_cap_pct ?? DEFAULT_HARD_CAP_PCT }));
-            return <p data-testid="per-line-deviation" className={d.large ? "text-caption text-warning" : "text-caption text-ink-secondary"}>Vurdert per linje: {d.large} med stort avvik, {d.within} innenfor toleranse{d.unknown ? `, ${d.unknown} uten grunnlag` : ""}. Snittet vurderes ikke mot toleransen.</p>;
+            return <p data-testid="per-line-deviation" className={d.large ? "text-caption text-warning" : "text-caption text-ink-secondary"}>Vurdert per linje: {d.large} med stort avvik, {d.within} uten stort avvik{d.unknown ? `, ${d.unknown} uten grunnlag` : ""}. Snittet vurderes ikke mot toleransen.</p>;
           })()}
         </div>
       ) : mixed ? (
