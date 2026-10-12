@@ -206,7 +206,7 @@ export function OverviewTab({ rm, registerSave, onEditLink }: Props) {
                   disabled={!canWrite}
                   className={`rounded-full border px-3 py-1 text-xs transition ${
                     active
-                      ? "border-app bg-app/10 text-app font-medium"
+                      ? "border-app bg-app/10 text-primary font-medium"
                       : "border-border bg-background text-ink-secondary hover:bg-muted"
                   } ${isPrimary ? "ring-1 ring-app" : ""} ${!canWrite ? "opacity-60 cursor-not-allowed" : ""}`}
                   title={isPrimary ? "Primær kategori" : undefined}
