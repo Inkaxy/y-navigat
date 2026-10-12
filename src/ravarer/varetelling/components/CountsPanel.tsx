@@ -1,6 +1,5 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,11 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { osloTodayISO } from "@/lib/osloDate";
-import { useVtApi, VtUnknownOutcomeError } from "../api";
-import { useVtCounts, useVtCoverage, useVtMutation, useVtScope, useVtTemplates } from "../hooks";
-import { COUNT_STATUS_LABEL } from "../logic";
-import type { VtCount } from "../types";
-import { formatDateNo, Loading, Notice } from "./shared";
+import { useVtApi } from "../api";
+import { useOpAction, useVtCounts, useVtCoverage, useVtScope, useVtTemplates } from "../hooks";
+import { COUNT_STATUS_LABEL, priceReasonLabel } from "../logic";
+import type { ValuationMode, VtCount } from "../types";
+import { report } from "./CountControls";
+import { formatDateNo, Loading, Notice, PendingNotice } from "./shared";
 
 const ACTIVE: VtCount["status"][] = ["planlagt", "pagar", "til_kontroll"];
 
@@ -54,12 +54,14 @@ function CountRow({ c, onOpen }: { c: VtCount; onOpen: (id: string) => void }) {
       <span className="min-w-0">
         <span className="block font-medium break-words">{c.name}</span>
         <span className="text-xs text-muted-foreground">Telledato {formatDateNo(c.planned_date)} · {c.template_ids.length} lister
-          {c.valuation_date !== c.planned_date && <> · verdsatt {formatDateNo(c.valuation_date)}</>}</span>
+          {c.valuation_mode === "historisk" && c.valuation_date && <> · historisk verdsatt {formatDateNo(c.valuation_date)}</>}</span>
       </span>
       <Badge variant="outline">{COUNT_STATUS_LABEL[c.status]}</Badge>
     </button>
   );
 }
+
+type CreatePayload = { name: string; plannedDate: string; valuationMode: ValuationMode; valuationDate: string | null; templateIds: string[] };
 
 function CreateCount({ onDone }: { onDone: (id: string | null) => void }) {
   const { entity } = useVtScope();
@@ -68,36 +70,44 @@ function CreateCount({ onDone }: { onDone: (id: string | null) => void }) {
   const today = osloTodayISO();
   const [name, setName] = useState(`Varetelling ${formatDateNo(today)}`);
   const [planned, setPlanned] = useState(today);
+  const [mode, setMode] = useState<ValuationMode>("ved_start");
+  const [valDate, setValDate] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
-  const op = useRef<{ id: string; sig: string } | null>(null);
-  const coverage = useVtCoverage(picked);
-  const create = useVtMutation(api.createCount);
+  const create = useOpAction("create-count", "write", (opId, p: CreatePayload) => api.createCount({ opId, entity, ...p }));
+  const coverage = useVtCoverage(picked, mode, mode === "historisk" ? valDate || null : null);
   const active = useMemo(() => (templates.data ?? []).filter(t => !t.archived_at).sort((a, b) => a.department.localeCompare(b.department, "nb") || a.name.localeCompare(b.name, "nb")), [templates.data]);
-  const historic = planned < today;
-  const sig = JSON.stringify([name.trim(), planned, [...picked].sort()]);
-
-  const submit = () => {
-    if (create.isPending) return;
-    // Samme innhold etter ukjent utfall = samme op-id; endret innhold = ny.
-    if (!op.current || op.current.sig !== sig) op.current = { id: crypto.randomUUID(), sig };
-    create.mutate({ opId: op.current.id, entity, name, plannedDate: planned, valuationDate: planned, templateIds: picked }, {
-      onSuccess: r => { op.current = null; toast.success(r.repeated ? "Tellingen fantes allerede" : "Telling planlagt"); onDone(r.id); },
-      onError: e => { if (!(e instanceof VtUnknownOutcomeError)) op.current = null; toast.error(e.message); },
-    });
-  };
+  const historicInvalid = mode === "historisk" && (!valDate || valDate >= today);
+  const payload: CreatePayload = { name: name.trim(), plannedDate: planned, valuationMode: mode, valuationDate: mode === "historisk" ? valDate : null, templateIds: [...picked].sort() };
+  const submit = (p: CreatePayload) => void create.execute(p, JSON.stringify(p)).then(r => { if (report(r, "Telling planlagt") && r.kind === "ok") onDone(r.value.countId); });
+  const c = coverage.data;
 
   return (
     <Card className="space-y-4 p-4">
       <h3 className="font-semibold">Ny telling</h3>
+      <PendingNotice op={create.pending} onResend={() => { const p = create.pending?.payload as CreatePayload | undefined; if (p) submit(p); }} />
       <div className="grid gap-3 sm:grid-cols-2">
         <div><Label htmlFor="vt-c-name">Navn</Label><Input id="vt-c-name" className="h-12 sm:h-10" value={name} onChange={e => setName(e.target.value)} /></div>
-        <div><Label htmlFor="vt-c-date">Telledato</Label><Input id="vt-c-date" type="date" className="h-12 sm:h-10" value={planned} onChange={e => setPlanned(e.target.value)} /></div>
+        <div><Label htmlFor="vt-c-date">Planlagt telledato</Label><Input id="vt-c-date" type="date" className="h-12 sm:h-10" value={planned} onChange={e => setPlanned(e.target.value)} /></div>
       </div>
-      {historic && (
-        <Notice tone="warning" title="Telledatoen er tilbake i tid.">
-          Systemet har ikke historiske priser for en eldre dato. Mengdene kan telles, men varene får ingen pris og verdien vises som ufullstendig.
-        </Notice>
-      )}
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium">Prisgrunnlag</legend>
+        <label className="flex min-h-[48px] items-start gap-3 rounded-md p-2">
+          <input type="radio" name="vt-mode" className="mt-1 h-5 w-5" checked={mode === "ved_start"} onChange={() => setMode("ved_start")} />
+          <span><span className="block">Nyeste dokumenterte pris når tellingen startes (vanlig)</span>
+            <span className="text-xs text-muted-foreground">Ny faktura etter start endrer ikke tellingen.</span></span>
+        </label>
+        <label className="flex min-h-[48px] items-start gap-3 rounded-md p-2">
+          <input type="radio" name="vt-mode" className="mt-1 h-5 w-5" checked={mode === "historisk"} onChange={() => setMode("historisk")} />
+          <span><span className="block">Historisk verdsettelse på en tidligere dato</span>
+            <span className="text-xs text-muted-foreground">Bruker bare priser med virkningsdato til og med datoen. Varer uten slik pris får ingen pris.</span></span>
+        </label>
+        {mode === "historisk" && (
+          <div><Label htmlFor="vt-c-val">Verdsettelsesdato (før i dag)</Label>
+            <Input id="vt-c-val" type="date" max={today} className="h-12 sm:h-10" value={valDate} onChange={e => setValDate(e.target.value)} aria-invalid={historicInvalid} />
+            {historicInvalid && <p className="text-xs text-destructive">Velg en dato før i dag.</p>}</div>
+        )}
+        {mode === "ved_start" && planned < today && <Notice tone="warning" title="Telledatoen er tilbake i tid.">Med vanlig prisgrunnlag brukes prisene på startdagen, ikke telledatoen. Velg historisk verdsettelse hvis tellingen gjelder en tidligere dato.</Notice>}
+      </fieldset>
       <fieldset className="space-y-1">
         <legend className="text-sm font-medium">Listemaler</legend>
         {templates.isLoading && <Loading />}
@@ -109,21 +119,18 @@ function CreateCount({ onDone }: { onDone: (id: string | null) => void }) {
           </label>
         ))}
       </fieldset>
-      {picked.length > 0 && (coverage.isLoading ? <Loading label="Kontrollerer dekning …" /> : coverage.data && (
+      {picked.length > 0 && !historicInvalid && (coverage.isLoading ? <Loading label="Kontrollerer dekning …" /> : c && (
         <div className="space-y-2 text-sm" aria-live="polite">
-          <p>{coverage.data.line_count} linjer i valgte lister.</p>
-          {coverage.data.duplicates.length > 0 && (
-            <Notice tone="danger" title={`${coverage.data.duplicates.length} varer ligger på samme sted i flere valgte lister.`}>
-              Tellingen kan ikke startes før dette er avklart i listemalene.
-            </Notice>
-          )}
-          {coverage.data.missing_price > 0 && <p>{coverage.data.missing_price} varer mangler verifisert pris — de telles, men verdien blir ufullstendig.</p>}
-          {coverage.data.missing_location > 0 && <p>{coverage.data.missing_location} linjer mangler plassering.</p>}
+          <p>{c.line_count} linjer, {c.material_count} varer i valgte lister. Pris i dag: {c.priced} med dokumentert pris, {c.missing_price} uten.</p>
+          {Object.entries(c.missing_price_by_reason).map(([k, n]) => <p key={k} className="pl-3 text-muted-foreground">{priceReasonLabel(k)}: {n}</p>)}
+          {c.duplicates.length > 0 && <Notice tone="danger" title={`${c.duplicates.length} varer ligger på samme sted i flere valgte lister.`}>Tellingen kan ikke startes før dette er avklart i listemalene.</Notice>}
+          {c.empty_templates > 0 && <Notice tone="danger" title={`${c.empty_templates} valgte lister har ingen varer.`} />}
+          {c.missing_location > 0 && <p>{c.missing_location} linjer mangler plassering.</p>}
         </div>
       ))}
       <p className="text-xs text-muted-foreground">Prisene fryses først når tellingen startes, ikke nå.</p>
       <div className="flex flex-wrap gap-2">
-        <Button className="min-h-[48px]" disabled={!name.trim() || !planned || picked.length === 0 || create.isPending} onClick={submit}>Planlegg telling</Button>
+        <Button className="min-h-[48px]" disabled={!name.trim() || !planned || picked.length === 0 || historicInvalid || create.busy || !!create.pending} onClick={() => submit(payload)}>Planlegg telling</Button>
         <Button variant="outline" className="min-h-[48px]" onClick={() => onDone(null)}>Avbryt</Button>
       </div>
     </Card>
