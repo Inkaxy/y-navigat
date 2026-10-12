@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import { fireEvent } from "@testing-library/react";
@@ -77,9 +78,10 @@ describe("allergener: vurdert er adskilt fra registrert", () => {
   it.each(cases)("listebrikke og råvarekort er enige (vurdert=%s, registrert=%s)", (rev, has, want) => {
     const at = rev ? "2026-10-02T17:44:24.546+00" : null;
     render(<StatusChips item={item({ hasAllergens: has, allergensReviewed: reviewedFrom(at) })} />);
+    const { unmount } = { unmount: () => undefined };
     const chip = screen.getByLabelText(ALLERGEN_STATE_LABEL[want as keyof typeof ALLERGEN_STATE_LABEL]);
     expect(chip.className.includes("text-success")).toBe(rev);
-    const detail = completenessChecklist({ allergens_reviewed_at: at } as Parameters<typeof completenessChecklist>[0]).find((c) => c.id === "allergener");
+    const detail = completenessChecklist({ rm: { is_packaging: false, allergens_reviewed_at: at, base_units_per_package: null, categories: null }, linkCount: 0, nutrition: null, hasDatasheet: false, costEvidence: { status: "mangler", reason: null } } as unknown as Parameters<typeof completenessChecklist>[0]).find((c) => c.id === "allergener");
     expect(detail?.status === "ok").toBe(rev);
   });
 });
