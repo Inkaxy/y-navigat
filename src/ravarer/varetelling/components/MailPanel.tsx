@@ -26,7 +26,7 @@ interface SendP { countId: string; hash: string; countRevision: number; recipien
 export function MailPanel({ count }: { count: VtCount }) {
   const api = useStage3Api(); const { entity, canWrite } = useVtScope(); const s3 = useStage3Ready();
   const [show, setShow] = useState(false);
-  const preview = useQuery({ queryKey: s3Keys.preview(entity, `${count.id}:${count.revision}`), queryFn: () => api!.previewReport(count.id), enabled: show && s3.ready && !!api, retry: false });
+  const preview = useQuery({ queryKey: s3Keys.preview(entity, `${count.id}:${count.revision}`), queryFn: () => (api ? api.previewReport(count.id) : Promise.reject(new Error("utilgjengelig"))), enabled: show && s3.ready && !!api, retry: false });
   const [recipient, setRecipient] = useState(""); const [subject, setSubject] = useState<string | null>(null); const [message, setMessage] = useState("");
   const [result, setResult] = useState<string | null>(null);
   const send = useOpAction(`mail:${count.id}`, "write", (opId, p: SendP) => (api ? api.sendReport({ opId, ...p }) : Promise.reject(new Error("utilgjengelig"))));
