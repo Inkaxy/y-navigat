@@ -39,6 +39,8 @@ export function ConcludeDialog({ open, onOpenChange, items, responses, recipient
   const [split, setSplit] = useState<ApplyOutcome | null>(null);
   const [remainingPrimary, setRemainingPrimary] = useState<PrimaryTask[] | null>(null);
   const lock = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   useEffect(() => {
     if (!open || items.length === 0) return;
@@ -86,13 +88,14 @@ export function ConcludeDialog({ open, onOpenChange, items, responses, recipient
     },
     onSuccess: ({ outcome, failedPrimary }) => {
       onRefresh();
+      if (!mounted.current) return;
       if (outcome.kind === "rejected") { toast.error(outcome.message); return; }
       if (outcome.kind === "partial" || outcome.kind === "unknown") { setSplit(outcome); return; }
       if (failedPrimary.length > 0) { setRemainingPrimary(failedPrimary); return; }
       toast.success("Forhandling avsluttet");
       onOpenChange(false);
     },
-    onError: () => { onRefresh(); setSplit({ kind: "unknown" }); },
+    onError: () => { onRefresh(); if (mounted.current) setSplit({ kind: "unknown" }); },
     onSettled: () => { lock.current = false; },
   });
 
@@ -100,6 +103,7 @@ export function ConcludeDialog({ open, onOpenChange, items, responses, recipient
     mutationFn: async (tasks: PrimaryTask[]) => runPrimaryTasks(tasks, setPrimarySupplier),
     onSuccess: ({ failed }) => {
       onRefresh();
+      if (!mounted.current) return;
       if (failed.length > 0) { setRemainingPrimary(failed); toast.error("Primærleverandør kunne fortsatt ikke settes for alle varer."); return; }
       setRemainingPrimary(null);
       toast.success("Primærleverandør satt");
@@ -163,7 +167,7 @@ export function ConcludeDialog({ open, onOpenChange, items, responses, recipient
             {split.kind === "partial" && split.failures.length > 0 && (
               <ul className="list-disc pl-5">{split.failures.map((f, i) => <li key={i}>{f}</li>)}</ul>
             )}
-            {split.kind === "unknown" && <p>Utfallet er ukjent. Status er lest på nytt; kontroller den før du gjør noe mer.</p>}
+            {split.kind === "unknown" && <p>Utfallet er ukjent, og det finnes ingen kvittering. Status hentes på nytt i bakgrunnen; kontroller forhandlingen før du gjør noe mer.</p>}
             <p>Ingenting prøves på nytt automatisk.</p>
           </div>
         )}
