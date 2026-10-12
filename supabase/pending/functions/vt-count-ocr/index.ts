@@ -121,4 +121,3 @@ Deno.serve(async (req) => {
   if (recErr) return json(200, { status: "ukjent_lagring" });
   return json(200, { status: "klar", document_ok: result.document_ok, proposals: result.proposals.length, issues: result.issues.length });
 });
-});
