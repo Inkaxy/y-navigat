@@ -15,7 +15,7 @@ export default function VaretellingPreviewContent() {
   const [api] = useState(() => createFakeVtApi({ available: !unavailable }));
   const [qc] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
   return (
-    <ModuleScope app="ravarer">
+    <ModuleScope appCode="ravarer">
       <QueryClientProvider client={qc}>
         <VtApiContext.Provider value={api}>
           <VtScopeContext.Provider value={{ entity: "demo-firma", canWrite: true, canApprove: true }}>
