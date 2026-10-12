@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { Plus, Radio, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,7 +32,6 @@ function ModeTag({ mode }: { mode: NegotiationRow["negotiation_mode"] }) {
 
 export default function ForhandlingerList() {
   const embedded = useIsEmbedded();
-  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const q = params.get("q") ?? "";
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -86,7 +85,7 @@ export default function ForhandlingerList() {
         emptyDescription={q ? undefined : rights.canWrite ? "Kom i gang med «Ny forhandling»." : undefined}
         rowHref={negotiationHref}
         renderMobileCard={(n) => (
-          <div className="space-y-1.5">
+          <div className="min-h-[44px] space-y-1.5 rounded-lg border border-border bg-card p-3">
             <div className="flex items-start justify-between gap-2">
               <span className="min-w-0 break-words font-medium text-ink-primary">{n.title}</span>
               <NegotiationStatusPill status={n.status} />
@@ -98,7 +97,6 @@ export default function ForhandlingerList() {
             </div>
           </div>
         )}
-        onRowClick={(n) => navigate(negotiationHref(n))}
       />
 
       <NewNegotiationTypeDialog open={pickerOpen} onOpenChange={setPickerOpen} />
