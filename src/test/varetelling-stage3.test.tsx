@@ -257,6 +257,7 @@ describe("rapport på e-post", () => {
     await toPreview(m, id);
     const sendBtn = screen.getByRole("button", { name: "Send" }); fireEvent.click(sendBtn); fireEvent.click(sendBtn);
     expect(await screen.findByText(/ikke avklart/)).toBeTruthy();
+    await screen.findByText(/Ukjent om e-posten ble sendt/);
     expect(m.s3._counters.graphCalls).toBe(1);
     const line = m.api._state.lines[0];
     await m.api.saveLine({ opId: "chg", lineId: line.id, expectedRevision: line.revision, state: "null", countedBase: 0, entry: [], note: null });
