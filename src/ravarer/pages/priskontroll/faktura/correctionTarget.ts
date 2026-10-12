@@ -1,0 +1,16 @@
+/**
+ * Hvilken linje en rettehandling skal åpne. Én regel for primærknapp, meny og forhåndsvisning:
+ * 1) eksplisitt valgt linje når den hører til DENNE fakturaen, 2) første linje med lesevarsel,
+ * ellers ingen — aldri en tilfeldig første linje eller en linje fra en annen faktura/kø.
+ */
+export type CorrectionTarget = { id: string; reason: "valgt" | "lesevarsel" } | null;
+
+export function correctionTarget<L extends { id: string }>(
+  lines: readonly L[],
+  selectedId: string | null | undefined,
+  hasReadIssue: (l: L) => boolean,
+): CorrectionTarget {
+  if (selectedId && lines.some((l) => l.id === selectedId)) return { id: selectedId, reason: "valgt" };
+  const flagged = lines.find(hasReadIssue);
+  return flagged ? { id: flagged.id, reason: "lesevarsel" } : null;
+}
