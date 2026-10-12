@@ -18,7 +18,7 @@ import { invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { chunkRawMaterialIds, isNonFatalPermissionError, MAX_RECALC_BATCH_SIZE } from "@/ravarer/lib/recalcBatch";
 import { parseRecalcEnvelope, parseUndoEnvelope, type RecalcOkItem } from "@/ravarer/lib/recalcContract";
 import {
-  EMPTY_LEDGER, acknowledgeUnknownApply, addAppliedBatch, addUnknownApply, applyUndoResult, closeBatch,
+  EMPTY_LEDGER, acknowledgeUndoUnknown, acknowledgeUnknownApply, addAppliedBatch, addUnknownApply, applyUndoResult, closeBatch,
   markUndoUnknown, outstanding, unresolvedIds, type RecalcLedger,
 } from "@/ravarer/lib/recalcLedger";
 
@@ -293,6 +293,11 @@ export function useCostRecalc() {
     if (!e || op.current || !live.current.mounted) return;
     commit(e, (l) => acknowledgeUnknownApply(l, opId));
   }, []);
+  const acknowledgeUndo = useCallback((batchId: string) => {
+    const e = live.current.entity;
+    if (!e || op.current || !live.current.mounted) return;
+    commit(e, (l) => acknowledgeUndoUnknown(l, batchId));
+  }, []);
   /** Eksplisitt (etter bekreftelse i UI): fjern kvittering; angring herfra blir da umulig. */
   const dismissBatch = useCallback((batchId: string) => {
     const e = live.current.entity;
@@ -305,5 +310,5 @@ export function useCostRecalc() {
   const summary = current?.summary ?? null;
   const rows = preview && preview.entity === legalEntityId ? preview.rows : null;
   const writeReady = !loading && canWrite && !!legalEntityId;
-  return { rows, progress, summary, ledger, error, busy, canWrite: writeReady, accessLoading: loading, scan, apply, undoBatch, cancel, reset, acknowledgeUnknown, dismissBatch };
+  return { rows, progress, summary, ledger, error, busy, canWrite: writeReady, accessLoading: loading, scan, apply, undoBatch, cancel, reset, acknowledgeUnknown, acknowledgeUndo, dismissBatch };
 }
