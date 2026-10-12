@@ -12,15 +12,8 @@ import { useNegotiations, type NegotiationRow } from "@/ravarer/hooks/useNegotia
 import { useInvoiceRights } from "@/fakturaer/hooks/useInvoiceRights";
 import { formatDate } from "@/ravarer/lib/constants";
 import { negotiationStatusLabel } from "@/ravarer/lib/negotiationMatrix";
-import { paths } from "@/ravarer/lib/paths";
 import NewNegotiationTypeDialog from "./NewNegotiationTypeDialog";
-
-/** Hvor en rad åpnes: aktiv live-forhandling går til arbeidsflaten, resten til detalj. */
-export function negotiationHref(n: Pick<NegotiationRow, "id" | "status" | "negotiation_mode">): string {
-  return n.negotiation_mode === "live" && n.status !== "concluded" && n.status !== "cancelled"
-    ? paths.liveForhandling(n.id)
-    : paths.forhandling(n.id);
-}
+import { negotiationHref } from "@/ravarer/lib/negotiationOps";
 
 function ModeTag({ mode }: { mode: NegotiationRow["negotiation_mode"] }) {
   return mode === "live" ? (

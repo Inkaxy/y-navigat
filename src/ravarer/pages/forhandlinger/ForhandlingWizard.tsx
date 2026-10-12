@@ -14,7 +14,6 @@ import { ModulePage } from "@/ravarer/ui/ModulePage";
 import { useInvoiceRights } from "@/fakturaer/hooks/useInvoiceRights";
 import { useAllRawMaterialPurchaseStats } from "@/ravarer/hooks/usePurchaseStats";
 import { baselineFromStats, type BaselineStats } from "@/ravarer/lib/negotiationOps";
-import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import {
@@ -27,8 +26,6 @@ import {
   useUpsertNegotiationRecipients,
   useGenerateRfqCredentials,
 } from "@/ravarer/hooks/useNegotiations";
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
 import { formatNok, formatNumber } from "@/ravarer/lib/constants";
 import { UnitPriceHint } from "@/ravarer/components/forhandlinger/UnitPriceHint";
 import { osloDateISO } from "@/lib/osloDate";

@@ -1,3 +1,5 @@
+import { paths } from "@/ravarer/lib/paths";
+
 /**
  * Forhandlinger: streng lesing av operasjonssvar og identitetsvern.
  *
@@ -222,3 +224,11 @@ export function baselineFromStats(s: { cost_12m: number | null; avg_price_per_ba
   const avg = s.avg_price_per_base_unit_12m == null || !(Number(s.avg_price_per_base_unit_12m) > 0) ? null : Number(s.avg_price_per_base_unit_12m);
   return { cost, avgPrice: avg, volume: cost != null && avg != null ? cost / avg : null };
 }
+
+/** Hvor en rad åpnes: aktiv live-forhandling går til arbeidsflaten, resten til detalj. */
+export function negotiationHref(n: { id: string; status: string; negotiation_mode: string | null }): string {
+  return n.negotiation_mode === "live" && n.status !== "concluded" && n.status !== "cancelled"
+    ? paths.liveForhandling(n.id)
+    : paths.forhandling(n.id);
+}
+
