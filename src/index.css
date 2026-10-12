@@ -268,12 +268,19 @@
     --primary-foreground: var(--surface-canvas);
     --ring: var(--text-primary);
     --rm-eyebrow-ink: var(--brand-bronze-deep);
+    --rm-warning-ink: var(--brand-bronze-deep);
   }
   html.dark[data-active-app="ravarer"] {
     --primary: var(--text-primary);
     --primary-foreground: var(--surface-canvas);
     --ring: var(--text-primary);
     --rm-eyebrow-ink: var(--brand-bronze-soft);
+    --rm-warning-ink: var(--brand-bronze-soft);
+  }
+  /* Råvarer: lesbar varseltekst (≥4,5:1). Bare tekstfargen; --warning til bakgrunn/ramme/dekor er uendret. */
+  html[data-active-app="ravarer"] .text-warning,
+  html[data-active-app="ravarer"] .hover\:text-warning:hover {
+    color: hsl(var(--rm-warning-ink));
   }
   html[data-active-app="ravarer"] [data-page-eyebrow],
   html[data-active-app="ravarer"] .eyebrow,
