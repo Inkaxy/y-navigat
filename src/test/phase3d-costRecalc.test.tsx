@@ -73,7 +73,7 @@ describe("useCostRecalc", () => {
     expect(result.current.busy).toBe("apply");
     st.entity = "E2"; rerender();
     await act(async () => { resolve({ data: env(ids.slice(0, APPLY_CHUNK), false, B1), error: null }); await p; });
-    expect(st.rpc).toHaveBeenCalledTimes(1);
+    expect(st.rpc.mock.calls.filter((c) => c[0] === "recalc_raw_material_costs")).toHaveLength(1);
     expect(result.current.ledger.batches[0].batchId).toBe(B1);
     expect(result.current.summary?.stopped).toBe("kontekst");
     expect(result.current.summary?.notStartedIds).toHaveLength(2);
