@@ -14,11 +14,13 @@ import { ModulePage } from "@/ravarer/ui/ModulePage";
 import { DataTable } from "@/ravarer/ui/DataTable";
 import { FilterChips } from "@/ravarer/ui/FilterChips";
 import { RAVARER_EYEBROW } from "@/ravarer/pages/hub/hubTabs";
-import { BUCKETS, RECALC_COLUMNS, RecalcDrilldown, UNDO_LABEL, kr } from "@/ravarer/pages/reberegn/reberegnColumns";
+import { BUCKETS, recalcColumns, RecalcDrilldown, UNDO_LABEL, kr } from "@/ravarer/pages/reberegn/reberegnColumns";
 import { useCostRecalc, type RecalcBucket, type RecalcRow } from "@/fakturaer/hooks/useCostRecalc";
 import { outstanding, unresolvedIds } from "@/ravarer/lib/recalcLedger";
 import { paths } from "@/ravarer/lib/paths";
 import { CostDeviationsCard } from "@/ravarer/components/CostDeviationsCard";
+import { useSingleRecalcPreview } from "@/ravarer/hooks/useSingleRecalcPreview";
+import { DetailButton, SingleRecalcDetail } from "@/ravarer/pages/reberegn/SingleRecalcDetail";
 
 const ORDER: RecalcBucket[] = ["endres", "usikker", "uendret", "feilet"];
 
@@ -31,6 +33,10 @@ export default function ReberegnKostpriser() {
   const [tab, setTab] = useState<RecalcBucket>("endres");
   const [dismissId, setDismissId] = useState<string | null>(null);
   const unresolved = useMemo(() => unresolvedIds(ledger), [ledger]);
+  // R192: separat, eksplisitt enkeltlesing; endrer ikke forslag, utvalg, kvitteringer eller logg.
+  const detail = useSingleRecalcPreview();
+  const openDetail = detail.open;
+  const columns = useMemo(() => recalcColumns((row) => void openDetail({ rawMaterialId: row.rawMaterialId, name: row.name, baseUnit: row.baseUnit, origin: row.proposal ? "forslag" : "feilet" })), [openDetail]);
 
   const byBucket = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -149,14 +155,14 @@ export default function ReberegnKostpriser() {
                         <td className="px-3 py-2 text-right tabular-nums">{kr(it.costBefore)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{kr(it.costAfter)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{it.linesChanged}</td>
-                        <td className="px-3 py-2"><RecalcDrilldown rawMaterialId={it.rawMaterialId} name={it.name} /></td>
+                        <td className="px-3 py-2"><DetailButton name={it.name} disabled={!detail.ready} onClick={() => void detail.open({ rawMaterialId: it.rawMaterialId, name: it.name, baseUnit: null, origin: "kvittering" })} /> <RecalcDrilldown rawMaterialId={it.rawMaterialId} name={it.name} /></td>
                       </tr>
                     ))}
                     {b.failures.map((f) => (
                       <tr key={f.rawMaterialId}>
                         <td className="px-3 py-2">{(rows ?? []).find((x) => x.rawMaterialId === f.rawMaterialId)?.name ?? "Råvare"}</td>
                         <td className="px-3 py-2"><StatusPill label="Feilet" tokenVar="--state-danger" /> <span className="text-caption text-ink-secondary">{f.message}</span></td>
-                        <td colSpan={3} /><td className="px-3 py-2"><RecalcDrilldown rawMaterialId={f.rawMaterialId} name="råvaren" /></td>
+                        <td colSpan={3} /><td className="px-3 py-2"><DetailButton name="råvaren" disabled={!detail.ready} onClick={() => void detail.open({ rawMaterialId: f.rawMaterialId, name: null, baseUnit: null, origin: "feilet" })} /> <RecalcDrilldown rawMaterialId={f.rawMaterialId} name="råvaren" /></td>
                       </tr>
                     ))}
                   </tbody>
@@ -177,7 +183,7 @@ export default function ReberegnKostpriser() {
             <DataTable<RecalcRow>
               ariaLabel={`Forslag: ${BUCKETS[tab].label}`}
               rows={byBucket[tab]}
-              columns={RECALC_COLUMNS}
+              columns={columns}
               getId={(x) => x.rawMaterialId}
               selectable={canWrite && tab !== "feilet"}
               selected={checked}
@@ -225,6 +231,8 @@ export default function ReberegnKostpriser() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <SingleRecalcDetail state={detail.state} onClose={detail.close} onRetry={(t) => void detail.open(t)} />
 
         <CostDeviationsCard />
       </div>
