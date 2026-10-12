@@ -41,58 +41,60 @@ export function CostDeviationsCard() {
     }
   };
 
+  const settled = q.isSuccess && !q.isError;
+  const unverifiedRows = useMemo(() => rows.filter((r) => r.status !== "avviker"), [rows]);
+  const toggle = (id: string, v: boolean) => setChecked((prev) => { const n = new Set(prev); if (v) n.add(id); else n.delete(id); return n; });
+
+  const renderRow = (r: (typeof rows)[number]) => (
+    <li key={r.rawMaterialId} className="flex flex-wrap items-start gap-x-3 gap-y-1 border-t border-line-subtle py-2 text-sm">
+      {r.status === "avviker" && canWrite && (
+        <label className="-my-1 flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center">
+          <Checkbox aria-label={`Velg ${r.name}`} checked={checked.has(r.rawMaterialId)} onCheckedChange={(v) => toggle(r.rawMaterialId, v === true)} />
+        </label>
+      )}
+      <div className="min-w-0 flex-1 basis-48">
+        <Link className="font-medium hover:underline" to={paths.raavare(r.rawMaterialId)}>{r.name}</Link>{" "}
+        <Badge variant="outline">{r.status === "avviker" ? "Avviker" : "Uverifisert"}</Badge>
+        <div className="text-caption text-ink-secondary">
+          {r.sourceDate ? formatDate(r.sourceDate) : "Ingen gyldig kilde"}
+          {r.supplierName && <> · {r.supplierName}</>}
+          {r.invoiceId && <> · <Link className="text-app hover:underline" to={paths.faktura(r.invoiceId)}>{r.invoiceNumber ?? "faktura"}</Link></>}
+        </div>
+      </div>
+      <dl className="grid grid-cols-2 gap-x-4 text-right tabular-nums">
+        <dt className="text-caption text-ink-secondary">Lagret</dt>
+        <dt className="text-caption text-ink-secondary">Nyeste gyldige</dt>
+        <dd>{r.currentPrice != null ? `${formatNok(r.currentPrice)}/${r.baseUnit ?? ""}` : "—"}</dd>
+        <dd>{r.sourcePrice != null ? `${formatNok(r.sourcePrice)}/${r.baseUnit ?? ""}` : "—"}</dd>
+      </dl>
+    </li>
+  );
+
   return (
     <Card className="space-y-3 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="max-w-2xl">
           <h2 className="text-lg font-semibold text-ink-primary">Avvik mot nyeste gyldige pris</h2>
-          <p className="mt-1 text-sm text-ink-secondary">
-            {deviating.length} råvarer har en lagret kostpris som ikke er nyeste gyldige pris. {unverified} har pris uten gyldig kilde
-            (uverifisert) — de beholdes til en pris dokumenteres.
+          <p className="mt-1 text-sm text-ink-secondary" data-testid="deviation-summary">
+            {settled
+              ? <>{deviating.length} med lagret kostpris som ikke er nyeste gyldige pris. {unverified} uten gyldig kilde (uverifisert) — de beholdes til en pris dokumenteres.</>
+              : q.isError ? "Avvikene kunne ikke hentes — antallet er ukjent." : "Henter avvik …"}
           </p>
         </div>
         {canWrite && (
-          <Button onClick={run} disabled={refresh.isPending || checked.size === 0}>
+          <Button className="min-h-[44px]" onClick={run} disabled={refresh.isPending || checked.size === 0}>
             <RefreshCw className="mr-1.5 h-4 w-4" aria-hidden /> Oppdater valgte ({checked.size})
           </Button>
         )}
       </div>
       <QueryState isLoading={q.isLoading} isError={q.isError} error={q.error} scope="ravarer:kostpris-avvik" onRetry={() => q.refetch()} isEmpty={rows.length === 0} emptyTitle="Ingen avvik" emptyDescription="Alle kostpriser er nyeste gyldige pris.">
-        <div className="max-h-96 overflow-auto">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-card text-left text-xs uppercase text-ink-secondary">
-              <tr>
-                <th className="w-8 pb-2"><span className="sr-only">Velg</span></th>
-                <th className="pb-2">Råvare</th>
-                <th className="pb-2">Status</th>
-                <th className="pb-2 text-right">Lagret</th>
-                <th className="pb-2 text-right">Nyeste gyldige</th>
-                <th className="pb-2">Kilde</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.rawMaterialId} className="border-t border-line-subtle">
-                  <td className="py-2">
-                    {r.status === "avviker" && canWrite && (
-                      <Checkbox aria-label={`Velg ${r.name}`} checked={checked.has(r.rawMaterialId)}
-                        onCheckedChange={(v) => setChecked((prev) => { const n = new Set(prev); if (v === true) n.add(r.rawMaterialId); else n.delete(r.rawMaterialId); return n; })} />
-                    )}
-                  </td>
-                  <td className="py-2"><Link className="hover:underline" to={paths.raavare(r.rawMaterialId)}>{r.name}</Link></td>
-                  <td className="py-2"><Badge variant="outline">{r.status === "avviker" ? "Avviker" : "Uverifisert"}</Badge></td>
-                  <td className="py-2 text-right tabular-nums">{r.currentPrice != null ? `${formatNok(r.currentPrice)}/${r.baseUnit ?? ""}` : "—"}</td>
-                  <td className="py-2 text-right tabular-nums">{r.sourcePrice != null ? `${formatNok(r.sourcePrice)}/${r.baseUnit ?? ""}` : "—"}</td>
-                  <td className="py-2 text-ink-secondary">
-                    {r.sourceDate ? formatDate(r.sourceDate) : "Ingen gyldig kilde"}
-                    {r.supplierName && <> · {r.supplierName}</>}
-                    {r.invoiceId && <> · <Link className="text-app hover:underline" to={paths.faktura(r.invoiceId)}>{r.invoiceNumber ?? "faktura"}</Link></>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {deviating.length > 0 && <ul aria-label="Avviker" className="max-h-96 overflow-auto">{deviating.map(renderRow)}</ul>}
+        {unverifiedRows.length > 0 && (
+          <details className="rounded-md border border-line-subtle">
+            <summary className="flex min-h-[44px] cursor-pointer items-center px-3 text-sm font-medium">Vis {unverifiedRows.length} uverifiserte</summary>
+            <ul aria-label="Uverifiserte" className="max-h-96 overflow-auto px-3">{unverifiedRows.map(renderRow)}</ul>
+          </details>
+        )}
       </QueryState>
     </Card>
   );

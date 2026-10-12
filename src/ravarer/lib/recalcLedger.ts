@@ -80,3 +80,16 @@ export function acknowledgeUnknownApply(l: RecalcLedger, opId: number): RecalcLe
 export function closeBatch(l: RecalcLedger, batchId: string): RecalcLedger {
   return { ...l, batches: l.batches.filter((b) => b.batchId !== batchId) };
 }
+
+/** Råvarer med uavklart utfall (ukjent kjøring eller ukjent angring) — sperrer ny kjøring. */
+export function unresolvedIds(l: RecalcLedger): Set<string> {
+  const out = new Set<string>();
+  for (const u of l.unknownApplies) u.rawMaterialIds.forEach((id) => out.add(id));
+  for (const b of l.batches) if (b.undoUnknown) b.items.forEach((i) => out.add(i.rawMaterialId));
+  return out;
+}
+
+/** Eksplisitt: brukeren har kontrollert et ukjent angreutfall; angring kan da forsøkes bevisst. */
+export function acknowledgeUndoUnknown(l: RecalcLedger, batchId: string): RecalcLedger {
+  return { ...l, batches: l.batches.map((b) => (b.batchId === batchId ? { ...b, undoUnknown: false } : b)) };
+}

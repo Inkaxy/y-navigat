@@ -71,7 +71,8 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
-  const [confirmUnlink, setConfirmUnlink] = useState(false);
+  /** Frosset ved åpning: bekreftelsen og den betingede slettingen gjelder nøyaktig det som ble vist. */
+  const [unlinkSnap, setUnlinkSnap] = useState<{ base: LinkBase | null; recipeName: string | null } | null>(null);
   // Én synkron lås for innstillinger, oppskriftsbytte og frakobling.
   const opLock = useRef(false);
   const [pending, setPending] = useState(false);
@@ -178,8 +179,8 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
           .select("id,product_id,recipe_id");
         if (productRef.current !== forProduct) return;
         if (error) { toast.error(linkErrorMessage(error)); return; }
-        const row = Array.isArray(data) && data.length === 1 ? (data[0] as { product_id?: unknown; recipe_id?: unknown }) : null;
-        if (!row || row.product_id !== productId || row.recipe_id !== sel.recipeId) {
+        const row = Array.isArray(data) && data.length === 1 ? (data[0] as { id?: unknown; product_id?: unknown; recipe_id?: unknown }) : null;
+        if (!row || typeof row.id !== "string" || row.id === "" || row.product_id !== productId || row.recipe_id !== sel.recipeId) {
           toast.error("Vi vet ikke om koblingen ble lagret. Last inn på nytt og kontroller.");
           await invalidate();
           return;
@@ -226,14 +227,17 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
   }
 
   async function removeLink() {
-    setConfirmUnlink(false);
+    const snap = unlinkSnap;
+    setUnlinkSnap(null);
+    if (!snap) return;
     if (!link?.id) {
       toast.error("Denne varen har en gammel direktekobling. Åpne oppskriften for å endre den.");
       return;
     }
-    if (!linkBase) { toast.error("Koblingen er ikke fullstendig lest. Last inn på nytt."); return; }
+    if (!snap.base) { toast.error("Koblingen er ikke fullstendig lest. Last inn på nytt."); return; }
     if (!acquire()) return;
-    const frozen = linkBase;
+    // Aldri rebase til nyere lest kobling: endret kobling gir konflikt fra den betingede slettingen.
+    const frozen = snap.base;
     try {
       const res = await conditionalLinkDelete(frozen);
       if (res.kind !== "deleted") { toast.error(linkWriteMessage(res)); await invalidate(); return; }
@@ -316,7 +320,7 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
                 <Button variant="outline" size="sm" onClick={() => setLinkDialogOpen(true)} disabled={pending}>
                   <Repeat className="mr-1.5 h-3.5 w-3.5" /> Bytt oppskrift
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setConfirmUnlink(true)} disabled={pending}>
+                <Button variant="outline" size="sm" onClick={() => setUnlinkSnap({ base: linkBase, recipeName: recipe.name })} disabled={pending}>
                   <Link2Off className="mr-1.5 h-3.5 w-3.5" /> Fjern kobling
                 </Button>
               </>
@@ -477,14 +481,17 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
         onConfirm={handleLinkConfirm}
       />
 
-      <AlertDialog open={confirmUnlink} onOpenChange={setConfirmUnlink}>
+      <AlertDialog open={!!unlinkSnap} onOpenChange={(o) => { if (!o) setUnlinkSnap(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Fjerne koblingen til «{recipe.name}»?</AlertDialogTitle>
+            <AlertDialogTitle>Fjerne koblingen til «{unlinkSnap?.recipeName ?? ""}»?</AlertDialogTitle>
             <AlertDialogDescription>
               Varen mister oppskriftens grunnlag for deklarasjon og kalkyle. Oppskriften slettes ikke, og kan kobles
               til igjen senere. Manuelt registrerte data på varen beholdes.
             </AlertDialogDescription>
+            {unlinkSnap?.base && linkBase && (linkBase.recipeId !== unlinkSnap.base.recipeId || linkBase.updatedAt !== unlinkSnap.base.updatedAt) && (
+              <p role="alert" className="text-sm text-warning">Koblingen er endret siden du åpnet dette. Lukk og kontroller før du fjerner — slettingen gjelder bare det du så.</p>
+            )}
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Avbryt</AlertDialogCancel>
