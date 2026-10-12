@@ -304,7 +304,7 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 | R192 | Gjeldende kost, foreløpig forslag nå og serverens linjetall (endres/ukjent/utelatt); kilde/regnestykke per linje finnes ikke i bulk-kontrakten og vises ikke | /verktoy/reberegn › kolonner | 3D | Endret |
 | R193 | Bekreft kjøring i bolker med kontekstsjekk før hver bolk; bekreftede bolker lagres straks; ukjent utfall holdes til eksplisitt kontroll; faktisk kost i kvittering | /verktoy/reberegn › «Reberegn valgte» | 3D | Endret |
 | R194 | Angre per bolk med serverens svar per post (angret / feilet / uavklart); ukjent angring beholder kvittering | /verktoy/reberegn › kvittering «Angre» | 3D | Endret |
-| R195 | Lenker til Pakninger og fakturaer | → /varer?liste=pakning og /priskontroll/faktura/:id | 3 | Flyttet |
+| R195 | Lenker til Pakninger og fakturaer | Ikke på reberegn-siden etter 3D (bulk-svaret har ingen faktura-/linje-ID-er); pakninger via /varer?liste=pakning | 3D | Endret |
 
 ## Ny råvare (alle veier → én dialog)
 
