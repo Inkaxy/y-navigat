@@ -413,8 +413,8 @@ export default function ForhandlingDetail() {
         onSuccess={() => {
           qc.invalidateQueries({ queryKey: ["negotiation", id] });
           qc.invalidateQueries({ queryKey: ["negotiations"] });
+          qc.invalidateQueries({ queryKey: ["negotiation-items", id] });
           invalidateRawMaterial(qc);
-          toast.success("Forhandling avsluttet");
         }}
       />
 
@@ -602,6 +602,7 @@ function ConcludeDialog({
       if (outcome.kind === "rejected") { toast.error(outcome.message); return; }
       if (outcome.kind === "partial" || outcome.kind === "unknown") { setSplit(outcome); return; }
       if (failedPrimary.length > 0) { setRemainingPrimary(failedPrimary); return; }
+      toast.success("Forhandling avsluttet");
       onOpenChange(false);
     },
     onError: () => setSplit({ kind: "unknown" }),
