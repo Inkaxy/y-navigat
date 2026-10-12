@@ -30,7 +30,7 @@ const ratio = (a: Rgb, b: Rgb) => { const [x, y] = [lum(a), lum(b)].sort((p, q) 
 describe("Råvarer varseltekst – kontrastkontrakt", () => {
   it("har scoped tekstregel og semantisk blekk for lyst/mørkt tema", () => {
     expect(css).toMatch(/html\[data-active-app="ravarer"\] \{[^}]*--rm-warning-ink: var\(--brand-bronze-deep\)/);
-    expect(css).toMatch(/html\.dark\[data-active-app="ravarer"\] \{[^}]*--rm-warning-ink: var\(--brand-bronze-soft\)/);
+    expect(css).toMatch(/html\.dark\[data-active-app="ravarer"\] \{[^}]*--rm-warning-ink: 30 62% 66%;/);
     expect(css).toMatch(/html\[data-active-app="ravarer"\] \.text-warning,\s*html\[data-active-app="ravarer"\] \.hover\\:text-warning:hover \{\s*color: hsl\(var\(--rm-warning-ink\)\);/);
     // --warning (bakgrunn/ramme) er uendret og ikke globalt overstyrt.
     expect(css).toMatch(/--warning:\s+var\(--state-warning\);/);
@@ -38,7 +38,7 @@ describe("Råvarer varseltekst – kontrastkontrakt", () => {
   });
 
   it.each([false, true])("varselblekk ≥4,5:1 på /10, /15 og flater (mørkt=%s)", (dark) => {
-    const ink = hsl(token(dark ? "brand-bronze-soft" : "brand-bronze-deep", dark));
+    const ink = hsl(dark ? "30 62% 66%" : token("brand-bronze-deep"));
     const warn = hsl(token("state-warning", dark));
     const surfaces = ["surface-canvas", "surface-raised", "surface-sunken", "surface-muted"].map((n) => hsl(token(n, dark)));
     const backgrounds: Rgb[] = [...surfaces, ...surfaces.flatMap((s) => [mix(warn, s, 0.1), mix(warn, s, 0.15)])];

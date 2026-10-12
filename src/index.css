@@ -275,7 +275,7 @@
     --primary-foreground: var(--surface-canvas);
     --ring: var(--text-primary);
     --rm-eyebrow-ink: var(--brand-bronze-soft);
-    --rm-warning-ink: var(--brand-bronze-soft);
+    --rm-warning-ink: 30 62% 66%; /* lysere bronse: bronze-soft gir bare 4,2:1 på varselfyll i mørkt tema */
   }
   /* Råvarer: lesbar varseltekst (≥4,5:1). Bare tekstfargen; --warning til bakgrunn/ramme/dekor er uendret. */
   html[data-active-app="ravarer"] .text-warning,
