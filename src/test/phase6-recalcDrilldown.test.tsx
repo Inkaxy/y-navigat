@@ -3,12 +3,13 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { RecalcDrilldown, costChange } from "@/ravarer/pages/reberegn/reberegnColumns";
+import { RecalcDrilldown } from "@/ravarer/pages/reberegn/reberegnColumns";
+import { costChange } from "@/ravarer/pages/reberegn/reberegnModel";
 
 describe("reberegning: kilde og pakning", () => {
   it("lenker til råvarekortets prisseksjon og pakningslisten med valgt vare", () => {
     render(<MemoryRouter><RecalcDrilldown rawMaterialId="rm-1" name="Mel" /></MemoryRouter>);
-    expect(screen.getByRole("link", { name: "Kilde, regnestykke og fakturaer for Mel" }).getAttribute("href")).toBe("/ravarer/varer/rm-1?seksjon=pris");
+    expect(screen.getByRole("link", { name: "Pris, prishistorikk og fakturaer for Mel" }).getAttribute("href")).toBe("/ravarer/varer/rm-1?seksjon=pris");
     expect(screen.getByRole("link", { name: "Pakning for Mel" }).getAttribute("href")).toBe("/ravarer/varer?liste=pakning&valgt=rm-1");
   });
   it("endring finnes bare når begge tall er bevist", () => {

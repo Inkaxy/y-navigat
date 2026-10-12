@@ -49,11 +49,13 @@ export function CorrectLineDialog({ open, onOpenChange, lineId, targetInvoiceId,
   // Eksakt identitet: frosset faktura = gjeldende faktura, og fersk rad = frosset linje på den fakturaen.
   const identityOk = !!q.data && !!lineId && q.data.id === lineId && q.data.invoice_id === invoice.id && targetInvoiceId === invoice.id;
   // Utkastet lages én gang per linje; ny lesing (også «Prøv igjen») beholder brukerens utkast.
+  // Bare vellykket, ferdig og samsvarende rad + kostprisføring kan danne første grunnlag (ikke bufret data under henting).
+  const initSettled = q.isSuccess && !q.isFetching && !q.isError;
   useEffect(() => {
-    if (!open || !q.data || !identityOk || base?.lineId === q.data.id) return;
+    if (!open || !q.data || !identityOk || !initSettled || base?.lineId === q.data.id) return;
     setDraft(draftFrom(q.data.values)); setBase({ lineId: q.data.id, updatedAt: q.data.updated_at });
     setReason(""); setLearn(false); setAcceptIssues(false); setErr(null);
-  }, [open, q.data, identityOk, base]);
+  }, [open, q.data, identityOk, initSettled, base]);
   // Raden er endret siden utkastet ble laget: utkastet beholdes, men kan ikke lagres mot ny versjon.
   const versionChanged = !!base && !!q.data && q.data.updated_at !== base.updatedAt;
   // Bare et vellykket, ferdig og gjeldende svar (rad + kostprisføring) kan ligge til grunn for lagring.
@@ -96,7 +98,26 @@ export function CorrectLineDialog({ open, onOpenChange, lineId, targetInvoiceId,
       submitting.current = false;
     }
   }
-  const reloadFresh = () => { setBase(null); void q.refetch(); };
+  // «Last inn ferske verdier»: utkast og grunnlag byttes først når en vellykket, ferdig og samsvarende
+  // fersk lesing for samme frosne mål er kommet — da atomisk. Feil eller byttet kontekst beholder utkastet.
+  const ctx = useRef({ open, lineId, invoiceId: invoice.id, targetInvoiceId, run: 0 });
+  ctx.current.open = open; ctx.current.lineId = lineId; ctx.current.invoiceId = invoice.id; ctx.current.targetInvoiceId = targetInvoiceId;
+  const [reloading, setReloading] = useState(false);
+  useEffect(() => { ctx.current.run += 1; setReloading(false); }, [open, lineId, invoice.id, targetInvoiceId]);
+  const reloadFresh = async () => {
+    if (reloading || !lineId) return;
+    const frozen = { lineId, invoiceId: invoice.id, targetInvoiceId, run: ctx.current.run };
+    setReloading(true); setErr(null);
+    const r = await q.refetch();
+    const c = ctx.current;
+    if (c.run !== frozen.run || !c.open || c.lineId !== frozen.lineId || c.invoiceId !== frozen.invoiceId || c.targetInvoiceId !== frozen.targetInvoiceId) return;
+    setReloading(false);
+    const d = r.data;
+    const ok = r.isSuccess && !r.isError && !r.isFetching && !!d && d.id === frozen.lineId && d.invoice_id === frozen.invoiceId && frozen.targetInvoiceId === frozen.invoiceId;
+    if (!ok || !d) { setErr("Kunne ikke hente ferske verdier. Utkastet ditt er beholdt."); return; }
+    setDraft(draftFrom(d.values)); setBase({ lineId: d.id, updatedAt: d.updated_at });
+    setReason(""); setLearn(false); setAcceptIssues(false);
+  };
 
   const field = (f: CorrectionField) => {
     if (!draft) return null;
@@ -154,7 +175,7 @@ export function CorrectLineDialog({ open, onOpenChange, lineId, targetInvoiceId,
         )}
         {versionChanged && (
           <p role="alert" className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">Linjen er endret siden du åpnet den. Utkastet kan ikke lagres mot den nye versjonen.{" "}
-            <button type="button" className="min-h-[44px] underline" onClick={reloadFresh}>Last inn ferske verdier</button></p>
+            <button type="button" className="min-h-[44px] underline" disabled={reloading} onClick={() => void reloadFresh()}>{reloading ? "Henter ferske verdier …" : "Last inn ferske verdier"}</button></p>
         )}
         {q.data && identityOk && draft && (
           <div className="grid gap-4 lg:grid-cols-2">

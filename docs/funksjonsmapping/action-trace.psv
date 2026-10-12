@@ -125,7 +125,7 @@ F97|src/ravarer/pages/priskontroll/import/ImportSheet.tsx|NewInvoice|Manuell
 F98|src/fakturaer/pages/RegistrerLinjer.tsx|match-invoice-lines|Matching etterpå
 F98|src/fakturaer/pages/RegistrerLinjer.tsx|replace_child_rows|Erstatt linjer
 F99|src/ravarer/pages/ReberegnKostpriser.tsx|Hent forslag|Skann
-F99|src/ravarer/pages/reberegn/reberegnColumns.tsx|BUCKETS|Fire grupper
+F99|src/ravarer/pages/reberegn/reberegnModel.tsx|BUCKETS|Fire grupper
 R1|src/components/layout/SubAppNav.tsx|RavarerNavView|Meny
 R108|src/ravarer/pages/Matvaretabellen.tsx|Dekning næringsdata|Dekning
 R109|src/ravarer/pages/Matvaretabellen.tsx|Alle matvaregrupper|Gruppefilter
@@ -288,3 +288,6 @@ F49|src/fakturaer/components/inbox/task/LineTask.tsx|Ny råvare …|Opprett ny v
 F54|src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx|WorkListView|Listerader/mobilkort (kolonnene er listerader)
 F84|src/ravarer/pages/priskontroll/fakturaer/FakturaerTab.tsx|TripletexStatusCard|Tripletex-statuskort
 F27|src/ravarer/pages/priskontroll/gjore/bulkGjore.ts|på tvers av fakturaer|Gruppert per varekort på tvers av fakturaer (grensen 200 ikke sporet)
+R192|src/ravarer/pages/reberegn/SingleRecalcDetail.tsx|Serverens regnestykke nå|Eksplisitt skrivebeskyttet enkeltforslag (recalc_raw_material_cost, p_dry_run true) per vare fra forslag/kvittering/feil; dagens forslag, ikke frosset kvitteringsspor
+R192|src/ravarer/hooks/useSingleRecalcPreview.ts|p_dry_run: true|Én forespørsel om gangen, frosset selskap+vare+generasjon
+R195|src/ravarer/pages/reberegn/reberegnColumns.tsx|paths.pakninger|Pakningslenke per vare

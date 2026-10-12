@@ -175,6 +175,13 @@ const recs = owners.map(([id, ownerRaw, urlsRaw, childRaw]) => {
     browser_check: ev?.browser_check ?? "ukjent",
     evidence_reports: ev?.reports ?? [],
     outstanding_gate: ev?.outstanding_gate ?? "ikke_vurdert",
+    // Historisk, datert delbevis holdes adskilt fra dagens kildesporing (mapping_status/handler_or_render_evidence).
+    // Det kopieres uendret og oppgraderes aldri til aksept.
+    historical_evidence: {
+      prior_evidence_ledger: ev ? { dated: "2026-10-11", source: "docs/funksjonsmapping/prior-evidence.psv", source_review: ev.source_review, mocked_test: ev.mocked_test, browser_check: ev.browser_check, reports: ev.reports, outstanding_gate: ev.outstanding_gate } : null,
+      list_status_note: c?.status || o?.status || null,
+      list_status_is_partial: /kilde|komponenttest|ikke nettleser|ikke innlogget/i.test(c?.status ?? ""),
+    },
     acceptance: "ikke akseptert",
   };
 }).sort((a, b) => a.id[0].localeCompare(b.id[0]) || Number(a.id.slice(1)) - Number(b.id.slice(1)));

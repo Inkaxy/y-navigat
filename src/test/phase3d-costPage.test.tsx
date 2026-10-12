@@ -6,6 +6,7 @@ import { MemoryRouter } from "react-router-dom";
 
 const h = vi.hoisted(() => ({ state: {} as Record<string, unknown> }));
 vi.mock("@/fakturaer/hooks/useCostRecalc", () => ({ useCostRecalc: () => h.state }));
+vi.mock("@/ravarer/hooks/useSingleRecalcPreview", () => ({ useSingleRecalcPreview: () => ({ state: { status: "closed" }, open: vi.fn(), close: vi.fn(), ready: true }) }));
 vi.mock("@/ravarer/components/CostDeviationsCard", () => ({ CostDeviationsCard: () => <div data-testid="avvik" /> }));
 vi.mock("@/ravarer/ui/ModulePage", () => ({ ModulePage: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
 vi.mock("@/ravarer/ui/DataTable", () => ({ DataTable: ({ rows, getId, onSelectedChange }: { rows: unknown[]; getId: (r: unknown) => string; onSelectedChange: (s: Set<string>) => void }) => <div>{rows.map((r) => <input key={getId(r)} type="checkbox" aria-label="velg" onChange={() => onSelectedChange(new Set([getId(r)]))} />)}</div> }));
