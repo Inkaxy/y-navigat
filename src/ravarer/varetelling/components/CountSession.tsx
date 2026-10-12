@@ -107,7 +107,7 @@ function SessionBody({ data, listParam, onBack, onList, onPrint }: {
                 </div>
                 <p className="text-xs text-muted-foreground" aria-live="polite">{list ? `${list.name}: ` : ""}{listSum.lines - listSum.notCounted}/{listSum.lines} registrert · {shown.length} vises</p>
               </div>
-              <p className="text-xs text-muted-foreground">Tomt felt betyr ikke talt — ikke 0. «Lagre og neste», «0 på lager» og «Ikke på stedet» flytter til neste vare som ikke er talt. Forventet beholdning vises ikke.</p>
+              <p id="vt-next-hint" className="text-xs text-muted-foreground">Tomt felt betyr ikke talt — ikke 0. «Lagre og neste», «0 på lager» og «Ikke på stedet» flytter til neste vare som ikke er talt. Forventet beholdning vises ikke.</p>
               <div className="grid gap-3 landscape:lg:grid-cols-2 xl:grid-cols-2">
                 {shown.map(l => (
                   <div key={l.id} data-line={l.id}>

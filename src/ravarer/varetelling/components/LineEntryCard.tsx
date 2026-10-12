@@ -127,12 +127,11 @@ export function LineEntryCard({ line, countId, readOnly, active, onFocus, onNext
         aria-label={`Kommentar for ${line.snap_name}`} className="mt-2 h-12" maxLength={500} />
       {!readOnly && (
         <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-          <Button className="min-h-[48px]" disabled={blocked || total == null || total <= 0} aria-describedby={`vt-next-${line.id}`} onClick={() => void send("talt")}>Lagre og neste</Button>
+          <Button className="min-h-[48px]" disabled={blocked || total == null || total <= 0} aria-describedby="vt-next-hint" onClick={() => void send("talt")}>Lagre og neste</Button>
           <Button variant="outline" className="min-h-[48px]" disabled={blocked} onClick={() => void send("null")}>0 på lager</Button>
           <Button variant="outline" className="min-h-[48px]" disabled={blocked} onClick={() => void send("ikke_her")}>Ikke på stedet</Button>
           <Button variant="outline" className="min-h-[48px]" disabled={blocked || invalid} onClick={() => void send("ma_kontrolleres")}>Må kontrolleres</Button>
           <Button variant="ghost" className="min-h-[48px]" onClick={onNext}>Neste vare</Button>
-          <p id={`vt-next-${line.id}`} className="col-span-2 text-xs text-muted-foreground">«Lagre og neste», «0 på lager» og «Ikke på stedet» lagrer og flytter til neste vare som ikke er talt. «Må kontrolleres» blir stående.</p>
         </div>
       )}
       <div className="mt-2 text-sm" aria-live="polite">
