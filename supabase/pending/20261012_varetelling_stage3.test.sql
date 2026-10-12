@@ -46,7 +46,7 @@ SELECT set_config('test.uid','00000000-0000-0000-0000-0000000000a1',false);
 SELECT pg_temp.expect_error($q$UPDATE vt_ocr_jobs SET status='klar'$q$, '42501');
 SELECT pg_temp.expect_error($q$SELECT csv FROM vt_report_mail_ops$q$, '42501');
 SELECT pg_temp.expect_error($q$SELECT vt_ocr_record_result(current_setting('test.job')::uuid, gen_random_uuid(), true, '[]', '[]')$q$, '42501');
-SELECT pg_temp.expect_error($q$SELECT vt_report_mail_claim(gen_random_uuid())$q$, '42501');
+SELECT pg_temp.expect_error($q$SELECT vt_report_mail_claim(gen_random_uuid(), auth.uid(), gen_random_uuid(), 'a', 'b', 'c')$q$, '42501');
 
 -- ===== Lease og forsøksidentitet =====
 SELECT set_config('test.att1', vt_ocr_claim(current_setting('test.job')::uuid)->>'attempt_id', false);
