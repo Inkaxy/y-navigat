@@ -168,7 +168,6 @@ describe("tellekort", () => {
     fireEvent.click(within(cardOf(screen.getByLabelText("Hvetemel (demo): antall kg"))).getByRole("button", { name: "0 på lager" }));
     await waitFor(() => expect(m.api._state.lines.find(l => l.raw_material_id === "m1")?.state).toBe("null"));
     await waitFor(() => expect((screen.getByLabelText("Hvetemel (demo): antall kg") as HTMLInputElement).value).toBe(""));
-    console.log("KORT", cardOf(screen.getByLabelText("Hvetemel (demo): antall kg")).textContent);
     expect(within(cardOf(screen.getByLabelText("Hvetemel (demo): antall kg"))).queryByText(/82,5/)).toBeNull();
   });
   it("utkast overlever liste-/visningsbytte og omlasting; avslutning sperres mens utkast finnes", async () => {
@@ -256,7 +255,7 @@ describe("rapport på e-post", () => {
   it("tapt svar ⇒ uavklart overlever lukk/omlasting og endret rapport; statussjekk sender aldri; ingen ny Send", async () => {
     const m = setup({ mailConfigured: true, mailOutcome: "tapt_svar" }); const id = await started(m.api);
     await toPreview(m, id);
-    fireEvent.click(screen.getByRole("button", { name: "Send" })); fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    const sendBtn = screen.getByRole("button", { name: "Send" }); fireEvent.click(sendBtn); fireEvent.click(sendBtn);
     expect(await screen.findByText(/ikke avklart/)).toBeTruthy();
     expect(m.s3._counters.graphCalls).toBe(1);
     const line = m.api._state.lines[0];
