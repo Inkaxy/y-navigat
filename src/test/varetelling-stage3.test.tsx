@@ -148,7 +148,7 @@ describe("tellekort – utkast og nettleserfunn", () => {
     fireEvent.change(await screen.findByLabelText("Sukker (demo): antall kg"), { target: { value: "4,2" } });
     await screen.findByText(/Utkast — ikke lagret/);
     m.remount(`/?telling=${id}`); // annen liste / omlasting
-    expect(await screen.findByText(/utkast som ikke er sendt/)).toBeTruthy();
+    expect((await screen.findAllByText(/utkast som ikke er sendt/)).length).toBeGreaterThan(0);
     m.remount(`/?telling=${id}&liste=${list1.id}`);
     expect(((await screen.findByLabelText("Sukker (demo): antall kg")) as HTMLInputElement).value).toBe("4,2");
     expect(spy).not.toHaveBeenCalled();

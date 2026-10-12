@@ -65,8 +65,12 @@ export function parseProposal(v: unknown): VtOcrProposal {
     corrected: typeof r.corrected === "boolean" ? r.corrected : null };
 }
 
+function readBytes(f: Blob): Promise<ArrayBuffer> {
+  if (typeof f.arrayBuffer === "function") return f.arrayBuffer();
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => (r.result instanceof ArrayBuffer ? res(r.result) : rej(new Error("fil"))); r.onerror = () => rej(new Error("fil")); r.readAsArrayBuffer(f); });
+}
 async function sha256File(f: Blob): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", await f.arrayBuffer());
+  const buf = await crypto.subtle.digest("SHA-256", await readBytes(f));
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
 }
 export const OCR_MIME = ["application/pdf", "image/jpeg", "image/png", "image/webp"] as const;
