@@ -135,3 +135,19 @@ describe("FakturaWorkspace: «Rett sumavvik» åpner vaktet retting", () => {
     expect(screen.queryByRole("dialog", { name: "Rett fakturalinje" })).toBeNull();
   });
 });
+
+import { correctionHref } from "@/ravarer/pages/priskontroll/faktura/correctionTarget";
+import { paths, RETURN_PARAM } from "@/ravarer/lib/paths";
+describe("forhåndsvisningens rettelenke", () => {
+  const has = (l: { issue?: boolean }) => !!l.issue;
+  it("eksakt faktura, linje med lesevarsel og listekontekst som retur", () => {
+    const href = correctionHref(paths.faktura, "I1", [{ id: "a" }, { id: "b", issue: true }], has, "?fane=gjore&valgt=x", RETURN_PARAM);
+    const u = new URL(href, "http://x");
+    expect(u.pathname).toBe("/ravarer/priskontroll/faktura/I1");
+    expect(u.searchParams.get("linje")).toBe("b");
+    expect(u.searchParams.get("retur")).toBe("?fane=gjore&valgt=x");
+  });
+  it("ingen lesevarsel → ingen linje i lenken", () => {
+    expect(new URL(correctionHref(paths.faktura, "I1", [{ id: "a" }], has, "", RETURN_PARAM), "http://x").searchParams.has("linje")).toBe(false);
+  });
+});
