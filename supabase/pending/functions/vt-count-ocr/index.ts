@@ -17,13 +17,13 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 interface Original { path: string; sha256: string; size: number; mime: string }
 interface Claim { attempt_id: string; count_id: string; list_id: string; template_revision: number; originals: Original[]; lines: ManifestLine[] }
 
-async function sha256Hex(b: Uint8Array): Promise<string> {
+async function sha256Hex(b: Uint8Array<ArrayBuffer>): Promise<string> {
   const d = await crypto.subtle.digest("SHA-256", b); return [...new Uint8Array(d)].map(x => x.toString(16).padStart(2, "0")).join("");
 }
 function b64(bytes: Uint8Array): string { let s = ""; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(s); }
 
 /** Én PDF per side, i opplastingsrekkefølge. */
-async function pagesFrom(files: { o: Original; bytes: Uint8Array }[]): Promise<Uint8Array[]> {
+async function pagesFrom(files: { o: Original; bytes: Uint8Array<ArrayBuffer> }[]): Promise<Uint8Array[]> {
   const out: Uint8Array[] = [];
   for (const { o, bytes } of files) {
     if (o.mime === "application/pdf") {
@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
   const fail = async (reason: string) => { await admin.rpc("vt_ocr_record_failure", { p_job_id: jobId, p_attempt_id: attempt, p_reason: reason }); return json(200, { status: "feilet", reason }); };
 
   // 2) Filbevis fra privat lagring.
-  const files: { o: Original; bytes: Uint8Array }[] = [];
+  const files: { o: Original; bytes: Uint8Array<ArrayBuffer> }[] = [];
   for (const o of c.originals) {
     const f = await admin.storage.from("vt-count-uploads").download(o.path);
     if (f.error || !f.data) return fail("En opplastet side mangler i lagringen");

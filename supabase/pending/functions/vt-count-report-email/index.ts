@@ -15,7 +15,8 @@ import { attachmentBase, attachmentHash, b64, buildGraphMessage, buildReportCsv,
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-type Admin = ReturnType<typeof createClient>;
+/** Samme klienttype som felles graph-mail forventer (den filen endres ikke). */
+type Admin = Parameters<typeof getGraphAccessToken>[0];
 
 async function senderMailbox(admin: Admin): Promise<string | null> {
   if (!Deno.env.get("MICROSOFT_GRAPH_TENANT_ID") || !Deno.env.get("MICROSOFT_GRAPH_CLIENT_ID") || !Deno.env.get("MICROSOFT_GRAPH_CLIENT_SECRET")) return null;
@@ -54,7 +55,7 @@ Deno.serve(async (req) => {
   let b: Record<string, unknown>; try { const v = await req.json(); if (typeof v !== "object" || v === null) throw 0; b = v as Record<string, unknown>; } catch { return json(400, { error: "Ugyldig forespørsel" }); }
   const url = Deno.env.get("SUPABASE_URL")!;
   const user = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: auth } } });
-  const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const admin: Admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!) as Admin;
 
   // Lagret operasjon først — både for status og send.
   if (b.action === "status" || b.action === "send") {
