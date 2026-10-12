@@ -5,7 +5,7 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
-const st = vi.hoisted(() => ({ entity: "E1" as string | null, canWrite: true, loading: false, rpc: vi.fn(), materials: [] as { id: string }[], cap: 200, pages: 0 }));
+const st = vi.hoisted(() => ({ entity: "E1" as string | null, canWrite: true, loading: false, rpc: vi.fn(), materials: [] as ({ id: string } & Record<string, unknown>)[], cap: 200, pages: 0 }));
 vi.mock("@/integrations/supabase/client", () => {
   const from = () => {
     const s: { head: boolean; gt: string | null; limit: number } = { head: false, gt: null, limit: 1e9 };

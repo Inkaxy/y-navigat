@@ -72,7 +72,7 @@ export function RecipeSummaryCard({ productId, productName, legalEntityId, canWr
   const qc = useQueryClient();
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   /** Frosset ved åpning: bekreftelsen og den betingede slettingen gjelder nøyaktig det som ble vist. */
-  const [unlinkSnap, setUnlinkSnap] = useState<{ base: LinkBase | null; recipeName: string } | null>(null);
+  const [unlinkSnap, setUnlinkSnap] = useState<{ base: LinkBase | null; recipeName: string | null } | null>(null);
   // Én synkron lås for innstillinger, oppskriftsbytte og frakobling.
   const opLock = useRef(false);
   const [pending, setPending] = useState(false);
