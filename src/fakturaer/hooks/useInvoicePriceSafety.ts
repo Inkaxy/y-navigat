@@ -140,14 +140,16 @@ export function gateWithRows(data: SafetyResult | undefined, fresh: boolean, lin
  * `rawMaterialId` (varekort) avviser kvitteringer for en annen råvare.
  */
 export function useInvoicePriceSafety(invoiceIds: readonly (string | null | undefined)[], opts?: { pending?: boolean; rawMaterialId?: string | null; active?: boolean }) {
-  const ids = [...new Set(invoiceIds.filter((x): x is string => !!x))].sort();
+  const inactive = opts?.active === false;
+  // Inaktiv eier: observatøren slipper SINE spørringer (tom liste), så en kø-jobb uten andre eiere
+  // aborteres og aldri starter. Ingen global cancelQueries — synlige søsken beholder sin henting.
+  const ids = inactive ? [] : [...new Set(invoiceIds.filter((x): x is string => !!x))].sort();
   const qs = useQueries({
     queries: ids.map((id) => ({
       queryKey: [PRICE_SAFETY_KEY, id] as const,
       queryFn: ({ signal }: { signal: AbortSignal }) => fetchInvoicePriceSafety(id, signal),
       // Skjult/inaktiv eier: ingen henting eller polling for denne observatøren. Andre synlige
       // observatører av samme nøkkel fortsetter uforstyrret (ingen global cancelQueries).
-      enabled: opts?.active !== false,
       staleTime: 15_000,
       refetchInterval: SAFETY_REFETCH_MS,
       refetchIntervalInBackground: false,
@@ -169,12 +171,12 @@ export function useInvoicePriceSafety(invoiceIds: readonly (string | null | unde
   const byId = new Map<string, (typeof qs)[number]>();
   ids.forEach((id, i) => byId.set(id, qs[i]));
   const gateFor: GateFor = (line) => {
-    if (opts?.pending || opts?.active === false) return UNCHECKED;
+    if (opts?.pending || inactive) return UNCHECKED;
     const q = byId.get(line.invoice_id);
     if (!q) return UNCHECKED;
     return gateWithRows(q.data, isFresh(q, clock), line, opts?.rawMaterialId);
   };
-  const allFresh = ids.length > 0 && qs.every((q) => isFresh(q, clock));
+  const allFresh = !inactive && ids.length > 0 && qs.every((q) => isFresh(q, clock));
   const anyError = qs.some((q) => q.isError);
   const refetch = () => { qs.forEach((q) => void q.refetch()); };
   return { gateFor, allFresh, anyError, refetch, loading: qs.some((q) => q.isLoading) };
