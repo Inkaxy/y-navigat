@@ -14,6 +14,8 @@ export class PendingStore {
   private locks = new Set<string>();
   private listeners = new Set<Listener>();
   private version = 0;
+  /** Synlig når nettleseren ikke kan lagre (innslaget ligger da bare i minnet). */
+  lastError: string | null = null;
 
   constructor(private readonly storageKey: string | null, private readonly storage: Storage | null) {
     if (!storageKey || !storage) return;
@@ -21,7 +23,7 @@ export class PendingStore {
       const raw = storage.getItem(storageKey);
       const arr: unknown = raw ? JSON.parse(raw) : [];
       if (Array.isArray(arr)) for (const o of arr) if (isOp(o)) this.ops.set(o.key, { ...o, state: "unknown" }); // inflight ved omlasting = ukjent
-    } catch { /* korrupt lagring: ignorer, ingenting sendes automatisk */ }
+    } catch { this.lastError = "Lagrede ventende sendinger kunne ikke leses i denne nettleseren. Kontroller status før du sender på nytt."; }
   }
   get(key: string): PendingOp | undefined { return this.ops.get(key); }
   all(): PendingOp[] { return [...this.ops.values()]; }
@@ -40,7 +42,8 @@ export class PendingStore {
   subscribe(fn: Listener): () => void { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; }
   private persist() {
     if (this.storageKey && this.storage) {
-      try { this.storage.setItem(this.storageKey, JSON.stringify(this.all())); } catch { /* full lagring: minnet gjelder fortsatt */ }
+      try { this.storage.setItem(this.storageKey, JSON.stringify(this.all())); this.lastError = null; }
+      catch { this.lastError = "Ventende sendinger kan ikke lagres i nettleseren (full eller blokkert lagring). De huskes bare til siden lukkes."; }
     }
     this.emit();
   }
@@ -54,13 +57,14 @@ function isOp(o: unknown): o is PendingOp {
 }
 
 const stores = new Map<string, PendingStore>();
-/** Én butikk per bruker + firma. Uten bruker-ID: bare minne (aldri delt mellom brukere). */
-export function pendingStoreFor(userId: string | null, entity: string): PendingStore {
-  const id = `${userId ?? "anon"}:${entity}`;
+/** Én butikk per bruker + firma (+ navnerom). Uten bruker-ID: bare minne (aldri delt mellom brukere). */
+export function pendingStoreFor(userId: string | null, entity: string, ns = "pending:v2"): PendingStore {
+  const id = `${ns}:${userId ?? "anon"}:${entity}`;
   let s = stores.get(id);
   if (!s) {
-    const storage = typeof window !== "undefined" && userId ? window.localStorage : null;
-    s = new PendingStore(userId ? `vt:pending:v2:${id}` : null, storage);
+    let storage: Storage | null = null;
+    try { storage = typeof window !== "undefined" && userId ? window.localStorage : null; } catch { storage = null; }
+    s = new PendingStore(userId ? `vt:${ns}:${userId}:${entity}` : null, storage);
     stores.set(id, s);
   }
   return s;

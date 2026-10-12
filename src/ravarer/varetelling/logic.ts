@@ -37,46 +37,12 @@ export function entryToBase(parts: Pick<EntryPart, "amount" | "units_in_base">[]
   return micro / 1e6;
 }
 
-export interface CountSummary {
-  lines: number; counted: number; zero: number; notHere: number; notCounted: number; review: number;
-  /** Sum av talt verdi med frosset pris (øre-presisjon). Null hvis ingen talt linje har pris. */
-  value: number | null;
-  /** Talte linjer med mengde > 0 uten pris — verdien er da ufullstendig. */
-  countedWithoutPrice: number;
-  complete: boolean;
-}
-
-export function summarize(lines: VtCountLine[]): CountSummary {
-  let counted = 0, zero = 0, notHere = 0, notCounted = 0, review = 0, countedWithoutPrice = 0, ore = 0, priced = 0;
-  for (const l of lines) {
-    if (l.state === "talt") counted++;
-    else if (l.state === "null") zero++;
-    else if (l.state === "ikke_her") notHere++;
-    else if (l.state === "ma_kontrolleres") review++;
-    else notCounted++;
-    if (l.state === "talt" && l.counted_base != null) {
-      if (l.snap_price_per_base == null) countedWithoutPrice++;
-      else { priced++; ore += Math.round(l.counted_base * l.snap_price_per_base * 100); }
-    }
-  }
-  return {
-    lines: lines.length, counted, zero, notHere, notCounted, review,
-    value: priced > 0 ? ore / 100 : null, countedWithoutPrice,
-    complete: lines.length > 0 && notCounted === 0 && review === 0 && countedWithoutPrice === 0,
-  };
-}
-
-export interface GroupSummary { key: string; label: string; summary: CountSummary }
-/** Sammendrag per liste og per avdeling (frosne verdier). */
-export function summarizeGroups(lists: VtCountList[], lines: VtCountLine[]): { byList: GroupSummary[]; byDepartment: GroupSummary[] } {
-  const byList = lists.map(l => ({ key: l.id, label: `${l.department} · ${l.name}`, summary: summarize(lines.filter(x => x.count_list_id === l.id)) }));
-  const depts = [...new Set(lists.map(l => l.department))].sort((a, b) => a.localeCompare(b, "nb"));
-  const byDepartment = depts.map(d => {
-    const ids = new Set(lists.filter(l => l.department === d).map(l => l.id));
-    return { key: d, label: d, summary: summarize(lines.filter(x => ids.has(x.count_list_id))) };
-  });
-  return { byList, byDepartment };
-}
+// Sammendrag kommer fra ÉN felles rapportkontrakt (skjerm, PDF/CSV og e-post).
+import { summarizeGroupsOf, summarizeLines, type VtGroup, type VtSummary } from "../../../supabase/pending/functions/_shared/vtReport";
+export type CountSummary = VtSummary;
+export type GroupSummary = VtGroup;
+export const summarize = (lines: VtCountLine[]): CountSummary => summarizeLines(lines);
+export const summarizeGroups = (lists: VtCountList[], lines: VtCountLine[]) => summarizeGroupsOf(lists, lines);
 
 /** Samme vare på flere steder summeres én gang til total mengde for varen. */
 export function totalsByMaterial(lines: VtCountLine[]): Map<string, { name: string; unit: string; total: number; places: number }> {
