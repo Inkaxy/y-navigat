@@ -102,8 +102,8 @@ export function CorrectLineDialog({ open, onOpenChange, lineId, targetInvoiceId,
   // fersk lesing for samme frosne mål er kommet — da atomisk. Feil eller byttet kontekst beholder utkastet.
   const ctx = useRef({ open, lineId, invoiceId: invoice.id, targetInvoiceId, run: 0 });
   ctx.current.open = open; ctx.current.lineId = lineId; ctx.current.invoiceId = invoice.id; ctx.current.targetInvoiceId = targetInvoiceId;
-  useEffect(() => { ctx.current.run += 1; }, [open, lineId, invoice.id, targetInvoiceId]);
   const [reloading, setReloading] = useState(false);
+  useEffect(() => { ctx.current.run += 1; setReloading(false); }, [open, lineId, invoice.id, targetInvoiceId]);
   const reloadFresh = async () => {
     if (reloading || !lineId) return;
     const frozen = { lineId, invoiceId: invoice.id, targetInvoiceId, run: ctx.current.run };
