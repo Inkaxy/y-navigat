@@ -169,7 +169,7 @@ function EntityConfig({ legalEntityId, onState }: { legalEntityId: string; onSta
   const { mode, syncEnabled, frequency } = form;
   const tokensEntered = !!(tokens.jwt.trim() || tokens.consumer.trim() || tokens.employee.trim());
   const dirty = (!!draft && !sameNonSecret(draft.value, baseline)) || tokensEntered;
-  useEffect(() => { onState(dirty, saving); }, [dirty, saving, onState]);
+  useEffect(() => { onState(dirty, saving || !!recon); }, [dirty, saving, recon, onState]);
   useEffect(() => () => onState(false, false), [onState]);
 
   const setForm = (p: Partial<TripletexNonSecret>) => {
@@ -337,7 +337,7 @@ function EntityConfig({ legalEntityId, onState }: { legalEntityId: string; onSta
   };
 
   if (isLoading) return <Card><CardContent className="p-6 text-sm text-muted-foreground">Laster…</CardContent></Card>;
-  if (credQ.isError) {
+  if (credQ.isError && !recon) {
     return (
       <Card><CardContent className="space-y-2 p-6 text-sm">
         <p className="text-destructive">Kunne ikke lese Tripletex-konfigurasjonen. Ingenting kan lagres før den er lest.</p>
