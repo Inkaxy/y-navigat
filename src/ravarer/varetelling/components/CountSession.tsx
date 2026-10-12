@@ -10,6 +10,7 @@ import { buildCsv, buildPdf, downloadBlob, reportFileBase } from "../report";
 import type { VtCountLine } from "../types";
 import { Lifecycle, ListActions, StartPanel } from "./CountControls";
 import { LineEntryCard } from "./LineEntryCard";
+import { UnsyncedPanel } from "./UnsyncedPanel";
 import { formatDateNo, Loading, NativeSelect, Notice } from "./shared";
 
 type Filter = "gjenstar" | "kontroll" | "alle";
@@ -92,6 +93,8 @@ function SessionBody({ data, listParam, onBack, onList, onPrint }: {
             <Card className="p-3 text-sm"><p className="font-medium">Varer talt på flere steder (summert én gang)</p>
               <ul>{multi.map(t => <li key={t.name}>{t.name}: {formatAmount(t.total)} {t.unit} fra {t.places} steder</li>)}</ul></Card>
           )}
+          <UnsyncedPanel countId={count.id} lines={lines} onGoTo={l => { onList(l.count_list_id); setFilter("alle"); setSnap(null); setActiveId(l.id);
+            requestAnimationFrame(() => document.querySelector<HTMLInputElement>(`[data-line="${l.id}"] input`)?.focus()); }} />
           <div className="grid gap-2 sm:grid-cols-2">
             <NativeSelect aria-label="Velg liste" value={listId} onChange={e => { onList(e.target.value === "alle" ? null : e.target.value); setSnap(null); }}>
               <option value="alle">Alle lister ({lines.length})</option>

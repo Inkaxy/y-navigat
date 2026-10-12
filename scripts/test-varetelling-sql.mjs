@@ -11,11 +11,15 @@ const test = readFileSync(join(dir, "20261012_varetelling_foundation.test.sql"),
   .replace(/^\\set .*$/m, "")
   .replace(/^\\i 20261012_varetelling_foundation\.PENDING\.sql$/m, () => pending);
 
+const stage3 = readFileSync(join(dir, "20261012_varetelling_stage3.PENDING.sql"), "utf8");
+const stage3Test = readFileSync(join(dir, "20261012_varetelling_stage3.test.sql"), "utf8")
+  .replace(/^\\i 20261012_varetelling_stage3\.PENDING\.sql$/m, () => stage3);
+const all = test + "\n" + stage3Test;
 const db = new PGlite();
 let oks = 0;
 const onNotice = (n) => { if (String(n.message).startsWith("OK")) oks++; };
 try {
-  const res = await db.exec(test, { onNotice });
+  const res = await db.exec(all, { onNotice });
   const last = res.at(-1)?.rows?.[0];
   console.log(`OK-kontroller: ${oks}`);
   console.log(last?.resultat ?? "ukjent resultat");
