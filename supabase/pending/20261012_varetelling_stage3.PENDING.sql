@@ -631,4 +631,4 @@ GRANT EXECUTE ON FUNCTION public.vt_stage3_version(), public.vt_report_snapshot(
   public.vt_issue_print_manifest(uuid,integer,jsonb), public.vt_clarify_price(uuid,uuid,uuid,numeric,text,text,text), public.vt_assignable_users(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.vt_ocr_record_page_count(uuid,uuid,integer), public.vt_ocr_record_unknown(uuid,uuid,text), public.vt_ocr_record_failure(uuid,uuid,text),
   public.vt_ocr_record_result(uuid,uuid,boolean,jsonb,jsonb), public.vt_report_mail_reserve(uuid,uuid,uuid,integer,text,text,text,text,jsonb,text,text,text,boolean,text),
-  public.vt_report_mail_claim(uuid,uuid,uuid,text,text,text), public.vt_report_mail_finish(uuid,text,text), public.vt_report_snapshot(uuid) TO service_role;
+  public.vt_report_mail_claim(uuid,uuid,uuid,text,text,text), public.vt_report_mail_finish(uuid,text,text), public._vt_report_snapshot_data(uuid) TO service_role;
