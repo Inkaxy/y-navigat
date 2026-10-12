@@ -145,4 +145,39 @@ describe("hook-livssyklus med ekte QueryClient", () => {
     expect(calls.filter((c) => c.kind === "invoice").length).toBeGreaterThanOrEqual(2);
     vi.useRealTimers();
   });
+  function Probe({ ids, active, out }: { ids: string[]; active: boolean; out: { allFresh?: boolean; gate?: unknown } }) {
+    const s = useInvoicePriceSafety(ids, { active });
+    out.allFresh = s.allFresh;
+    out.gate = s.gateFor({ id: "l1", invoice_id: ids[0], raw_material_id: "rm" } as never);
+    return null;
+  }
+  it("eneste inaktive eier av en kø-jobb: starter aldri, allFresh false; synlig søsken uforstyrret", async () => {
+    let release!: () => void;
+    invoiceGate = new Promise((r) => { release = r; });
+    const qc = new QueryClient();
+    const W = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+    const busyOut = {};
+    render(<W>{["b1", "b2", "b3", "b4"].map((id) => <Probe key={id} ids={[id]} active={true} out={busyOut} />)}</W>);
+    await act(async () => { await new Promise((r) => setTimeout(r, 5)); });
+    expect(__safetyQueueState().active).toBe(4);
+    const fifth: { allFresh?: boolean; gate?: unknown } = {};
+    const sole = render(<W><Probe ids={["inv-5"]} active={true} out={fifth} /></W>);
+    await act(async () => { await new Promise((r) => setTimeout(r, 5)); });
+    expect(__safetyQueueState().waiting).toBe(1);
+    sole.rerender(<W><Probe ids={["inv-5"]} active={false} out={fifth} /></W>);
+    await act(async () => { await new Promise((r) => setTimeout(r, 5)); });
+    expect(__safetyQueueState().waiting).toBe(0);
+    invoiceGate = null; release();
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    expect(calls.filter((c) => c.kind === "invoice").length).toBe(4);
+    expect(fifth.allFresh).toBe(false);
+    expect(fifth.gate).toMatchObject({ ok: false });
+    // Synlig søsken av samme nøkkel påvirkes ikke av en annen observatørs inaktivitet.
+    const vis: { allFresh?: boolean } = {};
+    const hid: { allFresh?: boolean } = {};
+    render(<W><Probe ids={["inv-6"]} active={true} out={vis} /><Probe ids={["inv-6"]} active={false} out={hid} /></W>);
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    expect(vis.allFresh).toBe(true);
+    expect(hid.allFresh).toBe(false);
+  });
 });
