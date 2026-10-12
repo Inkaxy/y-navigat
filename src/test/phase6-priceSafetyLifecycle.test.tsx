@@ -51,7 +51,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 function safetyPayload(inv: string) {
-  return { invoice_id: inv, legal_entity_id: "e1", checked_at: new Date().toISOString(), lines: [] };
+  return { schema_version: 2, invoice_id: inv, legal_entity_id: "e1", checked_at: new Date().toISOString(), lines: [] };
 }
 
 import { fetchInvoicePriceSafety, useInvoicePriceSafety, __safetyQueueState } from "@/fakturaer/hooks/useInvoicePriceSafety";
