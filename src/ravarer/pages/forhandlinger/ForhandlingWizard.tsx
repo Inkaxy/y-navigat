@@ -492,7 +492,7 @@ fakturahistorikk, og uten den finnes verken volum eller prisgrunnlag. */}
                   </label>
                 </div>
               )}
-              <Button onClick={handleSend} disabled={generateMut.isPending || (genUnknown && !confirmRegen) || recipients.length === 0} className="min-h-[44px] rounded-full">
+              <Button onClick={handleSend} disabled={!rights.canWrite || generateMut.isPending || (genUnknown && !confirmRegen) || recipients.length === 0} className="min-h-[44px] rounded-full">
                 {generateMut.isPending ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
