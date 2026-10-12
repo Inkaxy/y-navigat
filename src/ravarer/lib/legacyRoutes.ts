@@ -7,7 +7,7 @@ import { normalizePriskontrollSearch } from "@/ravarer/pages/priskontroll/faktur
 
 const R = "/ravarer";
 
-function merge(search: string, extra: [string, string][], rename: Record<string, string | null> = {}, values: Record<string, Record<string, string>> = {}): string {
+function merge(search: string, extra: [string, string][], rename: Record<string, string | null> = {}, values: Record<string, Record<string, string>> = {}, defaults: [string, string][] = []): string {
   const src = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const out = new URLSearchParams();
   for (const [k, v] of extra) out.set(k, v);
@@ -15,16 +15,17 @@ function merge(search: string, extra: [string, string][], rename: Record<string,
     if (k in rename) {
       const to = rename[k];
       const mapped = values[k] ? values[k][v] : v;
-      if (to && mapped && !out.has(to)) out.set(to, mapped);
+      if (to && mapped && !out.has(to) && !src.has(to)) out.set(to, mapped);
       return;
     }
     if (!out.has(k)) out.set(k, v);
   });
+  for (const [k, v] of defaults) if (!out.has(k)) out.set(k, v);
   const s = out.toString();
   return s ? `?${s}` : "";
 }
 
-type Entry = { to: string; extra?: [string, string][]; rename?: Record<string, string | null>; /** Verdioversetting for omdøpte parametre (ukjente verdier droppes). */ values?: Record<string, Record<string, string>>; /** Import-sidepanel: standardfane når ingen er oppgitt. */ importer?: boolean };
+type Entry = { to: string; extra?: [string, string][]; rename?: Record<string, string | null>; /** Verdioversetting for omdøpte parametre (ukjente verdier droppes). */ values?: Record<string, Record<string, string>>; /** Settes bare når verken query eller omdøping ga verdien. */ defaults?: [string, string][]; /** Import-sidepanel: standardfane når ingen er oppgitt. */ importer?: boolean };
 const IMP = { to: `${R}/priskontroll`, rename: { tab: "importer" }, importer: true } as const;
 
 /** Gamle beslutningstyper → gruppe i Å gjøre. */
@@ -35,6 +36,19 @@ const GJORE: Entry = {
   to: `${R}/priskontroll`, extra: [["fane", "gjore"]],
   rename: { omfang: "gruppe", type: "gruppe", fra: null, side: null, fane: null },
   values: { omfang: LEGACY_TYPE_TO_GRUPPE, type: LEGACY_TYPE_TO_GRUPPE },
+};
+
+/**
+ * Gammel fakturaliste. Eksplisitt moderne `visning` vinner; ellers oversettes gammel
+ * `filter=klar|avstemt|trenger|alle` til tilsvarende hurtigfilter (gammel «klar» = klar til
+ * avstemming). Ukjent/manglende filter → «alle» som før. `filter` fjernes, så det ikke
+ * blir stående som en tolkningsløs parameter.
+ */
+const LEGACY_FAKTURALISTE: Entry = {
+  to: `${R}/priskontroll`, extra: [["fane", "fakturaer"]],
+  rename: { filter: "visning", fane: null },
+  values: { filter: { klar: "klar", avstemt: "avstemt", fullfort: "avstemt", trenger: "trenger", alle: "alle" } },
+  defaults: [["visning", "alle"]],
 };
 
 const STATIC: Record<string, Entry> = {
@@ -51,7 +65,7 @@ const STATIC: Record<string, Entry> = {
   "/ravarer/varer/datablad-endringer": { to: `${R}/varer`, extra: [["liste", "datablad"]] },
   "/ravarer/matvaretabellen": { to: `${R}/varer/matvaretabellen` },
   "/ravarer/datablad-bulk": { to: `${R}/varer/datablad-opplasting` },
-  "/ravarer/fakturaer": { to: `${R}/priskontroll`, extra: [["fane", "fakturaer"], ["visning", "alle"]] },
+  "/ravarer/fakturaer": LEGACY_FAKTURALISTE,
   "/ravarer/fakturaer/til-behandling": {
     to: `${R}/priskontroll`, extra: [["fane", "fakturaer"], ["visning", "innboks"]], rename: { fane: "innboks" },
   },
@@ -79,7 +93,7 @@ const STATIC: Record<string, Entry> = {
   "/ravarer/innstillinger/kategorier": { to: `${R}/innstillinger`, extra: [["seksjon", "kategorier"]] },
   "/ravarer/innstillinger/ai-tjenester": { to: `${R}/innstillinger`, extra: [["seksjon", "ai"]] },
   // Eldre aliaser utenfor /ravarer
-  "/fakturaer": { to: `${R}/priskontroll`, extra: [["fane", "fakturaer"], ["visning", "alle"]] },
+  "/fakturaer": LEGACY_FAKTURALISTE,
   "/fakturaer/til-behandling": { to: `${R}/priskontroll`, extra: [["fane", "fakturaer"], ["visning", "innboks"]], rename: { fane: "innboks" } },
   "/fakturaer/ny": { ...IMP, extra: [["importer", "manuelt"]] },
   "/fakturaer/import-ehf": { ...IMP, extra: [["importer", "ehf"]] },
@@ -165,7 +179,7 @@ export function resolveLegacyRavarerUrl(pathname: string, search: string): strin
   const p = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
   const st = STATIC[p];
   if (st) {
-    let q = merge(search, st.extra ?? [], st.rename, st.values);
+    let q = merge(search, st.extra ?? [], st.rename, st.values, st.defaults);
     if (st.importer && !new URLSearchParams(q.slice(1)).has("importer")) q = q ? `${q}&importer=ehf` : "?importer=ehf";
     return (st.to === `${R}/priskontroll` && normalizePriskontrollSearch(q)) || st.to + q;
   }

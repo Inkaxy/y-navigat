@@ -328,24 +328,24 @@ function WizardOwner({ routeId }: { routeId: string | undefined }) {
               <Input id="wiz-deadline" className="min-h-[44px]" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
             </div>
             <div className="md:col-span-2">
-              <Label>Formål / bakgrunn</Label>
-              <Textarea value={purpose} onChange={(e) => setPurpose(e.target.value)} rows={3} />
+              <Label htmlFor="wiz-purpose">Formål / bakgrunn</Label>
+              <Textarea id="wiz-purpose" value={purpose} onChange={(e) => setPurpose(e.target.value)} rows={3} />
             </div>
             <div>
-              <Label>Kontrakt fra</Label>
-              <Input type="date" value={contractStart} onChange={(e) => setContractStart(e.target.value)} />
+              <Label htmlFor="wiz-contract-start">Kontrakt fra</Label>
+              <Input id="wiz-contract-start" className="min-h-[44px]" type="date" value={contractStart} onChange={(e) => setContractStart(e.target.value)} />
             </div>
             <div>
-              <Label>Kontrakt til</Label>
-              <Input type="date" value={contractEnd} onChange={(e) => setContractEnd(e.target.value)} />
+              <Label htmlFor="wiz-contract-end">Kontrakt til</Label>
+              <Input id="wiz-contract-end" className="min-h-[44px]" type="date" value={contractEnd} onChange={(e) => setContractEnd(e.target.value)} />
             </div>
             <div>
-              <Label>Baseline-periode fra</Label>
-              <Input type="date" value={baselineStart} onChange={(e) => setBaselineStart(e.target.value)} />
+              <Label htmlFor="wiz-baseline-start">Baseline-periode fra</Label>
+              <Input id="wiz-baseline-start" className="min-h-[44px]" type="date" value={baselineStart} onChange={(e) => setBaselineStart(e.target.value)} />
             </div>
             <div>
-              <Label>Baseline-periode til</Label>
-              <Input type="date" value={baselineEnd} onChange={(e) => setBaselineEnd(e.target.value)} />
+              <Label htmlFor="wiz-baseline-end">Baseline-periode til</Label>
+              <Input id="wiz-baseline-end" className="min-h-[44px]" type="date" value={baselineEnd} onChange={(e) => setBaselineEnd(e.target.value)} />
             </div>
           </div>
         </Card>
@@ -487,8 +487,8 @@ fakturahistorikk, og uten den finnes verken volum eller prisgrunnlag. */}
 
       {step === 4 && (
         <Card className="space-y-3 p-6">
-          <Label>E-post-tekst (lim inn i e-postklienten din)</Label>
-          <Textarea rows={10} value={emailIntro} onChange={(e) => setEmailIntro(e.target.value)} />
+          <Label htmlFor="wiz-email">E-post-tekst (lim inn i e-postklienten din)</Label>
+          <Textarea id="wiz-email" rows={10} value={emailIntro} onChange={(e) => setEmailIntro(e.target.value)} />
           <p className="text-xs text-ink-secondary">
             Lenken og passordet legges automatisk til nederst per leverandør i steg 5.
           </p>

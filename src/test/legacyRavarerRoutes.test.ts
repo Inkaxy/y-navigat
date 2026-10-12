@@ -12,7 +12,7 @@ const CASES: [string, string, string][] = [
   ["/ravarer/matvaretabellen", "", "/ravarer/varer/matvaretabellen"],
   ["/ravarer/datablad-bulk", "", "/ravarer/varer/datablad-opplasting"],
   ["/ravarer/fakturaer", "", "/ravarer/priskontroll?fane=fakturaer&visning=alle"],
-  ["/ravarer/fakturaer", "?status=reconciled", "/ravarer/priskontroll?fane=fakturaer&visning=alle&status=reconciled"],
+  ["/ravarer/fakturaer", "?status=reconciled", "/ravarer/priskontroll?fane=fakturaer&status=reconciled&visning=alle"],
   ["/ravarer/fakturaer/til-behandling", "?fane=klar&faktura=f1", "/ravarer/priskontroll/faktura/f1"],
   ["/ravarer/fakturaer/til-behandling", "?fane=fullfort", "/ravarer/priskontroll?fane=fakturaer&visning=avstemt"],
   ["/ravarer/fakturaer/i-dag", "", "/ravarer/priskontroll?fane=gjore"],

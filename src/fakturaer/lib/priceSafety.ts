@@ -60,13 +60,24 @@ export function versionKey(v: string | null | undefined): string | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(Z|[+-]\d{2}(?::?\d{2})?)$/.exec(v.trim());
   if (!m) return null;
   const [, y, mo, d, h, mi, se, frac = "", tz] = m;
+  const Y = Number(y), Mo = Number(mo), D = Number(d), H = Number(h), Mi = Number(mi), S = Number(se);
+  // Streng validering: Date.UTC normaliserer ellers 30. feb, 24:00, minutt 60 og år 00–99 stille.
+  if (Mo < 1 || Mo > 12 || D < 1 || H > 23 || Mi > 59 || S > 59) return null;
+  const leap = (Y % 4 === 0 && Y % 100 !== 0) || Y % 400 === 0;
+  const dim = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][Mo - 1];
+  if (D > dim) return null;
   let off = 0;
   if (tz !== "Z") {
-    const t = /^([+-])(\d{2}):?(\d{2})?$/.exec(tz);
+    const t = /^([+-])(\d{2})(?::?(\d{2}))?$/.exec(tz);
     if (!t) return null;
-    off = (t[1] === "-" ? -1 : 1) * (Number(t[2]) * 60 + Number(t[3] ?? "0"));
+    const oh = Number(t[2]), om = Number(t[3] ?? "0");
+    if (oh > 15 || om > 59) return null;
+    off = (t[1] === "-" ? -1 : 1) * (oh * 60 + om);
   }
-  const ms = Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(se)) - off * 60_000;
+  const dt = new Date(0);
+  dt.setUTCFullYear(Y, Mo - 1, D);
+  dt.setUTCHours(H, Mi, S, 0);
+  const ms = dt.getTime() - off * 60_000;
   if (!Number.isFinite(ms)) return null;
   return `${ms / 1000}.${frac.padEnd(6, "0")}`;
 }
