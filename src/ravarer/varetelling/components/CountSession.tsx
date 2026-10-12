@@ -38,7 +38,7 @@ function SessionBody({ data, listParam, onBack, onList, onPrint }: {
   const open = count.status === "pagar" || count.status === "til_kontroll";
   const listOf = (l: VtCountLine) => lists.find(x => x.id === l.count_list_id);
   const inList = useMemo(() => (listId === "alle" ? lines : lines.filter(l => l.count_list_id === listId)), [lines, listId]);
-  const snapKey = `${listId}|${filter}`;
+  const snapKey = `${listId}|${filter}|${count.status}|${lines.length}`;
   const keepIds = snap && snap.key === snapKey ? snap.ids : new Set(inList.filter(l => l.state === "ikke_talt").map(l => l.id));
   if (filter === "gjenstar" && (!snap || snap.key !== snapKey)) setSnap({ key: snapKey, ids: keepIds });
   const shown = filter === "alle" ? inList : filter === "kontroll" ? inList.filter(l => l.state === "ma_kontrolleres") : inList.filter(l => keepIds.has(l.id));
