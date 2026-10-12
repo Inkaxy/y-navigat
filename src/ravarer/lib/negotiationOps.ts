@@ -1,3 +1,5 @@
+import { paths } from "@/ravarer/lib/paths";
+
 /**
  * Forhandlinger: streng lesing av operasjonssvar og identitetsvern.
  *
@@ -193,3 +195,40 @@ export function sameItemSet(existing: ReadonlyArray<{ raw_material_id: string }>
   for (const x of b) if (!a.has(x)) return false;
   return true;
 }
+
+// ---------------------------------------------------------------------------
+// Besparelse
+
+/**
+ * Estimert årlig besparelse. Linjer der vinnerprisen ikke kan regnes om til
+ * grunnenhet, eller baseline mangler, telles som ukjente — aldri som 0 eller gjettet.
+ */
+export function estimateSavings(
+  lines: ReadonlyArray<{ volumeBaseline: number | null; costBaseline: number | null; winnerPerBase: number | null; hasWinner: boolean }>,
+): { value: number; known: number; unknown: number } {
+  let value = 0, known = 0, unknown = 0;
+  for (const l of lines) {
+    if (!l.hasWinner) continue;
+    if (l.winnerPerBase == null || l.volumeBaseline == null || l.costBaseline == null ||
+        !Number.isFinite(l.winnerPerBase) || !(l.volumeBaseline > 0)) { unknown++; continue; }
+    value += l.costBaseline - l.volumeBaseline * l.winnerPerBase;
+    known++;
+  }
+  return { value, known, unknown };
+}
+
+/** 12-måneders grunnlag for en råvare i grunnenhet. null = ukjent, aldri 0. */
+export interface BaselineStats { cost: number | null; avgPrice: number | null; volume: number | null }
+export function baselineFromStats(s: { cost_12m: number | null; avg_price_per_base_unit_12m: number | null }): BaselineStats {
+  const cost = s.cost_12m == null || !Number.isFinite(Number(s.cost_12m)) ? null : Number(s.cost_12m);
+  const avg = s.avg_price_per_base_unit_12m == null || !(Number(s.avg_price_per_base_unit_12m) > 0) ? null : Number(s.avg_price_per_base_unit_12m);
+  return { cost, avgPrice: avg, volume: cost != null && avg != null ? cost / avg : null };
+}
+
+/** Hvor en rad åpnes: aktiv live-forhandling går til arbeidsflaten, resten til detalj. */
+export function negotiationHref(n: { id: string; status: string; negotiation_mode: string | null }): string {
+  return n.negotiation_mode === "live" && n.status !== "concluded" && n.status !== "cancelled"
+    ? paths.liveForhandling(n.id)
+    : paths.forhandling(n.id);
+}
+

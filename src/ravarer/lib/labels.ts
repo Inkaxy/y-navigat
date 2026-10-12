@@ -74,6 +74,28 @@ export const NEGOTIATION_STATUS_LABEL: Record<string, string> = {
 export type LabelMeta = { label: string; tokenVar: string; hint?: string };
 export type LabelMap = Record<string, LabelMeta>;
 
+/** Status per vare i en live-forhandling. */
+export const LIVE_ITEM_STATUS_LABELS: LabelMap = {
+  pending: { label: "Ikke startet", tokenVar: "--state-neutral" },
+  discussing: { label: "Diskuteres", tokenVar: "--state-warning" },
+  tentatively_agreed: { label: "Foreløpig enig", tokenVar: "--state-info" },
+  agreed: { label: "Enig", tokenVar: "--state-success" },
+  declined: { label: "Avslått", tokenVar: "--state-danger" },
+  parked: { label: "Parkert", tokenVar: "--state-neutral" },
+  confirmed: { label: "Bekreftet", tokenVar: "--state-success" },
+  unconfirmed_active: { label: "Aktivert uten bekreftelse", tokenVar: "--state-warning" },
+};
+
+/** Status per mottaker (leverandør) i en forhandling. */
+export const RECIPIENT_STATUS_LABELS: LabelMap = {
+  invited: { label: "Invitert", tokenVar: "--state-info" },
+  viewed: { label: "Åpnet", tokenVar: "--state-info" },
+  responded: { label: "Har svart", tokenVar: "--state-success" },
+  declined: { label: "Takket nei", tokenVar: "--state-danger" },
+  expired: { label: "Utløpt", tokenVar: "--state-neutral" },
+  locked: { label: "Låst", tokenVar: "--state-danger" },
+};
+
 export const FALLBACK_LABEL = "Annen årsak";
 const NEUTRAL = "--state-neutral";
 

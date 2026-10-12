@@ -8,10 +8,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, ArrowRight, Send, Loader2, Copy, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Send, Loader2, Copy, CheckCircle2, Handshake } from "lucide-react";
 import { toast } from "sonner";
-import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
-import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { ModulePage } from "@/ravarer/ui/ModulePage";
+import { useInvoiceRights } from "@/fakturaer/hooks/useInvoiceRights";
+import { useAllRawMaterialPurchaseStats } from "@/ravarer/hooks/usePurchaseStats";
+import { baselineFromStats, type BaselineStats } from "@/ravarer/lib/negotiationOps";
 import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import {
@@ -24,8 +26,6 @@ import {
   useUpsertNegotiationRecipients,
   useGenerateRfqCredentials,
 } from "@/ravarer/hooks/useNegotiations";
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
 import { formatNok, formatNumber } from "@/ravarer/lib/constants";
 import { UnitPriceHint } from "@/ravarer/components/forhandlinger/UnitPriceHint";
 import { osloDateISO } from "@/lib/osloDate";
@@ -48,6 +48,7 @@ export default function ForhandlingWizard() {
   const { id: routeId } = useParams<{ id?: string }>();
   const [negotiationId, setNegotiationId] = useState<string | null>(routeId ?? null);
   const [step, setStep] = useState<Step>(1);
+  const rights = useInvoiceRights();
 
   // ---- step 1 state ----
   const [title, setTitle] = useState("");
@@ -92,7 +93,7 @@ export default function ForhandlingWizard() {
     if (negotiationId) {
       await updateMut.mutateAsync({ id: negotiationId, patch });
     } else {
-      const created = await createMut.mutateAsync(patch as any);
+      const created = await createMut.mutateAsync(patch);
       setNegotiationId(created.id);
     }
   }
@@ -102,23 +103,14 @@ export default function ForhandlingWizard() {
   const { data: items = [] } = useNegotiationItems(negotiationId ?? undefined);
   const [selectedRm, setSelectedRm] = useState<Set<string>>(new Set());
 
-  // baseline stats lookup via existing list_raw_material_purchase_stats
-  const { legalEntityId } = useRavarer();
-  const { data: stats = [] } = useQuery({
-    queryKey: ["rm-purchase-stats-365", legalEntityId],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("list_raw_material_purchase_stats" as any, {
-        p_legal_entity_id: legalEntityId,
-      });
-      if (error) throw error;
-      return (data ?? []) as any[];
-    },
-  });
+  // 12-måneders grunnlag fra den felles innkjøpsstatistikken. Volum i grunnenhet
+  // utledes som kost / snittpris per grunnenhet; mangler en av dem er grunnlaget ukjent.
+  const statsQ = useAllRawMaterialPurchaseStats();
   const statsMap = useMemo(() => {
-    const m = new Map<string, any>();
-    for (const s of stats) m.set(s.raw_material_id, s);
+    const m = new Map<string, BaselineStats>();
+    for (const [id, s] of statsQ.data ?? []) m.set(id, baselineFromStats(s));
     return m;
-  }, [stats]);
+  }, [statsQ.data]);
 
   useEffect(() => {
     if (items.length > 0 && selectedRm.size === 0) {
@@ -135,11 +127,11 @@ export default function ForhandlingWizard() {
       const s = statsMap.get(rmId);
       return {
         raw_material_id: rmId,
-        expected_annual_volume: s?.volume_365 ?? null,
+        expected_annual_volume: s?.volume ?? null,
         expected_annual_volume_unit: rawMaterials.find((r) => r.id === rmId)?.base_unit ?? null,
-        actual_volume_baseline: s?.volume_365 ?? null,
-        actual_cost_baseline: s?.cost_365 ?? null,
-        actual_avg_price_baseline: s?.avg_price_365 ?? null,
+        actual_volume_baseline: s?.volume ?? null,
+        actual_cost_baseline: s?.cost ?? null,
+        actual_avg_price_baseline: s?.avgPrice ?? null,
         sort_order: idx,
       };
     });
@@ -229,8 +221,8 @@ export default function ForhandlingWizard() {
       if (step === 2) await persistStep2();
       if (step === 3) await persistStep3();
       if (step < 5) setStep((s) => (s + 1) as Step);
-    } catch (e: any) {
-      toast.error(`Lagring feilet: ${e.message ?? e}`);
+    } catch (e) {
+      toast.error(`Lagring feilet: ${e instanceof Error ? e.message : "ukjent feil"}`);
     }
   }
   function back() {
@@ -238,11 +230,28 @@ export default function ForhandlingWizard() {
   }
 
   return (
-    <div className="mx-auto max-w-[1100px] space-y-6 p-6">
-      <RavarerHeaderBanner
+    <div className="mx-auto max-w-[1100px] space-y-4 p-4 sm:p-6">
+      <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={() => navigate(negotiationId ? paths.forhandling(negotiationId) : paths.forhandlinger())}>
+        <ArrowLeft className="mr-1 h-4 w-4" aria-hidden /> {negotiationId ? "Til forhandlingen" : "Forhandlinger"}
+      </Button>
+      <ModulePage
+        eyebrow="Forespørsel"
         title={negotiationId ? "Rediger forhandling" : "Ny forhandling"}
-        subtitle="Sett opp RFQ i 5 enkle steg"
-      />
+        subtitle="Sett opp forespørselen i fem steg. Ingenting sendes automatisk."
+        icon={Handshake}
+        embedsPage={false}
+      >
+      {!rights.loading && !rights.canWrite && (
+        <p role="status" className="rounded-md border border-line-subtle bg-surface-muted p-3 text-sm text-ink-secondary">
+          Du har lesetilgang. Endringer og lenkegenerering krever skrivetilgang til fakturaer i Råvarer.
+        </p>
+      )}
+      {statsQ.isError && (
+        <p role="alert" className="rounded-md border border-warning/30 bg-warning/10 p-3 text-sm">
+          Innkjøpsgrunnlaget kunne ikke hentes. Grunnlagstall vises som ukjent.{" "}
+          <button type="button" className="min-h-[44px] underline" onClick={() => void statsQ.refetch()}>Prøv igjen</button>
+        </p>
+      )}
 
       {/* Stepper */}
       <Card className="p-4">
@@ -327,8 +336,8 @@ export default function ForhandlingWizard() {
                   <th className="w-10 px-3 py-2"></th>
                   <th className="px-3 py-2 text-left">Råvare</th>
                   <th className="px-3 py-2 text-right">Volum 12 mnd</th>
-                  <th className="px-3 py-2 text-right">Kostnad 12 mnd</th>
-                  <th className="px-3 py-2 text-right">Snittpris</th>
+                  <th className="hidden px-3 py-2 text-right sm:table-cell">Kostnad 12 mnd</th>
+                  <th className="hidden px-3 py-2 text-right sm:table-cell">Snittpris</th>
                 </tr>
               </thead>
               <tbody>
@@ -339,10 +348,11 @@ export default function ForhandlingWizard() {
                     const checked = selectedRm.has(r.id);
                     return (
                       <tr key={r.id} className="border-t border-line-subtle">
-                        <td className="px-3 py-2">
+                        <td className="px-1 py-0">
+                          <label className="flex h-[44px] w-[44px] cursor-pointer items-center justify-center">
                           <Checkbox
                             checked={checked}
-                            disabled={itemsLocked}
+                            disabled={itemsLocked || !rights.canWrite}
                             aria-label={`Velg ${r.name}`}
                             onCheckedChange={(v) => {
                               const next = new Set(selectedRm);
@@ -351,20 +361,21 @@ export default function ForhandlingWizard() {
                               setSelectedRm(next);
                             }}
                           />
+                          </label>
                         </td>
                         <td className="px-3 py-2 font-medium text-ink-primary">
                           <div>{r.name}</div>
                           <UnitPriceHint
                             rawMaterialId={r.id}
-                            pricePerBase={s?.avg_price_365 == null ? null : Number(s.avg_price_365)}
+                            pricePerBase={s?.avgPrice ?? null}
                             baseUnit={r.base_unit}
                           />
                         </td>
                         <td className="px-3 py-2 text-right tabular-nums">
-                          {formatNumber(s?.volume_365)} {r.base_unit}
+                          {s?.volume == null ? "Ukjent" : `${formatNumber(s.volume)} ${r.base_unit ?? ""}`}
                         </td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatNok(s?.cost_365)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatNok(s?.avg_price_365)}</td>
+                        <td className="hidden px-3 py-2 text-right tabular-nums sm:table-cell">{formatNok(s?.cost)}</td>
+                        <td className="hidden px-3 py-2 text-right tabular-nums sm:table-cell">{formatNok(s?.avgPrice)}</td>
                       </tr>
                     );
                   })}
@@ -398,7 +409,7 @@ export default function ForhandlingWizard() {
                 <tr>
                   <th className="w-10 px-3 py-2"></th>
                   <th className="px-3 py-2 text-left">Leverandør</th>
-                  <th className="px-3 py-2 text-left">E-post</th>
+                  <th className="hidden px-3 py-2 text-left sm:table-cell">E-post</th>
                 </tr>
               </thead>
               <tbody>
@@ -410,9 +421,12 @@ fakturahistorikk, og uten den finnes verken volum eller prisgrunnlag. */}
                     const checked = selectedSup.has(s.id);
                     return (
                       <tr key={s.id} className="border-t border-line-subtle">
-                        <td className="px-3 py-2">
+                        <td className="px-1 py-0">
+                          <label className="flex h-[44px] w-[44px] cursor-pointer items-center justify-center">
                           <Checkbox
                             checked={checked}
+                            disabled={!rights.canWrite}
+                            aria-label={`Velg ${s.name}`}
                             onCheckedChange={(v) => {
                               const next = new Set(selectedSup);
                               if (v) next.add(s.id);
@@ -420,9 +434,13 @@ fakturahistorikk, og uten den finnes verken volum eller prisgrunnlag. */}
                               setSelectedSup(next);
                             }}
                           />
+                          </label>
                         </td>
-                        <td className="px-3 py-2 font-medium text-ink-primary">{s.name}</td>
-                        <td className="px-3 py-2 text-ink-secondary">{s.contact_email ?? "—"}</td>
+                        <td className="px-3 py-2 font-medium text-ink-primary">
+                          {s.name}
+                          <div className="break-all text-caption font-normal text-ink-secondary sm:hidden">{s.contact_email ?? "Mangler e-post"}</div>
+                        </td>
+                        <td className="hidden px-3 py-2 text-ink-secondary sm:table-cell">{s.contact_email ?? "—"}</td>
                       </tr>
                     );
                   })}
@@ -471,7 +489,7 @@ fakturahistorikk, og uten den finnes verken volum eller prisgrunnlag. */}
                   </label>
                 </div>
               )}
-              <Button onClick={handleSend} disabled={generateMut.isPending || (genUnknown && !confirmRegen) || recipients.length === 0} className="min-h-[44px] rounded-full">
+              <Button onClick={handleSend} disabled={!rights.canWrite || generateMut.isPending || (genUnknown && !confirmRegen) || recipients.length === 0} className="min-h-[44px] rounded-full">
                 {generateMut.isPending ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
@@ -519,15 +537,16 @@ fakturahistorikk, og uten den finnes verken volum eller prisgrunnlag. */}
       )}
 
       <div className="flex items-center justify-between">
-        <Button variant="ghost" onClick={back} disabled={step === 1}>
+        <Button variant="ghost" className="min-h-[44px]" onClick={back} disabled={step === 1}>
           <ArrowLeft className="mr-1 h-4 w-4" /> Tilbake
         </Button>
         {step < 5 && (
-          <Button onClick={next} disabled={createMut.isPending || updateMut.isPending} className="rounded-full">
+          <Button onClick={next} disabled={createMut.isPending || updateMut.isPending || upsertItems.isPending || upsertRecipients.isPending || !rights.canWrite} className="min-h-[44px] rounded-full">
             Neste <ArrowRight className="ml-1 h-4 w-4" />
           </Button>
         )}
       </div>
+      </ModulePage>
     </div>
   );
 }

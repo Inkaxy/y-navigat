@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS } from "@/fakturaer/lib/units";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Check, Pause, X, TrendingUp, Loader2 } from "lucide-react";
 import { useRawMaterialPurchaseStats } from "@/ravarer/hooks/usePurchaseStats";
 import { useRawMaterialSuppliers } from "@/ravarer/hooks/useRmSuppliers";
@@ -14,6 +13,10 @@ import { formatNok, formatNumber } from "@/ravarer/lib/constants";
 import { offerPricePerBaseUnit, targetPctForItem } from "@/ravarer/lib/negotiationMatrix";
 import { toBaseFactor } from "@/fakturaer/lib/units";
 import type { NegotiationItemRow } from "@/ravarer/hooks/useNegotiations";
+import type { Json } from "@/integrations/supabase/types";
+import type { LiveItemPatch } from "@/ravarer/hooks/useLiveNegotiation";
+import { baselineFromStats } from "@/ravarer/lib/negotiationOps";
+import { LiveItemStatusPill } from "@/ravarer/components/forhandlinger/NegotiationPills";
 import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 
 /** Baseenheter først, deretter pakningsenheter — samme vokabular som valideringen. */
@@ -24,7 +27,7 @@ interface Props {
   rawMaterial: RawMaterialRow | undefined;
   supplierId: string;
   facilitatorId: string | null;
-  onSave: (patch: Record<string, any>, eventType: string, eventData?: any, note?: string | null) => Promise<void>;
+  onSave: (patch: LiveItemPatch, eventType: string, eventData?: Json, note?: string | null) => Promise<void>;
   saving?: boolean;
 }
 
@@ -32,7 +35,10 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
   const { data: stats } = useRawMaterialPurchaseStats(item.raw_material_id);
   const { data: rmSuppliers = [] } = useRawMaterialSuppliers(item.raw_material_id);
 
-  const baseUnit = rawMaterial?.base_unit ?? "kg";
+  // Grunnenheten gjettes aldri. Mangler den, kan pris per grunnenhet ikke regnes ut.
+  const knownBaseUnit = rawMaterial?.base_unit ?? null;
+  const baseUnit = knownBaseUnit ?? "";
+  const unitLabel = knownBaseUnit ?? "grunnenhet";
   const currentSupplier = rmSuppliers.find((s) => s.supplier_id === supplierId);
   const existingAgreedPrice = currentSupplier?.agreed_price_per_base_unit ?? null;
   const avgPrice = stats?.avg_price_per_base_unit_12m ?? null;
@@ -44,7 +50,8 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
       : avgPrice != null
         ? Number((avgPrice * (1 - targetPct / 100)).toFixed(2))
         : null;
-  const yearlyVol = stats?.quantity_12m ?? null;
+  // Volum i grunnenhet = kost / snittpris per grunnenhet (samme som veiviseren); ellers ukjent.
+  const yearlyVol = stats ? baselineFromStats(stats).volume : null;
   const yearlySaving =
     suggested != null && avgPrice != null && yearlyVol
       ? (avgPrice - suggested) * yearlyVol
@@ -131,28 +138,23 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
       if (promptNote === null) return; // cancelled
       finalNote = promptNote;
     }
-    const patch: Record<string, any> = {
+    const patch: LiveItemPatch = {
       ...buildPatch(),
       live_notes: finalNote || null,
       live_status: status,
+      ...(status === "tentatively_agreed" ? { live_agreed_at: new Date().toISOString(), live_agreed_by: facilitatorId } : {}),
     };
-    if (status === "tentatively_agreed") {
-      patch.live_agreed_at = new Date().toISOString();
-      patch.live_agreed_by = facilitatorId;
-    }
     const eventType =
       status === "tentatively_agreed" ? "price_agreed" : status === "parked" ? "item_parked" : "item_declined";
-    await onSave(patch, eventType, { price: patch.live_agreed_price, status }, finalNote || null);
+    await onSave(patch, eventType, { price: patch.live_agreed_price ?? null, status }, finalNote || null);
   }
 
   const perBaseResult = perBaseUnitResult();
 
   return (
-    <Card className="space-y-5 p-5">
-      <div className="flex items-center justify-between">
-        <Badge variant="outline" className="border-warning/30 bg-warning/10 text-warning">
-          I diskusjon
-        </Badge>
+    <Card className="space-y-5 p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <LiveItemStatusPill status="discussing" />
         {existingAgreedPrice != null && (
           <span className="text-xs text-ink-muted">
             Nåværende avtale: {formatNok(existingAgreedPrice)}/{baseUnit}
@@ -160,14 +162,19 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
         )}
       </div>
 
-      <h2 className="text-2xl font-semibold tracking-tight">{rawMaterial?.name ?? "—"}</h2>
+      <h2 className="break-words text-2xl font-semibold tracking-tight">{rawMaterial?.name ?? "—"}</h2>
+      {!knownBaseUnit && (
+        <p role="alert" className="rounded-md border border-warning/30 bg-warning/10 p-2 text-sm">
+          Varen mangler grunnenhet. Pris per grunnenhet og besparelse kan ikke regnes ut før den er satt.
+        </p>
+      )}
 
       {/* Faktagrunnlag */}
       <div className="grid gap-3 rounded-lg bg-surface-muted/40 p-4 text-sm sm:grid-cols-2">
-        <Stat label="Volum 12 mnd" value={stats ? `${formatNumber(stats.quantity_12m)} ${baseUnit}` : "—"} />
+        <Stat label="Volum 12 mnd" value={yearlyVol != null && knownBaseUnit ? `${formatNumber(yearlyVol)} ${knownBaseUnit}` : "Ukjent"} />
         <Stat label="Total kostnad 12 mnd" value={stats ? formatNok(stats.cost_12m) : "—"} />
-        <Stat label="Snittpris 12 mnd" value={avgPrice != null ? `${formatNok(avgPrice)}/${baseUnit}` : "—"} />
-        <Stat label="Avtalt pris i dag" value={existingAgreedPrice != null ? `${formatNok(existingAgreedPrice)}/${baseUnit}` : "—"} />
+        <Stat label="Snittpris 12 mnd" value={avgPrice != null ? `${formatNok(avgPrice)}/${unitLabel}` : "—"} />
+        <Stat label="Avtalt pris i dag" value={existingAgreedPrice != null ? `${formatNok(existingAgreedPrice)}/${unitLabel}` : "—"} />
       </div>
 
       {suggested != null && yearlySaving != null && (
@@ -183,11 +190,11 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Pris">
             <div className="flex gap-2">
-              <Input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.00" inputMode="decimal" />
+              <Input className="min-h-[44px]" aria-label="Avtalt pris" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.00" inputMode="decimal" />
               {/* Enheten må være kanonisk — «kr/kg» ble avvist av valideringen
                   når avtalen skulle bekreftes. */}
               <Select value={priceUnit} onValueChange={setPriceUnit}>
-                <SelectTrigger className="w-32" aria-label="Prisenhet">
+                <SelectTrigger className="min-h-[44px] w-32 shrink-0" aria-label="Prisenhet">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -200,20 +207,20 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
             {price.trim() !== "" && (
               perBaseResult.value != null ? (
                 <p className="mt-1 text-xs text-ink-muted">
-                  = {formatNok(perBaseResult.value)}/{baseUnit}
+                  = {formatNok(perBaseResult.value)}/{unitLabel}
                 </p>
               ) : (
                 <p className="mt-1 text-xs text-warning">
-                  Pris per {baseUnit} kan ikke regnes ut{perBaseResult.reason ? ` (${perBaseResult.reason})` : ""}.
+                  Pris per {unitLabel} kan ikke regnes ut{perBaseResult.reason ? ` (${perBaseResult.reason})` : ""}.
                 </p>
               )
             )}
           </Field>
           <Field label="Pakning">
             <div className="flex gap-2">
-              <Input value={pkgSize} onChange={(e) => setPkgSize(e.target.value)} placeholder="0" inputMode="decimal" />
+              <Input className="min-h-[44px]" aria-label="Pakningsstørrelse" value={pkgSize} onChange={(e) => setPkgSize(e.target.value)} placeholder="0" inputMode="decimal" />
               <Select value={pkgUnit} onValueChange={setPkgUnit}>
-                <SelectTrigger className="w-32" aria-label="Pakningsenhet">
+                <SelectTrigger className="min-h-[44px] w-32 shrink-0" aria-label="Pakningsenhet">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -225,31 +232,31 @@ export function LiveItemCard({ item, rawMaterial, supplierId, facilitatorId, onS
             </div>
           </Field>
           <Field label="Avtale-lengde (mnd)">
-            <Input value={months} onChange={(e) => setMonths(e.target.value)} inputMode="numeric" />
+            <Input className="min-h-[44px]" aria-label="Avtalelengde i måneder" value={months} onChange={(e) => setMonths(e.target.value)} inputMode="numeric" />
           </Field>
-          <Field label={`Min ordre (${baseUnit})`}>
-            <Input value={minVol} onChange={(e) => setMinVol(e.target.value)} inputMode="decimal" />
+          <Field label={`Min ordre (${unitLabel})`}>
+            <Input className="min-h-[44px]" aria-label="Minste ordre" value={minVol} onChange={(e) => setMinVol(e.target.value)} inputMode="decimal" />
           </Field>
           <Field label="Betaling (dager)">
-            <Input value={pay} onChange={(e) => setPay(e.target.value)} inputMode="numeric" />
+            <Input className="min-h-[44px]" aria-label="Betalingsfrist i dager" value={pay} onChange={(e) => setPay(e.target.value)} inputMode="numeric" />
           </Field>
         </div>
 
         <div>
-          <Label className="text-xs">Notat fra møtet</Label>
-          <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Notater…" />
+          <Label htmlFor={`note-${item.id}`} className="text-xs">Notat fra møtet</Label>
+          <Textarea id={`note-${item.id}`} value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Notater…" />
         </div>
       </div>
 
-      <div className="flex gap-2">
-        <Button onClick={() => setStatus("tentatively_agreed")} disabled={saving} className="flex-1">
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={() => setStatus("tentatively_agreed")} disabled={saving} className="min-h-[44px] flex-1">
           {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
           Avtalt
         </Button>
-        <Button variant="outline" onClick={() => setStatus("parked")} disabled={saving}>
-          <Pause className="mr-2 h-4 w-4" /> Park
+        <Button variant="outline" className="min-h-[44px]" onClick={() => setStatus("parked")} disabled={saving}>
+          <Pause className="mr-2 h-4 w-4" /> Parker
         </Button>
-        <Button variant="outline" onClick={() => setStatus("declined")} disabled={saving}>
+        <Button variant="outline" className="min-h-[44px]" onClick={() => setStatus("declined")} disabled={saving}>
           <X className="mr-2 h-4 w-4" /> Avslå
         </Button>
       </div>
@@ -268,7 +275,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1">
+    <div role="group" aria-label={label} className="space-y-1">
       <Label className="text-xs">{label}</Label>
       {children}
     </div>

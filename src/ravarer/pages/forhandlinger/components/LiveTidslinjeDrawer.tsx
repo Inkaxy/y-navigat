@@ -2,8 +2,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { useLiveEvents } from "@/ravarer/hooks/useLiveNegotiation";
 import { Check, Pause, X, Plus, MessageCircle, Flag, Radio, RotateCcw, FileCheck, AlertTriangle } from "lucide-react";
 import { formatDate } from "@/ravarer/lib/constants";
+import type { LucideIcon } from "lucide-react";
 
-const ICONS: Record<string, any> = {
+const ICONS: Record<string, LucideIcon> = {
   item_added: Plus,
   item_discussed: MessageCircle,
   price_agreed: Check,
