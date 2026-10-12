@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import type { PreviewState, PreviewTarget } from "@/ravarer/hooks/useSingleRecalcPreview";
@@ -28,7 +28,7 @@ function Formula({ c, baseUnit }: { c: PreviewChange; baseUnit: string }) {
   let mengde: ReactNode = null;
   if (c.method === "pakning") {
     mengde = c.quantity != null && c.factor != null && qty != null
-      ? <>Mengde: {n6(Math.abs(c.quantity))} × {n6(c.factor)} ≈ {n6(qty)} {baseUnit}</>
+      ? <>Mengde: {n6(c.quantity)} × {n6(c.factor)} ≈ {n6(qty)} {baseUnit}</>
       : <>Mengde kunne ikke beregnes.</>;
   } else if (c.method === "direkte") {
     mengde = c.quantity != null && qty != null
@@ -97,11 +97,19 @@ const UNAVAILABLE: Record<"server" | "malformed" | "transport" | "access", strin
 export function SingleRecalcDetail({ state, onClose, onRetry }: { state: PreviewState; onClose: () => void; onRetry: (t: PreviewTarget) => void }) {
   const open = state.status !== "closed";
   const target = state.status === "closed" ? null : state.target;
+  // Åpneren huskes ved åpning og får fokus tilbake ved lukk/Escape hvis den fortsatt finnes.
+  const opener = useRef<HTMLElement | null>(null);
+  const wasOpen = useRef(false);
+  useLayoutEffect(() => {
+    if (open && !wasOpen.current) opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    wasOpen.current = open;
+  }, [open]);
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
-        <SheetHeader>
-          <SheetTitle>Serverens regnestykke nå{target?.name ? ` — ${target.name}` : ""}</SheetTitle>
+      <SheetContent className="w-full overflow-y-auto sm:max-w-xl"
+        onCloseAutoFocus={(e) => { const el = opener.current; if (el && el.isConnected) { e.preventDefault(); el.focus(); } }}>
+        <SheetHeader className="pr-12">
+          <SheetTitle className="break-words">Serverens regnestykke nå{target?.name ? ` — ${target.name}` : ""}</SheetTitle>
           <SheetDescription>Skrivebeskyttet prøvekjøring for én råvare. Ingenting lagres herfra.</SheetDescription>
         </SheetHeader>
         {target && <p className="mt-3 text-caption text-ink-secondary">{ORIGIN[target.origin]}</p>}
