@@ -10,8 +10,7 @@ import { useOpAction, useVtMaterials, useVtScope, useVtTemplateLines, useVtTempl
 import { findDuplicates, inCategory, materialCategories, moveItem } from "../logic";
 import type { TemplateLineInput, VtLocation, VtTemplate } from "../types";
 import { report } from "./CountControls";
-import { locName } from "./TemplatesPanel";
-import { NativeSelect, Notice, PendingNotice } from "./shared";
+import { locName, NativeSelect, Notice, PendingNotice } from "./shared";
 
 type Draft = { name: string; department: string; defaultLocationId: string | null; lines: TemplateLineInput[] };
 type SaveP = Draft & { id: string; expectedRevision: number; archived: boolean };

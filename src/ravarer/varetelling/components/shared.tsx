@@ -3,6 +3,12 @@ import { AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { PendingOp } from "../pendingStore";
+import type { VtLocation } from "../types";
+
+export const locName = (locs: VtLocation[], id: string | null) => {
+  const l = locs.find(x => x.id === id);
+  return l ? `${l.department} / ${l.name}` : "Uten plassering";
+};
 
 /** Native select med samme uttrykk som Input; 48 px på mobil. */
 export function NativeSelect({ className, ...p }: SelectHTMLAttributes<HTMLSelectElement>) {

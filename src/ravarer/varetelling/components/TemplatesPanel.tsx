@@ -9,12 +9,8 @@ import { useOpAction, useVtCounts, useVtDepartments, useVtLocations, useVtScope,
 import type { VtLocation, VtTemplate } from "../types";
 import { report } from "./CountControls";
 import { TemplateEditor } from "./TemplateEditor";
-import { Loading, NativeSelect, Notice, PendingNotice } from "./shared";
+import { locName, Loading, NativeSelect, Notice, PendingNotice } from "./shared";
 
-export const locName = (locs: VtLocation[], id: string | null) => {
-  const l = locs.find(x => x.id === id);
-  return l ? `${l.department} / ${l.name}` : "Uten plassering";
-};
 
 /** Listemaler gruppert etter avdeling, med steder/avdelinger og redigering. */
 export function TemplatesPanel() {
@@ -54,7 +50,7 @@ export function TemplatesPanel() {
         {canWrite && <NewTemplate locs={locs} onCreated={setSelected} />}
         <Locations locs={allLocs} />
       </div>
-      <div>{sel ? <TemplateEditor key={`${sel.id}:${sel.revision}`} template={sel} locations={allLocs} onCopied={setSelected} onArchived={() => setSelected(null)} />
+      <div>{sel ? <TemplateEditor key={`${sel.id}:${sel.revision}:${lines.filter(l => l.template_id === sel.id).map(l => l.id).join(",")}`} template={sel} locations={allLocs} onCopied={setSelected} onArchived={() => setSelected(null)} />
         : <Notice title="Velg en listemal for å se og endre varene." />}</div>
     </div>
   );
