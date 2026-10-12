@@ -6,7 +6,10 @@ import { useVtCount } from "../hooks";
 import { formatAmount, formatKr, LINE_STATE_LABEL, priceReasonLabel, summarize, summarizeGroups } from "../logic";
 import { isFinalReport, lineValueOre, listDeepLink, reportTitle, sheetIdentity } from "../report";
 import type { VtCount, VtCountLine, VtCountList } from "../types";
-import { paginateSheet, rowCodeOf, rowUnits, VT_SHEET_CAPACITY } from "../../../../supabase/pending/functions/vt-count-ocr/ocrCore";
+import { paginateSheet, rowCodeOf, rowUnits, VT_SHEET_CAPACITY, VT_SHEET_LAYOUT } from "../../../../supabase/pending/functions/vt-count-ocr/ocrCore";
+import { useStage3Api } from "../stage3";
+import { useStage3Ready } from "../stage3Hooks";
+import { VtRejectedError } from "../api";
 import { formatDateNo, Loading, Notice } from "./shared";
 
 /** Linjer per A4-side på blankt telleark (store skrivefelt, aldri delt linje). */
@@ -49,9 +52,9 @@ function useQr(text: string): string | null {
 }
 
 function BlankList({ count, list, lines }: { count: VtCount; list: VtCountList; lines: VtCountLine[] }) {
-  // Deterministisk, versjonert sideoppsett — samme inndeling som lesetjenestens manifest.
+  // Deterministisk, versjonert sideoppsett — utstedes til serveren slik at opplastede ark valideres mot det som ble trykt.
   const pages = paginateSheet(lines);
-  return <>{pages.map((p, i) => <BlankPage key={i} count={count} list={list} lines={p} page={i + 1} pages={pages.length} />)}</>;
+  return <><ManifestStatus listId={list.id} pages={pages.map(p => p.map(l => l.id))} />{pages.map((p, i) => <BlankPage key={i} count={count} list={list} lines={p} page={i + 1} pages={pages.length} />)}</>;
 }
 
 function BlankPage({ count, list, lines, page, pages }: { count: VtCount; list: VtCountList; lines: VtCountLine[]; page: number; pages: number }) {
@@ -126,5 +129,23 @@ function Report({ count, lists, lines }: { count: VtCount; lists: VtCountList[];
         </table>
       ))}
     </article>
+  );
+}
+
+function ManifestStatus({ listId, pages }: { listId: string; pages: string[][] }) {
+  const api = useStage3Api(); const s3 = useStage3Ready();
+  const [st, setSt] = useState<"venter" | "ok" | "avvik" | "feil">("venter");
+  const key = JSON.stringify(pages);
+  useEffect(() => {
+    if (!api || !s3.ready) return; let alive = true;
+    void api.issueManifest({ listId, layoutVersion: VT_SHEET_LAYOUT, pages: JSON.parse(key) as string[][] })
+      .then(() => { if (alive) setSt("ok"); }, (e: unknown) => { if (alive) setSt(e instanceof VtRejectedError && e.code === "23505" ? "avvik" : "feil"); });
+    return () => { alive = false; };
+  }, [api, s3.ready, listId, key]);
+  if (!s3.ready) return <p className="text-xs text-muted-foreground print:hidden">Opplasting av utfylte ark er ikke tatt i bruk ennå; utskriften registreres ikke.</p>;
+  return (
+    <p className={"text-xs print:hidden " + (st === "avvik" || st === "feil" ? "text-destructive" : "text-muted-foreground")} role={st === "avvik" ? "alert" : undefined}>
+      {st === "venter" ? "Registrerer utskriften …" : st === "ok" ? "Utskriften er registrert — utfylte ark kan lastes opp." : st === "avvik" ? "Denne sideinndelingen avviker fra en tidligere registrert utskrift. Bruk den opprinnelige utskriften for opplasting." : "Kunne ikke registrere utskriften. Opplastede ark fra denne utskriften kan ikke leses før den er registrert."}
+    </p>
   );
 }
