@@ -10,6 +10,7 @@ const st = vi.hoisted(() => ({
   rpcData: 1 as unknown,
   rpc: vi.fn(),
   statusRead: null as null | Promise<void>,
+  reads: 0,
   invoke: vi.fn(),
   updates: [] as Array<{ table: string; patch: unknown; filters: Array<[string, unknown]> }>,
   updateError: null as null | { message: string },
@@ -25,6 +26,7 @@ vi.mock("@/integrations/supabase/client", () => {
       order: () => q, limit: () => q,
       update: (p: unknown) => { patch = p; return q; },
       maybeSingle: async () => {
+        st.reads++;
         if (st.statusRead) await st.statusRead;
         return { data: { status: "draft", legal_entity_id: "A", rfq_issued_at: null }, error: null };
       },
@@ -112,7 +114,9 @@ describe("useUpsertNegotiationItems — kontekst og kvittering", () => {
     st.statusRead = new Promise<void>((r) => { release = r; });
     const { result, rerender } = renderHook(() => useUpsertNegotiationItems(), { wrapper: wrap() });
     let p: Promise<unknown> = Promise.resolve();
+    st.reads = 0;
     act(() => { p = result.current.mutateAsync({ negotiationId: "N", items: [{ raw_material_id: "m" }] }); });
+    await waitFor(() => expect(st.reads).toBe(1));
     st.entity = "B";
     rerender();
     await act(async () => { release(); await expect(p).rejects.toBeInstanceOf(NegotiationContextChangedError); });
