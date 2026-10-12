@@ -234,3 +234,11 @@ Tekniske hovedføringer: gjenbruk eksisterende firma- og tilgangsmodell; egne id
 - Storage-policyer (`20261012_varetelling_stage3_storage.PENDING.sql`) er fortsatt ikke kjørt; ingen SQL-migrasjon eller Edge-deploy.
 - E-post (etter root-kontroll): uklar claim-feil (transport/ukjent) gir `ukjent` med op_id og ingen Graph-kall (`runStoredSend` i `reportCore.ts`, testet i `varetelling-mail-claim.test.ts`); kjent avvisning (42501/23505) påstår ikke lenger at den lagrede sendingen aldri ble sendt. Forhåndsvisnings-hash binder vedlegg + valgt avsender — byttet postboks krever ny forhåndsvisning; lagret operasjon beholder sin lagrede avsender.
 - Bøttens MIME-liste: Storage-verktøyet støtter ikke filtypeliste; står NULL (smal jobbvalidering + stipolicy).
+
+## Utrullet av root (12.10.2026)
+- SQL: `varetelling_foundation_reviewed` (rev. 2, `42b9835d`), `varetelling_document_reports_reviewed` (stage3 rev. 4, `42b9835d`), `varetelling_private_upload_policies_reviewed` (`bfbe3d3a`). Live: 13 vt-tabeller med RLS, ingen anon, ingen direkte klientskriving; 44 vt-funksjoner uten anon-execute; service-skrivefunksjoner ikke klientkallbare. Tellinger/maler: 0.
+- Edge: `vt-count-ocr` v1 (`42b9835d`), `vt-count-report-email` v1 (`d753fa8d`), verify_jwt=true, tilbakelesing eksakt. Ingen andre Edge-funksjoner rullet ut på nytt.
+- Speil: `supabase/live-mirror/varetelling_*_reviewed.sql` og `supabase/live-mirror/functions/`.
+- Root-kontroll: 212 SQL-tester + positiv avslutning; nettleser 390 (48 px/16 px, bredde 375), iPad 768 felt 48 px; oversikt + utskrift 45 kr fra 2 kg × 22,5 avklaring; kildehopp riktig fil og retur; `runStoredSend` ukjent/avvisning/replay uten sending, avsender-hash ulik, én claimet falsk sending.
+- Advisor: `vt_ops` uten SELECT-policy er bevisst (privat idempotens); autoriserte SECURITY DEFINER-RPC-er er bevisst beskyttet.
+- Ikke testet: ekte AI, ekte Graph-sending, forretningsdata. Frontend-publisering gjenstår (root).

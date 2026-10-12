@@ -1,0 +1,106 @@
+// FORSLAG — IKKE UTRULLET. Flyttes til supabase/functions/vt-count-report-email/ først etter roots gjennomgang.
+// Handlinger:
+//  - "preview": koherent øyeblikksbilde (én SQL-setning) → CSV + PDF + versjons-hash. Vedleggene returneres for forhåndsvisning.
+//  - "status":  SKRIVEBESKYTTET oppslag av lagret operasjon. Sender aldri.
+//  - "send":    sjekker lagret operasjon FØRST. Finnes den: «reservert» fullføres med LAGREDE vedlegg; alt annet returneres
+//               uendret. Finnes den ikke: nytt øyeblikksbilde, hash må være lik forhåndsvisningen, reservasjon lagrer
+//               øyeblikksbilde + nøyaktige vedlegg, så én sending. Graph 202 = akseptert av tjenesten, ikke levert.
+// Avsender er den allerede godkjente Microsoft 365-postboksen (microsoft_oauth_tokens.account_email), samme som
+// eksisterende sendinger. getGraphAccessToken gjenbrukes uendret; microsoft-graph-send røres ikke.
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { getGraphAccessToken } from "../_shared/graph-mail.ts";
+import type { VtReportData } from "../_shared/vtReport.ts";
+import { attachmentBase, attachmentHash, b64, buildGraphMessage, buildReportCsv, buildReportPdf, defaultSubject, isFinal, previewHash, runStoredSend, summarizeLines, validateMail, type ClaimData } from "./reportCore.ts";
+
+const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Samme klienttype som felles graph-mail forventer (den filen endres ikke). */
+type Admin = Parameters<typeof getGraphAccessToken>[0];
+const mkClient = (u: string, k: string) => createClient(u, k);
+type Db = ReturnType<typeof mkClient>;
+
+async function senderMailbox(admin: Db): Promise<string | null> {
+  if (!Deno.env.get("MICROSOFT_GRAPH_TENANT_ID") || !Deno.env.get("MICROSOFT_GRAPH_CLIENT_ID") || !Deno.env.get("MICROSOFT_GRAPH_CLIENT_SECRET")) return null;
+  const { data } = await admin.from("microsoft_oauth_tokens").select("account_email").order("updated_at", { ascending: false }).limit(1).maybeSingle();
+  const m = (data as { account_email?: unknown } | null)?.account_email;
+  return typeof m === "string" && m.includes("@") ? m : null;
+}
+
+interface Req { countId: string; recipient: string; subject: string; message: string }
+async function sendStored(admin: Db, graph: Admin, opId: string, actor: string, req: Req): Promise<Response> {
+  // Claim krever opprinnelig aktør (eller godkjenner) og at forespørselen er den lagrede. Avsender er den LAGREDE.
+  const r = await runStoredSend(opId, {
+    claim: async () => {
+      const c = await admin.rpc("vt_report_mail_claim", { p_op_id: opId, p_actor: actor, p_count_id: req.countId, p_recipient: req.recipient, p_subject: req.subject, p_message: req.message });
+      return { data: (c.data ?? null) as ClaimData | null, error: c.error ? { code: (c.error as { code?: string }).code } : null };
+    },
+    graphSend: async (c) => {
+      const token = await getGraphAccessToken(graph);
+      const res = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(String(c.sender))}/sendMail`, {
+        method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify(buildGraphMessage({ recipient: String(c.recipient), subject: String(c.subject), message: String(c.message) }, c.final === true, String(c.csv), String(c.pdf_b64), String(c.attachment_base))),
+      });
+      await res.body?.cancel(); return res.status;
+    },
+    finish: async (state, detail) => admin.rpc("vt_report_mail_finish", { p_op_id: opId, p_state: state, p_detail: detail }),
+  });
+  return json(r.status, r.body);
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return json(405, { error: "Bare POST" });
+  const auth = req.headers.get("Authorization");
+  if (!auth?.startsWith("Bearer ")) return json(401, { error: "Ikke innlogget" });
+  let b: Record<string, unknown>; try { const v = await req.json(); if (typeof v !== "object" || v === null) throw 0; b = v as Record<string, unknown>; } catch { return json(400, { error: "Ugyldig forespørsel" }); }
+  const url = Deno.env.get("SUPABASE_URL")!;
+  const user = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: auth } } });
+  const admin = mkClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  // Verifisert aktør fra JWT (aldri fra forespørselen).
+  const who = await user.auth.getUser();
+  const actor = who.data.user?.id;
+  if (who.error || !actor) return json(401, { error: "Ikke innlogget" });
+  const graph = admin as Admin; // samme klient; typen kommer fra felles graph-mail (uendret)
+
+  // Lagret operasjon først — både for status og send.
+  if (b.action === "status" || b.action === "send") {
+    if (typeof b.op_id !== "string" || !UUID.test(b.op_id)) return json(400, { error: "op_id mangler" });
+    const st = await user.rpc("vt_report_mail_status", { p_op_id: b.op_id });
+    if (st.error) return json((st.error as { code?: string }).code === "42501" ? 403 : 500, { error: "Kunne ikke lese sendingen." });
+    const found = st.data as { found: boolean; state?: string; detail?: string | null } | null;
+    if (b.action === "status") return json(200, found?.found ? { found: true, state: found.state, detail: found.detail ?? null } : { found: false });
+    if (found?.found) {
+      if (found.state !== "reservert") return json(200, { state: found.state, detail: found.detail ?? null, replayed: true });
+      const req = { countId: String(b.count_id ?? ""), recipient: String(b.recipient ?? "").trim(), subject: String(b.subject ?? "").trim(), message: String(b.message ?? "") };
+      return sendStored(admin, graph, b.op_id, actor, req);
+    }
+  }
+
+  const countId = b.count_id;
+  if (typeof countId !== "string" || !UUID.test(countId)) return json(400, { error: "count_id mangler" });
+  // generatedAt settes av SQL til dataversjonen (siste endring), så samme data gir samme vedlegg/hash.
+  // Koherent øyeblikksbilde med BRUKERENS tilgang (RLS + _vt_require i SQL), ingen radgrense.
+  const snap = await user.rpc("vt_report_snapshot", { p_count_id: countId });
+  if (snap.error) return json((snap.error as { code?: string }).code === "42501" ? 403 : 409, { error: "Kunne ikke lese rapporten." });
+  const data = snap.data as VtReportData;
+  const csv = buildReportCsv(data); const pdfB64 = b64(buildReportPdf(data)); const sender = await senderMailbox(admin);
+  // Hash binder vedlegg + valgt avsender: byttet postboks mellom forhåndsvisning og send krever ny forhåndsvisning.
+  const hash = await previewHash(await attachmentHash(csv, pdfB64), sender);
+
+  if (b.action === "preview") {
+    return json(200, { hash, count_revision: data.count.revision, final: isFinal(data.count), default_subject: defaultSubject(data), attachment_base: attachmentBase(data),
+      csv, pdf_b64: pdfB64, totals: summarizeLines(data.lines), mail_configured: sender != null, sender });
+  }
+  if (b.action !== "send") return json(400, { error: "Ukjent handling" });
+  const mail = { recipient: String(b.recipient ?? ""), subject: String(b.subject ?? ""), message: String(b.message ?? "") };
+  const bad = validateMail(mail); if (bad) return json(400, { error: bad });
+  if (b.hash !== hash) return json(409, { error: "Rapporten eller avsenderpostboksen er endret siden forhåndsvisningen. Åpne forhåndsvisningen på nytt." });
+  if (!sender) return json(503, { error: "Microsoft 365-avsender er ikke koblet til." });
+  // Reservasjon er service-only: øyeblikksbilde, vedlegg, hash og avsender er bygget her, aktøren er verifisert over.
+  const r = await admin.rpc("vt_report_mail_reserve", { p_op_id: b.op_id, p_actor: actor, p_count_id: countId, p_count_revision: data.count.revision, p_report_hash: hash,
+    p_recipient: mail.recipient.trim(), p_subject: mail.subject.trim(), p_message: mail.message, p_snapshot: data, p_csv: csv, p_pdf_b64: pdfB64,
+    p_attachment_base: attachmentBase(data), p_final: isFinal(data.count), p_sender: sender });
+  if (r.error) return json((r.error as { code?: string }).code === "42501" ? 403 : 409, { error: "Kunne ikke reservere sendingen. Ingenting er sendt." });
+  return sendStored(admin, graph, String(b.op_id), actor, { countId, recipient: mail.recipient.trim(), subject: mail.subject.trim(), message: mail.message });
+});
