@@ -127,7 +127,7 @@ function TemplateEditor({ template, locations }: { template: VtTemplate; locatio
   const add = useVtMutation((rows: { raw_material_id: string; location_id: string | null; sort_order: number }[]) => api.addTemplateLines(entity, template.id, rows));
   const remove = useVtMutation((id: string) => api.removeTemplateLine(entity, id));
   const archive = useVtMutation(() => api.updateTemplate(entity, template.id, { archived: true }));
-  const all = tlines.data ?? []; const mats = materials.data ?? [];
+  const all = tlines.data ?? []; const mats = useMemo(() => materials.data ?? [], [materials.data]);
   const mine = all.filter(l => l.template_id === template.id).sort((a, b) => a.sort_order - b.sort_order);
   const matName = (id: string) => mats.find(m => m.id === id)?.name ?? "Ukjent vare";
   const tplName = (id: string) => templates.data?.find(t => t.id === id)?.name ?? "annen liste";
