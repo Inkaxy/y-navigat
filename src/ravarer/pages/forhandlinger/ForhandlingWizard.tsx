@@ -31,7 +31,7 @@ import { UnitPriceHint } from "@/ravarer/components/forhandlinger/UnitPriceHint"
 import { osloDateISO } from "@/lib/osloDate";
 import { Link } from "react-router-dom";
 import { paths } from "@/ravarer/lib/paths";
-import { parseRfqCredentials, isKnownRejection, sameItemSet, canReplaceNegotiationItems, type RfqCredential } from "@/ravarer/lib/negotiationOps";
+import { parseRfqCredentials, portalUrlFor, isKnownRejection, sameItemSet, canReplaceNegotiationItems, type RfqCredential } from "@/ravarer/lib/negotiationOps";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -557,7 +557,7 @@ fakturahistorikk, og uten den finnes verken volum eller prisgrunnlag. */}
           <ArrowLeft className="mr-1 h-4 w-4" /> Tilbake
         </Button>
         {step < 5 && (
-          <Button onClick={next} disabled={createMut.isPending || updateMut.isPending || upsertItems.isPending || upsertRecipients.isPending || !rights.canWrite} className="min-h-[44px] rounded-full">
+          <Button onClick={() => void next()} disabled={advancing || createMut.isPending || updateMut.isPending || upsertItems.isPending || upsertRecipients.isPending || !rights.canWrite} className="min-h-[44px] rounded-full">
             Neste <ArrowRight className="ml-1 h-4 w-4" />
           </Button>
         )}
