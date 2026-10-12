@@ -1,48 +1,50 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { parseRfqCredentials, portalUrlFor, isKnownRejection } from "@/ravarer/lib/negotiationOps";
 import { useQueryClient } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Loader2, Radio, Flag, Check, Pause, Play, X, History, RotateCcw } from "lucide-react";
+import { ArrowLeft, Flag, History, Pause, Play, Radio, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { QueryState } from "@/components/common/QueryState";
+import { ModulePage } from "@/ravarer/ui/ModulePage";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
-import {
-  useNegotiation,
-  useNegotiationItems,
-  useNegotiationRecipients,
-  useUpdateNegotiation,
-} from "@/ravarer/hooks/useNegotiations";
-import {
-  useAddLiveItem,
-  useDeleteLiveItem,
-  useLogLiveEvent,
-  useUpdateLiveItem,
-} from "@/ravarer/hooks/useLiveNegotiation";
+import { useInvoiceRights } from "@/fakturaer/hooks/useInvoiceRights";
+import { useNegotiation, useNegotiationItems, useNegotiationRecipients, useUpdateNegotiation } from "@/ravarer/hooks/useNegotiations";
+import { useAddLiveItem, useLogLiveEvent, useUpdateLiveItem, type LiveItemPatch } from "@/ravarer/hooks/useLiveNegotiation";
 import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { useAllRawMaterialPurchaseStats } from "@/ravarer/hooks/usePurchaseStats";
+import { NegotiationStatusPill, LiveItemStatusPill } from "@/ravarer/components/forhandlinger/NegotiationPills";
+import { UnitPriceHint } from "@/ravarer/components/forhandlinger/UnitPriceHint";
+import { baselineFromStats, estimateSavings } from "@/ravarer/lib/negotiationOps";
+import { formatNok } from "@/ravarer/lib/constants";
+import { paths } from "@/ravarer/lib/paths";
 import { LiveTimer } from "./components/LiveTimer";
 import { LiveItemSearch } from "./components/LiveItemSearch";
 import { LiveItemCard } from "./components/LiveItemCard";
 import { LiveTidslinjeDrawer } from "./components/LiveTidslinjeDrawer";
-import { formatNok } from "@/ravarer/lib/constants";
-import { UnitPriceHint } from "@/ravarer/components/forhandlinger/UnitPriceHint";
-import { paths } from "@/ravarer/lib/paths";
+import { EndSessionDialog } from "./components/EndSessionDialog";
+
+const PROCESSED = new Set(["agreed", "parked", "declined", "tentatively_agreed", "confirmed", "unconfirmed_active"]);
+const AGREED = new Set(["agreed", "tentatively_agreed", "confirmed"]);
+const REOPENABLE = new Set(["agreed", "tentatively_agreed", "parked", "declined"]);
+
+function errText(e: unknown, fallback: string) {
+  return e instanceof Error && e.message ? e.message : fallback;
+}
 
 export default function LiveForhandlingWorkspace() {
   const { id = "" } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { user } = useRavarer();
+  const { user, legalEntityId } = useRavarer();
+  const rights = useInvoiceRights();
 
-  const { data: neg } = useNegotiation(id);
+  const negQ = useNegotiation(id);
+  const neg = negQ.data ?? null;
   const { data: items = [] } = useNegotiationItems(id);
   const { data: recipients = [] } = useNegotiationRecipients(id);
   const { data: rawMaterials = [] } = useRawMaterials();
@@ -51,40 +53,31 @@ export default function LiveForhandlingWorkspace() {
 
   const addItem = useAddLiveItem();
   const updateItem = useUpdateLiveItem();
-  const deleteItem = useDeleteLiveItem();
   const logEvent = useLogLiveEvent();
   const updateNeg = useUpdateNegotiation();
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [endOpen, setEndOpen] = useState(false);
-  const [ending, setEnding] = useState(false);
-  const [deadlineDays, setDeadlineDays] = useState<string>("14");
-  const [autoApply, setAutoApply] = useState(true);
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [pausing, setPausing] = useState(false);
-  const [credentials, setCredentials] = useState<{ recipientId: string; url: string; password: string; email: string | null; supplierName: string } | null>(null);
-  /** Ukjent genereringsutfall: passord kan være endret. Ingen automatisk nytt forsøk. */
-  const [credUnknown, setCredUnknown] = useState(false);
-  const endLock = useRef(false);
+  const pauseLock = useRef(false);
 
-  // Alle mottakere vises — en live-forhandling kan ha flere leverandører i rommet.
-  const supplierNames = recipients
-    .map((r) => suppliers.find((s) => s.id === r.supplier_id)?.name)
-    .filter((n): n is string => !!n);
+  const supName = (sid: string) => suppliers.find((s) => s.id === sid)?.name ?? "";
+  const rmById = useMemo(() => new Map(rawMaterials.map((r) => [r.id, r])), [rawMaterials]);
+  const supplierNames = recipients.map((r) => supName(r.supplier_id)).filter((n) => !!n);
   const supplierName = supplierNames.length > 0 ? supplierNames.join(", ") : "—";
   const isPaused = !!neg?.live_session_paused;
 
-  // Hvilken mottaker prisene og bekreftelsen skal gjelde. Tidligere ble alltid
-  // den første mottakeren brukt, samme mønster som i ForhandlingDetail.
+  // Hvilken mottaker prisene og bekreftelsen gjelder (aldri automatisk den første ved flere).
   const [activeRecipientId, setActiveRecipientId] = useState<string>("");
-  const selectedRecipient =
-    recipients.find((r) => r.id === activeRecipientId) ?? (recipients.length === 1 ? recipients[0] : undefined);
+  useEffect(() => { setActiveRecipientId(""); setActiveId(null); }, [id, legalEntityId]);
+  const selectedRecipient = recipients.find((r) => r.id === activeRecipientId) ?? (recipients.length === 1 ? recipients[0] : undefined);
   const supplierId = selectedRecipient?.supplier_id ?? "";
 
   /**
-   * Live-flaten må vise det andre i rommet gjør. Vi lytter på endringer i
-   * linjene og hendelsene, med en enkel oppfriskning hvert 5. sekund som
-   * reserve hvis realtime-forbindelsen faller ut.
+   * Live-flaten må vise det andre i rommet gjør: realtime på forhandling, linjer og
+   * hendelser, med oppfriskning hvert 30. sekund som reserve når kanalen ikke er tilkoblet.
+   * Kanalen fjernes ved bytte av forhandling og ved avmontering.
    */
   const [realtimeConnected, setRealtimeConnected] = useState(false);
   useEffect(() => {
@@ -92,43 +85,25 @@ export default function LiveForhandlingWorkspace() {
     let connected = false;
     const channel = supabase
       .channel(`live-negotiation-${id}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "negotiations", filter: `id=eq.${id}` },
-        () => {
-          qc.invalidateQueries({ queryKey: ["negotiation", id] });
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "negotiation_items", filter: `negotiation_id=eq.${id}` },
-        () => {
-          qc.invalidateQueries({ queryKey: ["negotiation-items", id] });
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "negotiation_live_events", filter: `negotiation_id=eq.${id}` },
-        () => {
-          qc.invalidateQueries({ queryKey: ["negotiation-live-events", id] });
-          qc.invalidateQueries({ queryKey: ["negotiation", id] });
-        },
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "negotiations", filter: `id=eq.${id}` }, () => {
+        qc.invalidateQueries({ queryKey: ["negotiation", id] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "negotiation_items", filter: `negotiation_id=eq.${id}` }, () => {
+        qc.invalidateQueries({ queryKey: ["negotiation-items", id] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "negotiation_live_events", filter: `negotiation_id=eq.${id}` }, () => {
+        qc.invalidateQueries({ queryKey: ["negotiation-live-events", id] });
+        qc.invalidateQueries({ queryKey: ["negotiation", id] });
+      })
       .subscribe((status) => {
         connected = status === "SUBSCRIBED";
         setRealtimeConnected(connected);
       });
-
-    // negotiations/negotiation_items/negotiation_live_events er nå med i
-    // supabase_realtime-publikasjonen, så kanalen over blir normalt SUBSCRIBED.
-    // Pollingen hvert 30. sekund er kun en reserve for tilfeller der
-    // kanalstatusen ikke er SUBSCRIBED (f.eks. nettbrudd).
     const fallback = window.setInterval(() => {
       if (connected) return;
       qc.invalidateQueries({ queryKey: ["negotiation-items", id] });
       qc.invalidateQueries({ queryKey: ["negotiation", id] });
     }, 30000);
-
     return () => {
       window.clearInterval(fallback);
       supabase.removeChannel(channel);
@@ -136,21 +111,16 @@ export default function LiveForhandlingWorkspace() {
   }, [id, qc]);
 
   const itemsByStatus = useMemo(() => {
-    const groups: Record<string, typeof items> = { pending: [], discussing: [], processed: [] };
+    const groups = { pending: [] as typeof items, discussing: [] as typeof items, processed: [] as typeof items };
     for (const it of items) {
       const s = it.live_status ?? "pending";
-      if (s === "agreed" || s === "parked" || s === "declined" || s === "tentatively_agreed" || s === "confirmed" || s === "unconfirmed_active") {
-        groups.processed.push(it);
-      } else if (s === "discussing") {
-        groups.discussing.push(it);
-      } else {
-        groups.pending.push(it);
-      }
+      if (PROCESSED.has(s)) groups.processed.push(it);
+      else if (s === "discussing") groups.discussing.push(it);
+      else groups.pending.push(it);
     }
     return groups;
   }, [items]);
 
-  // Auto-select active item when none chosen
   const activeItem = useMemo(() => {
     if (activeId) return items.find((i) => i.id === activeId) ?? null;
     return itemsByStatus.discussing[0] ?? null;
@@ -158,494 +128,294 @@ export default function LiveForhandlingWorkspace() {
 
   const excludeIds = useMemo(() => new Set(items.map((i) => i.raw_material_id)), [items]);
 
-  const totalSavings = useMemo(() => {
-    let saved = 0;
-    for (const it of items) {
-      if (
-        (it.live_status !== "agreed" && it.live_status !== "tentatively_agreed" && it.live_status !== "confirmed") ||
-        it.live_agreed_price_per_base_unit == null
-      ) continue;
-      const stats = statsMap?.get(it.raw_material_id);
-      if (!stats?.avg_price_per_base_unit_12m || !stats.quantity_12m) continue;
-      saved += (Number(stats.avg_price_per_base_unit_12m) - Number(it.live_agreed_price_per_base_unit)) * Number(stats.quantity_12m);
-    }
-    return saved;
-  }, [items, statsMap]);
+  /** Besparelse: snittpris − avtalt pris per grunnenhet × volum i grunnenhet. Ukjent grunnlag telles som ukjent. */
+  const savings = useMemo(() => estimateSavings(items.filter((it) => AGREED.has(it.live_status ?? "")).map((it) => {
+    const s = statsMap?.get(it.raw_material_id);
+    const b = s ? baselineFromStats(s) : null;
+    return {
+      hasWinner: true,
+      winnerPerBase: it.live_agreed_price_per_base_unit,
+      volumeBaseline: b?.volume ?? null,
+      costBaseline: b?.cost ?? null,
+    };
+  })), [items, statsMap]);
+  const savingsValue = savings.known === 0 && savings.unknown > 0 ? null : savings.value;
 
   const processedCount = itemsByStatus.processed.length;
   const totalCount = items.length;
 
-  async function handleAdd(rmId: string) {
-    const created: any = await addItem.mutateAsync({
-      negotiation_id: id,
-      raw_material_id: rmId,
-      sort_order: items.length,
-    });
-    await logEvent.mutateAsync({
-      negotiation_id: id,
-      negotiation_item_id: created?.id ?? null,
-      event_type: "item_added",
-      event_data: { raw_material_id: rmId },
-    });
-    if (created?.id) setActiveId(created.id);
+  async function guarded(fn: () => Promise<void>, fallback: string) {
+    try { await fn(); } catch (e) { toast.error(errText(e, fallback)); }
   }
 
-  async function handleStartDiscuss(itemId: string) {
-    await updateItem.mutateAsync({
-      id: itemId,
-      negotiation_id: id,
-      patch: { live_status: "discussing" },
-    });
-    await logEvent.mutateAsync({
-      negotiation_id: id,
-      negotiation_item_id: itemId,
-      event_type: "item_discussed",
-    });
+  const handleAdd = (rmId: string) => guarded(async () => {
+    const created = await addItem.mutateAsync({ negotiation_id: id, raw_material_id: rmId, sort_order: items.length });
+    await logEvent.mutateAsync({ negotiation_id: id, negotiation_item_id: created.id, event_type: "item_added", event_data: { raw_material_id: rmId } });
+    setActiveId(created.id);
+  }, "Kunne ikke legge til");
+
+  async function startDiscuss(itemId: string) {
+    await updateItem.mutateAsync({ id: itemId, negotiation_id: id, patch: { live_status: "discussing" } });
+    await logEvent.mutateAsync({ negotiation_id: id, negotiation_item_id: itemId, event_type: "item_discussed" });
     setActiveId(itemId);
   }
+  const handleStartDiscuss = (itemId: string) => guarded(() => startDiscuss(itemId), "Kunne ikke starte diskusjon");
 
-  async function handleSaveActive(patch: Record<string, any>, eventType: string, eventData?: any, note?: string | null) {
+  async function handleSaveActive(patch: LiveItemPatch, eventType: string, eventData?: Json, note?: string | null) {
     if (!activeItem) return;
-    await updateItem.mutateAsync({ id: activeItem.id, negotiation_id: id, patch });
-    await logEvent.mutateAsync({
-      negotiation_id: id,
-      negotiation_item_id: activeItem.id,
-      event_type: eventType,
-      event_data: eventData,
-      note,
-    });
-    // Move to next pending
-    const next = itemsByStatus.pending.find((p) => p.id !== activeItem.id);
-    setActiveId(null);
-    if (next) {
-      await handleStartDiscuss(next.id);
-    }
+    const current = activeItem;
+    await guarded(async () => {
+      await updateItem.mutateAsync({ id: current.id, negotiation_id: id, patch });
+      await logEvent.mutateAsync({ negotiation_id: id, negotiation_item_id: current.id, event_type: eventType, event_data: eventData ?? null, note });
+      const next = itemsByStatus.pending.find((p) => p.id !== current.id);
+      setActiveId(null);
+      if (next) await startDiscuss(next.id);
+    }, "Kunne ikke lagre");
   }
 
   async function handleTogglePause() {
+    if (pauseLock.current) return;
+    pauseLock.current = true;
     setPausing(true);
     try {
       const next = !isPaused;
-      await updateNeg.mutateAsync({
-        id,
-        patch: { live_session_paused: next } as any,
-      });
-      await logEvent.mutateAsync({
-        negotiation_id: id,
-        event_type: next ? "session_paused" : "session_resumed",
-      });
-    } catch (e: any) {
-      toast.error(e?.message ?? "Kunne ikke pause");
+      await updateNeg.mutateAsync({ id, patch: { live_session_paused: next } });
+      await logEvent.mutateAsync({ negotiation_id: id, event_type: next ? "session_paused" : "session_resumed" });
+    } catch (e) {
+      toast.error(errText(e, "Kunne ikke pause"));
     } finally {
+      pauseLock.current = false;
       setPausing(false);
     }
   }
 
-  async function handleReopen(itemId: string) {
-    await updateItem.mutateAsync({
-      id: itemId,
-      negotiation_id: id,
-      patch: { live_status: "discussing" },
-    });
-    await logEvent.mutateAsync({
-      negotiation_id: id,
-      negotiation_item_id: itemId,
-      event_type: "item_reopened",
-    });
+  const handleReopen = (itemId: string) => guarded(async () => {
+    await updateItem.mutateAsync({ id: itemId, negotiation_id: id, patch: { live_status: "discussing" } });
+    await logEvent.mutateAsync({ negotiation_id: id, negotiation_item_id: itemId, event_type: "item_reopened" });
     setActiveId(itemId);
+  }, "Kunne ikke gjenåpne");
+
+  function summaryLines(supplierLabel: string): string[] {
+    const lines = [`Forhandling: ${neg?.title ?? ""}`, `Leverandør: ${supplierLabel}`, "", "Avtalte poster (venter bekreftelse):"];
+    for (const it of items.filter((i) => AGREED.has(i.live_status ?? ""))) {
+      const rm = rmById.get(it.raw_material_id);
+      const unit = it.live_agreed_price_unit ? `kr/${it.live_agreed_price_unit}` : "ukjent enhet";
+      lines.push(`- ${rm?.name ?? "?"}: ${it.live_agreed_price ?? "?"} ${unit} (${it.live_agreed_contract_months ?? "?"} mnd)`);
+    }
+    lines.push("", `Total estimert besparelse: ${savingsValue == null ? "ukjent" : `${formatNok(savingsValue)}/år`}`);
+    return lines;
   }
 
-  async function handleEndSession() {
-    if (endLock.current) return;
-    // Frys mottakeren nå: lenke, passord, e-postadresse og mailto skal alltid gjelde samme mottaker.
-    const frozen = selectedRecipient;
-    if (!frozen) { toast.error("Velg hvilken leverandør bekreftelsen gjelder"); return; }
-    const expected = recipients.map((r) => ({ id: r.id, supplier_id: r.supplier_id }));
-    endLock.current = true;
-    setEnding(true);
-    try {
-      const days = Math.max(1, Number(deadlineDays) || 14);
-      const deadline = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
-      await updateNeg.mutateAsync({
-        id,
-        patch: {
-          status: "awaiting_confirmation",
-          live_session_ended_at: new Date().toISOString(),
-          live_confirmation_deadline: deadline,
-          live_auto_apply_on_confirm: autoApply,
-        } as any,
-      });
-      // Generate supplier credentials (reuses RFQ token mechanism)
-      const { data: credRes, error: credErr } = await supabase.functions.invoke(
-        "generate-rfq-credentials",
-        { body: { negotiation_id: id } },
-      );
-      if (credErr) {
-        if (!isKnownRejection(credErr)) setCredUnknown(true);
-        throw credErr;
-      }
-      const parsed = parseRfqCredentials(credRes, expected);
-      const cred = parsed.kind === "ok" ? parsed.byRecipient.get(frozen.id) : undefined;
-      if (!cred) {
-        setCredUnknown(true);
-        throw new Error("Svaret kunne ikke knyttes sikkert til valgt leverandør. Passord kan være endret.");
-      }
-      setCredUnknown(false);
-      setCredentials({
-        recipientId: cred.recipient_id,
-        url: portalUrlFor(window.location.origin, "bekreftelse", cred),
-        password: cred.password,
-        email: cred.contact_email,
-        supplierName: suppliers.find((s) => s.id === cred.supplier_id)?.name ?? cred.supplier_name,
-      });
-      await logEvent.mutateAsync({
-        negotiation_id: id,
-        event_type: "session_ended",
-        event_data: { processed: processedCount, total: totalCount, total_savings: totalSavings },
-      });
-    } catch (e: any) {
-      toast.error(e?.message ?? "Kunne ikke avslutte");
-    } finally {
-      endLock.current = false;
-      setEnding(false);
-    }
-  }
+  useEffect(() => {
+    if (neg && neg.negotiation_mode !== "live") navigate(paths.forhandling(id), { replace: true });
+  }, [neg, id, navigate]);
 
-  function summaryText() {
-    const lines: string[] = [];
-    lines.push(`Forhandling: ${neg?.title ?? ""}`);
-    lines.push(`Leverandør: ${credentials ? credentials.supplierName : supplierName}`);
-    lines.push("");
-    lines.push("Avtalte poster (venter bekreftelse):");
-    for (const it of items.filter((i) => i.live_status === "tentatively_agreed" || i.live_status === "agreed" || i.live_status === "confirmed")) {
-      const rm = rawMaterials.find((r) => r.id === it.raw_material_id);
-      lines.push(`- ${rm?.name ?? "?"}: ${it.live_agreed_price ?? "?"} ${it.live_agreed_price_unit ?? ""} (${it.live_agreed_contract_months ?? "?"} mnd)`);
-    }
-    lines.push("");
-    lines.push(`Total estimert besparelse: ${formatNok(totalSavings)}/år`);
-    if (credentials) {
-      lines.push("");
-      lines.push(`Bekreftelses-lenke: ${credentials.url}`);
-      lines.push(`Passord (send i separat e-post): ${credentials.password}`);
-    }
-    return lines.join("\n");
-  }
+  const back = (
+    <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={() => navigate(paths.forhandlinger())}>
+      <ArrowLeft className="mr-1 h-4 w-4" aria-hidden /> Forhandlinger
+    </Button>
+  );
 
-  if (!neg) {
+  if (!neg || neg.negotiation_mode !== "live") {
     return (
-      <div className="p-6">
-        <Loader2 className="h-5 w-5 animate-spin" />
+      <div className="mx-auto max-w-[1100px] space-y-4 p-4 sm:p-6">
+        {back}
+        <QueryState
+          scope="ravarer:live-forhandling"
+          isLoading={negQ.isLoading || (!!neg && neg.negotiation_mode !== "live")}
+          isError={negQ.isError}
+          error={negQ.error}
+          onRetry={() => void negQ.refetch()}
+          isEmpty
+          emptyTitle="Fant ikke forhandlingen"
+          emptyDescription="Den finnes ikke, tilhører et annet selskap, eller du mangler tilgang."
+        >
+          {null}
+        </QueryState>
       </div>
     );
   }
 
-  if (neg.negotiation_mode !== "live") {
-    navigate(paths.forhandling(id));
-    return null;
-  }
-
   const isEnded = !!neg.live_session_ended_at || neg.status === "concluded";
+  const canEdit = rights.canWrite && !isEnded;
 
   return (
-    <div className="mx-auto max-w-[1100px] space-y-5 p-6">
-      <Button variant="ghost" size="sm" onClick={() => navigate(paths.forhandlinger())}>
-        <ArrowLeft className="mr-1 h-4 w-4" /> Forhandlinger
-      </Button>
-
-      {/* Live header */}
-      <Card className="flex flex-col gap-2 border-warning/30 bg-warning/5 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <span className="relative flex h-3 w-3">
-            {!isEnded && (
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-warning opacity-75" />
-            )}
-            <span className={`relative inline-flex h-3 w-3 rounded-full ${isEnded ? "bg-ink-muted" : "bg-warning"}`} />
-          </span>
-          <div>
-            <p className="text-xs uppercase tracking-wider text-warning">
-              {isEnded ? "AVSLUTTET" : "LIVE FORHANDLING"}
-            </p>
-            <p className="font-semibold">
-              {supplierName} ·{" "}
-              <LiveTimer startedAt={neg.live_session_started_at} endedAt={neg.live_session_ended_at} />
-            </p>
-            <p className="mt-0.5 text-xs text-ink-muted">
-              Sanntid: {realtimeConnected ? "på" : "av (bruker 5 sek. oppdatering)"}
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" className="rounded-full" onClick={() => setTimelineOpen(true)}>
-            <History className="mr-1.5 h-4 w-4" /> Tidslinje
-          </Button>
-          {!isEnded && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="rounded-full"
-              onClick={handleTogglePause}
-              disabled={pausing}
-            >
-              {isPaused ? <Play className="mr-1.5 h-4 w-4" /> : <Pause className="mr-1.5 h-4 w-4" />}
-              {isPaused ? "Gjenoppta" : "Pause"}
-            </Button>
-          )}
-          {!isEnded && (
-            <Button size="sm" className="rounded-full" onClick={() => setEndOpen(true)}>
-              <Flag className="mr-1.5 h-4 w-4" /> Avslutt →
-            </Button>
-          )}
-        </div>
-      </Card>
-
-      {isPaused && !isEnded && (
-        <Card className="border-warning/40 bg-warning/10 p-3 text-sm text-warning">
-          Møtet er pauset. Klikk «Gjenoppta» når dere er tilbake.
-        </Card>
-      )}
-
-      {recipients.length > 1 && (
-        <Card className="p-4">
-          <label className="text-xs uppercase tracking-wide text-ink-secondary">
-            Hvilken leverandør gjelder prisene for?
-          </label>
-          <Select value={activeRecipientId} onValueChange={setActiveRecipientId}>
-            <SelectTrigger className="mt-1 max-w-xs" aria-label="Leverandør avtalen gjelder">
-              <SelectValue placeholder="Velg leverandør" />
-            </SelectTrigger>
-            <SelectContent>
-              {recipients.map((r) => (
-                <SelectItem key={r.id} value={r.id}>
-                  {suppliers.find((s) => s.id === r.supplier_id)?.name ?? "—"}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Card>
-      )}
-
-      {/* Search */}
-      {!isEnded && (
-        <Card className="p-4">
-          <LiveItemSearch
-            rawMaterials={rawMaterials}
-            excludeIds={excludeIds}
-            onAdd={handleAdd}
-            disabled={addItem.isPending}
-          />
-        </Card>
-      )}
-
-      {/* Pending queue */}
-      {itemsByStatus.pending.length > 0 && !activeItem && !isEnded && (
-        <Card className="p-4">
-          <p className="mb-3 text-xs uppercase tracking-wide text-ink-secondary">Venter diskusjon</p>
-          <div className="flex flex-wrap gap-2">
-            {itemsByStatus.pending.map((it) => {
-              const rm = rawMaterials.find((r) => r.id === it.raw_material_id);
-              return (
-                <Button
-                  key={it.id}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleStartDiscuss(it.id)}
-                >
-                  {rm?.name ?? "—"}
-                </Button>
-              );
-            })}
-          </div>
-        </Card>
-      )}
-
-      {/* Active card */}
-      {activeItem && !isEnded && (
-        <LiveItemCard
-          item={activeItem}
-          rawMaterial={rawMaterials.find((r) => r.id === activeItem.raw_material_id)}
-          supplierId={supplierId}
-          facilitatorId={user?.id ?? null}
-          saving={updateItem.isPending}
-          onSave={handleSaveActive}
-        />
-      )}
-
-      {/* Processed list */}
-      {itemsByStatus.processed.length > 0 && (
-        <Card className="overflow-hidden">
-          <div className="border-b border-line-subtle px-4 py-3 text-sm font-semibold">
-            Allerede behandlet ({itemsByStatus.processed.length})
-          </div>
-          <ul>
-            {itemsByStatus.processed.map((it) => {
-              const rm = rawMaterials.find((r) => r.id === it.raw_material_id);
-              const stats = statsMap?.get(it.raw_material_id);
-              const baseline = stats?.avg_price_per_base_unit_12m ?? null;
-              const newPrice = it.live_agreed_price_per_base_unit;
-              const pct =
-                baseline && newPrice ? ((Number(newPrice) - Number(baseline)) / Number(baseline)) * 100 : null;
-              const Icon = it.live_status === "agreed" ? Check : it.live_status === "parked" ? Pause : X;
-              const cls =
-                it.live_status === "agreed"
-                  ? "text-success"
-                  : it.live_status === "parked"
-                  ? "text-warning"
-                  : "text-destructive";
-              const reopenable = !isEnded && (it.live_status === "agreed" || it.live_status === "tentatively_agreed" || it.live_status === "parked" || it.live_status === "declined");
-              return (
-                <li
-                  key={it.id}
-                  className={`group flex items-center justify-between border-t border-line-subtle px-4 py-2 text-sm first:border-0 ${reopenable ? "cursor-pointer hover:bg-surface-muted/40" : ""}`}
-                  onClick={() => { if (reopenable) handleReopen(it.id); }}
-                  title={reopenable ? "Klikk for å gjenåpne" : undefined}
-                >
-                  <span className="flex items-center gap-2">
-                    <Icon className={`h-4 w-4 ${cls}`} />
-                    <span>
-                      <span className="font-medium">{rm?.name ?? "—"}</span>
-                      <span className="block">
-                        <UnitPriceHint
-                          rawMaterialId={it.raw_material_id}
-                          pricePerBase={newPrice == null ? (baseline == null ? null : Number(baseline)) : Number(newPrice)}
-                          baseUnit={rm?.base_unit ?? null}
-                        />
-                      </span>
-                    </span>
-                    {reopenable && <RotateCcw className="h-3 w-3 text-ink-muted opacity-0 group-hover:opacity-100" />}
-                  </span>
-                  <span className="text-ink-secondary tabular-nums">
-                    {(it.live_status === "agreed" || it.live_status === "tentatively_agreed") && newPrice != null ? (
-                      <>
-                        {formatNok(newPrice)}/{rm?.base_unit ?? "kg"}
-                        {pct != null && (
-                          <span className={`ml-2 ${pct < 0 ? "text-success" : "text-destructive"}`}>
-                            ({pct >= 0 ? "+" : ""}
-                            {pct.toFixed(1)}%)
-                          </span>
-                        )}
-                        {it.live_agreed_contract_months && (
-                          <span className="ml-2 text-ink-muted">· {it.live_agreed_contract_months} mnd</span>
-                        )}
-                      </>
-                    ) : it.live_status === "parked" ? (
-                      "Parket"
-                    ) : it.live_status === "declined" ? (
-                      "Avslått"
-                    ) : (
-                      it.live_status ?? "—"
-                    )}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-      )}
-
-      {/* Footer summary */}
-      <Card className="flex items-center justify-between p-4 text-sm">
-        <span className="text-ink-secondary">
-          {processedCount} av {totalCount} råvarer behandlet
-        </span>
-        <span className="font-semibold tabular-nums">
-          Total besparelse:{" "}
-          <span className={totalSavings > 0 ? "text-success" : "text-ink-primary"}>
-            {formatNok(totalSavings)}/år
-          </span>
-        </span>
-      </Card>
-
-      {/* End dialog */}
-      <Dialog open={endOpen} onOpenChange={(o) => { setEndOpen(o); if (!o && credentials) { setCredentials(null); navigate(paths.forhandling(id)); } }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{credentials ? "Send bekreftelse til leverandør" : "Avslutt forhandling"}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 text-sm">
-            {credUnknown && !credentials && (
-              <p role="alert" className="rounded-md border border-warning/30 bg-warning/10 p-3 text-xs">
-                Utfallet av lenkegenereringen er ukjent. Passord kan allerede være endret, og ingenting prøves
-                på nytt automatisk. Prøver du igjen, lages nye passord for alle mottakere.
+    <div className="mx-auto max-w-[1100px] space-y-4 p-4 sm:p-6">
+      {back}
+      <ModulePage
+        eyebrow={isEnded ? "Live-forhandling · avsluttet" : "Live-forhandling"}
+        title={neg.title}
+        icon={Radio}
+        embedsPage={false}
+        compact
+        actions={<NegotiationStatusPill status={neg.status} />}
+      >
+        <Card className="flex flex-col gap-3 border-warning/30 bg-warning/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="relative flex h-3 w-3 shrink-0" aria-hidden>
+              {!isEnded && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-warning opacity-75" />}
+              <span className={`relative inline-flex h-3 w-3 rounded-full ${isEnded ? "bg-ink-muted" : "bg-warning"}`} />
+            </span>
+            <div className="min-w-0">
+              <p className="break-words font-semibold">
+                {supplierName} · <LiveTimer startedAt={neg.live_session_started_at} endedAt={neg.live_session_ended_at} />
               </p>
-            )}
-            {!credentials && (
-              <>
-                <p>
-                  Avslutter live-sesjonen og setter status til <strong>awaiting_confirmation</strong>.{" "}
-                  {processedCount} av {totalCount} råvarer er behandlet med estimert besparelse{" "}
-                  <strong>{formatNok(totalSavings)}/år</strong>.
-                </p>
-                <div>
-                  <label className="text-xs text-ink-secondary">Frist for bekreftelse (dager)</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={deadlineDays}
-                    onChange={(e) => setDeadlineDays(e.target.value)}
-                    className="mt-1 block w-32 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  />
-                </div>
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox checked={autoApply} onCheckedChange={(v) => setAutoApply(!!v)} />
-                  <span>Aktivér leverandør-priser automatisk når alle linjer er bekreftet</span>
-                </label>
-              </>
-            )}
-            {credentials && (
-              <div className="space-y-2 rounded-md border border-success/30 bg-success/5 p-3 text-xs">
-                <p className="font-semibold text-success">Lenke og passord generert — ingenting er sendt</p>
-                <p>Passordet gjelder i 5 minutter.</p>
-                <p>Send til: <strong>{credentials.email ?? "—"}</strong></p>
-                <p className="break-all">Lenke: <code>{credentials.url}</code></p>
-                <p>Passord (separat e-post): <code className="rounded bg-surface-muted px-1 py-0.5">{credentials.password}</code></p>
-              </div>
-            )}
-            <Card className="max-h-48 overflow-auto whitespace-pre-wrap p-3 font-mono text-xs">
-              {summaryText()}
-            </Card>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  navigator.clipboard.writeText(summaryText());
-                  toast.success("Kopiert");
-                }}
-              >
-                Kopier sammendrag
-              </Button>
-              {credentials?.email && (
-                <Button asChild variant="outline" size="sm">
-                  <a
-                    href={`mailto:${credentials.email}?subject=${encodeURIComponent(
-                      "Bekreftelse av avtaler: " + (neg.title ?? "")
-                    )}&body=${encodeURIComponent(summaryText())}`}
-                  >
-                    Åpne e-postutkast
-                  </a>
-                </Button>
-              )}
+              <p className="mt-0.5 text-caption text-ink-muted">
+                Sanntid: {realtimeConnected ? "tilkoblet" : "frakoblet (oppdateres hvert 30. sekund)"}
+              </p>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEndOpen(false)}>
-              {credentials ? "Lukk" : "Avbryt"}
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" className="min-h-[44px] rounded-full" onClick={() => setTimelineOpen(true)}>
+              <History className="mr-1.5 h-4 w-4" aria-hidden /> Tidslinje
             </Button>
-            {!credentials && (
-              <Button onClick={handleEndSession} disabled={ending || !selectedRecipient}>
-                {ending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Avslutt og generer lenke
+            {canEdit && (
+              <Button size="sm" variant="outline" className="min-h-[44px] rounded-full" onClick={() => void handleTogglePause()} disabled={pausing}>
+                {isPaused ? <Play className="mr-1.5 h-4 w-4" aria-hidden /> : <Pause className="mr-1.5 h-4 w-4" aria-hidden />}
+                {isPaused ? "Gjenoppta" : "Pause"}
               </Button>
             )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            {canEdit && (
+              <Button size="sm" className="min-h-[44px] rounded-full" onClick={() => setEndOpen(true)}>
+                <Flag className="mr-1.5 h-4 w-4" aria-hidden /> Avslutt
+              </Button>
+            )}
+          </div>
+        </Card>
+
+        {!rights.loading && !rights.canWrite && (
+          <p role="status" className="rounded-md border border-line-subtle bg-surface-muted p-3 text-sm text-ink-secondary">
+            Du har lesetilgang. Registrering i møtet krever skrivetilgang til fakturaer i Råvarer.
+          </p>
+        )}
+
+        {isPaused && !isEnded && (
+          <p role="status" className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
+            Møtet er pauset. Trykk «Gjenoppta» når dere er tilbake.
+          </p>
+        )}
+
+        {recipients.length > 1 && (
+          <Card className="p-4">
+            <label htmlFor="live-recipient" className="text-caption uppercase tracking-wide text-ink-secondary">Hvilken leverandør gjelder prisene for?</label>
+            <Select value={activeRecipientId} onValueChange={setActiveRecipientId}>
+              <SelectTrigger id="live-recipient" className="mt-1 min-h-[44px] max-w-xs" aria-label="Leverandør avtalen gjelder">
+                <SelectValue placeholder="Velg leverandør" />
+              </SelectTrigger>
+              <SelectContent>
+                {recipients.map((r) => <SelectItem key={r.id} value={r.id}>{supName(r.supplier_id) || "—"}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Card>
+        )}
+
+        {canEdit && (
+          <Card className="p-4">
+            <LiveItemSearch rawMaterials={rawMaterials} excludeIds={excludeIds} onAdd={(rm) => void handleAdd(rm)} disabled={addItem.isPending} />
+          </Card>
+        )}
+
+        {itemsByStatus.pending.length > 0 && !activeItem && canEdit && (
+          <Card className="p-4">
+            <p className="mb-3 text-caption uppercase tracking-wide text-ink-secondary">Venter på diskusjon</p>
+            <div className="flex flex-wrap gap-2">
+              {itemsByStatus.pending.map((it) => (
+                <Button key={it.id} variant="outline" size="sm" className="min-h-[44px]" onClick={() => void handleStartDiscuss(it.id)}>
+                  {rmById.get(it.raw_material_id)?.name ?? "—"}
+                </Button>
+              ))}
+            </div>
+          </Card>
+        )}
+
+        {activeItem && canEdit && (
+          <LiveItemCard
+            item={activeItem}
+            rawMaterial={rmById.get(activeItem.raw_material_id)}
+            supplierId={supplierId}
+            facilitatorId={user?.id ?? null}
+            saving={updateItem.isPending}
+            onSave={handleSaveActive}
+          />
+        )}
+
+        {itemsByStatus.processed.length > 0 && (
+          <Card className="overflow-hidden">
+            <div className="border-b border-line-subtle px-4 py-3 text-sm font-semibold">Allerede behandlet ({itemsByStatus.processed.length})</div>
+            <ul>
+              {itemsByStatus.processed.map((it) => {
+                const rm = rmById.get(it.raw_material_id);
+                const unit = rm?.base_unit ?? null;
+                const baseline = statsMap?.get(it.raw_material_id)?.avg_price_per_base_unit_12m ?? null;
+                const newPrice = it.live_agreed_price_per_base_unit;
+                const pct = baseline && newPrice != null ? ((newPrice - baseline) / baseline) * 100 : null;
+                const reopenable = canEdit && REOPENABLE.has(it.live_status ?? "");
+                const name = rm?.name ?? "—";
+                return (
+                  <li key={it.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-line-subtle px-4 py-2 text-sm first:border-0">
+                    <span className="min-w-0">
+                      <span className="font-medium">{name}</span>
+                      <span className="block"><UnitPriceHint rawMaterialId={it.raw_material_id} pricePerBase={newPrice ?? baseline} baseUnit={unit} /></span>
+                    </span>
+                    <span className="flex flex-wrap items-center gap-2 tabular-nums text-ink-secondary">
+                      {AGREED.has(it.live_status ?? "") && newPrice != null ? (
+                        <span>
+                          {formatNok(newPrice)}/{unit ?? "grunnenhet"}
+                          {pct != null && <span className={`ml-2 ${pct < 0 ? "text-success" : "text-destructive"}`}>({pct >= 0 ? "+" : ""}{pct.toFixed(1)} %)</span>}
+                          {it.live_agreed_contract_months != null && <span className="ml-2 text-ink-muted">· {it.live_agreed_contract_months} mnd</span>}
+                        </span>
+                      ) : AGREED.has(it.live_status ?? "") ? (
+                        <span>Pris per grunnenhet ukjent</span>
+                      ) : null}
+                      <LiveItemStatusPill status={it.live_status} />
+                      {reopenable && (
+                        <Button variant="ghost" size="sm" className="min-h-[44px] min-w-[44px]" aria-label={`Gjenåpne ${name}`} onClick={() => void handleReopen(it.id)}>
+                          <RotateCcw className="h-4 w-4" aria-hidden />
+                        </Button>
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        )}
+
+        <Card className="flex flex-wrap items-center justify-between gap-2 p-4 text-sm">
+          <span className="text-ink-secondary">{processedCount} av {totalCount} råvarer behandlet</span>
+          <span className="font-semibold tabular-nums">
+            Total besparelse:{" "}
+            <span className={savingsValue != null && savingsValue > 0 ? "text-success" : "text-ink-primary"}>
+              {savingsValue == null ? "ukjent" : `${formatNok(savingsValue)}/år`}
+            </span>
+            {savings.unknown > 0 && savingsValue != null && <span className="block text-caption font-normal text-ink-secondary">{savings.unknown} avtale(r) med ukjent grunnlag er ikke regnet med</span>}
+          </span>
+        </Card>
+      </ModulePage>
+
+      <EndSessionDialog
+        open={endOpen}
+        onOpenChange={(o, hadCredentials) => {
+          setEndOpen(o);
+          if (!o && hadCredentials) navigate(paths.forhandling(id));
+        }}
+        negotiationId={id}
+        legalEntityId={legalEntityId}
+        title={neg.title}
+        recipients={recipients}
+        selectedRecipient={selectedRecipient}
+        supplierName={supName}
+        summaryLines={summaryLines}
+        processedCount={processedCount}
+        totalCount={totalCount}
+        savingsValue={savingsValue}
+      />
 
       <LiveTidslinjeDrawer
         open={timelineOpen}
         onOpenChange={setTimelineOpen}
         negotiationId={id}
-        rmName={(rid) => rawMaterials.find((r) => r.id === rid)?.name ?? "—"}
+        rmName={(rid) => rmById.get(rid)?.name ?? "—"}
         itemRawMaterialMap={new Map(items.map((i) => [i.id, i.raw_material_id]))}
       />
     </div>
