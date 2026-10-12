@@ -68,7 +68,7 @@ describe("felles rapportkontrakt", () => {
 // ---------- lesing ----------
 const ML = (id: string, units = 0, name = "Vare"): ManifestLine => ({ id, revision: 0, snap_name: name, snap_base_unit: "kg", snap_units: Array.from({ length: units }, (_, i) => ({ id: `${id}-u${i}`, label: `pk${i}`, units_in_base: 10 })) });
 const C = "c0000000-0000-0000-0000-000000000000"; const LIST = "a1111111-0000-0000-0000-000000000000";
-const lines = Array.from({ length: 16 }, (_, i) => ML(`${String(i).padStart(12, "0")}-line`));
+const lines = Array.from({ length: 16 }, (_, i) => ML(`${String(i).padStart(10, "0")}-line`));
 const man = buildManifest(C, LIST, 3, lines);
 const row = (l: ManifestLine, raw: string | null, extra: Partial<{ crossed_out: boolean; unclear: boolean; column: "los" | "pakninger"; unit: string | null }> = {}) =>
   ({ row_code: rowCodeOf(l.id), amounts: [{ column: extra.column ?? "los", unit_label: extra.unit ?? null, raw }], crossed_out: extra.crossed_out ?? false, unclear: extra.unclear ?? false, comment: null });
@@ -166,7 +166,9 @@ describe("tellekort", () => {
     await waitFor(() => expect(m.api._state.lines.find(l => l.raw_material_id === "m1")?.counted_base).toBe(82.5));
     await screen.findByRole("option", { name: /Under telling/ });
     fireEvent.click(within(cardOf(screen.getByLabelText("Hvetemel (demo): antall kg"))).getByRole("button", { name: "0 på lager" }));
+    await waitFor(() => expect(m.api._state.lines.find(l => l.raw_material_id === "m1")?.state).toBe("null"));
     await waitFor(() => expect((screen.getByLabelText("Hvetemel (demo): antall kg") as HTMLInputElement).value).toBe(""));
+    console.log("KORT", cardOf(screen.getByLabelText("Hvetemel (demo): antall kg")).textContent);
     expect(within(cardOf(screen.getByLabelText("Hvetemel (demo): antall kg"))).queryByText(/82,5/)).toBeNull();
   });
   it("utkast overlever liste-/visningsbytte og omlasting; avslutning sperres mens utkast finnes", async () => {
