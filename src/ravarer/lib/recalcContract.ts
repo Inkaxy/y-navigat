@@ -61,6 +61,7 @@ export function parseRecalcEnvelope(data: unknown, expect: { ids: readonly strin
   if (requested !== wanted.size || requested !== succeeded + failed || data.items.length !== requested) return null;
   const seen = new Set<string>();
   const items: RecalcItem[] = [];
+  const seenRid = new Set<string>();
   let okN = 0, sumChanged = 0;
   for (const raw of data.items) {
     if (!isRecord(raw) || !isUuid(raw.raw_material_id) || !wanted.has(raw.raw_material_id) || seen.has(raw.raw_material_id)) return null;
@@ -72,6 +73,8 @@ export function parseRecalcEnvelope(data: unknown, expect: { ids: readonly strin
       if (typeof raw.raw_material !== "string") return null;
       const rid = raw.recalc_id;
       if (expect.dryRun ? rid !== null : !isUuid(rid)) return null;
+      // Samme recalc_id på to poster = motstridende kvittering → ukjent, aldri to angrehåndtak.
+      if (typeof rid === "string") { if (seenRid.has(rid)) return null; seenRid.add(rid); }
       okN++; sumChanged += raw.lines_changed;
       items.push({
         rawMaterialId: raw.raw_material_id, ok: true, name: raw.raw_material, recalcId: rid as string | null,
