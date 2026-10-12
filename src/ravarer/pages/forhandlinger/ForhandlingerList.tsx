@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { Plus, Radio, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,9 @@ function ModeTag({ mode }: { mode: NegotiationRow["negotiation_mode"] }) {
 export default function ForhandlingerList() {
   const embedded = useIsEmbedded();
   const [params, setParams] = useSearchParams();
+  const location = useLocation();
+  // Detalj/live får listekonteksten (søk) med seg, så «Forhandlinger» går tilbake hit.
+  const returnTo = `${location.pathname}${location.search}`;
   const q = params.get("q") ?? "";
   const [pickerOpen, setPickerOpen] = useState(false);
   const rights = useInvoiceRights();
@@ -76,7 +79,7 @@ export default function ForhandlingerList() {
         onRetry={() => void query.refetch()}
         emptyText={q ? "Ingen forhandlinger passer søket." : "Ingen forhandlinger ennå."}
         emptyDescription={q ? undefined : rights.canWrite ? "Kom i gang med «Ny forhandling»." : undefined}
-        rowHref={negotiationHref}
+        rowHref={(n) => negotiationHref(n, returnTo)}
         renderMobileCard={(n) => (
           <div className="min-h-[44px] space-y-1.5 rounded-lg border border-border bg-card p-3">
             <div className="flex items-start justify-between gap-2">
