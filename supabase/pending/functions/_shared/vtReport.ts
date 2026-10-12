@@ -15,7 +15,14 @@ export interface VtReportLine {
   snap_base_unit: string | null; snap_price_per_base: number | null; snap_price_source: string; snap_price_reason: string | null;
   snap_price_effective_date: string | null; snap_price_known_after_valuation: boolean;
   state: VtLineState; counted_base: number | null; note: string | null; revision: number;
+  /** Prisavklaring i denne tellingen (eget revisjonsspor). Opprinnelig snap_* er uendret. */
+  clar_price_per_base?: number | null; clar_source_kind?: string | null; clar_source_ref?: string | null; clar_reason?: string | null; clar_at?: string | null;
 }
+type PriceFields = Pick<VtReportLine, "snap_price_per_base"> & Partial<Pick<VtReportLine, "clar_price_per_base">>;
+/** Pris som brukes i verdsettelsen: frosset dokumentert pris, ellers godkjent avklaring i tellingen, ellers ukjent. */
+export const effectivePrice = (l: PriceFields): number | null => l.snap_price_per_base ?? l.clar_price_per_base ?? null;
+export const isClarified = (l: PriceFields) => l.snap_price_per_base == null && l.clar_price_per_base != null;
+export const CLAR_SOURCE_TEXT: Record<string, string> = { faktura: "Faktura", leverandorpris: "Leverandørens pris", prisliste: "Prisliste", manuell_vurdering: "Manuell vurdering" };
 export interface VtReportData { count: VtReportCount; lists: VtReportList[]; lines: VtReportLine[]; generatedAt: string }
 
 export const LINE_STATE_TEXT: Record<VtLineState, string> = {
@@ -50,10 +57,11 @@ export function mulToOreHalfUp(a: number, b: number): number {
 }
 
 /** Linjeverdi i øre. null = ukjent (ikke 0). */
-export function lineValueOre(l: Pick<VtReportLine, "state" | "counted_base" | "snap_price_per_base">): number | null {
+export function lineValueOre(l: Pick<VtReportLine, "state" | "counted_base"> & PriceFields): number | null {
   if (l.state === "null") return 0;
-  if (l.state !== "talt" || l.counted_base == null || l.snap_price_per_base == null) return null;
-  return mulToOreHalfUp(l.counted_base, l.snap_price_per_base);
+  const p = effectivePrice(l);
+  if (l.state !== "talt" || l.counted_base == null || p == null) return null;
+  return mulToOreHalfUp(l.counted_base, p);
 }
 
 export interface VtSummary {
@@ -65,12 +73,12 @@ export interface VtSummary {
   /** Alle linjer avklart, ingen må kontrolleres, og alle talte har pris. Da er `value` fullstendig. */
   complete: boolean;
 }
-export function summarizeLines(lines: Pick<VtReportLine, "state" | "counted_base" | "snap_price_per_base">[]): VtSummary {
+export function summarizeLines(lines: (Pick<VtReportLine, "state" | "counted_base"> & PriceFields)[]): VtSummary {
   let counted = 0, zero = 0, notHere = 0, notCounted = 0, review = 0, cwp = 0, ore = 0, known = 0;
   for (const l of lines) {
     if (l.state === "talt") counted++; else if (l.state === "null") zero++; else if (l.state === "ikke_her") notHere++;
     else if (l.state === "ma_kontrolleres") review++; else notCounted++;
-    if (l.state === "talt" && l.snap_price_per_base == null) cwp++;
+    if (l.state === "talt" && effectivePrice(l) == null) cwp++;
     const v = lineValueOre(l); if (v != null) { known++; ore += v; }
   }
   return { lines: lines.length, counted, zero, notHere, notCounted, review, value: known > 0 ? ore / 100 : null, countedWithoutPrice: cwp,
@@ -92,6 +100,7 @@ const dateNo = (iso: string | null) => (iso ? `${iso.slice(8, 10)}.${iso.slice(5
 export const isFinal = (c: Pick<VtReportCount, "status">) => c.status === "avsluttet";
 export const reportTitleOf = (c: VtReportCount) => `${c.name}${isFinal(c) ? "" : " — FORELØPIG"}`;
 export function priceSourceText(l: VtReportLine): string {
+  if (isClarified(l)) return `Avklart i tellingen (${CLAR_SOURCE_TEXT[l.clar_source_kind ?? ""] ?? "annet"}${l.clar_source_ref ? `: ${l.clar_source_ref}` : ""}) — opprinnelig: ${priceReasonText(l.snap_price_reason)}`;
   if (l.snap_price_per_base == null) return priceReasonText(l.snap_price_reason);
   const base = l.snap_price_source === "historisk_dokumentert" ? "Historisk dokumentert" : "Dokumentert kostpris";
   return l.snap_price_known_after_valuation ? `${base} (registrert etter verdsettelsesdato)` : base;
@@ -113,17 +122,17 @@ const orderLines = (d: VtReportData) => {
 export function buildReportCsv(d: VtReportData): string {
   const listOf = new Map(d.lists.map(l => [l.id, l]));
   const head = ["Telling", "Status", "Verdsettelsesdato", "Liste", "Avdeling", "Sted", "Varenr", "Vare", "Registrering", "Mengde", "Enhet",
-    "Pris per enhet (NOK eks. mva)", "Priskilde", "Pris virkningsdato", "Pris registrert etter verdsettelsesdato", "Verdi (NOK)", "Merknad", "Linje-ID", "Linjerevisjon"];
+    "Pris per enhet (NOK eks. mva)", "Priskilde", "Pris virkningsdato", "Pris registrert etter verdsettelsesdato", "Verdi (NOK)", "Merknad", "Linje-ID", "Linjerevisjon", "Avklaringsbegrunnelse", "Avklart tidspunkt"];
   const status = isFinal(d.count) ? "Avsluttet" : `Foreløpig ${d.generatedAt}`;
   const rows = orderLines(d).map(l => {
     const list = listOf.get(l.count_list_id); const v = lineValueOre(l);
     const qtyShown = l.state === "talt" || l.state === "null" || (l.state === "ma_kontrolleres" && l.counted_base != null);
     return [d.count.name, status, d.count.valuation_date ?? "", list?.name ?? "", list?.department ?? "", l.snap_location_name ?? "", l.snap_sku ?? "", l.snap_name,
       LINE_STATE_TEXT[l.state], qtyShown && l.counted_base != null ? nbNum(l.counted_base) : "", l.snap_base_unit ?? "ukjent",
-      l.snap_price_per_base == null ? "" : nbNum(l.snap_price_per_base), priceSourceText(l), l.snap_price_effective_date ?? "",
+      effectivePrice(l) == null ? "" : nbNum(effectivePrice(l) ?? 0), priceSourceText(l), isClarified(l) ? "" : l.snap_price_effective_date ?? "",
       l.snap_price_per_base == null ? "" : l.snap_price_known_after_valuation ? "Ja" : "Nei",
       v == null ? (l.state === "talt" ? "UKJENT (mangler pris)" : l.state === "ma_kontrolleres" ? "UKJENT (må kontrolleres)" : "") : krText(v),
-      l.note ?? "", l.id, String(l.revision)];
+      l.note ?? "", l.id, String(l.revision), isClarified(l) ? l.clar_reason ?? "" : "", isClarified(l) ? l.clar_at ?? "" : ""];
   });
   return "\uFEFF" + [head, ...rows].map(r => r.map(csvCell).join(";")).join("\r\n") + "\r\n";
 }
@@ -139,8 +148,10 @@ export function reportBlocks(d: VtReportData): Block[] {
   const g = summarizeGroupsOf(d.lists, d.lines);
   b("Per avdeling", 11, true, 2); for (const x of g.byDepartment) b(`${x.label}: ${summaryText(x.summary)}`);
   b("Per liste", 11, true, 2); for (const x of g.byList) b(`${x.label}: ${summaryText(x.summary)}`);
-  const missing = d.lines.filter(l => l.state === "talt" && l.snap_price_per_base == null);
+  const missing = d.lines.filter(l => l.state === "talt" && effectivePrice(l) == null);
   if (missing.length) { b("Talte varer uten pris (ikke regnet som 0)", 11, true, 2); for (const l of missing) b(`${l.snap_name} — ${l.counted_base == null ? "" : nbNum(l.counted_base)} ${l.snap_base_unit ?? ""} — ${priceReasonText(l.snap_price_reason)}`); }
+  const clar = d.lines.filter(isClarified);
+  if (clar.length) { b("Priser avklart i denne tellingen (opprinnelig grunnlag bevart)", 11, true, 2); for (const l of clar) b(`${l.snap_name} — ${nbNum(l.clar_price_per_base ?? 0)} kr/${l.snap_base_unit ?? ""} — ${priceSourceText(l)} — begrunnelse: ${l.clar_reason ?? ""}`); }
   const late = d.lines.filter(l => l.snap_price_per_base != null && l.snap_price_known_after_valuation);
   if (late.length) { b("Priser registrert etter verdsettelsesdatoen", 11, true, 2); for (const l of late) b(`${l.snap_name} — virkningsdato ${dateNo(l.snap_price_effective_date)}`); }
   const ordered = orderLines(d);
@@ -148,7 +159,7 @@ export function reportBlocks(d: VtReportData): Block[] {
     b(`${list.department} · ${list.name} (malversjon ${list.source_template_revision})`, 11, true, 3);
     for (const l of ordered.filter(x => x.count_list_id === list.id)) {
       const v = lineValueOre(l);
-      b(`${l.snap_sku ?? "—"}  ${l.snap_name}  ·  ${l.snap_location_name ?? "uten sted"}  ·  ${LINE_STATE_TEXT[l.state]}${l.counted_base != null && l.state !== "ikke_talt" && l.state !== "ikke_her" ? ` ${nbNum(l.counted_base)} ${l.snap_base_unit ?? ""}` : ""}  ·  ${l.snap_price_per_base == null ? priceReasonText(l.snap_price_reason) : `${nbNum(l.snap_price_per_base)} kr/${l.snap_base_unit}${l.snap_price_known_after_valuation ? " (registrert etter verdsettelsesdato)" : ""}`}  ·  ${v == null ? "ukjent verdi" : `${krText(v)} kr`}  ·  ID ${l.id}`);
+      b(`${l.snap_sku ?? "—"}  ${l.snap_name}  ·  ${l.snap_location_name ?? "uten sted"}  ·  ${LINE_STATE_TEXT[l.state]}${l.counted_base != null && l.state !== "ikke_talt" && l.state !== "ikke_her" ? ` ${nbNum(l.counted_base)} ${l.snap_base_unit ?? ""}` : ""}  ·  ${effectivePrice(l) == null ? priceReasonText(l.snap_price_reason) : `${nbNum(effectivePrice(l) ?? 0)} kr/${l.snap_base_unit}${isClarified(l) ? " (avklart i tellingen)" : l.snap_price_known_after_valuation ? " (registrert etter verdsettelsesdato)" : ""}`}  ·  ${v == null ? "ukjent verdi" : `${krText(v)} kr`}  ·  ID ${l.id}`);
     }
   }
   return out;
