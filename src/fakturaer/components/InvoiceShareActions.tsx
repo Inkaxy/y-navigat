@@ -1,33 +1,14 @@
 import { useRef, useState } from "react";
-import { FunctionsHttpError } from "@supabase/supabase-js";
 import { Loader2, Mail, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-
-const SENDER = "Henrik@nottero-bakeri.no";
-const MESSAGES: Record<string, string> = {
-  ugyldig_mottaker: "E-postadressen ser ikke gyldig ut.",
-  ingen_tilgang: "Du har ikke tilgang til denne fakturaen.",
-  mangler_original: "Fakturaen har ingen original-PDF.",
-  for_stor: "PDF-en er for stor til å sendes som vedlegg (maks 3 MB).",
-  sending_avvist: "E-posttjenesten avviste sendingen. Ingenting ble sendt.",
-  ukjent_utfall: "Uklart om e-posten ble sendt. Sjekk sendte elementer før du prøver igjen.",
-};
 
 interface Props { invoiceId: string | null; invoiceNumber?: string | null; url: string | null }
 
-/** Skriv ut originalen og send den som vedlegg på e-post. */
-export function InvoiceShareActions({ invoiceId, invoiceNumber, url }: Props) {
+/** Skriv ut originalen, eller lag en ny e-post i brukerens eget e-postprogram (Outlook). Systemet sender ingenting selv. */
+export function InvoiceShareActions({ invoiceNumber, url }: Props) {
   const [printing, setPrinting] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [to, setTo] = useState("");
-  const [msg, setMsg] = useState("");
-  const [sending, setSending] = useState(false);
+  const [busy, setBusy] = useState(false);
   const lock = useRef(false);
 
   const print = async () => {
@@ -50,10 +31,9 @@ export function InvoiceShareActions({ invoiceId, invoiceNumber, url }: Props) {
     } finally { setPrinting(false); }
   };
 
-  /** Lager en ny e-post i brukerens eget e-postprogram (Outlook). Ingenting sendes fra systemet. */
   const openMail = async () => {
     if (!url || lock.current) return;
-    lock.current = true; setSending(true);
+    lock.current = true; setBusy(true);
     const name = `Faktura-${String(invoiceNumber ?? "faktura").replace(/[^\w.-]+/g, "_")}.pdf`;
     const subject = `Faktura ${invoiceNumber ?? ""}`.trim();
     try {
@@ -68,10 +48,10 @@ export function InvoiceShareActions({ invoiceId, invoiceNumber, url }: Props) {
       a.href = obj; a.download = name; document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(obj), 60_000);
       window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent("Hei,\n\nVedlagt følger faktura.\n")}`;
-      toast({ title: "Ny e-post åpnet", description: `Legg ved ${name} fra Nedlastinger.` });
+      toast({ title: "Ny e-post åpnet", description: `Fakturaen er lastet ned som ${name}. Dra den inn i e-posten som vedlegg.` });
     } catch {
       toast({ title: "Kunne ikke hente fakturaen", variant: "destructive" });
-    } finally { lock.current = false; setSending(false); }
+    } finally { lock.current = false; setBusy(false); }
   };
 
   return (
@@ -79,8 +59,8 @@ export function InvoiceShareActions({ invoiceId, invoiceNumber, url }: Props) {
       <Button type="button" size="icon" variant="ghost" className="min-h-[44px] min-w-[44px]" disabled={!url || printing} onClick={() => void print()} aria-label="Skriv ut faktura" title="Skriv ut">
         {printing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
       </Button>
-      <Button type="button" size="icon" variant="ghost" className="min-h-[44px] min-w-[44px]" disabled={!url || sending} onClick={() => void openMail()} aria-label="Lag e-post med fakturaen i Outlook" title="Ny e-post i Outlook">
-        {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+      <Button type="button" size="icon" variant="ghost" className="min-h-[44px] min-w-[44px]" disabled={!url || busy} onClick={() => void openMail()} aria-label="Lag ny e-post med fakturaen" title="Ny e-post i Outlook">
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
       </Button>
     </>
   );
