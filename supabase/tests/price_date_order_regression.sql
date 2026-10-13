@@ -10,13 +10,11 @@ DECLARE
   i_jan uuid; i_mar uuid; i_feb1 uuid; i_feb2 uuid; i_usd uuid; i_oth uuid; i_apr uuid;
   l_mar uuid; l_apr uuid;
   ok boolean;
-  FUNCTION_UNUSED int;
 BEGIN
   INSERT INTO suppliers(legal_entity_id, name) VALUES (le, 'ZZ test lev A') RETURNING id INTO sup;
   INSERT INTO suppliers(legal_entity_id, name) VALUES (le, 'ZZ test lev B') RETURNING id INTO sup2;
   INSERT INTO raw_materials(legal_entity_id, sku, name, base_unit) VALUES (le, 'ZZTEST-DATO', 'ZZ testmel', 'kg') RETURNING id INTO rm;
 
-  CREATE TEMP TABLE _mk(k text, inv uuid, line uuid) ON COMMIT DROP;
 
   -- Hjelper som lager en faktura med én linje (10 kg × pris).
   CREATE OR REPLACE FUNCTION pg_temp.mk(p_le uuid, p_sup uuid, p_rm uuid, p_no text, p_date date, p_price numeric, p_cur text DEFAULT 'NOK')
@@ -114,6 +112,19 @@ BEGIN
   UPDATE invoice_lines SET price_acceptance=NULL, price_reference_source='none', price_reference_date=NULL, requires_review=true, review_reason='no_automatic_basis' WHERE id = l_apr;
   SELECT price_acceptance IS NULL AND requires_review INTO ok FROM invoice_lines WHERE id = l_apr;
   out := out || format('ukjent_gjenapnet(%s);', CASE WHEN ok THEN 'OK' ELSE 'FEIL' END);
+
+  -- (7) Omvendt rekkefølge (jan først, så mar) på en ny vare.
+  INSERT INTO raw_materials(legal_entity_id, sku, name, base_unit) VALUES (le, 'ZZTEST-DATO2', 'ZZ testmel 2', 'kg') RETURNING id INTO rm;
+  i_jan := pg_temp.mk(le, sup, rm, 'T2-JAN', '2026-01-10', 100);
+  i_mar := pg_temp.mk(le, sup, rm, 'T2-MAR', '2026-03-10', 120);
+  PERFORM _rm_reconcile_core(i_jan, NULL, 'manual');
+  ref := rm_price_reference(rm, sup, i_mar, '2026-03-10');
+  out := out || format('B_mar_ref=%s(%s);', ref->>'price', CASE WHEN (ref->>'price')::numeric=100 THEN 'OK' ELSE 'FEIL' END);
+  PERFORM _rm_reconcile_core(i_mar, NULL, 'manual');
+  SELECT current_cost_price INTO cost FROM raw_materials WHERE id = rm;
+  out := out || format('B_kost=%s(%s);', cost, CASE WHEN cost=120 THEN 'OK' ELSE 'FEIL' END);
+  ref := rm_price_reference(rm, sup, i_jan, '2026-01-10');
+  out := out || format('B_jan_ref=%s(%s);', ref->>'source', CASE WHEN ref->>'source'='none' THEN 'OK' ELSE 'FEIL' END);
 
   RAISE EXCEPTION 'RESULT: %', out;
 END $t$;
