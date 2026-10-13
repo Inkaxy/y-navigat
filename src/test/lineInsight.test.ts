@@ -145,3 +145,14 @@ describe("autoritative sperrer vs rådgivning", () => {
     expect(packageGateFromSupplierItem({ base_units_per_package: 40, package_confirmed_at: null })).toBe("missing");
   });
 });
+
+describe("norsk tallvisning i lesefeil", () => {
+  it("formaterer beløp i meldingen, ikke råbeviset", async () => {
+    const { nbAmounts } = await import("@/fakturaer/lib/lineInsight");
+    expect(nbAmounts("Mengde × pris (9777.40) stemmer ikke med linjesummen (6697.50).").replace(/\u00a0|\u202f/g, " ")).toBe("Mengde × pris (9 777,40) stemmer ikke med linjesummen (6 697,50).");
+    expect(nbAmounts("Beløp -20.00").replace(/\u00a0|\u202f/g, " ")).toContain("−20,00".replace("−", "-").length ? "20,00" : "");
+    expect(nbAmounts("varenr 3021, pose 100 g")).toBe("varenr 3021, pose 100 g");
+    const r = lineClarifications(florapan).find((x) => x.id === "read_issue")!;
+    expect(r.detail).not.toMatch(/\d\.\d{2}\b/);
+  });
+});
