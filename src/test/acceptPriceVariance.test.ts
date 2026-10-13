@@ -4,7 +4,7 @@ import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 
 const line = (o: Partial<ReviewLineRow>): ReviewLineRow =>
   ({ id: "l", review_reason: "price_variance", requires_review: true, variance_status: "over", raw_material_id: "rm", match_confidence: "manual",
-     price_per_base_unit: 35.54, expected_price_per_base_unit: 23.82, quantity: 6, invoice: null, ...o }) as unknown as ReviewLineRow;
+     price_per_base_unit: 35.54, expected_price_per_base_unit: 23.82, quantity: 6, unit: "kg", unit_price: 35.54, total_amount: 213.24, invoice: null, ...o }) as unknown as ReviewLineRow;
 
 describe("canAcceptPriceVariance", () => {
   it("rent prisavvik kan godtas", () => expect(canAcceptPriceVariance(line({}))).toBe(true));
@@ -12,4 +12,8 @@ describe("canAcceptPriceVariance", () => {
   it("ikke uten beregnet pris", () => expect(canAcceptPriceVariance(line({ price_per_base_unit: null }))).toBe(false));
   it("ikke med pakningsårsak", () => expect(canAcceptPriceVariance(line({ review_reason: "price_variance,unknown_package_size" }))).toBe(false));
   it("ikke uten årsak", () => expect(canAcceptPriceVariance(line({ review_reason: null }))).toBe(false));
+});
+
+describe("avklaring sperrer godta-pris", () => {
+  it("regnestykke som ikke går opp kan ikke godtas", () => expect(canAcceptPriceVariance(line({ total_amount: 150 }))).toBe(false));
 });
