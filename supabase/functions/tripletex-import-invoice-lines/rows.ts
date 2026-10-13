@@ -97,6 +97,10 @@ export function toInvoiceLineRows(rawLines: unknown, invoiceId: string, ledgerAc
           ...nums.unresolved
             .filter(() => !issuesOf(l.read_issues).some((x) => x.code === "tvetydig_tall"))
             .map((f) => ({ code: "tvetydig_tall", message: `Tvetydig tall i ${f}: kan ikke avgjøres sikkert. Kontroller mot dokumentet.` })),
+          // Samme regel som leseren: ugyldig trykt tallformat (f.eks. feil tusengruppe) erstattes aldri av modelltallet.
+          ...nums.invalid
+            .filter(() => !issuesOf(l.read_issues).some((x) => x.code === "ugyldig_tall"))
+            .map((f) => ({ code: "ugyldig_tall", message: `Ugyldig tallformat i ${f}: tallet er ikke tolket. Les det av originalen.` })),
         ].slice(0, 20),
         evidence: {
           confidence: num(l.confidence),
