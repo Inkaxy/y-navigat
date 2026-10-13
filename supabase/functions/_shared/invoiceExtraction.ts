@@ -126,6 +126,7 @@ export function sanitizeLines(raw: unknown, isCredit = false): ExtractedLine[] {
     };
     out.read_issues = [
       ...nums.unresolved.map((f) => ({ code: "tvetydig_tall", message: `Tvetydig tall i ${FIELD_LABEL[f]} («${nums.evidence.find((e) => e.field === f)?.raw ?? ""}»): kan ikke avgjøres sikkert. Kontroller mot dokumentet.` })),
+      ...nums.invalid.map((f) => ({ code: "ugyldig_tall", message: `Ugyldig tallformat i ${FIELD_LABEL[f]} («${nums.evidence.find((e) => e.field === f)?.raw ?? ""}»), f.eks. feil tusenskille. Tallet er ikke tolket – les det av originalen.` })),
       ...lineReadIssues({
       quantity, unit, unit_price, total_amount, package_size, package_unit, count_per_package,
       unit_price_basis: price_basis, discount_amount, line_kind, is_credit: isCredit,
