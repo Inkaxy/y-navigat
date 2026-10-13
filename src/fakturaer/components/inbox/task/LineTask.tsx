@@ -20,6 +20,8 @@ import { PackageForm } from "@/fakturaer/components/inbox/task/PackageForm";
 import { usePriceGate } from "@/fakturaer/lib/priceGateContext";
 import { PriceCheck } from "@/fakturaer/components/inbox/task/PriceCheck";
 import { OpenSupplierItemButton } from "@/fakturaer/components/supplier-item/OpenSupplierItemButton";
+import { lineClarifications } from "@/fakturaer/lib/lineInsight";
+import { LineInsightPanel } from "@/fakturaer/components/inbox/task/LineInsightPanel";
 import { taskCopy, type TaskMode } from "@/fakturaer/components/inbox/task/taskCopy";
 
 export type SecondaryAction = "create" | "not_rm" | "conflict" | "start_price";
@@ -206,6 +208,13 @@ export function LineTask(p: LineTaskProps) {
     };
   }
 
+  // Motstrid i linjens egne felt sperrer pakning/pris til mennesket har sett på koblingen.
+  const clarifications = lineClarifications(line);
+  const priceHeldByClarification = mode === "price" && clarifications.some((c) => c.blocksPrice);
+  if (p.canWrite && priceHeldByClarification) {
+    primary = { label: "Kontroller råvarekoblingen", run: () => setEditMaterial(true), hint: clarifications[0].detail };
+  }
+
   const rmName = form.selectedRm?.name ?? line.matched_raw_material?.name ?? null;
   const baseUnit = form.selectedRm?.base_unit ?? line.matched_raw_material?.base_unit ?? null;
 
@@ -236,6 +245,7 @@ export function LineTask(p: LineTaskProps) {
             Mengde, pris og linjesum på fakturaen går ikke opp med hverandre. Regnestykket under er en foreløpig tolkning — kontroller mot originalfakturaen.
           </p>
         )}
+        <LineInsightPanel line={line} clarifications={clarifications} />
         {mode !== "done" && <p className="pt-1 text-sm">{missingText}</p>}
         <OpenSupplierItemButton supplierId={line.invoice.supplier_id} line={line} variant="ghost" className="-ml-2 h-7 px-2 text-caption" />
       </header>
@@ -253,7 +263,7 @@ export function LineTask(p: LineTaskProps) {
           </label>
         )}
         {(mode === "price" || mode === "done") && <PriceCheck line={line} link={link} tolerancePct={p.tolerancePct} />}
-        {mode === "price" && p.canWrite && !agreedOpen && (
+        {mode === "price" && p.canWrite && !agreedOpen && !priceHeldByClarification && (
           <p className="flex flex-wrap gap-x-3 gap-y-1 text-caption text-ink-secondary">
             <span>Stemmer ikke prisen?</span>
             {priceAcceptable && (

@@ -116,3 +116,9 @@
 - [x] 0.4 RavarerOversiktPreview + ravarer-oversikt-preview.html.
 - [x] 0.5 Grep-rapport: ingen rester av gamle dialoger, agreed_price-skriving til raw_materials eller forbudt primary_supplier_id-insert.
 - [x] 1–7 Ny Oversikt med Header/KPI/Til deg/Aktivitet/Prisbevegelser/Datakvalitet.
+
+## Fakturahåndtering – ny versjon (13.10.2026)
+- [x] Tolkning per linje: pakning fra tekst (forslag), linjetype, motstrid (Florapan), lesekontroll for kollipris/rabatt/kreditfortegn
+- [x] Inntil tre forslag med serverens egen begrunnelse i linjeoppgaven
+- [ ] Samlet arbeidsbord (sikre treff/avklaringer/behandlet, tellinger med enhet) — ikke bygget ennå
+- [ ] Ny-matching 401 (rm_rematch_tick ↔ match-invoice-lines) — blokkert: live-kilde kan ikke hentes herfra
