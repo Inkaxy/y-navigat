@@ -39,6 +39,12 @@ export interface InsightLine {
   line_kind?: string | null;
   invoice?: { is_credit_note: boolean | null } | null;
   matched_raw_material?: { name: string; category: string | null; item_type?: string | null; base_unit?: string | null } | null;
+  /**
+   * Autoritativ pakningsstatus fra eksisterende kontroller: "safe" = bekreftet leverandørpakning
+   * eller serveren har ikke flagget pakningen; "missing" = serveren/leverandørvaren mangler pakning.
+   * Ukjent (udefinert) gjør en tekstmistanke til rådgivning, aldri til en ny prissperre.
+   */
+  package_gate?: "safe" | "missing" | null;
   suggestions?: Array<{ raw_material_id: string; confidence: number; match_reason: string | null; rank: number; raw_material: { name: string } | null }>;
 }
 
@@ -97,7 +103,7 @@ export function packageFromText(description: string | null | undefined): TextPac
 
 const round = (n: number) => Math.round(n * 1e6) / 1e6;
 
-const FEE = /\b(frakt|fraktgebyr|porto|gebyr|ekspedisjons|emballasjegebyr|pant|palle(?:leie)?|leveringstillegg|miljøgebyr|drivstoff|toll)\w*/i;
+const FEE = /\b(frakt|fraktgebyr|porto|gebyr|ekspedisjons|emballasjegebyr|pant|palleleie|pallepant|pallegebyr|leveringstillegg|miljøgebyr|drivstoff|toll)\w*/i;
 const DISCOUNT = /(rabatt|bonus|kreditt|kredit|godtgjørelse|returnert|retur)\w*/i;
 
 export interface KindGuess { kind: LineKind; reason: string }
@@ -126,7 +132,11 @@ export interface Clarification {
   detail: string;
   /** Hva som løser årsaken: les originalen/rett lesingen, kontroller varekoblingen eller pakningen. */
   action: ClarificationAction;
-  /** Sperrer pris-handlinger til avklart. */
+  /**
+   * Sperrer pris-handlinger til avklart. Bare autoritative grunnlag sperrer: delt lesekontroll
+   * (samme regel som serveren) og pakning som eksisterende kontroll sier mangler. Tekstmistanker
+   * er rådgivning (false) og kan aldri bli en ny skjult kontrollplikt.
+   */
   blocksPrice: boolean;
 }
 
@@ -158,7 +168,8 @@ export function lineClarifications(l: InsightLine): Clarification[] {
       title: `Fakturert per ${l.unit}, men varen telles i stk`,
       detail: `«${rm.name}» er registrert per stk, men linjen er fakturert i ${l.unit}${pkg ? ` og teksten sier «${pkg.raw}»` : ""}. Antall stk per ${l.unit} er ikke dokumentert — bekreft pakningen eller kontroller varekoblingen.`,
       action: pkg && pkg.count == null && MEASURE_UNITS.has(unit) ? "varekobling" : "pakning",
-      blocksPrice: true,
+      // Bekreftet leverandørpakning løser motstriden; da er dette bare et råd.
+      blocksPrice: l.package_gate === "missing",
     });
   }
 
@@ -176,15 +187,26 @@ export function lineClarifications(l: InsightLine): Clarification[] {
     out.push({ id: "read_issue", title: "Tallene på linjen må kontrolleres mot originalen", detail, action: "original", blocksPrice: true });
   }
   if (credit && (l.total_amount ?? 0) > 0) {
-    out.push({ id: "credit_sign", title: "Positivt beløp på kreditnota", detail: "Kontroller fortegnet mot originalen. Beløpet endres ikke automatisk.", action: "original", blocksPrice: true });
+    out.push({ id: "credit_sign", title: "Positivt beløp på kreditnota", detail: "Kontroller fortegnet mot originalen. Beløpet endres ikke automatisk.", action: "original", blocksPrice: false });
   }
   if (rm && FEE.test(l.description ?? "")) {
-    out.push({ id: "fee_linked_as_item", title: "Gebyrlinje er koblet til en vare", detail: `Teksten ser ut som frakt/gebyr/pant, men er koblet til «${rm.name}». Vurder å merke den som ikke-råvare.`, action: "varekobling", blocksPrice: true });
+    out.push({ id: "fee_linked_as_item", title: "Gebyrlinje er koblet til en vare", detail: `Teksten ser ut som frakt/gebyr/pant, men er koblet til «${rm.name}». Er det en vare (f.eks. paller som kjøpes), kan du se bort fra dette rådet — originalteksten endres ikke.`, action: "varekobling", blocksPrice: false });
   }
   return out;
 }
 
 /** Sant når linjen har en åpen avklaring som sperrer prishandlinger. */
+/** Pakningsstatus fra serverens årsakskoder i køen (eksisterende pakningskontroll). */
+export function packageGateFromReview(reviewReason: string | null | undefined): "safe" | "missing" {
+  return (reviewReason ?? "").includes("unknown_package_size") ? "missing" : "safe";
+}
+
+/** Pakningsstatus fra leverandørvaren: bekreftet pakning med innhold er trygg. */
+export function packageGateFromSupplierItem(i: { base_units_per_package: number | null; package_confirmed_at: string | null } | null | undefined): "safe" | "missing" | null {
+  if (!i) return null;
+  return i.base_units_per_package != null && i.base_units_per_package > 0 && i.package_confirmed_at ? "safe" : "missing";
+}
+
 export function priceHeldByClarification(l: InsightLine): Clarification | null {
   return lineClarifications(l).find((c) => c.blocksPrice) ?? null;
 }

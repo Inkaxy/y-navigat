@@ -20,7 +20,7 @@ import { PackageForm } from "@/fakturaer/components/inbox/task/PackageForm";
 import { usePriceGate } from "@/fakturaer/lib/priceGateContext";
 import { PriceCheck } from "@/fakturaer/components/inbox/task/PriceCheck";
 import { OpenSupplierItemButton } from "@/fakturaer/components/supplier-item/OpenSupplierItemButton";
-import { lineClarifications } from "@/fakturaer/lib/lineInsight";
+import { lineClarifications, packageGateFromReview } from "@/fakturaer/lib/lineInsight";
 import { LineInsightPanel } from "@/fakturaer/components/inbox/task/LineInsightPanel";
 import { taskCopy, type TaskMode } from "@/fakturaer/components/inbox/task/taskCopy";
 
@@ -209,7 +209,7 @@ export function LineTask(p: LineTaskProps) {
   }
 
   // Motstrid i linjens egne felt sperrer prisen. Hovedhandlingen løser den faktiske årsaken.
-  const clarifications = lineClarifications(line);
+  const clarifications = lineClarifications({ ...line, package_gate: packageGateFromReview(line.review_reason) });
   const heldBy = mode === "price" ? clarifications.find((c) => c.blocksPrice) ?? null : null;
   const priceHeldByClarification = heldBy != null;
   if (p.canWrite && heldBy) {
