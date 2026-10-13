@@ -69,7 +69,7 @@ export function PriceMoversView({ data, period, onPeriodChange, loading }: Price
   const print = () => {
     const ok = printPriceMovers([...normal, ...suspicious], {
       title: supplierName ? `Prisliste — ${supplierName}` : "Prisbevegelser",
-      subtitle: `Siste ${period} dager${dir !== "alle" ? ` · bare prisøkninger`.replace("økninger", dir === "opp" ? "økninger" : "fall") : ""}${q.trim() ? ` · søk «${q.trim()}»` : ""}`,
+      subtitle: `Siste ${period} dager${dir === "opp" ? " · bare prisøkninger" : dir === "ned" ? " · bare prisfall" : ""}${q.trim() ? ` · søk «${q.trim()}»` : ""}`,
     });
     if (!ok) toast({ title: "Utskriftsvinduet ble blokkert", description: "Tillat sprettoppvinduer for å skrive ut.", variant: "destructive" });
   };
@@ -123,7 +123,7 @@ export function PriceMoversView({ data, period, onPeriodChange, loading }: Price
         <p className="p-5 text-sm text-ink-secondary">Ingen treff for valgt søk eller filter.</p>
       )}
 
-      {!loading && items.length === 0 && (
+      {!loading && all.length === 0 && (
         <p className="p-5 text-sm text-ink-secondary">Ingen prisendringer i perioden.</p>
       )}
 
