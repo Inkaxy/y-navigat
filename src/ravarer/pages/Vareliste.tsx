@@ -22,7 +22,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Columns3, Search, SlidersHorizontal, X } from "lucide-react";
+import { Columns3, Printer, Search, SlidersHorizontal, X } from "lucide-react";
+import { printPriceList } from "@/ravarer/pages/varer/printPriceList";
 import { toast } from "sonner";
 
 import { RavarerHeaderBanner, NewRawMaterialButton } from "@/ravarer/components/RavarerHeaderBanner";
