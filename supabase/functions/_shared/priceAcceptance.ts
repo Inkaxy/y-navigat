@@ -20,11 +20,36 @@ export function reconcileAcceptance(
   rawMaterialId: string | null,
   /** Leverandørkoblingen motoren brukte som pakningskilde nå (null = ingen entydig). */
   rmsRow: AnyRec | null = null,
+  /** Fakturadato (ISO); grunnlaget må ligge før den. */
+  invoiceDate: string | null = null,
 ): void {
   const acc = line.price_acceptance as AnyRec | null;
   if (!acc) return;
   const unitNow = target.unit ?? line.unit;
-  const identical =
+  const ownBasis =
+    same(acc.raw_material_id, rawMaterialId) &&
+    round4(acc.quantity) === round4(line.quantity) &&
+    same(normalizeUnit(acc.unit), normalizeUnit(unitNow)) &&
+    round4(acc.unit_price) === round4(line.unit_price) &&
+    round4(acc.total_amount) === round4(line.total_amount) &&
+    round4(acc.base_quantity) === round4(target.base_quantity) &&
+    round4(acc.package_size) === round4(line.package_size) &&
+    same(normalizeUnit(acc.package_unit), normalizeUnit(line.package_unit)) &&
+    round4(acc.count_per_package) === round4(line.count_per_package) &&
+    same(acc.rms_id, rmsRow?.id ?? null) &&
+    (acc.rms_package == null) === (rmsRow == null) &&
+    (rmsRow == null || packageSignature(acc.rms_package ?? {}) === packageSignature(rmsRow)) &&
+    round4(acc.price_per_base_unit) === round4(target.price_per_base_unit);
+  // Samme regel som databasetriggeren `_rm_retain_price_acceptance`: et nyere,
+  // fortsatt tidligere «forrige kjøp» (f.eks. en eldre faktura behandlet senere)
+  // gjenåpner ikke en godtatt, uendret linje. Avtale/startpris/ukjent gjør det.
+  const accDate = acc.price_reference_date ? String(acc.price_reference_date).slice(0, 10) : null;
+  const newDate = target.price_reference_date ? String(target.price_reference_date).slice(0, 10) : null;
+  const movedLastPurchase = ownBasis &&
+    acc.price_reference_source === "last_purchase" && target.price_reference_source === "last_purchase" &&
+    !!accDate && !!newDate && newDate >= accDate &&
+    (!invoiceDate || newDate < invoiceDate);
+  const identical = movedLastPurchase || (
     same(acc.raw_material_id, rawMaterialId) &&
     round4(acc.quantity) === round4(line.quantity) &&
     same(normalizeUnit(acc.unit), normalizeUnit(unitNow)) &&
@@ -41,7 +66,7 @@ export function reconcileAcceptance(
     round4(acc.expected_price_per_base_unit) === round4(target.expected_price_per_base_unit) &&
     same(acc.price_reference_source, target.price_reference_source) &&
     same(acc.price_reference_id, target.price_reference_id) &&
-    same(acc.price_reference_date, target.price_reference_date);
+    same(acc.price_reference_date, target.price_reference_date));
   if (!identical) {
     target.price_acceptance = null;
     return;
