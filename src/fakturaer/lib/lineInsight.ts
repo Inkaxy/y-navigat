@@ -232,3 +232,32 @@ export function rankedSuggestions(l: InsightLine, max = 3): RankedSuggestion[] {
       matchScorePct: Number.isFinite(s.confidence) ? Math.round(s.confidence * 100) : null,
     }));
 }
+
+/** Linjeinnsikt for en ekte leverandørvarelinje (varekortet). Bare lesing — ingenting lagres. */
+export function insightLineFromSupplierItem(
+  item: { rm_name: string | null; rm_category: string | null; rm_base_unit: string | null; rm_id: string | null; base_units_per_package: number | null; package_confirmed_at: string | null },
+  l: { description: string | null; quantity: number | null; unit: string | null; unit_price: number | null; total_amount: number | null; package_size: number | null; package_unit: string | null; count_per_package: number | null; line_kind: string | null; is_credit_note: boolean | null },
+): InsightLine {
+  return {
+    description: l.description, quantity: l.quantity, unit: l.unit, unit_price: l.unit_price, total_amount: l.total_amount,
+    package_size: l.package_size, package_unit: l.package_unit, count_per_package: l.count_per_package, line_kind: l.line_kind,
+    invoice: { is_credit_note: l.is_credit_note },
+    matched_raw_material: item.rm_id ? { name: item.rm_name ?? "Råvare", category: item.rm_category, base_unit: item.rm_base_unit } : null,
+    package_gate: packageGateFromSupplierItem(item),
+  };
+}
+
+/**
+ * Pakningsforslaget er ikke dokumentert når varen telles i stk og varenavnet bare har en
+ * vekt/volum-etikett uten antall (f.eks. «pose 100 g» fakturert per sekk). Da gir verken
+ * etiketten eller et stk-regnestykke antall stk per pakning — forslaget vises som ukjent.
+ */
+export function textOnlyCountUnsupported(
+  inf: { direct: boolean; suggested_bupp: number | null } | null | undefined,
+  baseUnit: string | null | undefined,
+  description: string | null | undefined,
+): boolean {
+  if (!inf || inf.direct || (baseUnit ?? "").toLowerCase() !== "stk" || inf.suggested_bupp == null) return false;
+  const pkg = packageFromText(description);
+  return !pkg || pkg.count == null;
+}

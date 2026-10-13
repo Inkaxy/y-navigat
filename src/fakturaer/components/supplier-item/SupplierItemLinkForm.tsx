@@ -10,6 +10,7 @@ import { PackageBlock } from "./PackageBlock";
 import { LinkResultBox } from "./LinkResultBox";
 import { useConfirmMany } from "@/ravarer/ui/useConfirmMany";
 import { AiSuggestion } from "./AiSuggestion";
+import { textOnlyCountUnsupported } from "@/fakturaer/lib/lineInsight";
 import { RawMaterialCreateSheet } from "@/ravarer/editors/RawMaterialCreateSheet";
 import { NOT_ITEM_REASONS, nameFromDescription, needsPackage, openScope, suggestedBaseUnit } from "@/fakturaer/lib/linkFormLogic";
 import { parseDecimal } from "@/fakturaer/lib/units";
@@ -60,7 +61,11 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
   const { suggestions, results } = useMaterialChoices(item.rm_id ? null : refLineId, search);
   const selected = useMaterialById(mode === "existing" ? selectedId : null);
   const baseUnit = mode === "new" ? draft.baseUnit : selected.data?.base_unit ?? null;
-  const inference = usePackageInference(refLineId, baseUnit);
+  const inferenceQ = usePackageInference(refLineId, baseUnit);
+  // En vektetikett alene («pose 100 g») dokumenterer ikke antall stk per pakning: vis ukjent, ikke et fabrikert tall.
+  const textOnly = textOnlyCountUnsupported(inferenceQ.data, baseUnit, refLine?.description ?? item.description);
+  const inference = { ...inferenceQ, data: inferenceQ.data && textOnly ? { ...inferenceQ.data, suggested_bupp: null, agrees: false, auto_confirmable: false, source: null,
+    explanation: `Ukjent antall: varenavnet oppgir vekt/volum, ikke hvor mange stk som er i én ${refLine?.unit ?? "pakning"}. Les antallet av originalen eller leverandørens pakning.` } : inferenceQ.data };
   const baseGuess = usePackageInference(mode === "new" ? refLineId : null, null);
 
   // Grunnenhet for ny råvare forhåndsvelges fra varenavnet.

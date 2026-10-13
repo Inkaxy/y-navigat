@@ -11,7 +11,7 @@ export interface StatusEntry {
   label: string;
   count: number | null;
   unit: CountUnit;
-  /** Gruppefilter i arbeidsbordet (serverens første blokkering). */
+  /** Gruppefilter i arbeidsbordet (serverens køkategori, ikke nødvendigvis første blokkering). */
   group?: WorkGroup;
   /** Ellers lenke til eksisterende liste. */
   href?: string;
@@ -45,7 +45,7 @@ export function statusTiles(counts: WorkItemsCounts | undefined, summary: WorkSu
     {
       id: "klar",
       title: "Prisendringer å vurdere",
-      explain: "Grunnlaget er lest — du vurderer hver endring. Ingenting godkjennes automatisk.",
+      explain: "Registrerte prisavvik. Åpne kortet for å se hva som må avklares før prisen kan vurderes.",
       entries: [
         { label: "Prisendringer å vurdere", count: c("pris"), unit: "varekort", group: "pris" },
         { label: "Klare til avstemming", count: c("faktura_klar"), unit: "fakturaer", href: "/ravarer/priskontroll?fane=fakturaer&visning=klar" },
