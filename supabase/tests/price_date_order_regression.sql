@@ -63,7 +63,8 @@ BEGIN
   ref := rm_price_reference(rm, sup, NULL, '2026-02-10');
   out := out || format('feb_samme_dag=%s(%s);', ref->>'price', CASE WHEN (ref->>'price')::numeric=100 THEN 'OK' ELSE 'FEIL' END);
   SELECT current_cost_price INTO cost FROM raw_materials WHERE id = rm;
-  out := out || format('kost_fortsatt_mar=%s(%s);', cost, CASE WHEN cost=120 THEN 'OK' ELSE 'FEIL' END);
+  -- April (150) er nyeste fakturadato (betrodd linje) og skal vinne; feb-godkjenning senker den ikke.
+  out := out || format('kost_nyeste_dato=%s(%s);', cost, CASE WHEN cost=150 THEN 'OK' ELSE 'FEIL' END);
 
   -- (4) Annen leverandør og valuta brukes ikke.
   ref := rm_price_reference(rm, sup2, NULL, '2026-12-31');
