@@ -22,7 +22,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Columns3, Search, SlidersHorizontal, X } from "lucide-react";
+import { Columns3, Printer, Search, SlidersHorizontal, X } from "lucide-react";
+import { printPriceList } from "@/ravarer/pages/varer/printPriceList";
 import { toast } from "sonner";
 
 import { RavarerHeaderBanner, NewRawMaterialButton } from "@/ravarer/components/RavarerHeaderBanner";
@@ -521,6 +522,20 @@ export default function VarelistePage({ liste, onActiveChange, activeId = null }
             <span className="text-sm text-muted-foreground">
               {filtered.length} av {items.length}
             </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={isLoading || filtered.length === 0}
+              onClick={() => {
+                const names = new Set(filtered.map((i) => i.supplierName ?? ""));
+                const one = names.size === 1 ? [...names][0] : "";
+                const title = one ? `Prisliste – ${one}` : q ? `Prisliste – søk «${q}»` : "Prisliste – råvarer";
+                if (!printPriceList(filtered, title)) toast.error("Tillat sprettoppvinduer for å skrive ut.");
+              }}
+            >
+              <Printer className="h-4 w-4" aria-hidden="true" />Skriv ut prisliste
+            </Button>
             <PriceEvidenceStatus
               state={priceEvidence}
               controlCount={controlCount}
