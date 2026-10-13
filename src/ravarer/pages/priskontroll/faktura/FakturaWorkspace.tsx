@@ -24,7 +24,7 @@ import { FakturaerDialogs, type DialogState } from "@/ravarer/pages/priskontroll
 import { fakturaReturn, readReturnParam } from "@/ravarer/pages/priskontroll/fakturaer/visning";
 import { ControlSummary } from "./ControlSummary";
 import { FocusNotice } from "./FocusNotice";
-import { FOCUS_PARAM, parseFocus } from "@/ravarer/pages/priskontroll/gjore/clarifyTarget";
+import { FOCUS_PARAM, opensLineSheetForFocus, parseFocus } from "@/ravarer/pages/priskontroll/gjore/clarifyTarget";
 import { SumOverrideDialog } from "./SumOverrideDialog";
 import { recheckInvoiceLinesSum } from "@/fakturaer/lib/linesSum";
 import { supabase } from "@/integrations/supabase/client";
@@ -171,7 +171,8 @@ export default function FakturaWorkspace() {
       q.setOnlyOpen(false);
       q.setReason("all");
       setPendingFocus(targetLine);
-      setInspectorOpen(true);
+      // Linjen velges, men ved kreditnota-fokus skal «Koble til opprinnelig faktura» være synlig.
+      if (opensLineSheetForFocus(focus)) setInspectorOpen(true);
       setZone("linjer");
       setLineNotice(null);
       setSuppressActive(false);

@@ -89,3 +89,6 @@ export function clarifySummary(blocked: Pick<ClarifyLine, "reason" | "action">[]
   for (const b of blocked) { const k = clarifyKind(b); m.set(k, (m.get(k) ?? 0) + 1); }
   return [...m.entries()].map(([k, n]) => `${n} ${CLARIFY_GROUP[k]}`).join(" · ");
 }
+
+/** Fakturanivå-fokus (kreditnota) har handlingen i fokusoverskriften — linjearket skal ikke dekke den. */
+export const opensLineSheetForFocus = (f: FocusKind | null): boolean => f !== "kreditnota";

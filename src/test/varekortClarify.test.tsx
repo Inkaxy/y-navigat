@@ -179,4 +179,9 @@ describe("fokus på fakturasiden", () => {
     expect(n).toBe(1);
     expect(screen.queryByRole("link", { name: /varekort/i })).toBeNull();
   });
+  it("kreditnota-fokus åpner ikke linjearket over fokusoverskriften; andre fokus gjør", async () => {
+    const { opensLineSheetForFocus } = await import("@/ravarer/pages/priskontroll/gjore/clarifyTarget");
+    expect(opensLineSheetForFocus("kreditnota")).toBe(false);
+    for (const f of ["prisgrunnlag", "lesing", "sum", null] as const) expect(opensLineSheetForFocus(f)).toBe(true);
+  });
 });
