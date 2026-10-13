@@ -66,7 +66,7 @@ export function clarifyReturn(pathname: string, search: string): string | null {
 export function clarifyHref(b: ClarifyLine, ret: string | null): string | null {
   const k = clarifyKind(b);
   if (k === "pakning" || k === "status") return null;
-  return paths.faktura(b.invoice_id, { linje: b.id, [FOCUS_PARAM]: k === "faktura" ? null : k, [RETURN_PARAM]: ret });
+  return paths.faktura(b.invoice_id, { linje: k === "sum" ? null : b.id, [FOCUS_PARAM]: k === "faktura" ? null : k, [RETURN_PARAM]: ret });
 }
 
 const validDate = (d: string | null) => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d);
