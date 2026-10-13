@@ -28,6 +28,7 @@ const DATA: Record<string, ReturnType<typeof mk>> = {
   B: mk("B", "Vare Beta", "Beta kartong 250g", "krt"),
 };
 
+vi.mock("@/ravarer/pages/priskontroll/arbeidsbord/OriginalPane", () => ({ OriginalPane: () => null }));
 vi.mock("@/hooks/useCompany", () => ({ useCompany: () => ({ data: { id: "c1" } }) }));
 vi.mock("@/fakturaer/hooks/useInvoiceRights", () => ({ useInvoiceRights: () => ({ canWrite: true }) }));
 vi.mock("@/fakturaer/hooks/useSupplierItems", () => ({
@@ -63,6 +64,7 @@ describe("arbeidsbordets beslutningspanel nullstilles per kort", async () => {
     expect(screen.getAllByText(/Vare Alfa/).length).toBeGreaterThan(0);
     expect(screen.getByText(/Fakturert per sekk/)).toBeTruthy();
     const a = pkgInput();
+    expect(a).toBeTruthy();
     if (a) fireEvent.change(a, { target: { value: "12" } });
 
     // Samme kort, annet original-linjevalg: utkastet beholdes.
