@@ -66,6 +66,8 @@ export function clarificationGate(l: SupplierItemLine, item?: Pick<SupplierItem,
     description: l.description, quantity: l.quantity, unit: l.unit, unit_price: l.unit_price, total_amount: l.total_amount,
     package_size: l.package_size, package_unit: l.package_unit, count_per_package: l.count_per_package,
     invoice: { is_credit_note: l.is_credit_note }, package_gate: packageGateFromSupplierItem(item),
+    // Leverandørvarelinjen mangler prisgrunnlag/rabatt: bare serverens lesevarsel sperrer, ikke eget regnestykke.
+    arithmetic_context: "incomplete", server_review_reason: l.review_reason,
   });
   return c ? { ok: false, reason: c.id, action: "review_reading", label: c.title, detail: c.detail } : null;
 }
