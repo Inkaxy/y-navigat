@@ -127,19 +127,14 @@ export function ArbeidsbordView(p: ArbeidsbordViewProps) {
   );
 
   const detailHeader = sel && (
-    <header className="flex flex-wrap items-start gap-2 rounded-xl border border-line-subtle bg-card px-3 py-2">
-      {!wide && (
-        <Button variant="ghost" size="sm" className="min-h-[44px] gap-1" onClick={() => select(null, false)}>
-          <ChevronLeft className="h-4 w-4" aria-hidden /> Til listen
-        </Button>
-      )}
-      <div className="min-w-0 flex-1">
-        <p className="text-caption text-ink-secondary">{idx + 1} av {p.items.length} lastet · {sel.supplier_name ?? "Ukjent leverandør"}</p>
-        <h2 className="truncate font-serif text-lg leading-tight">{sel.title}</h2>
-        {/* Hovedårsaken vises én gang; panelet under har selve handlingen. */}
-        <p className="text-sm"><span className="font-medium">{causeText(sel)}</span><span className="text-ink-secondary"> · Neste: {nextActionText(sel)}</span></p>
-      </div>
-      <div className="flex items-center gap-1">
+    <header className="space-y-1 rounded-xl border border-line-subtle bg-card px-3 py-2">
+      <div className="flex flex-wrap items-center gap-1">
+        {!wide && (
+          <Button variant="ghost" size="sm" className="min-h-[44px] gap-1 px-2" onClick={() => select(null, false)}>
+            <ChevronLeft className="h-4 w-4" aria-hidden /> Til listen
+          </Button>
+        )}
+        <span className="mr-auto text-caption tabular-nums text-ink-secondary">{idx + 1} av {p.items.length} lastet</span>
         <Button variant="ghost" size="icon" className="h-11 w-11" aria-label="Forrige" disabled={idx <= 0} onClick={prev}><ChevronLeft className="h-4 w-4" /></Button>
         <Button variant="ghost" size="icon" className="h-11 w-11" aria-label="Neste" disabled={idx >= p.items.length - 1} onClick={next}><ChevronRight className="h-4 w-4" /></Button>
         {wide && (
@@ -149,7 +144,7 @@ export function ArbeidsbordView(p: ArbeidsbordViewProps) {
         )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="min-h-[44px] gap-1.5" aria-label="Flere valg"><MoreHorizontal className="h-4 w-4" /> Flere valg</Button>
+            <Button variant="ghost" size="sm" className="min-h-[44px] gap-1.5"><MoreHorizontal className="h-4 w-4" aria-hidden /> Flere valg</Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem asChild><Link to={p.fullHref(sel)}>Åpne på egen side</Link></DropdownMenuItem>
@@ -158,6 +153,10 @@ export function ArbeidsbordView(p: ArbeidsbordViewProps) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      <p className="text-caption text-ink-secondary">{sel.supplier_name ?? "Ukjent leverandør"}</p>
+      <h2 className="font-serif text-lg leading-tight">{sel.title}</h2>
+      {/* Hovedårsaken vises én gang; panelet under har selve handlingen. */}
+      <p className="text-sm"><span className="font-medium">{causeText(sel)}</span><span className="text-ink-secondary"> · Neste: {nextActionText(sel)}</span></p>
     </header>
   );
 
@@ -166,7 +165,7 @@ export function ArbeidsbordView(p: ArbeidsbordViewProps) {
 
   return (
     <div className="space-y-3 px-page pb-6">
-      <StatusOversikt tiles={statusTiles(p.counts, p.summary)} active={prm.gruppe} onGroup={pickGroup} />
+      {(wide || !sel) && <StatusOversikt tiles={statusTiles(p.counts, p.summary)} active={prm.gruppe} onGroup={pickGroup} />}
       {(wide || !sel) && toolbar}
       {wide ? (
         <div className={cn("grid gap-3", sel ? (showOriginal ? "grid-cols-[300px_minmax(0,1fr)_minmax(0,1fr)] 2xl:grid-cols-[340px_minmax(0,1fr)_minmax(0,1fr)]" : "grid-cols-[340px_minmax(0,1fr)]") : "grid-cols-[minmax(0,1fr)_320px]")}>
