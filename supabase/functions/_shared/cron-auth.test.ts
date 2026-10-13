@@ -40,3 +40,24 @@ Deno.test("authorizeCron: for kort secret avvises uten RPC-kall", async () => {
   const result = await authorizeCron(req, fakeAdmin("kort"));
   assertEquals(result, null);
 });
+
+Deno.test("authorizeCron: tom secret og tom bearer avvises", async () => {
+  Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "service-key-123");
+  const req = new Request("https://x", { headers: { "X-Cron-Secret": "", Authorization: "Bearer " } });
+  assertEquals(await authorizeCron(req, fakeAdmin("")), null);
+});
+
+Deno.test("authorizeCron: databasefeil i verify_cron_secret avvises", async () => {
+  Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "service-key-123");
+  const admin = {
+    rpc: () => Promise.resolve({ data: true, error: { message: "db nede" } }),
+  } as Parameters<typeof authorizeCron>[1];
+  const req = new Request("https://x", { headers: { "X-Cron-Secret": "hemmelig-cron-secret-1234" } });
+  assertEquals(await authorizeCron(req, admin), null);
+});
+
+Deno.test("authorizeCron: bruker-JWT gir ikke tjenestetilgang", async () => {
+  Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "service-key-123");
+  const req = new Request("https://x", { headers: { Authorization: "Bearer eyJ.bruker.jwt" } });
+  assertEquals(await authorizeCron(req, fakeAdmin("hemmelig-cron-secret-1234")), null);
+});
