@@ -127,7 +127,7 @@ export function ArbeidsbordView(p: ArbeidsbordViewProps) {
   const list = (
     <QueryState isLoading={false} isError={p.isError} error={p.error} scope="ravarer:arbeidsbord" onRetry={p.onRetry}>
       <WorkListView items={p.items} total={p.total} selectedKey={prm.valgt} loading={p.loading} fetchingMore={p.fetchingMore}
-        onSelect={(it) => select(it.key)} onMore={p.onMore} />
+        onSelect={(it) => select(it.key)} onMore={p.onMore} compact={!!sel && wide} />
     </QueryState>
   );
 

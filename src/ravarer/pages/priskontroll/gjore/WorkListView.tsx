@@ -56,10 +56,32 @@ type Props = {
   /** Masseutvalg (varekort på tvers av fakturaer). Avkrysning ligger ved siden av radknappen. */
   checked?: ReadonlySet<string>;
   onToggle?: (it: WorkItem, on: boolean) => void;
+  /** Smalt sidepanel (arbeidsbordet med valgt element): stablet rad med fullt navn. Styres av panelet, ikke av skjermbredden. */
+  compact?: boolean;
 };
 
+/** Kompakt stablet rad: navn over 1–2 linjer, leverandør/dato, årsak → handling én gang, prisvirkning egen linje. */
+function CompactRow({ it }: { it: WorkItem }) {
+  const meta = labelFor(WORK_KIND_LABELS, it.kind, "Oppgave");
+  const e = workEffect(it);
+  const sub = [it.supplier_name ?? "Ukjent leverandør", it.last_date ? formatDate(it.last_date) : null].filter(Boolean).join(" · ");
+  return (
+    <div className="min-w-0 flex-1 space-y-1">
+      <StatusPill label={meta.label} tokenVar={meta.tokenVar} />
+      <p className="line-clamp-2 break-words text-sm font-medium text-foreground" title={it.title}>{it.title}</p>
+      <p className="truncate text-caption text-ink-secondary" title={rowSubtitle(it)}>{sub}</p>
+      <p className="text-caption"><span className="text-ink-secondary">{causeText(it)}</span> <span className="font-medium text-primary">→ {nextActionText(it)}</span></p>
+      {e.kind !== "none" && (
+        <p className={cn("text-caption tabular-nums", e.kind === "read" ? "text-warning" : "text-ink-secondary")}>
+          {e.label}{e.kind === "verified" ? `: ${unsignedKr(e.value)}` : ""}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** Prioritert liste: varekort og fakturasaker med årsak, neste handling og ærlig kronevirkning. */
-export function WorkListView({ items, total, selectedKey, loading, fetchingMore, onSelect, onMore, checked, onToggle }: Props) {
+export function WorkListView({ items, total, selectedKey, loading, fetchingMore, onSelect, onMore, checked, onToggle, compact = false }: Props) {
   if (loading) {
     return (
       <div className="space-y-2" aria-busy="true" aria-label="Laster listen">
@@ -93,12 +115,14 @@ export function WorkListView({ items, total, selectedKey, loading, fetchingMore,
               <button
                 type="button"
                 data-key={it.key}
+                aria-label={compact ? `${it.title}. ${rowSubtitle(it)}. ${causeText(it)}. ${nextActionText(it)}` : undefined}
                 onClick={() => onSelect(it)}
                 className={cn(
                   "relative flex w-full items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/50",
                   active && "bg-primary/5 before:absolute before:inset-y-0 before:left-0 before:w-[2px] before:bg-primary",
                 )}
               >
+                {compact ? <CompactRow it={it} /> : <>
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex min-w-0 items-center gap-2">
                     <StatusPill label={meta.label} tokenVar={meta.tokenVar} />
@@ -114,6 +138,7 @@ export function WorkListView({ items, total, selectedKey, loading, fetchingMore,
                   <MobileEffect it={it} />
                 </div>
                 <EffectCell it={it} />
+                </>}
               </button>
             </li>
           );
