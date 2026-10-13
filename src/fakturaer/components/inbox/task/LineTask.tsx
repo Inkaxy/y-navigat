@@ -210,9 +210,8 @@ export function LineTask(p: LineTaskProps) {
 
   // Motstrid i linjens egne felt sperrer pakning/pris til mennesket har sett på koblingen.
   const clarifications = lineClarifications(line);
-  const pieceConflict = clarifications.some((c) => c.id === "text_weight_vs_piece");
   const priceHeldByClarification = mode === "price" && clarifications.some((c) => c.blocksPrice);
-  if (p.canWrite && ((mode === "package" && pieceConflict) || priceHeldByClarification)) {
+  if (p.canWrite && priceHeldByClarification) {
     primary = { label: "Kontroller råvarekoblingen", run: () => setEditMaterial(true), hint: clarifications[0].detail };
   }
 

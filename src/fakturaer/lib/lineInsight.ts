@@ -115,7 +115,7 @@ export function lineClarifications(l: InsightLine): Clarification[] {
   const pkg = packageFromText(l.description);
   const rm = l.matched_raw_material;
   const base = (rm?.base_unit ?? "").toLowerCase();
-  if (pkg && rm && base === "stk") {
+  if (pkg && pkg.count == null && rm && base === "stk") {
     out.push({
       id: "text_weight_vs_piece",
       title: "Varetekst og registrert enhet stemmer ikke",
