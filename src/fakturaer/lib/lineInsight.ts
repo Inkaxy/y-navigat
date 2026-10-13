@@ -53,23 +53,34 @@ export interface TextPackage {
 }
 
 const num = (s: string) => Number(s.replace(",", "."));
+const SIZE = String.raw`(\d+(?:[.,]\d+)?)\s*(kg|gr|g|ml|cl|dl|ltr|l)\b`;
 
-/** Leser pakning fra varetekst. Returnerer null ved ingen eller flere ulike treff. */
+/**
+ * Leser pakning fra varetekst. Kjedede multiplikatorer («2x6x1kg» = 12 kg) ganges
+ * ut. Returnerer null (ukjent) ved ingen treff, flere ulike kolli eller en
+ * frittstående mengde som motsier kolliet («6x1kg / 10 kg»).
+ */
 export function packageFromText(description: string | null | undefined): TextPackage | null {
   const d = (description ?? "").toLowerCase();
-  const multi = [...d.matchAll(/(\d{1,4})\s*[x×*]\s*(\d+(?:[.,]\d+)?)\s*(kg|gr|g|ml|cl|dl|ltr|l)\b/g)];
-  if (multi.length === 1) {
-    const [raw, c, s, u] = multi[0];
-    const w = WEIGHT[u];
-    const count = Number(c);
-    const size = num(s);
-    if (count > 0 && size > 0) return { count, size, sizeUnit: u, total: round(count * size * w.factor), totalUnit: w.unit, raw: raw.trim() };
-  }
+  const multiRe = new RegExp(String.raw`(\d{1,4}(?:\s*[x×*]\s*\d{1,4})*)\s*[x×*]\s*` + SIZE, "g");
+  const multi = [...d.matchAll(multiRe)];
+  const rest = multi.reduce((acc, m) => acc.replace(m[0], " "), d);
+  const singles = [...rest.matchAll(new RegExp(String.raw`(?:^|[\s,(/-])` + SIZE, "g"))];
+  const singleTotals = [...new Set(singles.map((m) => round(num(m[1]) * WEIGHT[m[2]].factor) + WEIGHT[m[2]].unit))];
   if (multi.length > 1) return null;
-  const single = [...d.matchAll(/(?:^|[\s,(/-])(\d+(?:[.,]\d+)?)\s*(kg|gr|g|ml|cl|dl|ltr|l)\b/g)];
-  const distinct = [...new Set(single.map((m) => `${m[1]}${m[2]}`))];
-  if (distinct.length !== 1) return null;
-  const [, s, u] = single[0];
+  if (multi.length === 1) {
+    const [raw, counts, s, u] = multi[0];
+    const w = WEIGHT[u];
+    const count = counts.split(/[x×*]/).map((c) => Number(c.trim())).reduce((a, b) => a * b, 1);
+    const size = num(s);
+    if (!(count > 0 && size > 0)) return null;
+    const total = round(count * size * w.factor);
+    // En frittstående mengde må stemme med kolliet; ellers er pakningen ukjent.
+    if (singleTotals.some((t) => t !== `${total}${w.unit}`)) return null;
+    return { count, size, sizeUnit: u, total, totalUnit: w.unit, raw: raw.trim() };
+  }
+  if (singleTotals.length !== 1) return null;
+  const [, s, u] = singles[0];
   const size = num(s);
   if (!(size > 0)) return null;
   const w = WEIGHT[u];
