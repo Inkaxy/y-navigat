@@ -11,7 +11,7 @@ export interface StatusEntry {
   label: string;
   count: number | null;
   unit: CountUnit;
-  /** Gruppefilter i arbeidsbordet (serverens første blokkering). */
+  /** Gruppefilter i arbeidsbordet (serverens køkategori, ikke nødvendigvis første blokkering). */
   group?: WorkGroup;
   /** Ellers lenke til eksisterende liste. */
   href?: string;

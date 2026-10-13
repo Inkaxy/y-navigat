@@ -24,6 +24,8 @@ import { packageConflict, packageLabel } from "./packageLabel";
 import { ChangeLinkDialog } from "./ChangeLinkDialog";
 import { SupplierLinkAliases } from "./SupplierLinkAliases";
 import type { PanelResult } from "./types";
+import { LineInsightPanel } from "@/fakturaer/components/inbox/task/LineInsightPanel";
+import { insightLineFromSupplierItem, lineClarifications } from "@/fakturaer/lib/lineInsight";
 
 type Props = {
   supplierId: string;
@@ -73,7 +75,7 @@ export function VarekortPanel({ supplierId, itemKey, onDone, onNext, onSkip, onC
             <Button size="sm" variant="outline" onClick={() => setSnap(live && lines.data ? { item: live, lines: lines.data } : null)}>Oppdater</Button>
           </div>
         )}
-        <VarekortBody key={`${item.supplier_id}|${item.item_key}`} item={item} lines={snap?.lines ?? lines.data ?? []} canWrite={canWrite} stale={!!change}
+        <VarekortBody key={`${item.supplier_id}|${item.item_key}`} originalLineId={originalLineId ?? null} item={item} lines={snap?.lines ?? lines.data ?? []} canWrite={canWrite} stale={!!change}
           onDone={done} onNext={onNext} onSkip={onSkip} onClose={onClose ?? (() => undefined)} />
         {onOriginalLine && <OriginalPicker lines={snap?.lines ?? lines.data ?? []} current={originalLineId ?? item.last_open_line_id ?? null} onPick={onOriginalLine} />}
         </>
@@ -119,8 +121,8 @@ export function frozenChange(before: readonly SupplierItemLine[], after: readonl
   return parts.length ? `Varekortet er endret siden du åpnet det: ${parts.join(", ")}.` : null;
 }
 
-function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, onClose }: {
-  item: SupplierItem; lines: SupplierItemLine[]; canWrite: boolean; stale?: boolean;
+function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, onClose, originalLineId }: {
+  originalLineId?: string | null; item: SupplierItem; lines: SupplierItemLine[]; canWrite: boolean; stale?: boolean;
   onDone: (r: PanelResult) => void; onNext?: () => void; onSkip?: () => void; onClose: () => void;
 }) {
   const { data: company } = useCompany();
@@ -138,6 +140,9 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
   const [primary, setPrimary] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scope = openScope(lines);
+  // Linjeinnsikt for den valgte originallinjen (ellers siste åpne). Bare visning — sperrer bare via eksisterende prisgates.
+  const insightSrc = lines.find((l) => l.id === (originalLineId ?? item.last_open_line_id)) ?? scope.lastOpen ?? lines[0] ?? null;
+  const insightLine = insightSrc ? insightLineFromSupplierItem(item, insightSrc) : null;
   const priceWork = hasPriceWork(item, lines);
   // Bare når koblingens varenummer er varekortets — ellers kan rms_id være en annen leverandørvare.
   const canMoveLink = item.rms_sku_matches === true && !!item.rms_id;
@@ -179,6 +184,7 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
   return (
     <div className="space-y-6">
       <VarekortHeaderView item={item} openInvoices={scope.invoices} />
+      {insightLine && <LineInsightPanel line={insightLine} clarifications={lineClarifications(insightLine)} />}
 
       {editForm ? (
         <SupplierItemLinkForm item={item} lines={lines} canWrite={canWrite} onDone={onLinkDone} onClose={onClose} onNext={onNext}
