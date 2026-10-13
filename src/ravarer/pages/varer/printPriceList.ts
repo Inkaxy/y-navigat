@@ -1,4 +1,4 @@
-import type { RawMaterialListItem } from "@/ravarer/lib/varerListFilter";
+import type { RawMaterialListItem } from "@/ravarer/lib/rawMaterialViews";
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 
