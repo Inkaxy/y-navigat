@@ -45,11 +45,30 @@ export function countByStatus(rows: readonly OverviewRow[]): Record<GodkjenningS
   return c;
 }
 
-export function filterApprovalRows(rows: readonly OverviewRow[], f: { status: GodkjenningStatus; q: string; leverandor: string | null }): OverviewRow[] {
+export type Rekkefolge = "eldste" | "nyeste";
+export const REKKEFOLGE_LABEL: Record<Rekkefolge, string> = { eldste: "Eldste fakturadato først", nyeste: "Nyeste fakturadato først" };
+export const parseRekkefolge = (v: string | null): Rekkefolge => (v === "nyeste" ? "nyeste" : "eldste");
+
+/**
+ * Stabil datorekkefølge: fakturadato, så fakturanummer og id. Uten dato står sist.
+ * Eldste først er standard, så eldre priser behandles før nyere.
+ */
+export function sortByInvoiceDate<T extends Pick<OverviewRow, "invoice_date" | "invoice_number" | "invoice_id">>(rows: readonly T[], r: Rekkefolge): T[] {
+  const dir = r === "eldste" ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    if (!a.invoice_date !== !b.invoice_date) return a.invoice_date ? -1 : 1;
+    if (a.invoice_date && b.invoice_date && a.invoice_date !== b.invoice_date) return a.invoice_date < b.invoice_date ? -dir : dir;
+    const n = a.invoice_number.localeCompare(b.invoice_number, "nb", { numeric: true });
+    if (n !== 0) return n * dir;
+    return a.invoice_id < b.invoice_id ? -1 : a.invoice_id > b.invoice_id ? 1 : 0;
+  });
+}
+
+export function filterApprovalRows(rows: readonly OverviewRow[], f: { status: GodkjenningStatus; q: string; leverandor: string | null; rekkefolge?: Rekkefolge }): OverviewRow[] {
   const s = f.q.trim().toLowerCase();
-  return rows.filter((r) => matchesStatus(r, f.status)
+  return sortByInvoiceDate(rows.filter((r) => matchesStatus(r, f.status)
     && (!f.leverandor || r.supplier_id === f.leverandor)
-    && (!s || r.invoice_number.toLowerCase().includes(s) || (r.supplier_name ?? "").toLowerCase().includes(s)));
+    && (!s || r.invoice_number.toLowerCase().includes(s) || (r.supplier_name ?? "").toLowerCase().includes(s))), f.rekkefolge ?? "eldste");
 }
 
 export type BulkReport = { ok: number; failed: number; title: string; items: string[] };
