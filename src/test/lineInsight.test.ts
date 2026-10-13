@@ -29,33 +29,56 @@ describe("pakning fra varetekst er forslag", () => {
 
 describe("Florapan-observasjonen", () => {
   const c = lineClarifications(florapan);
-  it("fanger vekt i tekst mot stk-emballasje", () => {
-    expect(c.find((x) => x.id === "text_weight_vs_piece")?.detail).toContain("100 g");
+  it("fakturert per sekk mot stk-vare gir pakningsavklaring", () => {
+    const u = c.find((x) => x.id === "unit_conflict")!;
+    expect(u.action).toBe("pakning");
+    expect(u.detail).toContain("100 g");
   });
-  it("fanger at 10 × 977,74 ikke er 6697,5 og antyder rabatt", () => {
-    const gap = c.find((x) => x.id === "arithmetic_gap")!;
-    expect(gap.blocksPrice).toBe(true);
-    expect(gap.detail).toMatch(/mulig rabatt/);
+  it("regnestykket går til originalen via felles lesekontroll (mulig rabatt)", () => {
+    const r = c.find((x) => x.id === "read_issue")!;
+    expect(r.action).toBe("original");
+    expect(r.blocksPrice).toBe(true);
+    expect(r.detail).toMatch(/rabatt/i);
+  });
+});
+
+describe("reproduserte feil", () => {
+  it("6x1kg / 10 kg er motstrid → ukjent", () => expect(packageFromText("Mel 6x1kg / 10 kg")).toBeNull());
+  it("6x1kg / 6 kg er samstemt", () => expect(packageFromText("Mel 6x1kg / 6 kg")?.total).toBe(6));
+  it("2x6x1kg = 12 kg", () => expect(packageFromText("Mel 2x6x1kg")).toMatchObject({ count: 12, total: 12, totalUnit: "kg" }));
+  it("smør 500 g solgt per stk, handelsvare i stk, går opp: ingen avklaring", () => {
+    expect(lineClarifications({ description: "Smør 500g", quantity: 2, unit: "stk", unit_price: 40, total_amount: 80, invoice: { is_credit_note: false },
+      matched_raw_material: { name: "Smør 500 g", category: null, item_type: "handelsvare", base_unit: "stk" } })).toEqual([]);
+  });
+  it("kreditnota -2 × 10 = -20 er korrekt", () => {
+    expect(lineClarifications({ description: "Smør", quantity: -2, unit: "stk", unit_price: 10, total_amount: -20, invoice: { is_credit_note: true } })).toEqual([]);
+  });
+  it("stk-vare med oppgitt antall per sekk gir ingen enhetskonflikt", () => {
+    expect(lineClarifications({ ...florapan, count_per_package: 1000, total_amount: 9777.4 }).map((x) => x.id)).toEqual([]);
   });
 });
 
 describe("lesekontroll", () => {
   const base = { invoice: { is_credit_note: false }, unit: "krt" };
-  it("kollipris: mengde × antall i kolli × pris = sum", () => {
+  it("kollipris i tekst forklares, men går til originalen", () => {
     const c = lineClarifications({ ...base, description: "Mel 6x1kg", quantity: 2, unit_price: 20, total_amount: 240 });
-    expect(c.map((x) => x.id)).toEqual(["collo_price"]);
+    expect(c.map((x) => x.action)).toEqual(["original"]);
+    expect(c[0].detail).toContain("6x1kg");
   });
   it("regnestykke som går opp gir ingen avklaring", () => {
     expect(lineClarifications({ ...base, description: "Sukker 25 kg", quantity: 2, unit_price: 300, total_amount: 600 })).toEqual([]);
   });
-  it("innenfor 1 % toleranse godtas (øreavrunding)", () => {
+  it("øreavrunding innenfor serverens toleranse godtas", () => {
     expect(lineClarifications({ ...base, description: "Gjær", quantity: 3, unit_price: 33.33, total_amount: 100 })).toEqual([]);
+  });
+  it("registrert rabatt går opp", () => {
+    expect(lineClarifications({ ...base, description: "Mel", quantity: 10, unit_price: 100, total_amount: 900, discount_amount: 100 })).toEqual([]);
   });
   it("positivt beløp på kreditnota", () => {
     const c = lineClarifications({ description: "Mel", quantity: 1, unit: "stk", unit_price: 10, total_amount: 10, invoice: { is_credit_note: true } });
     expect(c.map((x) => x.id)).toContain("credit_sign");
   });
-  it("kreditnota med negativt beløp regnes på absoluttverdi", () => {
+  it("kreditnota med negativt beløp", () => {
     expect(lineClarifications({ description: "Mel", quantity: 1, unit: "stk", unit_price: 10, total_amount: -10, invoice: { is_credit_note: true } })).toEqual([]);
   });
 });

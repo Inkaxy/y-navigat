@@ -21,7 +21,7 @@ export function MaterialPicker({ form, lineId }: { form: LineMatchForm; lineId: 
     name: s.raw_material?.name ?? "Ukjent råvare",
     baseUnit: s.raw_material?.base_unit ?? null,
     why: s.match_reason,
-    detail: `${s.raw_material?.sku ?? "uten varenr."} · ${Math.round((s.confidence ?? 0) * 100)} % treff`,
+    detail: `${s.raw_material?.sku ?? "uten varenr."} · ${Math.round((s.confidence ?? 0) * 100)} % matchscore`,
   }));
   const found: Option[] = form.rmResults
     .filter((r) => !suggested.some((s) => s.id === r.id))

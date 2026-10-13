@@ -1,0 +1,60 @@
+import { useEffect, useMemo, useState } from "react";
+import { useWorkItems, useWorkSummary } from "@/ravarer/hooks/useWorkData";
+import { paths } from "@/ravarer/lib/paths";
+import type { WorkItem } from "@/ravarer/lib/workRpcTypes";
+import { VarekortPanel } from "../gjore/VarekortPanel";
+import { FakturasakPanel } from "../gjore/FakturasakPanel";
+import { ArbeidsbordView, useArbeidsbordParams } from "./ArbeidsbordView";
+import { OriginalPane } from "./OriginalPane";
+
+const PAGE = 50;
+
+/** Priskontroll › Å gjøre (standard): arbeidsbordet med ekte data og eksisterende paneler. */
+export function Arbeidsbord() {
+  const prm = useArbeidsbordParams();
+  const [limit, setLimit] = useState(PAGE);
+  useEffect(() => setLimit(PAGE), [prm.gruppe, prm.sort, prm.q, prm.leverandor]);
+  const work = useWorkItems({ group: prm.gruppe, search: prm.q || null, supplierId: prm.leverandor, sort: prm.sort, limit });
+  const summary = useWorkSummary({ includeApproval: true });
+  const items = useMemo(() => work.data?.items ?? [], [work.data]);
+
+  const classic = new URLSearchParams(prm.sp);
+  classic.set("fane", "gjore");
+  classic.set("visning", "klassisk");
+  classic.delete("del");
+
+  const fullHref = (it: WorkItem) => {
+    if (it.type === "faktura" && it.invoice_id) {
+      const ret = new URLSearchParams(prm.sp);
+      ret.delete("valgt");
+      ret.delete("del");
+      ret.set("fane", "gjore");
+      return `${paths.faktura(it.invoice_id)}?retur=${encodeURIComponent(ret.toString())}`;
+    }
+    return it.supplier_id && it.item_key ? paths.varekort(it.supplier_id, it.item_key) : paths.priskontroll({ fane: "gjore" });
+  };
+
+  return (
+    <ArbeidsbordView
+      items={items}
+      total={work.data?.total ?? 0}
+      counts={work.data?.counts}
+      summary={summary.data}
+      loading={work.isLoading}
+      isError={work.isError}
+      error={work.error}
+      onRetry={() => void work.refetch()}
+      fetchingMore={work.isFetching && limit > items.length}
+      onMore={() => setLimit((n) => n + PAGE)}
+      fullHref={fullHref}
+      classicHref={`?${classic.toString()}`}
+      renderOriginal={(it, onClose) => <OriginalPane item={it} onClose={onClose} />}
+      renderDecision={(it, ctx) =>
+        it.type === "varekort" && it.supplier_id && it.item_key
+          ? <VarekortPanel supplierId={it.supplier_id} itemKey={it.item_key} onDone={ctx.onDone} onNext={ctx.onNext} onSkip={ctx.onSkip} />
+          : it.invoice_id
+            ? <FakturasakPanel invoiceId={it.invoice_id} kind={it.kind} onDone={ctx.onDone} onNext={ctx.onNext} onSkip={ctx.onSkip} />
+            : <p className="text-sm text-ink-secondary">Elementet mangler referanse.</p>}
+    />
+  );
+}

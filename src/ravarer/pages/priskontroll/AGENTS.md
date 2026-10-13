@@ -1,3 +1,4 @@
 # Priskontroll
 - Kronevirkning i arbeidslisten vises bare via `workEffect` (`src/ravarer/lib/workEffect.ts`): kun server-verifisert `effect_status` gir beløp, manglende felt = ukjent. Why: bruttobeløp fra feillest historikk ble vist som besparelse.
 - Sumkontroll regnes som gjort bare for `SUM_CHECKED_STATUSES` (`ok`/`overridden`) i `invoiceSteps.ts`. Why: `not_checked`/`no_lines` ble tolket som kontrollert.
+- «Å gjøre» er som standard arbeidsbordet (`arbeidsbord/Arbeidsbord.tsx` → presentasjon i `ArbeidsbordView.tsx`, gjenbruker VarekortPanel/FakturasakPanel/InvoiceDocumentPanel); `visning=klassisk` gir GjoreWorkspace, `visning=mengde` diagnostikk. Statustellere kommer bare fra serverens tellere med egen enhet (varekort/fakturaer). Why: én arbeidsflate uten å miste reserve eller blande enheter.

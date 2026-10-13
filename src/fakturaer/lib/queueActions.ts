@@ -1,3 +1,4 @@
+import { priceHeldByClarification } from "@/fakturaer/lib/lineInsight";
 import { supabase } from "@/integrations/supabase/client";
 import { acceptMatch } from "@/fakturaer/lib/acceptMatch";
 import { deriveLinePackage, resolveLineCost } from "@/fakturaer/lib/units";
@@ -194,6 +195,8 @@ export function canAcceptPriceVariance(line: ReviewLineRow): boolean {
   if (!pos(line.price_per_base_unit) || !pos(line.expected_price_per_base_unit)) return false;
   if (!line.raw_material_id || !["manual", "auto_high"].includes(line.match_confidence ?? "")) return false;
   const reasons = allReasons(line);
+  // Åpen avklaring i linjens egne felt (enhetsmotstrid, lesefeil, fortegn) sperrer alle prisveier.
+  if (priceHeldByClarification(line)) return false;
   return reasons.length > 0 && reasons.every((r) => ACCEPTABLE_PRICE_REASONS.has(r));
 }
 
