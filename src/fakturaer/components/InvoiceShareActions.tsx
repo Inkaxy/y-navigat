@@ -50,58 +50,38 @@ export function InvoiceShareActions({ invoiceId, invoiceNumber, url }: Props) {
     } finally { setPrinting(false); }
   };
 
-  const send = async () => {
-    if (lock.current || !invoiceId) return;
+  /** Lager en ny e-post i brukerens eget e-postprogram (Outlook). Ingenting sendes fra systemet. */
+  const openMail = async () => {
+    if (!url || lock.current) return;
     lock.current = true; setSending(true);
+    const name = `Faktura-${String(invoiceNumber ?? "faktura").replace(/[^\w.-]+/g, "_")}.pdf`;
+    const subject = `Faktura ${invoiceNumber ?? ""}`.trim();
     try {
-      const { error } = await supabase.functions.invoke("send-invoice-email", { body: { invoice_id: invoiceId, to: to.trim(), message: msg } });
-      if (error) {
-        let code = "ukjent_utfall";
-        if (error instanceof FunctionsHttpError) {
-          const j: unknown = await error.context.json().catch(() => null);
-          if (j && typeof j === "object" && "code" in j && typeof j.code === "string") code = j.code;
-        }
-        toast({ title: "E-post ikke bekreftet sendt", description: MESSAGES[code] ?? "Noe gikk galt. Ingenting er bekreftet sendt.", variant: "destructive" });
-        return;
+      const blob = await (await fetch(url)).blob();
+      const file = new File([blob], name, { type: "application/pdf" });
+      if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: subject }); return; }
+        catch (e) { if (e instanceof DOMException && e.name === "AbortError") return; }
       }
-      toast({ title: "Faktura sendt", description: `Sendt til ${to.trim()} fra ${SENDER}.` });
-      setOpen(false); setTo(""); setMsg("");
+      const obj = URL.createObjectURL(file);
+      const a = document.createElement("a");
+      a.href = obj; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(obj), 60_000);
+      window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent("Hei,\n\nVedlagt følger faktura.\n")}`;
+      toast({ title: "Ny e-post åpnet", description: `Legg ved ${name} fra Nedlastinger.` });
+    } catch {
+      toast({ title: "Kunne ikke hente fakturaen", variant: "destructive" });
     } finally { lock.current = false; setSending(false); }
   };
 
-  const valid = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(to.trim());
   return (
     <>
       <Button type="button" size="icon" variant="ghost" className="min-h-[44px] min-w-[44px]" disabled={!url || printing} onClick={() => void print()} aria-label="Skriv ut faktura" title="Skriv ut">
         {printing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
       </Button>
-      <Button type="button" size="icon" variant="ghost" className="min-h-[44px] min-w-[44px]" disabled={!url || !invoiceId} onClick={() => setOpen(true)} aria-label="Send faktura på e-post" title="Send på e-post">
-        <Mail className="h-4 w-4" />
+      <Button type="button" size="icon" variant="ghost" className="min-h-[44px] min-w-[44px]" disabled={!url || sending} onClick={() => void openMail()} aria-label="Lag e-post med fakturaen i Outlook" title="Ny e-post i Outlook">
+        {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
       </Button>
-      <Dialog open={open} onOpenChange={(o) => { if (!sending) setOpen(o); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Send faktura {invoiceNumber ?? ""} på e-post</DialogTitle>
-            <DialogDescription>Originalen sendes som PDF-vedlegg fra {SENDER}.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="inv-mail-to">Mottaker</Label>
-              <Input id="inv-mail-to" type="email" autoComplete="email" value={to} onChange={(e) => setTo(e.target.value)} placeholder="navn@firma.no" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="inv-mail-msg">Melding (valgfritt)</Label>
-              <Textarea id="inv-mail-msg" rows={4} maxLength={4000} value={msg} onChange={(e) => setMsg(e.target.value)} placeholder="Vedlagt følger faktura." />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" disabled={sending} onClick={() => setOpen(false)}>Avbryt</Button>
-            <Button disabled={!valid || sending} onClick={() => void send()}>
-              {sending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}Send
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
