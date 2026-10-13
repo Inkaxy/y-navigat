@@ -49,20 +49,7 @@ export function reconcileAcceptance(
     acc.price_reference_source === "last_purchase" && target.price_reference_source === "last_purchase" &&
     !!accDate && !!newDate && newDate >= accDate &&
     (!invoiceDate || newDate < invoiceDate);
-  const identical = movedLastPurchase || (
-    same(acc.raw_material_id, rawMaterialId) &&
-    round4(acc.quantity) === round4(line.quantity) &&
-    same(normalizeUnit(acc.unit), normalizeUnit(unitNow)) &&
-    round4(acc.unit_price) === round4(line.unit_price) &&
-    round4(acc.total_amount) === round4(line.total_amount) &&
-    round4(acc.base_quantity) === round4(target.base_quantity) &&
-    round4(acc.package_size) === round4(line.package_size) &&
-    same(normalizeUnit(acc.package_unit), normalizeUnit(line.package_unit)) &&
-    round4(acc.count_per_package) === round4(line.count_per_package) &&
-    same(acc.rms_id, rmsRow?.id ?? null) &&
-    (acc.rms_package == null) === (rmsRow == null) &&
-    (rmsRow == null || packageSignature(acc.rms_package ?? {}) === packageSignature(rmsRow)) &&
-    round4(acc.price_per_base_unit) === round4(target.price_per_base_unit) &&
+  const identical = movedLastPurchase || (ownBasis &&
     round4(acc.expected_price_per_base_unit) === round4(target.expected_price_per_base_unit) &&
     same(acc.price_reference_source, target.price_reference_source) &&
     same(acc.price_reference_id, target.price_reference_id) &&

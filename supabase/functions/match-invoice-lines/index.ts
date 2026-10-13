@@ -411,7 +411,7 @@ Deno.serve(async (req) => {
         manualUpdate.requires_review = requiresReview;
         manualUpdate.review_reason = reviewReasons.size ? Array.from(reviewReasons).join(",") : null;
         await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, manualUpdate, catTolMap.get(rm?.category ?? "") ?? tolDefault, refM);
-        reconcileAcceptance(line, manualUpdate, line.raw_material_id, rmsRow ?? null);
+        reconcileAcceptance(line, manualUpdate, line.raw_material_id, rmsRow ?? null, inv.invoice_date ?? null);
 
         await applyUpdate(svc, line.id, manualUpdate);
         results.push({ id: line.id, status: "manual", recomputed: true });
@@ -779,7 +779,7 @@ Deno.serve(async (req) => {
         if (foreignCurrency) addReason("unsupported_currency");
 
         await syncRegisteredPrices(svc, inv, line, rm, rmsRow, actual, update, catTolMap.get(rm?.category ?? "") ?? tolDefault, ref);
-        reconcileAcceptance(line, update, update.raw_material_id, rmsRow ?? null);
+        reconcileAcceptance(line, update, update.raw_material_id, rmsRow ?? null, inv.invoice_date ?? null);
       }
 
       // Lær av vellykket fuzzy-match: skriv pending alias (aldri degrader bekreftede)
