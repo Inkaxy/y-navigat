@@ -521,6 +521,20 @@ export default function VarelistePage({ liste, onActiveChange, activeId = null }
             <span className="text-sm text-muted-foreground">
               {filtered.length} av {items.length}
             </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={isLoading || filtered.length === 0}
+              onClick={() => {
+                const names = new Set(filtered.map((i) => i.supplierName ?? ""));
+                const one = names.size === 1 ? [...names][0] : "";
+                const title = one ? `Prisliste – ${one}` : q ? `Prisliste – søk «${q}»` : "Prisliste – råvarer";
+                if (!printPriceList(filtered, title)) toast.error("Tillat sprettoppvinduer for å skrive ut.");
+              }}
+            >
+              <Printer className="h-4 w-4" aria-hidden="true" />Skriv ut prisliste
+            </Button>
             <PriceEvidenceStatus
               state={priceEvidence}
               controlCount={controlCount}
