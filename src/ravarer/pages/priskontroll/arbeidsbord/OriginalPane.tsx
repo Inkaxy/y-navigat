@@ -6,8 +6,8 @@ import { InvoiceDocumentPanel } from "@/fakturaer/components/InvoiceDocumentPane
 import type { WorkItem } from "@/ravarer/lib/workRpcTypes";
 
 /** Fakturaen originalen hører til: fakturasaken selv, ellers fakturaen til varekortets siste åpne linje. */
-function useOriginalInvoiceId(item: WorkItem): { id: string | null; loading: boolean; error: unknown } {
-  const lineId = item.invoice_id ? null : item.last_open_line_id;
+function useOriginalInvoiceId(item: WorkItem, chosenLineId: string | null): { id: string | null; loading: boolean; error: unknown } {
+  const lineId = item.invoice_id ? null : chosenLineId ?? item.last_open_line_id;
   const q = useQuery({
     queryKey: ["arbeidsbord", "line-invoice", lineId],
     enabled: !!lineId,
@@ -23,8 +23,8 @@ function useOriginalInvoiceId(item: WorkItem): { id: string | null; loading: boo
 }
 
 /** Originaldokumentet i samme arbeidsflate — gjenbruker fakturaens dokumentpanel med fersk identitetskontroll. */
-export function OriginalPane({ item, onClose }: { item: WorkItem; onClose: () => void }) {
-  const target = useOriginalInvoiceId(item);
+export function OriginalPane({ item, onClose, lineId = null }: { item: WorkItem; onClose: () => void; lineId?: string | null }) {
+  const target = useOriginalInvoiceId(item, lineId);
   const detail = useQuery({ queryKey: ["invoice", target.id], enabled: !!target.id, queryFn: () => fetchInvoiceDetail(target.id as string) });
   if (!target.loading && !target.error && !target.id) {
     return <p className="rounded-xl border border-line-subtle bg-card p-4 text-sm text-ink-secondary">Ingen åpen fakturalinje å vise originalen for.</p>;
@@ -37,7 +37,7 @@ export function OriginalPane({ item, onClose }: { item: WorkItem; onClose: () =>
       </QueryState>
     );
   }
-  const line = (d.invoice_lines ?? []).find((l) => l.id === item.last_open_line_id) ?? null;
+  const line = (d.invoice_lines ?? []).find((l) => l.id === (lineId ?? item.last_open_line_id)) ?? null;
   return (
     <InvoiceDocumentPanel
       invoiceId={d.id}

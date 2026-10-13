@@ -22,6 +22,7 @@ export function Arbeidsbord() {
   classic.set("fane", "gjore");
   classic.set("visning", "klassisk");
   classic.delete("del");
+  classic.delete("linje");
 
   const fullHref = (it: WorkItem) => {
     if (it.type === "faktura" && it.invoice_id) {
@@ -48,10 +49,11 @@ export function Arbeidsbord() {
       onMore={() => setLimit((n) => n + PAGE)}
       fullHref={fullHref}
       classicHref={`?${classic.toString()}`}
-      renderOriginal={(it, onClose) => <OriginalPane item={it} onClose={onClose} />}
+      renderOriginal={(it, onClose) => <OriginalPane item={it} onClose={onClose} lineId={it.invoice_id ? null : prm.sp.get("linje")} />}
       renderDecision={(it, ctx) =>
         it.type === "varekort" && it.supplier_id && it.item_key
-          ? <VarekortPanel supplierId={it.supplier_id} itemKey={it.item_key} onDone={ctx.onDone} onNext={ctx.onNext} onSkip={ctx.onSkip} />
+          ? <VarekortPanel supplierId={it.supplier_id} itemKey={it.item_key} onDone={ctx.onDone} onNext={ctx.onNext} onSkip={ctx.onSkip}
+                originalLineId={prm.sp.get("linje")} onOriginalLine={(id) => prm.set({ linje: id }, false)} />
           : it.invoice_id
             ? <FakturasakPanel invoiceId={it.invoice_id} kind={it.kind} onDone={ctx.onDone} onNext={ctx.onNext} onSkip={ctx.onSkip} />
             : <p className="text-sm text-ink-secondary">Elementet mangler referanse.</p>}

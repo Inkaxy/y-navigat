@@ -88,7 +88,7 @@ export function ArbeidsbordView(p: ArbeidsbordViewProps) {
 
   const sel = p.items.find((i) => i.key === prm.valgt) ?? null;
   const idx = sel ? p.items.indexOf(sel) : -1;
-  const select = (key: string | null, push = true) => prm.set({ valgt: key, del: null }, push);
+  const select = (key: string | null, push = true) => prm.set({ valgt: key, del: null, linje: null }, push);
   const next = () => select(stepKey(p.items, prm.valgt, 1), false);
   const prev = () => select(stepKey(p.items, prm.valgt, -1), false);
   const ctx: DetailCtx = { onDone: next, onNext: next, onSkip: next };

@@ -33,10 +33,13 @@ type Props = {
   onNext?: () => void;
   onSkip?: () => void;
   onClose?: () => void;
+  /** Arbeidsbordet: linjen originalpanelet viser, og varsling når brukeren velger en annen faktura. */
+  originalLineId?: string | null;
+  onOriginalLine?: (lineId: string) => void;
 };
 
 /** Varekortet: alle beslutninger om én leverandørvare. Brukes i arbeidsflaten, på fullside og i Sheet. */
-export function VarekortPanel({ supplierId, itemKey, onDone, onNext, onSkip, onClose }: Props) {
+export function VarekortPanel({ supplierId, itemKey, onDone, onNext, onSkip, onClose, originalLineId, onOriginalLine }: Props) {
   const q = useSupplierItems({ supplierId, itemKey, pageSize: 1 });
   const lines = useSupplierItemLines(supplierId, itemKey);
   const { canWrite } = useInvoiceRights();
@@ -72,9 +75,34 @@ export function VarekortPanel({ supplierId, itemKey, onDone, onNext, onSkip, onC
         )}
         <VarekortBody key={`${item.supplier_id}|${item.item_key}`} item={item} lines={snap?.lines ?? lines.data ?? []} canWrite={canWrite} stale={!!change}
           onDone={done} onNext={onNext} onSkip={onSkip} onClose={onClose ?? (() => undefined)} />
+        {onOriginalLine && <OriginalPicker lines={snap?.lines ?? lines.data ?? []} current={originalLineId ?? item.last_open_line_id ?? null} onPick={onOriginalLine} />}
         </>
       )}
     </QueryState>
+  );
+}
+
+/** Velg hvilken faktura originalpanelet skal vise — én knapp per faktura i varekortets linjer, åpne først. */
+function OriginalPicker({ lines, current, onPick }: { lines: SupplierItemLine[]; current: string | null; onPick: (lineId: string) => void }) {
+  const byInvoice = new Map<string, SupplierItemLine>();
+  for (const l of [...lines].sort((a, b) => Number(!!b.requires_review) - Number(!!a.requires_review))) if (!byInvoice.has(l.invoice_id)) byInvoice.set(l.invoice_id, l);
+  const opts = [...byInvoice.values()];
+  if (opts.length < 2) return null;
+  const curInvoice = lines.find((l) => l.id === current)?.invoice_id ?? null;
+  return (
+    <nav aria-label="Vis original for faktura" className="mt-4 border-t border-line-subtle pt-3">
+      <p className="mb-1 text-caption text-ink-secondary">Originalen viser faktura:</p>
+      <div className="flex flex-wrap gap-1.5">
+        {opts.map((l) => {
+          const on = l.invoice_id === curInvoice;
+          return (
+            <Button key={l.invoice_id} size="sm" variant={on ? "secondary" : "outline"} className="min-h-[44px]" aria-pressed={on} onClick={() => onPick(l.id)}>
+              {l.invoice_number ? `Faktura ${l.invoice_number}` : "Faktura uten nummer"}{l.invoice_date ? ` · ${l.invoice_date.split("-").reverse().join(".")}` : ""}{l.requires_review ? " · åpen" : ""}
+            </Button>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
 
