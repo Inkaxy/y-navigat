@@ -140,6 +140,10 @@ export interface Clarification {
   blocksPrice: boolean;
 }
 
+/** Beløp med punktum og to desimaler i en kontrollmelding → norsk format. */
+export function nbAmounts(msg: string): string {
+  return msg.replace(/(^|[^\d.,])(-?\d+\.\d{2})(?![\d.,])/g, (_m, pre: string, n: string) => pre + Number(n).toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+}
 const nb = (n: number, d = 2) => n.toLocaleString("nb-NO", { maximumFractionDigits: d });
 /** Fakturaenheter som betyr en beholder med ukjent antall stk. */
 const CONTAINER = new Set(["sekk", "sk", "kartong", "krt", "kart", "kolli", "pall", "eske", "pk", "pakke", "pkn", "bx", "boks"]);
@@ -179,7 +183,8 @@ export function lineClarifications(l: InsightLine): Clarification[] {
     unit_price_basis: l.unit_price_basis ?? null, discount_amount: l.discount_amount ?? null, line_kind: l.line_kind ?? null, is_credit: credit,
   });
   for (const i of issues) {
-    let detail = i.message;
+    // Bare visning: beløp i den delte meldingen («6697.50») vises norsk («6 697,50»). Regel og råbevis er uendret.
+    let detail = nbAmounts(i.message);
     const q = l.quantity, p = l.unit_price, t = l.total_amount;
     if (pkg?.count && q != null && p != null && t != null && Math.abs(q * pkg.count * p - Math.abs(t)) < 0.005) {
       detail += ` Teksten «${pkg.raw}» passer: ${nb(q)} × ${pkg.count} × ${nb(p)} kr = ${nb(Math.abs(t))} kr — enhetsprisen kan gjelde per stykk i kolliet.`;
