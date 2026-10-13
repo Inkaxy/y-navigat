@@ -48,7 +48,8 @@ describe("integrasjonsrettinger", () => {
   it("prisavvik heter «Prisendringer å vurdere», ikke klare til godkjenning", () => {
     const k = statusTiles(counts, null).find((x) => x.id === "klar")!;
     expect(k.title).toBe("Prisendringer å vurdere");
-    expect(k.explain).toMatch(/Ingenting godkjennes automatisk/);
+    expect(k.explain).toBe("Registrerte prisavvik. Åpne kortet for å se hva som må avklares før prisen kan vurderes.");
+    expect(k.explain).not.toMatch(/Grunnlaget er lest/);
   });
   it("«Behandle flere» er synlig og originalen følger valgt linje", () => {
     expect(readFileSync("src/ravarer/pages/priskontroll/arbeidsbord/ArbeidsbordView.tsx", "utf8")).toContain("Behandle flere");
