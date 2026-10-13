@@ -1,6 +1,11 @@
+import { useMemo, useState } from "react";
 import { formatSignedPct } from "@/fakturaer/lib/sumDirection";
 import { Link } from "react-router-dom";
-import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Printer, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "@/hooks/use-toast";
+import { printPriceMovers } from "./printPriceMovers";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { paths } from "@/ravarer/lib/paths";
@@ -38,11 +43,36 @@ function Sparkline({ item }: { item: PriceMover }) {
   );
 }
 
+type Dir = "alle" | "opp" | "ned";
+
 export function PriceMoversView({ data, period, onPeriodChange, loading }: PriceMoversViewProps) {
-  const items = data?.items ?? [];
+  const all = data?.items ?? [];
+  const [q, setQ] = useState("");
+  const [supplier, setSupplier] = useState("alle");
+  const [dir, setDir] = useState<Dir>("alle");
+  const suppliers = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const i of all) if (i.supplier_id && i.supplier_name) m.set(i.supplier_id, i.supplier_name);
+    return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1], "nb"));
+  }, [all]);
+  const items = useMemo(() => {
+    const s = q.trim().toLocaleLowerCase("nb");
+    return all.filter((i) =>
+      (supplier === "alle" || i.supplier_id === supplier) &&
+      (dir === "alle" || (dir === "opp" ? (i.change_pct ?? 0) > 0 : (i.change_pct ?? 0) < 0)) &&
+      (!s || i.rm_name.toLocaleLowerCase("nb").includes(s) || (i.supplier_name ?? "").toLocaleLowerCase("nb").includes(s)));
+  }, [all, q, supplier, dir]);
   const suspicious = items.filter((i) => i.suspicious);
   const normal = items.filter((i) => !i.suspicious);
   const periods: (30 | 90 | 365)[] = [30, 90, 365];
+  const supplierName = suppliers.find(([id]) => id === supplier)?.[1];
+  const print = () => {
+    const ok = printPriceMovers([...normal, ...suspicious], {
+      title: supplierName ? `Prisliste — ${supplierName}` : "Prisbevegelser",
+      subtitle: `Siste ${period} dager${dir !== "alle" ? ` · bare prisøkninger`.replace("økninger", dir === "opp" ? "økninger" : "fall") : ""}${q.trim() ? ` · søk «${q.trim()}»` : ""}`,
+    });
+    if (!ok) toast({ title: "Utskriftsvinduet ble blokkert", description: "Tillat sprettoppvinduer for å skrive ut.", variant: "destructive" });
+  };
 
   return (
     <Card id="prisbevegelser" className="overflow-hidden">
@@ -60,7 +90,38 @@ export function PriceMoversView({ data, period, onPeriodChange, loading }: Price
         </div>
       </div>
 
+      {!loading && all.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
+          <div className="relative min-w-[200px] flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-secondary" aria-hidden />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Søk råvare eller leverandør" aria-label="Søk i prisbevegelser" className="pl-8" />
+          </div>
+          <Select value={supplier} onValueChange={setSupplier}>
+            <SelectTrigger className="w-[200px]" aria-label="Leverandør"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="alle">Alle leverandører</SelectItem>
+              {suppliers.map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={dir} onValueChange={(v) => setDir(v as Dir)}>
+            <SelectTrigger className="w-[150px]" aria-label="Retning"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="alle">Alle endringer</SelectItem>
+              <SelectItem value="opp">Prisøkninger</SelectItem>
+              <SelectItem value="ned">Prisfall</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" onClick={print} disabled={items.length === 0}>
+            <Printer className="mr-1.5 h-4 w-4" />{supplierName ? "Skriv ut prisliste" : "Skriv ut"}
+          </Button>
+        </div>
+      )}
+
       {loading && <div className="p-5 text-sm text-ink-secondary">Laster …</div>}
+
+      {!loading && all.length > 0 && items.length === 0 && (
+        <p className="p-5 text-sm text-ink-secondary">Ingen treff for valgt søk eller filter.</p>
+      )}
 
       {!loading && items.length === 0 && (
         <p className="p-5 text-sm text-ink-secondary">Ingen prisendringer i perioden.</p>
