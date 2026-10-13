@@ -61,7 +61,7 @@ function Preview() {
             <VBlock n={1} title="Råvare" done summary={<span className="font-medium underline">Softismiks</span>} />
             <VBlock n={2} title="Pakning" done summary={<span className="text-ink-secondary">5 l per kanne</span>} />
             <VBlock n={3} title="Pris">
-              <PriceBlockView rows={ROWS} blocked={[{ id: "k", invoice_id: "8050625", invoice_number: "8050625", invoice_date: "2026-10-02", label: "Kreditnota – ikke sammenlignbar varepris", detail: "" }]} status="ready" selected={sel} onToggle={toggle}
+              <PriceBlockView rows={ROWS} blocked={[{ id: "k", invoice_id: "8050625", invoice_number: "8050625", invoice_date: "2026-10-02", label: "Kreditnota – ikke sammenlignbar varepris", detail: "", reason: "credit_note", action: "review_credit_note" }]} status="ready" selected={sel} onToggle={toggle}
                 hasAgreement tolerancePct={3} hardCapPct={15} settings={null} reason="" onReason={() => undefined} canWrite busy={false}
                 onAccept={() => undefined} onCase={() => undefined} onFixAgreement={() => undefined} onCheckPackage={() => undefined} />
             </VBlock>
