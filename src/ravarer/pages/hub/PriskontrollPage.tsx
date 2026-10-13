@@ -12,6 +12,7 @@ import { FakturaerTab } from "@/ravarer/pages/priskontroll/fakturaer/FakturaerTa
 import { normalizePriskontrollSearch } from "@/ravarer/pages/priskontroll/fakturaer/visning";
 import { ImportSheet } from "@/ravarer/pages/priskontroll/import/ImportSheet";
 import { GjoreWorkspace } from "@/ravarer/pages/priskontroll/gjore/GjoreWorkspace";
+import { Arbeidsbord } from "@/ravarer/pages/priskontroll/arbeidsbord/Arbeidsbord";
 import { MengdeDiagnostikk } from "@/ravarer/pages/priskontroll/gjore/mengde/MengdeDiagnostikk";
 import { Link } from "react-router-dom";
 import { PriskontrollToolsMenu } from "./PriskontrollToolsMenu";
@@ -47,8 +48,14 @@ export default function PriskontrollPage() {
     >
       <Suspense fallback={<QueryLoadingState rows={6} />}>
         {tab === "gjore" && sp.get("visning") === "mengde" && <MengdeDiagnostikk />}
-        {tab === "gjore" && sp.get("visning") !== "mengde" && (
+        {tab === "gjore" && !sp.get("visning") && <Arbeidsbord />}
+        {tab === "gjore" && sp.get("visning") && sp.get("visning") !== "mengde" && (
           <>
+            <div className="px-page pb-2">
+              <Link to="?fane=gjore" className="inline-flex min-h-[44px] items-center text-sm text-ink-secondary underline-offset-2 hover:underline">
+                Til det nye arbeidsbordet
+              </Link>
+            </div>
             <GjoreWorkspace />
             <div className="px-page pb-4">
               <Link to="?fane=gjore&visning=mengde" className="inline-flex min-h-[44px] items-center text-sm text-ink-secondary underline-offset-2 hover:underline">
