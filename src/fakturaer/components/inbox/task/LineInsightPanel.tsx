@@ -58,11 +58,12 @@ export function LineInsightPanel({ line, clarifications }: Props) {
                 {i + 1}. {s.name}
                 <span className="text-ink-secondary">
                   {" "}— {s.reason}
-                  {s.confidencePct != null ? ` · ${s.confidencePct} %` : ""}
+                  {s.matchScorePct != null ? ` · matchscore ${s.matchScorePct} %` : ""}
                 </span>
               </li>
             ))}
           </ol>
+          <p className="mt-1 text-caption text-ink-secondary">Matchscore er hvor likt teksten er varen — ikke sannsynlighet for at fakturaen er riktig.</p>
         </div>
       )}
     </div>
