@@ -4,6 +4,7 @@ import { X, AlertTriangle, RefreshCw } from "lucide-react";
 import { PdfDocumentViewer } from "@/fakturaer/components/PdfDocumentViewer";
 import { invoiceFigures, type PriceGate } from "@/fakturaer/lib/financialPresentation";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
+import { InvoiceShareActions } from "@/fakturaer/components/InvoiceShareActions";
 import { useInvoiceDocumentUrl } from "@/fakturaer/hooks/useInvoiceDocument";
 import { useInvoiceDocumentVersion } from "@/fakturaer/hooks/useInvoiceDocumentVersion";
 import { formatMoney, formatDate } from "@/fakturaer/lib/constants";
@@ -96,6 +97,7 @@ export function InvoiceDocumentPanel({ invoiceId, invoice, line, onClose, classN
             {invoice?.supplier_name ?? "—"} • {formatDate(invoice?.invoice_date)}
           </div>
         </div>
+        <InvoiceShareActions invoiceId={invoiceId} invoiceNumber={invoice?.invoice_number} url={missing ? null : url} />
         <InvoiceDocumentButton path={path} label="Åpne i ny fane" variant="ghost" className="min-h-[44px]" />
         <Button type="button" size="icon" variant="ghost" className="min-h-[44px] min-w-[44px]" onClick={onClose} aria-label="Lukk dokumentpanel">
           <X className="h-4 w-4" />
