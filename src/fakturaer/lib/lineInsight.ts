@@ -79,7 +79,7 @@ export function packageFromText(description: string | null | undefined): TextPac
 const round = (n: number) => Math.round(n * 1e6) / 1e6;
 
 const FEE = /\b(frakt|fraktgebyr|porto|gebyr|ekspedisjons|emballasjegebyr|pant|palle(?:leie)?|leveringstillegg|miljøgebyr|drivstoff|toll)\w*/i;
-const DISCOUNT = /\b(rabatt|bonus|kreditt|kredit|godtgjørelse|returnert|retur)\w*/i;
+const DISCOUNT = /(rabatt|bonus|kreditt|kredit|godtgjørelse|returnert|retur)\w*/i;
 
 export interface KindGuess { kind: LineKind; reason: string }
 
