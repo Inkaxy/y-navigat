@@ -72,7 +72,7 @@ function CompactRow({ it }: { it: WorkItem }) {
       <p className="truncate text-caption text-ink-secondary" title={rowSubtitle(it)}>{sub}</p>
       <p className="text-caption"><span className="text-ink-secondary">{causeText(it)}</span> <span className="font-medium text-primary">→ {nextActionText(it)}</span></p>
       {e.kind !== "none" && (
-        <p className={cn("text-caption tabular-nums", e.kind === "read" ? "text-warning" : "text-ink-secondary")}>
+        <p className={`text-caption tabular-nums ${e.kind === "read" ? "text-warning" : "text-ink-secondary"}`}>
           {e.label}{e.kind === "verified" ? `: ${unsignedKr(e.value)}` : ""}
         </p>
       )}
