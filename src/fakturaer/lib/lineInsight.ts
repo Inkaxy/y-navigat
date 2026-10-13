@@ -12,6 +12,8 @@
  *    match_reason); ingen antall eller begrunnelser diktes opp.
  */
 
+import { lineReadIssues } from "./invoiceReadCheck";
+
 export type LineKind = "ravare" | "emballasje" | "handelsvare" | "frakt_gebyr_pant" | "rabatt_kreditt" | "ukjent";
 
 export const LINE_KIND_LABEL: Record<LineKind, string> = {
@@ -29,6 +31,12 @@ export interface InsightLine {
   unit: string | null;
   unit_price: number | null;
   total_amount: number | null;
+  package_size?: number | null;
+  package_unit?: string | null;
+  count_per_package?: number | null;
+  unit_price_basis?: string | null;
+  discount_amount?: number | null;
+  line_kind?: string | null;
   invoice?: { is_credit_note: boolean | null } | null;
   matched_raw_material?: { name: string; category: string | null; item_type?: string | null; base_unit?: string | null } | null;
   suggestions?: Array<{ raw_material_id: string; confidence: number; match_reason: string | null; rank: number; raw_material: { name: string } | null }>;
@@ -109,57 +117,79 @@ export function guessLineKind(l: InsightLine): KindGuess {
   return { kind: "ukjent", reason: "Ingen koblet vare og ingen kjennetegn i teksten." };
 }
 
+/** Hvilken handling løser avklaringen. */
+export type ClarificationAction = "original" | "varekobling" | "pakning";
+
 export interface Clarification {
-  id: "text_weight_vs_piece" | "arithmetic_gap" | "collo_price" | "credit_sign" | "fee_linked_as_item";
+  id: "unit_conflict" | "read_issue" | "credit_sign" | "fee_linked_as_item";
   title: string;
   detail: string;
+  /** Hva som løser årsaken: les originalen/rett lesingen, kontroller varekoblingen eller pakningen. */
+  action: ClarificationAction;
   /** Sperrer pris-handlinger til avklart. */
   blocksPrice: boolean;
 }
 
-const near = (a: number, b: number) => Math.abs(a - b) <= Math.max(0.05, Math.abs(b) * 0.01);
 const nb = (n: number, d = 2) => n.toLocaleString("nb-NO", { maximumFractionDigits: d });
+/** Fakturaenheter som betyr en beholder med ukjent antall stk. */
+const CONTAINER = new Set(["sekk", "sk", "kartong", "krt", "kart", "kolli", "pall", "eske", "pk", "pakke", "pkn", "bx", "boks"]);
+const MEASURE_UNITS = new Set(["g", "gr", "kg", "ml", "cl", "dl", "l", "ltr"]);
 
-/** Konkrete motstrider mellom linjens egne felt. Endrer aldri raden. */
+/**
+ * Konkrete motstrider mellom linjens egne felt. Endrer aldri raden.
+ * Regnestykket kontrolleres med den delte lesekontrollen (`lineReadIssues`,
+ * samme regler og toleranse som serverens rm_line_read_issues_v2) — ingen egen toleranse her.
+ */
 export function lineClarifications(l: InsightLine): Clarification[] {
   const out: Clarification[] = [];
   const pkg = packageFromText(l.description);
   const rm = l.matched_raw_material;
   const base = (rm?.base_unit ?? "").toLowerCase();
-  if (pkg && pkg.count == null && rm && base === "stk") {
+  const unit = (l.unit ?? "").trim().toLowerCase();
+  const credit = l.invoice?.is_credit_note === true;
+
+  // Faktisk enhetsmotstrid: varen telles i stk, men linjen er fakturert i en
+  // beholder eller vekt uten oppgitt antall per pakning. En vektetikett alene
+  // (f.eks. «Smør 500 g» solgt per stk) er ikke en konflikt.
+  const countKnown = l.count_per_package != null && Number(l.count_per_package) > 0;
+  if (rm && base === "stk" && !countKnown && (CONTAINER.has(unit) || MEASURE_UNITS.has(unit))) {
     out.push({
-      id: "text_weight_vs_piece",
-      title: "Varetekst og registrert enhet stemmer ikke",
-      detail: `Teksten sier «${pkg.raw}», men «${rm.name}» er registrert per stk${rm.item_type ? ` som ${rm.item_type}` : ""}. Kontroller om varen skal telles i ${pkg.totalUnit} før du svarer på pakning eller pris.`,
+      id: "unit_conflict",
+      title: `Fakturert per ${l.unit}, men varen telles i stk`,
+      detail: `«${rm.name}» er registrert per stk, men linjen er fakturert i ${l.unit}${pkg ? ` og teksten sier «${pkg.raw}»` : ""}. Antall stk per ${l.unit} er ikke dokumentert — bekreft pakningen eller kontroller varekoblingen.`,
+      action: pkg && pkg.count == null && MEASURE_UNITS.has(unit) ? "varekobling" : "pakning",
       blocksPrice: true,
     });
   }
-  const q = l.quantity, p = l.unit_price, t = l.total_amount;
-  if (q != null && p != null && t != null && q !== 0 && p !== 0 && !near(q * p, Math.abs(t))) {
-    const perUnit = Math.abs(t) / q;
-    const collo = pkg?.count && near(q * pkg.count * p, Math.abs(t));
-    if (collo) {
-      out.push({ id: "collo_price", title: "Prisen ser ut til å gjelde per enhet i kolliet", detail: `${nb(q)} × ${pkg!.count} × ${nb(p)} kr = ${nb(Math.abs(t))} kr. Bekreft om enhetsprisen gjelder per stykk i kolliet.`, blocksPrice: true });
-    } else {
-      const pct = (1 - Math.abs(t) / (q * p)) * 100;
-      out.push({
-        id: "arithmetic_gap",
-        title: "Mengde × pris går ikke opp i linjebeløpet",
-        detail: `${nb(q)} × ${nb(p)} kr = ${nb(q * p)} kr, men linjebeløpet er ${nb(Math.abs(t))} kr (${nb(perUnit)} kr per ${l.unit ?? "enhet"}${pct > 0 ? `, ${nb(pct, 1)} % lavere — mulig rabatt` : ""}). Sjekk originalen før prisen brukes.`,
-        blocksPrice: true,
-      });
+
+  const issues = lineReadIssues({
+    quantity: l.quantity, unit: l.unit, unit_price: l.unit_price, total_amount: l.total_amount,
+    package_size: l.package_size ?? null, package_unit: l.package_unit ?? null, count_per_package: l.count_per_package ?? null,
+    unit_price_basis: l.unit_price_basis ?? null, discount_amount: l.discount_amount ?? null, line_kind: l.line_kind ?? null, is_credit: credit,
+  });
+  for (const i of issues) {
+    let detail = i.message;
+    const q = l.quantity, p = l.unit_price, t = l.total_amount;
+    if (pkg?.count && q != null && p != null && t != null && Math.abs(q * pkg.count * p - Math.abs(t)) < 0.005) {
+      detail += ` Teksten «${pkg.raw}» passer: ${nb(q)} × ${pkg.count} × ${nb(p)} kr = ${nb(Math.abs(t))} kr — enhetsprisen kan gjelde per stykk i kolliet.`;
     }
+    out.push({ id: "read_issue", title: "Tallene på linjen må kontrolleres mot originalen", detail, action: "original", blocksPrice: true });
   }
-  if (l.invoice?.is_credit_note && (t ?? 0) > 0) {
-    out.push({ id: "credit_sign", title: "Positivt beløp på kreditnota", detail: "Kontroller fortegnet mot originalen. Beløpet endres ikke automatisk.", blocksPrice: true });
+  if (credit && (l.total_amount ?? 0) > 0) {
+    out.push({ id: "credit_sign", title: "Positivt beløp på kreditnota", detail: "Kontroller fortegnet mot originalen. Beløpet endres ikke automatisk.", action: "original", blocksPrice: true });
   }
   if (rm && FEE.test(l.description ?? "")) {
-    out.push({ id: "fee_linked_as_item", title: "Gebyrlinje er koblet til en vare", detail: `Teksten ser ut som frakt/gebyr/pant, men er koblet til «${rm.name}». Vurder å merke den som ikke-råvare.`, blocksPrice: true });
+    out.push({ id: "fee_linked_as_item", title: "Gebyrlinje er koblet til en vare", detail: `Teksten ser ut som frakt/gebyr/pant, men er koblet til «${rm.name}». Vurder å merke den som ikke-råvare.`, action: "varekobling", blocksPrice: true });
   }
   return out;
 }
 
-export interface RankedSuggestion { rawMaterialId: string; name: string; reason: string; confidencePct: number | null }
+/** Sant når linjen har en åpen avklaring som sperrer prishandlinger. */
+export function priceHeldByClarification(l: InsightLine): Clarification | null {
+  return lineClarifications(l).find((c) => c.blocksPrice) ?? null;
+}
+
+export interface RankedSuggestion { rawMaterialId: string; name: string; reason: string; /** Serverens matchscore (likhet), ikke sannsynlighet for at fakturaen er riktig. */ matchScorePct: number | null }
 
 /** Inntil tre forslag i serverens rekkefølge, med serverens egen begrunnelse. */
 export function rankedSuggestions(l: InsightLine, max = 3): RankedSuggestion[] {
@@ -172,6 +202,6 @@ export function rankedSuggestions(l: InsightLine, max = 3): RankedSuggestion[] {
       rawMaterialId: s.raw_material_id,
       name: s.raw_material?.name ?? "Ukjent vare",
       reason: s.match_reason ?? "Ingen begrunnelse lagret",
-      confidencePct: Number.isFinite(s.confidence) ? Math.round(s.confidence * 100) : null,
+      matchScorePct: Number.isFinite(s.confidence) ? Math.round(s.confidence * 100) : null,
     }));
 }
