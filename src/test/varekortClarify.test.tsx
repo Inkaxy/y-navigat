@@ -170,4 +170,13 @@ describe("fokus på fakturasiden", () => {
     render(<MemoryRouter><FocusNotice {...base} kind="prisgrunnlag" isCreditNote={false} priceBasisHref="/ravarer/varer/rm?seksjon=pris" /></MemoryRouter>);
     expect(screen.getByRole("link", { name: "Se prisgrunnlaget på råvaren" }).getAttribute("href")).toBe("/ravarer/varer/rm?seksjon=pris");
   });
+  it("prisgrunnlag med registrert lesefeil: Rett fakturalinje først, ingen loop til varekortet", () => {
+    let n = 0;
+    render(<MemoryRouter><FocusNotice {...base} invoiceNumber="1511398" kind="prisgrunnlag" isCreditNote={false} onCorrect={() => { n++; }} priceBasisHref="/ravarer/varer/rm?seksjon=pris"
+      lineIssues={["24 sekk × 57,22 = 1 373,28, men linjesum er 27 463,44"]} /></MemoryRouter>);
+    expect(screen.getByTestId("focus-line-issues").textContent).toMatch(/27 463,44/);
+    fireEvent.click(screen.getByRole("button", { name: "Rett fakturalinje" }));
+    expect(n).toBe(1);
+    expect(screen.queryByRole("link", { name: /varekort/i })).toBeNull();
+  });
 });

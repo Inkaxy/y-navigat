@@ -429,6 +429,7 @@ export default function FakturaWorkspace() {
             onOpenControl={() => { setFactsSignal((n) => n + 1); setZone("kontroll"); }}
             onCorrect={lineWrite && fl ? () => startCorrection(fl.id) : null}
             onCredit={s.canWrite ? () => setDialog({ kind: "credit", inv: data }) : null}
+            lineIssues={fl ? parseReadIssues(fl.extraction_issues).map((i) => i.message).filter(Boolean) : []}
             priceBasisHref={fl?.raw_material_id ? paths.raavare(fl.raw_material_id, { seksjon: "pris" }) : null} />
         );
       })()}
