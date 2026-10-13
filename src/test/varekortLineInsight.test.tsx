@@ -87,7 +87,7 @@ describe("varekort-adapteren kjører ikke regnestykke på ufullstendige felt", (
   it("full kontroll beholdes der komplett linje finnes", () => {
     const base = { description: "Smør", quantity: 10, unit: "stk", unit_price: 10, invoice: { is_credit_note: false } };
     expect(lineClarifications({ ...base, total_amount: 90, discount_amount: 10 }).some((c) => c.id === "read_issue")).toBe(false);
-    expect(lineClarifications({ ...base, total_amount: 1000, package_size: 25, package_unit: "kg", unit_price_basis: "per_base", unit: "sekk", quantity: 2, unit_price: 20 }).some((c) => c.id === "read_issue")).toBe(false);
+    expect(lineClarifications({ ...base, total_amount: 1000, package_size: 25, package_unit: "kg", unit_price_basis: "kg", unit: "sekk", quantity: 2, unit_price: 20 }).some((c) => c.id === "read_issue")).toBe(false);
     expect(lineClarifications({ ...base, total_amount: 250 }).some((c) => c.id === "read_issue")).toBe(true);
   });
 });
