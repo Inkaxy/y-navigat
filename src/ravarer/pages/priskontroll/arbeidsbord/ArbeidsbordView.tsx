@@ -96,7 +96,7 @@ export function ArbeidsbordView(p: ArbeidsbordViewProps) {
 
   const toolbar = (
     <div className="flex flex-wrap items-center gap-2">
-      <nav aria-label="Første blokkering" className="-mx-1 flex max-w-full gap-1 overflow-x-auto px-1">
+      <nav aria-label="Kategori fra arbeidskøen" className="-mx-1 flex max-w-full gap-1 overflow-x-auto px-1">
         {WORK_GROUPS.map((g) => {
           const c = p.counts?.[g];
           const on = g === prm.gruppe;
