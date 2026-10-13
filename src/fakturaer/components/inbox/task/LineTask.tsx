@@ -208,11 +208,18 @@ export function LineTask(p: LineTaskProps) {
     };
   }
 
-  // Motstrid i linjens egne felt sperrer pakning/pris til mennesket har sett på koblingen.
+  // Motstrid i linjens egne felt sperrer prisen. Hovedhandlingen løser den faktiske årsaken.
   const clarifications = lineClarifications(line);
-  const priceHeldByClarification = mode === "price" && clarifications.some((c) => c.blocksPrice);
-  if (p.canWrite && priceHeldByClarification) {
-    primary = { label: "Kontroller råvarekoblingen", run: () => setEditMaterial(true), hint: clarifications[0].detail };
+  const heldBy = mode === "price" ? clarifications.find((c) => c.blocksPrice) ?? null : null;
+  const priceHeldByClarification = heldBy != null;
+  if (p.canWrite && heldBy) {
+    if (heldBy.action === "original") {
+      primary = { label: "Kontroller originalen", run: line.invoice.source_document_url ? () => p.onShowDocument(line) : null, hint: `${heldBy.detail} Rett lesingen via «Rett fakturalinje» om tallene er lest feil.` };
+    } else if (heldBy.action === "pakning") {
+      primary = { label: "Bekreft pakningen", run: form.selectedRmId ? () => setEditPackage(true) : null, hint: heldBy.detail };
+    } else {
+      primary = { label: "Kontroller varekoblingen", run: () => setEditMaterial(true), hint: heldBy.detail };
+    }
   }
 
   const rmName = form.selectedRm?.name ?? line.matched_raw_material?.name ?? null;
@@ -355,7 +362,7 @@ export function LineTask(p: LineTaskProps) {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="gap-1.5" aria-label="Flere valg for linjen">
-                  <MoreHorizontal className="h-4 w-4" /> Mer
+                  <MoreHorizontal className="h-4 w-4" /> Flere valg
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
