@@ -72,3 +72,16 @@ export function groupCountText(group: WorkGroup, counts: WorkItemsCounts | undef
   if (group === "alle" || group === "fakturaer") parts.push(`${saker} ${saker === 1 ? "fakturasak" : "fakturasaker"}`);
   return parts.join(" · ");
 }
+
+/**
+ * Overskrift for valgt element i arbeidsbordet. Et varekort med flere fakturaer får ikke én fakturas
+ * årsak (f.eks. en gammel kreditnota) som merkelapp for hele kortet; avklaringene vises per faktura i panelet.
+ */
+export function detailCause(it: Pick<WorkItem, "type" | "kind" | "open_lines" | "open_invoices"> & Partial<Pick<WorkItem, "action_required">>): { cause: string; next: string } {
+  const multi = it.type === "varekort" && (it.open_invoices ?? 0) > 1;
+  if (multi && overriding({ action_required: it.action_required ?? null, kind: it.kind })) {
+    const base = causeText({ ...it, action_required: null });
+    return { cause: `${base} · ${it.open_lines} åpne linjer på ${it.open_invoices} fakturaer`, next: "Se avklaringene per faktura nedenfor" };
+  }
+  return { cause: causeText(it), next: nextActionText({ kind: it.kind, action_required: it.action_required ?? null }) };
+}

@@ -207,7 +207,7 @@ export function whatIsMissing(i: SupplierItem): string {
     case "mangler_pakning":
       return `Varen er koblet til ${rm}, men pakningen er ikke bekreftet — derfor kan ikke ${i.rm_base_unit ? `prisen per ${i.rm_base_unit}` : "prisen per grunnenhet"} regnes ut på ${lines}.`;
     case "prisavvik":
-      return `Varen er koblet til ${rm}, men prisen avviker fra prisgrunnlaget på ${lines}. Avklar avviket i fakturakontrollen.`;
+      return `Varen er koblet til ${rm} og har ${lines} med registrert mulig prisavvik. Prisdelen viser hvilke som kan sammenlignes med dokumentert pris, og hva som må avklares først.`;
     case "kontroll":
       return `Varen er koblet til ${rm}, men ${lines} står til kontroll: ${reasonLabelsOf(i.reasons_raw).join(", ").toLowerCase() || "annen årsak"}.`;
     case "ikke_vare":

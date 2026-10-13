@@ -184,6 +184,9 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
   return (
     <div className="space-y-6">
       <VarekortHeaderView item={item} openInvoices={scope.invoices} />
+      {insightSrc && lines.length > 1 && (
+        <p className="text-sm font-medium" data-testid="valgt-faktura">Valgt faktura {insightSrc.invoice_number ?? "uten nummer"}{insightSrc.invoice_date ? ` · ${insightSrc.invoice_date.split("-").reverse().join(".")}` : ""}{insightSrc.is_credit_note ? " · kreditnota" : ""}</p>
+      )}
       {insightLine && <LineInsightPanel line={insightLine} clarifications={lineClarifications(insightLine)} />}
 
       {editForm ? (
@@ -209,7 +212,7 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
 
       {priceWork && linked && (
         <VBlock n={3} title="Pris">
-          <PriceBlock item={item} lines={lines} canWrite={canWrite} onDone={onDone} onCheckPackage={() => { setEditPkg(true); setEditForm(true); }} />
+          <PriceBlock item={item} lines={lines} canWrite={canWrite} onDone={onDone} selectedInvoiceId={originalLineId ? insightSrc?.invoice_id ?? null : null} onCheckPackage={() => { setEditPkg(true); setEditForm(true); }} />
         </VBlock>
       )}
 
