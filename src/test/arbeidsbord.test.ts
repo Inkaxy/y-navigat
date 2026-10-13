@@ -43,3 +43,17 @@ describe("ruter", () => {
   });
   it("syntetisk forhåndsvisning finnes", () => expect(readFileSync("src/App.tsx", "utf8")).toContain('path="/forhandsvisning/arbeidsbord"'));
 });
+
+describe("integrasjonsrettinger", () => {
+  it("prisavvik heter «Prisendringer å vurdere», ikke klare til godkjenning", () => {
+    const k = statusTiles(counts, null).find((x) => x.id === "klar")!;
+    expect(k.title).toBe("Prisendringer å vurdere");
+    expect(k.explain).toMatch(/Ingenting godkjennes automatisk/);
+  });
+  it("«Behandle flere» er synlig og originalen følger valgt linje", () => {
+    expect(readFileSync("src/ravarer/pages/priskontroll/arbeidsbord/ArbeidsbordView.tsx", "utf8")).toContain("Behandle flere");
+    const a = readFileSync("src/ravarer/pages/priskontroll/arbeidsbord/Arbeidsbord.tsx", "utf8");
+    expect(a).toContain('lineId={it.invoice_id ? null : prm.sp.get("linje")}');
+    expect(a).toContain("onOriginalLine=");
+  });
+});

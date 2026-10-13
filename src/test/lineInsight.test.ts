@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { guessLineKind, lineClarifications, packageFromText, rankedSuggestions, type InsightLine } from "@/fakturaer/lib/lineInsight";
+import { guessLineKind, lineClarifications, packageFromText, packageGateFromReview, packageGateFromSupplierItem, priceHeldByClarification, rankedSuggestions, type InsightLine } from "@/fakturaer/lib/lineInsight";
 
 const florapan: InsightLine = {
   description: "Florapan L62 k, pose 100 g",
@@ -101,5 +101,47 @@ describe("rangerte forslag", () => {
     expect(r.map((x) => x.rawMaterialId)).toEqual(["a", "b", "c"]);
     expect(r[0].reason).toBe("Alias-likhet (supplier_sku)");
     expect(r[1].reason).toBe("Ingen begrunnelse lagret");
+  });
+});
+
+describe("autoritative sperrer vs rådgivning", () => {
+  const krt: InsightLine = {
+    description: "Rundstykke 40 stk krt", quantity: 5, unit: "krt", unit_price: 200, total_amount: 1000, count_per_package: null,
+    invoice: { is_credit_note: false }, matched_raw_material: { name: "Rundstykke", category: null, item_type: "handelsvare", base_unit: "stk" },
+  };
+  it("stk/krt uten count_per_package men bekreftet leverandørpakning sperrer ikke", () => {
+    const c = lineClarifications({ ...krt, package_gate: "safe" });
+    expect(c.find((x) => x.id === "unit_conflict")?.blocksPrice).toBe(false);
+    expect(priceHeldByClarification({ ...krt, package_gate: "safe" })).toBeNull();
+  });
+  it("ukjent pakningsstatus er rådgivning, ikke ny sperre", () => expect(priceHeldByClarification(krt)).toBeNull());
+  it("pakning som eksisterende kontroll sier mangler sperrer", () => {
+    expect(priceHeldByClarification({ ...krt, package_gate: "missing" })?.id).toBe("unit_conflict");
+  });
+  it("serverens uavklarte lesefeil sperrer fortsatt", () => {
+    expect(priceHeldByClarification({ ...krt, package_gate: "safe", total_amount: 300 })?.id).toBe("read_issue");
+  });
+  it("paller som faktisk vare er ikke gebyr og sperrer ikke", () => {
+    const pall: InsightLine = { description: "Paller EUR 120x80", quantity: 10, unit: "stk", unit_price: 150, total_amount: 1500,
+      invoice: { is_credit_note: false }, matched_raw_material: { name: "EUR-pall", category: null, item_type: "handelsvare", base_unit: "stk" } };
+    expect(guessLineKind(pall).kind).not.toBe("frakt_gebyr_pant");
+    expect(lineClarifications(pall)).toEqual([]);
+  });
+  it("falsk gebyrmistanke er råd som ikke sperrer, og originalteksten er uendret", () => {
+    const l: InsightLine = { description: "Fraktkasse plast", quantity: 2, unit: "stk", unit_price: 50, total_amount: 100,
+      invoice: { is_credit_note: false }, matched_raw_material: { name: "Fraktkasse", category: null, base_unit: "stk" } };
+    const c = lineClarifications(l);
+    expect(c.find((x) => x.id === "fee_linked_as_item")?.blocksPrice).toBe(false);
+    expect(priceHeldByClarification(l)).toBeNull();
+    expect(l.description).toBe("Fraktkasse plast");
+  });
+  it("positivt beløp på kreditnota er råd, ikke sperre", () => {
+    expect(priceHeldByClarification({ description: "Mel", quantity: 1, unit: "stk", unit_price: 10, total_amount: 10, invoice: { is_credit_note: true } })).toBeNull();
+  });
+  it("pakningsstatus fra kø og leverandørvare", () => {
+    expect(packageGateFromReview("price_variance,unknown_package_size")).toBe("missing");
+    expect(packageGateFromReview("price_variance")).toBe("safe");
+    expect(packageGateFromSupplierItem({ base_units_per_package: 40, package_confirmed_at: "2026-10-01" })).toBe("safe");
+    expect(packageGateFromSupplierItem({ base_units_per_package: 40, package_confirmed_at: null })).toBe("missing");
   });
 });
