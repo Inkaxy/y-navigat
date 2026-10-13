@@ -23,6 +23,8 @@ import type { EditMaterialSignal } from "@/fakturaer/lib/editMaterialSignal";
 import { FakturaerDialogs, type DialogState } from "@/ravarer/pages/priskontroll/fakturaer/FakturaerDialogs";
 import { fakturaReturn, readReturnParam } from "@/ravarer/pages/priskontroll/fakturaer/visning";
 import { ControlSummary } from "./ControlSummary";
+import { FocusNotice } from "./FocusNotice";
+import { FOCUS_PARAM, parseFocus } from "@/ravarer/pages/priskontroll/gjore/clarifyTarget";
 import { SumOverrideDialog } from "./SumOverrideDialog";
 import { recheckInvoiceLinesSum } from "@/fakturaer/lib/linesSum";
 import { supabase } from "@/integrations/supabase/client";
@@ -145,6 +147,15 @@ export default function FakturaWorkspace() {
   }, [pendingFocus, q.visible]);
   // `?linje=<id>`: åpne nøyaktig denne linjen (også lukkede). Ukjent ID velger aldri en annen linje.
   const targetLine = sp.get("linje");
+  // `?fokus=`: åpnet fra en avklaring i varekortet — synlig overskrift, ingen automatisk skriving.
+  const focus = parseFocus(sp.get(FOCUS_PARAM));
+  const focusHandled = useRef<string | null>(null);
+  useEffect(() => {
+    if (focus !== "sum" || !data || focusHandled.current === data.id) return;
+    focusHandled.current = data.id;
+    setFactsSignal((n) => n + 1);
+    setZone("kontroll");
+  }, [focus, data]);
   const [lineNotice, setLineNotice] = useState<string | null>(null);
   /** Ugyldig mål: ingen annen linje vises som valgt før brukeren selv velger en. */
   const [suppressActive, setSuppressActive] = useState(false);
@@ -409,6 +420,18 @@ export default function FakturaWorkspace() {
         lineProgress={{ done: q.total - q.needs, total: q.total }}
         onMenu={onMenu}
       />
+      {focus && (() => {
+        const fl = targetLine ? linesById.get(targetLine) : undefined;
+        const ret = fakturaReturn(readReturnParam(sp));
+        return (
+          <FocusNotice kind={focus} backHref={ret.href} backLabel={ret.label} invoiceNumber={data.invoice_number} isCreditNote={!!data.is_credit_note}
+            onShowDocument={data.source_document_url ? () => { if (isMobile) setZone("dokument"); else if (!docOpen) toggleDoc(); } : null}
+            onOpenControl={() => { setFactsSignal((n) => n + 1); setZone("kontroll"); }}
+            onCorrect={lineWrite && fl ? () => startCorrection(fl.id) : null}
+            onCredit={s.canWrite ? () => setDialog({ kind: "credit", inv: data }) : null}
+            priceBasisHref={fl?.raw_material_id ? paths.raavare(fl.raw_material_id, { seksjon: "pris" }) : null} />
+        );
+      })()}
       {isMobile ? (
         <div className="space-y-3 pb-24">
           <Tabs value={zone} onValueChange={(v) => { if (v === "dokument" || v === "linjer" || v === "kontroll") setZone(v); }}>

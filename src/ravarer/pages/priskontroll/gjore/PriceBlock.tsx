@@ -2,6 +2,8 @@ import { packageGateFromSupplierItem, priceHeldByClarification } from "@/faktura
 import { useConfirmMany } from "@/ravarer/ui/useConfirmMany";
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
+import { clarifyHref, clarifyReturn } from "./clarifyTarget";
 import { postSafeCosts } from "@/fakturaer/lib/costPosting";
 import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import { firstCostLinesByInvoice, firstCostReport } from "./firstCost";
@@ -42,7 +44,7 @@ export function splitByGate<L extends GateLine>(cands: L[], gateOf: (l: L) => Pr
   for (const l of cands) {
     const g = gateOf(l);
     const base = { id: l.id, invoice_id: l.invoice_id, invoice_number: l.invoice_number, invoice_date: l.invoice_date };
-    if (!g.ok) { blocked.push({ ...base, label: g.label, detail: g.detail }); continue; }
+    if (!g.ok) { blocked.push({ ...base, label: g.label, detail: g.detail, reason: g.reason, action: g.action }); continue; }
     const s = g.safety;
     if (!s.raw_material_id || !s.base_unit || s.price_per_base_unit == null || s.expected_price_per_base_unit == null || s.effect_nok == null || priceDirection(s) === "same") continue;
     rows.push({ ...base, quantity: l.quantity, unit: l.unit, price_per_base_unit: s.price_per_base_unit, expected_price_per_base_unit: s.expected_price_per_base_unit, base_quantity: s.base_quantity, effect_nok: s.effect_nok, reference_source: s.reference_source, reference_id: s.reference_id,
@@ -78,9 +80,13 @@ type Props = {
   canWrite: boolean;
   onDone: (r: PanelResult) => void;
   onCheckPackage: () => void;
+  /** Fakturaen originalpanelet viser (arbeidsbordet). */
+  selectedInvoiceId?: string | null;
 };
 
-export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Props) {
+export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage, selectedInvoiceId }: Props) {
+  const loc = useLocation();
+  const ret = clarifyReturn(loc.pathname, loc.search);
   const { data: company } = useCompany();
   const tol = useMatchTolerances(company?.id ?? null);
   const cands = useMemo(() => priceCandidates(lines), [lines]);
@@ -194,6 +200,7 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
           onAccept={() => many.guard(lineRefs.length, "Godta prisen", () => void onAccept())} onCase={() => void onCase()}
           onFixAgreement={() => setAgreementOpen(true)} onCheckPackage={onCheckPackage}
           startPrice={startLine ? { onConfirm: () => setStartOpen(true) } : null}
+          hrefFor={(b) => clarifyHref(b, ret)} selectedInvoiceId={selectedInvoiceId ?? null}
         />
       ) : startLine ? (
         <div className="space-y-2 text-sm">

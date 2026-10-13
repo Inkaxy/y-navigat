@@ -1,4 +1,7 @@
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ArrowRight } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import type { ActionRequired } from "@/fakturaer/lib/financialPresentation";
+import { CLARIFY_BUTTON, clarifyKind, clarifySummary, startTarget } from "./clarifyTarget";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -17,7 +20,7 @@ export type PriceRow = PriceLine & { invoice_id: string; invoice_number: string 
   /** Fra serverens kvittering (schema 2). */
   raw_material_id: string; base_unit: string; reference_date: string | null };
 /** Linje som ikke kan sammenlignes nå, med serverens årsak. */
-export type BlockedRow = { id: string; invoice_id: string; invoice_number: string | null; invoice_date: string | null; label: string; detail: string };
+export type BlockedRow = { id: string; invoice_id: string; invoice_number: string | null; invoice_date: string | null; label: string; detail: string; reason: string; action: ActionRequired };
 
 export type PriceBlockViewProps = {
   rows: PriceRow[];
@@ -42,6 +45,10 @@ export type PriceBlockViewProps = {
   onFixAgreement: () => void;
   onCheckPackage: () => void;
   startPrice?: { onConfirm: () => void } | null;
+  /** Mål for hver avklaring (eksisterende flyt); null = løses i varekortet. */
+  hrefFor?: (b: BlockedRow) => string | null;
+  /** Fakturaen originalpanelet viser — dens avklaring vises først og merkes. */
+  selectedInvoiceId?: string | null;
 };
 
 const refLabel = (s: string | null) => (s && s in PRICE_REFERENCE_LABEL ? PRICE_REFERENCE_LABEL[s as keyof typeof PRICE_REFERENCE_LABEL] : "Prisgrunnlag");
@@ -61,8 +68,40 @@ export function PriceBlockView(p: PriceBlockViewProps) {
   const refKeys = [...new Set(chosen.map((r) => `${r.reference_source}|${r.reference_id}`))];
   const oneRef = refKeys.length === 1 ? chosen[0] : null;
 
+  // Alle kandidater er sperret: ingen prisvurdering ennå — vis avklaringene og én startknapp.
+  const allBlocked = p.status === "ready" && p.rows.length === 0 && p.blocked.length > 0;
+  const canDecide = p.status === "ready" && p.rows.length > 0;
+  const first = allBlocked ? startTarget(p.blocked) : null;
+  const firstHref = first ? p.hrefFor?.(first) ?? null : null;
+  const firstKind = first ? clarifyKind(first) : null;
+  const sel = p.selectedInvoiceId ?? null;
+  const orderedBlocked = sel ? [...p.blocked.filter((b) => b.invoice_id === sel), ...p.blocked.filter((b) => b.invoice_id !== sel)] : p.blocked;
+  const moreMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild><Button variant="ghost" className="min-h-11">Flere valg</Button></DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        <DropdownMenuItem disabled={!p.canWrite} onSelect={p.onFixAgreement}>Rett avtalepris</DropdownMenuItem>
+        <DropdownMenuItem data-action="check-package" onSelect={p.onCheckPackage}>Kontroller pakningen</DropdownMenuItem>
+        {p.startPrice && <DropdownMenuItem disabled={!p.canWrite} onSelect={p.startPrice.onConfirm}>Bekreft startpris</DropdownMenuItem>}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <div className="space-y-3">
+      {allBlocked && (
+        <div className="space-y-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm" data-testid="clarify-first">
+          <h4 className="font-semibold">Avklar før prisvurdering</h4>
+          <p>Ingen av de {p.blocked.length} åpne linjene kan sammenlignes med en dokumentert pris ennå: {clarifySummary(p.blocked)}.</p>
+          <p className="text-caption text-ink-secondary">Prisen kan først godtas eller sendes som leverandørsak når avklaringene er gjort. Ingenting godkjennes automatisk.</p>
+          {first && (firstHref ? (
+            <Button asChild className="min-h-11 gap-1.5" data-primary-action><Link to={firstHref}>Start avklaring<span className="sr-only">: faktura {first.invoice_number ?? ""}</span><ArrowRight className="h-4 w-4" aria-hidden /></Link></Button>
+          ) : firstKind === "pakning" ? (
+            <Button className="min-h-11" data-primary-action onClick={p.onCheckPackage}>Start avklaring</Button>
+          ) : null)}
+          {first && <p className="text-caption text-ink-secondary">Starter med faktura {first.invoice_number ?? "uten nummer"} ({formatDate(first.invoice_date)}): {CLARIFY_BUTTON[clarifyKind(first)].toLowerCase()}.</p>}
+        </div>
+      )}
       {p.status === "loading" && <p role="status" className="text-sm text-ink-secondary">Prisgrunnlag ikke kontrollert ennå — henter status fra serveren …</p>}
       {p.status === "error" && (
         <p role="alert" className="text-sm text-warning">Prisgrunnlaget kunne ikke kontrolleres. Ingen prisavvik vises. {p.onRetry && <button type="button" className="underline" onClick={p.onRetry}>Prøv igjen</button>}</p>
@@ -122,21 +161,39 @@ export function PriceBlockView(p: PriceBlockViewProps) {
       )}
 
       {p.blocked.length > 0 && (
-        <div className="space-y-1 rounded-md border border-border p-3 text-sm">
-          <p className="font-medium">{p.blocked.length} {p.blocked.length === 1 ? "linje kan" : "linjer kan"} ikke sammenlignes nå</p>
-          <ul className="space-y-1 text-caption">
-            {p.blocked.map((b) => (
-              <li key={b.id} className="flex flex-wrap gap-x-2">
-                <Link className="underline underline-offset-2" to={paths.faktura(b.invoice_id)}>Faktura {b.invoice_number ?? "—"}</Link>
-                <span className="text-ink-secondary">{formatDate(b.invoice_date)}</span>
-                <span className="text-warning" title={b.detail}>{b.label}</span>
-              </li>
-            ))}
+        <div className="space-y-2 rounded-md border border-border p-3 text-sm" data-testid="clarify-list">
+          {!allBlocked && <p className="font-medium">{p.blocked.length} {p.blocked.length === 1 ? "linje kan" : "linjer kan"} ikke sammenlignes nå</p>}
+          <ul className="divide-y divide-line-subtle">
+            {orderedBlocked.map((b) => {
+              const href = p.hrefFor?.(b) ?? null;
+              const k = clarifyKind(b);
+              const sel = !!p.selectedInvoiceId && b.invoice_id === p.selectedInvoiceId;
+              const label = CLARIFY_BUTTON[k];
+              const aria = `${label}: faktura ${b.invoice_number ?? "uten nummer"}`;
+              return (
+                <li key={b.id} data-clarify={k} data-invoice={b.invoice_number ?? ""} className="space-y-1.5 py-2">
+                  <div className="min-w-0">
+                    <p className="font-medium">
+                      Faktura {b.invoice_number ?? "—"} <span className="font-normal text-ink-secondary">· {formatDate(b.invoice_date)}</span>
+                      {sel && <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-caption font-normal">Vises i originalen</span>}
+                    </p>
+                    <p className="text-warning">{b.label}</p>
+                    <p className="text-caption text-ink-secondary">{b.detail}</p>
+                  </div>
+                  {href ? (
+                    <Button asChild size="sm" variant="outline" className="min-h-11"><Link to={href} aria-label={aria}>{label}</Link></Button>
+                  ) : k === "pakning" ? (
+                    <Button size="sm" variant="outline" className="min-h-11" aria-label={aria} onClick={p.onCheckPackage}>{label}</Button>
+                  ) : p.onRetry ? (
+                    <Button size="sm" variant="outline" className="min-h-11" aria-label={aria} onClick={p.onRetry}>{label}</Button>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
 
-      <Textarea value={p.reason} onChange={(e) => p.onReason(e.target.value)} placeholder="Begrunnelse (valgfri)" rows={2} aria-label="Begrunnelse" />
       {p.error && (
         <div role="alert" className="text-sm text-destructive">
           <p>{p.error}</p>
@@ -144,16 +201,21 @@ export function PriceBlockView(p: PriceBlockViewProps) {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 [&>button]:min-h-11">
-        <Button data-action="accept-price" data-primary-action={primary === "accept" ? "" : undefined} variant={primary === "accept" ? "default" : "outline"} disabled={disabled} onClick={p.onAccept}>Godta ny pris</Button>
-        <Button data-action="claim-credit" data-primary-action={primary === "claim" ? "" : undefined} variant={primary === "claim" ? "default" : "outline"} disabled={disabled || positiveCount === 0} onClick={p.onCase}>
-          {positiveCount ? `Opprett leverandørsak for ${positiveCount} dyrere ${positiveCount === 1 ? "linje" : "linjer"} …` : "Opprett leverandørsak …"}
-        </Button>
-        <Button variant="ghost" disabled={!p.canWrite} onClick={p.onFixAgreement}>Rett avtalepris</Button>
-        <Button data-action="check-package" variant="ghost" onClick={p.onCheckPackage}>Kontroller pakningen</Button>
-        {p.startPrice && <Button variant="ghost" disabled={!p.canWrite} onClick={p.startPrice.onConfirm}>Bekreft startpris</Button>}
-      </div>
-      <p className="text-caption text-ink-secondary">Serveren avgjør om saken blir et dokumentert krav (avtalepris) eller en prisforespørsel (tidligere kjøp eller startpris).</p>
+      {canDecide ? (
+        <>
+          <Textarea value={p.reason} onChange={(e) => p.onReason(e.target.value)} placeholder="Begrunnelse (valgfri)" rows={2} aria-label="Begrunnelse" />
+          <div className="flex flex-wrap gap-2 [&>button]:min-h-11">
+            <Button data-action="accept-price" data-primary-action={primary === "accept" ? "" : undefined} variant={primary === "accept" ? "default" : "outline"} disabled={disabled} onClick={p.onAccept}>Godta ny pris</Button>
+            <Button data-action="claim-credit" data-primary-action={primary === "claim" ? "" : undefined} variant={primary === "claim" ? "default" : "outline"} disabled={disabled || positiveCount === 0} onClick={p.onCase}>
+              {positiveCount ? `Opprett leverandørsak for ${positiveCount} dyrere ${positiveCount === 1 ? "linje" : "linjer"} …` : "Opprett leverandørsak …"}
+            </Button>
+            {moreMenu}
+          </div>
+          <p className="text-caption text-ink-secondary">Serveren avgjør om saken blir et dokumentert krav (avtalepris) eller en prisforespørsel (tidligere kjøp eller startpris).</p>
+        </>
+      ) : (
+        p.status === "ready" && <div className="flex flex-wrap gap-2">{moreMenu}</div>
+      )}
       {!p.canWrite && <p className="text-caption text-ink-secondary">Du har bare lesetilgang.</p>}
     </div>
   );

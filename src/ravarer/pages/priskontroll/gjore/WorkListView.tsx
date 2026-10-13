@@ -12,7 +12,7 @@ import { kr } from "./logic";
 
 // impact_nok er absolutt størrelse fra serveren — vises uten fortegn.
 const unsignedKr = (n: number) => kr(Math.abs(n));
-import { causeText, nextActionText } from "./groupCopy";
+import { detailCause } from "./groupCopy";
 import { WorkRowPrice } from "./WorkRowPrice";
 
 function MobileEffect({ it }: { it: WorkItem }) {
@@ -70,7 +70,7 @@ function CompactRow({ it }: { it: WorkItem }) {
       <StatusPill label={meta.label} tokenVar={meta.tokenVar} />
       <p className="line-clamp-2 break-words text-sm font-medium text-foreground" title={it.title}>{it.title}</p>
       <p className="truncate text-caption text-ink-secondary" title={rowSubtitle(it)}>{sub}</p>
-      <p className="text-caption"><span className="text-ink-secondary">{causeText(it)}</span> <span className="font-medium text-primary">→ {nextActionText(it)}</span></p>
+      <p className="text-caption"><span className="text-ink-secondary">{detailCause(it).cause}</span> <span className="font-medium text-primary">→ {detailCause(it).next}</span></p>
       {e.kind !== "none" && (
         <p className={`text-caption tabular-nums ${e.kind === "read" ? "text-warning" : "text-ink-secondary"}`}>
           {e.label}{e.kind === "verified" ? `: ${unsignedKr(e.value)}` : ""}
@@ -115,7 +115,7 @@ export function WorkListView({ items, total, selectedKey, loading, fetchingMore,
               <button
                 type="button"
                 data-key={it.key}
-                aria-label={compact ? `${it.title}. ${rowSubtitle(it)}. ${causeText(it)}. ${nextActionText(it)}` : undefined}
+                aria-label={compact ? `${it.title}. ${rowSubtitle(it)}. ${detailCause(it).cause}. ${detailCause(it).next}` : undefined}
                 onClick={() => onSelect(it)}
                 className={cn(
                   "relative flex w-full items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/50",
@@ -130,9 +130,9 @@ export function WorkListView({ items, total, selectedKey, loading, fetchingMore,
                   </div>
                   <p className="truncate text-sm text-ink-secondary">{rowSubtitle(it)}</p>
                   <p className="flex flex-wrap items-center gap-x-2 text-sm">
-                    <span className="text-ink-secondary">{causeText(it)}</span>
+                    <span className="text-ink-secondary">{detailCause(it).cause}</span>
                     <span aria-hidden className="text-ink-secondary">·</span>
-                    <span className="font-medium text-primary">{nextActionText(it)} →</span>
+                    <span className="font-medium text-primary">{detailCause(it).next} →</span>
                   </p>
                   <WorkRowPrice it={it} />
                   <MobileEffect it={it} />

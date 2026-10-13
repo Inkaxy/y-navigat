@@ -10,7 +10,7 @@ import type { WorkGroup, WorkItem, WorkItemsCounts, WorkSort, WorkSummary } from
 import { WORK_GROUPS } from "@/ravarer/lib/workRpcTypes";
 import { cn } from "@/lib/utils";
 import { GJORE_SORTS, GROUP_LABELS, parseGruppe, parseSort, stepKey } from "../gjore/logic";
-import { causeText, nextActionText } from "../gjore/groupCopy";
+import { detailCause } from "../gjore/groupCopy";
 import { WorkListView } from "../gjore/WorkListView";
 import { StatusOversikt } from "./StatusOversikt";
 import { parseDel, statusTiles } from "./sporLogic";
@@ -161,7 +161,7 @@ export function ArbeidsbordView(p: ArbeidsbordViewProps) {
       <p className="text-caption text-ink-secondary">{sel.supplier_name ?? "Ukjent leverandør"}</p>
       <h2 className="font-serif text-lg leading-tight">{sel.title}</h2>
       {/* Hovedårsaken vises én gang; panelet under har selve handlingen. */}
-      <p className="text-sm"><span className="font-medium">{causeText(sel)}</span><span className="text-ink-secondary"> · Neste: {nextActionText(sel)}</span></p>
+      <p className="text-sm" data-testid="detail-cause"><span className="font-medium">{detailCause(sel).cause}</span><span className="text-ink-secondary"> · Neste: {detailCause(sel).next}</span></p>
     </header>
   );
 
