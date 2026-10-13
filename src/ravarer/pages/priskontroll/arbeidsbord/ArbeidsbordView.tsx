@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ChevronLeft, ChevronRight, FileText, MoreHorizontal, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, MoreHorizontal, Search, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -88,7 +88,7 @@ export function ArbeidsbordView(p: ArbeidsbordViewProps) {
 
   const sel = p.items.find((i) => i.key === prm.valgt) ?? null;
   const idx = sel ? p.items.indexOf(sel) : -1;
-  const select = (key: string | null, push = true) => prm.set({ valgt: key, del: null }, push);
+  const select = (key: string | null, push = true) => prm.set({ valgt: key, del: null, linje: null }, push);
   const next = () => select(stepKey(p.items, prm.valgt, 1), false);
   const prev = () => select(stepKey(p.items, prm.valgt, -1), false);
   const ctx: DetailCtx = { onDone: next, onNext: next, onSkip: next };
@@ -116,6 +116,11 @@ export function ArbeidsbordView(p: ArbeidsbordViewProps) {
         <SelectTrigger className="min-h-[44px] w-full sm:w-56" aria-label="Rekkefølge"><SelectValue /></SelectTrigger>
         <SelectContent>{GJORE_SORTS.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
       </Select>
+      <Button asChild variant="outline" className="min-h-[44px] w-full gap-1.5 sm:w-auto">
+        <Link to={p.classicHref} title="Velg flere varekort og behandle dem samlet med forhåndsvisning. Filteret beholdes.">
+          <ListChecks className="h-4 w-4" aria-hidden /> Behandle flere
+        </Link>
+      </Button>
     </div>
   );
 
@@ -149,7 +154,7 @@ export function ArbeidsbordView(p: ArbeidsbordViewProps) {
           <DropdownMenuContent align="end">
             <DropdownMenuItem asChild><Link to={p.fullHref(sel)}>Åpne på egen side</Link></DropdownMenuItem>
             <DropdownMenuItem onSelect={next}>Hopp over</DropdownMenuItem>
-            <DropdownMenuItem asChild><Link to={p.classicHref}>Klassisk visning</Link></DropdownMenuItem>
+            <DropdownMenuItem asChild><Link to={p.classicHref}>Behandle flere (samlet visning)</Link></DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

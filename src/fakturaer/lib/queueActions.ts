@@ -1,4 +1,4 @@
-import { priceHeldByClarification } from "@/fakturaer/lib/lineInsight";
+import { packageGateFromReview, priceHeldByClarification } from "@/fakturaer/lib/lineInsight";
 import { supabase } from "@/integrations/supabase/client";
 import { acceptMatch } from "@/fakturaer/lib/acceptMatch";
 import { deriveLinePackage, resolveLineCost } from "@/fakturaer/lib/units";
@@ -196,7 +196,7 @@ export function canAcceptPriceVariance(line: ReviewLineRow): boolean {
   if (!line.raw_material_id || !["manual", "auto_high"].includes(line.match_confidence ?? "")) return false;
   const reasons = allReasons(line);
   // Åpen avklaring i linjens egne felt (enhetsmotstrid, lesefeil, fortegn) sperrer alle prisveier.
-  if (priceHeldByClarification(line)) return false;
+  if (priceHeldByClarification({ ...line, package_gate: packageGateFromReview(line.review_reason) })) return false;
   return reasons.length > 0 && reasons.every((r) => ACCEPTABLE_PRICE_REASONS.has(r));
 }
 

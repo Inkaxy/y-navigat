@@ -23,11 +23,12 @@ export function LineInsightPanel({ line, clarifications }: Props) {
   return (
     <div className="space-y-2" aria-label="Tolkning av linjen">
       {clarifications.map((c) => (
-        <div key={c.id} role="status" className="flex gap-2 rounded-md border border-warning/40 bg-warning/10 p-2 text-caption">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
+        <div key={c.id} role="status" className={c.blocksPrice ? "flex gap-2 rounded-md border border-warning/40 bg-warning/10 p-2 text-caption" : "flex gap-2 rounded-md border border-line-subtle bg-muted/40 p-2 text-caption"}>
+          {c.blocksPrice ? <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden /> : <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-ink-secondary" aria-hidden />}
           <div>
-            <p className="font-medium text-foreground">{c.title}</p>
+            <p className="font-medium text-foreground">{c.blocksPrice ? c.title : `Råd: ${c.title}`}</p>
             <p className="text-ink-secondary">{c.detail}</p>
+            {!c.blocksPrice && <p className="text-ink-secondary">Sperrer ikke prisen — de eksisterende kontrollene er trygge.</p>}
           </div>
         </div>
       ))}

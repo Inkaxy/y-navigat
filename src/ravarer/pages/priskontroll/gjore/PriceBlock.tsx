@@ -1,4 +1,4 @@
-import { priceHeldByClarification } from "@/fakturaer/lib/lineInsight";
+import { packageGateFromSupplierItem, priceHeldByClarification } from "@/fakturaer/lib/lineInsight";
 import { useConfirmMany } from "@/ravarer/ui/useConfirmMany";
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -61,11 +61,11 @@ export function hasPriceWork(item: SupplierItem, lines: SupplierItemLine[]): boo
 }
 
 /** Avklaring i linjens egne felt gir en lukket prisstatus. */
-export function clarificationGate(l: SupplierItemLine): PriceGate | null {
+export function clarificationGate(l: SupplierItemLine, item?: Pick<SupplierItem, "base_units_per_package" | "package_confirmed_at"> | null): PriceGate | null {
   const c = priceHeldByClarification({
     description: l.description, quantity: l.quantity, unit: l.unit, unit_price: l.unit_price, total_amount: l.total_amount,
     package_size: l.package_size, package_unit: l.package_unit, count_per_package: l.count_per_package,
-    invoice: { is_credit_note: l.is_credit_note },
+    invoice: { is_credit_note: l.is_credit_note }, package_gate: packageGateFromSupplierItem(item),
   });
   return c ? { ok: false, reason: c.id, action: "review_reading", label: c.title, detail: c.detail } : null;
 }
@@ -88,7 +88,7 @@ export function PriceBlock({ item, lines, canWrite, onDone, onCheckPackage }: Pr
   // Én autoritativ statusforespørsel per bidragende faktura (begrenset samtidighet i hooken).
   const safety = useInvoicePriceSafety(cands.map((l) => l.invoice_id), { pending: accept.isPending || claim.isPending, rawMaterialId: item.rm_id ?? null });
   // Serverens prisstatus først; deretter samme linjeavklaring som fakturakøen (lesing/fortegn) — alle prisveier sperres likt.
-  const { rows, blocked } = splitByGate(cands, (l) => clarificationGate(l) ?? safety.gateFor({ id: l.id, invoice_id: l.invoice_id }));
+  const { rows, blocked } = splitByGate(cands, (l) => clarificationGate(l, item) ?? safety.gateFor({ id: l.id, invoice_id: l.invoice_id }));
   const status: "ready" | "loading" | "error" = cands.length === 0 || safety.allFresh ? "ready" : safety.anyError ? "error" : "loading";
   // Ingen linjer er valgt på forhånd; valg som ikke lenger er kontrollert faller bort.
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
