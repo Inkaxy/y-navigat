@@ -8,6 +8,7 @@ import { syncRegisteredPrices, learnPendingAliases } from "../_shared/priceSync.
 import { pickPackageRow } from "../_shared/packageSignature.ts";
 import { reconcileAcceptance } from "../_shared/priceAcceptance.ts";
 import { CREDIT_NOTE_REF_PREFIX, creditNoteOriginalRef } from "../_shared/creditNote.ts";
+import { authorizeCron } from "../_shared/cron-auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -48,11 +49,15 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
+    // Tjenestekall: service-role-bearer (import) ELLER X-Cron-Secret verifisert
+    // server-side via verify_cron_secret (rm_rematch_tick). Tom, kort eller feil
+    // secret — og enhver databasefeil i verifiseringen — gir IKKE tjenestetilgang;
+    // da gjelder vanlig bruker-JWT + firmarettighet som før.
+    const cronClient = createClient(SUPABASE_URL, SERVICE);
+    const isServiceCall = (await authorizeCron(req, cronClient)) !== null;
     const auth = req.headers.get("Authorization");
-    if (!auth) return json({ error: "Unauthorized" }, 401);
-    // Tjenestekall (cron/import) med service-role-nøkkelen hopper over brukersjekken.
-    const isServiceCall = auth.replace(/^Bearer\s+/i, "").trim() === SERVICE;
-    const userClient = createClient(SUPABASE_URL, ANON, { global: { headers: { Authorization: auth } } });
+    if (!isServiceCall && !auth) return json({ error: "Unauthorized" }, 401);
+    const userClient = createClient(SUPABASE_URL, ANON, { global: { headers: { Authorization: auth ?? "" } } });
     if (!isServiceCall) {
       const { data: userData, error: uerr } = await userClient.auth.getUser();
       if (uerr || !userData.user) return json({ error: "Unauthorized" }, 401);

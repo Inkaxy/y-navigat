@@ -107,3 +107,6 @@ verify_jwt = false
 
 [functions.matvaretabellen-sync]
 verify_jwt = false
+
+[functions.match-invoice-lines]
+verify_jwt = false
