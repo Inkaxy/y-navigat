@@ -33,7 +33,7 @@ export type WorkItemsParams = {
   limit?: number; offset?: number; enabled?: boolean;
 };
 
-export function useWorkItems({ group = "alle", search = null, supplierId = null, sort = "impact", limit = 50, offset = 0, enabled = true }: WorkItemsParams = {}) {
+export function useWorkItems({ group = "alle", search = null, supplierId = null, sort = "oldest", limit = 50, offset = 0, enabled = true }: WorkItemsParams = {}) {
   const { data: company } = useCompany();
   const legalEntityId = company?.id ?? null;
   return useQuery({

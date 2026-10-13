@@ -39,7 +39,7 @@ export const WORK_KINDS = [
   "faktura_mangler_linjer", "faktura_sumavvik", "faktura_flagget", "faktura_klar",
 ] as const;
 export type WorkItemKind = (typeof WORK_KINDS)[number];
-export type WorkSort = "impact" | "frequency" | "newest";
+export type WorkSort = "oldest" | "impact" | "frequency" | "newest";
 
 export type WorkItem = {
   key: string; grp: WorkItemGroup; type: "varekort" | "faktura"; kind: WorkItemKind;

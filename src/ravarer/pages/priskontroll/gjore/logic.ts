@@ -33,16 +33,18 @@ export const fakturaKey = (invoiceId: string) => `faktura:${invoiceId}`;
 
 // ---------- URL-parametre ----------
 export const GJORE_SORTS: { id: WorkSort; label: string }[] = [
+  { id: "oldest", label: "Eldste fakturadato først" },
   { id: "impact", label: "Prioritet" },
   { id: "frequency", label: "Går oftest igjen" },
-  { id: "newest", label: "Nyeste" },
+  { id: "newest", label: "Nyeste fakturadato først" },
 ];
 
 export function parseGruppe(v: string | null): WorkGroup {
   return (WORK_GROUPS as readonly string[]).includes(v ?? "") ? (v as WorkGroup) : "alle";
 }
 export function parseSort(v: string | null): WorkSort {
-  return v === "frequency" || v === "newest" ? v : "impact";
+  // Eldste fakturadato først er standard: eldre priser skal behandles før nyere.
+  return v === "impact" || v === "frequency" || v === "newest" ? v : "oldest";
 }
 
 export const GROUP_LABELS: Record<WorkGroup, string> = {

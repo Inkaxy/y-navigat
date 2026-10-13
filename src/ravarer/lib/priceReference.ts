@@ -11,6 +11,7 @@ const PRICE_REFERENCE_REASON: Record<string, string> = {
   mangler_vare_leverandor_eller_dato: "Mangler vare, leverandør eller dato",
   to_likestilte_avtaler_med_ulik_pris: "To likestilte avtaler med ulik pris — velg én",
   ingen_sammenlignbare_kjop_etter_enhetsendring: "Ingen sammenlignbare kjøp etter at grunnenheten ble endret",
+  flere_kjop_samme_dato_ulik_pris: "Flere kjøp samme dato med ulik pris — velg grunnlag manuelt",
   ingen_avtale_eller_tidligere_kjop: "Ingen avtale og ingen tidligere kjøp — første faktura blir grunnlaget",
 };
 

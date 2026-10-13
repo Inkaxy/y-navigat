@@ -25,7 +25,7 @@ import { blockerLabel } from "@/fakturaer/lib/approval";
 import { ApprovalHistorySheet } from "./ApprovalHistorySheet";
 import { ConfirmInvoiceList } from "./ConfirmInvoiceList";
 import { ApprovedBy, approvalColumns, RowMenu } from "./approvalColumns";
-import { bulkActionGate, approvalReport, canPostCosts, costReport, countByStatus, filterApprovalRows, GODKJENNING_LABEL, GODKJENNING_STATUSER, parseGodkjenningStatus, type GodkjenningStatus } from "./approvalLogic";
+import { bulkActionGate, approvalReport, canPostCosts, costReport, countByStatus, filterApprovalRows, GODKJENNING_LABEL, GODKJENNING_STATUSER, parseGodkjenningStatus, parseRekkefolge, REKKEFOLGE_LABEL, type GodkjenningStatus, type Rekkefolge } from "./approvalLogic";
 import { approvalSteps, useApprovalDelivery, useApprovalOverview } from "./useGodkjenning";
 
 const PAGE = 25;
@@ -42,6 +42,7 @@ export function GodkjenningTab() {
   const gate = bulkActionGate({ canApprove, canWrite });
   const status = parseGodkjenningStatus(sp.get("status"));
   const leverandor = sp.get("leverandor");
+  const rekkefolge = parseRekkefolge(sp.get("rekkefolge"));
   const page = Math.max(1, Number(sp.get("side") ?? "1") || 1);
   const [q, setQ] = useState(sp.get("q") ?? "");
   const debounced = useDebouncedValue(q, 300);
@@ -69,7 +70,7 @@ export function GodkjenningTab() {
   const rows = useMemo(() => overview.data ?? [], [overview.data]);
   const counts = useMemo(() => countByStatus(rows), [rows]);
   const suppliers = useMemo(() => [...new Map(rows.filter((r) => r.supplier_id).map((r) => [r.supplier_id as string, r.supplier_name ?? "Ukjent"])).entries()].sort((a, b) => a[1].localeCompare(b[1], "nb")), [rows]);
-  const visible = useMemo(() => filterApprovalRows(rows, { status, q: sp.get("q") ?? "", leverandor }), [rows, status, sp, leverandor]);
+  const visible = useMemo(() => filterApprovalRows(rows, { status, q: sp.get("q") ?? "", leverandor, rekkefolge }), [rows, status, sp, leverandor, rekkefolge]);
   const pg = paginate(visible, page, PAGE);
   const ids = pg.items.map((r) => r.invoice_id);
   const delivery = useApprovalDelivery(ids);
@@ -139,6 +140,12 @@ export function GodkjenningTab() {
           <SelectContent>
             <SelectItem value="all">Alle leverandører</SelectItem>
             {suppliers.map(([id, n]) => <SelectItem key={id} value={id}>{n}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={rekkefolge} onValueChange={(v) => update({ rekkefolge: v === "eldste" ? null : v })}>
+          <SelectTrigger className="w-[230px]" aria-label="Rekkefølge"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {(Object.keys(REKKEFOLGE_LABEL) as Rekkefolge[]).map((k) => <SelectItem key={k} value={k}>{REKKEFOLGE_LABEL[k]}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>

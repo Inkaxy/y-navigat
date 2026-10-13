@@ -177,7 +177,7 @@ export function GjoreWorkspace() {
     </Select>
   );
   const sortSelect = (
-    <Select value={sort} onValueChange={(v) => set({ sort: v === "impact" ? null : v })}>
+    <Select value={sort} onValueChange={(v) => set({ sort: v === "oldest" ? null : v })}>
       <SelectTrigger className="w-full 2xl:w-44" aria-label="Sortering"><SelectValue /></SelectTrigger>
       <SelectContent>{GJORE_SORTS.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
     </Select>
