@@ -45,6 +45,13 @@ export interface InsightLine {
    * Ukjent (udefinert) gjør en tekstmistanke til rådgivning, aldri til en ny prissperre.
    */
   package_gate?: "safe" | "missing" | null;
+  /**
+   * "incomplete" når kilden ikke leverer prisgrunnlag/rabatt (f.eks. leverandørvarelinjer).
+   * Da kjøres ikke eget regnestykke — bare serverens dokumenterte lesevarsel vises.
+   */
+  arithmetic_context?: "complete" | "incomplete";
+  /** Serverens lagrede årsakskoder (kommaseparert review_reason), brukt når regnestykket ikke kan kjøres her. */
+  server_review_reason?: string | null;
   suggestions?: Array<{ raw_material_id: string; confidence: number; match_reason: string | null; rank: number; raw_material: { name: string } | null }>;
 }
 
@@ -177,19 +184,26 @@ export function lineClarifications(l: InsightLine): Clarification[] {
     });
   }
 
-  const issues = lineReadIssues({
-    quantity: l.quantity, unit: l.unit, unit_price: l.unit_price, total_amount: l.total_amount,
-    package_size: l.package_size ?? null, package_unit: l.package_unit ?? null, count_per_package: l.count_per_package ?? null,
-    unit_price_basis: l.unit_price_basis ?? null, discount_amount: l.discount_amount ?? null, line_kind: l.line_kind ?? null, is_credit: credit,
-  });
-  for (const i of issues) {
-    // Bare visning: beløp i den delte meldingen («6697.50») vises norsk («6 697,50»). Regel og råbevis er uendret.
-    let detail = nbAmounts(i.message);
-    const q = l.quantity, p = l.unit_price, t = l.total_amount;
-    if (pkg?.count && q != null && p != null && t != null && Math.abs(q * pkg.count * p - Math.abs(t)) < 0.005) {
-      detail += ` Teksten «${pkg.raw}» passer: ${nb(q)} × ${pkg.count} × ${nb(p)} kr = ${nb(Math.abs(t))} kr — enhetsprisen kan gjelde per stykk i kolliet.`;
+  if (l.arithmetic_context === "incomplete") {
+    // Ufullstendig datasett: ingen ny regnefeil herfra. Serverens dokumenterte lesevarsel vises fortsatt.
+    if ((l.server_review_reason ?? "").split(",").map((x) => x.trim()).includes("extraction_unresolved")) {
+      out.push({ id: "read_issue", title: "Tallene på linjen må kontrolleres mot originalen", detail: "Serveren har registrert et uløst lesevarsel på linjen. Les tallene av originalen.", action: "original", blocksPrice: true });
     }
-    out.push({ id: "read_issue", title: "Tallene på linjen må kontrolleres mot originalen", detail, action: "original", blocksPrice: true });
+  } else {
+    const issues = lineReadIssues({
+      quantity: l.quantity, unit: l.unit, unit_price: l.unit_price, total_amount: l.total_amount,
+      package_size: l.package_size ?? null, package_unit: l.package_unit ?? null, count_per_package: l.count_per_package ?? null,
+      unit_price_basis: l.unit_price_basis ?? null, discount_amount: l.discount_amount ?? null, line_kind: l.line_kind ?? null, is_credit: credit,
+    });
+    for (const i of issues) {
+      // Bare visning: beløp i den delte meldingen («6697.50») vises norsk («6 697,50»). Regel og råbevis er uendret.
+      let detail = nbAmounts(i.message);
+      const q = l.quantity, p = l.unit_price, t = l.total_amount;
+      if (pkg?.count && q != null && p != null && t != null && Math.abs(q * pkg.count * p - Math.abs(t)) < 0.005) {
+        detail += ` Teksten «${pkg.raw}» passer: ${nb(q)} × ${pkg.count} × ${nb(p)} kr = ${nb(Math.abs(t))} kr — enhetsprisen kan gjelde per stykk i kolliet.`;
+      }
+      out.push({ id: "read_issue", title: "Tallene på linjen må kontrolleres mot originalen", detail, action: "original", blocksPrice: true });
+    }
   }
   if (credit && (l.total_amount ?? 0) > 0) {
     out.push({ id: "credit_sign", title: "Positivt beløp på kreditnota", detail: "Kontroller fortegnet mot originalen. Beløpet endres ikke automatisk.", action: "original", blocksPrice: false });
@@ -236,7 +250,7 @@ export function rankedSuggestions(l: InsightLine, max = 3): RankedSuggestion[] {
 /** Linjeinnsikt for en ekte leverandørvarelinje (varekortet). Bare lesing — ingenting lagres. */
 export function insightLineFromSupplierItem(
   item: { rm_name: string | null; rm_category: string | null; rm_base_unit: string | null; rm_id: string | null; base_units_per_package: number | null; package_confirmed_at: string | null },
-  l: { description: string | null; quantity: number | null; unit: string | null; unit_price: number | null; total_amount: number | null; package_size: number | null; package_unit: string | null; count_per_package: number | null; line_kind: string | null; is_credit_note: boolean | null },
+  l: { review_reason: string | null; description: string | null; quantity: number | null; unit: string | null; unit_price: number | null; total_amount: number | null; package_size: number | null; package_unit: string | null; count_per_package: number | null; line_kind: string | null; is_credit_note: boolean | null },
 ): InsightLine {
   return {
     description: l.description, quantity: l.quantity, unit: l.unit, unit_price: l.unit_price, total_amount: l.total_amount,
@@ -244,6 +258,9 @@ export function insightLineFromSupplierItem(
     invoice: { is_credit_note: l.is_credit_note },
     matched_raw_material: item.rm_id ? { name: item.rm_name ?? "Råvare", category: item.rm_category, base_unit: item.rm_base_unit } : null,
     package_gate: packageGateFromSupplierItem(item),
+    // rm_supplier_item_lines leverer ikke prisgrunnlag/rabatt: regnestykket kan ikke vurderes her.
+    arithmetic_context: "incomplete",
+    server_review_reason: l.review_reason,
   };
 }
 

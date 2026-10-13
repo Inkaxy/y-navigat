@@ -30,7 +30,8 @@ describe("prissperre i varekortet", () => {
     description: "Mel", quantity: 10, unit: "sekk", unit_price: 100, total_amount: 300, package_size: null, package_unit: null, count_per_package: null, base_quantity: null,
     price_per_base_unit: null, expected_price_per_base_unit: null, price_variance_pct: null, variance_status: null, price_reference_source: null, raw_material_id: null, raw_material_name: null,
     match_confidence: null, requires_review: null, review_reason: null, resolution_note: null };
-  it("lesefeil stenger prisen", () => expect(clarificationGate(l as never)?.ok).toBe(false));
+  it("serverens lesevarsel stenger prisen", () => expect(clarificationGate({ ...l, review_reason: "extraction_unresolved" } as never)?.ok).toBe(false));
+  it("eget regnestykke på ufullstendig varekortlinje stenger ikke (mangler prisgrunnlag/rabatt)", () => expect(clarificationGate(l as never)).toBeNull());
   it("regnestykke som går opp stenger ikke", () => expect(clarificationGate({ ...l, total_amount: 1000 } as never)).toBeNull());
 });
 

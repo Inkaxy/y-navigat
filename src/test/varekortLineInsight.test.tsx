@@ -72,3 +72,22 @@ describe("varekort: linjeinnsikt og pakningsforslag (faktisk komponent)", () => 
     expect(inputs.some((i) => i.value === "1")).toBe(false);
   });
 });
+
+describe("varekort-adapteren kjører ikke regnestykke på ufullstendige felt", () => {
+  const perBase = { ...line, description: "Hvetemel 25 kg", unit: "sekk", quantity: 2, unit_price: 20, total_amount: 1000, package_size: 25, package_unit: "kg", review_reason: null };
+  const disc = { ...line, description: "Smør", unit: "stk", quantity: 10, unit_price: 10, total_amount: 90, review_reason: null };
+  const kg = { ...item, rm_base_unit: "kg" };
+  it("per_base- og rabattlinje gir ikke falskt lesevarsel i varekortet", () => {
+    for (const l of [perBase, disc]) expect(lineClarifications(insightLineFromSupplierItem(kg, l)).some((c) => c.id === "read_issue")).toBe(false);
+  });
+  it("serverens dokumenterte lesevarsel vises og sperrer fortsatt", () => {
+    const c = lineClarifications(insightLineFromSupplierItem(kg, { ...disc, review_reason: "price_increase,extraction_unresolved" }));
+    expect(c.find((x) => x.id === "read_issue")?.blocksPrice).toBe(true);
+  });
+  it("full kontroll beholdes der komplett linje finnes", () => {
+    const base = { description: "Smør", quantity: 10, unit: "stk", unit_price: 10, invoice: { is_credit_note: false } };
+    expect(lineClarifications({ ...base, total_amount: 90, discount_amount: 10 }).some((c) => c.id === "read_issue")).toBe(false);
+    expect(lineClarifications({ ...base, total_amount: 1000, package_size: 25, package_unit: "kg", unit_price_basis: "kg", unit: "sekk", quantity: 2, unit_price: 20 }).some((c) => c.id === "read_issue")).toBe(false);
+    expect(lineClarifications({ ...base, total_amount: 250 }).some((c) => c.id === "read_issue")).toBe(true);
+  });
+});
