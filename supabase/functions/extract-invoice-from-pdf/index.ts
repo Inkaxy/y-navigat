@@ -22,6 +22,9 @@ import {
   checkSum, computeConfidence, num, runExtractionAttempts, type Hints, type LearningExample,
 } from "../_shared/invoiceExtraction.ts";
 import { INVOICE_EXTRACTION_SYSTEM_PROMPT } from "../_shared/invoiceExtractionPrompt.ts";
+import { decodeBase64 } from "jsr:@std/encoding@1/base64";
+import { formatPdfTextForModel, PDF_TEXT_LIMITS, pdfTextProfile, readPdfText, type PdfTextResult } from "../_shared/pdfText.ts";
+import { annotateSkuTextCheck } from "../_shared/invoiceExtraction.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -169,6 +172,17 @@ Deno.serve(async (req) => {
     const warnings: string[] = [];
     let attempts = 0;
 
+    // Tekstlaget i original-PDF-en som ekstra lesestøtte (samme helper som linjeforslag og eval). Ikke logget.
+    let pdfText: PdfTextResult | null = null;
+    if (pdf_base64) {
+      try {
+        const bytes = decodeBase64(pdf_base64);
+        pdfText = bytes.byteLength <= PDF_TEXT_LIMITS.maxBytes ? await readPdfText(bytes) : null;
+      } catch { pdfText = null; }
+      if (pdfText && pdfText.status !== "ok") warnings.push("PDF-en har ikke brukbart tekstlag – lest bare visuelt");
+    }
+    const textBlock = pdfText ? formatPdfTextForModel(pdfText) : null;
+
     if (cfg && pdf_base64) {
       const apiKey = await decryptWithKey(cfg.encrypted_api_key, "AI_CONFIG_ENCRYPTION_KEY");
       // Strict schema bare når eksplisitt slått på (server-hemmelighet) og bare for OpenAI/Azure. Av = som før.
@@ -185,7 +199,7 @@ Deno.serve(async (req) => {
               maxTokens: Math.max(Number(cfg.max_tokens ?? 2000), 12000),
               temperature: Number(cfg.temperature),
               systemPrompt: SYSTEM_PROMPT,
-              userText,
+              userText: textBlock ? `${userText}\n\n${textBlock}` : userText,
               pdfBase64: pdf_base64,
               azureEndpoint: cfg.azure_endpoint ?? undefined,
               azureDeployment: cfg.azure_deployment ?? undefined,
@@ -251,6 +265,7 @@ Deno.serve(async (req) => {
       };
     }
 
+    if (Array.isArray(extracted.lines) && pdfText?.status === "ok") extracted.lines = annotateSkuTextCheck(extracted.lines, pdfText.pages);
     const lines = (extracted.lines ?? []) as any[];
     const expected = hints.expected_total_excl_vat;
     const sum = checkSum(lines, expected, hints.expected_total_incl_vat, hints.expected_vat);
@@ -291,6 +306,7 @@ Deno.serve(async (req) => {
       matched_supplier: matchedSupplier,
       name_matched_supplier: nameMatchedSupplier,
       ai_usage: aiUsage,
+      read_profile: pdfTextProfile(pdfText),
       attempts,
       sum_check: {
         lines_sum: sum.lines_sum,
