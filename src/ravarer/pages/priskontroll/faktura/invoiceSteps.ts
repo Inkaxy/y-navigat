@@ -131,7 +131,7 @@ export function deliverySteps(inv: DeliveryInvoice, extras: DeliveryExtras): Del
 }
 
 export type NextStepKey =
-  | "flagget" | "koble_kreditnota" | "hent_linjer" | "registrer_linjer" | "rett_sum" | "avklar" | "avstem" | "godkjenn" | "kostpris" | "ferdig";
+  | "holdt_utenfor" | "flagget" | "koble_kreditnota" | "hent_linjer" | "registrer_linjer" | "rett_sum" | "avklar" | "avstem" | "godkjenn" | "kostpris" | "ferdig";
 
 export interface NextStep {
   key: NextStepKey;
@@ -160,6 +160,10 @@ export interface NextStepInput extends DeliveryInvoice, DeliveryExtras {
 
 /** ÉN primærhandling — alltid neste steg i leveransen. */
 export function nextInvoiceStep(i: NextStepInput): NextStep {
+  // Avsluttet: holdt utenfor er ingen oppgave. Ingen kreditnota-/avklarings-/sumhandling; gjenåpning skjer i ExclusionPanel.
+  if (i.status === "excluded") {
+    return { key: "holdt_utenfor", label: "Holdt utenfor råvarebehandling", enabled: false, hint: "Dokumentet er holdt utenfor råvarebehandling. Gjenåpne for ny kontroll." };
+  }
   if (i.status === "flagged") {
     return { key: "flagget", label: "Fjern flagg", enabled: i.canWrite, hint: "Fakturaen er flagget for oppfølging." };
   }

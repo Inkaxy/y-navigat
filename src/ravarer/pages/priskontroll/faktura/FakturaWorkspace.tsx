@@ -24,6 +24,7 @@ import { FakturaerDialogs, type DialogState } from "@/ravarer/pages/priskontroll
 import { fakturaReturn, readReturnParam } from "@/ravarer/pages/priskontroll/fakturaer/visning";
 import { ControlSummary } from "./ControlSummary";
 import { FocusNotice } from "./FocusNotice";
+import { finalLockNote, isExcludedInvoice } from "./exclusionView";
 import { FOCUS_PARAM, opensLineSheetForFocus, parseFocus } from "@/ravarer/pages/priskontroll/gjore/clarifyTarget";
 import { SumOverrideDialog } from "./SumOverrideDialog";
 import { recheckInvoiceLinesSum } from "@/fakturaer/lib/linesSum";
@@ -299,11 +300,14 @@ export default function FakturaWorkspace() {
   const linesById = new Map((data.invoice_lines ?? []).map((l) => [l.id, l]));
   // Kallerens EGEN radversjon/råvare binder statusen. Lånes aldri fra en annen cache; mangler den, er prisen ukjent.
   const gateFor = ownLineGate(safety.gateFor, data.id);
+  const heldOutside = (line: NonNullable<typeof active>) =>
+    isExcludedInvoice(data.status, data.excluded_at) || !!linesById.get(line.id)?.excluded_at;
   const docFor = (line: typeof active) => (
     <InvoiceDocumentPanel invoiceId={data.id}
       invoice={{ invoice_number: data.invoice_number, invoice_date: data.invoice_date, supplier_name: data.suppliers?.name ?? null, source_document_url: data.source_document_url, total_amount: data.total_amount, total_vat: data.total_vat, lines_sum_status: data.lines_sum_status, lines_sum_excl_vat: data.lines_sum_excl_vat, lines_sum_variance_pct: data.lines_sum_variance_pct, extraction_confidence: data.extraction_confidence, currency: data.currency, is_credit_note: data.is_credit_note, flagged_at: data.flagged_at, extraction_issues: data.extraction_issues }}
       line={line ? { ...line, matched_name: line.matched_raw_material?.name ?? null, extraction_issues: linesById.get(line.id)?.extraction_issues } : null}
-      gate={line ? gateFor(line) : null}
+      gate={line && !heldOutside(line) ? gateFor(line) : null}
+      heldOutside={!!line && heldOutside(line)}
       tolerancePct={tolerances.defaultPct}
       onClose={() => toggleDoc()}
       className="h-full"
@@ -313,7 +317,7 @@ export default function FakturaWorkspace() {
   // Rettedialogen viser samme linje som skjemaet (tabell eller kø), aldri køens forrige valg.
   const correctDocEl = docFor(correctionDocLine(correctFor, q.linesQuery.data?.rows ?? [], null));
   const showDocZone = docOpen && wide && !!data.source_document_url;
-  const lockNote = final ? (data.status === "reconciled" ? "Fakturaen er avstemt — linjene er låst" : "Fakturaen er flagget — linjene er låst") : null;
+  const lockNote = finalLockNote(data.status, data.excluded_at);
   const notApplicableCount = q.selectedLines.length;
 
   const control = (expanded?: boolean) => (
@@ -449,7 +453,7 @@ export default function FakturaWorkspace() {
         onDone={(scope) => { setInspectorOpen(false); void detail.refetch(); q.refresh();
           s.setResult({ title: scope === "invoice" ? "Holdt utenfor råvarebehandling" : "Linjen er holdt utenfor råvarebehandling",
             items: ["Ikke avstemt og ikke godkjent. Du kan gjenåpne fra fakturasiden."] }); }} />
-      {focus && (() => {
+      {focus && !isExcludedInvoice(data.status, data.excluded_at) && (() => {
         const fl = targetLine ? linesById.get(targetLine) : undefined;
         const ret = fakturaReturn(readReturnParam(sp));
         return (
