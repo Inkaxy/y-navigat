@@ -46,21 +46,49 @@ export interface AiCallResult {
 
 export type AiErrorKind = "refusal" | "incomplete" | "timeout" | "model_unavailable" | "http" | "empty";
 
+export interface AiUsage {
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cachedInputTokens?: number | null;
+  reasoningTokens?: number | null;
+}
+
 export class AiCallError extends Error {
   kind: AiErrorKind;
   httpStatus: number | null;
   detail: string | null;
-  constructor(kind: AiErrorKind, message: string, httpStatus: number | null = null, detail: string | null = null) {
+  /** Forbruk modellen faktisk rapporterte før feilen (avslag/ufullstendig). Betalte tokens skal ikke mistes i loggen. */
+  usage: AiUsage | null;
+  constructor(kind: AiErrorKind, message: string, httpStatus: number | null = null, detail: string | null = null, usage: AiUsage | null = null) {
     super(message);
     this.name = "AiCallError";
     this.kind = kind;
     this.httpStatus = httpStatus;
     this.detail = detail;
+    this.usage = usage;
   }
 }
 
-// Rough cost table USD per 1M tokens (input/output). Modeller uten kjent pris gir null (= ukjent).
-const COST_TABLE: Record<string, { in: number; out: number }> = {
+/** Forbruk fra et AI-kall eller en AiCallError (null når ukjent). */
+export function usageOf(x: unknown): AiUsage | null {
+  if (x instanceof AiCallError) return x.usage;
+  if (typeof x === "object" && x !== null && "inputTokens" in x) {
+    const r = x as AiUsage;
+    return { inputTokens: r.inputTokens ?? null, outputTokens: r.outputTokens ?? null, cachedInputTokens: r.cachedInputTokens ?? null, reasoningTokens: r.reasoningTokens ?? null };
+  }
+  return null;
+}
+
+/** Versjon av pristabellen. Endres når satsene endres, og følger hvert overslag. */
+export const COST_RATE_VERSION = "2026-10-14";
+
+// USD per 1M tokens. `cached` = sats for bufrede inndata-tokens når publisert; uten den regnes bufrede
+// tokens til full inndatapris (konservativt overslag). Cache-skriving rapporteres ikke av Responses-API-et
+// og er derfor ikke med. Modeller uten kjent pris gir null (= ukjent).
+// gpt-6.1-sol / gpt-6-luna: standardsatser fra developers.openai.com/api/docs/models/{gpt-6.1-sol,gpt-6-luna}.md, hentet 14.10.2026.
+const COST_TABLE: Record<string, { in: number; out: number; cached?: number; cacheWrite?: number }> = {
+  "gpt-6.1-sol": { in: 2, out: 10, cached: 0.1, cacheWrite: 2.5 },
+  "gpt-6-luna": { in: 0.1, out: 0.5, cached: 0.01, cacheWrite: 0.125 },
   "claude-sonnet-4-5": { in: 3, out: 15 },
   "claude-3-5-sonnet-20241022": { in: 3, out: 15 },
   "claude-3-5-haiku-20241022": { in: 0.8, out: 4 },
@@ -70,10 +98,20 @@ const COST_TABLE: Record<string, { in: number; out: number }> = {
   "gpt-4.1-mini": { in: 0.4, out: 1.6 },
 };
 
-export function estimateCostUsd(model: string, inTok: number | null, outTok: number | null): number | null {
+/**
+ * Anslått kostnad. `cachedTok` er en del av `inTok` (slik Responses rapporterer). Bufrede tokens prises med
+ * `cached`-satsen når den er kjent, ellers med full inndatapris. Ukjent modell/forbruk → null.
+ */
+export function estimateCostUsd(model: string, inTok: number | null, outTok: number | null, cachedTok: number | null = null): number | null {
   const cost = COST_TABLE[model];
   if (!cost || inTok == null || outTok == null) return null;
-  return ((inTok / 1_000_000) * cost.in) + ((outTok / 1_000_000) * cost.out);
+  const cached = cachedTok != null && cachedTok > 0 && cost.cached != null ? Math.min(cachedTok, inTok) : 0;
+  return (((inTok - cached) * cost.in) + (cached * (cost.cached ?? cost.in)) + (outTok * cost.out)) / 1_000_000;
+}
+
+/** Om modellens bufrede inndata prises med egen sats (ellers konservativt til full pris). */
+export function hasCachedRate(model: string): boolean {
+  return COST_TABLE[model]?.cached != null;
 }
 
 /** Resonneringsmodeller avviser temperature/top_p. */
@@ -154,13 +192,13 @@ export function parseResponsesOutput(data: unknown): AiCallResult {
     if (!raw) raw = collected;
   }
   if (refusal != null) {
-    throw Object.assign(new AiCallError("refusal", `Modellen avslo forespørselen: ${refusal.slice(0, 200)}`), { usage: base });
+    throw new AiCallError("refusal", `Modellen avslo forespørselen: ${refusal.slice(0, 200)}`, null, null, base);
   }
   if (base.status === "incomplete") {
     const reason = isRec(d.incomplete_details) && typeof d.incomplete_details.reason === "string" ? d.incomplete_details.reason : "ukjent";
-    throw Object.assign(new AiCallError("incomplete", `Svaret ble ufullstendig (${reason})`, null, reason), { usage: base });
+    throw new AiCallError("incomplete", `Svaret ble ufullstendig (${reason})`, null, reason, base);
   }
-  if (!raw.trim()) throw Object.assign(new AiCallError("empty", "Modellen returnerte tomt svar"), { usage: base });
+  if (!raw.trim()) throw new AiCallError("empty", "Modellen returnerte tomt svar", null, null, base);
   return { rawText: raw, ...base };
 }
 
@@ -172,12 +210,15 @@ export function classifyHttpError(provider: string, status: number, text: string
   return new AiCallError(unavailable ? "model_unavailable" : "http", `${provider} ${status}: ${text.slice(0, 500)}`, status, code || null);
 }
 
-async function timedFetch(url: string, init: RequestInit, timeoutMs: number | undefined): Promise<Response> {
-  if (!timeoutMs) return await fetch(url, init);
+/** Fetch + lesing av hele svarkroppen under SAMME tidsfrist (ikke bare til headerne kommer). */
+export async function timedFetch(url: string, init: RequestInit, timeoutMs: number | undefined): Promise<{ res: Response; text: string }> {
+  if (!timeoutMs) { const res = await fetch(url, init); return { res, text: await res.text() }; }
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    return await fetch(url, { ...init, signal: ctl.signal });
+    const res = await fetch(url, { ...init, signal: ctl.signal });
+    const text = await res.text();
+    return { res, text };
   } catch (e) {
     if (ctl.signal.aborted) throw new AiCallError("timeout", `Modellen svarte ikke innen ${Math.round(timeoutMs / 1000)} s`);
     throw e;
@@ -206,7 +247,7 @@ async function callAnthropic(p: AiCallParams): Promise<AiCallResult> {
   }
   content.push({ type: "text", text: p.userText });
 
-  const res = await timedFetch("https://api.anthropic.com/v1/messages", {
+  const { res, text } = await timedFetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "x-api-key": p.apiKey,
@@ -221,7 +262,6 @@ async function callAnthropic(p: AiCallParams): Promise<AiCallResult> {
       messages: [{ role: "user", content }],
     }),
   }, p.timeoutMs);
-  const text = await res.text();
   if (!res.ok) throw classifyHttpError("Anthropic", res.status, text);
   const data = JSON.parse(text);
   const raw = data?.content?.[0]?.text ?? "";
@@ -234,12 +274,11 @@ async function callAnthropic(p: AiCallParams): Promise<AiCallResult> {
 
 async function callOpenAi(p: AiCallParams): Promise<AiCallResult> {
   // Responses API (støtter PDF som input_file og strict JSON-schema).
-  const res = await timedFetch("https://api.openai.com/v1/responses", {
+  const { res, text } = await timedFetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { Authorization: `Bearer ${p.apiKey}`, "content-type": "application/json" },
     body: JSON.stringify(buildResponsesBody(p, true)),
   }, p.timeoutMs);
-  const text = await res.text();
   if (!res.ok) throw classifyHttpError("OpenAI", res.status, text);
   return parseResponsesOutput(JSON.parse(text));
 }
@@ -249,12 +288,11 @@ async function callAzureOpenAi(p: AiCallParams): Promise<AiCallResult> {
     throw new Error("Azure endpoint og deployment må settes");
   }
   const url = `${p.azureEndpoint.replace(/\/$/, "")}/openai/deployments/${p.azureDeployment}/responses?api-version=2024-12-01-preview`;
-  const res = await timedFetch(url, {
+  const { res, text } = await timedFetch(url, {
     method: "POST",
     headers: { "api-key": p.apiKey, "content-type": "application/json" },
     body: JSON.stringify(buildResponsesBody(p, false)),
   }, p.timeoutMs);
-  const text = await res.text();
   if (!res.ok) throw classifyHttpError("Azure OpenAI", res.status, text);
   return parseResponsesOutput(JSON.parse(text));
 }
