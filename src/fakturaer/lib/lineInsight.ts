@@ -251,9 +251,14 @@ export function rankedSuggestions(l: InsightLine, max = 3): RankedSuggestion[] {
     }));
 }
 
+const otherContainer = (pkgUnit: string | null | undefined, lineUnit: string | null | undefined) => {
+  const a = (pkgUnit ?? "").trim().toLowerCase(), b = (lineUnit ?? "").trim().toLowerCase();
+  return a !== "" && b !== "" && a !== b;
+};
+
 /** Linjeinnsikt for en ekte leverandørvarelinje (varekortet). Bare lesing — ingenting lagres. */
 export function insightLineFromSupplierItem(
-  item: { rm_name: string | null; rm_category: string | null; rm_base_unit: string | null; rm_id: string | null; base_units_per_package: number | null; package_confirmed_at: string | null },
+  item: { rm_name: string | null; rm_category: string | null; rm_base_unit: string | null; rm_id: string | null; base_units_per_package: number | null; package_confirmed_at: string | null; package_unit?: string | null },
   l: { review_reason: string | null; description: string | null; quantity: number | null; unit: string | null; unit_price: number | null; total_amount: number | null; package_size: number | null; package_unit: string | null; count_per_package: number | null; line_kind: string | null; is_credit_note: boolean | null;
     price_context?: boolean; unit_price_basis?: string | null; discount_amount?: number | null; extraction_issues?: unknown },
 ): InsightLine {
@@ -263,8 +268,9 @@ export function insightLineFromSupplierItem(
     package_size: l.package_size, package_unit: l.package_unit, count_per_package: l.count_per_package, line_kind: l.line_kind,
     invoice: { is_credit_note: l.is_credit_note },
     matched_raw_material: item.rm_id ? { name: item.rm_name ?? "Råvare", category: item.rm_category, base_unit: item.rm_base_unit } : null,
-    // Serverens pakningsflagg på linjen vinner over en bekreftet leverandørfaktor (f.eks. gammel «1 stk per sekk» mot pose).
-    package_gate: packageGateFromReview(l.review_reason) === "missing" ? "missing" : packageGateFromSupplierItem(item),
+    // En bekreftet leverandørpakning for en ANNEN beholder (f.eks. gammel «1 stk per sekk» mot pose) løser ikke
+    // linjens pakningsflagg: da vinner serverens unknown_package_size.
+    package_gate: packageGateFromReview(l.review_reason) === "missing" && otherContainer(item.package_unit, l.unit) ? "missing" : packageGateFromSupplierItem(item),
     // Bare når serveren leverte prisgrunnlag og rabatt (v2) kjøres det delte regnestykket; ellers ukjent.
     arithmetic_context: complete ? "complete" : "incomplete",
     ...(complete ? { unit_price_basis: l.unit_price_basis ?? null, discount_amount: l.discount_amount ?? null } : {}),

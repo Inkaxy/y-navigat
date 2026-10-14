@@ -89,11 +89,13 @@ describe("rabattlinje – delt regnestykke", () => {
   });
 
   it("varekortets adapter: linjens unknown_package_size vinner over gammel bekreftet faktor", () => {
-    const item = { rm_name: RM.name, rm_category: "Emballasje", rm_base_unit: "stk", rm_id: RM.id, base_units_per_package: 1, package_confirmed_at: "2026-10-14" };
+    const item = { rm_name: RM.name, rm_category: "Emballasje", rm_base_unit: "stk", rm_id: RM.id, base_units_per_package: 1, package_confirmed_at: "2026-10-14", package_unit: "sekk" };
     const l = poseLine();
     const il = insightLineFromSupplierItem(item, { ...l, is_credit_note: false, price_context: true, line_kind: "vare" });
     expect(il.package_gate).toBe("missing");
     expect(lineClarifications(il).some((x) => x.id === "read_issue")).toBe(false);
+    // Samme beholder bekreftet: bekreftelsen gjelder, motstriden er råd.
+    expect(insightLineFromSupplierItem({ ...item, package_unit: "pose" }, { ...l, is_credit_note: false, price_context: true, line_kind: "vare" }).package_gate).toBe("safe");
   });
 
   it("fakturaens beholderetikett beholdes", () => {
