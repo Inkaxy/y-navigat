@@ -11,7 +11,7 @@ const TITLE: Record<FocusKind, string> = {
 const TEXT: Record<FocusKind, string> = {
   sum: "Linjesummen er ikke kontrollert mot fakturaens totalsum. Sammenlign med originalen i kontrollen nedenfor; prisen på varekortet kan vurderes når summen stemmer.",
   lesing: "Tallene på linjen er ikke kontrollert mot originalen. Sammenlign linjen med dokumentet og rett lesingen ved behov.",
-  kreditnota: "Dette er en kreditnota, ikke en prisendring. Koble den til opprinnelig faktura; beløpet vises som på dokumentet.",
+  kreditnota: "Dette er en kreditnota, ikke en prisendring. Koble den til opprinnelig faktura; beløpet vises som på dokumentet. Gjelder den noe annet enn råvarepris, for eksempel erstatning for ødelagte varer, kan du holde den utenfor råvarebehandlingen.",
   prisgrunnlag: "Linjen har ingen dokumentert sammenligningspris (mangler eller er holdt tilbake til kontroll). Angi prisgrunnlaget i «Rett fakturalinje» hvis lesingen er feil, ellers se prisgrunnlaget på råvaren. Ingenting fylles inn automatisk.",
 };
 
@@ -25,6 +25,8 @@ export type FocusNoticeProps = {
   onOpenControl?: (() => void) | null;
   onCorrect?: (() => void) | null;
   onCredit?: (() => void) | null;
+  /** «Hold utenfor råvarebehandling» (erstatning/produksjonstap o.l.); null = ikke tilgjengelig. */
+  onHoldOutside?: (() => void) | null;
   priceBasisHref?: string | null;
   /** Lesefeil som allerede er registrert på målinjen (serverens extraction_issues). */
   lineIssues?: string[];
@@ -48,6 +50,7 @@ export function FocusNotice(p: FocusNoticeProps) {
         {p.kind === "sum" && p.onOpenControl && <Button size="sm" onClick={p.onOpenControl}>Vis sumkontrollen</Button>}
         {(p.kind === "lesing" || p.kind === "prisgrunnlag") && p.onCorrect && <Button size="sm" onClick={p.onCorrect}>Rett fakturalinje</Button>}
         {p.kind === "kreditnota" && p.isCreditNote && p.onCredit && <Button size="sm" onClick={p.onCredit}>Koble til opprinnelig faktura</Button>}
+        {p.kind === "kreditnota" && p.onHoldOutside && <Button size="sm" variant="outline" onClick={p.onHoldOutside}>Hold utenfor råvarebehandling</Button>}
         {p.kind === "prisgrunnlag" && p.priceBasisHref && <Button asChild size="sm" variant={p.onCorrect ? "outline" : "default"}><Link to={p.priceBasisHref}>Se prisgrunnlaget på råvaren</Link></Button>}
         {p.onShowDocument && <Button size="sm" variant="outline" onClick={p.onShowDocument}>Vis original</Button>}
         <Button asChild size="sm" variant="ghost"><Link to={p.backHref}>Tilbake til {p.backLabel.toLowerCase()}</Link></Button>

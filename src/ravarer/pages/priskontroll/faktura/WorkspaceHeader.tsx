@@ -9,7 +9,7 @@ import { isFlaggable } from "@/fakturaer/lib/flagging";
 import { DeliveryTimeline } from "./DeliveryTimeline";
 import type { DeliveryStep, NextStep } from "./invoiceSteps";
 
-export type HeaderMenuAction = "flag" | "unflag" | "rematch" | "fetch" | "register" | "credit" | "history" | "recheck" | "vat" | "override" | "correct" | "reread" | "facts";
+export type HeaderMenuAction = "flag" | "unflag" | "rematch" | "fetch" | "register" | "credit" | "history" | "recheck" | "vat" | "override" | "correct" | "reread" | "facts" | "exclude";
 
 type Props = {
   backHref: string;
@@ -38,6 +38,8 @@ type Props = {
   /** «N av M linjer avklart». */
   lineProgress?: { done: number; total: number } | null;
   onMenu: (a: HeaderMenuAction) => void;
+  /** «Hold utenfor råvarebehandling» er tilgjengelig (skrivbar, ikke avstemt/utelatt). */
+  canHoldOutside?: boolean;
   /** Tekst på tilbakeknappen («Fakturaer» eller «Å gjøre»). */
   backLabel?: string;
   /** Linjesummen avviker: vis mva-forslag og overstyring. */
@@ -103,6 +105,7 @@ export function WorkspaceHeader(p: Props) {
               {p.canWrite && p.sumMismatch && <DropdownMenuItem onSelect={() => p.onMenu("vat")}>Forslag ved mva-avvik</DropdownMenuItem>}
               {p.canWrite && p.sumMismatch && !final && <DropdownMenuItem onSelect={() => p.onMenu("override")}>Overstyr sumavvik med begrunnelse …</DropdownMenuItem>}
               {p.canWrite && p.isCreditNote && <DropdownMenuItem onSelect={() => p.onMenu("credit")}>Koble kreditnota</DropdownMenuItem>}
+              {p.canHoldOutside && <DropdownMenuItem onSelect={() => p.onMenu("exclude")}>Hold utenfor råvarebehandling …</DropdownMenuItem>}
               <DropdownMenuSeparator />
               <DropdownMenuItem disabled={!doc.url} onSelect={() => { if (doc.url) window.open(doc.url, "_blank", "noopener,noreferrer"); }}>
                 Originalfaktura i ny fane

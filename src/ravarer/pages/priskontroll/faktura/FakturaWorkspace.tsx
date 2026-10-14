@@ -48,6 +48,8 @@ import { parseReadIssues } from "@/fakturaer/lib/lineCorrection";
 import { useInvoicePriceSafety } from "@/fakturaer/hooks/useInvoicePriceSafety";
 import { ownLineGate } from "./ownLineGate";
 import { PriceGateProvider } from "@/fakturaer/lib/priceGateContext";
+import { HoldOutsideDialog, type HoldOutsideTarget } from "@/fakturaer/components/HoldOutsideDialog";
+import { ExclusionPanel } from "@/fakturaer/components/ExclusionPanel";
 
 // v2: originaldokumentet er åpent som standard; bare et eksplisitt «skjul» huskes.
 const LS_DOC = "nbhub.faktura.docpanel.v2";
@@ -98,6 +100,7 @@ export default function FakturaWorkspace() {
   const [lastLinked, setLastLinked] = useState<{ rmsId: string; name: string } | null>(null);
   const [showLedger, setShowLedger] = useState(false);
   const [overrideOpen, setOverrideOpen] = useState(false);
+  const [hold, setHold] = useState<HoldOutsideTarget | null>(null);
   const [zone, setZone] = useState<"dokument" | "linjer" | "kontroll">("linjer");
 
   const routeEntity = data?.legal_entity_id ?? null;
@@ -118,7 +121,7 @@ export default function FakturaWorkspace() {
     if (o.el && o.el.isConnected) return o.el;
     return document.querySelector<HTMLElement>("[data-primary-action]:not([disabled])");
   };
-  const final = data?.status === "reconciled" || data?.status === "flagged";
+  const final = data?.status === "reconciled" || data?.status === "flagged" || data?.status === "excluded";
   // Linjene kan bare endres med skrivetilgang og når fakturaen ikke er avstemt/flagget.
   const lineWrite = s.canWrite && !final;
   // Mobil: dokumentet vises via sonen; desktop: via docOpen. Én kilde for etikett/aria-pressed.
@@ -226,6 +229,17 @@ export default function FakturaWorkspace() {
     else if (k === "godkjenn") void s.approve();
     else if (k === "kostpris") void s.postCosts();
   };
+  // Skrivbar, ikke avstemt/godkjent og ikke allerede utelatt; serveren kontrollerer det samme på nytt.
+  const canHold = !!data && s.canWrite && data.status !== "reconciled" && data.status !== "excluded" && !data.reconciled_at;
+  const openHold = (lineId: string | null, scope: "invoice" | "line") => {
+    if (!data || !canHold) return;
+    const l = lineId ? (data.invoice_lines ?? []).find((x) => x.id === lineId) : undefined;
+    setHold({
+      invoice: { id: data.id, invoice_number: data.invoice_number, updated_at: data.updated_at, is_credit_note: !!data.is_credit_note },
+      line: l && !l.excluded_at ? { id: l.id, line_number: l.line_number, description: l.description, updated_at: l.updated_at } : null,
+      initialScope: l && !l.excluded_at ? scope : "invoice",
+    });
+  };
   const onMenu = (a: HeaderMenuAction) => {
     if (!data) return;
     if (a === "flag") { if (data.status !== "reconciled" && data.status !== "flagged") setDialog({ kind: "flag", ids: [data.id] }); }
@@ -249,10 +263,11 @@ export default function FakturaWorkspace() {
       })();
     }
     else if (a === "override") setOverrideOpen(true);
+    else if (a === "exclude") openHold(null, "invoice");
     else setHistoryOpen(true);
   };
 
-  const anyDialog = !!dialog || !!lineDialog || !!correctFor || historyOpen || helpOpen || overrideOpen || !!q.bulkLink;
+  const anyDialog = !!hold || !!dialog || !!lineDialog || !!correctFor || historyOpen || helpOpen || overrideOpen || !!q.bulkLink;
   const keys = useMemo(() => ({
     enabled: !!data && !anyDialog,
     canWrite: lineWrite,
@@ -381,6 +396,9 @@ export default function FakturaWorkspace() {
           inspectorNote={active ? (
             <div className="space-y-2">
               <Button variant="outline" size="sm" className="min-h-[44px]" onClick={() => startCorrection(active.id)}>Rett fakturalinje</Button>
+              {canHold && !active.excluded_at && (
+                <Button variant="outline" size="sm" className="min-h-[44px]" onClick={() => openHold(active.id, "line")}>Hold utenfor råvarebehandling …</Button>
+              )}
               <SupplierItemScopeNote supplierId={data.supplier_id} line={active} />
             </div>
           ) : null}
@@ -420,7 +438,17 @@ export default function FakturaWorkspace() {
         rematchNote={rematch.note}
         lineProgress={{ done: q.total - q.needs, total: q.total }}
         onMenu={onMenu}
+        canHoldOutside={canHold}
       />
+      <ExclusionPanel canWrite={s.canWrite}
+        invoice={{ id: data.id, is_credit_note: !!data.is_credit_note, updated_at: data.updated_at, lines_sum_status: data.lines_sum_status,
+          excluded_at: data.excluded_at, excluded_by: data.excluded_by, exclusion_category: data.exclusion_category, exclusion_reason: data.exclusion_reason }}
+        lines={(data.invoice_lines ?? []).map((l) => ({ id: l.id, line_number: l.line_number, description: l.description, updated_at: l.updated_at,
+          excluded_at: l.excluded_at, excluded_by: l.excluded_by, exclusion_category: l.exclusion_category, exclusion_reason: l.exclusion_reason }))} />
+      <HoldOutsideDialog target={hold} canWrite={s.canWrite} onOpenChange={(v) => { if (!v) setHold(null); }}
+        onDone={(scope) => { setInspectorOpen(false); void detail.refetch(); q.refresh();
+          s.setResult({ title: scope === "invoice" ? "Holdt utenfor råvarebehandling" : "Linjen er holdt utenfor råvarebehandling",
+            items: ["Ikke avstemt og ikke godkjent. Du kan gjenåpne fra fakturasiden."] }); }} />
       {focus && (() => {
         const fl = targetLine ? linesById.get(targetLine) : undefined;
         const ret = fakturaReturn(readReturnParam(sp));
@@ -430,6 +458,7 @@ export default function FakturaWorkspace() {
             onOpenControl={() => { setFactsSignal((n) => n + 1); setZone("kontroll"); }}
             onCorrect={lineWrite && fl ? () => startCorrection(fl.id) : null}
             onCredit={s.canWrite ? () => setDialog({ kind: "credit", inv: data }) : null}
+            onHoldOutside={canHold ? () => openHold(fl?.id ?? null, "invoice") : null}
             lineIssues={fl ? parseReadIssues(fl.extraction_issues).map((i) => i.message).filter(Boolean) : []}
             priceBasisHref={fl?.raw_material_id ? paths.raavare(fl.raw_material_id, { seksjon: "pris" }) : null} />
         );
