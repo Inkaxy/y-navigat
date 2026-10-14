@@ -23,7 +23,7 @@ function useSavedVariants(rawMaterialId: string | null, supplierId: string) {
       if (!id) return [];
       const { data, error: e2 } = await supabase.from("raw_material_supplier_packages")
         .select("supplier_sku_norm, package_size, package_unit, base_units_per_package, confirmed_at")
-        .eq("raw_material_supplier_id", id).order("confirmed_at", { ascending: false }).limit(20);
+        .eq("raw_material_supplier_id", id).is("superseded_at", null).order("confirmed_at", { ascending: false }).limit(20);
       if (e2) throw new Error("Kunne ikke hente lagrede pakninger");
       return data ?? [];
     },

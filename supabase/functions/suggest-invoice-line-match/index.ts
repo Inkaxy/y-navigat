@@ -128,7 +128,7 @@ Deno.serve(async (req) => {
       if (sameSku.length) {
         const { data: pk } = await admin.from("raw_material_supplier_packages")
           .select("raw_material_supplier_id, supplier_sku_norm, package_size, package_unit, confirmed_at")
-          .in("raw_material_supplier_id", sameSku.map((r) => r.id)).limit(40);
+          .in("raw_material_supplier_id", sameSku.map((r) => r.id)).is("superseded_at", null).limit(40);
         const rmBy = new Map(sameSku.map((r) => [r.id, r.raw_material_id]));
         packages = ((pk ?? []) as { raw_material_supplier_id: string; supplier_sku_norm: string | null; package_size: number | null; package_unit: string | null; confirmed_at: string | null }[])
           .map((p) => ({ raw_material_id: rmBy.get(p.raw_material_supplier_id) ?? "", supplier_sku_norm: p.supplier_sku_norm ?? lineSku, package_size: numOrNull(p.package_size), package_unit: p.package_unit, confirmed: !!p.confirmed_at }));

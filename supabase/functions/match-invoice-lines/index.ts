@@ -269,7 +269,7 @@ Deno.serve(async (req) => {
     if (rmsIds.length) {
       variants = required("pakningsvarianter", await svc.from("raw_material_supplier_packages")
         .select("raw_material_supplier_id, supplier_sku_norm, package_size, package_unit, base_units_per_package, confirmed_at")
-        .in("raw_material_supplier_id", rmsIds)) ?? [];
+        .in("raw_material_supplier_id", rmsIds).is("superseded_at", null)) ?? [];
     }
     const skuNormSql = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
     /** Linjens egen dokumenterte pakning mot en bekreftet variant. Ukjent pakning gir aldri treff. */
