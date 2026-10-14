@@ -100,3 +100,31 @@ describe("Modellsammenligning", () => {
     expect(createHash("sha256").update(INVOICE_EXTRACTION_SYSTEM_PROMPT).digest("hex")).toBe("c915ec4f62e5fbdea77382cdfbc2cfc317d190a1cf608af8bc406047cd5d43c5");
   });
 });
+
+import { scoreAgainstFasit, EVAL_FASIT } from "../../supabase/functions/_shared/evalFasit";
+import { buildExtractorRequest } from "../../supabase/functions/reread-invoice-preview/proposal";
+import { readFileSync } from "node:fs";
+
+describe("Fasit og bruksloggkobling", () => {
+  const PALS = "dffd27f6-7f1b-4a3b-8c11-8f9cfa0ab95d";
+  it("PALS 526301: riktig lesing gir 18/18, punktum-tusenfeil fanges", () => {
+    const f = EVAL_FASIT[PALS];
+    const ok = scoreAgainstFasit(PALS, { lines: f.lines, header: { total_excl_vat: 25784.74, total_vat: 3867.71, total_amount: 29652.45 } })!;
+    expect(ok.fields_correct).toBe(18); expect(ok.errors).toEqual([]);
+    const bad = scoreAgainstFasit(PALS, { lines: f.lines.map((l, i) => (i === 3 ? { ...l, quantity: 396000 } : l)), header: null })!;
+    expect(bad.errors.join()).toMatch(/Linje 4 quantity: lest 396000/);
+    expect(scoreAgainstFasit("annen", { lines: [], header: null })).toBeNull();
+  });
+  it("fasit sendes aldri som hint til modellen", () => {
+    const ev = readFileSync("supabase/functions/invoice-model-eval/index.ts", "utf8");
+    const hintsBlock = ev.slice(ev.indexOf("const hints: Hints"), ev.indexOf("const started"));
+    expect(hintsBlock).not.toMatch(/fasit|EVAL_FASIT/i);
+  });
+  it("leser, ny lesing og Tripletex sender faktura-id til bruksloggen", () => {
+    expect(buildExtractorRequest({ legalEntityId: "le", invoice: { supplier_id: null, invoice_number: null, is_credit_note: false, total_amount: 1, total_vat: 0 }, lines: [], supplierName: null, pdfBase64: "x", invoiceId: "inv-1" }).invoice_id).toBe("inv-1");
+    expect(readFileSync("supabase/functions/tripletex-import-invoice-lines/index.ts", "utf8")).toContain("invoice_id: inv.id,");
+    const ex = readFileSync("supabase/functions/extract-invoice-from-pdf/index.ts", "utf8");
+    expect(ex.match(/invoice_id: usageInvoiceId/g)?.length).toBe(2);
+    expect(ex).toContain('.eq("legal_entity_id", legal_entity_id)');
+  });
+});
