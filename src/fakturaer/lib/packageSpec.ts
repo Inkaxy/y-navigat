@@ -49,3 +49,13 @@ export function describePackageSpec(v: PackageSpecInput, baseUnit: string | null
   return { state: "valid", size: d.size, unit: d.unit, baseUnitsPerPackage: bu, containerMismatch,
     text: `1 ${v.container} inneholder ${fmtNum(d.size, 3)} ${d.unit}${conv}.` };
 }
+
+/**
+ * Felles lagringskontrakt for begge pakningsskjemaer: innhold (størrelse + innholdsenhet) og faktor.
+ * Fysisk beholder sendes ALDRI fra klienten – serveren lagrer linjens egen trykte enhet som beholder
+ * (`container_unit`). Avvikende beholder rettes bare via «Rett fakturalinje» med begrunnelse.
+ */
+export function packageSavePayload(s: PackageSpec): { package_size: number; package_unit: string; base_units_per_package: number } | null {
+  if (s.state !== "valid" || s.containerMismatch) return null;
+  return { package_size: s.size, package_unit: s.unit, base_units_per_package: s.baseUnitsPerPackage };
+}
