@@ -25,7 +25,7 @@ import { ChangeLinkDialog } from "./ChangeLinkDialog";
 import { SupplierLinkAliases } from "./SupplierLinkAliases";
 import type { PanelResult } from "./types";
 import { ReviewPlanCard } from "@/fakturaer/components/ReviewPlanCard";
-import { buildReviewPlan, discountArithmeticText, supplierBasis } from "@/fakturaer/lib/reviewPlan";
+import { buildReviewPlan, discountArithmeticText, lineLocked, supplierBasis } from "@/fakturaer/lib/reviewPlan";
 import { cardFinished, freshStatusFrom, type FreshStatus } from "@/fakturaer/lib/freshReceipt";
 import { LineInsightPanel } from "@/fakturaer/components/inbox/task/LineInsightPanel";
 import { insightLineFromSupplierItem, lineClarifications } from "@/fakturaer/lib/lineInsight";
@@ -151,6 +151,21 @@ function OriginalPicker({ lines, current, onPick }: { lines: SupplierItemLine[];
   );
 }
 
+/** Låst varekort: alle åpne linjer ligger på internt godkjente fakturaer eller har ført kostpris. null = ikke låst. */
+export function lockedOpenLines(lines: readonly SupplierItemLine[]) {
+  const open = lines.filter((l) => l.requires_review === true);
+  if (open.length === 0 || !open.every((l) => lineLocked(l) != null)) return null;
+  const first = open[0];
+  const approved = open.filter((l) => lineLocked(l) === "approved").length;
+  const n = open.length;
+  return {
+    badge: approved === n ? "Internt godkjent – låst" : "Låst for endring",
+    title: `${n} ${n === 1 ? "åpen linje er" : "åpne linjer er"} låst${approved ? ` (${approved} internt godkjent)` : ""}`,
+    detail: "Kobling og pakning endres ikke herfra. Den godkjente historikken beholdes; fakturaen må åpnes for ny kontroll.",
+    invoiceId: first.invoice_id, lineId: first.id, invoiceNumber: first.invoice_number,
+  };
+}
+
 /** Hva har endret seg siden varekortet ble åpnet? null = ingenting som påvirker beslutningen. */
 export function frozenChange(before: readonly SupplierItemLine[], after: readonly SupplierItemLine[], bi: SupplierItem, ai: SupplierItem): string | null {
   const open = (ls: readonly SupplierItemLine[]) => new Set(ls.filter((l) => l.requires_review).map((l) => l.id));
@@ -198,6 +213,10 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
   const basis = supplierBasis(item, plan, lines);
   // Bare når koblingens varenummer er varekortets — ellers kan rms_id være en annen leverandørvare.
   const canMoveLink = item.rms_sku_matches === true && !!item.rms_id;
+  const locked = lockedOpenLines(lines);
+  // Alle åpne linjer er låst (internt godkjent / ført kost): ingen skrivende skjema her, planen er autoritativ.
+  const readOnly = locked != null;
+  const writable = canWrite && !readOnly;
 
   const onLinkDone = (r: Parameters<NonNullable<React.ComponentProps<typeof SupplierItemLinkForm>["onDone"]>>[0]) => {
     onDone({ title: "Varekortet er oppdatert", items: linkResultSummary(r) });
@@ -235,7 +254,7 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
 
   return (
     <div className="space-y-4">
-      <VarekortHeaderView item={item} openInvoices={scope.invoices} />
+      <VarekortHeaderView item={item} openInvoices={scope.invoices} lockedNote={locked?.badge ?? null} />
       <ReviewPlanCard plan={plan} basis={basis}
         onBasisAction={(k) => { if (k === "pakning") { setEditPkg(true); setEditForm(true); } else navigate(paths.reberegn()); }}
         returnTo={typeof window !== "undefined" ? window.location.pathname + window.location.search : undefined}
@@ -246,7 +265,13 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
       {insightSrc && discountArithmeticText(insightSrc) && <p className="rounded-md bg-muted/50 px-3 py-2 text-sm tabular-nums" data-testid="rabatt-regnestykke">Trykt på fakturaen: {discountArithmeticText(insightSrc)}</p>}
       {insightLine && <LineInsightPanel line={insightLine} clarifications={lineClarifications(insightLine)} />}
 
-      {editForm ? (
+      {locked ? (
+        <div role="status" className="space-y-1 rounded-md border border-line-subtle bg-muted/40 p-3 text-sm" data-testid="laast-varekort">
+          <p className="font-medium">{locked.title}</p>
+          <p className="text-caption text-ink-secondary">{locked.detail}</p>
+          <Link className="inline-flex min-h-[44px] items-center font-medium underline underline-offset-2" to={`/ravarer/priskontroll/faktura/${locked.invoiceId}?linje=${locked.lineId}`}>Åpne faktura {locked.invoiceNumber ?? "uten nummer"} for ny kontroll</Link>
+        </div>
+      ) : editForm ? (
         <SupplierItemLinkForm item={item} lines={lines} canWrite={canWrite} onDone={onLinkDone} onClose={onClose} onNext={onNext}
           onCreateNew={() => setCreateOpen(true)} startEditingPackage={editPkg} onOwnMetadataSaved={onOwnMetadataSaved} />
       ) : (
@@ -267,13 +292,13 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
         </>
       )}
 
-      {priceWork && linked && (
+      {priceWork && linked && !readOnly && (
         <VBlock n={3} title="Pris">
           <PriceBlock item={item} lines={lines} canWrite={canWrite} onDone={onDone} selectedInvoiceId={originalLineId ? insightSrc?.invoice_id ?? null : null} onCheckPackage={() => { setEditPkg(true); setEditForm(true); }} />
         </VBlock>
       )}
 
-      {!editForm && (
+      {!editForm && !readOnly && (
         <VBlock n={4} title="Gjelder">
           <p className="text-sm">{scope.lines} åpne {scope.lines === 1 ? "linje" : "linjer"} på {scope.invoices} {scope.invoices === 1 ? "faktura" : "fakturaer"}</p>
           {!item.is_primary && (
@@ -289,7 +314,7 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       {!canWrite && <p className="text-caption text-ink-secondary">Du har bare lesetilgang.</p>}
 
-      {!editForm && (
+      {!editForm && !readOnly && (
         // Med prisarbeid ligger hovedhandlingene i Pris-blokken; da skal ikke «Ikke vare …» være eneste klebrige handling.
         <div className={`${priceWork ? "" : "sticky bottom-0 z-10 "}-mx-4 flex flex-wrap items-center gap-2 border-t border-line-subtle bg-card px-4 py-3 [&>button]:min-h-11`}>
           {/* Én primærhandling: når planen har en neste handling står den i planen; da er «Ferdig» sekundær. */}
