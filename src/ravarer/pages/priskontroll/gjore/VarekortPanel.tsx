@@ -27,6 +27,7 @@ import type { PanelResult } from "./types";
 import { ReviewPlanCard } from "@/fakturaer/components/ReviewPlanCard";
 import { buildReviewPlan, discountArithmeticText, lineLocked, supplierBasis } from "@/fakturaer/lib/reviewPlan";
 import { cardFinished, freshStatusFrom, type FreshStatus } from "@/fakturaer/lib/freshReceipt";
+import { confirmedPackageFor } from "@/fakturaer/lib/lineDoneSummary";
 import { LineInsightPanel } from "@/fakturaer/components/inbox/task/LineInsightPanel";
 import { insightLineFromSupplierItem, lineClarifications } from "@/fakturaer/lib/lineInsight";
 
@@ -262,7 +263,7 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
         <p className="text-sm font-medium" data-testid="valgt-faktura">Valgt faktura {insightSrc.invoice_number ?? "uten nummer"}{insightSrc.invoice_date ? ` · ${insightSrc.invoice_date.split("-").reverse().join(".")}` : ""}{insightSrc.is_credit_note ? " · kreditnota" : ""}</p>
       )}
       {insightSrc && discountArithmeticText(insightSrc) && <p className="rounded-md bg-muted/50 px-3 py-2 text-sm tabular-nums" data-testid="rabatt-regnestykke">Trykt på fakturaen: {discountArithmeticText(insightSrc)}</p>}
-      {insightLine && <LineInsightPanel line={insightLine} clarifications={lineClarifications(insightLine)} />}
+      {insightLine && insightSrc && <LineInsightPanel line={insightLine} clarifications={lineClarifications(insightLine)} baseUnit={item.rm_base_unit} confirmedPackage={confirmedPackageFor(item, insightSrc)} />}
 
       {locked ? (
         <div role="status" className="space-y-1 rounded-md border border-line-subtle bg-muted/40 p-3 text-sm" data-testid="laast-varekort">
