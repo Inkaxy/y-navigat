@@ -43,3 +43,11 @@ end $do$;
 drop trigger if exists trg_rms_package_variant on public.raw_material_suppliers;
 create trigger trg_rms_package_variant after insert or update of package_size, package_unit, base_units_per_package, package_confirmed_at, supplier_sku, container_unit
   on public.raw_material_suppliers for each row execute function public._rms_record_package_variant();
+
+-- Steg 3 (root, 2026-10-14, fix_packing_confirmation_aliases – allerede live, ikke kjør på nytt):
+-- Steg 1 sin container-UPDATE brukte aliasene s/l, som kolliderer med PL/pgSQL-recordene s/l
+-- («column reference s.id is ambiguous»). Live bruker nå pkg_source_row/unit_source_line:
+--    update public.raw_material_suppliers pkg_source_row
+--       set container_unit = (select nullif(lower(btrim(coalesce(unit_source_line.unit, ''))), '') from public.invoice_lines unit_source_line where unit_source_line.id = p_invoice_line_id)
+--     where pkg_source_row.id = v_rms_id and pkg_source_row.package_confirmed_at is not null and pkg_source_row.base_units_per_package is not null;
+-- Eksakt live-funksjon: rm_confirm_line_match_alias_fix.sql (md5 e2958f267da2cb5fc70f1af49c97d60a).
