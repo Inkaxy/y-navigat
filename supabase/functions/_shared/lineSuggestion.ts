@@ -105,14 +105,33 @@ export interface KnownSupplierItem {
   raw_material_id: string; name: string | null; supplier_sku: string | null; supplier_product_name: string | null;
   package_size: number | null; package_unit: string | null; base_units_per_package: number | null; confirmed: boolean;
 }
+/** Bekreftet pakningsvariant (raw_material_supplier_packages) for leverandørvarenummeret. */
+export interface KnownPackageVariant {
+  raw_material_id: string; supplier_sku_norm: string | null; package_size: number | null; package_unit: string | null; confirmed: boolean;
+}
 export interface SuggestContext {
   line: SuggestLine;
   isCreditNote: boolean;
   currency: string | null;
   candidates: SuggestCandidate[];
   known: KnownSupplierItem[];
+  /** Bekreftede pakningsvarianter fra raw_material_supplier_packages (ikke bare legacy-raden). */
+  packages?: KnownPackageVariant[];
   categories: string[];
   corrections: unknown[];
+}
+
+/** line_kind som allerede er satt autoritativt og aldri er en vare. */
+export const NON_GOODS_LINE_KINDS: ReadonlySet<string> = new Set(["pant", "frakt", "gebyr", "rabatt", "avrunding", "mva"]);
+
+const PRICE_KEYS = new Set(["unit_price", "total_amount", "discount_amount", "discount_pct", "price", "unit_price_raw", "total_amount_raw", "expected_price_per_base_unit", "price_per_base_unit"]);
+/** Rettelser sendes uten pris-/beløpsfelt: modellen får faktisk ingen gamle priser. */
+export function stripPrices(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(stripPrices);
+  if (typeof v === "object" && v !== null) {
+    return Object.fromEntries(Object.entries(v as Record<string, unknown>).filter(([k]) => !PRICE_KEYS.has(k)).map(([k, x]) => [k, stripPrices(x)]));
+  }
+  return v;
 }
 
 export function buildSuggestUserText(c: SuggestContext): string {
@@ -121,7 +140,8 @@ export function buildSuggestUserText(c: SuggestContext): string {
     `Kandidatvarer i selskapet (${c.candidates.length}):\n${JSON.stringify(c.candidates)}`,
     `Leverandørens kjente varer (bekreftet=true betyr menneskelig bekreftet pakning):\n${JSON.stringify(c.known.map((k) => ({ raw_material_id: k.raw_material_id, name: k.name, supplier_sku: k.supplier_sku, supplier_product_name: k.supplier_product_name, package_size: k.package_size, package_unit: k.package_unit, base_units_per_package: k.base_units_per_package, bekreftet: k.confirmed })))}`,
     `Kategorier: ${JSON.stringify(c.categories)}`,
-    c.corrections.length ? `Bekreftede rettelser for leverandøren (DATA):\n${JSON.stringify(c.corrections)}` : "Ingen bekreftede rettelser.",
+    c.packages?.length ? `Bekreftede pakningsvarianter for leverandøren (DATA):\n${JSON.stringify(c.packages)}` : "Ingen bekreftede pakningsvarianter.",
+    c.corrections.length ? `Bekreftede rettelser for leverandøren (DATA, uten priser):\n${JSON.stringify(stripPrices(c.corrections))}` : "Ingen bekreftede rettelser.",
   ].join("\n\n");
 }
 
@@ -169,6 +189,76 @@ export function numbersInText(text: string | null | undefined): number[] {
 }
 const near = (a: number, b: number) => Math.abs(a - b) < 1e-9;
 
+/** Et konkret pakningsuttrykk i varetekst: «2x5kg» → 2 indre pakninger à 5 kg; «25 kg» → 25 kg. */
+export interface PackExpr { size: number; unit: string; count: number | null; raw: string }
+const UNIT_RE = "kg|g|l|dl|cl|ml|stk";
+export function packExpressions(text: string | null | undefined): PackExpr[] {
+  const t = String(text ?? "");
+  const out: PackExpr[] = [];
+  const used: Array<[number, number]> = [];
+  const nr = (x: string) => Number(x.replace(",", "."));
+  for (const m of t.matchAll(new RegExp(`(\\d+)\\s*[xX×*]\\s*(\\d+(?:[.,]\\d+)?)\\s*(${UNIT_RE})(?![\\p{L}])`, "giu"))) {
+    out.push({ count: nr(m[1]), size: nr(m[2]), unit: m[3].toLowerCase(), raw: m[0] });
+    used.push([m.index ?? 0, (m.index ?? 0) + m[0].length]);
+  }
+  for (const m of t.matchAll(new RegExp(`(?<![\\d.,])(\\d+(?:[.,]\\d+)?)\\s*(${UNIT_RE})(?![\\p{L}])`, "giu"))) {
+    const i = m.index ?? 0;
+    if (used.some(([s, e]) => i >= s && i < e)) continue;
+    out.push({ count: null, size: nr(m[1]), unit: m[2].toLowerCase(), raw: m[0] });
+  }
+  return out.filter((e) => Number.isFinite(e.size) && e.size > 0);
+}
+const sameExpr = (a: PackExpr, b: PackExpr) => near(a.size, b.size) && a.unit === b.unit && (a.count ?? 1) === (b.count ?? 1);
+
+export interface ValidatedPackage { size: number | null; unit: string | null; count: number | null; source: "faktura" | "kjent_vare" | null }
+
+/**
+ * Pakning godtas bare når den svarer til ETT konkret pakningsuttrykk i linjeteksten (størrelse+enhet+antall),
+ * eller til én entydig bekreftet pakningsvariant for samme leverandørvarenummer. Tall uten enhet (produktnavn
+ * «… 75»), annen enhet (1000 stk ≠ 1000 kg) og motstridende uttrykk/varianter gir null med forklaring.
+ * base_units_per_package brukes aldri som count_per_package.
+ */
+export function validatePackage(
+  model: { size: number | null; unit: string | null; count: number | null },
+  text: string | null | undefined,
+  variants: Array<{ package_size: number | null; package_unit: string | null }>,
+  rejected: string[],
+): ValidatedPackage {
+  const none: ValidatedPackage = { size: null, unit: null, count: null, source: null };
+  if (model.size == null && model.count == null) return none;
+  if ((model.size != null && !(model.size > 0)) || (model.count != null && !(model.count > 0))) {
+    rejected.push("Pakningstallet er ikke et gyldig tall; satt til ukjent."); return none;
+  }
+  const unit = (model.unit ?? "").toLowerCase();
+  const exprs = packExpressions(text);
+  const distinct = exprs.filter((e, i) => exprs.findIndex((x) => sameExpr(x, e)) === i);
+  if (distinct.length > 1) {
+    rejected.push(`Linjen har flere pakningsuttrykk (${distinct.map((e) => e.raw).join(", ")}); pakningen er satt til ukjent.`);
+    return none;
+  }
+  if (distinct.length === 1) {
+    const e = distinct[0];
+    const m: PackExpr = { size: model.size ?? NaN, unit, count: model.count, raw: "" };
+    if (sameExpr(m, e)) return { size: e.size, unit: e.unit, count: e.count, source: "faktura" };
+    // «2x5kg» oppgitt som 10 kg uten antall: normaliseres til 2 indre pakninger à 5 kg.
+    if (e.count != null && model.count == null && model.size != null && unit === e.unit && near(model.size, e.size * e.count)) {
+      rejected.push(`«${e.raw}» er ${e.count} indre pakninger à ${String(e.size).replace(".", ",")} ${e.unit}; registrert slik.`);
+      return { size: e.size, unit: e.unit, count: e.count, source: "faktura" };
+    }
+    rejected.push(`Foreslått pakning ${String(model.size ?? "?").replace(".", ",")} ${unit || "?"}${model.count ? ` × ${model.count}` : ""} stemmer ikke med «${e.raw}» på linjen; ikke brukt.`);
+    return none;
+  }
+  // Ingen uttrykk på linjen: bare én entydig bekreftet variant for samme varenummer.
+  const vs = variants.filter((v) => v.package_size != null && v.package_size > 0 && v.package_unit);
+  const vd = vs.filter((v, i) => vs.findIndex((x) => near(x.package_size!, v.package_size!) && x.package_unit!.toLowerCase() === v.package_unit!.toLowerCase()) === i);
+  if (vd.length > 1) { rejected.push("Leverandøren har flere bekreftede pakninger for varenummeret; pakningen er satt til ukjent."); return none; }
+  if (vd.length === 1 && model.size != null && near(vd[0].package_size!, model.size) && vd[0].package_unit!.toLowerCase() === unit && model.count == null) {
+    return { size: vd[0].package_size!, unit: vd[0].package_unit!.toLowerCase(), count: null, source: "kjent_vare" };
+  }
+  rejected.push("Pakningen står ikke som et konkret pakningsuttrykk på linjen og svarer ikke til én bekreftet pakning; ikke brukt.");
+  return none;
+}
+
 export function validateLineSuggestion(raw: unknown, c: SuggestContext): ValidatedSuggestion {
   const o = isRec(raw) ? raw : {};
   const rejected: string[] = [];
@@ -177,26 +267,31 @@ export function validateLineSuggestion(raw: unknown, c: SuggestContext): Validat
   const allowed = new Set(c.candidates.map((x) => x.id));
 
   let decision: Decision = oneOf(o.decision, DECISIONS) ?? "unclear";
-  const lineClass: LineClass = oneOf(o.line_class, LINE_CLASSES) ?? "annet";
+  let lineClass: LineClass = oneOf(o.line_class, LINE_CLASSES) ?? "annet";
+  // Autoritativ linjetype fra lesingen vinner over modellen.
+  const kind = (c.line.line_kind ?? "").toLowerCase();
+  if (NON_GOODS_LINE_KINDS.has(kind) && !NON_GOODS.has(lineClass)) {
+    if (decision === "existing" || decision === "new_draft") rejected.push(`Linjen er registrert som «${kind}»; vareforslaget er fjernet.`);
+    lineClass = kind === "frakt" || kind === "pant" || kind === "gebyr" || kind === "rabatt" ? kind : "annet";
+    decision = "not_raw_material";
+  }
   let rmId = strOrNull(o.raw_material_id, 64);
   if (rmId && !allowed.has(rmId)) { rejected.push("Modellen pekte på en vare som ikke er blant selskapets kandidater; forkastet."); rmId = null; }
   if (decision === "existing" && !rmId) { decision = "unclear"; }
   if (decision !== "existing") rmId = null;
 
-  // Tall må stå på linjen, eller i en bekreftet pakning for samme leverandørvarenummer.
-  const textNums = numbersInText(c.line.description);
   const sku = normSku(c.line.supplier_sku);
-  const confirmedSame = c.known.filter((k) => k.confirmed && sku && normSku(k.supplier_sku) === sku);
-  const factual = (v: number | null, field: string, alt: (k: KnownSupplierItem) => number | null): number | null => {
-    if (v == null) return null;
-    if (!(v > 0)) { rejected.push(`${field} ${v} er ikke et gyldig tall; satt til ukjent.`); return null; }
-    if (textNums.some((n) => near(n, v)) || confirmedSame.some((k) => { const a = alt(k); return a != null && near(a, v); })) return v;
-    rejected.push(`${field} ${String(v).replace(".", ",")} står ikke på linjen; ikke brukt.`);
-    return null;
-  };
-  const packageSize = factual(finiteOrNull(o.package_size), "Pakningsstørrelse", (k) => k.package_size);
-  const countPer = factual(finiteOrNull(o.count_per_package), "Antall per pakning", (k) => k.base_units_per_package);
-  const packageUnit = packageSize != null ? oneOf(o.package_unit, PACKAGE_UNITS) : null;
+  const variants = [
+    ...(c.packages ?? []).filter((p) => p.confirmed && sku && normSku(p.supplier_sku_norm) === sku),
+    ...c.known.filter((k) => k.confirmed && sku && normSku(k.supplier_sku) === sku),
+  ];
+  const pkg = validatePackage(
+    { size: finiteOrNull(o.package_size), unit: strOrNull(o.package_unit, 20), count: finiteOrNull(o.count_per_package) },
+    c.line.description, variants, rejected,
+  );
+  const packageSize = pkg.size;
+  const countPer = pkg.count;
+  const packageUnit = pkg.unit && (PACKAGE_UNITS as readonly string[]).includes(pkg.unit) ? pkg.unit : null;
 
   let draft: ValidatedDraft | null = null;
   if (decision === "new_draft" && isRec(o.draft)) {
@@ -222,7 +317,8 @@ export function validateLineSuggestion(raw: unknown, c: SuggestContext): Validat
   if (NON_GOODS.has(lineClass)) {
     if (decision === "existing" || decision === "new_draft") rejected.push("Linjetypen er ikke en vare; vareforslaget er fjernet.");
     decision = "not_raw_material"; rmId = null; draft = null;
-  } else if (lineClass === "kreditnota" && decision === "new_draft") {
+  } else if ((lineClass === "kreditnota" || c.isCreditNote) && decision === "new_draft") {
+    // Dokumentet er kreditnota (uansett hva modellen kaller linjen): aldri ny vare.
     rejected.push("Kreditnota oppretter ikke ny vare; forslaget er fjernet.");
     decision = "unclear"; draft = null;
   }
@@ -236,13 +332,27 @@ export function validateLineSuggestion(raw: unknown, c: SuggestContext): Validat
   if (draft && !draft.category) missing.push("kategori");
 
   const conf = finiteOrNull(o.confidence);
-  const evidence: Evidence[] = Array.isArray(o.evidence)
+  const modelEvidence: Evidence[] = Array.isArray(o.evidence)
     ? o.evidence.filter(isRec).map((e) => ({
         field: strOrNull(e.field, 60) ?? "",
         value: strOrNull(e.value, 160) ?? "",
         source: oneOf(e.source, ["faktura", "kjent_vare", "korrigering", "forslag"] as const) ?? "forslag",
-      })).filter((e) => e.field && e.value).slice(0, 12)
+      })).filter((e) => e.field && e.value)
     : [];
+  // Bevis vises bare for felt som faktisk er validert. Forkastet pakning/vare/utkast presenteres aldri som lest.
+  const isPkgField = (f: string) => /pakn|package|count_per|antall per|størrelse/i.test(f);
+  const isRmField = (f: string) => /raw_material|vare_id|kandidat/i.test(f);
+  const isDraftField = (f: string) => /^draft|navn|kategori|item_type|base_unit|grunnenhet/i.test(f);
+  const evidence: Evidence[] = modelEvidence.filter((e) => {
+    if (isPkgField(e.field)) return false; // erstattes av serverens eget bevis under
+    if (isRmField(e.field) && !rmId) return false;
+    if (isDraftField(e.field) && !draft) return false;
+    if (/pris|price|beløp|sum/i.test(e.field) && e.source !== "faktura") return false;
+    return true;
+  }).slice(0, 10);
+  if (packageSize != null) {
+    evidence.unshift({ field: "pakning", value: `${countPer ? `${countPer} × ` : ""}${String(packageSize).replace(".", ",")} ${packageUnit ?? ""}`.trim(), source: pkg.source ?? "faktura" });
+  }
 
   return {
     decision,
