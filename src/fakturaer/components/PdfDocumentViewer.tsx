@@ -215,7 +215,7 @@ function DocumentView({ data, title, fallback, className, onReload }: { data: Do
           <span className="tabular-nums" aria-live="polite">Side {Math.min(page, pages)} av {pages}</span>
           <Button size="icon" variant="ghost" className="min-h-[44px] min-w-[44px]" aria-label="Neste side" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
           {origin && (
-            <span data-testid="dokumentkilde" title={origin.evidence ?? undefined} className={cn("rounded-md border px-2 py-0.5 text-caption", origin.origin === "tripletex_generert" ? "border-warning/40 bg-warning/10 text-warning" : "border-line-subtle text-ink-secondary")}>
+            <span data-testid="dokumentkilde" title={origin.evidence ?? undefined} className={cn("rounded-md border px-2 py-0.5 text-caption", origin.origin === "generert_fra_detaljer" ? "border-warning/40 bg-warning/10 text-warning" : "border-line-subtle text-ink-secondary")}>
               {ORIGIN_LABEL[origin.origin]}
             </span>
           )}

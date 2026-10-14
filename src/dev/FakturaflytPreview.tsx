@@ -6,7 +6,6 @@ import { ReviewPlanCard } from "@/fakturaer/components/ReviewPlanCard";
 import { PackageSpecFields } from "@/fakturaer/components/package/PackageSpecFields";
 import { buildReviewPlan, discountArithmeticText } from "@/fakturaer/lib/reviewPlan";
 import { describePackageSpec, type PackageSpecInput } from "@/fakturaer/lib/packageSpec";
-import { ORIGIN_LABEL } from "@/fakturaer/lib/documentOrigin";
 import type { SupplierItemLine } from "@/fakturaer/lib/supplierItems";
 
 const nb = (n: number, d = 2) => n.toLocaleString("nb-NO", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -60,7 +59,7 @@ export default function FakturaflytPreview() {
     <main className="mx-auto max-w-3xl space-y-4 px-page py-6">
       <header className="space-y-1">
         <h1 className="text-title font-semibold">Fakturaflyt – forhåndsvisning</h1>
-        <p className="text-caption text-ink-secondary">Helt syntetiske testdata (Testleverandør, DEMO1042). Ingen nettverk eller lagring · {ORIGIN_LABEL.tripletex_generert}.</p>
+        <p className="text-caption text-ink-secondary">Helt syntetiske testdata (Testleverandør, DEMO1042). Ingen nettverk eller lagring.</p>
       </header>
       <nav aria-label="Steg" className="flex flex-wrap gap-1.5">
         {STEPS.map((s, k) => <Button key={s.title} size="sm" variant={k === i ? "secondary" : "outline"} className="min-h-[44px]" aria-pressed={k === i} onClick={() => { setI(k); setLog(null); }}>{s.title}</Button>)}
