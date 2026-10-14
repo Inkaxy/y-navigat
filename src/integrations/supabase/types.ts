@@ -11144,6 +11144,8 @@ export type Database = {
           package_size: number | null
           package_unit: string | null
           raw_material_supplier_id: string
+          superseded_at: string | null
+          superseded_reason: string | null
           supplier_sku_norm: string
           updated_at: string
         }
@@ -11156,6 +11158,8 @@ export type Database = {
           package_size?: number | null
           package_unit?: string | null
           raw_material_supplier_id: string
+          superseded_at?: string | null
+          superseded_reason?: string | null
           supplier_sku_norm?: string
           updated_at?: string
         }
@@ -11168,6 +11172,8 @@ export type Database = {
           package_size?: number | null
           package_unit?: string | null
           raw_material_supplier_id?: string
+          superseded_at?: string | null
+          superseded_reason?: string | null
           supplier_sku_norm?: string
           updated_at?: string
         }
@@ -18826,6 +18832,18 @@ export type Database = {
           p_expected_updated_at: string
           p_learn?: boolean
           p_line_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
+      rm_correct_raw_material_type_unit: {
+        Args: {
+          p_base_unit: string
+          p_dry_run?: boolean
+          p_expected_updated_at: string
+          p_item_type: string
+          p_op_id: string
+          p_raw_material_id: string
           p_reason: string
         }
         Returns: Json

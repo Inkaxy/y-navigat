@@ -31,6 +31,8 @@ interface Props {
   onSearch: (v: string) => void;
   draft: NewMaterialDraft;
   onDraft: (d: NewMaterialDraft) => void;
+  /** Åpner «Rett varetype og måleenhet» for valgt vare (bare med skriverett). */
+  onCorrectTypeUnit?: () => void;
 }
 
 /** Blokk 1: «Hvilken råvare er dette?» */
@@ -117,6 +119,12 @@ export function MaterialBlock(p: Props) {
             );
           })}
         </ul>
+      )}
+      {p.selected && p.onCorrectTypeUnit && (
+        <p className="text-caption text-ink-secondary">
+          Valgt: {p.selected.name}{p.selected.base_unit ? ` · per ${p.selected.base_unit}` : ""}.{" "}
+          <button type="button" className="min-h-[44px] underline underline-offset-2" onClick={p.onCorrectTypeUnit}>Rett varetype og måleenhet</button>
+        </p>
       )}
       <div>
         <Label htmlFor={`${p.idPrefix}-search`} className="text-caption">Søk i råvareregisteret</Label>
