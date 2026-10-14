@@ -1,4 +1,5 @@
 import { RawMaterialCreateSheet } from "@/ravarer/editors/RawMaterialCreateSheet";
+import type { CreatePrefill } from "@/ravarer/editors/createSheetLogic";
 import { supplierItemKey } from "@/fakturaer/lib/supplierItemKey";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 
@@ -8,13 +9,15 @@ interface Props {
   line: ReviewLineRow | null;
   /** Kalles når råvaren er opprettet og koblet — etter at brukeren har lukket resultatet. */
   onCreated?: (rawMaterialId: string) => void;
+  /** Valgfritt AI-utkast (navn/type/kategori/grunnenhet). Varenummer kommer alltid fra linjen. */
+  aiPrefill?: CreatePrefill | null;
 }
 
 /**
  * «Ny råvare …» fra en fakturalinje. Oppretter via varekortet
  * (`link-supplier-item`), slik at alle åpne linjer kobles og regnes om.
  */
-export function CreateRawMaterialFromLine({ open, onOpenChange, line, onCreated }: Props) {
+export function CreateRawMaterialFromLine({ open, onOpenChange, line, onCreated, aiPrefill }: Props) {
   const itemKey = line ? supplierItemKey(line) : null;
   if (!line || !itemKey) return null;
   return (
@@ -30,7 +33,8 @@ export function CreateRawMaterialFromLine({ open, onOpenChange, line, onCreated 
         lineUnit: line.unit,
         invoiceId: line.invoice_id,
         prefill: {
-          name: line.description ?? "",
+          ...(aiPrefill ?? {}),
+          name: aiPrefill?.name ?? line.description ?? "",
           sku: line.supplier_sku ?? "",
         },
       }}

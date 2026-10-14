@@ -1,3 +1,4 @@
+import type { CreatePrefill } from "@/ravarer/editors/createSheetLogic";
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, FileText, Loader2, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -41,7 +42,7 @@ export interface LineTaskProps {
   onSaved: (lineId: string) => Promise<void>;
   /** Etter bekreftet kobling: koblingen som kan brukes på like linjer. */
   onLinked?: (rmsId: string, name: string) => void;
-  onSecondary: (a: SecondaryAction, line: ReviewLineRow) => void;
+  onSecondary: (a: SecondaryAction, line: ReviewLineRow, prefill?: CreatePrefill | null) => void;
   onShowDocument: (line: ReviewLineRow) => void;
   onReconcile: () => void;
   /** Åpner «Endre råvare» (tast M i arbeidsflaten) — bare for linjen signalet gjelder. */

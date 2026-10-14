@@ -7,10 +7,11 @@ import { StartPriceDialog } from "@/fakturaer/components/StartPriceDialog";
 import { BulkCreateRawMaterialsDialog } from "@/fakturaer/components/BulkCreateRawMaterialsDialog";
 import { BulkImportRawMaterialsDrawer } from "@/fakturaer/components/BulkImportRawMaterialsDrawer";
 import { BulkLinkDialog } from "@/fakturaer/components/BulkLinkDialog";
+import type { CreatePrefill } from "@/ravarer/editors/createSheetLogic";
 import type { InvoiceLineQueue } from "./useInvoiceLineQueue";
 
 export type LineDialogKind = "create" | "not_rm" | "conflict" | "start_price" | "bulk_create" | "bulk_import";
-export type LineDialog = { kind: LineDialogKind; line: ReviewLineRow | null } | null;
+export type LineDialog = { kind: LineDialogKind; line: ReviewLineRow | null; prefill?: CreatePrefill | null } | null;
 
 type Props = {
   dialog: LineDialog;
@@ -33,7 +34,7 @@ export function LineDialogs({ dialog, onClose, q, canWrite, invoice, onEditMater
   const unmatched = q.selectedLines.filter((l) => !l.raw_material_id);
   return (
     <>
-      <CreateRawMaterialFromLine open={is("create")} onOpenChange={close} line={line} />
+      <CreateRawMaterialFromLine open={is("create")} onOpenChange={close} line={line} aiPrefill={dialog?.prefill ?? null} />
       <NotARawMaterialDialog open={is("not_rm")} onOpenChange={close} line={line} onDone={onNotItemDone} />
       <SkuConflictDialog open={is("conflict")} onOpenChange={close} line={line} onOpenMatchDrawer={() => { onClose(); onEditMaterial(); }} />
       <StartPriceDialog

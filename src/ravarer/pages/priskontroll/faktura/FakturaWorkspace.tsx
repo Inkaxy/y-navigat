@@ -387,7 +387,7 @@ export default function FakturaWorkspace() {
           countsError={q.countsQuery.isError}
           onSaved={q.handleSaved}
           onLinked={(rmsId, name) => setLastLinked({ rmsId, name })}
-          onSecondary={(a, l) => setLineDialog({ kind: a, line: l })}
+          onSecondary={(a, l, prefill) => setLineDialog({ kind: a, line: l, prefill: prefill ?? null })}
           onShowDocument={() => { if (isMobile) setZone("dokument"); else if (!docOpen) toggleDoc(); }}
           onReconcile={runPrimary}
           inspectorAsSheet={!isMobile && (!wide || (showDocZone && !threeZones))}

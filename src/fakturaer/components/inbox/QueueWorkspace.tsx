@@ -1,3 +1,4 @@
+import type { CreatePrefill } from "@/ravarer/editors/createSheetLogic";
 import type { ReactNode } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -55,7 +56,7 @@ export interface QueueWorkspaceProps {
   countsError: boolean;
   onSaved: (lineId: string) => Promise<void>;
   onLinked?: (rmsId: string, name: string) => void;
-  onSecondary: (a: SecondaryAction, l: ReviewLineRow) => void;
+  onSecondary: (a: SecondaryAction, l: ReviewLineRow, prefill?: CreatePrefill | null) => void;
   onShowDocument: (l: ReviewLineRow) => void;
   onReconcile: () => void;
   /** Under 1280 px: linjene som liste, inspektøren i et sidepanel. */

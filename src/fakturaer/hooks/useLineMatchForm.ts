@@ -91,6 +91,7 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
     setPackageTouched(false);
     setAiSuggestion(null);
     setAiNotice(null);
+    setAiApplied(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- nullstilles bevisst bare ved ny linje
   }, [line?.id, resetKey]);
 
