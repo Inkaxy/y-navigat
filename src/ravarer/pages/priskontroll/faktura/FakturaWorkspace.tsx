@@ -307,7 +307,8 @@ export default function FakturaWorkspace() {
       invoice={{ invoice_number: data.invoice_number, invoice_date: data.invoice_date, supplier_name: data.suppliers?.name ?? null, source_document_url: data.source_document_url, total_amount: data.total_amount, total_vat: data.total_vat, lines_sum_status: data.lines_sum_status, lines_sum_excl_vat: data.lines_sum_excl_vat, lines_sum_variance_pct: data.lines_sum_variance_pct, extraction_confidence: data.extraction_confidence, currency: data.currency, is_credit_note: data.is_credit_note, flagged_at: data.flagged_at, extraction_issues: data.extraction_issues }}
       line={line ? { ...line, matched_name: line.matched_raw_material?.name ?? null, extraction_issues: linesById.get(line.id)?.extraction_issues } : null}
       gate={line && !heldOutside(line) ? gateFor(line) : null}
-      heldOutside={!!line && heldOutside(line)}
+      lineHeldOutside={!!line && heldOutside(line)}
+      documentHeldOutside={isExcludedInvoice(data.status, data.excluded_at)}
       tolerancePct={tolerances.defaultPct}
       onClose={() => toggleDoc()}
       className="h-full"
