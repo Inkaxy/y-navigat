@@ -15,7 +15,7 @@ import { AiSuggestion } from "./AiSuggestion";
 import { textOnlyCountUnsupported } from "@/fakturaer/lib/lineInsight";
 import { RawMaterialCreateSheet } from "@/ravarer/editors/RawMaterialCreateSheet";
 import { NOT_ITEM_REASONS, nameFromDescription, needsPackage, openScope, suggestedBaseUnit } from "@/fakturaer/lib/linkFormLogic";
-import { parseDecimal } from "@/fakturaer/lib/units";
+import { describePackageSpec, initialContainer, type PackageSpecInput } from "@/fakturaer/lib/packageSpec";
 import type { LinkSupplierItemBody, LinkSupplierItemResult, SupplierItem, SupplierItemLine } from "@/fakturaer/lib/supplierItems";
 
 interface Props {
@@ -50,7 +50,7 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
   const [selectedId, setSelectedId] = useState<string | null>(item.rm_id);
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState<NewMaterialDraft>({ name: nameFromDescription(item.description), itemType: "ravare", category: "", baseUnit: "stk", declarationName: "" });
-  const [bupp, setBupp] = useState("");
+  const [spec, setSpec] = useState<PackageSpecInput>({ container: initialContainer(lines.find((l) => l.unit)?.unit ?? null), size: "", contentUnit: "" });
   const [confirm, setConfirm] = useState(false);
   const [editPkg, setEditPkg] = useState(startEditingPackage);
   const [ownCreateOpen, setOwnCreateOpen] = useState(false);
@@ -80,14 +80,19 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
   useEffect(() => {
     const inf = inference.data;
     if (!inf || inf.direct) return;
-    if (!touched.bupp) setBupp(inf.suggested_bupp != null ? String(inf.suggested_bupp).replace(".", ",") : "");
+    if (!touched.bupp) setSpec((v) => ({ ...v, size: inf.suggested_bupp != null ? String(inf.suggested_bupp).replace(".", ",") : "", contentUnit: baseUnit ?? "" }));
     if (!touched.confirm) setConfirm(inf.source === "regnestykke_og_varenavn" || inf.source === "bekreftet_pakning");
   }, [inference.data, touched.bupp, touched.confirm]);
+  // Innholdsenhet følger grunnenheten til brukeren selv velger.
+  useEffect(() => {
+    if (!touched.bupp && baseUnit) setSpec((v) => ({ ...v, contentUnit: baseUnit }));
+  }, [baseUnit, touched.bupp]);
 
   const pkgNeeded = !inference.data?.direct && needsPackage(refLine?.unit, baseUnit);
   const sameRm = mode === "existing" && selectedId === item.rm_id;
   const existingPkg = sameRm && item.package_confirmed_at && item.base_units_per_package != null ? { bupp: item.base_units_per_package, confirmedAt: item.package_confirmed_at } : null;
-  const buppNum = parseDecimal(bupp);
+  const specState = describePackageSpec(spec, baseUnit, refLine?.unit ?? null);
+  const buppNum = specState.state === "valid" ? specState.baseUnitsPerPackage : null;
   const pkgValid = !pkgNeeded || (existingPkg && !editPkg) || (buppNum != null && buppNum > 0);
   const hasMaterial = mode === "new" ? draft.name.trim().length > 1 : !!selectedId;
   const n = scope.lines;
@@ -122,7 +127,7 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
       };
     } else if (selectedId) body.raw_material_id = selectedId;
     if (pkgNeeded && !(existingPkg && !editPkg) && buppNum != null) {
-      body.package = { base_units_per_package: buppNum, package_unit: refLine?.unit ?? undefined, confirm };
+      body.package = { base_units_per_package: buppNum, package_unit: spec.container || refLine?.unit || undefined, confirm };
     }
     void submit(body);
   };
@@ -155,8 +160,10 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
           onDraft={onDraft}
           onCorrectTypeUnit={canWrite && selected.data ? () => setTypeUnitOpen(true) : undefined}
         />
-        {typeUnitOpen && selected.data && (
+        {typeUnitOpen && selected.data && company && (
           <TypeUnitCorrectionDialog
+            key={`${company.id}:${selected.data.id}`}
+            companyId={company.id}
             rawMaterialId={selected.data.id}
             rawMaterialName={selected.data.name}
             open={typeUnitOpen}
@@ -168,13 +175,14 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
         {mode === "existing" && !item.rm_id && refLineId && <AiSuggestion lineId={refLineId} onPick={(id) => { setMode("existing"); setSelectedId(id); }} />}
       </Block>
       {pkgNeeded && baseUnit && (
-        <Block n={2} title={`Hva inneholder én ${refLine?.unit ?? "pakning"}?`}>
+        <Block n={2} title={`Hva inneholder én ${spec.container || refLine?.unit || "pakning"}?`}>
           <PackageBlock
             idPrefix={`si-${item.item_key}`}
             baseUnit={baseUnit}
-            packageUnit={refLine?.unit ?? "pakning"}
-            value={bupp}
-            onChange={(v) => { setTouched((t) => ({ ...t, bupp: true })); setBupp(v); }}
+            packageUnit={spec.container || refLine?.unit || "pakning"}
+            invoiceUnit={refLine?.unit ?? null}
+            value={spec}
+            onChange={(v) => { setTouched((t) => ({ ...t, bupp: true })); setSpec(v); }}
             confirm={confirm}
             onConfirm={(v) => { setTouched((t) => ({ ...t, confirm: true })); setConfirm(v); }}
             inference={inference.data}

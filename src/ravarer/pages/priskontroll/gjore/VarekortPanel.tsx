@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,9 @@ import { packageConflict, packageLabel } from "./packageLabel";
 import { ChangeLinkDialog } from "./ChangeLinkDialog";
 import { SupplierLinkAliases } from "./SupplierLinkAliases";
 import type { PanelResult } from "./types";
+import { ReviewPlanCard } from "@/fakturaer/components/ReviewPlanCard";
+import { buildReviewPlan, discountArithmeticText } from "@/fakturaer/lib/reviewPlan";
+import { cardFinished, freshStatusFrom, type FreshStatus } from "@/fakturaer/lib/freshReceipt";
 import { LineInsightPanel } from "@/fakturaer/components/inbox/task/LineInsightPanel";
 import { insightLineFromSupplierItem, lineClarifications } from "@/fakturaer/lib/lineInsight";
 
@@ -54,11 +57,45 @@ export function VarekortPanel({ supplierId, itemKey, onDone, onNext, onSkip, onC
   }, [snap, live, lines.data]);
   const change = snap && live && lines.data ? frozenChange(snap.lines, lines.data, snap.item, live) : null;
   const item = snap?.item ?? live;
-  const done = (r: PanelResult) => { setResult(r); onDone?.(r); };
+  const [fresh, setFresh] = useState<FreshStatus | null>(null);
+  const verifyGen = useRef(0);
+  /** Hent faktisk serverstatus etter lagring; kortet regnes ferdig (og arbeidsflaten går videre) bare ved 0 åpne. */
+  const verify = (r: PanelResult) => {
+    const gen = ++verifyGen.current;
+    setFresh({ kind: "pending" });
+    void Promise.all([lines.refetch(), q.refetch()]).then(([lr]) => {
+      if (gen !== verifyGen.current) return;
+      const st = freshStatusFrom({ isError: lr.isError, data: lr.data });
+      setFresh(st);
+      if (cardFinished(st)) onDone?.(r);
+    }, () => { if (gen === verifyGen.current) setFresh({ kind: "unknown" }); });
+  };
+  const done = (r: PanelResult) => { setResult(r); verify(r); };
+  const continueCard = () => { setResult(null); setFresh(null); setSnap(live && lines.data ? { item: live, lines: lines.data } : null); };
 
   if (result) {
+    const finished = !!fresh && cardFinished(fresh);
     return (
-      <ResultBox title={result.title} items={result.items} onNext={onNext}>
+      <ResultBox title={result.title} items={result.items} onNext={finished ? onNext : undefined}>
+        {fresh?.kind === "pending" && <p className="text-sm text-ink-secondary" aria-live="polite">Henter faktisk status fra serveren …</p>}
+        {fresh?.kind === "unknown" && (
+          <p role="alert" className="text-sm text-destructive">Status etter lagringen er ukjent. Varekortet regnes ikke som ferdig.{" "}
+            <button type="button" className="underline underline-offset-2" onClick={() => verify(result)}>Prøv igjen</button></p>
+        )}
+        {fresh?.kind === "ok" && fresh.remaining > 0 && (
+          <div className="space-y-2 text-sm" aria-live="polite">
+            <p className="font-medium">Lagret, men {fresh.remaining} {fresh.remaining === 1 ? "linje gjenstår" : "linjer gjenstår"} på {fresh.invoices.length} {fresh.invoices.length === 1 ? "faktura" : "fakturaer"}. Varekortet er ikke ferdig.</p>
+            <ul className="list-disc pl-4">
+              {fresh.invoices.map((i) => (
+                <li key={i.invoiceId}>
+                  <Link className="underline underline-offset-2" to={`/ravarer/priskontroll/faktura/${i.invoiceId}?linje=${i.lineId}`}>Faktura {i.invoiceNumber ?? "uten nummer"}</Link>: {i.open} åpen{i.open === 1 ? "" : "e"}
+                </li>
+              ))}
+            </ul>
+            <Button size="sm" className="min-h-[44px]" onClick={continueCard}>Fortsett med varekortet</Button>
+          </div>
+        )}
+        {fresh?.kind === "ok" && fresh.remaining === 0 && <p className="text-sm">Ingen åpne linjer igjen – varekortet er behandlet.</p>}
         {result.link && <Link className="underline underline-offset-2" to={result.link.to}>{result.link.label}</Link>}
         {!onNext && onClose && <button type="button" className="ml-3 underline underline-offset-2" onClick={onClose}>Lukk</button>}
       </ResultBox>
@@ -184,9 +221,12 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
   return (
     <div className="space-y-6">
       <VarekortHeaderView item={item} openInvoices={scope.invoices} />
+      <ReviewPlanCard plan={buildReviewPlan(item, lines)} returnTo={typeof window !== "undefined" ? window.location.pathname + window.location.search : undefined}
+        onAction={(step) => { if (step === "pakning" || step === "vare") { setEditPkg(step === "pakning"); setEditForm(true); return true; } return false; }} />
       {insightSrc && lines.length > 1 && (
         <p className="text-sm font-medium" data-testid="valgt-faktura">Valgt faktura {insightSrc.invoice_number ?? "uten nummer"}{insightSrc.invoice_date ? ` · ${insightSrc.invoice_date.split("-").reverse().join(".")}` : ""}{insightSrc.is_credit_note ? " · kreditnota" : ""}</p>
       )}
+      {insightSrc && discountArithmeticText(insightSrc) && <p className="rounded-md bg-muted/50 px-3 py-2 text-sm tabular-nums" data-testid="rabatt-regnestykke">Trykt på fakturaen: {discountArithmeticText(insightSrc)}</p>}
       {insightLine && <LineInsightPanel line={insightLine} clarifications={lineClarifications(insightLine)} />}
 
       {editForm ? (
