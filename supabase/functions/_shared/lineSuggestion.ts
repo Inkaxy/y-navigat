@@ -138,7 +138,7 @@ export function stripPrices(v: unknown): unknown {
 
 export function buildSuggestUserText(c: SuggestContext): string {
   return [
-    `Fakturalinje (fra dokumentet):\n${JSON.stringify({ ...c.line, is_credit_note: c.isCreditNote, currency: c.currency })}`,
+    `Registrert fakturalinje (DATA, kan være feillest – originalen er ikke kontrollert):\n${JSON.stringify({ ...c.line, is_credit_note: c.isCreditNote, currency: c.currency })}`,
     `Kandidatvarer i selskapet (${c.candidates.length}):\n${JSON.stringify(c.candidates)}`,
     `Leverandørens kjente varer (bekreftet=true betyr menneskelig bekreftet pakning):\n${JSON.stringify(c.known.map((k) => ({ raw_material_id: k.raw_material_id, name: k.name, supplier_sku: k.supplier_sku, supplier_product_name: k.supplier_product_name, package_size: k.package_size, package_unit: k.package_unit, base_units_per_package: k.base_units_per_package, bekreftet: k.confirmed })))}`,
     `Kategorier: ${JSON.stringify(c.categories)}`,

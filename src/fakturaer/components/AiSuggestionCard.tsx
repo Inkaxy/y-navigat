@@ -64,9 +64,12 @@ export function AiSuggestionCard({ suggestion: s, rawMaterialName, canWrite, onA
         </span>
       </header>
 
+      {s.sourceStatus !== "original" && (
+        <p className="text-caption text-ink-secondary" role="note">Forslag basert på registrert linje, original ikke kontrollert.</p>
+      )}
       {read.length > 0 && (
         <div>
-          <h5 className="text-caption font-semibold">Lest fra fakturaen</h5>
+          <h5 className="text-caption font-semibold">{s.sourceStatus === "original" ? "Lest fra originalen" : "Fra registrert linje"}</h5>
           <ul className="text-caption text-ink-secondary">{read.map((e, i) => <li key={i}>{e.field}: {e.value}</li>)}</ul>
         </div>
       )}

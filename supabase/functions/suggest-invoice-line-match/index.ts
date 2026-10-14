@@ -214,7 +214,7 @@ Deno.serve(async (req) => {
 
     const v = validateLineSuggestion(parsed, ctx);
     return json({
-      suggestion: { ...v, model: String(cfg.model ?? ""), candidate_count: ctx.candidates.length },
+      suggestion: { ...v, model: String(cfg.model ?? ""), candidate_count: ctx.candidates.length, source_status: "registrert_linje", document_version: null },
       reason: null,
     });
   } catch (e) {
