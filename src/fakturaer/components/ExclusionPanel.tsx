@@ -5,11 +5,11 @@ import { useUserNames } from "@/ravarer/hooks/useUserNames";
 import { EXCLUSION_CATEGORY_LABEL, exclusionErrorText, parseExclusionCategory, type ExclusionScope } from "@/fakturaer/lib/invoiceExclusion";
 
 export type ExclusionPanelInvoice = {
-  id: string; is_credit_note: boolean; updated_at: string; lines_sum_status: string | null;
+  id: string; is_credit_note: boolean; updated_at: string | null; lines_sum_status: string | null;
   excluded_at: string | null; excluded_by: string | null; exclusion_category: string | null; exclusion_reason: string | null;
 };
 export type ExclusionPanelLine = {
-  id: string; line_number: number | null; description: string | null; updated_at: string;
+  id: string; line_number: number | null; description: string | null; updated_at: string | null;
   excluded_at: string | null; excluded_by: string | null; exclusion_category: string | null; exclusion_reason: string | null;
 };
 
@@ -27,7 +27,7 @@ export function ExclusionPanel({ invoice, lines, canWrite }: { invoice: Exclusio
   const who = (id: string | null) => (id ? names.data?.get(id) ?? "ukjent bruker" : "ukjent bruker");
   const cat = (c: string | null) => { const k = parseExclusionCategory(c); return k ? EXCLUSION_CATEGORY_LABEL[k] : "Ukjent årsak"; };
 
-  async function reopen(scope: ExclusionScope, lineId: string | null, updatedAt: string) {
+  async function reopen(scope: ExclusionScope, lineId: string | null, updatedAt: string | null) {
     setMsg(null);
     const r = await ex.reopen({ invoiceId: invoice.id, scope, lineId, expectedUpdatedAt: updatedAt });
     if (r.kind === "ok") setMsg({ text: "Gjenåpnet. Linjene må kontrolleres på nytt; ingenting er godkjent, ført som kostpris eller lagt på lager.", error: false });

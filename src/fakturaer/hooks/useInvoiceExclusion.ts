@@ -9,9 +9,9 @@ const isJson = (v: unknown): v is Json => v === null || typeof v === "object" ||
 
 export type ExcludeInput = {
   invoiceId: string; scope: ExclusionScope; lineId: string | null;
-  category: ExclusionCategory; reason: string; expectedUpdatedAt: string; opId: string;
+  category: ExclusionCategory; reason: string; expectedUpdatedAt: string | null; opId: string;
 };
-export type ReopenInput = { invoiceId: string; scope: ExclusionScope; lineId: string | null; expectedUpdatedAt: string };
+export type ReopenInput = { invoiceId: string; scope: ExclusionScope; lineId: string | null; expectedUpdatedAt: string | null };
 
 /**
  * Kall mot utelatelses-RPC-ene med synkron lås. Transportfeil uten SQL-svar er ukjent utfall
@@ -42,11 +42,11 @@ export function useInvoiceExclusion() {
   }
   const exclude = (i: ExcludeInput) => run(i.invoiceId, () => supabase.rpc("rm_set_invoice_exclusion", {
     p_invoice_id: i.invoiceId, p_scope: i.scope, p_line_id: i.lineId ?? undefined,
-    p_category: i.category, p_reason: i.reason.trim(), p_expected_updated_at: i.expectedUpdatedAt, p_op_id: i.opId,
+    p_category: i.category, p_reason: i.reason.trim(), p_expected_updated_at: i.expectedUpdatedAt ?? "", p_op_id: i.opId,
   }));
   const reopen = (i: ReopenInput) => run(i.invoiceId, () => supabase.rpc("rm_reopen_invoice_exclusion", {
     p_invoice_id: i.invoiceId, p_scope: i.scope, p_line_id: i.lineId ?? undefined,
-    p_expected_updated_at: i.expectedUpdatedAt,
+    p_expected_updated_at: i.expectedUpdatedAt ?? undefined,
   }));
   return { exclude, reopen, busy };
 }

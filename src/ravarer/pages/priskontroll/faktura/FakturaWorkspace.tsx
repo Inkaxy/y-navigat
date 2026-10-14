@@ -396,7 +396,7 @@ export default function FakturaWorkspace() {
           inspectorNote={active ? (
             <div className="space-y-2">
               <Button variant="outline" size="sm" className="min-h-[44px]" onClick={() => startCorrection(active.id)}>Rett fakturalinje</Button>
-              {canHold && !active.excluded_at && (
+              {canHold && !(data.invoice_lines ?? []).find((x) => x.id === active.id)?.excluded_at && (
                 <Button variant="outline" size="sm" className="min-h-[44px]" onClick={() => openHold(active.id, "line")}>Hold utenfor råvarebehandling …</Button>
               )}
               <SupplierItemScopeNote supplierId={data.supplier_id} line={active} />

@@ -11,9 +11,9 @@ import {
 } from "@/fakturaer/lib/invoiceExclusion";
 
 export type HoldOutsideTarget = {
-  invoice: { id: string; invoice_number: string | null; updated_at: string; is_credit_note: boolean };
+  invoice: { id: string; invoice_number: string | null; updated_at: string | null; is_credit_note: boolean };
   /** Linjen dialogen ble åpnet fra; null = bare dokumentvalget. */
-  line: { id: string; line_number: number | null; description: string | null; updated_at: string } | null;
+  line: { id: string; line_number: number | null; description: string | null; updated_at: string | null } | null;
   initialScope: ExclusionScope;
 };
 
