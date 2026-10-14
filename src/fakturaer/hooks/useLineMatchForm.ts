@@ -8,7 +8,7 @@ import { packageDisagreement, pickSupplierLink, readPackageDraft, suggestPackage
 export { readPackageDraft, suggestPackage, type PackageDraft } from "@/fakturaer/lib/packageDraft";
 import { acceptMatch, type AcceptMatchResult } from "@/fakturaer/lib/acceptMatch";
 import { normalizeMatchKey } from "@/fakturaer/lib/matchNormalize";
-import { fetchAiLineSuggestion, AI_REASON_LABELS, type AiLineSuggestion } from "@/fakturaer/lib/aiLineSuggestion";
+import { fetchAiLineSuggestion, AI_REASON_LABELS, planAiApply, type AiLineSuggestion } from "@/fakturaer/lib/aiLineSuggestion";
 
 /** Leverandørkoblingen bak et forslag — pris, pakning og SKU hos leverandøren. */
 export interface LinkInfo {
@@ -72,6 +72,7 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
   const [aiBusy, setAiBusy] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<AiLineSuggestion | null>(null);
   const [aiNotice, setAiNotice] = useState<string | null>(null);
+  const [aiApplied, setAiApplied] = useState<string | null>(null);
   /** Linjen skjemaet gjelder nå — asynkrone svar for en annen linje ignoreres. */
   const currentLineId = useRef<string | null>(line?.id ?? null);
 
@@ -313,11 +314,13 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
     }
   }
 
+  /** Henter forslaget. Fyller IKKE inn skjemaet — det gjør `applyAiSuggestion` på brukerens valg. */
   async function runAiSuggestion() {
     if (!line) return;
     const lineId = line.id;
     setAiBusy(true);
     setAiNotice(null);
+    setAiApplied(null);
     try {
       const { suggestion, reason } = await fetchAiLineSuggestion({
         invoiceLineId: line.id,
@@ -330,14 +333,24 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
         return;
       }
       setAiSuggestion(suggestion);
-      if (suggestion.rawMaterialId) setSelectedRmId(suggestion.rawMaterialId);
-      if (suggestion.packageSize != null || suggestion.packageUnit) setPackageTouched(true);
-      if (suggestion.packageSize != null) setPackageSize(String(suggestion.packageSize));
-      if (suggestion.packageUnit) setPackageUnit(suggestion.packageUnit);
-      if (!suggestion.rawMaterialId) setAiNotice("AI-hjelpen fant ingen passende vare. Søk fram varen manuelt.");
     } finally {
       setAiBusy(false);
     }
+  }
+
+  /** «Bruk forslag»: fyller bare tomme, uberørte felt. Ingen bekreftelse settes. */
+  function applyAiSuggestion() {
+    if (!aiSuggestion) return;
+    const plan = planAiApply(aiSuggestion, { selectedRmId, packageSize, packageUnit, packageTouched });
+    if (plan.rawMaterialId && plan.rawMaterialId !== selectedRmId) setSelectedRmId(plan.rawMaterialId);
+    if (plan.packageSize != null || plan.packageUnit) {
+      if (plan.packageSize != null) setPackageSize(plan.packageSize);
+      if (plan.packageUnit) setPackageUnit(plan.packageUnit);
+      setPackageTouched(true);
+    }
+    setAiApplied(plan.kept.length
+      ? `Forslaget er fylt inn. Beholdt dine endringer: ${plan.kept.join(", ")}.`
+      : "Forslaget er fylt inn, men ikke bekreftet.");
   }
 
   return {
@@ -387,7 +400,9 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
     aiBusy,
     aiSuggestion,
     aiNotice,
+    aiApplied,
     runAiSuggestion,
+    applyAiSuggestion,
   };
 }
 
