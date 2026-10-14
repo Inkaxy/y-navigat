@@ -8,6 +8,8 @@ export interface MaterialChoice {
   name: string;
   base_unit: string | null;
   sku: string | null;
+  /** Faktisk varetype (råvare/emballasje/…), uavhengig av kategori. null = ikke registrert. */
+  item_type: string | null;
   category: string | null;
   why: string | null;
 }
@@ -24,7 +26,7 @@ export function useMaterialChoices(lineId: string | null, search: string) {
     queryFn: async (): Promise<MaterialChoice[]> => {
       const { data, error } = await supabase
         .from("invoice_line_match_suggestions")
-        .select("raw_material_id, match_reason, rank, raw_materials(name, base_unit, sku, category)")
+        .select("raw_material_id, match_reason, rank, raw_materials(name, base_unit, sku, category, item_type)")
         .eq("invoice_line_id", lineId!)
         .order("rank")
         .limit(3);
@@ -35,6 +37,7 @@ export function useMaterialChoices(lineId: string | null, search: string) {
         base_unit: s.raw_materials?.base_unit ?? null,
         sku: s.raw_materials?.sku ?? null,
         category: s.raw_materials?.category ?? null,
+        item_type: s.raw_materials?.item_type ?? null,
         why: s.match_reason,
       }));
     },
@@ -47,7 +50,7 @@ export function useMaterialChoices(lineId: string | null, search: string) {
       const term = q.replace(/[%,()]/g, " ");
       const { data, error } = await supabase
         .from("raw_materials")
-        .select("id, name, base_unit, sku, category")
+        .select("id, name, base_unit, sku, category, item_type")
         .eq("legal_entity_id", le!)
         .eq("is_active", true)
         .or(`name.ilike.%${term}%,sku.ilike.%${term}%`)
@@ -66,7 +69,7 @@ export function useMaterialById(id: string | null) {
     queryKey: ["supplier-item-rm", id],
     enabled: !!id,
     queryFn: async (): Promise<MaterialChoice | null> => {
-      const { data, error } = await supabase.from("raw_materials").select("id, name, base_unit, sku, category").eq("id", id!).maybeSingle();
+      const { data, error } = await supabase.from("raw_materials").select("id, name, base_unit, sku, category, item_type").eq("id", id!).maybeSingle();
       if (error) throw error;
       return data ? { ...data, why: null } : null;
     },

@@ -23,6 +23,9 @@ export function contentUnitsFor(baseUnit: string | null | undefined): string[] {
 
 /** Startverdi: fakturaens enhet som beholder når den er en kjent beholder, ellers tom. */
 export function initialContainer(invoiceUnit: string | null | undefined): string {
+  // Fakturaens egen beholderetikett beholdes («kartong» blir aldri «eske»); bare ukjente aliaser normaliseres.
+  const raw = (invoiceUnit ?? "").trim().toLowerCase();
+  if ((CONTAINER_OPTIONS as readonly string[]).includes(raw)) return raw;
   const n = normalizeUnit(invoiceUnit);
   return n && (CONTAINER_OPTIONS as readonly string[]).includes(n) ? n : "";
 }

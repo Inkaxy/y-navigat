@@ -59,6 +59,8 @@ export interface QueueWorkspaceProps {
   onSecondary: (a: SecondaryAction, l: ReviewLineRow, prefill?: CreatePrefill | null) => void;
   onShowDocument: (l: ReviewLineRow) => void;
   onReconcile: () => void;
+  /** Åpner eksisterende «Rett fakturalinje» for linjen (bare fakturaflaten). */
+  onCorrectLine?: (l: ReviewLineRow) => void;
   /** Under 1280 px: linjene som liste, inspektøren i et sidepanel. */
   inspectorAsSheet?: boolean;
   inspectorOpen?: boolean;
@@ -92,6 +94,7 @@ export function QueueWorkspace(p: QueueWorkspaceProps) {
       onSecondary={p.onSecondary}
       onShowDocument={p.onShowDocument}
       onReconcile={p.onReconcile}
+      onCorrectLine={p.onCorrectLine}
       editMaterialSignal={p.editMaterialSignal}
     />
   ) : null;

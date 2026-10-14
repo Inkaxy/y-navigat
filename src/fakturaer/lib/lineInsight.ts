@@ -52,6 +52,8 @@ export interface InsightLine {
   arithmetic_context?: "complete" | "incomplete";
   /** Serverens lagrede årsakskoder (kommaseparert review_reason), brukt når regnestykket ikke kan kjøres her. */
   server_review_reason?: string | null;
+  /** Serverens lagrede lesevarsler (`extraction_issues`). Ikke-tom liste = uløst lesevarsel, uansett lokalt regnestykke. */
+  extraction_issues?: unknown;
   suggestions?: Array<{ raw_material_id: string; confidence: number; match_reason: string | null; rank: number; raw_material: { name: string } | null }>;
 }
 
@@ -153,7 +155,7 @@ export function nbAmounts(msg: string): string {
 }
 const nb = (n: number, d = 2) => n.toLocaleString("nb-NO", { maximumFractionDigits: d });
 /** Fakturaenheter som betyr en beholder med ukjent antall stk. */
-const CONTAINER = new Set(["sekk", "sk", "kartong", "krt", "kart", "kolli", "pall", "eske", "pk", "pakke", "pkn", "bx", "boks"]);
+const CONTAINER = new Set(["pose", "sekk", "sk", "kartong", "krt", "kart", "kolli", "pall", "eske", "pk", "pakke", "pkn", "bx", "boks"]);
 const MEASURE_UNITS = new Set(["g", "gr", "kg", "ml", "cl", "dl", "l", "ltr"]);
 
 /**
@@ -184,11 +186,13 @@ export function lineClarifications(l: InsightLine): Clarification[] {
     });
   }
 
+  const serverRead = (l.server_review_reason ?? "").split(",").map((x) => x.trim()).includes("extraction_unresolved")
+    || (Array.isArray(l.extraction_issues) && l.extraction_issues.length > 0);
+  if (serverRead) {
+    out.push({ id: "read_issue", title: "Tallene på linjen må kontrolleres mot originalen", detail: "Serveren har registrert et uløst lesevarsel på linjen. Les tallene av originalen.", action: "original", blocksPrice: true });
+  }
   if (l.arithmetic_context === "incomplete") {
-    // Ufullstendig datasett: ingen ny regnefeil herfra. Serverens dokumenterte lesevarsel vises fortsatt.
-    if ((l.server_review_reason ?? "").split(",").map((x) => x.trim()).includes("extraction_unresolved")) {
-      out.push({ id: "read_issue", title: "Tallene på linjen må kontrolleres mot originalen", detail: "Serveren har registrert et uløst lesevarsel på linjen. Les tallene av originalen.", action: "original", blocksPrice: true });
-    }
+    // Ufullstendig datasett: ingen ny regnefeil herfra. Serverens dokumenterte lesevarsel er vist over.
   } else {
     const issues = lineReadIssues({
       quantity: l.quantity, unit: l.unit, unit_price: l.unit_price, total_amount: l.total_amount,
@@ -202,7 +206,7 @@ export function lineClarifications(l: InsightLine): Clarification[] {
       if (pkg?.count && q != null && p != null && t != null && Math.abs(q * pkg.count * p - Math.abs(t)) < 0.005) {
         detail += ` Teksten «${pkg.raw}» passer: ${nb(q)} × ${pkg.count} × ${nb(p)} kr = ${nb(Math.abs(t))} kr — enhetsprisen kan gjelde per stykk i kolliet.`;
       }
-      out.push({ id: "read_issue", title: "Tallene på linjen må kontrolleres mot originalen", detail, action: "original", blocksPrice: true });
+      if (!serverRead) out.push({ id: "read_issue", title: "Tallene på linjen må kontrolleres mot originalen", detail, action: "original", blocksPrice: true });
     }
   }
   if (credit && (l.total_amount ?? 0) > 0) {
@@ -247,11 +251,16 @@ export function rankedSuggestions(l: InsightLine, max = 3): RankedSuggestion[] {
     }));
 }
 
+const otherContainer = (pkgUnit: string | null | undefined, lineUnit: string | null | undefined) => {
+  const a = (pkgUnit ?? "").trim().toLowerCase(), b = (lineUnit ?? "").trim().toLowerCase();
+  return a !== "" && b !== "" && a !== b;
+};
+
 /** Linjeinnsikt for en ekte leverandørvarelinje (varekortet). Bare lesing — ingenting lagres. */
 export function insightLineFromSupplierItem(
-  item: { rm_name: string | null; rm_category: string | null; rm_base_unit: string | null; rm_id: string | null; base_units_per_package: number | null; package_confirmed_at: string | null },
+  item: { rm_name: string | null; rm_category: string | null; rm_base_unit: string | null; rm_id: string | null; base_units_per_package: number | null; package_confirmed_at: string | null; package_unit?: string | null },
   l: { review_reason: string | null; description: string | null; quantity: number | null; unit: string | null; unit_price: number | null; total_amount: number | null; package_size: number | null; package_unit: string | null; count_per_package: number | null; line_kind: string | null; is_credit_note: boolean | null;
-    price_context?: boolean; unit_price_basis?: string | null; discount_amount?: number | null },
+    price_context?: boolean; unit_price_basis?: string | null; discount_amount?: number | null; extraction_issues?: unknown },
 ): InsightLine {
   const complete = l.price_context === true;
   return {
@@ -259,11 +268,14 @@ export function insightLineFromSupplierItem(
     package_size: l.package_size, package_unit: l.package_unit, count_per_package: l.count_per_package, line_kind: l.line_kind,
     invoice: { is_credit_note: l.is_credit_note },
     matched_raw_material: item.rm_id ? { name: item.rm_name ?? "Råvare", category: item.rm_category, base_unit: item.rm_base_unit } : null,
-    package_gate: packageGateFromSupplierItem(item),
+    // En bekreftet leverandørpakning for en ANNEN beholder (f.eks. gammel «1 stk per sekk» mot pose) løser ikke
+    // linjens pakningsflagg: da vinner serverens unknown_package_size.
+    package_gate: packageGateFromReview(l.review_reason) === "missing" && otherContainer(item.package_unit, l.unit) ? "missing" : packageGateFromSupplierItem(item),
     // Bare når serveren leverte prisgrunnlag og rabatt (v2) kjøres det delte regnestykket; ellers ukjent.
     arithmetic_context: complete ? "complete" : "incomplete",
     ...(complete ? { unit_price_basis: l.unit_price_basis ?? null, discount_amount: l.discount_amount ?? null } : {}),
     server_review_reason: l.review_reason,
+    extraction_issues: l.extraction_issues ?? null,
   };
 }
 

@@ -1,3 +1,4 @@
+import { lineReadIssues } from "@/fakturaer/lib/invoiceReadCheck";
 // ÉN gjennomgangsplan for et varekort (leverandørvare), brukt av både køkortet og det valgte varekortet.
 // Bygges bare av serverens lagrede tilstand (review_reason, variance_status, lesevarsler, pakningsstatus,
 // prisgrunnlag/rabatt fra rm_supplier_item_lines v2). AI-forslag/confidence gjør aldri et steg grønt.
@@ -25,6 +26,8 @@ export interface ReviewPlan {
   incomplete: boolean;
   /** Linjekontroll ferdig, men fakturaen har egne mangler/godkjenning igjen (vises separat, aldri som ferdig). */
   invoiceFollowUp: { invoiceId: string; invoiceNumber: string | null }[];
+  /** Én neste handling per åpen faktura (eldste først), alltid til eksakt faktura og linje. */
+  perInvoice: PlanAction[];
 }
 
 export interface PlanItem { rm_id: string | null; rm_base_unit: string | null; package_confirmed_at: string | null; base_units_per_package: number | null }
@@ -41,15 +44,22 @@ export function packageActionLabel(l: Pick<SupplierItemLine, "description" | "un
 
 const hasIssues = (v: unknown) => (Array.isArray(v) ? v.length > 0 : v != null && typeof v === "object" && Object.keys(v).length > 0);
 
-/** Prisgrunnlaget er uavklart: q × pris ≠ sum uten trykt rabatt eller dokumentert grunnlag. */
+/**
+ * Prisgrunnlaget er uavklart etter den DELTE lesekontrollen (`lineReadIssues`, samme regel og toleranse
+ * som serverens rm_line_read_issues_v2, med rabatt/prisgrunnlag/kreditnota). Ingen egen toleranse her.
+ * null = grunnlaget mangler (ukjent, ikke godkjent).
+ */
 function basisUnclear(l: SupplierItemLine): boolean | null {
   if (!l.price_context) return null;
-  if (l.discount_amount != null && l.discount_amount > 0) return false;
-  if (l.unit_price_basis) return false;
-  const q = Number(l.quantity), p = Number(l.unit_price), t = Number(l.total_amount);
-  if (![q, p, t].every(Number.isFinite)) return null;
-  return Math.abs(q * p - t) > Math.max(0.02, Math.abs(t) * 0.0005);
+  const issues = lineReadIssues({
+    quantity: l.quantity, unit: l.unit, unit_price: l.unit_price, total_amount: l.total_amount,
+    package_size: l.package_size ?? null, package_unit: l.package_unit ?? null, count_per_package: l.count_per_package ?? null,
+    unit_price_basis: l.unit_price_basis ?? null, discount_amount: l.discount_amount ?? null, line_kind: l.line_kind ?? null, is_credit: l.is_credit_note === true,
+  });
+  return issues.length > 0;
 }
+
+const WEIGHT_UNITS = new Set(["g", "gr", "kg", "ml", "cl", "dl", "l"]);
 
 type LineStep = { step: StepKey; state: "todo" | "unknown"; label: string };
 
@@ -59,13 +69,17 @@ function lineSteps(l: SupplierItemLine, item: PlanItem): LineStep[] {
   if (r.includes("extraction_unresolved") || hasIssues(l.extraction_issues)) out.push({ step: "kilde", state: "todo", label: "Kontroller tallene mot originalen" });
   else if (!l.price_context) out.push({ step: "kilde", state: "unknown", label: "Hent lesegrunnlaget på nytt" });
   if (!l.raw_material_id || r.includes("unmatched") || r.includes("low_confidence") || r.includes("missing_base_unit")) out.push({ step: "vare", state: "todo", label: r.includes("missing_base_unit") ? "Rett varetype og måleenhet" : "Velg råvare" });
-  if (r.includes("unknown_package_size") || r.includes("package_conflict")) out.push({ step: "pakning", state: "todo", label: packageActionLabel(l) });
+  if (r.includes("unknown_package_size") || r.includes("package_conflict")) {
+    // Stk-vare med innhold i vekt/volum: antall stk per beholder er ikke dokumentert. Neste handling er da
+    // å rette varetype/grunnenhet (eller oppgi antall), aldri å bekrefte vekten som et antall.
+    const weightContent = WEIGHT_UNITS.has((l.package_unit ?? "").toLowerCase()) || PKG_RX.test(l.description ?? "");
+    out.push({ step: "pakning", state: "todo", label: (item.rm_base_unit ?? "").toLowerCase() === "stk" && weightContent ? "Rett varetype og måleenhet" : packageActionLabel(l) });
+  }
   const b = basisUnclear(l);
   if (b === true) out.push({ step: "prisgrunnlag", state: "todo", label: "Registrer rabatt / avklar prisgrunnlag" });
   else if (b === null && l.requires_review) out.push({ step: "prisgrunnlag", state: "unknown", label: "Avklar prisgrunnlag" });
   if (r.includes("no_baseline") || r.includes("start_price_manual_check")) out.push({ step: "prisavvik", state: "todo", label: "Bekreft første pris" });
   else if (r.some((x) => x === "price_variance" || x === "price_increase" || x === "price_drop" || x === "uncertain_cost" || x === "agreement_conflict" || x === "price_reference_error")) out.push({ step: "prisavvik", state: "todo", label: "Vurder pris" });
-  void item;
   return out;
 }
 
@@ -101,7 +115,14 @@ export function buildReviewPlan(item: PlanItem, lines: readonly SupplierItemLine
     }
   }
   for (const l of open) followUp.delete(l.invoice_id);
+  const perInvoice = new Map<string, PlanAction>();
+  for (const l of ordered) {
+    if (perInvoice.has(l.invoice_id)) continue;
+    const st = lineSteps(l, item).sort((a, b) => STEP_ORDER.indexOf(a.step) - STEP_ORDER.indexOf(b.step))[0];
+    perInvoice.set(l.invoice_id, { label: st?.label ?? "Kontroller linjen", step: st?.step ?? "kontrollert", invoiceId: l.invoice_id, lineId: l.id, invoiceNumber: l.invoice_number ?? null });
+  }
   return {
+    perInvoice: [...perInvoice.values()],
     steps, current, primary, openLines: open.length, openInvoices: new Set(open.map((l) => l.invoice_id)).size,
     incomplete: lines.length >= limit, invoiceFollowUp: [...followUp.values()],
   };

@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { LineMatchForm } from "@/fakturaer/hooks/useLineMatchForm";
 import { cn } from "@/lib/utils";
+import { itemTypeText } from "@/fakturaer/components/supplier-item/MaterialBlock";
 
 interface Option {
   id: string;
@@ -11,6 +12,12 @@ interface Option {
   baseUnit: string | null;
   why: string | null;
   detail: string | null;
+  /** Varetype og kategori vises alltid atskilt — kategori alene sier ikke hva varen er. */
+  kind: string;
+}
+
+function kindText(t: string | null | undefined, c: string | null | undefined): string {
+  return [itemTypeText(t), c ? `Kategori: ${c}` : null].filter(Boolean).join(" · ");
 }
 
 /** Kort råvarevalg: de mest relevante forslagene + søk. Tekniske detaljer er sekundære. */
@@ -22,10 +29,11 @@ export function MaterialPicker({ form, lineId }: { form: LineMatchForm; lineId: 
     baseUnit: s.raw_material?.base_unit ?? null,
     why: s.match_reason,
     detail: `${s.raw_material?.sku ?? "uten varenr."} · ${Math.round((s.confidence ?? 0) * 100)} % matchscore`,
+    kind: kindText(s.raw_material?.item_type, s.raw_material?.category),
   }));
   const found: Option[] = form.rmResults
     .filter((r) => !suggested.some((s) => s.id === r.id))
-    .map((r) => ({ id: r.id, name: r.name, baseUnit: r.base_unit, why: null, detail: r.sku ?? r.category ?? null }));
+    .map((r) => ({ id: r.id, name: r.name, baseUnit: r.base_unit, why: null, detail: r.sku ?? null, kind: kindText(r.item_type, r.category) }));
 
   const renderOption = (o: Option) => {
     const active = form.selectedRmId === o.id;
@@ -42,6 +50,7 @@ export function MaterialPicker({ form, lineId }: { form: LineMatchForm; lineId: 
         >
           <span className="font-medium">{o.name}</span>
           {o.baseUnit && <span className="text-ink-secondary"> · per {o.baseUnit}</span>}
+          <span className="block text-caption text-ink-secondary">{o.kind}</span>
           {o.why && <span className="block text-caption text-ink-secondary">Hvorfor: {o.why}</span>}
           {showDetails && o.detail && <span className="block text-caption text-ink-secondary">{o.detail}</span>}
         </button>

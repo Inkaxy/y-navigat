@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -66,8 +66,12 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
   const inferenceQ = usePackageInference(refLineId, baseUnit);
   // En vektetikett alene («pose 100 g») dokumenterer ikke antall stk per pakning: vis ukjent, ikke et fabrikert tall.
   const textOnly = textOnlyCountUnsupported(inferenceQ.data, baseUnit, refLine?.description ?? item.description);
-  const inference = { ...inferenceQ, data: inferenceQ.data && textOnly ? { ...inferenceQ.data, suggested_bupp: null, agrees: false, auto_confirmable: false, source: null,
-    explanation: `Ukjent antall: varenavnet oppgir vekt/volum, ikke hvor mange stk som er i én ${refLine?.unit ?? "pakning"}. Les antallet av originalen eller leverandørens pakning.` } : inferenceQ.data };
+  const unitLabel = refLine?.unit ?? "pakning";
+  // Stabil referanse: effekten under fyller utkastet når forslaget faktisk endres — et nytt objekt per
+  // render ga en uendelig oppdateringssløyfe for stk-varer med bare vektetikett.
+  const inferenceData = useMemo(() => (inferenceQ.data && textOnly ? { ...inferenceQ.data, suggested_bupp: null, agrees: false, auto_confirmable: false, source: null,
+    explanation: `Ukjent antall: varenavnet oppgir vekt/volum, ikke hvor mange stk som er i én ${unitLabel}. Les antallet av originalen eller leverandørens pakning.` } : inferenceQ.data), [inferenceQ.data, textOnly, unitLabel]);
+  const inference = { ...inferenceQ, data: inferenceData };
   const baseGuess = usePackageInference(mode === "new" ? refLineId : null, null);
 
   // Grunnenhet for ny råvare forhåndsvelges fra varenavnet.

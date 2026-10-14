@@ -395,6 +395,7 @@ export default function FakturaWorkspace() {
           onSecondary={(a, l, prefill) => setLineDialog({ kind: a, line: l, prefill: prefill ?? null })}
           onShowDocument={() => { if (isMobile) setZone("dokument"); else if (!docOpen) toggleDoc(); }}
           onReconcile={runPrimary}
+          onCorrectLine={lineWrite ? (l) => startCorrection(l.id) : undefined}
           inspectorAsSheet={!isMobile && (!wide || (showDocZone && !threeZones))}
           inspectorOpen={inspectorOpen}
           onInspectorOpenChange={setInspectorOpen}

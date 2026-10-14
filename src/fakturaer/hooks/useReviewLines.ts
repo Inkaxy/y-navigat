@@ -31,6 +31,8 @@ export interface ReviewLineRow {
   count_per_package: number | null;
   unit_price_basis?: string | null;
   discount_amount?: number | null;
+  /** Serverens lagrede lesevarsler (jsonb-liste). Ikke-tom = uløst lesevarsel. */
+  extraction_issues?: unknown;
   line_kind?: string | null;
   base_quantity: number | null;
   match_confidence: string | null;
@@ -80,7 +82,7 @@ export interface ReviewLineRow {
 export const HIDDEN_INVOICE_STATUSES = ["flagged", "reconciled", "ready"];
 
 const SELECT = `id, updated_at, invoice_id, line_number, supplier_sku, description, quantity, unit, unit_price, total_amount,
-   package_size, package_unit, count_per_package, base_quantity, unit_price_basis, discount_amount, line_kind,
+   package_size, package_unit, count_per_package, base_quantity, unit_price_basis, discount_amount, extraction_issues, line_kind,
    match_confidence, raw_material_id, price_per_base_unit, expected_price_per_base_unit, price_variance_pct,
    variance_status, review_reason, requires_review,
    price_reference_source, price_reference_id, price_reference_date,

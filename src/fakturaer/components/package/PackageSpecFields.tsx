@@ -21,12 +21,14 @@ export function PackageSpecFields(p: Props) {
   const units = contentUnitsFor(p.baseUnit);
   const set = (patch: Partial<PackageSpecInput>) => p.onChange({ ...p.value, ...patch });
   const c = p.value.container || "pakning";
+  // Varer som telles i stk: innholdet er et antall. Vekt/volum blandes aldri inn i antallet.
+  const isPieces = p.baseUnit === "stk";
   return (
     <div className="space-y-2">
       <p className="text-caption text-ink-secondary">
         Fakturert som: <strong className="text-ink-primary">{p.invoiceUnit?.trim() || "ukjent enhet"}</strong>
       </p>
-      <div className="grid gap-2 sm:grid-cols-[10rem_1fr_7rem]">
+      <div className={isPieces ? "grid gap-2 sm:grid-cols-[10rem_1fr]" : "grid gap-2 sm:grid-cols-[10rem_1fr_7rem]"}>
         <div>
           <Label htmlFor={`${p.idPrefix}-container`} className="text-caption">Kjøpes som</Label>
           <Select value={p.value.container} onValueChange={(v) => set({ container: v })} disabled={p.disabled || !p.containerEditable}>
@@ -37,11 +39,11 @@ export function PackageSpecFields(p: Props) {
           </Select>
         </div>
         <div>
-          <Label htmlFor={`${p.idPrefix}-size`} className="text-caption">Innhold per {c}</Label>
+          <Label htmlFor={`${p.idPrefix}-size`} className="text-caption">{isPieces ? `Antall stk per ${c}` : `Innhold per ${c}`}</Label>
           <Input id={`${p.idPrefix}-size`} inputMode="decimal" className="mt-1 min-h-[44px]" value={p.value.size} disabled={p.disabled}
             aria-invalid={spec.state === "invalid"} onChange={(e) => set({ size: e.target.value })} />
         </div>
-        <div>
+        {!isPieces && <div>
           <Label htmlFor={`${p.idPrefix}-cunit`} className="text-caption">Enhet</Label>
           <Select value={p.value.contentUnit} onValueChange={(v) => set({ contentUnit: v })} disabled={p.disabled}>
             <SelectTrigger id={`${p.idPrefix}-cunit`} aria-label={`Enhet for innhold per ${c}`} className="mt-1 min-h-[44px]"><SelectValue placeholder="Velg" /></SelectTrigger>
@@ -49,7 +51,7 @@ export function PackageSpecFields(p: Props) {
               {units.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
             </SelectContent>
           </Select>
-        </div>
+        </div>}
       </div>
       {spec.state === "valid" && <p className="text-caption" aria-live="polite">{spec.text}</p>}
       {spec.state === "invalid" && <p role="alert" className="rounded-md bg-warning/10 px-3 py-2 text-caption text-warning">{spec.reason}</p>}
