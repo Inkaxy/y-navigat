@@ -12,10 +12,10 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { decryptWithKey } from "../_shared/crypto.ts";
-import { AiCallError, callAi, extractJson, estimateCostUsd, type AiProvider } from "../_shared/ai-providers.ts";
+import { AiCallError, callAi, extractJson, estimateCostUsd, usageOf, type AiProvider } from "../_shared/ai-providers.ts";
 import {
-  buildSuggestUserText, LINE_SUGGESTION_SCHEMA, LINE_SUGGESTION_SYSTEM_PROMPT, validateLineSuggestion,
-  type KnownSupplierItem, type SuggestCandidate, type SuggestContext,
+  buildSuggestUserText, LINE_SUGGESTION_SCHEMA, LINE_SUGGESTION_SYSTEM_PROMPT, NON_GOODS_LINE_KINDS, validateLineSuggestion,
+  type KnownPackageVariant, type KnownSupplierItem, type SuggestCandidate, type SuggestContext,
 } from "../_shared/lineSuggestion.ts";
 
 const corsHeaders = {
@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
     // Linjen leses med brukerens egne rettigheter — RLS avgjør hva som er synlig.
     const { data: line, error: lineErr } = await userClient
       .from("invoice_lines")
-      .select("id, description, supplier_sku, quantity, unit, unit_price, total_amount, package_size, package_unit, count_per_package, unit_price_basis, line_kind, invoice_id")
+      .select("id, description, supplier_sku, quantity, unit, unit_price, total_amount, package_size, package_unit, count_per_package, unit_price_basis, line_kind, excluded_at, invoice_id")
       .eq("id", invoice_line_id)
       .maybeSingle();
     if (lineErr) return jsonErr("Kunne ikke lese fakturalinjen", 400);
@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
 
     const { data: invoice, error: invErr } = await userClient
       .from("invoices")
-      .select("id, legal_entity_id, supplier_id, currency, is_credit_note")
+      .select("id, legal_entity_id, supplier_id, currency, is_credit_note, status, excluded_at")
       .eq("id", line.invoice_id)
       .maybeSingle();
     if (invErr) return jsonErr("Kunne ikke lese fakturaen", 400);
@@ -73,6 +73,10 @@ Deno.serve(async (req) => {
       _required_level: "write",
     });
     if (hasAccess !== true) return jsonErr("Mangler skrivetilgang til fakturaer", 403);
+
+    // Autoritativ status før AI: utelatt dokument/linje og registrert ikke-vare får aldri vareforslag (og koster ingenting).
+    if (line.excluded_at || invoice.excluded_at || invoice.status === "excluded") return json({ suggestion: null, reason: "holdt_utenfor" });
+    if (NON_GOODS_LINE_KINDS.has(String(line.line_kind ?? "").toLowerCase())) return json({ suggestion: null, reason: "ikke_vare" });
 
     // --- Kontekst, alltid avgrenset til selskapet (og leverandøren) ---
     const rmCols = "id, name, sku, base_unit, category, item_type";
@@ -88,27 +92,42 @@ Deno.serve(async (req) => {
     }
 
     let known: KnownSupplierItem[] = [];
+    let packages: KnownPackageVariant[] = [];
     if (invoice.supplier_id) {
-      const { data: rms } = await admin
-        .from("raw_material_suppliers")
-        .select("raw_material_id, supplier_sku, supplier_product_name, package_size, package_unit, base_units_per_package, package_confirmed_at, raw_materials!inner(id, name, sku, base_unit, category, item_type, legal_entity_id)")
-        .eq("supplier_id", invoice.supplier_id)
-        .eq("raw_materials.legal_entity_id", legalEntityId)
-        .limit(40);
-      type Row = { raw_material_id: string; supplier_sku: string | null; supplier_product_name: string | null; package_size: number | null; package_unit: string | null; base_units_per_package: number | null; package_confirmed_at: string | null; raw_materials: SuggestCandidate | SuggestCandidate[] | null };
-      const rows = (Array.isArray(rms) ? rms : []) as Row[];
-      known = rows.map((r) => {
-        const rm = Array.isArray(r.raw_materials) ? r.raw_materials[0] : r.raw_materials;
-        return {
-          raw_material_id: r.raw_material_id, name: rm?.name ?? null, supplier_sku: r.supplier_sku,
-          supplier_product_name: r.supplier_product_name, package_size: numOrNull(r.package_size), package_unit: r.package_unit,
-          base_units_per_package: numOrNull(r.base_units_per_package), confirmed: !!r.package_confirmed_at,
-        };
-      });
+      type Row = { id: string; raw_material_id: string; supplier_sku: string | null; supplier_product_name: string | null; package_size: number | null; package_unit: string | null; base_units_per_package: number | null; package_confirmed_at: string | null; raw_materials: SuggestCandidate | SuggestCandidate[] | null };
+      const sel = "id, raw_material_id, supplier_sku, supplier_product_name, package_size, package_unit, base_units_per_package, package_confirmed_at, raw_materials!inner(id, name, sku, base_unit, category, item_type, legal_entity_id)";
+      const lineSku = String(line.supplier_sku ?? "").trim();
+      // 1) Eksakt varenummer FØR den generelle grensen — en kjent vare skal aldri falle utenfor de 40 første.
+      let exact: Row[] = [];
+      if (lineSku) {
+        const { data } = await admin.from("raw_material_suppliers").select(sel)
+          .eq("supplier_id", invoice.supplier_id).eq("raw_materials.legal_entity_id", legalEntityId)
+          .ilike("supplier_sku", lineSku.replace(/[%_\\]/g, (m) => `\\${m}`)).limit(20);
+        exact = (Array.isArray(data) ? data : []) as Row[];
+      }
+      const { data: rms } = await admin.from("raw_material_suppliers").select(sel)
+        .eq("supplier_id", invoice.supplier_id).eq("raw_materials.legal_entity_id", legalEntityId).limit(40);
+      const seen = new Set<string>();
+      const rows = [...exact, ...((Array.isArray(rms) ? rms : []) as Row[])].filter((r) => (seen.has(r.id) ? false : (seen.add(r.id), true)));
+      const rmOf = (r: Row) => (Array.isArray(r.raw_materials) ? r.raw_materials[0] : r.raw_materials);
+      known = rows.map((r) => ({
+        raw_material_id: r.raw_material_id, name: rmOf(r)?.name ?? null, supplier_sku: r.supplier_sku,
+        supplier_product_name: r.supplier_product_name, package_size: numOrNull(r.package_size), package_unit: r.package_unit,
+        base_units_per_package: numOrNull(r.base_units_per_package), confirmed: !!r.package_confirmed_at,
+      }));
       // Samme leverandørvarenummer først — det er den sterkeste kjente koblingen.
-      const sku = (line.supplier_sku ?? "").replace(/\s+/g, "").toLowerCase();
+      const sku = lineSku.replace(/\s+/g, "").toLowerCase();
       const sameSku = rows.filter((r) => sku && (r.supplier_sku ?? "").replace(/\s+/g, "").toLowerCase() === sku);
-      add(sameSku.map((r) => (Array.isArray(r.raw_materials) ? r.raw_materials[0] : r.raw_materials)));
+      add(sameSku.map(rmOf));
+      // Bekreftede pakningsvarianter (raw_material_supplier_packages) for samme varenummer.
+      if (sameSku.length) {
+        const { data: pk } = await admin.from("raw_material_supplier_packages")
+          .select("raw_material_supplier_id, supplier_sku_norm, package_size, package_unit, confirmed_at")
+          .in("raw_material_supplier_id", sameSku.map((r) => r.id)).limit(40);
+        const rmBy = new Map(sameSku.map((r) => [r.id, r.raw_material_id]));
+        packages = ((pk ?? []) as { raw_material_supplier_id: string; supplier_sku_norm: string | null; package_size: number | null; package_unit: string | null; confirmed_at: string | null }[])
+          .map((p) => ({ raw_material_id: rmBy.get(p.raw_material_supplier_id) ?? "", supplier_sku_norm: p.supplier_sku_norm ?? lineSku, package_size: numOrNull(p.package_size), package_unit: p.package_unit, confirmed: !!p.confirmed_at }));
+      }
     }
 
     const words = String(line.description ?? "").split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 4 && !/^\d+$/.test(w)).slice(0, 3);
@@ -148,6 +167,7 @@ Deno.serve(async (req) => {
       currency: invoice.currency ?? null,
       candidates: [...byId.values()].map((c) => ({ id: String(c.id), name: c.name, sku: c.sku, base_unit: c.base_unit, category: c.category, item_type: c.item_type })),
       known,
+      packages,
       categories,
       corrections,
     };
@@ -174,6 +194,9 @@ Deno.serve(async (req) => {
       usage = { in: result.inputTokens, out: result.outputTokens };
       parsed = extractJson(result.rawText);
     } catch (e) {
+      // Avslag/ufullstendig svar har likevel kostet tokens — behold forbruket i loggen.
+      const u = usageOf(e);
+      if (u) usage = { in: u.inputTokens, out: u.outputTokens };
       errorMessage = e instanceof Error ? e.message : String(e);
       reason = e instanceof AiCallError
         ? (e.kind === "timeout" ? "tidsavbrudd" : e.kind === "refusal" ? "ai_avslo" : e.kind === "incomplete" ? "ai_ufullstendig" : e.kind === "model_unavailable" ? "modell_utilgjengelig" : "ai_feilet")
