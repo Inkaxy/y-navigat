@@ -345,13 +345,21 @@ export function validateLineSuggestion(raw: unknown, c: SuggestContext): Validat
   const isPkgField = (f: string) => /pakn|package|count_per|antall per|størrelse/i.test(f);
   const isRmField = (f: string) => /raw_material|vare_id|kandidat/i.test(f);
   const isDraftField = (f: string) => /^draft|navn|kategori|item_type|base_unit|grunnenhet/i.test(f);
+  const isBasisField = (f: string) => /price_basis|unit_price_basis|prisgrunnlag|pris_grunnlag/i.test(f);
   const evidence: Evidence[] = modelEvidence.filter((e) => {
     if (isPkgField(e.field)) return false; // erstattes av serverens eget bevis under
     if (isRmField(e.field) && !rmId) return false;
     if (isDraftField(e.field) && !draft) return false;
+    if (isBasisField(e.field)) return false; // prisgrunnlag valideres ikke på serveren → vises bare som forslag under
     if (/pris|price|beløp|sum/i.test(e.field) && e.source !== "faktura") return false;
     return true;
   }).slice(0, 10);
+  // Modellens prisgrunnlag er alltid et forslag, aldri lest fakta — det brukes aldri automatisk.
+  const priceBasis = oneOf(o.price_basis, PRICE_BASES) ?? "ukjent";
+  if (priceBasis !== "ukjent") {
+    evidence.push({ field: "prisgrunnlag", value: priceBasis, source: "forslag" });
+    if (!missing.some((m) => /prisgrunnlag/i.test(m))) missing.push("Prisgrunnlag må bekreftes");
+  }
   if (packageSize != null) {
     evidence.unshift({ field: "pakning", value: `${countPer ? `${countPer} × ` : ""}${String(packageSize).replace(".", ",")} ${packageUnit ?? ""}`.trim(), source: pkg.source ?? "faktura" });
   }
@@ -364,7 +372,7 @@ export function validateLineSuggestion(raw: unknown, c: SuggestContext): Validat
     package_size: packageSize,
     package_unit: packageUnit,
     count_per_package: countPer,
-    price_basis: oneOf(o.price_basis, PRICE_BASES) ?? "ukjent",
+    price_basis: priceBasis,
     draft,
     evidence,
     explanation: strOrNull(o.explanation, 600),

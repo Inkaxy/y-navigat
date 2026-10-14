@@ -160,3 +160,18 @@ describe("2x5kg: ingen dobbeltelling ende-til-ende", async () => {
     expect(planAiApply(single, { selectedRmId: null, packageSize: "", packageUnit: "", packageTouched: false }).packageSize).toBe("12,5");
   });
 });
+
+describe("prisgrunnlag fra modellen er alltid forslag", async () => {
+  const { validateLineSuggestion } = await import("../../supabase/functions/_shared/lineSuggestion");
+  const ctx = { candidates: [], known: [], corrections: [], line: { description: "Smoothiebeger 358713", supplier_sku: "358713", quantity: 1, unit: "krt", unit_price: 1, total_amount: 1, package_size: null, package_unit: null, count_per_package: null, unit_price_basis: null, line_kind: "vare", line_class: null, isCreditNote: false, excluded: false }, variants: [] } as never;
+  it("price_basis merket faktura vises som forslag, med «Prisgrunnlag må bekreftes»", () => {
+    const r = validateLineSuggestion({ decision: "unclear", line_class: "emballasje", price_basis: "per_pakning", evidence: [{ field: "price_basis", value: "per_pakning", source: "faktura" }, { field: "prisgrunnlag", value: "per_pakning", source: "faktura" }] }, ctx);
+    expect(r.evidence.filter((e) => /basis|prisgrunnlag/i.test(e.field))).toEqual([{ field: "prisgrunnlag", value: "per_pakning", source: "forslag" }]);
+    expect(r.missing).toContain("Prisgrunnlag må bekreftes");
+    expect(r.price_basis).toBe("per_pakning");
+  });
+  it("ukjent prisgrunnlag gir ingen bevisrad", () => {
+    const r = validateLineSuggestion({ decision: "unclear", price_basis: "ukjent", evidence: [] }, ctx);
+    expect(r.evidence.some((e) => e.field === "prisgrunnlag")).toBe(false);
+  });
+});
