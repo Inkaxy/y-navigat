@@ -1,4 +1,4 @@
-import { packageSavePayload } from "@/fakturaer/lib/packageSpec";
+import { contentUnitsFor, packageSavePayload } from "@/fakturaer/lib/packageSpec";
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
@@ -95,7 +95,7 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
   }, [inference.data, touched.bupp, touched.confirm]);
   // Innholdsenhet følger grunnenheten til brukeren selv velger.
   useEffect(() => {
-    if (!touched.bupp && baseUnit) setSpec((v) => ({ ...v, contentUnit: baseUnit }));
+    if (!touched.bupp && baseUnit) setSpec((v) => (v.contentUnit && contentUnitsFor(baseUnit).includes(v.contentUnit) ? v : { ...v, contentUnit: baseUnit }));
   }, [baseUnit, touched.bupp]);
 
   const pkgNeeded = !inference.data?.direct && needsPackage(refLine?.unit, baseUnit);
