@@ -19138,10 +19138,10 @@ export type Database = {
       rm_rematch_tick: { Args: { p_slots?: number }; Returns: Json }
       rm_reopen_invoice_exclusion: {
         Args: {
-          p_expected_updated_at: string
+          p_expected_updated_at?: string
           p_invoice_id: string
-          p_line_id: string
-          p_reason: string
+          p_line_id?: string
+          p_reason?: string
           p_scope: string
         }
         Returns: Json
@@ -19188,12 +19188,12 @@ export type Database = {
       }
       rm_set_invoice_exclusion: {
         Args: {
-          p_category: string
-          p_expected_updated_at: string
+          p_category?: string
+          p_expected_updated_at?: string
           p_invoice_id: string
-          p_line_id: string
-          p_op_id: string
-          p_reason: string
+          p_line_id?: string
+          p_op_id?: string
+          p_reason?: string
           p_scope: string
         }
         Returns: Json
