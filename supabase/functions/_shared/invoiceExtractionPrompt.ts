@@ -59,6 +59,11 @@ REGLER FOR BELØP (viktigst):
    mengden er 10, ikke 10 000.
    I TILLEGG: oppgi for hver linje råteksten nøyaktig slik den er trykt i quantity_raw, unit_price_raw og total_amount_raw
    (strenger, f.eks. "10.000", "110,00", "1 100,00"). Ikke omform råteksten.
+   sku_raw: varenummeret nøyaktig slik det står, med ALLE tegn i kolonnen inkludert mellomrom og siste siffer
+   («5301 0» er ikke «5301»; «3021 6» skal stå som «3021 6»). sku er samme verdi; ingen kandidatliste kan endre den.
+   package_raw: pakningsuttrykket slik det er trykt («2X5KG», «36X90G», «POSE 100G») eller null.
+   unit_price_unit_raw: enheten prisen gjelder slik den er trykt ved prisen («KG», «SEKK») eller null.
+   page_number: sidenummeret linjen står på (1 = første side) eller null. Ukjent er null, aldri 0 eller 1 som gjetning.
    Negative beløp kan være trykt som «-120,00», «(120,00)» eller «120,00-». Ta med parentes/minus i råteksten nøyaktig
    slik den står, og behold fortegnet i tallfeltet. Snu aldri fortegn for å få regnestykket til å gå opp.
    Er et tall utydelig eller formatet tvetydig, oppgi råteksten og sett tallfeltet til null i stedet for å gjette.

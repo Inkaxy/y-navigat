@@ -38,36 +38,44 @@ Deno.serve(async (req) => {
     let { provider, api_key, model, azure_endpoint, azure_deployment } = body;
     const purpose = body.purpose ?? "invoice_extraction";
 
-    // Fallback: bruk lagret konfig hvis api_key ikke er oppgitt
+    // Lagret nøkkel: provider/endpoint/deployment avledes ALLTID fra lagret konfig.
+    // Klienten kan bare velge modell innen samme provider, fra serverens allowlist.
     if (!api_key) {
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
       const admin = createClient(supabaseUrl, serviceKey);
       const { data: cfg, error: cfgErr } = await admin
         .from("ai_provider_config")
-        .select("provider, model, encrypted_api_key, azure_endpoint, azure_deployment")
+        .select("id, provider, model, encrypted_api_key, azure_endpoint, azure_deployment")
         .eq("purpose", purpose)
         .eq("is_active", true)
         .maybeSingle();
-      if (cfgErr) return jsonErr(`Kunne ikke hente lagret konfig: ${cfgErr.message}`, 500);
+      if (cfgErr) { console.error("ai-config-test cfg", cfgErr.code); return jsonErr("Kunne ikke hente lagret konfig", 500); }
       if (!cfg) return jsonErr("Ingen lagret AI-konfig — lim inn API-key for å teste", 400);
+      if (body.config_id && body.config_id !== cfg.id) return jsonErr("Konfigurasjonen er endret — last siden på nytt", 409);
+      if (provider && provider !== cfg.provider) return jsonErr("Lagret nøkkel kan bare testes mot sin egen leverandør", 400);
+      if (azure_endpoint || azure_deployment) return jsonErr("Endepunkt kan ikke overstyres for lagret nøkkel", 400);
+      const chosen = model ?? cfg.model;
+      if (chosen !== cfg.model && !TESTABLE_MODELS[cfg.provider as string]?.includes(chosen)) return jsonErr("Modellen er ikke tillatt", 400);
       try {
         api_key = await decryptWithKey(cfg.encrypted_api_key, "AI_CONFIG_ENCRYPTION_KEY");
-      } catch (e) {
-        return jsonErr(`Dekryptering feilet: ${(e as Error).message}`, 500);
+      } catch {
+        return jsonErr("Dekryptering feilet", 500);
       }
-      provider = provider ?? cfg.provider;
-      model = model ?? cfg.model;
-      azure_endpoint = azure_endpoint ?? cfg.azure_endpoint;
-      azure_deployment = azure_deployment ?? cfg.azure_deployment;
+      provider = cfg.provider;
+      model = chosen;
+      azure_endpoint = cfg.azure_endpoint;
+      azure_deployment = cfg.azure_deployment;
     }
 
     if (!provider || !model) return jsonErr("provider og model påkrevd", 400);
+    const reasoning = /^gpt-6/.test(String(model));
 
     const result = await callAi({
       provider: provider as AiProvider,
       apiKey: api_key,
       model,
-      maxTokens: 50,
+      // Reasoningmodeller trenger rom til resonnering; 50 tokens gir tomt svar.
+      maxTokens: reasoning ? 1024 : 50,
       temperature: 0,
       systemPrompt: "Svar kun med JSON: {\"ok\": true}",
       userText: "Returner JSON.",

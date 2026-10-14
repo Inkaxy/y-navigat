@@ -236,7 +236,9 @@ export function buildUserText(h: Hints, attemptHint: string | null, examples: re
   if (facts.length) parts.push("\nKontrollfakta fra regnskapssystemet (Tripletex):\n- " + facts.join("\n- "));
   if (h.known_items.length) {
     const rows = h.known_items.filter((k) => k.sku || k.name).slice(0, 150).map((k) => `${k.sku ?? "(uten varenr)"} → ${k.name ?? ""}`);
-    parts.push("\nKjente varer fra denne leverandøren (varenummer → navn). Når en linje er en av disse, bruk NØYAKTIG samme varenummer i sku:\n" + rows.join("\n"));
+    // Registeret er bare kontekst for gjenkjenning. Dokumentets varenummerkolonne er autoritet:
+    // et registernummer skal aldri erstatte det som er trykt (PALS «5301 0» ≠ «5301»).
+    parts.push("\nKjente varer fra denne leverandøren (varenummer → navn), KUN som kontekst. Skriv alltid varenummeret nøyaktig slik det er trykt på fakturaen i sku_raw og sku, også når det avviker fra listen. Endre aldri et trykt varenummer for å likne listen:\n" + rows.join("\n"));
   }
   const ex = formatExamples(examples);
   if (ex) parts.push(ex);
