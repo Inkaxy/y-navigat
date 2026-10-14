@@ -52,6 +52,7 @@ type Props = {
 export function WorkspaceHeader(p: Props) {
   const doc = useInvoiceDocumentUrl(p.docPath);
   const final = p.status === "reconciled";
+  const excluded = p.status === "excluded";
   return (
     <header className="sticky top-0 z-20 space-y-2 border-b border-border bg-background/95 py-3 backdrop-blur">
       <div className="flex flex-wrap items-center gap-2">
@@ -104,7 +105,7 @@ export function WorkspaceHeader(p: Props) {
               <DropdownMenuItem onSelect={() => p.onMenu("recheck")}>Kontroller summen på nytt</DropdownMenuItem>
               {p.canWrite && p.sumMismatch && <DropdownMenuItem onSelect={() => p.onMenu("vat")}>Forslag ved mva-avvik</DropdownMenuItem>}
               {p.canWrite && p.sumMismatch && !final && <DropdownMenuItem onSelect={() => p.onMenu("override")}>Overstyr sumavvik med begrunnelse …</DropdownMenuItem>}
-              {p.canWrite && p.isCreditNote && <DropdownMenuItem onSelect={() => p.onMenu("credit")}>Koble kreditnota</DropdownMenuItem>}
+              {p.canWrite && p.isCreditNote && !excluded && <DropdownMenuItem onSelect={() => p.onMenu("credit")}>Koble kreditnota</DropdownMenuItem>}
               {p.canHoldOutside && <DropdownMenuItem onSelect={() => p.onMenu("exclude")}>Hold utenfor råvarebehandling …</DropdownMenuItem>}
               <DropdownMenuSeparator />
               <DropdownMenuItem disabled={!doc.url} onSelect={() => { if (doc.url) window.open(doc.url, "_blank", "noopener,noreferrer"); }}>
@@ -113,10 +114,10 @@ export function WorkspaceHeader(p: Props) {
               <DropdownMenuItem onSelect={() => p.onMenu("history")}>Revisjonshistorikk</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button size="sm" className="hidden min-h-[44px] sm:inline-flex" data-primary-action disabled={!p.next.enabled || p.busy} title={p.next.hint} onClick={p.onPrimary}>
+          {!excluded && <Button size="sm" className="hidden min-h-[44px] sm:inline-flex" data-primary-action disabled={!p.next.enabled || p.busy} title={p.next.hint} onClick={p.onPrimary}>
             {p.busy && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden />}
             {p.next.label}
-          </Button>
+          </Button>}
         </div>
       </div>
       <p className="hidden text-right text-caption sm:block text-ink-secondary" aria-live="polite">{p.rematchNote ? `${p.rematchNote} · ` : ""}{p.next.hint}</p>

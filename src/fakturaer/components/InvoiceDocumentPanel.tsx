@@ -60,6 +60,8 @@ interface Props {
   /** Holdt-tilbake-status for valgt linjes prisobservasjon (null = ukjent). */
   /** Serverens prisstatus for valgt linje (ukjent uten). */
   gate?: PriceGate | null;
+  /** Linjen/dokumentet er holdt utenfor råvarebehandling: ikke prisgrunnlag, sumvarsel er bare historikk. */
+  heldOutside?: boolean;
 }
 
 function num(v: number | null | undefined): number | null {
@@ -68,7 +70,7 @@ function num(v: number | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export function InvoiceDocumentPanel({ invoiceId, invoice, line, onClose, className, showSumWarning, gate: gateIn }: Props) {
+export function InvoiceDocumentPanel({ invoiceId, invoice, line, onClose, className, showSumWarning, gate: gateIn, heldOutside }: Props) {
   // Gjeldende identitet hentes fersk; uten den vises aldri bufret (mulig gammel) original.
   const ver = useInvoiceDocumentVersion(invoice?.source_document_url ? invoiceId : null);
   // Alt (sti, signering, åpne-knapp, visning) kommer BARE fra identitet bekreftet i denne epoken.
@@ -108,7 +110,7 @@ export function InvoiceDocumentPanel({ invoiceId, invoice, line, onClose, classN
         <div className="flex gap-2 border-b border-line-subtle bg-warning/10 p-2.5 text-xs text-warning">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
-            Linjene summerer seg til {formatMoney(fig.linesSum, cur)}, fakturaen er på {fig.net == null ? "ukjent beløp (mva mangler)" : `${formatMoney(fig.net, cur)} eks. mva`}. Sjekk om en linje mangler eller er lest feil.
+            Linjene summerer seg til {formatMoney(fig.linesSum, cur)}, fakturaen er på {fig.net == null ? "ukjent beløp (mva mangler)" : `${formatMoney(fig.net, cur)} eks. mva`}. {heldOutside ? "Historisk sumvarsel – dokumentet er holdt utenfor og krever ingen retting." : "Sjekk om en linje mangler eller er lest feil."}
           </span>
         </div>
       )}
@@ -123,11 +125,13 @@ export function InvoiceDocumentPanel({ invoiceId, invoice, line, onClose, classN
             <span>Sum {formatMoney(num(line.total_amount), cur)}</span>
             {line.matched_name && <span>→ {line.matched_name}</span>}
           </div>
-          <p className={cn("mt-1 text-xs", gate?.ok ? "text-ink-secondary" : "text-warning")}>
+          {heldOutside ? (
+            <p className="mt-1 text-xs text-ink-secondary">Holdt utenfor råvarebehandling — ikke prisgrunnlag.</p>
+          ) : <p className={cn("mt-1 text-xs", gate?.ok ? "text-ink-secondary" : "text-warning")}>
             {gate?.ok
               ? `Kontrollert pris/grunnenhet ${formatMoney(gate.safety.price_per_base_unit, "NOK")} mot ${formatMoney(gate.safety.expected_price_per_base_unit, "NOK")} · beregnet prisavvik ${formatMoney(gate.safety.effect_nok, "NOK")}`
               : `${gate?.label ?? "Prisgrunnlag ikke kontrollert"} — prisavvik vises ikke.`}
-          </p>
+          </p>}
         </div>
       )}
 
