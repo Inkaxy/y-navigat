@@ -193,7 +193,7 @@ describe("varekort: pakning lagret → fersk serverstatus → kortet blir ståen
     expect(screen.getByTestId("rabatt-regnestykke").textContent).toMatch(/rabatt 3 079,90 = 6 697,50/);
     expect(screen.getByText(/Fakturert som:/)).toBeTruthy();
     const size = screen.getByLabelText(/Innhold per pose/) as HTMLInputElement;
-    expect(size.value).toBe("0,1");
+    expect(size.value).toBe("100");
     fireEvent.click(screen.getByRole("button", { name: /Koble og regn om/ }));
     await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
     expect(mutateAsync.mock.calls[0][0].package).toEqual({ package_size: 100, package_unit: "g", base_units_per_package: 0.1, confirm: expect.any(Boolean) });
