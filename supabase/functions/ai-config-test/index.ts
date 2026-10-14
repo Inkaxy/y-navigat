@@ -5,10 +5,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { callAi, type AiProvider } from "../_shared/ai-providers.ts";
 import { decryptWithKey } from "../_shared/crypto.ts";
 
-/** Modeller som kan testes med lagret nøkkel, per lagret provider. Tilkoblingstest — ikke kvalitetsbevis. */
-const TESTABLE_MODELS: Record<string, readonly string[]> = {
-  openai: ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-6.1-sol", "gpt-6-luna"],
-};
+import { catalogEntry, isCatalogModel } from "../_shared/aiModelCatalog.ts";
+// Modeller som kan testes med lagret nøkkel: felles katalog, samme provider. Tilkoblingstest — ikke kvalitetsbevis.
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -59,7 +57,7 @@ Deno.serve(async (req) => {
       if (provider && provider !== cfg.provider) return jsonErr("Lagret nøkkel kan bare testes mot sin egen leverandør", 400);
       if (azure_endpoint || azure_deployment) return jsonErr("Endepunkt kan ikke overstyres for lagret nøkkel", 400);
       const chosen = model ?? cfg.model;
-      if (chosen !== cfg.model && !TESTABLE_MODELS[cfg.provider as string]?.includes(chosen)) return jsonErr("Modellen er ikke tillatt", 400);
+      if (chosen !== cfg.model && !isCatalogModel(cfg.provider, chosen)) return jsonErr("Modellen er ikke tillatt", 400);
       try {
         api_key = await decryptWithKey(cfg.encrypted_api_key, "AI_CONFIG_ENCRYPTION_KEY");
       } catch {
@@ -72,7 +70,7 @@ Deno.serve(async (req) => {
     }
 
     if (!provider || !model) return jsonErr("provider og model påkrevd", 400);
-    const reasoning = /^gpt-6/.test(String(model));
+    const reasoning = catalogEntry(String(provider), String(model))?.reasoning ?? /^(gpt-5|gpt-6|o\d)/i.test(String(model));
 
     const result = await callAi({
       provider: provider as AiProvider,
@@ -80,7 +78,8 @@ Deno.serve(async (req) => {
       model,
       // Reasoningmodeller trenger rom til resonnering; 50 tokens gir tomt svar.
       maxTokens: reasoning ? 1024 : 50,
-      temperature: 0,
+      temperature: reasoning ? undefined : 0,
+      timeoutMs: 30_000,
       systemPrompt: "Svar kun med JSON: {\"ok\": true}",
       userText: "Returner JSON.",
       azureEndpoint: azure_endpoint,
@@ -89,6 +88,8 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       ok: true,
+      // Bare tilkobling: sier ingenting om fakturakvalitet.
+      scope: "connection_only",
       sample_response: result.rawText.slice(0, 200),
       input_tokens: result.inputTokens,
       output_tokens: result.outputTokens,
