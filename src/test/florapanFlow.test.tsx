@@ -110,9 +110,13 @@ describe("prislesekontekst fra rm_supplier_item_lines v2", () => {
 
 describe("kildemerking fra dokumentets innhold", () => {
   it("Tripletex i metadata = generert visning; ellers ukjent (aldri antatt original)", () => {
-    expect(classifyDocumentOrigin({ producer: "Tripletex AS PDF" }).origin).toBe("tripletex_generert");
-    expect(classifyDocumentOrigin({ text: "Faktura generert i Tripletex" }).origin).toBe("tripletex_generert");
-    expect(classifyDocumentOrigin({ producer: "Microsoft Word", text: "Idun Industri AS" }).origin).toBe("ukjent");
+    // Eksakt rekonstruksjonsvannmerke (uten Tripletex-tekst) → generert fra fakturadetaljene.
+    expect(classifyDocumentOrigin({ producer: "Ukjent", text: "Side 1\nDenne visningen er generert fra fakturadetaljene\nTestleverandør" }).origin).toBe("generert_fra_detaljer");
+    // Leverandørens egen PDF lastet opp i Tripletex: bare generatornavn/tekst → ukjent, nøytralt bevis.
+    const sup = classifyDocumentOrigin({ producer: "Tripletex AS PDF", creator: "Tripletex", text: "Faktura generert i Tripletex · Testleverandør" });
+    expect(sup.origin).toBe("ukjent");
+    expect(sup.evidence).toBe("Laget med: Tripletex AS PDF");
+    expect(classifyDocumentOrigin({ producer: "Microsoft Word", text: "Testleverandør AS" }).origin).toBe("ukjent");
   });
 });
 
