@@ -7,7 +7,7 @@ import { whatIsMissing, type SupplierItem } from "@/fakturaer/lib/supplierItems"
 import { paths } from "@/ravarer/lib/paths";
 
 /** Topp på varekortet: leverandør · varenr · beskrivelse, status, omfang og «Hva mangler». */
-export function VarekortHeaderView({ item, openInvoices }: { item: SupplierItem; openInvoices: number }) {
+export function VarekortHeaderView({ item, openInvoices, lockedNote }: { item: SupplierItem; openInvoices: number; lockedNote?: string | null }) {
   return (
     <div className="space-y-2">
       <header className="space-y-1">
@@ -17,7 +17,9 @@ export function VarekortHeaderView({ item, openInvoices }: { item: SupplierItem;
         </p>
         <h2 className="font-display text-xl">{item.description ?? "Uten beskrivelse"}</h2>
         <div className="flex flex-wrap items-center gap-2">
-          <SupplierItemStatusBadge status={item.status} />
+          {lockedNote
+            ? <span className="inline-flex rounded-md border border-line-subtle bg-muted px-2 py-0.5 text-caption font-semibold text-ink-secondary">{lockedNote}</span>
+            : <SupplierItemStatusBadge status={item.status} />}
           <span className="text-caption text-ink-secondary tabular-nums">
             {item.open_lines} åpne {item.open_lines === 1 ? "linje" : "linjer"} på {openInvoices} {openInvoices === 1 ? "faktura" : "fakturaer"}
             {item.last_seen ? ` · sist sett ${formatDate(item.last_seen)}` : ""}
@@ -25,7 +27,7 @@ export function VarekortHeaderView({ item, openInvoices }: { item: SupplierItem;
         </div>
       </header>
       {/* «Hva mangler» står i gjennomgangsplanen rett under – ikke gjentatt her. */}
-      {item.rms_notes && <p className="text-caption text-ink-secondary" title={whatIsMissing(item)}>{item.rms_notes}</p>}
+      {!lockedNote && item.rms_notes && <p className="text-caption text-ink-secondary" title={whatIsMissing(item)}>{item.rms_notes}</p>}
     </div>
   );
 }

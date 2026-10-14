@@ -31,7 +31,8 @@ export function PackageBlock(p: Props) {
     return (
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted/40 p-3 text-sm">
         <span>
-          {p.existing.bupp.toLocaleString("nb-NO")} {p.baseUnit} per {p.packageUnit}, bekreftet {formatDate(p.existing.confirmedAt)}
+          Leverandørens bekreftede pakning: {p.existing.bupp.toLocaleString("nb-NO")} {p.baseUnit} per pakning, bekreftet {formatDate(p.existing.confirmedAt)}.
+          <span className="block text-caption text-ink-secondary">Gjelder leverandørgrunnlaget. Hver fakturalinje kontrolleres mot sin egen enhet ({p.packageUnit}).</span>
         </span>
         <Button type="button" variant="ghost" size="sm" onClick={p.onEdit}>Endre</Button>
       </div>
