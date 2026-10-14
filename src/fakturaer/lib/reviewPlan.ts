@@ -75,9 +75,9 @@ function lineSteps(l: SupplierItemLine, item: PlanItem): LineStep[] {
     // Stk-vare med innhold i vekt/volum: antall stk per beholder er ikke dokumentert. Neste handling er da
     // å rette varetype/grunnenhet (eller oppgi antall), aldri å bekrefte vekten som et antall.
     const weightContent = WEIGHT_UNITS.has((l.package_unit ?? "").toLowerCase()) || PKG_RX.test(l.description ?? "");
-    // Linjens egen varetype/grunnenhet fra serveren vinner over kortets (kan være eldre snapshot).
-    const base = (l.rm_base_unit ?? item.rm_base_unit ?? "").toLowerCase();
-    out.push({ step: "pakning", state: "todo", label: base === "stk" && weightContent ? "Rett varetype og måleenhet" : packageActionLabel(l) });
+    // Konservativt: sier linjen ELLER kortet stk, bekreftes aldri vekt/volum som antall.
+    const isStk = [l.rm_base_unit, item.rm_base_unit].some((u) => (u ?? "").toLowerCase() === "stk");
+    out.push({ step: "pakning", state: "todo", label: isStk && weightContent ? "Rett varetype og måleenhet" : packageActionLabel(l) });
   }
   const b = basisUnclear(l);
   if (b === true) out.push({ step: "prisgrunnlag", state: "todo", label: "Registrer rabatt / avklar prisgrunnlag" });
