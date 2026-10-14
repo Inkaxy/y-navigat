@@ -61,7 +61,7 @@ begin
   -- Gammel 1 stk-bekreftelse gjenbrukes ikke som kg; historikken beholdes.
   select count(*) into n from raw_material_suppliers where id = rms and (package_confirmed_at is not null or base_units_per_package is not null);
   if n <> 0 then ok := false; end if;
-  select count(*) into n from raw_material_supplier_packages where raw_material_supplier_id = rms and confirmed_at is not null;
+  select count(*) into n from raw_material_supplier_packages where raw_material_supplier_id = rms and superseded_at is null;
   if n <> 0 then ok := false; end if;
   select count(*) into n from raw_material_supplier_packages where raw_material_supplier_id = rms;
   log := log || format('varianter_beholdt=%s; ', n);
