@@ -216,7 +216,6 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
   const locked = lockedOpenLines(lines);
   // Alle åpne linjer er låst (internt godkjent / ført kost): ingen skrivende skjema her, planen er autoritativ.
   const readOnly = locked != null;
-  const writable = canWrite && !readOnly;
 
   const onLinkDone = (r: Parameters<NonNullable<React.ComponentProps<typeof SupplierItemLinkForm>["onDone"]>>[0]) => {
     onDone({ title: "Varekortet er oppdatert", items: linkResultSummary(r) });
