@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router-dom";
 import { FocusNotice } from "@/ravarer/pages/priskontroll/faktura/FocusNotice";
 import { HoldOutsideDialog, type HoldOutsideTarget } from "@/fakturaer/components/HoldOutsideDialog";
 import type { ExclusionResult } from "@/fakturaer/lib/invoiceExclusion";
@@ -20,7 +19,7 @@ export default function HoldUtenforPreview() {
     : mode === "kost" ? { kind: "rejected", error: "reversering_kreves", blocked: [{ lineId: "l2", lineNumber: 2, blocker: "kostpris_fort" }] }
     : { kind: "unknown" };
   return (
-    <QueryClientProvider client={qc}><MemoryRouter>
+    <QueryClientProvider client={qc}>
       <main className="mx-auto max-w-3xl space-y-4 p-page">
         <p className="text-caption text-ink-secondary">Syntetisk forhåndsvisning – ingen data lagres.</p>
         <label className="flex items-center gap-2 text-sm">Simulert svar
@@ -33,6 +32,6 @@ export default function HoldUtenforPreview() {
         <HoldOutsideDialog target={target} canWrite simulate={simulate} onOpenChange={(v) => { if (!v) setTarget(null); }}
           onDone={(s) => setDone(s === "invoice" ? "Hele kreditnotaen er holdt utenfor (simulert)." : "Linjen er holdt utenfor (simulert).")} />
       </main>
-    </MemoryRouter></QueryClientProvider>
+    </QueryClientProvider>
   );
 }
