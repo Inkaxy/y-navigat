@@ -1,7 +1,8 @@
 // Tekstlaget i en original-PDF som ekstra lesestøtte (DATA til modellen, aldri bevis i seg selv).
 // Avgrenset størrelse, sider, tegn og tid. Teksten logges/persisteres aldri.
 
-export const PDF_TEXT_LIMITS = { maxBytes: 15 * 1024 * 1024, maxPages: 20, maxChars: 60_000, timeoutMs: 8_000, minCharsPerPage: 40 } as const;
+export interface PdfTextLimits { maxBytes: number; maxPages: number; maxChars: number; timeoutMs: number; minCharsPerPage: number }
+export const PDF_TEXT_LIMITS: PdfTextLimits = { maxBytes: 15 * 1024 * 1024, maxPages: 20, maxChars: 60_000, timeoutMs: 8_000, minCharsPerPage: 40 };
 
 export type PdfTextStatus = "ok" | "ingen_tekst" | "for_stor" | "tidsavbrudd" | "feil";
 export interface PdfTextResult {
@@ -25,7 +26,7 @@ export const unpdfExtract: ExtractFn = async (bytes) => {
 
 const empty = (status: PdfTextStatus, totalPages: number | null = null): PdfTextResult => ({ status, pages: [], totalPages, pagesRead: 0, chars: 0, truncated: false });
 
-export async function readPdfText(bytes: Uint8Array, extract: ExtractFn = unpdfExtract, limits = PDF_TEXT_LIMITS): Promise<PdfTextResult> {
+export async function readPdfText(bytes: Uint8Array, extract: ExtractFn = unpdfExtract, limits: PdfTextLimits = PDF_TEXT_LIMITS): Promise<PdfTextResult> {
   if (bytes.byteLength > limits.maxBytes) return empty("for_stor");
   let timer: number | undefined;
   try {
