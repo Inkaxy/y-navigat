@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -5,7 +6,7 @@ import { nextInvoiceStep, type NextStepInput } from "@/ravarer/pages/priskontrol
 import { finalLockNote, isExcludedInvoice } from "@/ravarer/pages/priskontroll/faktura/exclusionView";
 import { parseVisning } from "@/ravarer/pages/priskontroll/fakturaer/visning";
 
-vi.mock("@/fakturaer/hooks/useInvoiceDocumentUrl", () => ({ useInvoiceDocumentUrl: () => ({ url: null }) }));
+vi.mock("@/fakturaer/hooks/useInvoiceDocument", () => ({ useInvoiceDocumentUrl: () => ({ url: null }) }));
 import { WorkspaceHeader } from "@/ravarer/pages/priskontroll/faktura/WorkspaceHeader";
 
 const base = {
