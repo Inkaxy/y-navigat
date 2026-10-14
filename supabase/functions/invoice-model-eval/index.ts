@@ -12,11 +12,11 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { encodeBase64 } from "jsr:@std/encoding@1/base64";
 import { decryptWithKey } from "../_shared/crypto.ts";
-import { AiCallError, callAi, extractJson, estimateCostUsd, type AiCallResult } from "../_shared/ai-providers.ts";
+import { AiCallError, callAi, COST_RATE_VERSION, extractJson, estimateCostUsd, hasCachedRate, usageOf, type AiCallResult, type AiUsage } from "../_shared/ai-providers.ts";
 import { runExtractionAttempts, type Hints, type LearningExample } from "../_shared/invoiceExtraction.ts";
 import { INVOICE_EXTRACTION_SYSTEM_PROMPT } from "../_shared/invoiceExtractionPrompt.ts";
 import { scoreAgainstFasit } from "../_shared/evalFasit.ts";
-import { deterministicChecks, EVAL_LIMITS, INVOICE_EXTRACTION_SCHEMA, isEvalModel } from "../_shared/modelEval.ts";
+import { deterministicChecks, EVAL_LIMITS, INVOICE_EXTRACTION_SCHEMA, INVOICE_EXTRACTION_SCHEMA_VERSION, isEvalModel } from "../_shared/modelEval.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -61,17 +61,6 @@ Deno.serve(async (req) => {
     const { data: canRead } = await userClient.rpc("has_ravarer_invoice_access", { _legal_entity_id: le, _required_level: "read" });
     if (canRead !== true) return err("forbidden", "Mangler tilgang til fakturaen", 403);
 
-    // Grenser: duplikat og døgntak, lest fra eksisterende bruksregister.
-    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-    const { data: recent, error: recErr } = await admin.from("ai_usage_log").select("invoice_id, model, created_at")
-      .eq("purpose", "invoice_model_eval").eq("legal_entity_id", le).gte("created_at", since).limit(200);
-    if (recErr) return err("limits_unknown", "Kunne ikke kontrollere grensene; prøv igjen", 503);
-    const rows = (recent ?? []) as { invoice_id: string | null; model: string; created_at: string }[];
-    if (rows.length >= EVAL_LIMITS.maxPerDay) return err("daily_limit", `Døgntaket på ${EVAL_LIMITS.maxPerDay} sammenligninger er nådd`, 429);
-    if (rows.some((r) => r.invoice_id === inv.id && r.model === model && Date.now() - Date.parse(r.created_at) < EVAL_LIMITS.dedupWindowMs)) {
-      return err("duplicate", "Samme faktura og modell ble nettopp kjørt. Vent to minutter.", 409);
-    }
-
     // Original: validert sti via eksisterende RPC (tilgang + selskapssti), kontroll før og etter nedlasting.
     const { data: dv, error: dvErr } = await userClient.rpc("rm_invoice_document_version", { p_invoice_id: inv.id });
     const doc = dv as { available?: boolean; path?: string; version?: string; reason?: string } | null;
@@ -114,7 +103,21 @@ Deno.serve(async (req) => {
       known_items: knownItems,
     };
 
+    // Grenser: reserveres ATOMISK (rådgivende lås per selskap i databasen) FØR AI-kallet. To samtidige
+    // klikk kan ikke begge slippe gjennom; en reservasjon teller selv om kallet senere feiler.
+    const { data: resv, error: resvErr } = await admin.rpc("rm_model_eval_reserve", {
+      p_legal_entity_id: le, p_invoice_id: inv.id, p_model: model,
+      p_max_per_day: EVAL_LIMITS.maxPerDay, p_dedup_seconds: Math.round(EVAL_LIMITS.dedupWindowMs / 1000),
+    });
+    const rv = resv as { ok?: boolean; error?: string; reservation_id?: string } | null;
+    if (resvErr || !rv) return err("limits_unknown", "Kunne ikke kontrollere grensene; prøv igjen", 503);
+    if (rv.error === "daily_limit") return err("daily_limit", `Døgntaket på ${EVAL_LIMITS.maxPerDay} sammenligninger er nådd`, 429);
+    if (rv.error === "duplicate") return err("duplicate", "Samme faktura og modell ble nettopp kjørt. Vent to minutter.", 409);
+    if (rv.ok !== true || !rv.reservation_id) return err("limits_unknown", "Kunne ikke kontrollere grensene; prøv igjen", 503);
+    const reservationId = rv.reservation_id;
+
     const started = Date.now();
+    let errUsage: AiUsage | null = null;
     let last: AiCallResult | null = null;
     let failure: { kind: string; message: string } | null = null;
     const run = await runExtractionAttempts({
@@ -130,26 +133,28 @@ Deno.serve(async (req) => {
           });
           return last;
         } catch (e) {
+          errUsage = usageOf(e);
           failure = e instanceof AiCallError ? { kind: e.kind, message: e.message.slice(0, 300) } : { kind: "error", message: e instanceof Error ? e.message.slice(0, 300) : "ukjent" };
           throw e;
         }
       },
     });
     const latencyMs = Date.now() - started;
-    const r = last as AiCallResult | null;
+    // Ved avslag/ufullstendig svar brukes forbruket fra feilen — betalte tokens skal ikke forsvinne.
+    const r = (last as AiCallResult | null) ?? (errUsage as AiUsage | null);
     const usage = {
       input_tokens: r?.inputTokens ?? null, output_tokens: r?.outputTokens ?? null,
       cached_input_tokens: r?.cachedInputTokens ?? null, reasoning_tokens: r?.reasoningTokens ?? null,
     };
-    const cost = estimateCostUsd(model, usage.input_tokens, usage.output_tokens);
+    const cost = estimateCostUsd(model, usage.input_tokens, usage.output_tokens, usage.cached_input_tokens);
     const f = failure as { kind: string; message: string } | null;
     const parseFailed = !f && !run.best;
 
-    await admin.from("ai_usage_log").insert({
-      provider: "openai", model, purpose: "invoice_model_eval", invoice_id: inv.id, legal_entity_id: le,
+    // Reservasjonsraden fullføres (ingen ny rad).
+    await admin.from("ai_usage_log").update({
       input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, estimated_cost_usd: cost,
       success: !f && !parseFailed, error_message: f ? `${f.kind}: ${f.message}` : parseFailed ? "invalid_json" : null,
-    });
+    }).eq("id", reservationId);
 
     const lines = run.best?.lines ?? [];
     const checks = run.best ? deterministicChecks(lines, { excl: hints.expected_total_excl_vat, incl, vat }) : null;
@@ -166,6 +171,10 @@ Deno.serve(async (req) => {
       usage,
       estimated_cost_usd: cost,
       cost_known: cost != null,
+      cost_rate_version: COST_RATE_VERSION,
+      cost_cached_rate: cost == null ? null : hasCachedRate(model) ? "egen_sats" : "full_inndatapris_konservativt",
+      // Evalen bruker produksjonsprompten MED strict schema. Produksjonsleseren bruker schema bare når det er slått på.
+      request_profile: { prompt: "produksjon", schema: INVOICE_EXTRACTION_SCHEMA_VERSION, single_attempt: true },
       latency_ms: latencyMs,
       document_version: doc.version,
       parsed: run.best ? { header, lines } : null,
