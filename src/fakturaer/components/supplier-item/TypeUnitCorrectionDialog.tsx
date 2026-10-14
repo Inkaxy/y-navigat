@@ -112,7 +112,7 @@ export function TypeUnitCorrectionDialog(p: Props) {
           <p className="text-caption text-ink-secondary">Registrert nå: {itemTypeLabel(current.data.item_type)} · grunnenhet {current.data.base_unit ?? "ukjent"}</p>
         )}
 
-        <fieldset className="space-y-1" disabled={saving || outcome?.kind === "saved"}>
+        <fieldset className="space-y-1" disabled={saving || unknown || outcome?.kind === "saved"}>
           <legend className="text-caption font-medium">Varetype</legend>
           <div className="grid grid-cols-2 gap-1.5">
             {ITEM_TYPES.map((t) => (
@@ -123,7 +123,7 @@ export function TypeUnitCorrectionDialog(p: Props) {
             ))}
           </div>
         </fieldset>
-        <fieldset className="space-y-1" disabled={saving || outcome?.kind === "saved"}>
+        <fieldset className="space-y-1" disabled={saving || unknown || outcome?.kind === "saved"}>
           <legend className="text-caption font-medium">Grunnenhet (det oppskrifter og kostpris regnes i)</legend>
           <div className="grid grid-cols-3 gap-1.5">
             {BASE_UNITS.map((u) => (
@@ -159,7 +159,7 @@ export function TypeUnitCorrectionDialog(p: Props) {
 
         <div>
           <Label htmlFor="tu-reason" className="text-caption">Begrunnelse (påkrevd)</Label>
-          <Textarea id="tu-reason" value={reason} disabled={saving || outcome?.kind === "saved"} onChange={(e) => setReason(e.target.value)} placeholder="F.eks. Leveres i poser à 100 gram, brukes i gram i oppskrifter" />
+          <Textarea id="tu-reason" value={reason} disabled={saving || unknown || outcome?.kind === "saved"} onChange={(e) => setReason(e.target.value)} placeholder="F.eks. Leveres i poser à 100 gram, brukes i gram i oppskrifter" />
         </div>
 
         {outcome?.kind === "saved" && (
