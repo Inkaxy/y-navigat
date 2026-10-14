@@ -56,7 +56,20 @@ export interface ExtractedLine {
   read_issues: ReadIssue[];
   /** Råtekst → verdi per tallfelt (hvordan mengde/pris/sum ble tolket). */
   number_evidence?: NumberEvidence[];
+  /** Varenummer nøyaktig slik modellen leste det trykt (alle tegn/mellomrom). Modellens lesing, ikke verifisert. */
+  sku_raw?: string | null;
+  /** Modellens «sku» avvek fra sku_raw; sku er satt til den trykte verdien. */
+  sku_model?: string | null;
+  package_raw?: string | null;
+  unit_price_unit_raw?: string | null;
+  /** 1-basert side, null = ukjent (aldri gjettet). */
+  page_number?: number | null;
+  /** Kontroll av sku_raw mot PDF-ens tekstlag: funnet entydig / flere / ikke funnet / ikke kontrollert. */
+  sku_text_check?: "funnet" | "flere" | "ikke_funnet" | null;
 }
+
+const rawStr = (v: unknown, max = 120): string | null => (typeof v === "string" && v.trim() ? v.trim().replace(/[\u0000-\u001f]/g, " ").slice(0, max) : null);
+const pageNum = (v: unknown): number | null => (typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 999 ? v : null);
 
 const UNIT_ALIASES: Record<string, string> = {
   gr: "g", gram: "g", grams: "g", kilo: "kg", kgs: "kg", ltr: "l", liter: "l", litre: "l", lit: "l",
@@ -132,7 +145,11 @@ export function sanitizeLines(raw: unknown, isCredit = false): ExtractedLine[] {
     const k = typeof l.line_kind === "string" ? l.line_kind.toLowerCase() : "";
     const line_kind = (LINE_KINDS as readonly string[]).includes(k) ? (k as LineKind) : null;
     const unit_price_basis = l.unit_price_basis === "per_base" ? "per_base" : l.unit_price_basis === "per_unit" ? "per_unit" : null;
-    let sku = str(l.sku);
+    const sku_raw = rawStr(l.sku_raw, 64);
+    const modelSku = str(l.sku);
+    // Trykt varenummer er autoritativt: «5301 0» skal aldri bli «5301». Mellomrom innad beholdes.
+    let sku = sku_raw ?? modelSku;
+    const sku_model = sku_raw && modelSku && modelSku.replace(/\s+/g, "") !== sku_raw.replace(/\s+/g, "") ? modelSku : null;
     // Linjenummer er ikke et varenummer.
     if (sku !== null && /^\d{1,2}$/.test(sku)) sku = null;
     const unit = normalizeUnit(l.unit);
@@ -155,6 +172,9 @@ export function sanitizeLines(raw: unknown, isCredit = false): ExtractedLine[] {
       confidence: clampConfidence(l.confidence),
       read_issues: [],
       number_evidence: nums.evidence,
+      sku_raw, sku_model,
+      package_raw: rawStr(l.package_raw), unit_price_unit_raw: rawStr(l.unit_price_unit_raw, 32), page_number: pageNum(l.page_number),
+      sku_text_check: null,
     };
     out.read_issues = [
       ...nums.unresolved.map((f) => ({ code: "tvetydig_tall", message: `Tvetydig tall i ${FIELD_LABEL[f]} («${nums.evidence.find((e) => e.field === f)?.raw ?? ""}»): kan ikke avgjøres sikkert. Kontroller mot dokumentet.` })),
@@ -348,4 +368,21 @@ export async function runExtractionAttempts(opts: {
       " Ikke skaler tallene for å treffe summen.";
   }
   return { best: best?.data ?? null, attempts, log, warnings, userTexts };
+}
+
+/**
+ * Kontrollerer hver linjes trykte varenummer mot PDF-ens tekstlag (helt token, alle sifre).
+ * Bare merking — endrer aldri sku. Ikke kontrollert (null) når tekstlaget mangler.
+ */
+export function annotateSkuTextCheck(lines: ExtractedLine[], pageTexts: readonly string[] | null): ExtractedLine[] {
+  if (!pageTexts || pageTexts.length === 0) return lines;
+  const text = pageTexts.join("\n");
+  return lines.map((l) => {
+    const raw = (l.sku_raw ?? l.sku ?? "").trim();
+    if (!raw) return l;
+    const esc = raw.split(/\s+/).map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+");
+    const re = new RegExp(`(^|[^\\p{L}\\p{N}])${esc}(?![\\p{N}]|\\s\\p{N}(?![\\p{N}]))`, "gu");
+    const n = [...text.matchAll(re)].length;
+    return { ...l, sku_text_check: n === 1 ? "funnet" : n > 1 ? "flere" : "ikke_funnet" };
+  });
 }
