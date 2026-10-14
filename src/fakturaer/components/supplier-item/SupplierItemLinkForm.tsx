@@ -10,6 +10,7 @@ import { useLinkSupplierItem, usePackageInference } from "@/fakturaer/hooks/useS
 import { MaterialBlock, type NewMaterialDraft } from "./MaterialBlock";
 import { TypeUnitCorrectionDialog } from "./TypeUnitCorrectionDialog";
 import { PackageBlock } from "./PackageBlock";
+import { InvoiceUnitCorrectionDialog } from "@/fakturaer/components/package/InvoiceUnitCorrectionDialog";
 import { LinkResultBox } from "./LinkResultBox";
 import { useConfirmMany } from "@/ravarer/ui/useConfirmMany";
 import { AiSuggestion } from "./AiSuggestion";
@@ -55,6 +56,10 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
   const [draft, setDraft] = useState<NewMaterialDraft>({ name: nameFromDescription(item.description), itemType: "ravare", category: "", baseUnit: "stk", declarationName: "" });
   const [spec, setSpec] = useState<PackageSpecInput>({ container: initialContainer(lines.find((l) => l.unit)?.unit ?? null), size: "", contentUnit: "" });
   const [confirm, setConfirm] = useState(false);
+  const [unitFixLine, setUnitFixLine] = useState<string | null>(null);
+  // Beholderen følger alltid referanselinjens egen enhet (også etter «Rett fakturert enhet»); innholdsutkastet beholdes.
+  const refUnit = refLine?.unit ?? null;
+  useEffect(() => { setSpec((v) => ({ ...v, container: initialContainer(refUnit) })); }, [refUnit]);
   const [editPkg, setEditPkg] = useState(startEditingPackage);
   const [ownCreateOpen, setOwnCreateOpen] = useState(false);
   const [primary, setPrimary] = useState(false);
@@ -210,7 +215,11 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
             existing={existingPkg}
             editing={editPkg}
             onEdit={() => setEditPkg(true)}
+            onCorrectUnit={canWrite && refLine ? () => setUnitFixLine(refLine.id) : undefined}
           />
+          {unitFixLine && <InvoiceUnitCorrectionDialog open onOpenChange={(v) => { if (!v) setUnitFixLine(null); }} lineId={unitFixLine}
+            invoiceNumber={lines.find((l) => l.id === unitFixLine)?.invoice_number ?? null}
+            onSaved={() => { setConfirm(false); setTouched((t) => ({ ...t, confirm: false })); onOwnMetadataSaved?.(); }} />}
         </Block>
       )}
       <Block n={pkgNeeded && baseUnit ? 3 : 2} title="Gjelder">

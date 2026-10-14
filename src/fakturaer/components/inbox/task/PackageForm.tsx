@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { InvoiceUnitCorrectionDialog } from "@/fakturaer/components/package/InvoiceUnitCorrectionDialog";
 import { Loader2 } from "lucide-react";
 import { PackageSpecFields } from "@/fakturaer/components/package/PackageSpecFields";
 import { initialContainer } from "@/fakturaer/lib/packageSpec";
@@ -20,6 +21,9 @@ export function PackageForm({ line, form }: { line: ReviewLineRow; form: LineMat
   const cost = form.cost;
   // «Kjøpes som» er visning/kontroll her: fakturaens enhet endres bare via «Rett fakturalinje».
   const [container, setContainer] = useState(() => initialContainer(line.unit));
+  const [unitFix, setUnitFix] = useState(false);
+  // Fersk linje med ny enhet (etter «Rett fakturert enhet»): beholderen følger linjen, innholdsutkastet beholdes.
+  useEffect(() => { setContainer(initialContainer(line.unit)); }, [line.unit]);
 
   if (form.materialLoading) {
     return (
@@ -69,7 +73,9 @@ export function PackageForm({ line, form }: { line: ReviewLineRow; form: LineMat
         value={{ container, size: form.packageSize, contentUnit: form.packageUnit || base }}
         onChange={(v) => { setContainer(v.container); if (v.size !== form.packageSize) form.setPackageSize(v.size); if (v.contentUnit !== (form.packageUnit || base)) form.setPackageUnit(v.contentUnit); }}
         containerEditable={false}
+        onCorrectUnit={() => setUnitFix(true)}
       />
+      {unitFix && <InvoiceUnitCorrectionDialog open onOpenChange={setUnitFix} lineId={line.id} />}
       {draft.state === "invalid" ? (
         <p role="alert" className="rounded-md bg-warning/10 px-3 py-2 text-caption text-warning">
           {draft.reason}
