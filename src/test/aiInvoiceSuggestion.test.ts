@@ -107,12 +107,10 @@ import { readFileSync } from "node:fs";
 
 describe("Fasit og bruksloggkobling", () => {
   const PALS = "dffd27f6-7f1b-4a3b-8c11-8f9cfa0ab95d";
-  it("PALS 526301: riktig lesing gir 18/18, punktum-tusenfeil fanges", () => {
+  it("PALS 526301 uten verifiserte SKU-er: alle linjer uavklarte, ingen rekkefølgescoring", () => {
     const f = EVAL_FASIT[PALS];
-    const ok = scoreAgainstFasit(PALS, { lines: f.lines, header: { total_excl_vat: 25784.74, total_vat: 3867.71, total_amount: 29652.45 } })!;
-    expect(ok.fields_correct).toBe(18); expect(ok.errors).toEqual([]);
-    const bad = scoreAgainstFasit(PALS, { lines: f.lines.map((l, i) => (i === 3 ? { ...l, quantity: 396000 } : l)), header: null })!;
-    expect(bad.errors.join()).toMatch(/Linje 4 quantity: lest 396000/);
+    const r = scoreAgainstFasit(PALS, { lines: f.lines, header: { total_excl_vat: 25784.74, total_vat: 3867.71, total_amount: 29652.45 } })!;
+    expect(r.fields_unresolved).toBe(20); expect(r.fields_correct).toBe(4); expect(r.unresolved_rows).toHaveLength(5);
     expect(scoreAgainstFasit("annen", { lines: [], header: null })).toBeNull();
   });
   it("fasit sendes aldri som hint til modellen", () => {
@@ -126,5 +124,37 @@ describe("Fasit og bruksloggkobling", () => {
     const ex = readFileSync("supabase/functions/extract-invoice-from-pdf/index.ts", "utf8");
     expect(ex.match(/invoice_id: usageInvoiceId/g)?.length).toBe(2);
     expect(ex).toContain('.eq("legal_entity_id", legal_entity_id)');
+  });
+});
+
+describe("Fasitkobling på eksakt SKU", async () => {
+  const mod = await import("../../supabase/functions/_shared/evalFasit");
+  const ID = "test-fasit";
+  mod.EVAL_FASIT[ID] = { invoice_number: "T", verified_note: "syntetisk", net: 300, vat: 75, gross: 375, lines: [
+    { sku: "5301 0", quantity: 10, unit_price: 10, total_amount: 100 },
+    { sku: "6541 1", quantity: 10, unit_price: 20, total_amount: 200 },
+  ] };
+  const header = { total_excl_vat: 300, total_vat: 75, total_amount: 375 };
+  it("riktige SKU-er i omvendt rekkefølge gir full score", () => {
+    const r = mod.scoreAgainstFasit(ID, { header, lines: [
+      { sku: "6541  1", quantity: 10, unit_price: 20, total_amount: 200 },
+      { sku: " 5301 0", quantity: 10, unit_price: 10, total_amount: 100 },
+    ] })!;
+    expect(r.fields_correct).toBe(12); expect(r.fields_total).toBe(12); expect(r.unresolved_rows).toEqual([]);
+  });
+  it("«5301 0»→«5301» er SKU-feil, ikke koblet på rekkefølge/pris, raden vises uavklart", () => {
+    const r = mod.scoreAgainstFasit(ID, { header, lines: [
+      { sku: "5301", description: "Vare A", quantity: 10, unit_price: 10, total_amount: 100 },
+      { sku: "6541", quantity: 10, unit_price: 20, total_amount: 200 },
+    ] })!;
+    expect(r.sku_errors).toHaveLength(2); expect(r.fields_unresolved).toBe(6);
+    expect(r.fields_correct).toBe(4); expect(r.fields_total).toBe(6);
+    expect(r.unresolved_rows.map((x) => x.sku)).toEqual(["5301", "6541"]);
+    expect(mod.normSku("53010")).not.toBe(mod.normSku("5301 0"));
+  });
+  it("to leste rader med samme SKU er tvetydig", () => {
+    const l = { sku: "5301 0", quantity: 10, unit_price: 10, total_amount: 100 };
+    const r = mod.scoreAgainstFasit(ID, { header, lines: [l, l] })!;
+    expect(r.sku_errors.join()).toMatch(/tvetydig/);
   });
 });
