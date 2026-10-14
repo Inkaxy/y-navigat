@@ -26,7 +26,7 @@ export function rowCause(it: WorkItem, plan: WorkItemPlanLines | undefined): { c
 }
 
 /** Låst rad (kjent plan): planens årsak/handling gjelder; den generelle prishjelpeteksten («Fullfør kobling …») vises ikke. */
-export function rowEffect(it: WorkItem, rc: { readonly: boolean } | null) {
+export function rowEffect(it: Parameters<typeof workEffect>[0], rc: { readonly: boolean } | null) {
   const e = workEffect(it);
   return rc?.readonly && e.kind !== "verified" ? null : e;
 }

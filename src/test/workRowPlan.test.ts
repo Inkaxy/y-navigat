@@ -63,7 +63,7 @@ describe("rett fakturert enhet", () => {
 
 import { rowEffect } from "@/ravarer/pages/priskontroll/gjore/WorkListView";
 describe("rowEffect – låst rad", () => {
-  const it0 = { effect_status: "unknown_price_effect", effect_label: null, impact_nok: null, read_integrity: "needs_review", unknown_effect_lines: 1, action_required: "complete_link_or_package" } as Parameters<typeof rowEffect>[0];
+  const it0 = { effect_status: "unknown_price_effect", effect_label: null, impact_nok: null, read_integrity: "needs_review", unknown_effect_lines: 1, action_required: "complete_link_or_package" } satisfies Parameters<typeof rowEffect>[0];
   it("skjuler generell hjelpetekst når planen er låst", () => { expect(rowEffect(it0, { readonly: true })).toBeNull(); });
   it("beholder den når raden ikke er låst", () => { expect(rowEffect(it0, { readonly: false })).not.toBeNull(); });
 });
