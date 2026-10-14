@@ -20,6 +20,8 @@ import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import { InvoiceDocumentButton } from "@/fakturaer/components/InvoiceDocumentButton";
 import { recalculateLines, startPriceOutcomeLabel } from "@/fakturaer/lib/acceptMatch";
 import { Sparkles } from "lucide-react";
+import { AiSuggestionCard, useRawMaterialName } from "@/fakturaer/components/AiSuggestionCard";
+import type { CreatePrefill } from "@/ravarer/editors/createSheetLogic";
 import { OpenSupplierItemButton } from "@/fakturaer/components/supplier-item/OpenSupplierItemButton";
 
 interface Props {
@@ -36,6 +38,7 @@ interface Props {
 export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props) {
   const qc = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
+  const [createPrefill, setCreatePrefill] = useState<CreatePrefill | null>(null);
   // Samme skjema og lagring som kontrollflaten i køen. Nullstilles når skuffen åpnes.
   const form = useLineMatchForm(open ? line : null, open);
   const {
@@ -43,7 +46,7 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
     selectedRm, linkExists, anyPrimary, rememberSku, setRememberSku, rememberName, setRememberName,
     setAsPrimary, setSetAsPrimary, confirmPackage, setConfirmPackage, agreedPrice, setAgreedPrice,
     packageSize, setPackageSize, packageUnit, setPackageUnit, cost, linePricePerBaseUnit, busy,
-    aiBusy, aiSuggestion, aiNotice, runAiSuggestion,
+    aiBusy, aiSuggestion, aiNotice, runAiSuggestion, applyAiSuggestion, aiApplied,
   } = form;
 
   async function performMatch(applyToAll: boolean, keepOpen = false) {
@@ -143,19 +146,10 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
               </div>
               {aiNotice && <p className="mt-2 text-xs text-ink-secondary">{aiNotice}</p>}
               {aiSuggestion && (
-                <div className="mt-2 space-y-1 rounded-md bg-muted/40 p-2 text-xs">
-                  <div className="font-medium">
-                    AI-forslag{aiSuggestion.confidence != null ? ` • ${Math.round(aiSuggestion.confidence * 100)}% sikkerhet` : ""}
-                  </div>
-                  {aiSuggestion.explanation && <p>{aiSuggestion.explanation}</p>}
-                  {aiSuggestion.uncertainties.length > 0 && (
-                    <ul className="list-disc pl-4 text-ink-secondary">
-                      {aiSuggestion.uncertainties.map((u) => <li key={u}>{u}</li>)}
-                    </ul>
-                  )}
-                  <p className="text-ink-secondary">
-                    Forslaget er en gjetning og er ikke bekreftet. Du bekrefter vare og pakning selv.
-                  </p>
+                <div className="mt-2">
+                  <AiSuggestionCard suggestion={aiSuggestion} rawMaterialName={aiRmName.data ?? null} canWrite
+                    onApply={applyAiSuggestion} appliedNote={aiApplied}
+                    onCreateDraft={(prefill) => { setCreatePrefill(prefill); setCreateOpen(true); }} />
                 </div>
               )}
             </div>
@@ -367,8 +361,9 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
 
         <CreateRawMaterialFromLine
           open={createOpen}
-          onOpenChange={setCreateOpen}
+          onOpenChange={(v) => { setCreateOpen(v); if (!v) setCreatePrefill(null); }}
           line={line}
+          aiPrefill={createPrefill}
           onCreated={() => {
             qc.invalidateQueries({ queryKey: ["fakturaer-review-lines"] });
             qc.invalidateQueries({ queryKey: ["fakturaer-review-count"] });

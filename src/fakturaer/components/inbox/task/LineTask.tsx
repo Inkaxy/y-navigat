@@ -1,3 +1,4 @@
+import { AiSuggestionCard, useRawMaterialName } from "@/fakturaer/components/AiSuggestionCard";
 import type { CreatePrefill } from "@/ravarer/editors/createSheetLogic";
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, FileText, Loader2, MoreHorizontal } from "lucide-react";
@@ -388,11 +389,26 @@ export function LineTask(p: LineTaskProps) {
             {primary.label}
           </Button>
         </div>
-        {(form.aiNotice || form.aiSuggestion) && (
-          <p className="text-caption text-ink-secondary">{form.aiNotice ?? "AI-forslaget er fylt inn, men ikke bekreftet."}</p>
+        {form.aiNotice && <p className="text-caption text-ink-secondary">{form.aiNotice}</p>}
+        {form.aiSuggestion && (
+          <LineAiCard form={form} canWrite={p.canWrite}
+            onCreateDraft={(prefill) => p.onSecondary("create", line, prefill)}
+            onNotItem={() => p.onSecondary("not_rm", line)} />
         )}
       </footer>
     </article>
+  );
+}
+
+function LineAiCard({ form, canWrite, onCreateDraft, onNotItem }: {
+  form: ReturnType<typeof useLineMatchForm>; canWrite: boolean;
+  onCreateDraft: (p: CreatePrefill) => void; onNotItem: () => void;
+}) {
+  const name = useRawMaterialName(form.aiSuggestion?.rawMaterialId ?? null);
+  if (!form.aiSuggestion) return null;
+  return (
+    <AiSuggestionCard suggestion={form.aiSuggestion} rawMaterialName={name.data ?? null} canWrite={canWrite}
+      onApply={form.applyAiSuggestion} onCreateDraft={onCreateDraft} onNotItem={onNotItem} appliedNote={form.aiApplied} />
   );
 }
 
