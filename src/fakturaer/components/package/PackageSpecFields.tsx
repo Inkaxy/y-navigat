@@ -34,7 +34,7 @@ export function PackageSpecFields(p: Props) {
           <Select value={p.value.container} onValueChange={(v) => set({ container: v })} disabled={p.disabled || !p.containerEditable}>
             <SelectTrigger id={`${p.idPrefix}-container`} className="mt-1 min-h-[44px]"><SelectValue placeholder="Velg" /></SelectTrigger>
             <SelectContent>
-              {CONTAINER_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              {[...CONTAINER_OPTIONS, ...(p.value.container && !(CONTAINER_OPTIONS as readonly string[]).includes(p.value.container) ? [p.value.container] : [])].map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -57,9 +57,7 @@ export function PackageSpecFields(p: Props) {
       {spec.state === "invalid" && <p role="alert" className="rounded-md bg-warning/10 px-3 py-2 text-caption text-warning">{spec.reason}</p>}
       {spec.containerMismatch && (
         <p className="rounded-md bg-warning/10 px-3 py-2 text-caption text-warning">
-          {p.containerEditable
-            ? `Fakturaen sier «${p.invoiceUnit}», du har valgt «${p.value.container}». Pakningen lagres for leverandøren som ${p.value.container}; fakturalinjen endres ikke.`
-            : `Fakturaen sier «${p.invoiceUnit}». Skal linjen være ${p.value.container}, rett fakturalinjen («Rett fakturalinje») med begrunnelse.`}
+          {`Fakturaen sier «${p.invoiceUnit}». Skal linjen være ${p.value.container}, rett fakturalinjen («Rett fakturalinje») med begrunnelse. Pakningen kan ikke lagres før beholderen stemmer.`}
         </p>
       )}
     </div>

@@ -1,3 +1,4 @@
+import { contentUnitsFor, packageSavePayload } from "@/fakturaer/lib/packageSpec";
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
@@ -23,6 +24,8 @@ interface Props {
   lines: SupplierItemLine[];
   canWrite?: boolean;
   onDone?: (r: LinkSupplierItemResult) => void;
+  /** Egen varetype/grunnenhet-retting lagret: forelderen tar nytt øyeblikksbilde (ikke «endret av andre»). */
+  onOwnMetadataSaved?: () => void;
   onClose: () => void;
   onNext?: () => void;
   /** Åpne «Ny råvare»-panelet i stedet for innebygd skjema. */
@@ -39,7 +42,7 @@ const Block = ({ n, title, children }: { n: number; title: string; children: Rea
 );
 
 /** Én flate, tre blokker, én hovedknapp. */
-export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onClose, onNext, onCreateNew, startEditingPackage = false }: Props) {
+export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onClose, onNext, onCreateNew, startEditingPackage = false, onOwnMetadataSaved }: Props) {
   const { data: company } = useCompany();
   const link = useLinkSupplierItem();
   const scope = openScope(lines);
@@ -84,12 +87,17 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
   useEffect(() => {
     const inf = inference.data;
     if (!inf || inf.direct) return;
-    if (!touched.bupp) setSpec((v) => ({ ...v, size: inf.suggested_bupp != null ? String(inf.suggested_bupp).replace(".", ",") : "", contentUnit: baseUnit ?? "" }));
+    // Innholdet vises i trykt enhet (100 g) når varenavnet gir samme faktor; ellers i grunnenhet.
+    const d = inf.description;
+    const printed = d && d.size != null && d.unit && (d.count == null || d.count === 1) && inf.suggested_bupp != null && d.bupp != null && Math.abs(d.bupp - inf.suggested_bupp) < 1e-9;
+    if (!touched.bupp) setSpec((v) => printed && d
+      ? { ...v, size: String(d.size).replace(".", ","), contentUnit: String(d.unit) }
+      : { ...v, size: inf.suggested_bupp != null ? String(inf.suggested_bupp).replace(".", ",") : "", contentUnit: baseUnit ?? "" });
     if (!touched.confirm) setConfirm(inf.source === "regnestykke_og_varenavn" || inf.source === "bekreftet_pakning");
   }, [inference.data, touched.bupp, touched.confirm]);
   // Innholdsenhet følger grunnenheten til brukeren selv velger.
   useEffect(() => {
-    if (!touched.bupp && baseUnit) setSpec((v) => ({ ...v, contentUnit: baseUnit }));
+    if (!touched.bupp && baseUnit) setSpec((v) => (v.contentUnit && contentUnitsFor(baseUnit).includes(v.contentUnit) ? v : { ...v, contentUnit: baseUnit }));
   }, [baseUnit, touched.bupp]);
 
   const pkgNeeded = !inference.data?.direct && needsPackage(refLine?.unit, baseUnit);
@@ -97,7 +105,7 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
   const existingPkg = sameRm && item.package_confirmed_at && item.base_units_per_package != null ? { bupp: item.base_units_per_package, confirmedAt: item.package_confirmed_at } : null;
   const specState = describePackageSpec(spec, baseUnit, refLine?.unit ?? null);
   const buppNum = specState.state === "valid" ? specState.baseUnitsPerPackage : null;
-  const pkgValid = !pkgNeeded || (existingPkg && !editPkg) || (buppNum != null && buppNum > 0);
+  const pkgValid = !pkgNeeded || (existingPkg && !editPkg) || (buppNum != null && buppNum > 0 && packageSavePayload(specState) != null);
   const hasMaterial = mode === "new" ? draft.name.trim().length > 1 : !!selectedId;
   const n = scope.lines;
 
@@ -131,7 +139,9 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
       };
     } else if (selectedId) body.raw_material_id = selectedId;
     if (pkgNeeded && !(existingPkg && !editPkg) && buppNum != null) {
-      body.package = { base_units_per_package: buppNum, package_unit: spec.container || refLine?.unit || undefined, confirm };
+      const payload = packageSavePayload(specState);
+      if (!payload) return;
+      body.package = { ...payload, confirm };
     }
     void submit(body);
   };
@@ -173,7 +183,13 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
             open={typeUnitOpen}
             onOpenChange={setTypeUnitOpen}
             canWrite={canWrite}
-            onSaved={() => { void selected.refetch(); void qc.invalidateQueries({ queryKey: ["supplier-item-rm", selected.data?.id] }); void qc.invalidateQueries({ queryKey: ["package-inference"] }); }}
+            onSaved={() => {
+              // Gammelt pakningsutkast i forrige grunnenhet er ugyldig: «1 stk» skal aldri bli «1 kg».
+              setSpec((v) => ({ ...v, size: "", contentUnit: "" }));
+              setTouched((t) => ({ ...t, bupp: false, confirm: false }));
+              setConfirm(false); setEditPkg(true);
+              onOwnMetadataSaved?.();
+              void selected.refetch(); void qc.invalidateQueries({ queryKey: ["supplier-item-rm", selected.data?.id] }); void qc.invalidateQueries({ queryKey: ["package-inference"] }); }}
           />
         )}
         {mode === "existing" && !item.rm_id && refLineId && <AiSuggestion lineId={refLineId} onPick={(id) => { setMode("existing"); setSelectedId(id); }} />}

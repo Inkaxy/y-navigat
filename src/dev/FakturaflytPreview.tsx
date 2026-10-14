@@ -35,6 +35,21 @@ const STEPS = [
 
 export default function FakturaflytPreview() {
   const [i, setI] = useState(0);
+  const [log, setLog] = useState<string | null>(null);
+  // Demohandlinger: hver knapp utfører stegets syntetiske handling og går til neste tilstand (ingen nettverk).
+  const act = (step: string) => {
+    const next: Record<number, [number, string]> = {
+      0: [1, "Demo: varetype rettet til Råvare / kg. Gammel stk-pakning nullstilt."],
+      1: [2, "Demo: pakningsskjemaet er åpnet med fakturaens beholder «pose»."],
+      2: [3, pkg.state === "valid" ? `Demo: lagret innhold ${spec.size} ${spec.contentUnit} = ${pkg.baseUnitsPerPackage.toLocaleString("nb-NO")} kg per pose.` : "Demo: fyll inn gyldig innhold først."],
+      3: [4, "Demo: «Rett fakturalinje» registrerte trykt rabatt 250,00 med begrunnelse."],
+      4: [5, "Demo: linjen er kontrollert; viser neste åpne faktura DEMO1043."],
+      5: [5, "Demo: DEMO1043 åpnes på nøyaktig linje (ingen navigasjon i forhåndsvisningen)."],
+    };
+    const [to, msg] = next[i] ?? [i, `Demo: ${step}`];
+    if (i === 2 && pkg.state !== "valid") { setLog(msg); return; }
+    setI(to); setLog(msg);
+  };
   const [spec, setSpec] = useState<PackageSpecInput>({ container: "pose", size: "100", contentUnit: "g" });
   const st = STEPS[i];
   const plan = buildReviewPlan({ rm_id: line.raw_material_id ?? "", rm_base_unit: st.base, package_confirmed_at: i >= 3 ? "2026-01-15T08:05:00.000001+00:00" : null, base_units_per_package: i >= 3 ? 0.1 : null }, st.lines);
@@ -48,10 +63,11 @@ export default function FakturaflytPreview() {
         <p className="text-caption text-ink-secondary">Helt syntetiske testdata (Testleverandør, DEMO1042). Ingen nettverk eller lagring · {ORIGIN_LABEL.tripletex_generert}.</p>
       </header>
       <nav aria-label="Steg" className="flex flex-wrap gap-1.5">
-        {STEPS.map((s, k) => <Button key={s.title} size="sm" variant={k === i ? "secondary" : "outline"} className="min-h-[44px]" aria-pressed={k === i} onClick={() => setI(k)}>{s.title}</Button>)}
+        {STEPS.map((s, k) => <Button key={s.title} size="sm" variant={k === i ? "secondary" : "outline"} className="min-h-[44px]" aria-pressed={k === i} onClick={() => { setI(k); setLog(null); }}>{s.title}</Button>)}
       </nav>
       <p className="text-sm">{st.note}</p>
-      <ReviewPlanCard plan={plan} onAction={() => true} />
+      <ReviewPlanCard plan={plan} onAction={(step) => { act(step); return true; }} />
+      {log && <p role="status" aria-live="polite" className="text-caption text-ink-secondary">{log}</p>}
       {arith && <p className="rounded-md bg-muted/50 px-3 py-2 text-sm tabular-nums">Trykt på fakturaen: {arith}</p>}
       {i === 2 && (
         <section aria-label="Pakning" className="space-y-2 rounded-md border border-line-subtle p-3">

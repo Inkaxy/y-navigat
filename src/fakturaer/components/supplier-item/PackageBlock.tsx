@@ -38,7 +38,7 @@ export function PackageBlock(p: Props) {
   }
   return (
     <div className="space-y-2">
-      <PackageSpecFields idPrefix={p.idPrefix} baseUnit={p.baseUnit} invoiceUnit={p.invoiceUnit} value={p.value} onChange={p.onChange} containerEditable />
+      <PackageSpecFields idPrefix={p.idPrefix} baseUnit={p.baseUnit} invoiceUnit={p.invoiceUnit} value={p.value} onChange={p.onChange} containerEditable={false} />
       {p.loading && <Loader2 className="h-4 w-4 animate-spin text-ink-secondary" aria-label="Regner ut pakning" />}
       {p.inference?.explanation && <p className="text-caption text-ink-secondary">{p.inference.explanation}</p>}
       {p.inference?.source && (

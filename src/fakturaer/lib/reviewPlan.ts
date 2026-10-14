@@ -51,6 +51,8 @@ const hasIssues = (v: unknown) => (Array.isArray(v) ? v.length > 0 : v != null &
  */
 function basisUnclear(l: SupplierItemLine): boolean | null {
   if (!l.price_context) return null;
+  // Manglende tall er aldri «går opp» (Number(null)=0 skal ikke gi grønt): kontrollbehov.
+  if (![l.quantity, l.unit_price, l.total_amount].every((v) => typeof v === "number" && Number.isFinite(v))) return true;
   const issues = lineReadIssues({
     quantity: l.quantity, unit: l.unit, unit_price: l.unit_price, total_amount: l.total_amount,
     package_size: l.package_size ?? null, package_unit: l.package_unit ?? null, count_per_package: l.count_per_package ?? null,
@@ -73,7 +75,9 @@ function lineSteps(l: SupplierItemLine, item: PlanItem): LineStep[] {
     // Stk-vare med innhold i vekt/volum: antall stk per beholder er ikke dokumentert. Neste handling er da
     // å rette varetype/grunnenhet (eller oppgi antall), aldri å bekrefte vekten som et antall.
     const weightContent = WEIGHT_UNITS.has((l.package_unit ?? "").toLowerCase()) || PKG_RX.test(l.description ?? "");
-    out.push({ step: "pakning", state: "todo", label: (item.rm_base_unit ?? "").toLowerCase() === "stk" && weightContent ? "Rett varetype og måleenhet" : packageActionLabel(l) });
+    // Konservativt: sier linjen ELLER kortet stk, bekreftes aldri vekt/volum som antall.
+    const isStk = [l.rm_base_unit, item.rm_base_unit].some((u) => (u ?? "").toLowerCase() === "stk");
+    out.push({ step: "pakning", state: "todo", label: isStk && weightContent ? "Rett varetype og måleenhet" : packageActionLabel(l) });
   }
   const b = basisUnclear(l);
   if (b === true) out.push({ step: "prisgrunnlag", state: "todo", label: "Registrer rabatt / avklar prisgrunnlag" });
@@ -83,8 +87,15 @@ function lineSteps(l: SupplierItemLine, item: PlanItem): LineStep[] {
   return out;
 }
 
+/** Holdt utenfor (dokument/linje) eller ikke-vare: aldri en åpen oppgave i planen, uansett review-flagg. */
+export function heldOutside(l: SupplierItemLine): boolean {
+  return l.invoice_status === "excluded" || l.match_confidence === "not_applicable";
+}
+
 export function buildReviewPlan(item: PlanItem, lines: readonly SupplierItemLine[], limit = 200): ReviewPlan {
-  const open = lines.filter((l) => l.requires_review);
+  const live = lines.filter((l) => !heldOutside(l));
+  const open = live.filter((l) => l.requires_review === true);
+  const reviewUnknown = live.some((l) => typeof l.requires_review !== "boolean");
   // Eldste først: avklaringen starter på eldste gyldige dato.
   const ordered = [...open].sort((a, b) => (a.invoice_date ?? "").localeCompare(b.invoice_date ?? "") || (a.line_number ?? 0) - (b.line_number ?? 0));
   const per = new Map<StepKey, { todo: number; unknown: number; first: { l: SupplierItemLine; label: string } | null }>();
@@ -99,6 +110,7 @@ export function buildReviewPlan(item: PlanItem, lines: readonly SupplierItemLine
   const steps: PlanStep[] = STEP_ORDER.map((k) => {
     const e = per.get(k)!;
     if (k === "kontrollert") {
+      if (open.length === 0 && reviewUnknown) return { key: k, state: "unknown", detail: "Status ukjent for minst én linje", lines: 0 };
       return open.length === 0 ? { key: k, state: "ok", detail: "Ingen åpne linjer", lines: 0 } : { key: k, state: "todo", detail: `${open.length} åpne linjer`, lines: open.length };
     }
     if (e.todo > 0) return { key: k, state: "todo", detail: e.first!.label, lines: e.todo };
@@ -109,8 +121,8 @@ export function buildReviewPlan(item: PlanItem, lines: readonly SupplierItemLine
   const cur = current && current.key !== "kontrollert" ? per.get(current.key)!.first : ordered[0] ? { l: ordered[0], label: "Kontroller linjen" } : null;
   const primary = current && cur ? { label: cur.label, step: current.key, invoiceId: cur.l.invoice_id, lineId: cur.l.id, invoiceNumber: cur.l.invoice_number ?? null } : null;
   const followUp = new Map<string, { invoiceId: string; invoiceNumber: string | null }>();
-  for (const l of lines) {
-    if (!l.requires_review && !l.invoice_approved && l.invoice_status && !["reconciled", "excluded"].includes(l.invoice_status)) {
+  for (const l of live) {
+    if (l.requires_review === false && !l.invoice_approved && l.invoice_status && !["reconciled", "excluded"].includes(l.invoice_status)) {
       followUp.set(l.invoice_id, { invoiceId: l.invoice_id, invoiceNumber: l.invoice_number ?? null });
     }
   }
@@ -124,7 +136,7 @@ export function buildReviewPlan(item: PlanItem, lines: readonly SupplierItemLine
   return {
     perInvoice: [...perInvoice.values()],
     steps, current, primary, openLines: open.length, openInvoices: new Set(open.map((l) => l.invoice_id)).size,
-    incomplete: lines.length >= limit, invoiceFollowUp: [...followUp.values()],
+    incomplete: lines.length >= limit || reviewUnknown, invoiceFollowUp: [...followUp.values()],
   };
 }
 

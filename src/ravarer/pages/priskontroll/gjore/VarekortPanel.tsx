@@ -60,12 +60,17 @@ export function VarekortPanel({ supplierId, itemKey, onDone, onNext, onSkip, onC
   const [fresh, setFresh] = useState<FreshStatus | null>(null);
   const verifyGen = useRef(0);
   /** Hent faktisk serverstatus etter lagring; kortet regnes ferdig (og arbeidsflaten går videre) bare ved 0 åpne. */
+  // Kvitteringen er bundet til frosset leverandør+varenøkkel og montert generasjon; bytte/avmontering ignorerer svaret.
+  const ctxRef = useRef({ supplierId, itemKey });
+  useEffect(() => { ctxRef.current = { supplierId, itemKey }; verifyGen.current += 1; }, [supplierId, itemKey]);
+  useEffect(() => () => { verifyGen.current += 1; }, []);
   const verify = (r: PanelResult) => {
     const gen = ++verifyGen.current;
+    const ctx = { supplierId, itemKey };
     setFresh({ kind: "pending" });
-    void Promise.all([lines.refetch(), q.refetch()]).then(([lr]) => {
-      if (gen !== verifyGen.current) return;
-      const st = freshStatusFrom({ isError: lr.isError, data: lr.data });
+    void Promise.all([lines.refetch(), q.refetch()]).then(([lr, qr]) => {
+      if (gen !== verifyGen.current || ctxRef.current.supplierId !== ctx.supplierId || ctxRef.current.itemKey !== ctx.itemKey) return;
+      const st = freshStatusFrom({ item: { isError: qr.isError, data: qr.data }, lines: { isError: lr.isError, data: lr.data }, supplierId: ctx.supplierId, itemKey: ctx.itemKey });
       setFresh(st);
       if (cardFinished(st)) onDone?.(r);
     }, () => { if (gen === verifyGen.current) setFresh({ kind: "unknown" }); });
@@ -92,6 +97,7 @@ export function VarekortPanel({ supplierId, itemKey, onDone, onNext, onSkip, onC
                 </li>
               ))}
             </ul>
+            {!fresh.complete && <p className="text-caption text-ink-secondary">Ikke alle åpne linjer kunne listes her; varekortet viser resten.</p>}
             <Button size="sm" className="min-h-[44px]" onClick={continueCard}>Fortsett med varekortet</Button>
           </div>
         )}
@@ -112,7 +118,7 @@ export function VarekortPanel({ supplierId, itemKey, onDone, onNext, onSkip, onC
             <Button size="sm" variant="outline" onClick={() => setSnap(live && lines.data ? { item: live, lines: lines.data } : null)}>Oppdater</Button>
           </div>
         )}
-        <VarekortBody key={`${item.supplier_id}|${item.item_key}`} originalLineId={originalLineId ?? null} item={item} lines={snap?.lines ?? lines.data ?? []} canWrite={canWrite} stale={!!change}
+        <VarekortBody key={`${item.supplier_id}|${item.item_key}`} originalLineId={originalLineId ?? null} item={item} lines={snap?.lines ?? lines.data ?? []} canWrite={canWrite} stale={!!change} onOwnMetadataSaved={() => setSnap(null)}
           onDone={done} onNext={onNext} onSkip={onSkip} onClose={onClose ?? (() => undefined)} />
         {onOriginalLine && <OriginalPicker lines={snap?.lines ?? lines.data ?? []} current={originalLineId ?? item.last_open_line_id ?? null} onPick={onOriginalLine} />}
         </>
@@ -155,10 +161,16 @@ export function frozenChange(before: readonly SupplierItemLine[], after: readonl
   if (added) parts.push(`${added} ${added === 1 ? "ny åpen linje" : "nye åpne linjer"}`);
   if (removed) parts.push(`${removed} ${removed === 1 ? "linje er" : "linjer er"} løst et annet sted`);
   if (bi.status !== ai.status || bi.rm_id !== ai.rm_id) parts.push("koblingen eller statusen er endret");
+  if (bi.rm_base_unit !== ai.rm_base_unit) parts.push("grunnenheten er endret");
+  if (bi.base_units_per_package !== ai.base_units_per_package || bi.package_confirmed_at !== ai.package_confirmed_at) parts.push("pakningen er endret");
+  const ctx = (ls: readonly SupplierItemLine[]) => new Map(ls.map((l) => [l.id, `${l.line_updated_at ?? ""}|${l.rm_base_unit ?? ""}|${l.price_context ? 1 : 0}`]));
+  const cb = ctx(before); const ca = ctx(after);
+  if ([...ca].some(([id, v]) => cb.has(id) && cb.get(id) !== v)) parts.push("linjegrunnlaget er oppdatert");
   return parts.length ? `Varekortet er endret siden du åpnet det: ${parts.join(", ")}.` : null;
 }
 
-function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, onClose, originalLineId }: {
+function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, onClose, originalLineId, onOwnMetadataSaved }: {
+  onOwnMetadataSaved?: () => void;
   originalLineId?: string | null; item: SupplierItem; lines: SupplierItemLine[]; canWrite: boolean; stale?: boolean;
   onDone: (r: PanelResult) => void; onNext?: () => void; onSkip?: () => void; onClose: () => void;
 }) {
@@ -231,7 +243,7 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
 
       {editForm ? (
         <SupplierItemLinkForm item={item} lines={lines} canWrite={canWrite} onDone={onLinkDone} onClose={onClose} onNext={onNext}
-          onCreateNew={() => setCreateOpen(true)} startEditingPackage={editPkg} />
+          onCreateNew={() => setCreateOpen(true)} startEditingPackage={editPkg} onOwnMetadataSaved={onOwnMetadataSaved} />
       ) : (
         <>
           <VBlock n={1} title="Råvare" done summary={

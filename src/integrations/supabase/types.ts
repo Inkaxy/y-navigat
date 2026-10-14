@@ -11139,6 +11139,7 @@ export type Database = {
           base_units_per_package: number
           confirmed_at: string
           confirmed_by: string | null
+          container_unit: string | null
           created_at: string
           id: string
           package_size: number | null
@@ -11153,6 +11154,7 @@ export type Database = {
           base_units_per_package: number
           confirmed_at: string
           confirmed_by?: string | null
+          container_unit?: string | null
           created_at?: string
           id?: string
           package_size?: number | null
@@ -11167,6 +11169,7 @@ export type Database = {
           base_units_per_package?: number
           confirmed_at?: string
           confirmed_by?: string | null
+          container_unit?: string | null
           created_at?: string
           id?: string
           package_size?: number | null
@@ -11199,6 +11202,7 @@ export type Database = {
           agreement_valid_from: string | null
           agreement_valid_to: string | null
           base_units_per_package: number | null
+          container_unit: string | null
           created_at: string
           id: string
           is_primary: boolean
@@ -11238,6 +11242,7 @@ export type Database = {
           agreement_valid_from?: string | null
           agreement_valid_to?: string | null
           base_units_per_package?: number | null
+          container_unit?: string | null
           created_at?: string
           id?: string
           is_primary?: boolean
@@ -11277,6 +11282,7 @@ export type Database = {
           agreement_valid_from?: string | null
           agreement_valid_to?: string | null
           base_units_per_package?: number | null
+          container_unit?: string | null
           created_at?: string
           id?: string
           is_primary?: boolean
