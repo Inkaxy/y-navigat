@@ -27,7 +27,8 @@ export function initialContainer(invoiceUnit: string | null | undefined): string
   const raw = (invoiceUnit ?? "").trim().toLowerCase();
   if ((CONTAINER_OPTIONS as readonly string[]).includes(raw)) return raw;
   const n = normalizeUnit(invoiceUnit);
-  return n && (CONTAINER_OPTIONS as readonly string[]).includes(n) ? n : "";
+  // Ukjent etikett beholdes rå: beholderen er alltid fakturaens egen enhet, aldri tom blindvei.
+  return n && (CONTAINER_OPTIONS as readonly string[]).includes(n) ? n : raw;
 }
 
 export function describePackageSpec(v: PackageSpecInput, baseUnit: string | null | undefined, invoiceUnit: string | null | undefined): PackageSpec {

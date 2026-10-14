@@ -98,7 +98,7 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
   const existingPkg = sameRm && item.package_confirmed_at && item.base_units_per_package != null ? { bupp: item.base_units_per_package, confirmedAt: item.package_confirmed_at } : null;
   const specState = describePackageSpec(spec, baseUnit, refLine?.unit ?? null);
   const buppNum = specState.state === "valid" ? specState.baseUnitsPerPackage : null;
-  const pkgValid = !pkgNeeded || (existingPkg && !editPkg) || (buppNum != null && buppNum > 0);
+  const pkgValid = !pkgNeeded || (existingPkg && !editPkg) || (buppNum != null && buppNum > 0 && packageSavePayload(specState) != null);
   const hasMaterial = mode === "new" ? draft.name.trim().length > 1 : !!selectedId;
   const n = scope.lines;
 

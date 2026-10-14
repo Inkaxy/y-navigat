@@ -34,7 +34,7 @@ export function PackageSpecFields(p: Props) {
           <Select value={p.value.container} onValueChange={(v) => set({ container: v })} disabled={p.disabled || !p.containerEditable}>
             <SelectTrigger id={`${p.idPrefix}-container`} className="mt-1 min-h-[44px]"><SelectValue placeholder="Velg" /></SelectTrigger>
             <SelectContent>
-              {CONTAINER_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              {[...CONTAINER_OPTIONS, ...(p.value.container && !(CONTAINER_OPTIONS as readonly string[]).includes(p.value.container) ? [p.value.container] : [])].map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
