@@ -15,6 +15,7 @@ begin
     exit when not public.has_ravarer_invoice_access(le, 'write');
   end loop;
 
+  perform set_config('request.jwt.claims', json_build_object('sub', w, 'role', 'authenticated')::text, true);
   -- Fixture: «Florapan»-lignende vare feilregistrert som emballasje/stk, bekreftet 1 stk per sekk.
   insert into raw_materials (legal_entity_id, sku, name, item_type, base_unit, category) values (le, 'TEST-TU-A', 'TEST Florapan pose 100g', 'emballasje', 'stk', 'Emballasje') returning id into rm;
   insert into raw_materials (legal_entity_id, sku, name, item_type, base_unit) values (le, 'TEST-TU-B', 'TEST stk-vare', 'ravare', 'stk') returning id into rm2;
