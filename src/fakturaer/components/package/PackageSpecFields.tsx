@@ -1,4 +1,5 @@
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CONTAINER_OPTIONS, contentUnitsFor, describePackageSpec, type PackageSpecInput } from "@/fakturaer/lib/packageSpec";
@@ -13,6 +14,8 @@ interface Props {
   /** Kan «Kjøpes som» endres her? I linjeskjemaet må fakturaens enhet rettes via «Rett fakturalinje». */
   containerEditable: boolean;
   disabled?: boolean;
+  /** Åpner «Rett fakturert enhet» (bare enhet + begrunnelse via rm_correct_invoice_line). */
+  onCorrectUnit?: () => void;
 }
 
 /** Felles pakningsfelt: Fakturert som · Kjøpes som · Innhold per beholder (størrelse + enhet). */
@@ -25,9 +28,16 @@ export function PackageSpecFields(p: Props) {
   const isPieces = p.baseUnit === "stk";
   return (
     <div className="space-y-2">
-      <p className="text-caption text-ink-secondary">
-        Fakturert som: <strong className="text-ink-primary">{p.invoiceUnit?.trim() || "ukjent enhet"}</strong>
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-caption text-ink-secondary">
+          Fakturert som: <strong className="text-ink-primary">{p.invoiceUnit?.trim() || "ukjent enhet"}</strong>
+        </p>
+        {p.onCorrectUnit && (
+          <Button type="button" variant="outline" size="sm" className="min-h-[44px]" disabled={p.disabled} onClick={p.onCorrectUnit}>
+            Rett fakturert enhet
+          </Button>
+        )}
+      </div>
       <div className={isPieces ? "grid gap-2 sm:grid-cols-[10rem_1fr]" : "grid gap-2 sm:grid-cols-[10rem_1fr_7rem]"}>
         <div>
           <Label htmlFor={`${p.idPrefix}-container`} className="text-caption">Kjøpes som</Label>
@@ -57,7 +67,7 @@ export function PackageSpecFields(p: Props) {
       {spec.state === "invalid" && <p role="alert" className="rounded-md bg-warning/10 px-3 py-2 text-caption text-warning">{spec.reason}</p>}
       {spec.containerMismatch && (
         <p className="rounded-md bg-warning/10 px-3 py-2 text-caption text-warning">
-          {`Fakturaen sier «${p.invoiceUnit}». Skal linjen være ${p.value.container}, rett fakturalinjen («Rett fakturalinje») med begrunnelse. Pakningen kan ikke lagres før beholderen stemmer.`}
+          {`Fakturaen sier «${p.invoiceUnit}». Skal linjen være ${p.value.container}, bruk «Rett fakturert enhet» med begrunnelse. Pakningen kan ikke lagres før enheten er rettet.`}
         </p>
       )}
     </div>

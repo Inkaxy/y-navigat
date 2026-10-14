@@ -22,6 +22,7 @@ interface Props {
   existing: { bupp: number; confirmedAt: string } | null;
   editing: boolean;
   onEdit: () => void;
+  onCorrectUnit?: () => void;
 }
 
 /** Blokk 2: «Hva inneholder én <enhet>?» */
@@ -38,7 +39,7 @@ export function PackageBlock(p: Props) {
   }
   return (
     <div className="space-y-2">
-      <PackageSpecFields idPrefix={p.idPrefix} baseUnit={p.baseUnit} invoiceUnit={p.invoiceUnit} value={p.value} onChange={p.onChange} containerEditable={false} />
+      <PackageSpecFields idPrefix={p.idPrefix} baseUnit={p.baseUnit} invoiceUnit={p.invoiceUnit} value={p.value} onChange={p.onChange} containerEditable={false} onCorrectUnit={p.onCorrectUnit} />
       {p.loading && <Loader2 className="h-4 w-4 animate-spin text-ink-secondary" aria-label="Regner ut pakning" />}
       {p.inference?.explanation && <p className="text-caption text-ink-secondary">{p.inference.explanation}</p>}
       {p.inference?.source && (

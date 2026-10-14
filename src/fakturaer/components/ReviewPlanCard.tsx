@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { CheckCircle2, Circle, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { STEP_LABEL, type ReviewPlan } from "@/fakturaer/lib/reviewPlan";
+import { STEP_LABEL, basisNextAction, type BasisRow, type ReviewPlan } from "@/fakturaer/lib/reviewPlan";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -10,20 +10,26 @@ interface Props {
   returnTo?: string;
   /** Lokal handling i stedet for navigasjon (f.eks. åpne pakningsskjemaet i samme kort). */
   onAction?: (step: string) => boolean;
+  /** Leverandørgrunnlag (pakning/kost/godkjenning) – vises atskilt fra linjekontroll. */
+  basis?: BasisRow[];
+  /** Neste handling for grunnlaget når linjene er ferdige. */
+  onBasisAction?: (kind: "pakning" | "kost") => void;
 }
 
 const invoiceLink = (invoiceId: string, lineId: string, ret?: string) =>
   `/ravarer/priskontroll/faktura/${invoiceId}?linje=${lineId}${ret ? `&retur=${encodeURIComponent(ret)}` : ""}`;
 
 /** Kompakt status + plan: ett hovedsteg, én primærhandling, sjekkliste i fast rekkefølge. */
-export function ReviewPlanCard({ plan, returnTo, onAction }: Props) {
+export function ReviewPlanCard({ plan, returnTo, onAction, basis, onBasisAction }: Props) {
   const navigate = useNavigate();
   const p = plan.primary;
   const done = plan.openLines === 0 && !plan.incomplete;
+  const basisGap = basis?.some((b) => b.key !== "linjer" && b.state !== "ok") ?? false;
+  const basisNext = basis ? basisNextAction(basis) : null;
   return (
     <section aria-label="Gjennomgangsplan" className="space-y-2 rounded-md border border-line-subtle p-3">
       <p className="text-sm font-medium">
-        {done ? "Linjene er kontrollert" : plan.current ? `Neste: ${STEP_LABEL[plan.current.key]}` : "Status ukjent"}
+        {done ? (basisGap ? "Linjekontrollert – leverandørgrunnlaget er ikke komplett" : "Linjene er kontrollert") : plan.current ? `Neste: ${STEP_LABEL[plan.current.key]}` : "Status ukjent"}
         <span className="ml-2 text-caption font-normal text-ink-secondary">
           {plan.openLines} {plan.openLines === 1 ? "åpen linje" : "åpne linjer"} · {plan.openInvoices} {plan.openInvoices === 1 ? "faktura" : "fakturaer"}
         </span>
@@ -36,6 +42,16 @@ export function ReviewPlanCard({ plan, returnTo, onAction }: Props) {
           </li>
         ))}
       </ol>
+      {basis && basis.length > 1 && (
+        <ul aria-label="Grunnlag" className="grid gap-x-3 gap-y-0.5 text-caption sm:grid-cols-2" data-testid="basis-rows">
+          {basis.map((b) => (
+            <li key={b.key} className="flex items-start gap-1">
+              {b.state === "ok" ? <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" aria-hidden /> : b.state === "unknown" ? <HelpCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" aria-hidden /> : <Circle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-secondary" aria-hidden />}
+              <span><span className="font-medium">{b.label}:</span> {b.detail}</span>
+            </li>
+          ))}
+        </ul>
+      )}
       {plan.current && plan.current.key !== "kontrollert" && (
         <details className="text-caption text-ink-secondary">
           <summary className="cursor-pointer">Hvorfor venter dette?</summary>
@@ -60,14 +76,19 @@ export function ReviewPlanCard({ plan, returnTo, onAction }: Props) {
           </ul>
         </details>
       )}
+      {!p && basisNext && onBasisAction && (
+        <div className="sticky bottom-0 bg-card pt-1">
+          <Button data-primary-action className="min-h-[44px] w-full sm:w-auto" onClick={() => onBasisAction(basisNext.kind)}>{basisNext.label}</Button>
+        </div>
+      )}
       {p && (
         <div className="sticky bottom-0 bg-card pt-1">
-          {onAction ? (
-            <Button className="min-h-[44px] w-full sm:w-auto" onClick={() => { if (!onAction(p.step)) navigate(invoiceLink(p.invoiceId, p.lineId, returnTo)); }}>
+          {onAction && !p.readonly ? (
+            <Button data-primary-action className="min-h-[44px] w-full sm:w-auto" onClick={() => { if (!onAction(p.step)) navigate(invoiceLink(p.invoiceId, p.lineId, returnTo)); }}>
               {p.label}{p.invoiceNumber ? ` · faktura ${p.invoiceNumber}` : ""}
             </Button>
           ) : (
-            <Button asChild className="min-h-[44px] w-full sm:w-auto">
+            <Button asChild data-primary-action className="min-h-[44px] w-full sm:w-auto">
               <Link to={invoiceLink(p.invoiceId, p.lineId, returnTo)}>{p.label}{p.invoiceNumber ? ` · faktura ${p.invoiceNumber}` : ""}</Link>
             </Button>
           )}

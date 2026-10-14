@@ -14,6 +14,16 @@ import { kr } from "./logic";
 const unsignedKr = (n: number) => kr(Math.abs(n));
 import { detailCause } from "./groupCopy";
 import { WorkRowPrice } from "./WorkRowPrice";
+import { useWorkItemPlans, type WorkItemPlanLines } from "@/ravarer/hooks/useWorkItemPlans";
+import { rowPlanSummary } from "@/fakturaer/lib/reviewPlan";
+
+/** Årsak → neste handling for raden: samme gjennomgangsplan som varekortet når linjegrunnlaget finnes, ellers serverens tekst. */
+export function rowCause(it: WorkItem, plan: WorkItemPlanLines | undefined): { cause: string; next: string; readonly: boolean; openLines: number } {
+  const fallback = { ...detailCause(it), readonly: false, openLines: it.open_lines };
+  if (it.type !== "varekort" || !plan) return fallback;
+  const s = rowPlanSummary(plan.lines, plan.openLines, null);
+  return s ? { ...s, openLines: plan.openLines ?? it.open_lines } : fallback;
+}
 
 function MobileEffect({ it }: { it: WorkItem }) {
   const e = workEffect(it);
@@ -61,7 +71,7 @@ type Props = {
 };
 
 /** Kompakt stablet rad: navn over 1–2 linjer, leverandør/dato, årsak → handling én gang, prisvirkning egen linje. */
-function CompactRow({ it }: { it: WorkItem }) {
+function CompactRow({ it, rc }: { it: WorkItem; rc: ReturnType<typeof rowCause> }) {
   const meta = labelFor(WORK_KIND_LABELS, it.kind, "Oppgave");
   const e = workEffect(it);
   const sub = [it.supplier_name ?? "Ukjent leverandør", it.last_date ? formatDate(it.last_date) : null].filter(Boolean).join(" · ");
@@ -70,7 +80,7 @@ function CompactRow({ it }: { it: WorkItem }) {
       <StatusPill label={meta.label} tokenVar={meta.tokenVar} />
       <p className="line-clamp-2 break-words text-sm font-medium text-foreground" title={it.title}>{it.title}</p>
       <p className="truncate text-caption text-ink-secondary" title={rowSubtitle(it)}>{sub}</p>
-      <p className="text-caption"><span className="text-ink-secondary">{detailCause(it).cause}</span> <span className="font-medium text-primary">→ {detailCause(it).next}</span></p>
+      <p className="text-caption" data-testid="row-plan"><span className="text-ink-secondary">{rc.cause}</span> <span className="font-medium text-primary">→ {rc.next}</span></p>
       {e.kind !== "none" && (
         <p className={`text-caption tabular-nums ${e.kind === "read" ? "text-warning" : "text-ink-secondary"}`}>
           {e.label}{e.kind === "verified" ? `: ${unsignedKr(e.value)}` : ""}
@@ -82,6 +92,8 @@ function CompactRow({ it }: { it: WorkItem }) {
 
 /** Prioritert liste: varekort og fakturasaker med årsak, neste handling og ærlig kronevirkning. */
 export function WorkListView({ items, total, selectedKey, loading, fetchingMore, onSelect, onMore, checked, onToggle, compact = false }: Props) {
+  const plans = useWorkItemPlans(items.flatMap((it) => (it.type === "varekort" && it.supplier_id && it.item_key ? [{ supplier_id: it.supplier_id, item_key: it.item_key }] : [])));
+  const planFor = (it: WorkItem) => (plans.data && it.supplier_id && it.item_key ? plans.data.get(`${it.supplier_id}|${it.item_key}`) : undefined);
   if (loading) {
     return (
       <div className="space-y-2" aria-busy="true" aria-label="Laster listen">
@@ -103,6 +115,7 @@ export function WorkListView({ items, total, selectedKey, loading, fetchingMore,
         {items.map((it) => {
           const meta = labelFor(WORK_KIND_LABELS, it.kind, "Oppgave");
           const active = it.key === selectedKey;
+          const rc = rowCause(it, planFor(it));
           return (
             <li key={it.key} role="option" aria-selected={active} className="flex items-stretch">
               {onToggle && (
@@ -115,24 +128,24 @@ export function WorkListView({ items, total, selectedKey, loading, fetchingMore,
               <button
                 type="button"
                 data-key={it.key}
-                aria-label={compact ? `${it.title}. ${rowSubtitle(it)}. ${detailCause(it).cause}. ${detailCause(it).next}` : undefined}
+                aria-label={compact ? `${it.title}. ${rowSubtitle(it)}. ${rc.cause}. ${rc.next}` : undefined}
                 onClick={() => onSelect(it)}
                 className={cn(
                   "relative flex w-full items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/50",
                   active && "bg-primary/5 before:absolute before:inset-y-0 before:left-0 before:w-[2px] before:bg-primary",
                 )}
               >
-                {compact ? <CompactRow it={it} /> : <>
+                {compact ? <CompactRow it={it} rc={rc} /> : <>
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex min-w-0 items-center gap-2">
                     <StatusPill label={meta.label} tokenVar={meta.tokenVar} />
                     <span className="truncate text-sm font-medium text-foreground">{it.title}</span>
                   </div>
                   <p className="truncate text-sm text-ink-secondary">{rowSubtitle(it)}</p>
-                  <p className="flex flex-wrap items-center gap-x-2 text-sm">
-                    <span className="text-ink-secondary">{detailCause(it).cause}</span>
+                  <p className="flex flex-wrap items-center gap-x-2 text-sm" data-testid="row-plan">
+                    <span className="text-ink-secondary">{rc.cause}</span>
                     <span aria-hidden className="text-ink-secondary">·</span>
-                    <span className="font-medium text-primary">{detailCause(it).next} →</span>
+                    <span className="font-medium text-primary">{rc.next} →</span>
                   </p>
                   <WorkRowPrice it={it} />
                   <MobileEffect it={it} />

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -25,7 +25,7 @@ import { ChangeLinkDialog } from "./ChangeLinkDialog";
 import { SupplierLinkAliases } from "./SupplierLinkAliases";
 import type { PanelResult } from "./types";
 import { ReviewPlanCard } from "@/fakturaer/components/ReviewPlanCard";
-import { buildReviewPlan, discountArithmeticText } from "@/fakturaer/lib/reviewPlan";
+import { buildReviewPlan, discountArithmeticText, supplierBasis } from "@/fakturaer/lib/reviewPlan";
 import { cardFinished, freshStatusFrom, type FreshStatus } from "@/fakturaer/lib/freshReceipt";
 import { LineInsightPanel } from "@/fakturaer/components/inbox/task/LineInsightPanel";
 import { insightLineFromSupplierItem, lineClarifications } from "@/fakturaer/lib/lineInsight";
@@ -175,6 +175,7 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
   onDone: (r: PanelResult) => void; onNext?: () => void; onSkip?: () => void; onClose: () => void;
 }) {
   const { data: company } = useCompany();
+  const navigate = useNavigate();
   const link = useLinkSupplierItem();
   const linked = !!item.rm_id && item.status !== "ukoblet";
   const pkgOk = linked && item.status !== "mangler_pakning";
@@ -193,6 +194,8 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
   const insightSrc = lines.find((l) => l.id === (originalLineId ?? item.last_open_line_id)) ?? scope.lastOpen ?? lines[0] ?? null;
   const insightLine = insightSrc ? insightLineFromSupplierItem(item, insightSrc) : null;
   const priceWork = hasPriceWork(item, lines);
+  const plan = buildReviewPlan(item, lines);
+  const basis = supplierBasis(item, plan, lines);
   // Bare når koblingens varenummer er varekortets — ellers kan rms_id være en annen leverandørvare.
   const canMoveLink = item.rms_sku_matches === true && !!item.rms_id;
 
@@ -231,9 +234,11 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <VarekortHeaderView item={item} openInvoices={scope.invoices} />
-      <ReviewPlanCard plan={buildReviewPlan(item, lines)} returnTo={typeof window !== "undefined" ? window.location.pathname + window.location.search : undefined}
+      <ReviewPlanCard plan={plan} basis={basis}
+        onBasisAction={(k) => { if (k === "pakning") { setEditPkg(true); setEditForm(true); } else navigate(paths.reberegn()); }}
+        returnTo={typeof window !== "undefined" ? window.location.pathname + window.location.search : undefined}
         onAction={(step) => { if (step === "pakning" || step === "vare") { setEditPkg(step === "pakning"); setEditForm(true); return true; } return false; }} />
       {insightSrc && lines.length > 1 && (
         <p className="text-sm font-medium" data-testid="valgt-faktura">Valgt faktura {insightSrc.invoice_number ?? "uten nummer"}{insightSrc.invoice_date ? ` · ${insightSrc.invoice_date.split("-").reverse().join(".")}` : ""}{insightSrc.is_credit_note ? " · kreditnota" : ""}</p>
@@ -287,7 +292,8 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
       {!editForm && (
         // Med prisarbeid ligger hovedhandlingene i Pris-blokken; da skal ikke «Ikke vare …» være eneste klebrige handling.
         <div className={`${priceWork ? "" : "sticky bottom-0 z-10 "}-mx-4 flex flex-wrap items-center gap-2 border-t border-line-subtle bg-card px-4 py-3 [&>button]:min-h-11`}>
-          {!priceWork && <Button data-primary-action disabled={(!canWrite && primary) || primarySaving} onClick={() => void finish()}>Ferdig — neste</Button>}
+          {/* Én primærhandling: når planen har en neste handling står den i planen; da er «Ferdig» sekundær. */}
+          {!priceWork && <Button variant={plan.primary ? "outline" : "default"} {...(plan.primary ? {} : { "data-primary-action": true })} disabled={(!canWrite && primary) || primarySaving} onClick={() => void finish()}>Ferdig — neste</Button>}
           {/* Hurtigtast X: Radix åpner ikke på .click(), så menyen styres direkte. */}
           <button type="button" hidden data-action="not-item" disabled={!canWrite || link.isPending} onClick={() => setMenuOpen(true)} />
           <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>

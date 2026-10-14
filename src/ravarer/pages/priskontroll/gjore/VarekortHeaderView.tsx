@@ -9,7 +9,7 @@ import { paths } from "@/ravarer/lib/paths";
 /** Topp på varekortet: leverandør · varenr · beskrivelse, status, omfang og «Hva mangler». */
 export function VarekortHeaderView({ item, openInvoices }: { item: SupplierItem; openInvoices: number }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       <header className="space-y-1">
         <p className="text-caption text-ink-secondary">
           {item.supplier_name ?? "Ukjent leverandør"}{item.supplier_sku ? ` · varenr ${item.supplier_sku}` : ""} ·{" "}
@@ -24,11 +24,8 @@ export function VarekortHeaderView({ item, openInvoices }: { item: SupplierItem;
           </span>
         </div>
       </header>
-      <section className="rounded-md bg-muted/40 p-3">
-        <h3 className="text-caption font-semibold text-ink-secondary">Hva mangler</h3>
-        <p className="mt-1 text-sm">{whatIsMissing(item)}</p>
-        {item.rms_notes && <p className="mt-2 text-caption text-ink-secondary">{item.rms_notes}</p>}
-      </section>
+      {/* «Hva mangler» står i gjennomgangsplanen rett under – ikke gjentatt her. */}
+      {item.rms_notes && <p className="text-caption text-ink-secondary" title={whatIsMissing(item)}>{item.rms_notes}</p>}
     </div>
   );
 }
