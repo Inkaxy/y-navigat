@@ -65,11 +65,12 @@ export function PackageDecision({ g, canWrite, onSaved }: { g: DecisionGroup; ca
         <p className="font-medium">Lagrede pakninger for denne varen</p>
         {variants.isLoading && <p className="text-ink-secondary">Henter …</p>}
         {variants.isError && <p className="text-destructive">Kunne ikke hente lagrede pakninger.</p>}
-        {variants.data?.length === 0 && <p className="text-ink-secondary">Ingen bekreftet pakning ennå.</p>}
+        {variants.data?.length === 0 && <p className="text-ink-secondary">Ingen lagret pakning ennå.</p>}
         <ul className="mt-1 space-y-0.5">
           {variants.data?.map((v, i) => (
             <li key={i} className="tabular-nums">
-              {v.package_size != null ? `${fmtNum(Number(v.package_size))} ${v.package_unit ?? ""}` : "Pakning"} = {fmtNum(Number(v.base_units_per_package))} {unit}
+              {v.package_size != null ? `${fmtNum(Number(v.package_size))} ${v.package_unit ?? ""}` : "Pakning"} = {v.base_units_per_package == null ? "ukjent" : `${fmtNum(Number(v.base_units_per_package))} ${unit}`}
+              {v.confirmed_at ? "" : " · ikke bekreftet (brukes ikke som grunnlag)"}
             </li>
           ))}
         </ul>

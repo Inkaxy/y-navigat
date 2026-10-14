@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { formatMoney } from "@/fakturaer/lib/constants";
-import { fmtNum, invoiceArithmeticMismatch } from "@/fakturaer/lib/units";
+import { lineArithmeticText, registeredDiscount } from "@/fakturaer/lib/lineArithmeticText";
+import { refineGateForLine } from "@/fakturaer/lib/priceSafety";
+import { itemTypeText } from "@/fakturaer/components/supplier-item/MaterialBlock";
 import { GENERIC_ERROR_MESSAGE } from "@/lib/userError";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { shouldOpenEditMaterial, type EditMaterialSignal } from "@/fakturaer/lib/editMaterialSignal";
@@ -15,7 +17,6 @@ import { useLineMatchForm } from "@/fakturaer/hooks/useLineMatchForm";
 import { recalculateLines } from "@/fakturaer/lib/acceptMatch";
 import { acceptPriceVariance, canAcceptPriceVariance } from "@/fakturaer/lib/queueActions";
 import type { LineStatus } from "@/fakturaer/lib/lineStatus";
-import { costOf } from "@/fakturaer/lib/lineControl";
 import { LineStatusBadge } from "@/fakturaer/components/inbox/LineStatusBadge";
 import { MaterialPicker } from "@/fakturaer/components/inbox/task/MaterialPicker";
 import { PackageForm } from "@/fakturaer/components/inbox/task/PackageForm";
@@ -46,6 +47,8 @@ export interface LineTaskProps {
   onSecondary: (a: SecondaryAction, line: ReviewLineRow, prefill?: CreatePrefill | null) => void;
   onShowDocument: (line: ReviewLineRow) => void;
   onReconcile: () => void;
+  /** Åpner eksisterende «Rett fakturalinje» for nøyaktig denne linjen (fakturaflaten). */
+  onCorrectLine?: (line: ReviewLineRow) => void;
   /** Åpner «Endre råvare» (tast M i arbeidsflaten) — bare for linjen signalet gjelder. */
   editMaterialSignal?: EditMaterialSignal | null;
 }
@@ -77,18 +80,20 @@ export function LineTask(p: LineTaskProps) {
   const copy = taskCopy.forStatus(status.key);
   const currency = line.invoice.currency ?? "NOK";
   const supplier = line.invoice.supplier?.name ?? "leverandøren";
-  const dataCost = costOf(line, link);
-  const dataInconsistent = invoiceArithmeticMismatch(
-    { quantity: line.quantity, unitPrice: line.unit_price, totalAmount: line.total_amount },
-    dataCost?.checks ?? null,
-  );
+  // Delt lesekontroll (samme regel som serveren: prisgrunnlag, rabatt, kreditnota) + serverens lesevarsler.
+  const clarifications = lineClarifications({ ...line, package_gate: packageGateFromReview(line.review_reason), server_review_reason: line.review_reason, extraction_issues: line.extraction_issues ?? null });
+  const readIssue = clarifications.find((c) => c.id === "read_issue") ?? null;
+  const dataInconsistent = readIssue != null;
+  const discount = registeredDiscount(line);
   const pkgValid = form.packageDraft.state === "valid" && !!form.cost && !form.cost.needsInput && !!form.selectedRm;
   const pkgHint =
     form.materialLoading
       ? "Henter råvaren …"
       : form.packageDraft.state === "invalid"
         ? form.packageDraft.reason
-        : "Fyll inn innholdet slik at mengden kan regnes om.";
+        : (form.selectedRm?.base_unit ?? line.matched_raw_material?.base_unit) === "stk" && ["g", "kg", "ml", "l"].includes((line.package_unit ?? "").toLowerCase())
+          ? "Varen telles i stk, men innholdet er oppgitt i vekt/volum. Rett varetype og grunnenhet fra varekortet («Åpne leverandørvaren») før pakningen bekreftes."
+          : "Fyll inn innholdet slik at mengden kan regnes om.";
 
   async function save(confirmPackage: boolean, applyToAll = false) {
     setError(null);
@@ -113,7 +118,7 @@ export function LineTask(p: LineTaskProps) {
     }
   }
 
-  const priceGate = usePriceGate(line);
+  const priceGate = refineGateForLine(usePriceGate(line), line, dataInconsistent);
   // Felles regel: kreditnota, valuta, lesing, sumkontroll og holdt pris gir aldri «Prisen er riktig».
   const priceAcceptable = canAcceptPriceVariance(line) && priceGate.ok;
   // Prisstatus uten servergodkjenning: aldri «Prisen avviker»/«Se over pris». Kreditnota har egen veiledning.
@@ -192,12 +197,19 @@ export function LineTask(p: LineTaskProps) {
       run: () => void acceptPrice(),
       hint: "Godtar prisen på denne linjen. Avtaleprisen endres ikke.",
     };
-  } else if (mode === "price" && p.canWrite && !priceGate.ok && priceGate.action !== "complete_link_or_package") {
-    primary = { label: priceGate.label, run: null, hint: priceGate.detail };
+  } else if (mode === "price" && p.canWrite && !priceGate.ok && priceGate.action !== "complete_link_or_package" && priceGate.action !== "confirm_price_basis") {
+    // Aldri en død knapp: lesing rettes via «Rett fakturalinje», ellers åpnes originalen for kontroll.
+    const doc = line.invoice.source_document_url ? () => p.onShowDocument(line) : null;
+    const fix = priceGate.action === "review_reading" && p.onCorrectLine ? () => p.onCorrectLine?.(line) : null;
+    primary = fix
+      ? { label: "Rett fakturalinje", run: fix, hint: `${priceGate.label}. ${priceGate.detail}` }
+      : doc
+        ? { label: "Kontroller originalen", run: doc, hint: `${priceGate.label}. ${priceGate.detail}` }
+        : { label: "Gå til neste linje", run: p.position.index < p.position.total - 1 ? p.onNext : null, hint: `${priceGate.label}. ${priceGate.detail} Originalen mangler — åpne fakturaen for å rette linjen.` };
   } else if (mode === "price" && p.canWrite) {
     primary = {
-      label: "Kontroller pakningen",
-      run: form.selectedRmId ? () => setEditPackage(true) : null,
+      label: form.selectedRmId ? "Kontroller pakningen" : "Kontroller varekoblingen",
+      run: form.selectedRmId ? () => setEditPackage(true) : () => setEditMaterial(true),
       hint: "Prisen kan ikke sammenlignes ennå. Kontroller pakning, råvare eller avtalepris.",
     };
   } else if (mode === "done" && p.reconcileReady) {
@@ -211,14 +223,17 @@ export function LineTask(p: LineTaskProps) {
   }
 
   // Motstrid i linjens egne felt sperrer prisen. Hovedhandlingen løser den faktiske årsaken.
-  const clarifications = lineClarifications({ ...line, package_gate: packageGateFromReview(line.review_reason) });
   const heldBy = mode === "price" ? clarifications.find((c) => c.blocksPrice) ?? null : null;
   const priceHeldByClarification = heldBy != null;
   if (p.canWrite && heldBy) {
     if (heldBy.action === "original") {
-      primary = { label: "Kontroller originalen", run: line.invoice.source_document_url ? () => p.onShowDocument(line) : null, hint: `${heldBy.detail} Rett lesingen via «Rett fakturalinje» om tallene er lest feil.` };
+      primary = p.onCorrectLine
+        ? { label: "Rett fakturalinje", run: () => p.onCorrectLine?.(line), hint: `${heldBy.detail} Kontroller mot originalen; tallene endres bare med begrunnelse.` }
+        : { label: "Kontroller originalen", run: line.invoice.source_document_url ? () => p.onShowDocument(line) : null, hint: `${heldBy.detail} Rett lesingen via «Rett fakturalinje» om tallene er lest feil.` };
     } else if (heldBy.action === "pakning") {
-      primary = { label: "Bekreft pakningen", run: form.selectedRmId ? () => setEditPackage(true) : null, hint: heldBy.detail };
+      primary = form.selectedRmId
+        ? { label: "Bekreft pakningen", run: () => setEditPackage(true), hint: heldBy.detail }
+        : { label: "Kontroller varekoblingen", run: () => setEditMaterial(true), hint: heldBy.detail };
     } else {
       primary = { label: "Kontroller varekoblingen", run: () => setEditMaterial(true), hint: heldBy.detail };
     }
@@ -246,12 +261,14 @@ export function LineTask(p: LineTaskProps) {
         </div>
         <h2 className="font-serif text-lg leading-snug">{line.description ?? "Uten varetekst"}</h2>
         <p className="text-caption text-ink-secondary">
-          Fakturert: {line.quantity == null ? "—" : fmtNum(Number(line.quantity))} {line.unit ?? ""} · {formatMoney(line.unit_price, currency)} per {line.unit ?? "enhet"} ·{" "}
-          {formatMoney(line.total_amount, currency)} eks. mva
+          Fakturert: {lineArithmeticText(line, currency)} eks. mva
+          {discount != null && line.quantity != null && Number(line.quantity) > 0 && line.total_amount != null && (
+            <> · netto {formatMoney(Number(line.total_amount) / Number(line.quantity), currency)} per {line.unit ?? "enhet"}</>
+          )}
         </p>
-        {dataInconsistent && (
+        {dataInconsistent && readIssue && (
           <p className="rounded-md bg-warning/10 px-2 py-1 text-caption text-warning">
-            Mengde, pris og linjesum på fakturaen går ikke opp med hverandre. Regnestykket under er en foreløpig tolkning — kontroller mot originalfakturaen.
+            {readIssue.detail} Regnestykket under er en foreløpig tolkning — kontroller mot originalfakturaen.
           </p>
         )}
         <LineInsightPanel line={line} clarifications={clarifications} />
@@ -261,7 +278,7 @@ export function LineTask(p: LineTaskProps) {
 
       <div className="space-y-4 px-4 py-3">
         {mode !== "material" && rmName && (
-          <SummaryRow label="Råvare" value={`${rmName}${baseUnit ? ` · per ${baseUnit}` : ""}`} action={p.canWrite ? { label: "Endre", run: () => setEditMaterial(true) } : null} />
+          <SummaryRow label="Råvare" value={`${rmName} · ${itemTypeText(form.selectedRm?.item_type ?? line.matched_raw_material?.item_type ?? null)}${baseUnit ? ` · per ${baseUnit}` : ""}`} action={p.canWrite ? { label: "Endre", run: () => setEditMaterial(true) } : null} />
         )}
         {mode === "material" && <MaterialPicker form={form} lineId={line.id} />}
         {(mode === "package" || (mode === "material" && form.selectedRmId)) && <PackageForm line={line} form={form} />}

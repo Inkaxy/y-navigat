@@ -46,6 +46,20 @@ export function ReviewPlanCard({ plan, returnTo, onAction }: Props) {
       {done && plan.invoiceFollowUp.length > 0 && (
         <p className="text-caption">Linjekontrollert – {plan.invoiceFollowUp.length === 1 ? "fakturaen" : "fakturaene"} {plan.invoiceFollowUp.map((f) => f.invoiceNumber ?? "uten nummer").join(", ")} har egne mangler eller venter på godkjenning.</p>
       )}
+      {plan.perInvoice.length > 1 && (
+        <details className="text-caption">
+          <summary className="cursor-pointer text-ink-secondary">Neste handling per faktura ({plan.perInvoice.length})</summary>
+          <ul className="mt-1 space-y-1">
+            {plan.perInvoice.map((a) => (
+              <li key={a.invoiceId}>
+                <Link className="inline-flex min-h-[44px] items-center underline underline-offset-2" to={invoiceLink(a.invoiceId, a.lineId, returnTo)}>
+                  Faktura {a.invoiceNumber ?? "uten nummer"}: {a.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
       {p && (
         <div className="sticky bottom-0 bg-card pt-1">
           {onAction ? (

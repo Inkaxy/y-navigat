@@ -74,6 +74,19 @@ describe("gjennomgangsplan", () => {
   it("avkortet utvalg markeres ufullstendig", () => {
     expect(buildReviewPlan(planItem, Array.from({ length: 200 }, (_, i) => ({ ...base, id: `x${i}` }))).incomplete).toBe(true);
   });
+  it("prisgrunnlag følger delt lesekontroll: rabatt som ikke forklarer summen er ikke ok", () => {
+    const l = { ...base, discount_amount: 100, review_reason: null };
+    expect(buildReviewPlan(planItem, [l]).steps.find((s) => s.key === "prisgrunnlag")?.state).toBe("todo");
+  });
+  it("stk-vare med 100 g innhold: neste handling er varetype/grunnenhet, ikke å bekrefte vekt som antall", () => {
+    const stk = { ...planItem, rm_base_unit: "stk" };
+    expect(buildReviewPlan(stk, [{ ...base, package_size: 100, package_unit: "g" }]).primary?.label).toBe("Rett varetype og måleenhet");
+  });
+  it("én neste handling per åpen faktura, eldste først, til eksakt linje", () => {
+    const b = { ...base, id: "l2", invoice_id: "i2", invoice_number: "1600000", invoice_date: "2026-10-01", review_reason: "price_increase" };
+    const plan = buildReviewPlan(planItem, [b, base]);
+    expect(plan.perInvoice.map((a) => [a.invoiceNumber, a.lineId, a.label])).toEqual([["1539842", "l1", "Bekreft 100 g pose"], ["1600000", "l2", "Vurder pris"]]);
+  });
   it("etikett og rabattregnestykke", () => {
     expect(packageActionLabel({ description: "Mel 25 kg", unit: "sekk" })).toBe("Bekreft 25 kg sekk");
     expect(discountArithmeticText(base)).toBe("10 pose × 977,74 − rabatt 3 079,90 = 6 697,50 (netto 669,75 per pose)");

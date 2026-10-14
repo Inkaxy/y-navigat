@@ -277,7 +277,8 @@ Deno.serve(async (req) => {
       if (!row || line.package_size == null || !line.package_unit) return row;
       const sku = skuNormSql(line.supplier_sku);
       const unit = String(line.package_unit).trim().toLowerCase();
-      const hits = variants.filter((v) => v.raw_material_supplier_id === row.id
+      // Bare faktisk bekreftede varianter (confirmed_at satt) er grunnlag; ubekreftede gir aldri pakning.
+      const hits = variants.filter((v) => v.raw_material_supplier_id === row.id && v.confirmed_at != null
         && (v.supplier_sku_norm === "" || v.supplier_sku_norm === sku)
         && v.package_size != null && Number(v.package_size) === Number(line.package_size)
         && String(v.package_unit ?? "").trim().toLowerCase() === unit);

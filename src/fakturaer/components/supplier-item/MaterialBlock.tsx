@@ -5,6 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectTrigger, SelectValue, SelectItem } from "@/components/ui/select";
 import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
 import { ITEM_TYPES, defaultCategoryFor, type ItemType } from "@/ravarer/lib/itemTypes";
+
+/** Faktisk varetype, vist atskilt fra kategori. Ukjent varetype vises som ukjent, aldri som «Råvare». */
+export function itemTypeText(t: string | null | undefined): string {
+  const hit = ITEM_TYPES.find((i) => i.value === t);
+  return hit ? `Varetype: ${hit.label}` : "Varetype ikke registrert";
+}
+function materialFacts(o: MaterialChoice): string {
+  return [o.sku, itemTypeText(o.item_type), o.category ? `Kategori: ${o.category}` : null].filter(Boolean).join(" · ");
+}
 import { CANONICAL_BASE_UNITS } from "@/fakturaer/lib/units";
 import type { MaterialChoice } from "@/fakturaer/hooks/useMaterialChoices";
 import { cn } from "@/lib/utils";
@@ -112,7 +121,7 @@ export function MaterialBlock(p: Props) {
                 >
                   <span className="font-medium">{o.name}</span>
                   {o.base_unit && <span className="text-ink-secondary"> · per {o.base_unit}</span>}
-                  {(o.sku || o.category) && <span className="block text-caption text-ink-secondary">{[o.sku, o.category].filter(Boolean).join(" · ")}</span>}
+                  <span className="block text-caption text-ink-secondary">{materialFacts(o)}</span>
                   {o.why && <span className="block text-caption text-ink-secondary">Hvorfor: {o.why}</span>}
                 </button>
               </li>
@@ -122,7 +131,7 @@ export function MaterialBlock(p: Props) {
       )}
       {p.selected && p.onCorrectTypeUnit && (
         <p className="text-caption text-ink-secondary">
-          Valgt: {p.selected.name}{p.selected.base_unit ? ` · per ${p.selected.base_unit}` : ""}.{" "}
+          Valgt: {p.selected.name} · {itemTypeText(p.selected.item_type)}{p.selected.category ? ` · kategori ${p.selected.category}` : ""}{p.selected.base_unit ? ` · grunnenhet ${p.selected.base_unit}` : ""}.{" "}
           <button type="button" className="min-h-[44px] underline underline-offset-2" onClick={p.onCorrectTypeUnit}>Rett varetype og måleenhet</button>
         </p>
       )}

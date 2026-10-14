@@ -6,6 +6,9 @@ import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import type { SupplierLinkRow } from "@/fakturaer/hooks/useSupplierLinkContext";
 import { baseUnitOf, reasonsIn } from "@/fakturaer/lib/lineControl";
 import { usePriceGate } from "@/fakturaer/lib/priceGateContext";
+import { refineGateForLine } from "@/fakturaer/lib/priceSafety";
+import { lineArithmeticText } from "@/fakturaer/lib/lineArithmeticText";
+import { lineClarifications, packageGateFromReview } from "@/fakturaer/lib/lineInsight";
 
 /** Etikett fra serverens kvittering — aldri fra en eldre linjekopi. */
 function referenceLabel(source: string | null, date: string | null): string | null {
@@ -30,7 +33,8 @@ export function PriceCheck({ line, link, tolerancePct }: { line: ReviewLineRow; 
   const { settings } = useMatchTolerances(line.invoice.legal_entity_id);
   const currency = line.invoice.currency ?? "NOK";
   const reasons = reasonsIn(line, "price");
-  const gate = usePriceGate(line);
+  const localRead = lineClarifications({ ...line, package_gate: packageGateFromReview(line.review_reason), server_review_reason: line.review_reason, extraction_issues: line.extraction_issues ?? null }).some((c) => c.id === "read_issue");
+  const gate = refineGateForLine(usePriceGate(line), line, localRead);
   // Sammenligningsenhet og referanse kommer fra kvitteringen; dokumentets egne tall vises separat.
   const unit = (gate.ok ? gate.safety.base_unit : null) ?? baseUnitOf(line, link) ?? "grunnenhet";
   const ref = gate.ok ? referenceLabel(gate.safety.reference_source, gate.safety.reference_date) : null;
@@ -56,7 +60,7 @@ export function PriceCheck({ line, link, tolerancePct }: { line: ReviewLineRow; 
         <div role="note" className="rounded-md border border-warning/30 bg-warning/10 p-2 text-caption">
           <p className="font-medium text-warning">{credit ? "Kreditnota – ikke en prisendring" : gate.label}</p>
           <p className="text-ink-secondary">{credit ? "Lagret lesing beholder fortegnet slik det ble lest; beløpene er ikke kontrollert mot originalen. Koble kreditnotaen til opprinnelig faktura." : gate.detail}</p>
-          <p className="mt-1 text-ink-secondary">Lagret lesing (må kontrolleres mot originalen): {line.quantity ?? "—"} {line.unit ?? ""} × {formatMoney(line.unit_price, currency)} = {formatMoney(line.total_amount, currency)}. Utledet pris per {unit} vises ikke før grunnlaget er kontrollert.</p>
+          <p className="mt-1 text-ink-secondary">{localRead ? "Lagret lesing (må kontrolleres mot originalen)" : "Lagret lesing (regnestykket går opp)"}: {lineArithmeticText(line, currency)}. Utledet pris per {unit} vises ikke før grunnlaget er kontrollert.</p>
         </div>
       )}
       {reasons.length > 0 && !gate.ok && !credit && <p className="text-caption text-warning">Må avklares: {reasons.join(" · ")}</p>}
@@ -67,9 +71,7 @@ export function PriceCheck({ line, link, tolerancePct }: { line: ReviewLineRow; 
         <dl className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-2 text-caption">
           <div>
             <dt className="text-ink-secondary">Lagret lesing</dt>
-            <dd>
-              {line.quantity ?? "—"} {line.unit ?? ""} × {formatMoney(line.unit_price, currency)}
-            </dd>
+            <dd>{lineArithmeticText(line, currency)}</dd>
           </div>
           <div>
             <dt className="text-ink-secondary">Linjesum eks. mva</dt>

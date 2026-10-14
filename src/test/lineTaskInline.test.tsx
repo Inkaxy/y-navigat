@@ -225,7 +225,7 @@ describe("Pakning for stk-råvare (ALI 36×90 g)", () => {
     fireEvent.change(input, { target: { value: v } });
     const btn = screen.getByRole("button", { name: "Bekreft pakning og fortsett" }) as HTMLButtonElement;
     await waitFor(() => expect(btn.disabled).toBe(true));
-    expect(screen.queryByText(/2 kartong × /)).toBeNull();
+    expect(screen.queryByText(/2 kartong × [\d,]+ stk/)).toBeNull();
     expect(acceptMatch).not.toHaveBeenCalled();
   });
 

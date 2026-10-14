@@ -193,3 +193,18 @@ export function priceDirection(s: LineSafety): "up" | "down" | "same" | null {
 }
 
 export const PRICE_SAFETY_KEY = "invoice-line-price-safety" as const;
+
+/**
+ * Presisering for én linje uten å endre serverens svar: `invalid_quantity` på en linje med gyldig
+ * mengde men uten grunnmengde betyr at mengden ikke kan regnes om (pakning/grunnenhet), ikke at
+ * tallene er lest feil. Bare da flyttes handlingen til pakningssteget; alt annet er uendret.
+ */
+export function refineGateForLine(
+  gate: PriceGate,
+  l: { quantity: number | null; base_quantity: number | null },
+  localReadIssue: boolean,
+): PriceGate {
+  if (gate.ok || gate.reason !== "invalid_quantity" || localReadIssue) return gate;
+  if (l.base_quantity != null || l.quantity == null || !(Number(l.quantity) > 0)) return gate;
+  return { ...gate, action: "complete_link_or_package", label: "Avklar pakning og mengdegrunnlag", detail: "Mengden kan ikke regnes om til varens grunnenhet før pakningen (og eventuelt varetype/grunnenhet) er avklart. Tallene på linjen er ikke underkjent." };
+}
