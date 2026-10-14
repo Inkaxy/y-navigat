@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -126,6 +127,7 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
     void submit(body);
   };
 
+  const qc = useQueryClient();
   const [typeUnitOpen, setTypeUnitOpen] = useState(false);
   const disabled = !canWrite || link.isPending || !company;
   const materialLoading = mode === "existing" && !!selectedId && selected.isLoading;
