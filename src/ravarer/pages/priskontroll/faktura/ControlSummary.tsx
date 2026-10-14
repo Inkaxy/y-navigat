@@ -1,3 +1,4 @@
+import { isExcludedInvoice } from "./exclusionView";
 import { sumDirection, sumDirectionText } from "@/fakturaer/lib/sumDirection";
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
@@ -49,8 +50,10 @@ export function ControlSummary({ data, openCount, totalCount, canWrite, locked, 
   const [open, setOpen] = useState(extractionFailed);
   useEffect(() => { if (openSignal > 0) setOpen(true); }, [openSignal]);
   const f = controlFigures(data);
+  // Hele dokumentet holdt utenfor: tallene bevares, men sum/lesing er historikk — ingen ny oppgave.
+  const docExcluded = isExcludedInvoice(data.status, data.excluded_at);
   const checked = sumOk(data.lines_sum_status);
-  const readNote = extractionFailed
+  const readNote = docExcluded ? null : extractionFailed
     ? `Linjene kunne ikke hentes (forsøk ${Math.min(data.line_extraction_attempts ?? 0, 3)}/3)`
     : invIssues.length + lineIssues > 0
       ? `Lesingen må kontrolleres: ${[invIssues.length > 0 ? "fakturavarsel" : null, lineIssues > 0 ? `${lineIssues} ${lineIssues === 1 ? "linje" : "linjer"} med lesevarsel` : null].filter(Boolean).join(", ")}`
@@ -63,12 +66,14 @@ export function ControlSummary({ data, openCount, totalCount, canWrite, locked, 
           <Figure label="Netto på fakturaen" value={f.net == null ? (f.gross == null ? "—" : "Ukjent – mva mangler") : formatMoney(f.net, f.currency)} tone={f.net == null && f.gross != null ? "muted" : undefined} />
           <Figure label="Lest linjesum" value={formatMoney(f.linesSum, f.currency)} />
           <Figure label={sumStatusLabel(data.lines_sum_status)} value={f.diff == null ? "—" : `${f.diff > 0 ? "+" : ""}${formatMoney(f.diff, f.currency)}`}
-            tone={data.lines_sum_status === "mismatch" ? "warning" : checked ? "success" : "muted"} />
-          <Figure label="Gjenstår" value={totalCount === 0 ? "—" : openCount === 0 ? "Alle avklart" : `${openCount} av ${totalCount} linjer`} tone={openCount > 0 ? "warning" : undefined} />
+            tone={docExcluded ? "muted" : data.lines_sum_status === "mismatch" ? "warning" : checked ? "success" : "muted"} />
+          <Figure label="Gjenstår" value={docExcluded ? "Holdt utenfor" : totalCount === 0 ? "—" : openCount === 0 ? "Alle avklart" : `${openCount} av ${totalCount} linjer`} tone={!docExcluded && openCount > 0 ? "warning" : undefined} />
         </dl>
         <div className="flex items-center justify-between gap-2">
           <p className={cn("min-w-0 text-xs", readNote ? "text-warning" : "text-ink-secondary")}>
-            {readNote ?? (data.lines_sum_status === "mismatch" ? sumDirectionText(sumDirection(f.linesSum, f.net)) : checked ? "Linjesummen er kontrollert mot fakturaen." : "Linjesummen er ikke kontrollert mot fakturaen ennå.")}
+            {readNote ?? (docExcluded
+              ? (data.lines_sum_status === "mismatch" ? "Historisk sumvarsel – dokumentet er holdt utenfor råvarebehandling og krever ingen retting." : "Dokumentet er holdt utenfor råvarebehandling.")
+              : data.lines_sum_status === "mismatch" ? sumDirectionText(sumDirection(f.linesSum, f.net)) : checked ? "Linjesummen er kontrollert mot fakturaen." : "Linjesummen er ikke kontrollert mot fakturaen ennå.")}
           </p>
           {!expanded && (
             <CollapsibleTrigger className="flex shrink-0 items-center gap-1 rounded-sm text-caption text-ink-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">

@@ -60,8 +60,10 @@ interface Props {
   /** Holdt-tilbake-status for valgt linjes prisobservasjon (null = ukjent). */
   /** Serverens prisstatus for valgt linje (ukjent uten). */
   gate?: PriceGate | null;
-  /** Linjen/dokumentet er holdt utenfor råvarebehandling: ikke prisgrunnlag, sumvarsel er bare historikk. */
-  heldOutside?: boolean;
+  /** Valgt linje er holdt utenfor (selv eller via dokumentet): ikke prisgrunnlag. */
+  lineHeldOutside?: boolean;
+  /** HELE dokumentet er holdt utenfor: sumvarselet er bare historikk. Aldri sant for én utelatt linje. */
+  documentHeldOutside?: boolean;
 }
 
 function num(v: number | null | undefined): number | null {
@@ -70,7 +72,7 @@ function num(v: number | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export function InvoiceDocumentPanel({ invoiceId, invoice, line, onClose, className, showSumWarning, gate: gateIn, heldOutside }: Props) {
+export function InvoiceDocumentPanel({ invoiceId, invoice, line, onClose, className, showSumWarning, gate: gateIn, lineHeldOutside, documentHeldOutside }: Props) {
   // Gjeldende identitet hentes fersk; uten den vises aldri bufret (mulig gammel) original.
   const ver = useInvoiceDocumentVersion(invoice?.source_document_url ? invoiceId : null);
   // Alt (sti, signering, åpne-knapp, visning) kommer BARE fra identitet bekreftet i denne epoken.
@@ -110,7 +112,7 @@ export function InvoiceDocumentPanel({ invoiceId, invoice, line, onClose, classN
         <div className="flex gap-2 border-b border-line-subtle bg-warning/10 p-2.5 text-xs text-warning">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
-            Linjene summerer seg til {formatMoney(fig.linesSum, cur)}, fakturaen er på {fig.net == null ? "ukjent beløp (mva mangler)" : `${formatMoney(fig.net, cur)} eks. mva`}. {heldOutside ? "Historisk sumvarsel – dokumentet er holdt utenfor og krever ingen retting." : "Sjekk om en linje mangler eller er lest feil."}
+            Linjene summerer seg til {formatMoney(fig.linesSum, cur)}, fakturaen er på {fig.net == null ? "ukjent beløp (mva mangler)" : `${formatMoney(fig.net, cur)} eks. mva`}. {documentHeldOutside ? "Historisk sumvarsel – dokumentet er holdt utenfor og krever ingen retting." : "Sjekk om en linje mangler eller er lest feil."}
           </span>
         </div>
       )}
@@ -125,7 +127,7 @@ export function InvoiceDocumentPanel({ invoiceId, invoice, line, onClose, classN
             <span>Sum {formatMoney(num(line.total_amount), cur)}</span>
             {line.matched_name && <span>→ {line.matched_name}</span>}
           </div>
-          {heldOutside ? (
+          {lineHeldOutside ? (
             <p className="mt-1 text-xs text-ink-secondary">Holdt utenfor råvarebehandling — ikke prisgrunnlag.</p>
           ) : <p className={cn("mt-1 text-xs", gate?.ok ? "text-ink-secondary" : "text-warning")}>
             {gate?.ok
