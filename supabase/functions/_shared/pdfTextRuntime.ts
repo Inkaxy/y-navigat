@@ -4,13 +4,15 @@
 import { getResolvedPDFJS } from "npm:unpdf@1.8.1";
 import { PDF_TEXT_LIMITS, readPdfText, type ExtractFn, type PdfTextLimits, type PdfTextResult } from "./pdfText.ts";
 
-interface TextItemLike { str?: unknown; hasEOL?: unknown }
-interface PageLike { getTextContent(): Promise<{ items: TextItemLike[] }>; cleanup?(): unknown }
+interface PageLike { getTextContent(): Promise<{ items: ReadonlyArray<object> }>; cleanup?(): unknown }
 interface DocLike { numPages: number; getPage(n: number): Promise<PageLike> }
 export interface LoadingTaskLike { promise: Promise<DocLike>; destroy(): Promise<void> | void }
 export type GetDocument = (bytes: Uint8Array) => LoadingTaskLike;
 
-const pageText = (items: TextItemLike[]) => items.map((i) => (typeof i.str === "string" ? i.str : "") + (i.hasEOL === true ? "\n" : "")).join("");
+const pageText = (items: ReadonlyArray<object>) => items.map((i) => {
+  const str = "str" in i && typeof i.str === "string" ? i.str : "";
+  return str + ("hasEOL" in i && i.hasEOL === true ? "\n" : "");
+}).join("");
 
 /** Bygger en avgrenset uttrekker over en pdf.js-lignende getDocument (injiserbar for test). */
 export function boundedExtract(getDocument: GetDocument): ExtractFn {
@@ -54,7 +56,8 @@ const unpdfGetDocument: GetDocument = (() => {
       if (cancelled) throw new Error("pdf_text_aborted");
       const t = pdfjs.getDocument({ data: bytes, isEvalSupported: false, useSystemFonts: true });
       inner = t;
-      return (await t.promise) as unknown as DocLike;
+      const doc: DocLike = await t.promise;
+      return doc;
     })();
     return { promise, destroy: async () => { cancelled = true; if (inner) await inner.destroy(); } };
   };
