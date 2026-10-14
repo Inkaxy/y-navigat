@@ -60,12 +60,17 @@ export function VarekortPanel({ supplierId, itemKey, onDone, onNext, onSkip, onC
   const [fresh, setFresh] = useState<FreshStatus | null>(null);
   const verifyGen = useRef(0);
   /** Hent faktisk serverstatus etter lagring; kortet regnes ferdig (og arbeidsflaten går videre) bare ved 0 åpne. */
+  // Kvitteringen er bundet til frosset leverandør+varenøkkel og montert generasjon; bytte/avmontering ignorerer svaret.
+  const ctxRef = useRef({ supplierId, itemKey });
+  useEffect(() => { ctxRef.current = { supplierId, itemKey }; verifyGen.current += 1; }, [supplierId, itemKey]);
+  useEffect(() => () => { verifyGen.current += 1; }, []);
   const verify = (r: PanelResult) => {
     const gen = ++verifyGen.current;
+    const ctx = { supplierId, itemKey };
     setFresh({ kind: "pending" });
-    void Promise.all([lines.refetch(), q.refetch()]).then(([lr]) => {
-      if (gen !== verifyGen.current) return;
-      const st = freshStatusFrom({ isError: lr.isError, data: lr.data });
+    void Promise.all([lines.refetch(), q.refetch()]).then(([lr, qr]) => {
+      if (gen !== verifyGen.current || ctxRef.current.supplierId !== ctx.supplierId || ctxRef.current.itemKey !== ctx.itemKey) return;
+      const st = freshStatusFrom({ item: { isError: qr.isError, data: qr.data }, lines: { isError: lr.isError, data: lr.data }, supplierId: ctx.supplierId, itemKey: ctx.itemKey });
       setFresh(st);
       if (cardFinished(st)) onDone?.(r);
     }, () => { if (gen === verifyGen.current) setFresh({ kind: "unknown" }); });
@@ -92,6 +97,7 @@ export function VarekortPanel({ supplierId, itemKey, onDone, onNext, onSkip, onC
                 </li>
               ))}
             </ul>
+            {!fresh.complete && <p className="text-caption text-ink-secondary">Ikke alle åpne linjer kunne listes her; varekortet viser resten.</p>}
             <Button size="sm" className="min-h-[44px]" onClick={continueCard}>Fortsett med varekortet</Button>
           </div>
         )}
