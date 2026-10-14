@@ -52,7 +52,11 @@ export function applyOriginalGate(
     return {
       suggestion: {
         ...v, decision: "unclear", raw_material_id: null, draft: null, package_size: null, package_unit: null, count_per_package: null,
-        rejected: [...v.rejected, "Fant ikke én entydig rad for linjen i originalen – ingen vare foreslått."],
+        // Ingen entydig rad: ingenting kan presenteres som lest — verken faktura-/registrert bevis eller prisgrunnlag.
+        price_basis: "ukjent",
+        evidence: v.evidence.filter((e) => e.source === "kjent_vare" || e.source === "korrigering"),
+        missing: v.missing.filter((m) => !/prisgrunnlag/i.test(m)),
+        rejected: [...v.rejected, "Fant ikke én entydig rad for linjen i originalen – ingen vare, pakning, bevis eller prisgrunnlag brukt."],
       },
       source: { status: mode === "tekst" ? "original_tekst" : "original_pdf", documentVersion: version, originalReason: null, page: textRow?.page ?? null, originalRow: textRow?.row ?? null, differences: [] },
     };

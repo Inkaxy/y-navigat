@@ -343,6 +343,7 @@ export function validateLineSuggestion(raw: unknown, c: SuggestContext): Validat
   const packageUnit = pkg.unit && (PACKAGE_UNITS as readonly string[]).includes(pkg.unit) ? pkg.unit : null;
 
   let draft: ValidatedDraft | null = null;
+  let draftSku: string | null = null;
   if (decision === "new_draft" && isRec(o.draft)) {
     const name = strOrNull(o.draft.name, 120);
     if (name) {
@@ -356,7 +357,7 @@ export function validateLineSuggestion(raw: unknown, c: SuggestContext): Validat
       const skuOk = !regSku || om === "ingen"
         || (om === "tekst" ? (c.original?.by === "sku" || skuInRow(verifiedRow, regSku)) : (differences.length === 0 && skuInRow(modelRow, regSku)));
       if (regSku && !skuOk) rejected.push(`Varenummeret «${regSku}» på registrert linje er ikke bekreftet i originalraden; utkastet får ikke varenummer.`);
-      var draftSku: string | null = skuOk ? regSku : null;
+      draftSku = skuOk ? regSku : null;
       draft = {
         name,
         item_type: oneOf(o.draft.item_type, ITEM_TYPES) ?? (lineClass === "emballasje" ? "emballasje" : lineClass === "handelsvare" ? "videresalg" : "ravare"),

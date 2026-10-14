@@ -181,6 +181,7 @@ Deno.serve(async (req) => {
     const orig = await fetchVerifiedOriginal(supabaseOriginalDeps(userClient, admin, invoice.id, PDF_TEXT_LIMITS.maxBytes));
     let mode: "tekst" | "pdf" | "ingen" = "ingen";
     let textRow: { page: number; row: string } | null = null;
+    let textBy: "sku" | "beskrivelse" | null = null;
     let pdfBase64: string | undefined;
     let originalText = "Original: IKKE tilgjengelig. Forslaget bygger bare på den registrerte linjen. original_row_found=null.";
     if (orig.status === "ok" && orig.bytes) {
@@ -191,6 +192,7 @@ Deno.serve(async (req) => {
       if (hit.page != null) {
         mode = "tekst";
         textRow = { page: hit.page, row: hit.row };
+        textBy = hit.by;
         originalText = `Original-PDF er vedlagt. ${identity}\nEntydig rad i tekstlaget (DATA, side ${hit.page}): ${JSON.stringify(hit.row)}`;
       } else {
         mode = "pdf";
@@ -240,7 +242,7 @@ Deno.serve(async (req) => {
     // AI-feil skal aldri stoppe arbeidet — brukeren fortsetter manuelt.
     if (reason) return json({ suggestion: null, reason, source_status: mode === "ingen" ? "registrert_linje" : mode === "tekst" ? "original_tekst" : "original_pdf", document_version: orig.status === "ok" ? orig.version : null });
 
-    const gated = applyOriginalGate(validateLineSuggestion(parsed, ctx), parsed, mode, textRow, orig.status === "ok" ? orig.version : null, unavailable);
+    const gated = applyOriginalGate(validateLineSuggestion(parsed, { ...ctx, original: { mode, row: textRow?.row ?? null, by: textBy } }), parsed, mode, textRow, orig.status === "ok" ? orig.version : null, unavailable);
     const src = gated.source;
     return json({
       suggestion: {
