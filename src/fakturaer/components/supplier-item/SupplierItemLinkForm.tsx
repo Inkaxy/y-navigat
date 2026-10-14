@@ -85,7 +85,12 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
   useEffect(() => {
     const inf = inference.data;
     if (!inf || inf.direct) return;
-    if (!touched.bupp) setSpec((v) => ({ ...v, size: inf.suggested_bupp != null ? String(inf.suggested_bupp).replace(".", ",") : "", contentUnit: baseUnit ?? "" }));
+    // Innholdet vises i trykt enhet (100 g) når varenavnet gir samme faktor; ellers i grunnenhet.
+    const d = inf.description;
+    const printed = d && d.size != null && d.unit && d.count == null && inf.suggested_bupp != null && d.bupp != null && Math.abs(d.bupp - inf.suggested_bupp) < 1e-9;
+    if (!touched.bupp) setSpec((v) => printed && d
+      ? { ...v, size: String(d.size).replace(".", ","), contentUnit: String(d.unit) }
+      : { ...v, size: inf.suggested_bupp != null ? String(inf.suggested_bupp).replace(".", ",") : "", contentUnit: baseUnit ?? "" });
     if (!touched.confirm) setConfirm(inf.source === "regnestykke_og_varenavn" || inf.source === "bekreftet_pakning");
   }, [inference.data, touched.bupp, touched.confirm]);
   // Innholdsenhet følger grunnenheten til brukeren selv velger.

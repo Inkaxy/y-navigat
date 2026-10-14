@@ -155,7 +155,7 @@ const onDone = vi.fn();
 vi.mock("@/hooks/useCompany", () => ({ useCompany: () => ({ data: { id: "c1" } }) }));
 vi.mock("@/fakturaer/hooks/useInvoiceRights", () => ({ useInvoiceRights: () => ({ canWrite: true }) }));
 vi.mock("@/fakturaer/hooks/useSupplierItems", () => ({
-  useSupplierItems: () => ({ data: { items: [item] }, isLoading: false, isError: false, error: null, refetch: async () => ({ data: { items: [item] }, isError: false }) }),
+  useSupplierItems: () => ({ data: { items: [item] }, isLoading: false, isError: false, error: null, refetch: async () => ({ data: { items: [{ ...item, open_lines: linesNow.filter((l) => l.requires_review).length }] }, isError: false }) }),
   useSupplierItemLines: () => ({ data: linesNow, isLoading: false, isError: false, error: null,
     refetch: async () => { await new Promise((r) => setTimeout(r, 5)); return { data: linesNow, isError: false }; } }),
   usePackageInference: (id: string | null, b: string | null) => ({ data: id && b ? inference : undefined, isFetching: false }),
@@ -196,7 +196,7 @@ describe("varekort: pakning lagret → fersk serverstatus → kortet blir ståen
     expect(size.value).toBe("0,1");
     fireEvent.click(screen.getByRole("button", { name: /Koble og regn om/ }));
     await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
-    expect(mutateAsync.mock.calls[0][0].package).toMatchObject({ base_units_per_package: 0.1, package_unit: "pose" });
+    expect(mutateAsync.mock.calls[0][0].package).toEqual({ package_size: 100, package_unit: "g", base_units_per_package: 0.1, confirm: expect.any(Boolean) });
     expect(await screen.findByText(/1 linje gjenstår på 1 faktura/)).toBeTruthy();
     expect(onDone).not.toHaveBeenCalled();
     expect(screen.getByRole("link", { name: "Faktura 1540001" }).getAttribute("href")).toBe("/ravarer/priskontroll/faktura/i2?linje=l2");

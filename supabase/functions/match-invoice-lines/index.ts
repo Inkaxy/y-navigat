@@ -272,6 +272,15 @@ Deno.serve(async (req) => {
         .in("raw_material_supplier_id", rmsIds).is("superseded_at", null)) ?? [];
     }
     const skuNormSql = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    /** Samme innhold uavhengig av skrivemåte: 100 g = 0,1 kg, 500 ml = 0,5 l; ellers lik enhet. */
+    const stdContent = (n: number, u: string): [number, string] => {
+      const k = u.trim().toLowerCase();
+      return k === "kg" ? [n * 1000, "g"] : k === "l" ? [n * 1000, "ml"] : [n, k];
+    };
+    function sameContent(a: number, au: string, b: number, bu: string): boolean {
+      const [x, xu] = stdContent(a, au); const [y, yu] = stdContent(b, bu);
+      return Number.isFinite(x) && Number.isFinite(y) && xu === yu && Math.abs(x - y) < 1e-9;
+    }
     /** Linjens egen dokumenterte pakning mot en bekreftet variant. Ukjent pakning gir aldri treff. */
     function withVariant(row: AnyRec | undefined, line: AnyRec): AnyRec | undefined {
       if (!row || line.package_size == null || !line.package_unit) return row;
@@ -280,8 +289,7 @@ Deno.serve(async (req) => {
       // Bare faktisk bekreftede varianter (confirmed_at satt) er grunnlag; ubekreftede gir aldri pakning.
       const hits = variants.filter((v) => v.raw_material_supplier_id === row.id && v.confirmed_at != null
         && (v.supplier_sku_norm === "" || v.supplier_sku_norm === sku)
-        && v.package_size != null && Number(v.package_size) === Number(line.package_size)
-        && String(v.package_unit ?? "").trim().toLowerCase() === unit
+        && v.package_size != null && sameContent(Number(v.package_size), String(v.package_unit ?? ""), Number(line.package_size), unit)
         // Fysisk beholder (pose/sekk) er eget felt: en variant lagret for annen beholder er ikke bevis.
         && (v.container_unit == null || String(v.container_unit).trim().toLowerCase() === String(line.unit ?? "").trim().toLowerCase()));
       const bupps = new Set(hits.map((h) => Number(h.base_units_per_package)));
