@@ -25,8 +25,15 @@ export function rowCause(it: WorkItem, plan: WorkItemPlanLines | undefined): { c
   return s ? { ...s, openLines: plan.openLines ?? it.open_lines } : fallback;
 }
 
-function MobileEffect({ it }: { it: WorkItem }) {
+/** Låst rad (kjent plan): planens årsak/handling gjelder; den generelle prishjelpeteksten («Fullfør kobling …») vises ikke. */
+export function rowEffect(it: WorkItem, rc: { readonly: boolean } | null) {
   const e = workEffect(it);
+  return rc?.readonly && e.kind !== "verified" ? null : e;
+}
+
+function MobileEffect({ it, rc }: { it: WorkItem; rc?: { readonly: boolean } }) {
+  const e = rowEffect(it, rc ?? null);
+  if (!e) return null;
   return (
     <p className={cn("text-xs sm:hidden", e.kind === "read" ? "text-warning" : "text-ink-secondary")}>
       {e.label}{e.kind === "verified" ? `: ${unsignedKr(e.value)}` : ""}
@@ -35,8 +42,9 @@ function MobileEffect({ it }: { it: WorkItem }) {
 }
 
 /** Kronevirkning: bare server-verifisert prisavvik vises som beløp. */
-export function EffectCell({ it }: { it: WorkItem }) {
-  const e = workEffect(it);
+export function EffectCell({ it, rc }: { it: WorkItem; rc?: { readonly: boolean } }) {
+  const e = rowEffect(it, rc ?? null);
+  if (!e) return <div className="hidden w-32 shrink-0 sm:block" />;
   return (
     <div className="hidden w-32 shrink-0 text-right sm:block" title={e.kind === "verified" ? undefined : e.detail}>
       <div className="text-caption text-ink-secondary">{e.label}</div>
@@ -73,7 +81,7 @@ type Props = {
 /** Kompakt stablet rad: navn over 1–2 linjer, leverandør/dato, årsak → handling én gang, prisvirkning egen linje. */
 function CompactRow({ it, rc }: { it: WorkItem; rc: ReturnType<typeof rowCause> }) {
   const meta = labelFor(WORK_KIND_LABELS, it.kind, "Oppgave");
-  const e = workEffect(it);
+  const e = rowEffect(it, rc);
   const sub = [it.supplier_name ?? "Ukjent leverandør", it.last_date ? formatDate(it.last_date) : null].filter(Boolean).join(" · ");
   return (
     <div className="min-w-0 flex-1 space-y-1">
@@ -81,7 +89,7 @@ function CompactRow({ it, rc }: { it: WorkItem; rc: ReturnType<typeof rowCause> 
       <p className="line-clamp-2 break-words text-sm font-medium text-foreground" title={it.title}>{it.title}</p>
       <p className="truncate text-caption text-ink-secondary" title={rowSubtitle(it)}>{sub}</p>
       <p className="text-caption" data-testid="row-plan"><span className="text-ink-secondary">{rc.cause}</span> <span className="font-medium text-primary">→ {rc.next}</span></p>
-      {e.kind !== "none" && (
+      {e && e.kind !== "none" && (
         <p className={`text-caption tabular-nums ${e.kind === "read" ? "text-warning" : "text-ink-secondary"}`}>
           {e.label}{e.kind === "verified" ? `: ${unsignedKr(e.value)}` : ""}
         </p>
@@ -148,9 +156,9 @@ export function WorkListView({ items, total, selectedKey, loading, fetchingMore,
                     <span className="font-medium text-primary">{rc.next} →</span>
                   </p>
                   <WorkRowPrice it={it} />
-                  <MobileEffect it={it} />
+                  <MobileEffect it={it} rc={rc} />
                 </div>
-                <EffectCell it={it} />
+                <EffectCell it={it} rc={rc} />
                 </>}
               </button>
             </li>
