@@ -274,7 +274,8 @@ describe("package_size = 1-fellen", () => {
   });
 
   it("ubekreftet «1 pose» forkastes — pose er en pakke-enhet", () => {
-    expect(normalizeUnit("pose")).toBe("sekk");
+    expect(normalizeUnit("pose")).toBe("pose");
+    expect(isPackageUnit("pose")).toBe(true);
     const r = resolveLineCost({
       quantity: 1,
       unit: "pose",
