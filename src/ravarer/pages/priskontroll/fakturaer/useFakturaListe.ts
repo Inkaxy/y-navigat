@@ -28,7 +28,7 @@ export type FakturaListe = {
  */
 export function useFakturaListe(a: Args): FakturaListe {
   const open = useInboxInvoices({ legalEntityId: a.legalEntityId, supplierId: null });
-  const server = a.visning === "avstemt" || a.visning === "alle";
+  const server = a.visning === "avstemt" || a.visning === "utenfor" || a.visning === "alle";
   const remote = useQuery({
     queryKey: ["fakturaer-liste", a.legalEntityId, a.visning, a.modus, a.filters, a.page, a.sort],
     enabled: server && !!a.legalEntityId,
@@ -90,7 +90,8 @@ async function fetchServerRows(a: Args, from: number, size: number): Promise<{ r
     q = q.eq("status", "reconciled");
     if (a.modus === "auto") q = q.eq("reconciled_mode", "auto");
     if (a.modus === "manuell") q = q.or("reconciled_mode.is.null,reconciled_mode.neq.auto");
-  } else if (f.status) q = q.eq("status", f.status);
+  } else if (a.visning === "utenfor") q = q.eq("status", "excluded");
+  else if (f.status) q = q.eq("status", f.status);
   if (f.leverandor) q = q.eq("supplier_id", f.leverandor);
   if (f.fra) q = q.gte("invoice_date", f.fra);
   if (f.til) q = q.lte("invoice_date", f.til);

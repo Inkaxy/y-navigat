@@ -39,7 +39,7 @@ export function FakturaerTab() {
   const filters = useMemo(() => parseFilters(sp), [sp]);
   const page = Math.max(1, Number(sp.get("side") ?? "1") || 1);
   const sort = useMemo(() => parseSort(sp), [sp]);
-  const serverMode = visning === "avstemt" || visning === "alle";
+  const serverMode = visning === "avstemt" || visning === "utenfor" || visning === "alle";
   const liste = useFakturaListe({ legalEntityId, visning, modus, filters, page, sort });
   const { data: summary } = useWorkSummary();
   const extras = useInvoiceDeliveryStatus(liste.rows.map((r) => r.id));
@@ -125,7 +125,7 @@ export function FakturaerTab() {
     <div className="space-y-3">
       <TripletexStatusCard />
       <div className="flex flex-wrap items-center gap-2">
-        <VisningChips visning={visning} modus={modus} counts={{ ...liste.openCounts, inv: summary?.invoices ?? null, alle: visning === "alle" ? liste.total : null }} onChange={(v, m) => update({ visning: v, modus: m })} />
+        <VisningChips visning={visning} modus={modus} counts={{ ...liste.openCounts, inv: summary?.invoices ?? null, alle: visning === "alle" ? liste.total : null, utenfor: visning === "utenfor" ? liste.total : null }} onChange={(v, m) => update({ visning: v, modus: m })} />
         {canWrite && visning !== "avstemt" && (
           <Button size="sm" variant="outline" className="ml-auto gap-1.5" disabled={rematch.isPending || targets.length === 0} onClick={() => queueRematch(targets)}>
             {rematch.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <RotateCw className="h-3.5 w-3.5" aria-hidden />}

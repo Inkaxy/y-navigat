@@ -9,6 +9,7 @@ export const INVOICE_STATUSES = [
   { value: "ready", label: "Klar for avstemming", tone: "info" },
   { value: "reconciled", label: "Avstemt", tone: "success" },
   { value: "flagged", label: "Flagget", tone: "danger" },
+  { value: "excluded", label: "Holdt utenfor råvarebehandling", tone: "muted" },
 ] as const;
 
 export const INVOICE_SOURCES = [
