@@ -384,7 +384,8 @@ export function LineTask(p: LineTaskProps) {
       </div>
 
       <footer className="sticky bottom-0 z-10 flex flex-col gap-2 rounded-b-xl border-t border-line-subtle bg-card px-4 py-3">
-        <p className="text-caption text-ink-secondary" id={`hint-${line.id}`}>{primary.hint}</p>
+        {/* Ferdig linje: «avklart»-teksten står allerede i toppen – ikke gjenta den her. */}
+        <p className={mode === "done" && status.key === "ready" && primary.hint === copy.missing ? "sr-only" : "text-caption text-ink-secondary"} id={`hint-${line.id}`}>{primary.hint}</p>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Button variant="ghost" size="sm" className="mr-auto gap-1.5" disabled={!line.invoice.source_document_url} onClick={() => p.onShowDocument(line)}>
             <FileText className="h-4 w-4" /> Originalfaktura
