@@ -32,7 +32,7 @@ export function useWorkItemPlans(keys: readonly { supplier_id: string; item_key:
     enabled: !!le && ks.length > 0,
     staleTime: 30_000,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("rm_work_item_plan_lines", { p_legal_entity_id: le!, p_keys: ks as unknown as Json });
+      const { data, error } = await supabase.rpc("rm_work_item_plan_lines", { p_legal_entity_id: le!, p_keys: ks.map((k): Json => ({ supplier_id: k.supplier_id, item_key: k.item_key })) });
       if (error) throw error;
       return parseWorkItemPlans(data);
     },
