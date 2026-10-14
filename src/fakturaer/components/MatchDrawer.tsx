@@ -48,6 +48,7 @@ export function MatchDrawer({ open, onOpenChange, line, onAcceptedNext }: Props)
     packageSize, setPackageSize, packageUnit, setPackageUnit, cost, linePricePerBaseUnit, busy,
     aiBusy, aiSuggestion, aiNotice, runAiSuggestion, applyAiSuggestion, aiApplied,
   } = form;
+  const aiRmName = useRawMaterialName(aiSuggestion?.rawMaterialId ?? null);
 
   async function performMatch(applyToAll: boolean, keepOpen = false) {
     if (!line || !selectedRmId) return;
