@@ -87,7 +87,7 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
     if (!inf || inf.direct) return;
     // Innholdet vises i trykt enhet (100 g) når varenavnet gir samme faktor; ellers i grunnenhet.
     const d = inf.description;
-    const printed = d && d.size != null && d.unit && d.count == null && inf.suggested_bupp != null && d.bupp != null && Math.abs(d.bupp - inf.suggested_bupp) < 1e-9;
+    const printed = d && d.size != null && d.unit && (d.count == null || d.count === 1) && inf.suggested_bupp != null && d.bupp != null && Math.abs(d.bupp - inf.suggested_bupp) < 1e-9;
     if (!touched.bupp) setSpec((v) => printed && d
       ? { ...v, size: String(d.size).replace(".", ","), contentUnit: String(d.unit) }
       : { ...v, size: inf.suggested_bupp != null ? String(inf.suggested_bupp).replace(".", ",") : "", contentUnit: baseUnit ?? "" });
