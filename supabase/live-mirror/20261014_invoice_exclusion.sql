@@ -1,3 +1,6 @@
+-- Speilet 14.10.2026 fra live pg_get_functiondef: _rm_line_exclusion_guard, rm_set_invoice_exclusion og
+-- rm_reopen_invoice_exclusion slik de stod etter denne migrasjonen + DEFAULT NULL-oppfølgingen, før
+-- 20261014_invoice_exclusion_compare_timestamp_instant.sql og 20261014_invoice_exclusion_line_approved_lock.sql.
 -- Varig «Hold utenfor råvarebehandling» for faktura/kreditnota og enkeltlinje.
 alter table public.invoices
   add column if not exists excluded_at timestamptz,
@@ -47,8 +50,12 @@ drop trigger if exists zzz_rm_invoice_exclusion_guard on public.invoices;
 create trigger zzz_rm_invoice_exclusion_guard before update on public.invoices
   for each row execute function public._rm_invoice_exclusion_guard();
 
-create or replace function public._rm_line_exclusion_guard()
-returns trigger language plpgsql security definer set search_path = public as $$
+CREATE OR REPLACE FUNCTION public._rm_line_exclusion_guard()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
 declare v_inv record;
 begin
   if coalesce(current_setting('rm.exclusion_write', true), '') = 'on' then
@@ -66,7 +73,7 @@ begin
     select status, excluded_at, excluded_by, exclusion_category, exclusion_reason into v_inv from invoices where id = new.invoice_id;
     if v_inv.status = 'excluded' then
       new.exclusion_prev := jsonb_build_object('raw_material_id', new.raw_material_id, 'match_confidence', new.match_confidence,
-        'requires_review', new.requires_review, 'review_reason', new.review_reason, 'inserted_while_excluded', true);
+        'requires_review', new.requires_review, 'review_reason', new.review_reason, 'inserted_while_excluded', true, 'via', 'invoice');
       new.excluded_raw_material_id := new.raw_material_id;
       new.excluded_at := v_inv.excluded_at; new.excluded_by := v_inv.excluded_by;
       new.exclusion_category := v_inv.exclusion_category; new.exclusion_reason := v_inv.exclusion_reason;
@@ -75,7 +82,6 @@ begin
     end if;
     return new;
   end if;
-  -- UPDATE
   if new.excluded_at is distinct from old.excluded_at or new.excluded_by is distinct from old.excluded_by
      or new.exclusion_category is distinct from old.exclusion_category or new.exclusion_reason is distinct from old.exclusion_reason
      or new.excluded_raw_material_id is distinct from old.excluded_raw_material_id or new.exclusion_prev is distinct from old.exclusion_prev then
@@ -96,7 +102,7 @@ begin
     new.expected_price_per_base_unit := old.expected_price_per_base_unit;
   end if;
   return new;
-end $$;
+end $function$;
 drop trigger if exists zzz_rm_line_exclusion_guard on public.invoice_lines;
 create trigger zzz_rm_line_exclusion_guard before insert or update or delete on public.invoice_lines
   for each row execute function public._rm_line_exclusion_guard();
@@ -116,10 +122,12 @@ returns text language sql stable security definer set search_path = public as $$
     else null end
 $$;
 
-create or replace function public.rm_set_invoice_exclusion(
-  p_invoice_id uuid, p_scope text, p_line_id uuid, p_category text, p_reason text,
-  p_expected_updated_at text, p_op_id uuid)
-returns jsonb language plpgsql security definer set search_path = public as $$
+CREATE OR REPLACE FUNCTION public.rm_set_invoice_exclusion(p_invoice_id uuid, p_scope text, p_line_id uuid DEFAULT NULL::uuid, p_category text DEFAULT NULL::text, p_reason text DEFAULT NULL::text, p_expected_updated_at text DEFAULT NULL::text, p_op_id uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
 declare
   v_uid uuid := auth.uid(); v_inv invoices%rowtype; v_line invoice_lines%rowtype;
   v_reason text := btrim(coalesce(p_reason, '')); v_now timestamptz := now();
@@ -176,7 +184,6 @@ begin
     return jsonb_build_object('ok', true, 'already', false, 'scope', 'invoice', 'invoice_id', v_inv.id, 'lines', v_n, 'updated_at', v_inv.updated_at::text);
   end if;
 
-  -- linje
   select * into v_line from invoice_lines where id = p_line_id and invoice_id = v_inv.id for update;
   if not found then return jsonb_build_object('ok', false, 'error', 'linje_finnes_ikke'); end if;
   if v_line.excluded_at is not null then
@@ -208,11 +215,14 @@ begin
     jsonb_build_object('scope', 'line', 'invoice_id', v_inv.id, 'category', p_category,
       'raw_material_id', v_line.excluded_raw_material_id, 'op_id', p_op_id), v_reason, 'ravarer');
   return jsonb_build_object('ok', true, 'already', false, 'scope', 'line', 'line_id', v_line.id, 'updated_at', v_line.updated_at::text);
-end $$;
+end $function$;
 
-create or replace function public.rm_reopen_invoice_exclusion(
-  p_invoice_id uuid, p_scope text, p_line_id uuid, p_expected_updated_at text, p_reason text)
-returns jsonb language plpgsql security definer set search_path = public as $$
+CREATE OR REPLACE FUNCTION public.rm_reopen_invoice_exclusion(p_invoice_id uuid, p_scope text, p_line_id uuid DEFAULT NULL::uuid, p_expected_updated_at text DEFAULT NULL::text, p_reason text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
 declare v_uid uuid := auth.uid(); v_inv invoices%rowtype; v_line invoice_lines%rowtype; v_n int := 0;
   v_reason text := btrim(coalesce(p_reason, ''));
 begin
@@ -222,17 +232,14 @@ begin
   if not found or not public.has_ravarer_invoice_access(v_inv.legal_entity_id, 'write') then
     raise exception 'ingen_tilgang' using errcode = '42501';
   end if;
-  perform set_config('rm.exclusion_write', 'on', true);
   if p_scope = 'invoice' then
     if v_inv.status <> 'excluded' then
-      perform set_config('rm.exclusion_write', '', true);
       return jsonb_build_object('ok', true, 'already', true, 'scope', 'invoice', 'updated_at', v_inv.updated_at::text);
     end if;
     if v_inv.updated_at::text is distinct from p_expected_updated_at then
-      perform set_config('rm.exclusion_write', '', true);
       return jsonb_build_object('ok', false, 'error', 'versjon_endret');
     end if;
-    -- Linjer utelatt via dokumentet åpnes; egne linjeutelatelser beholdes.
+    perform set_config('rm.exclusion_write', 'on', true);
     update invoice_lines set excluded_at = null, excluded_by = null, exclusion_category = null, exclusion_reason = null,
         exclusion_prev = null, excluded_raw_material_id = null, raw_material_id = null,
         match_confidence = case when exclusion_prev->>'match_confidence' = 'not_applicable' then 'not_applicable' else 'unmatched' end,
@@ -249,16 +256,15 @@ begin
     return jsonb_build_object('ok', true, 'already', false, 'scope', 'invoice', 'lines', v_n, 'updated_at', v_inv.updated_at::text);
   end if;
   select * into v_line from invoice_lines where id = p_line_id and invoice_id = v_inv.id for update;
-  if not found then perform set_config('rm.exclusion_write', '', true); return jsonb_build_object('ok', false, 'error', 'linje_finnes_ikke'); end if;
+  if not found then return jsonb_build_object('ok', false, 'error', 'linje_finnes_ikke'); end if;
   if v_line.excluded_at is null then
-    perform set_config('rm.exclusion_write', '', true);
     return jsonb_build_object('ok', true, 'already', true, 'scope', 'line', 'updated_at', v_line.updated_at::text);
   end if;
-  if v_inv.status = 'excluded' then perform set_config('rm.exclusion_write', '', true); return jsonb_build_object('ok', false, 'error', 'faktura_holdt_utenfor'); end if;
+  if v_inv.status = 'excluded' then return jsonb_build_object('ok', false, 'error', 'faktura_holdt_utenfor'); end if;
   if v_line.updated_at::text is distinct from p_expected_updated_at then
-    perform set_config('rm.exclusion_write', '', true);
     return jsonb_build_object('ok', false, 'error', 'versjon_endret');
   end if;
+  perform set_config('rm.exclusion_write', 'on', true);
   update invoice_lines set excluded_at = null, excluded_by = null, exclusion_category = null, exclusion_reason = null,
       exclusion_prev = null, excluded_raw_material_id = null, raw_material_id = null,
       match_confidence = 'unmatched', requires_review = true, review_reason = 'reopened_exclusion'
@@ -268,7 +274,7 @@ begin
   values (v_uid, 'invoice_line.exclusion_reopened', 'invoice_lines', v_line.id, v_inv.legal_entity_id,
     jsonb_build_object('scope', 'line', 'invoice_id', v_inv.id), nullif(v_reason, ''), 'ravarer');
   return jsonb_build_object('ok', true, 'already', false, 'scope', 'line', 'updated_at', v_line.updated_at::text);
-end $$;
+end $function$;
 
 revoke all on function public.rm_set_invoice_exclusion(uuid, text, uuid, text, text, text, uuid) from public, anon;
 revoke all on function public.rm_reopen_invoice_exclusion(uuid, text, uuid, text, text) from public, anon;
