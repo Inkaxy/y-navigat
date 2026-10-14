@@ -21,6 +21,7 @@ import { encodeBase64 } from "jsr:@std/encoding@1/base64";
 import { fetchVerifiedOriginal, supabaseOriginalDeps } from "../_shared/invoiceOriginal.ts";
 import { alignLineRow, PDF_TEXT_LIMITS } from "../_shared/pdfText.ts";
 import { readOriginalPdfText } from "../_shared/pdfTextRuntime.ts";
+import { aiTimeoutFor } from "../_shared/suggestTimeouts.ts";
 import { applyOriginalGate, type OriginalUnavailable } from "../_shared/lineSuggestionSource.ts";
 
 const corsHeaders = {
@@ -38,6 +39,7 @@ const numOrNull = (v: unknown): number | null => (typeof v === "number" && Numbe
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const startedAt = Date.now();
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -206,7 +208,10 @@ Deno.serve(async (req) => {
     let usage = { in: null as number | null, out: null as number | null };
     let errorMessage: string | null = null;
     let reason: string | null = null;
+    const aiTimeout = aiTimeoutFor(startedAt, Date.now(), !!pdfBase64);
     try {
+      // Budsjettet er brukt opp av original/tekstlag: ikke start et kall klienten ikke venter på.
+      if (aiTimeout == null) throw new AiCallError("timeout", "Serverbudsjettet for linjeforslag er brukt opp");
       const result = await callAi({
         provider: cfg.provider as AiProvider,
         apiKey,
@@ -217,7 +222,7 @@ Deno.serve(async (req) => {
         userText: `${buildSuggestUserText(ctx)}\n\n${originalText}`,
         pdfBase64,
         jsonSchema: cfg.provider === "anthropic" ? undefined : { name: "invoice_line_suggestion", schema: LINE_SUGGESTION_SCHEMA },
-        timeoutMs: pdfBase64 ? 90_000 : 45_000,
+        timeoutMs: aiTimeout,
         azureEndpoint: cfg.azure_endpoint ?? undefined,
         azureDeployment: cfg.azure_deployment ?? undefined,
       });

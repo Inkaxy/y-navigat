@@ -19,7 +19,9 @@ export interface AiDraft {
   baseUnit: "kg" | "l" | "stk" | null;
   supplierSku: string | null;
 }
-export interface AiEvidence { field: string; value: string; source: "faktura" | "kjent_vare" | "korrigering" | "forslag" }
+/** Speiler SUGGEST_CLIENT_TIMEOUT_MS i supabase/functions/_shared/suggestTimeouts.ts (lengre enn serverbudsjettet). */
+export const SUGGEST_CLIENT_TIMEOUT_MS = 115_000;
+export interface AiEvidence { field: string; value: string; source: "faktura" | "registrert_linje" | "kjent_vare" | "korrigering" | "forslag" }
 
 export interface AiLineSuggestion {
   decision: AiDecision;
@@ -126,7 +128,7 @@ export function parseAiSuggestion(raw: unknown): AiLineSuggestion | null {
     evidence: Array.isArray(raw.evidence)
       ? raw.evidence.filter(isRec).map((e) => ({
           field: str(e.field) ?? "", value: str(e.value) ?? "",
-          source: oneOf(e.source, ["faktura", "kjent_vare", "korrigering", "forslag"] as const, "forslag"),
+          source: oneOf(e.source, ["faktura", "registrert_linje", "kjent_vare", "korrigering", "forslag"] as const, "forslag"),
         })).filter((e) => e.field && e.value)
       : [],
     explanation: str(raw.explanation),
@@ -160,7 +162,7 @@ export async function fetchAiLineSuggestion(args: {
   candidateIds?: string[];
   timeoutMs?: number;
 }): Promise<AiLineSuggestionResult> {
-  const timeoutMs = args.timeoutMs ?? 60_000;
+  const timeoutMs = args.timeoutMs ?? SUGGEST_CLIENT_TIMEOUT_MS;
   let timer: ReturnType<typeof setTimeout> | null = null;
   const timeout = new Promise<AiLineSuggestionResult>((resolve) => {
     timer = setTimeout(() => resolve({ suggestion: null, reason: "tidsavbrudd" }), timeoutMs);
