@@ -19015,6 +19015,16 @@ export type Database = {
         Args: { p_raw_material_id: string }
         Returns: Json
       }
+      rm_model_eval_reserve: {
+        Args: {
+          p_dedup_seconds: number
+          p_invoice_id: string
+          p_legal_entity_id: string
+          p_max_per_day: number
+          p_model: string
+        }
+        Returns: Json
+      }
       rm_move_legacy_agreed_price: {
         Args: {
           p_raw_material_id: string
