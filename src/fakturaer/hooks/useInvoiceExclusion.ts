@@ -2,7 +2,10 @@ import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { invalidateInvoice } from "@/ravarer/lib/invalidate";
+import type { Json } from "@/integrations/supabase/types";
 import { parseExclusionResult, type ExclusionCategory, type ExclusionResult, type ExclusionScope } from "@/fakturaer/lib/invoiceExclusion";
+
+const isJson = (v: unknown): v is Json => v === null || typeof v === "object" || typeof v === "string" || typeof v === "number" || typeof v === "boolean";
 
 export type ExcludeInput = {
   invoiceId: string; scope: ExclusionScope; lineId: string | null;
@@ -30,7 +33,7 @@ export function useInvoiceExclusion() {
     try {
       const { data, error } = await call();
       if (error) return error.code === "42501" ? { kind: "denied" } : { kind: "unknown" };
-      const r = parseExclusionResult(data as never);
+      const r = parseExclusionResult(isJson(data) ? data : null);
       if (r.kind === "ok") after(invoiceId);
       return r;
     } catch {
@@ -38,12 +41,12 @@ export function useInvoiceExclusion() {
     } finally { lock.current = false; setBusy(false); }
   }
   const exclude = (i: ExcludeInput) => run(i.invoiceId, () => supabase.rpc("rm_set_invoice_exclusion", {
-    p_invoice_id: i.invoiceId, p_scope: i.scope, p_line_id: i.lineId ?? undefined as unknown as string,
+    p_invoice_id: i.invoiceId, p_scope: i.scope, p_line_id: i.lineId ?? undefined,
     p_category: i.category, p_reason: i.reason.trim(), p_expected_updated_at: i.expectedUpdatedAt, p_op_id: i.opId,
   }));
   const reopen = (i: ReopenInput) => run(i.invoiceId, () => supabase.rpc("rm_reopen_invoice_exclusion", {
-    p_invoice_id: i.invoiceId, p_scope: i.scope, p_line_id: i.lineId ?? undefined as unknown as string,
-    p_expected_updated_at: i.expectedUpdatedAt, p_reason: undefined as unknown as string,
+    p_invoice_id: i.invoiceId, p_scope: i.scope, p_line_id: i.lineId ?? undefined,
+    p_expected_updated_at: i.expectedUpdatedAt,
   }));
   return { exclude, reopen, busy };
 }
