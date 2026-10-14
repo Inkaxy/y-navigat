@@ -2,10 +2,13 @@
 // Samme prompt, samme schema og samme kontrollfakta for alle modeller.
 
 import { checkSum, type ExtractedLine } from "./invoiceExtraction.ts";
+import { isCatalogModel } from "./aiModelCatalog.ts";
 
 /** Server-allowlist. Ingen andre modeller kan kjøres fra evalen. */
-export const EVAL_MODELS = ["gpt-4o", "gpt-6.1-sol", "gpt-6-luna"] as const;
-export type EvalModel = (typeof EVAL_MODELS)[number];
+/** De tre sammenligningsvalgene; hver må finnes i felles modellkatalog for OpenAI. */
+const EVAL_MODEL_IDS = ["gpt-4o", "gpt-6.1-sol", "gpt-6-luna"] as const;
+export type EvalModel = (typeof EVAL_MODEL_IDS)[number];
+export const EVAL_MODELS: readonly EvalModel[] = EVAL_MODEL_IDS.filter((m) => isCatalogModel("openai", m));
 export const isEvalModel = (v: unknown): v is EvalModel => typeof v === "string" && (EVAL_MODELS as readonly string[]).includes(v);
 
 export const EVAL_LIMITS = {
@@ -21,7 +24,9 @@ export const EVAL_LIMITS = {
 const n = (t: string) => ({ anyOf: [{ type: t }, { type: "null" }] });
 
 /** Versjon av schemaet. Følger hvert evalresultat slik at «nytt schema» ikke blandes med «ny modell». */
-export const INVOICE_EXTRACTION_SCHEMA_VERSION = "strict-v2-2026-10-14";
+/** Pipeline: versjonsbundet original med frist + side-/tegnbegrenset tekstlag. */
+export const EVAL_PIPELINE_VERSION = "eval-pipeline-v2-2026-10-14";
+export const INVOICE_EXTRACTION_SCHEMA_VERSION = "strict-v3-2026-10-14-raw-discount";
 const TOP_FIELDS = ["supplier_name", "supplier_org_number", "invoice_number", "invoice_date", "due_date", "total_amount", "total_excl_vat", "total_vat", "currency", "kid_number", "account_number"] as const;
 
 /**
