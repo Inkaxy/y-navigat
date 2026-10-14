@@ -158,10 +158,13 @@ export function ArbeidsbordView(p: ArbeidsbordViewProps) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      {/* Varekortet eier egen overskrift, status og plan – ikke gjenta dem her. */}
+      {sel.type !== "varekort" && <>
       <p className="text-caption text-ink-secondary">{sel.supplier_name ?? "Ukjent leverandør"}</p>
       <h2 className="font-serif text-lg leading-tight">{sel.title}</h2>
       {/* Hovedårsaken vises én gang; panelet under har selve handlingen. */}
       <p className="text-sm" data-testid="detail-cause"><span className="font-medium">{detailCause(sel).cause}</span><span className="text-ink-secondary"> · Neste: {detailCause(sel).next}</span></p>
+      </>}
     </header>
   );
 
