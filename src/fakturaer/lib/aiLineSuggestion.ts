@@ -42,7 +42,7 @@ export interface AiLineSuggestion {
 
 export type AiSuggestionReason =
   | "ingen_kandidater" | "for_lite_tekst" | "ingen_ai_konfigurasjon" | "ai_feilet" | "tidsavbrudd"
-  | "ai_avslo" | "ai_ufullstendig" | "modell_utilgjengelig";
+  | "ai_avslo" | "ai_ufullstendig" | "modell_utilgjengelig" | "holdt_utenfor" | "ikke_vare";
 
 export interface AiLineSuggestionResult {
   suggestion: AiLineSuggestion | null;
@@ -58,6 +58,8 @@ export const AI_REASON_LABELS: Record<AiSuggestionReason, string> = {
   ai_avslo: "AI-hjelpen avslo å svare på denne linjen. Fortsett manuelt.",
   ai_ufullstendig: "AI-svaret ble ufullstendig og er ikke brukt. Fortsett manuelt.",
   modell_utilgjengelig: "AI-modellen er ikke tilgjengelig. Fortsett manuelt.",
+  holdt_utenfor: "Linjen er holdt utenfor råvarebehandling. Det gis ikke vareforslag.",
+  ikke_vare: "Linjen er allerede registrert som ikke-vare (frakt, pant, gebyr, rabatt e.l.). Det gis ikke vareforslag.",
 };
 
 export const LINE_CLASS_LABELS: Record<AiLineClass, string> = {
@@ -171,7 +173,10 @@ export function planAiApply(
     if (!form.selectedRmId || form.selectedRmId === s.rawMaterialId) rawMaterialId = s.rawMaterialId;
     else kept.push("valgt vare");
   }
-  const sameMaterial = rawMaterialId != null || (!s.rawMaterialId && !!form.selectedRmId);
+  // Pakningsfeltene gjelder bare forslagets egen eksisterende vare — aldri en annen manuelt valgt vare,
+  // og aldri et utkast til ny vare (det fylles bare i «Ny råvare»-skjemaet).
+  const sameMaterial = s.decision === "existing" && rawMaterialId != null;
+  if (!sameMaterial && (s.packageSize != null || s.packageUnit) && form.selectedRmId && form.selectedRmId !== s.rawMaterialId) kept.push("pakning (gjelder ikke valgt vare)");
   let packageSize: string | null = null;
   let packageUnit: string | null = null;
   // Pakningen fylles bare inn når varen er forslagets og brukeren ikke har rørt feltene.
