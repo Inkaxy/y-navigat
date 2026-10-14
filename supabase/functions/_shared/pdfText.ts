@@ -15,20 +15,13 @@ export interface PdfTextResult {
   truncated: boolean;
 }
 
-type ExtractFn = (bytes: Uint8Array) => Promise<{ totalPages: number; text: string[] }>;
-
-/** Standard uttrekker: pinned unpdf, kopi av bytene (pdf.js kan overta bufferen). */
-export const unpdfExtract: ExtractFn = async (bytes) => {
-  const { extractText } = await import("npm:unpdf@1.8.1");
-  const r = await extractText(new Uint8Array(bytes), { mergePages: false });
-  return { totalPages: r.totalPages, text: Array.isArray(r.text) ? r.text : [String(r.text)] };
-};
+export type ExtractFn = (bytes: Uint8Array) => Promise<{ totalPages: number; text: string[] }>;
 
 const empty = (status: PdfTextStatus, totalPages: number | null = null): PdfTextResult => ({ status, pages: [], totalPages, pagesRead: 0, chars: 0, truncated: false });
 
-export async function readPdfText(bytes: Uint8Array, extract: ExtractFn = unpdfExtract, limits: PdfTextLimits = PDF_TEXT_LIMITS): Promise<PdfTextResult> {
+export async function readPdfText(bytes: Uint8Array, extract: ExtractFn, limits: PdfTextLimits = PDF_TEXT_LIMITS): Promise<PdfTextResult> {
   if (bytes.byteLength > limits.maxBytes) return empty("for_stor");
-  let timer: number | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const r = await Promise.race([
       extract(bytes),

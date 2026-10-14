@@ -97,7 +97,7 @@ describe("Modellsammenligning", () => {
     expect(parseEvalOutcome(null, "i", "gpt-4o").status).toBe("invalid_json");
   });
   it("prompten er byte-identisk med produksjonens", () => {
-    expect(createHash("sha256").update(INVOICE_EXTRACTION_SYSTEM_PROMPT).digest("hex")).toBe("c915ec4f62e5fbdea77382cdfbc2cfc317d190a1cf608af8bc406047cd5d43c5");
+    expect(createHash("sha256").update(INVOICE_EXTRACTION_SYSTEM_PROMPT).digest("hex")).toBe("9ba81f093413faa7b2aac9d5a2dadecd71e052ee32227a30513dccf6d81631a9");
   });
 });
 

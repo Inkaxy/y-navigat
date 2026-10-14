@@ -1,5 +1,6 @@
 import { assertEquals } from "jsr:@std/assert@1";
 import { alignLineRow, readPdfText } from "../_shared/pdfText.ts";
+import { unpdfExtract } from "../_shared/pdfTextRuntime.ts";
 import { fetchVerifiedOriginal } from "../_shared/invoiceOriginal.ts";
 
 /** Minimal PDF med to tekstrader (syntetisk, ingen ekte faktura). */
@@ -23,7 +24,7 @@ function tinyPdf(lines: string[]): Uint8Array {
 
 Deno.test("unpdf leser tekstlag i Deno-runtime og finner fullt varenummer", async () => {
   const pdf = tinyPdf(["5301 0 HASSELNOTTER HELE 10 kg 113,00 1130,00", "6541 1 TRANEBAER 11,34 kg 86,00 975,24", "Sum varer 2105,24 og flere ord her"]);
-  const r = await readPdfText(pdf, undefined, { maxBytes: 1e6, maxPages: 5, maxChars: 10000, timeoutMs: 8000, minCharsPerPage: 10 });
+  const r = await readPdfText(pdf, unpdfExtract, { maxBytes: 1e6, maxPages: 5, maxChars: 10000, timeoutMs: 8000, minCharsPerPage: 10 });
   assertEquals(r.status, "ok");
   const hit = alignLineRow(r, "5301 0", "Hasselnøtter");
   assertEquals(hit.by, "sku");
@@ -37,7 +38,7 @@ Deno.test("tidsavbrudd og feil gir fallback, aldri ok", async () => {
   assertEquals(r.status, "tidsavbrudd");
   const bad = await readPdfText(new Uint8Array(10), () => Promise.reject(new Error("x")));
   assertEquals(bad.status, "feil");
-  assertEquals((await readPdfText(new Uint8Array(200), undefined, { maxBytes: 100, maxPages: 1, maxChars: 1, timeoutMs: 1, minCharsPerPage: 1 })).status, "for_stor");
+  assertEquals((await readPdfText(new Uint8Array(200), unpdfExtract, { maxBytes: 100, maxPages: 1, maxChars: 1, timeoutMs: 1, minCharsPerPage: 1 })).status, "for_stor");
 });
 
 Deno.test("original: endret versjon etter nedlasting avvises", async () => {

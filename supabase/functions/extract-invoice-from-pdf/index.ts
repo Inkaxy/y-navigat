@@ -23,7 +23,8 @@ import {
 } from "../_shared/invoiceExtraction.ts";
 import { INVOICE_EXTRACTION_SYSTEM_PROMPT } from "../_shared/invoiceExtractionPrompt.ts";
 import { decodeBase64 } from "jsr:@std/encoding@1/base64";
-import { formatPdfTextForModel, PDF_TEXT_LIMITS, pdfTextProfile, readPdfText, type PdfTextResult } from "../_shared/pdfText.ts";
+import { formatPdfTextForModel, PDF_TEXT_LIMITS, pdfTextProfile, type PdfTextResult } from "../_shared/pdfText.ts";
+import { readOriginalPdfText } from "../_shared/pdfTextRuntime.ts";
 import { annotateSkuTextCheck } from "../_shared/invoiceExtraction.ts";
 
 const corsHeaders = {
@@ -177,7 +178,7 @@ Deno.serve(async (req) => {
     if (pdf_base64) {
       try {
         const bytes = decodeBase64(pdf_base64);
-        pdfText = bytes.byteLength <= PDF_TEXT_LIMITS.maxBytes ? await readPdfText(bytes) : null;
+        pdfText = bytes.byteLength <= PDF_TEXT_LIMITS.maxBytes ? await readOriginalPdfText(bytes) : null;
       } catch { pdfText = null; }
       if (pdfText && pdfText.status !== "ok") warnings.push("PDF-en har ikke brukbart tekstlag – lest bare visuelt");
     }

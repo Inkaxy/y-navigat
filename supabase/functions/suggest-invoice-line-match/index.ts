@@ -19,7 +19,8 @@ import {
 } from "../_shared/lineSuggestion.ts";
 import { encodeBase64 } from "jsr:@std/encoding@1/base64";
 import { fetchVerifiedOriginal, supabaseOriginalDeps } from "../_shared/invoiceOriginal.ts";
-import { alignLineRow, PDF_TEXT_LIMITS, readPdfText } from "../_shared/pdfText.ts";
+import { alignLineRow, PDF_TEXT_LIMITS,  } from "../_shared/pdfText.ts";
+import { readOriginalPdfText } from "../_shared/pdfTextRuntime.ts";
 import { applyOriginalGate, type OriginalUnavailable } from "../_shared/lineSuggestionSource.ts";
 
 const corsHeaders = {
@@ -183,7 +184,7 @@ Deno.serve(async (req) => {
     let pdfBase64: string | undefined;
     let originalText = "Original: IKKE tilgjengelig. Forslaget bygger bare på den registrerte linjen. original_row_found=null.";
     if (orig.status === "ok" && orig.bytes) {
-      const pt = await readPdfText(orig.bytes);
+      const pt = await readOriginalPdfText(orig.bytes);
       const hit = alignLineRow(pt, line.supplier_sku, line.description);
       pdfBase64 = encodeBase64(orig.bytes);
       const identity = `Målrad (frossen identitet): varenummer ${JSON.stringify(line.supplier_sku ?? null)}, beskrivelse ${JSON.stringify(line.description ?? null)}.`;
