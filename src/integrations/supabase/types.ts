@@ -18830,6 +18830,18 @@ export type Database = {
         }
         Returns: Json
       }
+      rm_correct_raw_material_type_unit: {
+        Args: {
+          p_base_unit: string
+          p_dry_run?: boolean
+          p_expected_updated_at: string
+          p_item_type: string
+          p_op_id: string
+          p_raw_material_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       rm_cost_price_deviations: {
         Args: { p_legal_entity_id: string }
         Returns: {
