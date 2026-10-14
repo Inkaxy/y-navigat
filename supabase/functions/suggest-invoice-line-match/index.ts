@@ -19,7 +19,7 @@ import {
 } from "../_shared/lineSuggestion.ts";
 import { encodeBase64 } from "jsr:@std/encoding@1/base64";
 import { fetchVerifiedOriginal, supabaseOriginalDeps } from "../_shared/invoiceOriginal.ts";
-import { alignLineRow, PDF_TEXT_LIMITS,  } from "../_shared/pdfText.ts";
+import { alignLineRow, PDF_TEXT_LIMITS } from "../_shared/pdfText.ts";
 import { readOriginalPdfText } from "../_shared/pdfTextRuntime.ts";
 import { applyOriginalGate, type OriginalUnavailable } from "../_shared/lineSuggestionSource.ts";
 

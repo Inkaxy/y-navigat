@@ -11,7 +11,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { encodeBase64 } from "jsr:@std/encoding@1/base64";
-import { formatPdfTextForModel, pdfTextProfile,  } from "../_shared/pdfText.ts";
+import { formatPdfTextForModel, pdfTextProfile } from "../_shared/pdfText.ts";
 import { readOriginalPdfText } from "../_shared/pdfTextRuntime.ts";
 import { decryptWithKey } from "../_shared/crypto.ts";
 import { AiCallError, callAi, COST_RATE_VERSION, extractJson, estimateCostUsd, hasCachedRate, usageOf, type AiCallResult, type AiUsage } from "../_shared/ai-providers.ts";
