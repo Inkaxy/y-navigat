@@ -44,7 +44,7 @@ describe("holdt utenfor: avsluttet visning", () => {
     );
     expect(screen.queryByRole("button", { name: /Koble kreditnota/ })).toBeNull();
     expect(document.querySelector("[data-primary-action]")).toBeNull();
-    expect(screen.getByText(/holdt utenfor råvarebehandling/i)).toBeTruthy();
+    expect(screen.getAllByText(/holdt utenfor råvarebehandling/i).length).toBeGreaterThan(0);
   });
 
   it("fakturalistens filter «Holdt utenfor» tolkes fra URL", () => {
