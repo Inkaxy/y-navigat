@@ -16,8 +16,8 @@ begin
   end loop;
 
   -- Fixture: «Florapan»-lignende vare feilregistrert som emballasje/stk, bekreftet 1 stk per sekk.
-  insert into raw_materials (legal_entity_id, name, item_type, base_unit, category) values (le, 'TEST Florapan pose 100g', 'emballasje', 'stk', 'Emballasje') returning id into rm;
-  insert into raw_materials (legal_entity_id, name, item_type, base_unit) values (le, 'TEST stk-vare', 'ravare', 'stk') returning id into rm2;
+  insert into raw_materials (legal_entity_id, sku, name, item_type, base_unit, category) values (le, 'TEST-TU-A', 'TEST Florapan pose 100g', 'emballasje', 'stk', 'Emballasje') returning id into rm;
+  insert into raw_materials (legal_entity_id, sku, name, item_type, base_unit) values (le, 'TEST-TU-B', 'TEST stk-vare', 'ravare', 'stk') returning id into rm2;
   insert into suppliers (legal_entity_id, name) values (le, 'TEST typeretting leverandør') returning id into sup;
   insert into raw_material_suppliers (raw_material_id, supplier_id, supplier_sku, package_unit, base_units_per_package, package_confirmed_at)
   values (rm, sup, 'T3021', 'sekk', 1, now()) returning id into rms;
