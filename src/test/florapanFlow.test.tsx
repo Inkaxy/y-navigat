@@ -119,7 +119,7 @@ describe("kildemerking fra dokumentets innhold", () => {
 describe("fersk kvittering", () => {
   const it1 = (open: unknown, extra: Partial<SupplierItem> = {}) => ({ items: [{ supplier_id: "s1", item_key: "sku:3021", open_lines: open, ...extra } as unknown as SupplierItem] });
   const ok = { isError: false, data: [base] };
-  const f = (item: { isError: boolean; data: { items: SupplierItem[] } | undefined }, lines = ok) => freshStatusFrom({ item, lines, supplierId: "s1", itemKey: "sku:3021" });
+  const f = (item: { isError: boolean; data: { items: SupplierItem[] } | undefined }, lines: { isError: boolean; data: SupplierItemLine[] | undefined } = ok) => freshStatusFrom({ item, lines, supplierId: "s1", itemKey: "sku:3021" });
   it("varekortfeil/tomt/annet kort/ugyldig tall = ukjent, aldri 0", () => {
     expect(f({ isError: true, data: undefined }).kind).toBe("unknown");
     expect(f({ isError: false, data: { items: [] } }).kind).toBe("unknown");
