@@ -15,20 +15,23 @@ export interface PdfTextResult {
   truncated: boolean;
 }
 
-export type ExtractFn = (bytes: Uint8Array) => Promise<{ totalPages: number; text: string[] }>;
+/** Uttrekker får grensene og et avbruddssignal: den skal selv stoppe etter maxPages/maxChars og rydde ved abort. */
+export interface ExtractOpts { maxPages: number; maxChars: number; signal: AbortSignal }
+export type ExtractFn = (bytes: Uint8Array, opts: ExtractOpts) => Promise<{ totalPages: number; text: string[] }>;
 
 const empty = (status: PdfTextStatus, totalPages: number | null = null): PdfTextResult => ({ status, pages: [], totalPages, pagesRead: 0, chars: 0, truncated: false });
 
 export async function readPdfText(bytes: Uint8Array, extract: ExtractFn, limits: PdfTextLimits = PDF_TEXT_LIMITS): Promise<PdfTextResult> {
   if (bytes.byteLength > limits.maxBytes) return empty("for_stor");
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const ctl = new AbortController();
   try {
     const r = await Promise.race([
-      extract(bytes),
-      new Promise<never>((_, rej) => { timer = setTimeout(() => rej(new Error("pdf_text_timeout")), limits.timeoutMs); }),
+      extract(bytes, { maxPages: limits.maxPages, maxChars: limits.maxChars, signal: ctl.signal }),
+      new Promise<never>((_, rej) => { timer = setTimeout(() => { ctl.abort(); rej(new Error("pdf_text_timeout")); }, limits.timeoutMs); }),
     ]);
     let chars = 0;
-    let truncated = r.text.length > limits.maxPages;
+    let truncated = r.text.length > limits.maxPages || r.totalPages > limits.maxPages;
     const pages: string[] = [];
     for (const p of r.text.slice(0, limits.maxPages)) {
       const room = limits.maxChars - chars;
@@ -43,6 +46,8 @@ export async function readPdfText(bytes: Uint8Array, extract: ExtractFn, limits:
     return empty(e instanceof Error && e.message === "pdf_text_timeout" ? "tidsavbrudd" : "feil");
   } finally {
     if (timer !== undefined) clearTimeout(timer);
+    // Ferdig eller feilet: signaliser uttrekkeren slik at eventuelt gjenværende arbeid ryddes.
+    ctl.abort();
   }
 }
 

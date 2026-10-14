@@ -33,10 +33,10 @@ describe("2) pakning bare fra konkret uttrykk eller entydig bekreftet variant", 
     const v = validateLineSuggestion({ decision: "existing", raw_material_id: "rm-1", line_class: "vare", package_size: 75, package_unit: "kg" }, ctx({}, { description: "Sjokolade 75" }));
     expect(v.package_size).toBeNull();
   });
-  it("25 kg på linjen godtas med faktura-bevis", () => {
+  it("25 kg på linjen godtas, men uten kontrollert original merket som registrert linje", () => {
     const v = validateLineSuggestion({ decision: "existing", raw_material_id: "rm-1", line_class: "vare", package_size: 20, package_unit: "kg" }, ctx());
     expect(v).toMatchObject({ package_size: 20, package_unit: "kg", count_per_package: null });
-    expect(v.evidence[0]).toMatchObject({ field: "pakning", source: "faktura" });
+    expect(v.evidence[0]).toMatchObject({ field: "pakning", source: "registrert_linje" });
   });
   it("2x5kg: 2 indre pakninger à 5 kg; 10 kg uten antall normaliseres", () => {
     expect(packExpressions("Smør 2x5kg")).toEqual([{ count: 2, size: 5, unit: "kg", raw: "2x5kg" }]);

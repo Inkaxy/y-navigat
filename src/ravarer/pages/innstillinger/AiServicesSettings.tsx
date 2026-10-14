@@ -164,7 +164,7 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
     try {
       const body = storedTestOnly && existing
         // Lagret nøkkel: server avleder provider/endepunkt; bare modell innen samme provider kan velges.
-        ? { model, purpose: "invoice_extraction", config_id: existing.id }
+        ? { model, purpose: "invoice_extraction", config_id: existing.id, expected_updated_at: existing.updated_at }
         : { provider, api_key: apiKey.trim(), model, purpose: "invoice_extraction",
             azure_endpoint: provider === "azure_openai" ? azureEndpoint : undefined,
             azure_deployment: provider === "azure_openai" ? azureDeployment : undefined };

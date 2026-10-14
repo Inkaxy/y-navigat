@@ -21,6 +21,7 @@ import { encodeBase64 } from "jsr:@std/encoding@1/base64";
 import { fetchVerifiedOriginal, supabaseOriginalDeps } from "../_shared/invoiceOriginal.ts";
 import { alignLineRow, PDF_TEXT_LIMITS } from "../_shared/pdfText.ts";
 import { readOriginalPdfText } from "../_shared/pdfTextRuntime.ts";
+import { aiTimeoutFor } from "../_shared/suggestTimeouts.ts";
 import { applyOriginalGate, type OriginalUnavailable } from "../_shared/lineSuggestionSource.ts";
 
 const corsHeaders = {
@@ -38,6 +39,7 @@ const numOrNull = (v: unknown): number | null => (typeof v === "number" && Numbe
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const startedAt = Date.now();
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -181,6 +183,7 @@ Deno.serve(async (req) => {
     const orig = await fetchVerifiedOriginal(supabaseOriginalDeps(userClient, admin, invoice.id, PDF_TEXT_LIMITS.maxBytes));
     let mode: "tekst" | "pdf" | "ingen" = "ingen";
     let textRow: { page: number; row: string } | null = null;
+    let textBy: "sku" | "beskrivelse" | null = null;
     let pdfBase64: string | undefined;
     let originalText = "Original: IKKE tilgjengelig. Forslaget bygger bare på den registrerte linjen. original_row_found=null.";
     if (orig.status === "ok" && orig.bytes) {
@@ -191,6 +194,7 @@ Deno.serve(async (req) => {
       if (hit.page != null) {
         mode = "tekst";
         textRow = { page: hit.page, row: hit.row };
+        textBy = hit.by;
         originalText = `Original-PDF er vedlagt. ${identity}\nEntydig rad i tekstlaget (DATA, side ${hit.page}): ${JSON.stringify(hit.row)}`;
       } else {
         mode = "pdf";
@@ -204,7 +208,10 @@ Deno.serve(async (req) => {
     let usage = { in: null as number | null, out: null as number | null };
     let errorMessage: string | null = null;
     let reason: string | null = null;
+    const aiTimeout = aiTimeoutFor(startedAt, Date.now(), !!pdfBase64);
     try {
+      // Budsjettet er brukt opp av original/tekstlag: ikke start et kall klienten ikke venter på.
+      if (aiTimeout == null) throw new AiCallError("timeout", "Serverbudsjettet for linjeforslag er brukt opp");
       const result = await callAi({
         provider: cfg.provider as AiProvider,
         apiKey,
@@ -215,7 +222,7 @@ Deno.serve(async (req) => {
         userText: `${buildSuggestUserText(ctx)}\n\n${originalText}`,
         pdfBase64,
         jsonSchema: cfg.provider === "anthropic" ? undefined : { name: "invoice_line_suggestion", schema: LINE_SUGGESTION_SCHEMA },
-        timeoutMs: pdfBase64 ? 90_000 : 45_000,
+        timeoutMs: aiTimeout,
         azureEndpoint: cfg.azure_endpoint ?? undefined,
         azureDeployment: cfg.azure_deployment ?? undefined,
       });
@@ -240,7 +247,7 @@ Deno.serve(async (req) => {
     // AI-feil skal aldri stoppe arbeidet — brukeren fortsetter manuelt.
     if (reason) return json({ suggestion: null, reason, source_status: mode === "ingen" ? "registrert_linje" : mode === "tekst" ? "original_tekst" : "original_pdf", document_version: orig.status === "ok" ? orig.version : null });
 
-    const gated = applyOriginalGate(validateLineSuggestion(parsed, ctx), parsed, mode, textRow, orig.status === "ok" ? orig.version : null, unavailable);
+    const gated = applyOriginalGate(validateLineSuggestion(parsed, { ...ctx, original: { mode, row: textRow?.row ?? null, by: textBy } }), parsed, mode, textRow, orig.status === "ok" ? orig.version : null, unavailable);
     const src = gated.source;
     return json({
       suggestion: {
