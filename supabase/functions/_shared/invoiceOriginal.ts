@@ -50,7 +50,7 @@ export async function fetchVerifiedOriginal(d: OriginalDeps): Promise<OriginalRe
 interface RpcCall { abortSignal(s: AbortSignal): PromiseLike<{ data: unknown; error: unknown }> }
 export interface UserRpcClient { rpc(fn: string, args: Record<string, unknown>): RpcCall }
 export interface StorageClient {
-  storage: { from(bucket: string): { download(path: string, opts?: Record<string, unknown>, params?: { signal?: AbortSignal }): Promise<{ data: Blob | null; error: unknown }> } };
+  storage: { from(bucket: string): { download(path: string, opts?: Record<string, unknown>, params?: { signal?: AbortSignal }): PromiseLike<{ data: Blob | null; error: unknown }> } };
 }
 
 /** Standard avhengigheter mot Supabase (bruker-RPC + tjenestenedlasting av validert sti), begge med AbortSignal. */
