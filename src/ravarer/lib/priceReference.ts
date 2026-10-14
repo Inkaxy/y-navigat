@@ -44,6 +44,8 @@ export function lineReferenceLabel(s: string | null | undefined): string {
 export function supersededReasonText(code: string | null | undefined): string | null {
   if (!code) return null;
   if (code === "usannsynlig_pris_karantene") return "Satt i karantene: usannsynlig pris";
+  // Ny pris/enhet/pakning/linjegrunnlag gir egen versjon; den gamle observasjonen beholdes uendret med sin enhet.
+  if (code === "nytt_prisgrunnlag") return "Erstattet av ny versjon: prisgrunnlaget (enhet, pakning eller linje) ble endret. Denne observasjonen beholder sin opprinnelige pris og enhet.";
   const t = code.replace(/_/g, " ").trim();
   return t ? t.charAt(0).toLocaleUpperCase("nb-NO") + t.slice(1) : null;
 }

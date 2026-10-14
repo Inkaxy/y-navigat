@@ -33,3 +33,10 @@ describe("trykt linjerabatt", () => {
     expect(rows[0].discount_amount).toBe(3079.9);
   });
 });
+
+import { supersededReasonText } from "@/ravarer/lib/priceReference";
+describe("prishistorikk: ny versjon ved nytt grunnlag", () => {
+  it("forklarer at gammel observasjon beholder sin pris og enhet", () => {
+    expect(supersededReasonText("nytt_prisgrunnlag")).toMatch(/ny versjon.*beholder sin opprinnelige pris og enhet/);
+  });
+});
