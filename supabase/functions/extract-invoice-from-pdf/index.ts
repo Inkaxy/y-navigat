@@ -119,6 +119,14 @@ Deno.serve(async (req) => {
       if (!hasAccess) return jsonErr("Mangler skrivetilgang til fakturaer", 403);
     }
 
+    // Bruksloggen kobles til fakturaen bare når id-en faktisk finnes i samme selskap.
+    // Uten id (f.eks. manuell PDF-import før lagring) logges kallet som ukoblet (invoice_id=null).
+    let usageInvoiceId: string | null = null;
+    if (typeof body.invoice_id === "string" && /^[0-9a-f-]{36}$/i.test(body.invoice_id)) {
+      const { data: invRow } = await admin.from("invoices").select("id").eq("id", body.invoice_id).eq("legal_entity_id", legal_entity_id).maybeSingle();
+      usageInvoiceId = invRow?.id ?? null;
+    }
+
     const supplierId: string | null = typeof body.supplier_id === "string" && /^[0-9a-f-]{36}$/i.test(body.supplier_id) ? body.supplier_id : null;
     const hints: Hints = {
       is_credit: body.is_credit === true,
@@ -183,7 +191,7 @@ Deno.serve(async (req) => {
           } catch (e) {
             await admin.from("ai_usage_log").insert({
               provider: cfg.provider, model: cfg.model, purpose: "invoice_extraction",
-              legal_entity_id, success: false, error_message: (e as Error).message,
+              legal_entity_id, invoice_id: usageInvoiceId, success: false, error_message: (e as Error).message,
             });
             throw e;
           }
@@ -194,7 +202,7 @@ Deno.serve(async (req) => {
       for (const l of run.log) {
         if (l.reason === "call_failed") continue;
         await admin.from("ai_usage_log").insert({
-          provider: cfg.provider, model: cfg.model, purpose: "invoice_extraction",
+          provider: cfg.provider, model: cfg.model, purpose: "invoice_extraction", invoice_id: usageInvoiceId,
           input_tokens: l.inputTokens ?? null, output_tokens: l.outputTokens ?? null,
           estimated_cost_usd: estimateCostUsd(cfg.model, l.inputTokens ?? null, l.outputTokens ?? null),
           legal_entity_id, success: l.reason !== "invalid_json", error_message: l.reason === "invalid_json" ? (l.error ?? "invalid_json") : l.reason === "empty" ? "tomt_resultat" : null,

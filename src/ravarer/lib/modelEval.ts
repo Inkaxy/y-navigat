@@ -22,6 +22,8 @@ export interface EvalOutcome {
   storedLineCount: number | null;
   checkCount: number | null;
   checkCounts: Record<string, number>;
+  /** Mot manuelt verifisert fasit; null = ikke verifisert. */
+  fasit: { correct: number; total: number; errors: string[] } | null;
   raw: unknown;
 }
 
@@ -58,6 +60,11 @@ export function parseEvalOutcome(data: unknown, invoiceId: string, model: string
     storedLineCount: num(o.stored_line_count),
     checkCount: Array.isArray(o.checks) && !errObj ? o.checks.length : null,
     checkCounts: counts,
+    fasit: (() => {
+      const f = isRec(o.fasit) ? o.fasit : null;
+      const c = f ? num(f.fields_correct) : null; const t = f ? num(f.fields_total) : null;
+      return f && c != null && t != null && t > 0 ? { correct: c, total: t, errors: Array.isArray(f.errors) ? f.errors.filter((e): e is string => typeof e === "string") : [] } : null;
+    })(),
     raw: data,
   };
 }

@@ -15,6 +15,7 @@ import { decryptWithKey } from "../_shared/crypto.ts";
 import { AiCallError, callAi, extractJson, estimateCostUsd, type AiCallResult } from "../_shared/ai-providers.ts";
 import { runExtractionAttempts, type Hints, type LearningExample } from "../_shared/invoiceExtraction.ts";
 import { INVOICE_EXTRACTION_SYSTEM_PROMPT } from "../_shared/invoiceExtractionPrompt.ts";
+import { scoreAgainstFasit } from "../_shared/evalFasit.ts";
 import { deterministicChecks, EVAL_LIMITS, INVOICE_EXTRACTION_SCHEMA, isEvalModel } from "../_shared/modelEval.ts";
 
 const corsHeaders = {
@@ -171,7 +172,9 @@ Deno.serve(async (req) => {
       checks: checks?.checks ?? [],
       check_counts: checks?.counts ?? {},
       stored_line_count: storedLines ?? null,
-      quality: "ikke_verifisert",
+      // Fasit brukes bare her, etter modellsvaret — aldri som hint.
+      fasit: run.best ? scoreAgainstFasit(inv.id, { lines, header }) : null,
+      quality: run.best && scoreAgainstFasit(inv.id, { lines, header }) ? "fasit" : "ikke_verifisert",
       warnings: run.warnings,
     });
   } catch (e) {

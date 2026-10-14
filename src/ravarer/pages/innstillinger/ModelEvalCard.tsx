@@ -74,7 +74,7 @@ export function ModelEvalCard() {
         <CardTitle>Sammenlign modeller på fakturaer</CardTitle>
         <CardDescription>
           Leser lagrede originaler med samme leseregler for hver modell. Ingenting lagres på fakturaene, og modelloppsettet endres ikke.
-          Kvalitet er ikke verifisert mot fasit; tallene under er kontrollfeil og forbruk.
+          Kvalitet vises bare for fakturaer med manuelt verifisert fasit (nå PALS 526301); ellers «ikke verifisert».
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -147,8 +147,11 @@ export function EvalResults({ results }: { results: EvalOutcome[] }) {
                     <dt>Bufret / resonnering</dt><dd>{nb(r.usage.cached)} / {nb(r.usage.reasoning)}</dd>
                     <dt>Anslått kostnad</dt><dd>{r.costUsd == null ? "ukjent" : `$${nb(r.costUsd, 4)}`}</dd>
                     <dt>Svartid</dt><dd>{r.latencyMs == null ? "ukjent" : `${nb(r.latencyMs / 1000, 1)} s`}</dd>
-                    <dt>Kvalitet</dt><dd>ikke verifisert</dd>
+                    <dt>Kvalitet</dt><dd>{r.fasit ? `${r.fasit.correct} av ${r.fasit.total} felt riktig mot fasit` : "ikke verifisert"}</dd>
                   </dl>
+                  {r.fasit && r.fasit.errors.length > 0 && (
+                    <ul className="list-disc pl-4 text-caption text-destructive">{r.fasit.errors.slice(0, 8).map((e) => <li key={e}>{e}</li>)}</ul>
+                  )}
                   {Object.keys(r.checkCounts).length > 0 && (
                     <ul className="list-disc pl-4 text-caption text-muted-foreground">
                       {Object.entries(r.checkCounts).map(([k, v]) => <li key={k}>{k}: {v}</li>)}
