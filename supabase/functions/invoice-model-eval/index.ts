@@ -18,7 +18,8 @@ import { AiCallError, callAi, COST_RATE_VERSION, extractJson, estimateCostUsd, h
 import { runExtractionAttempts, type Hints, type LearningExample } from "../_shared/invoiceExtraction.ts";
 import { INVOICE_EXTRACTION_SYSTEM_PROMPT } from "../_shared/invoiceExtractionPrompt.ts";
 import { scoreAgainstFasit } from "../_shared/evalFasit.ts";
-import { deterministicChecks, EVAL_LIMITS, INVOICE_EXTRACTION_SCHEMA, INVOICE_EXTRACTION_SCHEMA_VERSION, isEvalModel } from "../_shared/modelEval.ts";
+import { fetchVerifiedOriginal, supabaseOriginalDeps } from "../_shared/invoiceOriginal.ts";
+import { deterministicChecks, EVAL_LIMITS, INVOICE_EXTRACTION_SCHEMA, INVOICE_EXTRACTION_SCHEMA_VERSION, EVAL_PIPELINE_VERSION, isEvalModel } from "../_shared/modelEval.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -63,17 +64,14 @@ Deno.serve(async (req) => {
     const { data: canRead } = await userClient.rpc("has_ravarer_invoice_access", { _legal_entity_id: le, _required_level: "read" });
     if (canRead !== true) return err("forbidden", "Mangler tilgang til fakturaen", 403);
 
-    // Original: validert sti via eksisterende RPC (tilgang + selskapssti), kontroll før og etter nedlasting.
-    const { data: dv, error: dvErr } = await userClient.rpc("rm_invoice_document_version", { p_invoice_id: inv.id });
-    const doc = dv as { available?: boolean; path?: string; version?: string; reason?: string } | null;
-    if (dvErr || !doc) return err("document_unknown", "Kunne ikke kontrollere originalen", 503);
-    if (!doc.available || !doc.path || !doc.version) return err("document_missing", "Fakturaen har ingen lagret original-PDF", 422);
-    const { data: blob, error: dlErr } = await admin.storage.from("invoice-pdfs").download(doc.path);
-    if (dlErr || !blob) return err("document_unknown", "Kunne ikke laste ned originalen", 503);
-    if (blob.size > EVAL_LIMITS.maxPdfBytes) return err("document_too_large", "Originalen er for stor for sammenligning", 413);
-    const { data: dv2 } = await userClient.rpc("rm_invoice_document_version", { p_invoice_id: inv.id });
-    if ((dv2 as { version?: string } | null)?.version !== doc.version) return err("document_changed", "Originalen ble endret under nedlasting", 409);
-    const pdfBytes = new Uint8Array(await blob.arrayBuffer());
+    // Original: samme versjonsbundne helper som produksjon (tilgang + selskapssti, kontroll før/etter, frist per steg).
+    const orig = await fetchVerifiedOriginal(supabaseOriginalDeps(userClient, admin, inv.id, EVAL_LIMITS.maxPdfBytes));
+    if (orig.status === "mangler") return err("document_missing", "Fakturaen har ingen lagret original-PDF", 422);
+    if (orig.status === "for_stor") return err("document_too_large", "Originalen er for stor for sammenligning", 413);
+    if (orig.status === "endret") return err("document_changed", "Originalen ble endret under nedlasting", 409);
+    if (orig.status !== "ok" || !orig.bytes || !orig.version) return err("document_unknown", "Kunne ikke kontrollere eller laste ned originalen", 503);
+    const doc = { version: orig.version };
+    const pdfBytes = orig.bytes;
     const pdfBase64 = encodeBase64(pdfBytes);
     // Samme tekstlag-helper som produksjonsleseren: endret input måles i profilen.
     const pdfText = await readOriginalPdfText(pdfBytes);
@@ -180,7 +178,7 @@ Deno.serve(async (req) => {
       cost_rate_version: COST_RATE_VERSION,
       cost_cached_rate: cost == null ? null : hasCachedRate(model) ? "egen_sats" : "full_inndatapris_konservativt",
       // Evalen bruker produksjonsprompten MED strict schema. Produksjonsleseren bruker schema bare når det er slått på.
-      request_profile: { prompt: "produksjon", schema: INVOICE_EXTRACTION_SCHEMA_VERSION, single_attempt: true, read: pdfTextProfile(pdfText) },
+      request_profile: { prompt: "produksjon", pipeline: EVAL_PIPELINE_VERSION, schema: INVOICE_EXTRACTION_SCHEMA_VERSION, single_attempt: true, read: pdfTextProfile(pdfText) },
       latency_ms: latencyMs,
       document_version: doc.version,
       parsed: run.best ? { header, lines } : null,
