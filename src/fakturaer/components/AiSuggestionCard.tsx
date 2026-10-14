@@ -3,7 +3,7 @@ import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { itemTypeLabel } from "@/ravarer/lib/itemTypes";
-import { LINE_CLASS_LABELS, PRICE_BASIS_LABELS, type AiLineSuggestion } from "@/fakturaer/lib/aiLineSuggestion";
+import { isFromOriginal, LINE_CLASS_LABELS, PRICE_BASIS_LABELS, type AiLineSuggestion } from "@/fakturaer/lib/aiLineSuggestion";
 import type { CreatePrefill } from "@/ravarer/editors/createSheetLogic";
 
 /** Navnet på foreslått råvare (RLS avgjør synlighet). */
@@ -64,12 +64,10 @@ export function AiSuggestionCard({ suggestion: s, rawMaterialName, canWrite, onA
         </span>
       </header>
 
-      {s.sourceStatus !== "original" && (
-        <p className="text-caption text-ink-secondary" role="note">Forslag basert på registrert linje, original ikke kontrollert.</p>
-      )}
+      <SourceNote s={s} />
       {read.length > 0 && (
         <div>
-          <h5 className="text-caption font-semibold">{s.sourceStatus === "original" ? "Lest fra originalen" : "Fra registrert linje"}</h5>
+          <h5 className="text-caption font-semibold">{isFromOriginal(s) ? "Registrert linje" : "Fra registrert linje"}</h5>
           <ul className="text-caption text-ink-secondary">{read.map((e, i) => <li key={i}>{e.field}: {e.value}</li>)}</ul>
         </div>
       )}
@@ -126,5 +124,38 @@ export function AiSuggestionCard({ suggestion: s, rawMaterialName, canWrite, onA
         Forslaget lagrer ingenting. Du kontrollerer og bekrefter vare og pakning selv; prisen vurderes separat.
       </p>
     </section>
+  );
+}
+
+const REASON_TEXT: Record<string, string> = {
+  mangler: "fakturaen har ingen lagret original",
+  ukjent: "originalen kunne ikke hentes",
+  for_stor: "originalen er for stor",
+  endret: "originalen ble endret under henting",
+};
+
+function SourceNote({ s }: { s: AiLineSuggestion }) {
+  if (!isFromOriginal(s)) {
+    return (
+      <p className="text-caption text-ink-secondary" role="note">
+        Forslag basert på registrert linje, original ikke kontrollert{s.originalReason ? ` (${REASON_TEXT[s.originalReason]})` : ""}.
+      </p>
+    );
+  }
+  return (
+    <div role="note" className="space-y-1">
+      <p className="text-caption text-ink-secondary">
+        Kontrollert mot originalen{s.sourceStatus === "original_tekst" ? " (tekstlaget i PDF-en)" : " (PDF-en)"}
+        {s.originalPage != null ? `, side ${s.originalPage}` : ""}.
+      </p>
+      {s.originalRow && <p className="text-caption"><span className="font-semibold">Lest fra originalen:</span> {s.originalRow}</p>}
+      {s.originalDifferences.length > 0 && (
+        <div>
+          <h5 className="text-caption font-semibold">Avvik mellom original og registrert linje</h5>
+          <ul className="list-disc pl-4 text-caption">{s.originalDifferences.map((d, i) => <li key={i}>{d}</li>)}</ul>
+          <p className="text-caption text-ink-secondary">Linjen endres ikke automatisk. Rett den via «Rett fakturalinje».</p>
+        </div>
+      )}
+    </div>
   );
 }

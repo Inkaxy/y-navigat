@@ -39,8 +39,18 @@ export interface AiLineSuggestion {
   model: string;
   candidateCount: number | null;
   /** Hvilket grunnlag forslaget bygger på. Alt annet enn «original» er ukontrollert mot originalen. */
-  sourceStatus: "original" | "registrert_linje";
+  sourceStatus: AiSourceStatus;
+  /** Dokumentversjonen originalen ble lest fra (null når original ikke er brukt). */
+  documentVersion: string | null;
+  /** Hvorfor originalen ikke ble brukt. */
+  originalReason: "mangler" | "ukjent" | "for_stor" | "endret" | null;
+  originalPage: number | null;
+  originalRow: string | null;
+  originalDifferences: string[];
 }
+
+export type AiSourceStatus = "original_tekst" | "original_pdf" | "registrert_linje";
+export const isFromOriginal = (s: AiLineSuggestion) => s.sourceStatus !== "registrert_linje" && s.documentVersion != null;
 
 export type AiSuggestionReason =
   | "ingen_kandidater" | "for_lite_tekst" | "ingen_ai_konfigurasjon" | "ai_feilet" | "tidsavbrudd"
@@ -126,7 +136,12 @@ export function parseAiSuggestion(raw: unknown): AiLineSuggestion | null {
     model: str(raw.model) ?? "",
     candidateCount: num(raw.candidate_count),
     // Ukjent/manglende kilde = registrert linje; aldri antatt lest fra originalen.
-    sourceStatus: raw.source_status === "original" ? "original" : "registrert_linje",
+    sourceStatus: raw.source_status === "original_tekst" || raw.source_status === "original_pdf" ? raw.source_status : "registrert_linje",
+    documentVersion: str(raw.document_version),
+    originalReason: oneOf(raw.original_reason, ["mangler", "ukjent", "for_stor", "endret"] as const, null as never) ?? null,
+    originalPage: num(raw.original_page),
+    originalRow: str(raw.original_row),
+    originalDifferences: strs(raw.original_differences),
   };
 }
 
