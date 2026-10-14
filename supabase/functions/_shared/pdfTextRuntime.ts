@@ -54,7 +54,7 @@ const unpdfGetDocument: GetDocument = (() => {
     const promise = (async () => {
       pdfjs ??= await getResolvedPDFJS();
       if (cancelled) throw new Error("pdf_text_aborted");
-      const t = pdfjs.getDocument({ data: bytes, isEvalSupported: false, useSystemFonts: true });
+      const t = pdfjs.getDocument({ data: bytes, useSystemFonts: true });
       inner = t;
       const doc: DocLike = await t.promise;
       return doc;
