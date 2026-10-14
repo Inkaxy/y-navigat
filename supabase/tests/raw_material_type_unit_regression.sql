@@ -2,7 +2,7 @@
 do $$
 declare
   le uuid := '751709bc-04b3-4449-867d-b97faa9ab373';
-  w uuid; ro uuid; rm uuid; rm2 uuid; sup uuid; rms uuid; rec uuid; inv uuid; ln uuid;
+  w uuid; ro uuid; rm uuid; rm2 uuid; sup uuid; rms uuid; rec uuid; part uuid; inv uuid; ln uuid;
   r jsonb; op uuid := gen_random_uuid(); v text; n int; log text := ''; q numeric;
   ok boolean := true;
 begin
@@ -23,9 +23,9 @@ begin
   values (rm, sup, 'T3021', 'sekk', 1, now()) returning id into rms;
   select count(*) into n from raw_material_supplier_packages where raw_material_supplier_id = rms and confirmed_at is not null;
   log := log || format('variant_bekreftet_for=%s; ', n);
-  select id into rec from recipes where legal_entity_id = le limit 1;
-  insert into recipe_lines (recipe_id, ingredient_name, quantity, unit, entry_mode, raw_material_id, quantity_grams) values (rec, 'TEST Florapan', 25, 'g', 'grams', rm, 25);
-  insert into recipe_lines (recipe_id, ingredient_name, quantity, unit, entry_mode, raw_material_id, quantity_grams) values (rec, 'TEST stk', 2, 'stk', 'grams', rm2, null);
+  select rp.recipe_id, rp.id into rec, part from recipe_parts rp join recipes x on x.id = rp.recipe_id where x.legal_entity_id = le limit 1;
+  insert into recipe_lines (recipe_id, recipe_part_id, ingredient_name, quantity, unit, entry_mode, raw_material_id, quantity_grams) values (rec, part, 'TEST Florapan', 25, 'g', 'grams', rm, 25);
+  insert into recipe_lines (recipe_id, recipe_part_id, ingredient_name, quantity, unit, entry_mode, raw_material_id, quantity_grams) values (rec, part, 'TEST stk', 2, 'stk', 'grams', rm2, null);
   insert into invoices (legal_entity_id, supplier_id, invoice_number, invoice_date, total_amount, total_vat, currency, status)
   values (le, sup, 'TEST-TU-1', '2026-09-01', 8371.88, 1674.38, 'NOK', 'needs_review') returning id into inv;
   insert into invoice_lines (invoice_id, line_number, description, supplier_sku, quantity, unit, unit_price, total_amount, raw_material_id, match_confidence, requires_review)
