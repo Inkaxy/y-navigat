@@ -128,7 +128,7 @@ describe("7) strict schema i fakturaleseren", () => {
     for (const f of ["line_kind", "sku", "ean", "quantity_raw", "unit_price_raw", "total_amount_raw", "unit_price_basis", "discount_pct", "count_per_package", "confidence"]) {
       expect(line).toContain(f); expect(INVOICE_EXTRACTION_SYSTEM_PROMPT).toContain(f);
     }
-    expect(INVOICE_EXTRACTION_SCHEMA_VERSION).toMatch(/^strict-v2/);
+    expect(INVOICE_EXTRACTION_SCHEMA_VERSION).toMatch(/^strict-v3/);
   });
   it("er av som standard og bare for OpenAI/Azure", () => {
     expect(extractionSchemaEnabled(undefined, "openai")).toBe(false);
