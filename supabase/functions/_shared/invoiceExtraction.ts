@@ -94,6 +94,38 @@ export function discountAmountFrom(pct: number | null, total: number | null): nu
   return r2((Math.abs(total) * pct) / (100 - pct));
 }
 
+/** Tolker trykt rabattbeløp («-3 079,90», «(3079,90)», «3079,90-»). Null ved tvetydig/ugyldig format. */
+export function parsePrintedAmount(raw: unknown): number | null {
+  if (typeof raw !== "string") return null;
+  let s = raw.replace(/\s|\u00a0|kr/gi, "");
+  if (!s) return null;
+  let neg = false;
+  if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1, -1); }
+  if (s.endsWith("-")) { neg = true; s = s.slice(0, -1); }
+  if (s.startsWith("-") || s.startsWith("−")) { neg = !neg; s = s.slice(1); }
+  if (!/^\d{1,3}(\.\d{3})*(,\d{1,2})?$|^\d+(,\d{1,2})?$|^\d+\.\d{2}$/.test(s)) return null;
+  const v = /,/.test(s) ? Number(s.replace(/\./g, "").replace(",", ".")) : Number(s);
+  return Number.isFinite(v) ? (neg ? -v : v) : null;
+}
+
+/**
+ * Linjerabatt i kr (positiv = fradrag, samme kontrakt som lineReadIssues/rm_line_read_issues_v2).
+ * Bare TRYKT beløp godtas: modellens tall må samsvare med trykt råtekst. Et positivt påslag er ikke rabatt.
+ * Beregnes aldri fra differansen mellom antall×pris og linjesum. Ellers fra trykt prosent.
+ */
+export function lineDiscountFrom(l: Record<string, unknown>, pct: number | null, total: number | null): number | null {
+  const printed = parsePrintedAmount(l.discount_amount_raw);
+  const model = num(l.discount_amount);
+  if (printed != null && printed !== 0) {
+    const isReduction = printed < 0 || l.discount_kind === "rabatt";
+    if (!isReduction) return null;
+    const abs = Math.abs(printed);
+    if (model != null && Math.abs(Math.abs(model) - abs) > 0.005) return null;
+    return r2(abs);
+  }
+  return discountAmountFrom(pct, total);
+}
+
 export function sanitizeLines(raw: unknown, isCredit = false): ExtractedLine[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter(isRecord).map((l) => {
@@ -113,7 +145,7 @@ export function sanitizeLines(raw: unknown, isCredit = false): ExtractedLine[] {
     const nums = resolveLineNumbers(l, factor);
     const { quantity, unit_price, total_amount } = nums;
     const price_basis = toDbPriceBasis(unit_price_basis, unit, package_unit);
-    const discount_amount = discountAmountFrom(discount_pct, total_amount);
+    const discount_amount = lineDiscountFrom(l, discount_pct, total_amount);
     const out: ExtractedLine = {
       line_kind, sku,
       ean: l.ean == null ? null : String(l.ean).replace(/\D/g, "") || null,
