@@ -147,7 +147,8 @@ export function EvalResults({ results }: { results: EvalOutcome[] }) {
                     <dt>Bufret / resonnering</dt><dd>{nb(r.usage.cached)} / {nb(r.usage.reasoning)}</dd>
                     <dt>Anslått kostnad</dt><dd>{r.costUsd == null ? "ukjent" : `$${nb(r.costUsd, 4)}`}</dd>
                     <dt>Svartid</dt><dd>{r.latencyMs == null ? "ukjent" : `${nb(r.latencyMs / 1000, 1)} s`}</dd>
-                    <dt>Kvalitet</dt><dd>{r.fasit ? `${nb(r.fasit.correct)} av ${nb(r.fasit.total)} felt riktig mot fasit${r.fasit.unresolved > 0 ? `, ${nb(r.fasit.unresolved)} uavklart` : ""}${r.fasit.skuErrors.length > 0 ? ` (${nb(r.fasit.skuErrors.length)} SKU-feil)` : ""}` : "ikke verifisert"}</dd>
+                    <dt>Kvalitet</dt><dd>{r.fasit ? `${nb(r.fasit.correct)} av ${nb(r.fasit.total)} felt riktig mot fasit${r.fasit.unresolved > 0 ? `, ${nb(r.fasit.unresolved)} uavklart` : ""}` : "ikke verifisert"}</dd>
+                    {r.fasit && <><dt>Varenummer (SKU)</dt><dd>{r.fasit.skuMatched == null || r.fasit.skuExpected == null ? "ukjent" : `${nb(r.fasit.skuMatched)} av ${nb(r.fasit.skuExpected)} lest riktig`}</dd></>}
                   </dl>
                   {r.fasit && r.fasit.errors.length > 0 && (
                     <ul className="list-disc pl-4 text-caption text-destructive">{r.fasit.errors.slice(0, 12).map((e) => <li key={e}>{e}</li>)}</ul>

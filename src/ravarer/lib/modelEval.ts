@@ -23,7 +23,7 @@ export interface EvalOutcome {
   checkCount: number | null;
   checkCounts: Record<string, number>;
   /** Mot manuelt verifisert fasit; null = ikke verifisert. */
-  fasit: { correct: number; total: number; unresolved: number; skuErrors: string[]; unresolvedRows: string[]; errors: string[] } | null;
+  fasit: { correct: number; total: number; unresolved: number; skuMatched: number | null; skuExpected: number | null; skuErrors: string[]; unresolvedRows: string[]; errors: string[] } | null;
   raw: unknown;
 }
 
@@ -66,7 +66,7 @@ export function parseEvalOutcome(data: unknown, invoiceId: string, model: string
       const strs = (v: unknown) => Array.isArray(v) ? v.filter((e): e is string => typeof e === "string") : [];
       const rows = Array.isArray(f?.unresolved_rows) ? f.unresolved_rows.flatMap((r) => isRec(r) ? [`Rad ${num(r.index) ?? "?"}: SKU ${typeof r.sku === "string" ? `«${r.sku}»` : "mangler"}${typeof r.description === "string" ? ` – ${r.description}` : ""}`] : []) : [];
       return f && c != null && t != null && (t > 0 || (num(f.fields_unresolved) ?? 0) > 0)
-        ? { correct: c, total: t, unresolved: num(f.fields_unresolved) ?? 0, skuErrors: strs(f.sku_errors), unresolvedRows: rows, errors: strs(f.errors) } : null;
+        ? { correct: c, total: t, unresolved: num(f.fields_unresolved) ?? 0, skuMatched: num(f.sku_matched), skuExpected: num(f.line_count_expected), skuErrors: strs(f.sku_errors), unresolvedRows: rows, errors: strs(f.errors) } : null;
     })(),
     raw: data,
   };
