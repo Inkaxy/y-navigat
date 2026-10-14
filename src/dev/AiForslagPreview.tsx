@@ -9,7 +9,7 @@ const CASES: Record<string, AiLineSuggestion> = {
   eksisterende: parseAiSuggestion({
     decision: "existing", raw_material_id: "rm-1", line_class: "vare", confidence: 0.82, package_size: 20, package_unit: "kg",
     count_per_package: null, price_basis: "per_enhet", draft: null,
-    evidence: [{ field: "Varenr.", value: "12113", source: "faktura" }, { field: "Tekst", value: "Combisur Soft sekk 20kg", source: "faktura" }, { field: "Bekreftet pakning", value: "20 kg per sekk", source: "kjent_vare" }],
+    evidence: [{ field: "Varenr.", value: "TEST-002", source: "faktura" }, { field: "Tekst", value: "Testmiks sekk 20kg", source: "faktura" }, { field: "Bekreftet pakning", value: "20 kg per sekk", source: "kjent_vare" }],
     explanation: "Samme leverandørvarenummer som en kjent vare.", uncertainties: [], missing: [], rejected: [], model: "gpt-4o",
   })!,
   ny: parseAiSuggestion({
@@ -45,7 +45,7 @@ export default function AiForslagPreview() {
           <button key={c} className={`min-h-11 rounded-md border px-3 ${k === c ? "border-primary" : "border-border"}`} onClick={() => { setK(c); setNote(null); }}>{c}</button>
         ))}
       </div>
-      <AiSuggestionCard suggestion={CASES[k]} rawMaterialName="Idun Combisur Soft" canWrite appliedNote={note}
+      <AiSuggestionCard suggestion={CASES[k]} rawMaterialName="Testmiks" canWrite appliedNote={note}
         onApply={() => setNote("Forslaget er fylt inn, men ikke bekreftet.")}
         onCreateDraft={(p) => setNote(`Åpner «Ny råvare» med ${p.name} (ikke lagret).`)}
         onNotItem={() => setNote("Åpner «Ikke vare» (ikke lagret).")} />
