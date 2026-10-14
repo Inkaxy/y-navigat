@@ -38,6 +38,8 @@ export interface AiLineSuggestion {
   rejected: string[];
   model: string;
   candidateCount: number | null;
+  /** Hvilket grunnlag forslaget bygger på. Alt annet enn «original» er ukontrollert mot originalen. */
+  sourceStatus: "original" | "registrert_linje";
 }
 
 export type AiSuggestionReason =
@@ -123,6 +125,8 @@ export function parseAiSuggestion(raw: unknown): AiLineSuggestion | null {
     rejected: strs(raw.rejected),
     model: str(raw.model) ?? "",
     candidateCount: num(raw.candidate_count),
+    // Ukjent/manglende kilde = registrert linje; aldri antatt lest fra originalen.
+    sourceStatus: raw.source_status === "original" ? "original" : "registrert_linje",
   };
 }
 
