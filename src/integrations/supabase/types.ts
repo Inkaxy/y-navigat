@@ -11144,6 +11144,8 @@ export type Database = {
           package_size: number | null
           package_unit: string | null
           raw_material_supplier_id: string
+          superseded_at: string | null
+          superseded_reason: string | null
           supplier_sku_norm: string
           updated_at: string
         }
@@ -11156,6 +11158,8 @@ export type Database = {
           package_size?: number | null
           package_unit?: string | null
           raw_material_supplier_id: string
+          superseded_at?: string | null
+          superseded_reason?: string | null
           supplier_sku_norm?: string
           updated_at?: string
         }
@@ -11168,6 +11172,8 @@ export type Database = {
           package_size?: number | null
           package_unit?: string | null
           raw_material_supplier_id?: string
+          superseded_at?: string | null
+          superseded_reason?: string | null
           supplier_sku_norm?: string
           updated_at?: string
         }
