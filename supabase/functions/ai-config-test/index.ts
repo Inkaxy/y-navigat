@@ -5,7 +5,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { callAi, type AiProvider } from "../_shared/ai-providers.ts";
 import { decryptWithKey } from "../_shared/crypto.ts";
 
-import { catalogEntry, isCatalogModel } from "../_shared/aiModelCatalog.ts";
+import { catalogEntry } from "../_shared/aiModelCatalog.ts";
+import { guardStoredKeyTest } from "../_shared/aiConfigTestGuard.ts";
 // Modeller som kan testes med lagret nøkkel: felles katalog, samme provider. Tilkoblingstest — ikke kvalitetsbevis.
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -47,17 +48,16 @@ Deno.serve(async (req) => {
       const admin = createClient(supabaseUrl, serviceKey);
       const { data: cfg, error: cfgErr } = await admin
         .from("ai_provider_config")
-        .select("id, provider, model, encrypted_api_key, azure_endpoint, azure_deployment")
+        .select("id, provider, model, updated_at, encrypted_api_key, azure_endpoint, azure_deployment")
         .eq("purpose", purpose)
         .eq("is_active", true)
         .maybeSingle();
       if (cfgErr) { console.error("ai-config-test cfg", cfgErr.code); return jsonErr("Kunne ikke hente lagret konfig", 500); }
       if (!cfg) return jsonErr("Ingen lagret AI-konfig — lim inn API-key for å teste", 400);
-      if (body.config_id && body.config_id !== cfg.id) return jsonErr("Konfigurasjonen er endret — last siden på nytt", 409);
-      if (provider && provider !== cfg.provider) return jsonErr("Lagret nøkkel kan bare testes mot sin egen leverandør", 400);
-      if (azure_endpoint || azure_deployment) return jsonErr("Endepunkt kan ikke overstyres for lagret nøkkel", 400);
-      const chosen = model ?? cfg.model;
-      if (chosen !== cfg.model && !isCatalogModel(cfg.provider, chosen)) return jsonErr("Modellen er ikke tillatt", 400);
+      // Før dekryptering: eksakt id + revisjon, ellers avvis (aldri test mot en annen/ny nøkkel).
+      const g = guardStoredKeyTest(body, { id: cfg.id, provider: cfg.provider, model: cfg.model, updated_at: String(cfg.updated_at) });
+      if (!g.ok) return jsonErr(g.error, g.status);
+      const chosen = g.model;
       try {
         api_key = await decryptWithKey(cfg.encrypted_api_key, "AI_CONFIG_ENCRYPTION_KEY");
       } catch {
