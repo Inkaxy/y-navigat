@@ -43,12 +43,12 @@ begin
   log := log || format('%s utelat_flagget=%s; ', case when (r->>'ok')::boolean then 'ok' else 'FEIL' end, r->>'error');
 
   -- (a) rm_supplier_items: eldre åpen linje bestemmer kortet.
-  select x into it from jsonb_array_elements(public.rm_supplier_items(le, sup, null, null, 50, 0)->'items') x where x->>'item_key' = 'sku:TSTQ1';
+  select x into it from jsonb_array_elements(public.rm_supplier_items(le, sup, null, null, 50, 0)->'items') x where x->>'item_key' = 'sku:tstq1';
   log := log || format('%s varekort_eldre_apen last_invoice=%s open=%s; ',
     case when it->>'last_invoice_id' = ia::text and (it->>'open_lines')::int = 1 then 'ok' else 'FEIL' end, it->>'last_invoice_id', it->>'open_lines');
   -- (a) rm_work_items: kortet finnes fortsatt i arbeidskøen.
   ok := exists (select 1 from jsonb_array_elements(public.rm_work_items(le, 'alle', null, sup, 'oldest', 50, 0)->'items') x
-                where x->>'item_key' = 'sku:TSTQ1' and x->>'type' = 'varekort');
+                where x->>'item_key' = 'sku:tstq1' and x->>'type' = 'varekort');
   log := log || format('%s arbeidsko_eldre_apen; ', case when ok then 'ok' else 'FEIL' end);
   -- (b) Flagget utelatt dokument: ingen oppgave og ingen flaggteller.
   ok := position(ic::text in public.rm_work_items(le, 'alle', null, sup, 'oldest', 50, 0)::text) = 0;
