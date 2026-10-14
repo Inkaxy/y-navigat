@@ -48,7 +48,9 @@ interface Props {
  * mangler, og konkrete neste handlinger. Lagrer ingenting selv.
  */
 export function AiSuggestionCard({ suggestion: s, rawMaterialName, canWrite, onApply, onCreateDraft, onNotItem, appliedNote }: Props) {
-  const read = s.evidence.filter((e) => e.source === "faktura");
+  // «faktura» = server-kontrollert originalrad; «registrert_linje» = lagret linje (kan være feillest).
+  const read = isFromOriginal(s) ? s.evidence.filter((e) => e.source === "faktura") : [];
+  const registered = s.evidence.filter((e) => e.source === "registrert_linje" || (e.source === "faktura" && !isFromOriginal(s)));
   const known = s.evidence.filter((e) => e.source === "kjent_vare" || e.source === "korrigering");
   const doubts = [...s.rejected, ...s.uncertainties];
   const prefill = draftToPrefill(s);
@@ -67,8 +69,14 @@ export function AiSuggestionCard({ suggestion: s, rawMaterialName, canWrite, onA
       <SourceNote s={s} />
       {read.length > 0 && (
         <div>
-          <h5 className="text-caption font-semibold">{isFromOriginal(s) ? "Registrert linje" : "Fra registrert linje"}</h5>
+          <h5 className="text-caption font-semibold">Lest i originalen</h5>
           <ul className="text-caption text-ink-secondary">{read.map((e, i) => <li key={i}>{e.field}: {e.value}</li>)}</ul>
+        </div>
+      )}
+      {registered.length > 0 && (
+        <div>
+          <h5 className="text-caption font-semibold">Fra registrert linje – ikke kontrollert mot originalen</h5>
+          <ul className="text-caption text-ink-secondary">{registered.map((e, i) => <li key={`r${i}`}>{e.field}: {e.value}</li>)}</ul>
         </div>
       )}
 
