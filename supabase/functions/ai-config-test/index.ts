@@ -5,6 +5,10 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { callAi, type AiProvider } from "../_shared/ai-providers.ts";
 import { decryptWithKey } from "../_shared/crypto.ts";
 
+/** Modeller som kan testes med lagret nøkkel, per lagret provider. Tilkoblingstest — ikke kvalitetsbevis. */
+const TESTABLE_MODELS: Record<string, readonly string[]> = {
+  openai: ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-6.1-sol", "gpt-6-luna"],
+};
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
