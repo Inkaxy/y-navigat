@@ -98,6 +98,17 @@ export interface SupplierItemLine {
   line_kind: string | null;
   cost_posted: boolean | null;
   in_price_history: boolean | null;
+  /** Prislesekontekst (rm_supplier_item_lines v2). price_context=false = eldre svar uten feltene → ukjent. */
+  price_context?: boolean;
+  discount_amount?: number | null;
+  unit_price_basis?: string | null;
+  extraction_issues?: unknown;
+  line_updated_at?: string | null;
+  rm_item_type?: string | null;
+  rm_base_unit?: string | null;
+  invoice_source?: string | null;
+  invoice_lines_source?: string | null;
+  invoice_approved?: boolean | null;
 }
 
 export interface PackageInference {

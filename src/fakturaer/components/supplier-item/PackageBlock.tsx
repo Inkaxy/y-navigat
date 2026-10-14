@@ -1,5 +1,6 @@
 import { Loader2 } from "lucide-react";
-import { PackageFields } from "@/ravarer/editors/PackageFields";
+import { PackageSpecFields } from "@/fakturaer/components/package/PackageSpecFields";
+import type { PackageSpecInput } from "@/fakturaer/lib/packageSpec";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import type { PackageInference } from "@/fakturaer/lib/supplierItems";
@@ -10,8 +11,10 @@ interface Props {
   idPrefix: string;
   baseUnit: string;
   packageUnit: string;
-  value: string;
-  onChange: (v: string) => void;
+  /** Rå enhet på fakturalinjen. */
+  invoiceUnit: string | null;
+  value: PackageSpecInput;
+  onChange: (v: PackageSpecInput) => void;
   confirm: boolean;
   onConfirm: (v: boolean) => void;
   inference: PackageInference | undefined;
@@ -35,15 +38,7 @@ export function PackageBlock(p: Props) {
   }
   return (
     <div className="space-y-2">
-      <PackageFields
-        inputId={`${p.idPrefix}-bupp`}
-        baseUnit={p.baseUnit}
-        units={p.value}
-        onUnitsChange={p.onChange}
-        packageUnit={p.packageUnit}
-        onPackageUnitChange={() => undefined}
-        lockedUnit={p.packageUnit}
-      />
+      <PackageSpecFields idPrefix={p.idPrefix} baseUnit={p.baseUnit} invoiceUnit={p.invoiceUnit} value={p.value} onChange={p.onChange} containerEditable />
       {p.loading && <Loader2 className="h-4 w-4 animate-spin text-ink-secondary" aria-label="Regner ut pakning" />}
       {p.inference?.explanation && <p className="text-caption text-ink-secondary">{p.inference.explanation}</p>}
       {p.inference?.source && (

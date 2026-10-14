@@ -75,6 +75,11 @@ function parseLine(o: Obj): SupplierItemLine | null {
     raw_material_id: str(o, "raw_material_id"), raw_material_name: str(o, "raw_material_name"), match_confidence: str(o, "match_confidence"),
     requires_review: bool(o, "requires_review"), review_reason: str(o, "review_reason"), resolution_note: str(o, "resolution_note"),
     created_at: str(o, "created_at"), line_kind: str(o, "line_kind"), cost_posted: bool(o, "cost_posted"), in_price_history: bool(o, "in_price_history"),
+    // Konteksten er bare komplett når serveren faktisk sendte feltene (nøkkelen finnes), ikke når de mangler.
+    price_context: "line_updated_at" in o && "discount_amount" in o && "unit_price_basis" in o && str(o, "line_updated_at") != null,
+    discount_amount: num(o, "discount_amount"), unit_price_basis: str(o, "unit_price_basis"), extraction_issues: o.extraction_issues ?? null,
+    line_updated_at: str(o, "line_updated_at"), rm_item_type: str(o, "rm_item_type"), rm_base_unit: str(o, "rm_base_unit"),
+    invoice_source: str(o, "invoice_source"), invoice_lines_source: str(o, "invoice_lines_source"), invoice_approved: bool(o, "invoice_approved"),
   };
 }
 

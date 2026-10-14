@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Minus, Plus, RefreshCw, Maximize2 } from "lucide-react";
+import { classifyDocumentOrigin, ORIGIN_LABEL, type DocumentOrigin } from "@/fakturaer/lib/documentOrigin";
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from "pdfjs-dist";
 // Arbeideren bygges inn som egen fil i appen (førsteparts), ingen ekstern PDF-tjeneste.
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -148,6 +149,25 @@ function DocumentView({ data, title, fallback, className, onReload }: { data: Do
 
   const pages = doc?.numPages ?? 0;
 
+  // Kildemerking fra dokumentets eget innhold (metadata + første sides tekst). Feil gir «ukjent», aldri «original».
+  const [origin, setOrigin] = useState<{ origin: DocumentOrigin; evidence: string | null } | null>(null);
+  useEffect(() => {
+    setOrigin(null);
+    if (!doc) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const meta = await doc.getMetadata();
+        const info = (meta.info ?? {}) as { Producer?: unknown; Creator?: unknown };
+        const p1 = await doc.getPage(1);
+        const tc = await p1.getTextContent();
+        const text = tc.items.map((i) => ("str" in i ? i.str : "")).join(" ");
+        if (!cancelled) setOrigin(classifyDocumentOrigin({ producer: typeof info.Producer === "string" ? info.Producer : null, creator: typeof info.Creator === "string" ? info.Creator : null, text }));
+      } catch { if (!cancelled) setOrigin({ origin: "ukjent", evidence: null }); }
+    })();
+    return () => { cancelled = true; };
+  }, [doc]);
+
   useEffect(() => {
     if (!doc || !canvasRef.current || width <= 0) return;
     let cancelled = false;
@@ -194,6 +214,11 @@ function DocumentView({ data, title, fallback, className, onReload }: { data: Do
           <Button size="icon" variant="ghost" className="min-h-[44px] min-w-[44px]" aria-label="Forrige side" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
           <span className="tabular-nums" aria-live="polite">Side {Math.min(page, pages)} av {pages}</span>
           <Button size="icon" variant="ghost" className="min-h-[44px] min-w-[44px]" aria-label="Neste side" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
+          {origin && (
+            <span data-testid="dokumentkilde" title={origin.evidence ?? undefined} className={cn("rounded-md border px-2 py-0.5 text-caption", origin.origin === "tripletex_generert" ? "border-warning/40 bg-warning/10 text-warning" : "border-line-subtle text-ink-secondary")}>
+              {ORIGIN_LABEL[origin.origin]}
+            </span>
+          )}
           <span className="ml-auto" />
           <Button size="icon" variant="ghost" className="min-h-[44px] min-w-[44px]" aria-label="Zoom ut" onClick={() => step(-0.25)}><Minus className="h-4 w-4" /></Button>
           <span className="w-14 text-center tabular-nums">{zoomPct == null ? "Bredde" : `${zoomPct} %`}</span>

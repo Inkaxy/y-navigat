@@ -1,11 +1,11 @@
+import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import { PackageSpecFields } from "@/fakturaer/components/package/PackageSpecFields";
+import { initialContainer } from "@/fakturaer/lib/packageSpec";
 import { Button } from "@/components/ui/button";
-import { PackageFields } from "@/ravarer/editors/PackageFields";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import type { LineMatchForm } from "@/fakturaer/hooks/useLineMatchForm";
-import { CANONICAL_BASE_UNITS, fmtNum, normalizeUnit, parsePackageFromDescription, toBaseFactor } from "@/fakturaer/lib/units";
+import { fmtNum, normalizeUnit, parsePackageFromDescription } from "@/fakturaer/lib/units";
 
 /**
  * «Hvor mye inneholder én eske?» — svaret oppgis i råvarens grunnenhet (eller en
@@ -18,6 +18,8 @@ export function PackageForm({ line, form }: { line: ReviewLineRow; form: LineMat
   const parsed = parsePackageFromDescription(line.description);
   const draft = form.packageDraft;
   const cost = form.cost;
+  // «Kjøpes som» er visning/kontroll her: fakturaens enhet endres bare via «Rett fakturalinje».
+  const [container, setContainer] = useState(() => initialContainer(line.unit));
 
   if (form.materialLoading) {
     return (
@@ -39,7 +41,6 @@ export function PackageForm({ line, form }: { line: ReviewLineRow; form: LineMat
   if (!base) return <p className="text-caption text-ink-secondary">Velg råvare for å fylle inn pakningen.</p>;
 
   const isPieces = base === "stk";
-  const units = CANONICAL_BASE_UNITS.filter((u) => toBaseFactor(u, base) != null);
   const used = cost && !cost.needsInput ? cost.baseUnitsPerPackage : null;
   const draftUsed = draft.state === "valid" && used != null && Math.abs(used - draft.baseUnitsPerPackage) < 1e-9;
 
@@ -61,38 +62,14 @@ export function PackageForm({ line, form }: { line: ReviewLineRow; form: LineMat
             : " Det er et forslag til du bekrefter."}
         </p>
       )}
-      <div className={isPieces ? "" : "grid grid-cols-[1fr_8rem] gap-2"}>
-        <PackageFields
-          inputId={`pkg-size-${line.id}`}
-          baseUnit={base}
-          unitsLabel={isPieces ? `Antall stk per ${unit}` : `Innhold per ${unit}`}
-          units={form.packageSize}
-          onUnitsChange={form.setPackageSize}
-          packageUnit={unit}
-          onPackageUnitChange={() => undefined}
-          lockedUnit={line.unit ?? ""}
-          invalid={draft.state === "invalid"}
-        />
-        {!isPieces && (
-          <div>
-            <Label htmlFor={`pkg-unit-${line.id}`} className="text-caption">
-              Enhet
-            </Label>
-            <Select value={form.packageUnit || base} onValueChange={form.setPackageUnit}>
-              <SelectTrigger id={`pkg-unit-${line.id}`} className="mt-1">
-                <SelectValue placeholder="Velg" />
-              </SelectTrigger>
-              <SelectContent>
-                {units.map((u) => (
-                  <SelectItem key={u} value={u}>
-                    {u}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-      </div>
+      <PackageSpecFields
+        idPrefix={`pkg-${line.id}`}
+        baseUnit={base}
+        invoiceUnit={line.unit}
+        value={{ container, size: form.packageSize, contentUnit: form.packageUnit || base }}
+        onChange={(v) => { setContainer(v.container); if (v.size !== form.packageSize) form.setPackageSize(v.size); if (v.contentUnit !== (form.packageUnit || base)) form.setPackageUnit(v.contentUnit); }}
+        containerEditable
+      />
       {draft.state === "invalid" ? (
         <p role="alert" className="rounded-md bg-warning/10 px-3 py-2 text-caption text-warning">
           {draft.reason}

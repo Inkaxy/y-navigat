@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { parseTypeUnitApply, parseTypeUnitPreview } from "@/fakturaer/lib/typeUnitCorrection";
+import { blockerText, parseTypeUnitApply, parseTypeUnitPreview } from "@/fakturaer/lib/typeUnitCorrection";
 
 const RM = "11111111-1111-4111-8111-111111111111";
 const calls: Record<string, unknown>[] = [];
@@ -13,7 +13,7 @@ let previewData: unknown = preview();
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: RM, item_type: "emballasje", base_unit: "stk" }, error: null }) }) }) }),
+    from: () => { const q = { eq: () => q, maybeSingle: async () => ({ data: { id: RM, item_type: "emballasje", base_unit: "stk", legal_entity_id: "le-a" }, error: null }) }; return { select: () => q }; },
     rpc: async (_fn: string, args: Record<string, unknown>) => {
       calls.push(args);
       return args.p_dry_run ? { data: previewData, error: null } : applyImpl();
@@ -39,7 +39,7 @@ describe("parsere", () => {
 
 describe("Rett varetype og måleenhet", () => {
   beforeEach(() => { calls.length = 0; previewData = preview(); });
-  const open = () => render(<TypeUnitCorrectionDialog rawMaterialId={RM} rawMaterialName="Florapan" open onOpenChange={() => {}} canWrite />, { wrapper: wrap });
+  const open = () => render(<TypeUnitCorrectionDialog companyId="le-a" rawMaterialId={RM} rawMaterialName="Florapan" open onOpenChange={() => {}} canWrite />, { wrapper: wrap });
 
   it("viser konsekvenser, krever begrunnelse, sender eksakt revisjon; ukjent utfall gjentas med samme opId", async () => {
     applyImpl = async () => ({ data: null, error: new Error("nett") });
@@ -70,5 +70,32 @@ describe("Rett varetype og måleenhet", () => {
     expect(await screen.findByText(/må rettes først – mengdene endres ikke automatisk/)).toBeTruthy();
     fireEvent.change(screen.getByLabelText(/Begrunnelse/), { target: { value: "Leveres i poser à 100 gram" } });
     expect((screen.getByRole("button", { name: "Lagre retting" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("frossen kontekst: forelder bytter vare/selskap under uavklart utfall – «Prøv igjen» sender identisk payload", async () => {
+    applyImpl = async () => ({ data: null, error: new Error("nett") });
+    const ui = (company: string, rm: string) => <TypeUnitCorrectionDialog companyId={company} rawMaterialId={rm} rawMaterialName="X" open onOpenChange={() => {}} canWrite />;
+    const r = render(ui("le-a", RM), { wrapper: wrap });
+    fireEvent.click(await screen.findByRole("button", { name: "Råvare" }));
+    fireEvent.click(screen.getByRole("button", { name: "kg" }));
+    fireEvent.change(screen.getByLabelText(/Begrunnelse/), { target: { value: "Leveres i poser à 100 gram" } });
+    await waitFor(() => expect((screen.getByRole("button", { name: "Lagre retting" }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: "Lagre retting" }));
+    await screen.findByText(/Utfallet er ukjent/);
+    r.rerender(ui("le-b", "22222222-2222-4222-8222-222222222222"));
+    fireEvent.click(screen.getByRole("button", { name: "Prøv igjen" }));
+    await waitFor(() => expect(calls.filter((c) => c.p_dry_run === false)).toHaveLength(2));
+    const [a, b] = calls.filter((c) => c.p_dry_run === false);
+    expect(b).toEqual(a);
+    expect(b.p_raw_material_id).toBe(RM);
+  });
+
+  it("gjenbrukt op avvises, gjentak uten tellere er ukjent (null), lagersperre ber ikke om nullstilling", () => {
+    expect(parseTypeUnitApply({ ok: false, error: "op_gjenbrukt" }, RM)).toMatchObject({ kind: "rejected", error: "op_gjenbrukt" });
+    const r = parseTypeUnitApply({ ok: true, already: true, raw_material_id: RM, updated_at: "x", item_type: "ravare", base_unit: "kg", package_confirmations_reset: 2 }, RM);
+    expect(r).toMatchObject({ kind: "saved", openInvoicesRequeued: null });
+    const t = blockerText({ code: "lager_finnes", count: 1 });
+    expect(t).toMatch(/Lagergrunnlaget må avklares/);
+    expect(t).not.toMatch(/Juster lageret til 0/);
   });
 });

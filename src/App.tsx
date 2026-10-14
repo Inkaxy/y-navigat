@@ -67,6 +67,7 @@ const RegnestykkePreviewContent = lazy(() => import("./dev/RegnestykkePreviewCon
 const ArbeidsbordPreviewContent = lazy(() => import("./dev/ArbeidsbordPreviewContent"));
 const HoldUtenforPreview = lazy(() => import("./dev/HoldUtenforPreview"));
 const AiForslagPreview = lazy(() => import("./dev/AiForslagPreview"));
+const FlorapanFlytPreview = lazy(() => import("./dev/FlorapanFlytPreview"));
 const VaretellingPreviewContent = lazy(() => import("./dev/VaretellingPreviewContent"));
 const Integrasjoner = lazy(() => import("./pages/admin/Integrasjoner"));
 const IntegrasjonDetalj = lazy(() => import("./pages/admin/IntegrasjonDetalj"));
@@ -296,6 +297,7 @@ const App = () => (
               <Route path="/forhandsvisning/arbeidsbord" element={<ArbeidsbordPreviewContent />} />
               <Route path="/forhandsvisning/hold-utenfor" element={<HoldUtenforPreview />} />
               <Route path="/forhandsvisning/ai-forslag" element={<AiForslagPreview />} />
+              <Route path="/forhandsvisning/florapan-flyt" element={<FlorapanFlytPreview />} />
               <Route path="/forhandsvisning/varetelling" element={<VaretellingPreviewContent />} />
               <Route path="/glemt-passord" element={<ForgotPassword />} />
               <Route path="/velg-passord" element={<SetPortalPassword />} />

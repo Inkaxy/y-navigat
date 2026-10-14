@@ -16,10 +16,11 @@ export interface TypeUnitPreview {
   priceHistoryToSupersede: number;
   packageConfirmationsToReset: number;
   openInvoices: number;
+  approvedInvoicesSkipped: number;
 }
 
 export type TypeUnitApply =
-  | { kind: "saved"; already: boolean; updatedAt: string; itemType: string; baseUnit: string; packageConfirmationsReset: number; priceHistorySuperseded: number; openInvoicesRequeued: number }
+  | { kind: "saved"; already: boolean; updatedAt: string; itemType: string; baseUnit: string; packageConfirmationsReset: number; priceHistorySuperseded: number; openInvoicesRequeued: number | null; approvedInvoicesSkipped: number | null }
   | { kind: "rejected"; error: string; blockers: TypeUnitBlocker[] }
   | { kind: "unknown" };
 
@@ -49,10 +50,11 @@ export function parseTypeUnitPreview(data: unknown, rawMaterialId: string): Type
     updatedAt, from: { itemType: str(from, "item_type") ?? "", baseUnit: str(from, "base_unit") ?? "" }, unitChanges, typeChanges, blockers,
     compatibleRecipeLines: num(data, "compatible_recipe_lines") ?? 0, priceHistoryToSupersede: num(data, "price_history_to_supersede") ?? 0,
     packageConfirmationsToReset: num(data, "package_confirmations_to_reset") ?? 0, openInvoices: num(data, "open_invoices") ?? 0,
+    approvedInvoicesSkipped: num(data, "approved_invoices_skipped") ?? 0,
   };
 }
 
-const KNOWN_REJECTIONS = new Set(["versjon_endret", "sperret", "ingen_endring", "begrunnelse_mangler", "ugyldig_varetype", "ugyldig_grunnenhet", "op_mangler"]);
+const KNOWN_REJECTIONS = new Set(["versjon_endret", "sperret", "ingen_endring", "begrunnelse_mangler", "ugyldig_varetype", "ugyldig_grunnenhet", "op_mangler", "op_gjenbrukt"]);
 
 export function parseTypeUnitApply(data: unknown, rawMaterialId: string): TypeUnitApply {
   if (!isObj(data)) return { kind: "unknown" };
@@ -68,7 +70,9 @@ export function parseTypeUnitApply(data: unknown, rawMaterialId: string): TypeUn
     kind: "saved", already: data.already === true, updatedAt, itemType, baseUnit,
     packageConfirmationsReset: num(data, "package_confirmations_reset") ?? 0,
     priceHistorySuperseded: num(data, "price_history_superseded") ?? 0,
-    openInvoicesRequeued: num(data, "open_invoices_requeued") ?? 0,
+    // Gjentak returnerer den opprinnelige kvitteringen; mangler et tall der, er det ukjent (null), ikke 0.
+    openInvoicesRequeued: num(data, "open_invoices_requeued"),
+    approvedInvoicesSkipped: num(data, "approved_invoices_skipped"),
   };
 }
 
@@ -80,10 +84,11 @@ export const REJECTION_TEXT: Record<string, string> = {
   ugyldig_varetype: "Ugyldig varetype.",
   ugyldig_grunnenhet: "Ugyldig grunnenhet.",
   op_mangler: "Teknisk feil: mangler operasjons-ID.",
+  op_gjenbrukt: "Forespørselen passer ikke til den opprinnelige rettingen. Ingenting er lagret – lukk og åpne rettingen på nytt.",
 };
 
 export function blockerText(b: TypeUnitBlocker): string {
   if (b.code === "kost_fort") return `Kostpris er ført på ${b.count} fakturalinje(r). Reverser føringen før grunnenheten endres.`;
-  if (b.code === "lager_finnes") return "Varen har lagerbeholdning. Juster lageret til 0 før grunnenheten endres.";
+  if (b.code === "lager_finnes") return "Varen har registrert lagerbeholdning i dagens enhet. Lagergrunnlaget må avklares (hva beholdningen faktisk er målt i) før grunnenheten kan endres. Ikke nullstill reelt lager for å komme forbi kontrollen.";
   return `${b.lines.length} oppskriftslinje(r) bruker en enhet som ikke passer den nye grunnenheten (${[...new Set(b.lines.map((l) => l.unit ?? "ukjent"))].join(", ")}). Oppskriftene må rettes først – mengdene endres ikke automatisk.`;
 }
