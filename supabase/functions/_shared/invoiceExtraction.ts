@@ -117,12 +117,11 @@ export function lineDiscountFrom(l: Record<string, unknown>, pct: number | null,
   const printed = parsePrintedAmount(l.discount_amount_raw);
   const model = num(l.discount_amount);
   if (printed != null && printed !== 0) {
-    const sign = String(l.discount_amount_raw).trim();
     const isReduction = printed < 0 || l.discount_kind === "rabatt";
     if (!isReduction) return null;
     const abs = Math.abs(printed);
     if (model != null && Math.abs(Math.abs(model) - abs) > 0.005) return null;
-    return sign ? r2(abs) : null;
+    return r2(abs);
   }
   return discountAmountFrom(pct, total);
 }

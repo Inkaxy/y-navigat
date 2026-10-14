@@ -3,7 +3,7 @@
 // lesekontroll (rm_line_read_issues_v2) regner med riktig grunnlag i stedet for å gjette.
 import { parsePackageFromDescription } from "../_shared/units.ts";
 import { resolveLineNumbers } from "../_shared/numberTokens.ts";
-import { LINE_KINDS, normalizeUnit, num, toDbPriceBasis, discountAmountFrom, type DbPriceBasis } from "../_shared/invoiceExtraction.ts";
+import { LINE_KINDS, normalizeUnit, num, toDbPriceBasis, lineDiscountFrom, type DbPriceBasis } from "../_shared/invoiceExtraction.ts";
 
 export interface InvoiceLineRow {
   invoice_id: string;
@@ -74,7 +74,8 @@ export function toInvoiceLineRows(rawLines: unknown, invoiceId: string, ledgerAc
       const nums = resolveLineNumbers(l, factor);
       const total = nums.total_amount;
       const discRaw = num(l.discount_amount);
-      const discount = discRaw != null && discRaw > 0 ? discRaw : discountAmountFrom(num(l.discount_pct), total);
+      // Trykt rabattbeløp bindes til råteksten; aldri avledet fra differansen antall×pris − sum.
+      const discount = l.discount_amount_raw == null && discRaw != null && discRaw > 0 ? discRaw : lineDiscountFrom(l, num(l.discount_pct), total);
       return {
         invoice_id: invoiceId,
         line_number: i + 1,
