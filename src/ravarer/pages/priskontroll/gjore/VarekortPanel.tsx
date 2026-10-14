@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -175,6 +175,7 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
   onDone: (r: PanelResult) => void; onNext?: () => void; onSkip?: () => void; onClose: () => void;
 }) {
   const { data: company } = useCompany();
+  const navigate = useNavigate();
   const link = useLinkSupplierItem();
   const linked = !!item.rm_id && item.status !== "ukoblet";
   const pkgOk = linked && item.status !== "mangler_pakning";
@@ -236,7 +237,7 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
     <div className="space-y-4">
       <VarekortHeaderView item={item} openInvoices={scope.invoices} />
       <ReviewPlanCard plan={plan} basis={basis}
-        onBasisAction={(k) => { if (k === "pakning") { setEditPkg(true); setEditForm(true); } else window.location.assign(paths.priskontroll({ fane: "verktoy" }).replace(/\?.*$/, "") + "/verktoy/reberegn"); }}
+        onBasisAction={(k) => { if (k === "pakning") { setEditPkg(true); setEditForm(true); } else navigate(paths.reberegn()); }}
         returnTo={typeof window !== "undefined" ? window.location.pathname + window.location.search : undefined}
         onAction={(step) => { if (step === "pakning" || step === "vare") { setEditPkg(step === "pakning"); setEditForm(true); return true; } return false; }} />
       {insightSrc && lines.length > 1 && (
