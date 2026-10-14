@@ -86,7 +86,7 @@ export function parseSupplierItemLines(data: Json | null | undefined): SupplierI
   });
 }
 
-const SOURCES = ["regnestykke_og_varenavn", "regnestykke", "varenavn"] as const;
+const SOURCES = ["bekreftet_pakning", "regnestykke_og_varenavn", "regnestykke", "varenavn"] as const;
 
 export function parsePackageInference(data: Json | null | undefined): PackageInference {
   const o = isObj(data) ? data : {};

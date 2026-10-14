@@ -81,7 +81,7 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
     const inf = inference.data;
     if (!inf || inf.direct) return;
     if (!touched.bupp) setBupp(inf.suggested_bupp != null ? String(inf.suggested_bupp).replace(".", ",") : "");
-    if (!touched.confirm) setConfirm(inf.source === "regnestykke_og_varenavn");
+    if (!touched.confirm) setConfirm(inf.source === "regnestykke_og_varenavn" || inf.source === "bekreftet_pakning");
   }, [inference.data, touched.bupp, touched.confirm]);
 
   const pkgNeeded = !inference.data?.direct && needsPackage(refLine?.unit, baseUnit);

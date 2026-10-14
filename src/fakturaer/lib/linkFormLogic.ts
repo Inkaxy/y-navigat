@@ -34,6 +34,7 @@ export function nameFromDescription(desc: string | null | undefined): string {
 }
 
 export const SOURCE_LABEL: Record<NonNullable<PackageInference["source"]>, string> = {
+  bekreftet_pakning: "Bekreftet tidligere for samme beholder",
   regnestykke_og_varenavn: "Regnestykket og varenavnet er enige",
   regnestykke: "Bare regnestykket",
   varenavn: "Bare varenavnet",
