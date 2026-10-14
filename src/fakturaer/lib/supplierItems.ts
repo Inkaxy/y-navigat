@@ -108,7 +108,7 @@ export interface PackageInference {
   description: { count: number | null; size: number | null; unit: string | null; total: number | null; bupp: number | null } | null;
   agrees: boolean;
   suggested_bupp: number | null;
-  source: "regnestykke_og_varenavn" | "regnestykke" | "varenavn" | null;
+  source: "bekreftet_pakning" | "regnestykke_og_varenavn" | "regnestykke" | "varenavn" | null;
   auto_confirmable: boolean;
   /** Fakturaenheten kan regnes rett om til grunnenheten — pakning trengs ikke. */
   direct: boolean;

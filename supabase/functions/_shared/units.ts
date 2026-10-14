@@ -7,19 +7,19 @@
 export type CanonicalUnit =
   | "g" | "kg" | "ml" | "cl" | "dl" | "l"
   | "stk"
-  | "eske" | "pakke" | "sekk" | "flaske" | "rull" | "spann" | "kanne" | "boks" | "brett"
+  | "eske" | "pakke" | "sekk" | "pose" | "flaske" | "rull" | "spann" | "kanne" | "boks" | "brett"
   | "pall" | "palleboks" | "konteiner" | "glass" | "beger" | "tube" | "bunt" | "par" | "kolli" | "bulk";
 
 const BASE_UNITS = new Set<CanonicalUnit>(["g", "kg", "ml", "cl", "dl", "l", "stk"]);
 
 const PACKAGE_UNITS = new Set<CanonicalUnit>([
-  "eske", "pakke", "sekk", "flaske", "rull", "spann", "kanne", "boks", "brett",
+  "eske", "pakke", "sekk", "pose", "flaske", "rull", "spann", "kanne", "boks", "brett",
   "pall", "palleboks", "konteiner", "glass", "beger", "tube", "bunt", "par", "kolli", "bulk",
 ]);
 
 /** Kanoniske pakke-enheter, i visningsrekkefølge — brukes av nedtrekkene i Råvarer. */
 export const CANONICAL_PACKAGE_UNITS: CanonicalUnit[] = [
-  "sekk", "eske", "pakke", "spann", "boks", "flaske", "kanne", "glass", "beger",
+  "sekk", "pose", "eske", "pakke", "spann", "boks", "flaske", "kanne", "glass", "beger",
   "tube", "brett", "rull", "bunt", "par", "kolli", "pall", "palleboks", "konteiner", "bulk",
 ];
 
@@ -42,8 +42,9 @@ const UNIT_ALIASES: Record<string, CanonicalUnit> = {
   esk: "eske", eske: "eske", ks: "eske", ksk: "eske", krt: "eske", krg: "eske",
   kart: "eske", kartong: "eske", bx: "eske", box: "eske", carton: "eske", ct: "eske",
   pk: "pakke", pak: "pakke", pakke: "pakke", pack: "pakke",
-  pos: "sekk", pose: "sekk", poser: "sekk", sk: "sekk", sekk: "sekk", sekker: "sekk",
-  bag: "sekk", bags: "sekk", sack: "sekk", sacks: "sekk",
+  sk: "sekk", sekk: "sekk", sekker: "sekk", sack: "sekk", sacks: "sekk",
+  // Pose er egen beholder (ikke sekk): samme pakningskategori, men etiketten bevares.
+  pos: "pose", pose: "pose", poser: "pose", posen: "pose", bag: "pose", bags: "pose",
   fl: "flaske", btl: "flaske", flaske: "flaske", bottle: "flaske",
   rl: "rull", rull: "rull", roll: "rull",
   spn: "spann", spann: "spann",
@@ -407,6 +408,7 @@ export interface ResolveLineCostInput {
 
 const PLURALS: Record<string, string> = {
   sekk: "sekker",
+  pose: "poser",
   eske: "esker",
   pakke: "pakker",
   flaske: "flasker",
