@@ -132,6 +132,12 @@ export interface SuggestContext {
   packages?: KnownPackageVariant[];
   categories: string[];
   corrections: unknown[];
+  /**
+   * Originalgrunnlag (satt av serveren). «tekst»: raden er funnet entydig i PDF-ens tekstlag (verifisert);
+   * «pdf»: PDF sendt, raden bare modell-lest; «ingen»/utelatt: original ikke kontrollert.
+   * Den registrerte linjen kan være feillest og er aldri originalbevis.
+   */
+  original?: { mode: "tekst" | "pdf" | "ingen"; row: string | null; by: "sku" | "beskrivelse" | null };
 }
 
 /** line_kind som allerede er satt autoritativt og aldri er en vare. */
@@ -158,7 +164,9 @@ export function buildSuggestUserText(c: SuggestContext): string {
   ].join("\n\n");
 }
 
-export interface Evidence { field: string; value: string; source: "faktura" | "kjent_vare" | "korrigering" | "forslag" }
+/** faktura = lest i kontrollert original; registrert_linje = fra lagret (mulig feillest) linje. */
+export const EVIDENCE_SOURCES = ["faktura", "registrert_linje", "kjent_vare", "korrigering", "forslag"] as const;
+export interface Evidence { field: string; value: string; source: (typeof EVIDENCE_SOURCES)[number] }
 export interface ValidatedDraft { name: string; item_type: (typeof ITEM_TYPES)[number]; category: string | null; base_unit: (typeof BASE_UNITS)[number] | null; supplier_sku: string | null }
 export interface ValidatedSuggestion {
   decision: Decision;
@@ -224,6 +232,15 @@ export function packExpressions(text: string | null | undefined): PackExpr[] {
 const sameExpr = (a: PackExpr, b: PackExpr) => near(a.size, b.size) && a.unit === b.unit && (a.count ?? 1) === (b.count ?? 1);
 
 export interface ValidatedPackage { size: number | null; unit: string | null; count: number | null; source: "faktura" | "kjent_vare" | null }
+
+/** Varenummeret står på raden som eget nummer («5301» treffer ikke «5301 0»/«53012»), mellomrom inni tolereres. */
+export function skuInRow(row: string | null | undefined, sku: string | null | undefined): boolean {
+  const s = (sku ?? "").replace(/\s+/g, "");
+  if (!row || !s) return false;
+  const pat = [...s].map((ch) => ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s*");
+  return new RegExp(`(?<![\\p{L}\\d])${pat}(?!\\s*\\d)(?![\\p{L}])`, "iu").test(row);
+}
+const exprKey = (es: PackExpr[]) => es.map((e) => `${e.count ?? 1}x${e.size}${e.unit}`).sort().join("|");
 
 /**
  * Pakning godtas bare når den svarer til ETT konkret pakningsuttrykk i linjeteksten (størrelse+enhet+antall),
@@ -298,10 +315,29 @@ export function validateLineSuggestion(raw: unknown, c: SuggestContext): Validat
     ...(c.packages ?? []).filter((p) => p.confirmed && sku && normSku(p.supplier_sku_norm) === sku),
     ...c.known.filter((k) => k.confirmed && sku && normSku(k.supplier_sku) === sku),
   ];
-  const pkg = validatePackage(
-    { size: finiteOrNull(o.package_size), unit: strOrNull(o.package_unit, 20), count: finiteOrNull(o.count_per_package) },
-    c.line.description, variants, rejected,
-  );
+  // Pakningsbevis: verifisert originalrad hvis den finnes; ellers den registrerte linjen, merket som registrert.
+  const om = c.original?.mode ?? "ingen";
+  const verifiedRow = om === "tekst" ? c.original?.row ?? null : null;
+  const modelRow = om === "pdf" ? strOrNull(o.original_row_text, 300) : null;
+  const differences = om === "ingen" ? [] : strList(o.original_differences, 10);
+  const modelPkg = { size: finiteOrNull(o.package_size), unit: strOrNull(o.package_unit, 20), count: finiteOrNull(o.count_per_package) };
+  const regExprs = packExpressions(c.line.description);
+  let pkg: ValidatedPackage;
+  let pkgFromRegistered = false;
+  if (verifiedRow) {
+    const rowExprs = packExpressions(verifiedRow);
+    if (regExprs.length && exprKey(regExprs) !== exprKey(rowExprs)) {
+      uncertainties.push(`Registrert linje sier «${regExprs.map((e) => e.raw).join(", ")}», originalen «${rowExprs.map((e) => e.raw).join(", ") || "ingen pakning"}»; rett linjen via «Rett fakturalinje».`);
+    }
+    pkg = validatePackage(modelPkg, verifiedRow, variants, rejected);
+  } else if (om === "pdf" && (differences.length > 0 || (modelRow != null && exprKey(packExpressions(modelRow)) !== exprKey(regExprs)))) {
+    // Kildemotstrid uten verifisert rad: ingen pakningsautofyll fra hverken registrert linje eller modellens lesing.
+    if (modelPkg.size != null || modelPkg.count != null) rejected.push("Originalen og registrert linje er ikke like, og raden er ikke kontrollert i tekstlaget; pakningen er ikke brukt.");
+    pkg = { size: null, unit: null, count: null, source: null };
+  } else {
+    pkg = validatePackage(modelPkg, c.line.description, variants, rejected);
+    pkgFromRegistered = pkg.source === "faktura";
+  }
   const packageSize = pkg.size;
   const countPer = pkg.count;
   const packageUnit = pkg.unit && (PACKAGE_UNITS as readonly string[]).includes(pkg.unit) ? pkg.unit : null;
@@ -315,12 +351,18 @@ export function validateLineSuggestion(raw: unknown, c: SuggestContext): Validat
       if (cat && !known) rejected.push(`Kategorien «${cat}» finnes ikke i selskapet; ikke brukt.`);
       const modelSku = strOrNull(o.draft.supplier_sku, 64);
       if (modelSku && normSku(modelSku) !== sku) rejected.push("Leverandørvarenummeret i forslaget skilte seg fra fakturaen; fakturaens brukes.");
+      // Varenummeret i utkastet kommer fra registrert linje; når originalen er sendt må det stå på originalraden.
+      const regSku = c.line.supplier_sku?.trim() || null;
+      const skuOk = !regSku || om === "ingen"
+        || (om === "tekst" ? (c.original?.by === "sku" || skuInRow(verifiedRow, regSku)) : (differences.length === 0 && skuInRow(modelRow, regSku)));
+      if (regSku && !skuOk) rejected.push(`Varenummeret «${regSku}» på registrert linje er ikke bekreftet i originalraden; utkastet får ikke varenummer.`);
+      var draftSku: string | null = skuOk ? regSku : null;
       draft = {
         name,
         item_type: oneOf(o.draft.item_type, ITEM_TYPES) ?? (lineClass === "emballasje" ? "emballasje" : lineClass === "handelsvare" ? "videresalg" : "ravare"),
         category: known,
         base_unit: oneOf(o.draft.base_unit, BASE_UNITS),
-        supplier_sku: c.line.supplier_sku?.trim() || null,
+        supplier_sku: draftSku,
       };
     }
   }
@@ -349,7 +391,8 @@ export function validateLineSuggestion(raw: unknown, c: SuggestContext): Validat
     ? o.evidence.filter(isRec).map((e) => ({
         field: strOrNull(e.field, 60) ?? "",
         value: strOrNull(e.value, 160) ?? "",
-        source: oneOf(e.source, ["faktura", "kjent_vare", "korrigering", "forslag"] as const) ?? "forslag",
+        // Uten verifisert originalrad er «lest fra fakturaen» bare lest fra den registrerte linjen.
+        source: ((s) => (s === "faktura" && !verifiedRow ? "registrert_linje" : s))(oneOf(e.source, EVIDENCE_SOURCES) ?? "forslag"),
       })).filter((e) => e.field && e.value)
     : [];
   // Bevis vises bare for felt som faktisk er validert. Forkastet pakning/vare/utkast presenteres aldri som lest.
@@ -362,7 +405,7 @@ export function validateLineSuggestion(raw: unknown, c: SuggestContext): Validat
     if (isRmField(e.field) && !rmId) return false;
     if (isDraftField(e.field) && !draft) return false;
     if (isBasisField(e.field)) return false; // prisgrunnlag valideres ikke på serveren → vises bare som forslag under
-    if (/pris|price|beløp|sum/i.test(e.field) && e.source !== "faktura") return false;
+    if (/pris|price|beløp|sum/i.test(e.field) && e.source !== "faktura" && e.source !== "registrert_linje") return false;
     return true;
   }).slice(0, 10);
   // Modellens prisgrunnlag er alltid et forslag, aldri lest fakta — det brukes aldri automatisk.
@@ -372,7 +415,7 @@ export function validateLineSuggestion(raw: unknown, c: SuggestContext): Validat
     if (!missing.some((m) => /prisgrunnlag/i.test(m))) missing.push("Prisgrunnlag må bekreftes");
   }
   if (packageSize != null) {
-    evidence.unshift({ field: "pakning", value: `${countPer ? `${countPer} × ` : ""}${String(packageSize).replace(".", ",")} ${packageUnit ?? ""}`.trim(), source: pkg.source ?? "faktura" });
+    evidence.unshift({ field: "pakning", value: `${countPer ? `${countPer} × ` : ""}${String(packageSize).replace(".", ",")} ${packageUnit ?? ""}`.trim(), source: pkgFromRegistered ? "registrert_linje" : pkg.source ?? "faktura" });
   }
 
   return {
