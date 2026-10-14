@@ -35,9 +35,9 @@ export async function decryptWithKey(payload: string, envName: string): Promise<
   if (v !== "v1") throw new Error("Unsupported payload version");
   const key = await getKey(envName);
   const plain = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: unb64(ivB64) },
+    { name: "AES-GCM", iv: unb64(ivB64) as Uint8Array<ArrayBuffer> },
     key,
-    unb64(cipherB64),
+    unb64(cipherB64) as Uint8Array<ArrayBuffer>,
   );
   return new TextDecoder().decode(plain);
 }
