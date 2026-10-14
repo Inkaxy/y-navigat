@@ -110,7 +110,9 @@ describe("kildeparitet", () => {
   it("ingen stille mva-skalering i leseren", () => {
     expect(ex).not.toMatch(/fixVatScaledLines|\* factor/);
     expect(ex).toContain("rm_extraction_examples_for");
-    expect(ex).toContain("line_kind (string)");
+    // Prompten ligger i delt fil (byte-identisk, importert av leseren og modellsammenligningen).
+    expect(ex).toContain("INVOICE_EXTRACTION_SYSTEM_PROMPT");
+    expect(readFileSync("supabase/functions/_shared/invoiceExtractionPrompt.ts", "utf8")).toContain("line_kind (string)");
   });
   it("importen sender leverandør og bevarer posterings-mva", () => {
     expect(imp).toContain("supplier_id: supplierId");
