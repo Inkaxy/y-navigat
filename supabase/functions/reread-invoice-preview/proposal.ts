@@ -46,11 +46,13 @@ export interface SnapshotInvoice { supplier_id: string | null; invoice_number: s
 export interface SnapshotLine { supplier_sku: string | null; description: string | null }
 
 /** Ekstraktorforespørsel bygget KUN fra lagret snapshot. Fakturaens total er inkl. mva. */
-export function buildExtractorRequest(a: { legalEntityId: string; invoice: SnapshotInvoice; lines: SnapshotLine[]; supplierName: string | null; pdfBase64: string }) {
+export function buildExtractorRequest(a: { legalEntityId: string; invoice: SnapshotInvoice; lines: SnapshotLine[]; supplierName: string | null; pdfBase64: string; invoiceId?: string | null }) {
   const incl = finiteOrNull(a.invoice.total_amount);
   const vat = finiteOrNull(a.invoice.total_vat);
   return {
     legal_entity_id: a.legalEntityId,
+    // Bare for bruksloggen (kostnad per faktura); leseren kontrollerer selskap selv.
+    invoice_id: a.invoiceId ?? null,
     supplier_id: a.invoice.supplier_id,
     supplier_name: a.supplierName,
     invoice_number: a.invoice.invoice_number,

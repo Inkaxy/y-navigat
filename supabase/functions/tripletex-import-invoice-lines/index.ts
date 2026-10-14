@@ -250,6 +250,7 @@ Deno.serve(async (req) => {
             },
             body: JSON.stringify({
               legal_entity_id: legalEntityId,
+              invoice_id: inv.id,
               pdf_base64: toBase64(buf),
               expected_total_excl_vat: expectedExcl,
               expected_total_incl_vat: totalAmount,

@@ -70,7 +70,7 @@ export async function runPreview(deps: Deps, userId: string, runId: unknown): Pr
   }
   const sha = await sha256Hex(pdf);
   const supplierName = inv.supplier_id ? await deps.supplierName(run.legal_entity_id, inv.supplier_id) : null;
-  const req = buildExtractorRequest({ legalEntityId: run.legal_entity_id, invoice: inv, lines, supplierName, pdfBase64: toBase64(pdf) });
+  const req = buildExtractorRequest({ legalEntityId: run.legal_entity_id, invoice: inv, lines, supplierName, pdfBase64: toBase64(pdf), invoiceId: run.invoice_id });
   let ex: { ok: boolean; status: number; json: unknown };
   try { ex = await deps.extract(req); } catch { return transportFailure("leser_transportfeil"); }
   if (!ex.ok) {
