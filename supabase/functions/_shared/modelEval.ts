@@ -26,8 +26,8 @@ const TOP_FIELDS = ["supplier_name", "supplier_org_number", "invoice_number", "i
 
 /**
  * Strict schema for fakturaleserens JSON: ALLE felt prompten ber om og parseren leser
- * (inkl. field_confidence, *_raw, unit_price_basis, discount_pct). discount_amount ber prompten ikke
- * om — parseren avleder den fra discount_pct og linjesum — så den er bevisst ikke i schemaet.
+ * (inkl. field_confidence, *_raw, unit_price_basis, discount_pct). discount_amount/_raw/_kind ber prompten om;
+ * parseren godtar bare trykt beløp bundet til råteksten (lineDiscountFrom).
  */
 export const INVOICE_EXTRACTION_SCHEMA: Record<string, unknown> = {
   type: "object",
@@ -47,14 +47,15 @@ export const INVOICE_EXTRACTION_SCHEMA: Record<string, unknown> = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["line_kind", "sku", "sku_raw", "ean", "description", "quantity", "quantity_raw", "unit", "unit_price", "unit_price_raw", "unit_price_unit_raw", "unit_price_basis", "total_amount", "total_amount_raw", "discount_pct", "vat_rate", "package_size", "package_unit", "count_per_package", "package_raw", "page_number", "confidence"],
+        required: ["line_kind", "sku", "sku_raw", "ean", "description", "quantity", "quantity_raw", "unit", "unit_price", "unit_price_raw", "unit_price_unit_raw", "unit_price_basis", "total_amount", "total_amount_raw", "discount_pct", "discount_amount", "discount_amount_raw", "discount_kind", "vat_rate", "package_size", "package_unit", "count_per_package", "package_raw", "page_number", "confidence"],
         properties: {
           line_kind: { anyOf: [{ type: "string", enum: ["vare", "pant", "frakt", "gebyr", "rabatt", "avrunding", "mva", "annet"] }, { type: "null" }] },
           sku: n("string"), sku_raw: n("string"), ean: n("string"), description: n("string"),
           quantity: n("number"), quantity_raw: n("string"), unit: n("string"),
           unit_price: n("number"), unit_price_raw: n("string"), unit_price_unit_raw: n("string"),
           unit_price_basis: { anyOf: [{ type: "string", enum: ["per_unit", "per_base"] }, { type: "null" }] },
-          total_amount: n("number"), total_amount_raw: n("string"), discount_pct: n("number"), vat_rate: n("number"),
+          total_amount: n("number"), total_amount_raw: n("string"), discount_pct: n("number"), discount_amount: n("number"), discount_amount_raw: n("string"),
+          discount_kind: { anyOf: [{ type: "string", enum: ["rabatt", "paslag"] }, { type: "null" }] }, vat_rate: n("number"),
           package_size: n("number"), package_unit: n("string"), count_per_package: n("number"), package_raw: n("string"),
           page_number: n("integer"), confidence: n("number"),
         },

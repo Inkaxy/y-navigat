@@ -30,6 +30,9 @@ Felter som skal hentes:
     er per kg/liter mens quantity er i pakninger (kontroll: quantity × innhold × unit_price = total_amount)
   - total_amount (number) eller null — linjesum EKSKLUSIVE MVA etter linjerabatt, slik den står i sum-kolonnen
   - discount_pct (number) eller null — linjerabatt i prosent når fakturaen viser det
+  - discount_amount_raw (string) eller null — trykt rabatt-/påslagsbeløp i kroner nøyaktig slik det står («-3 079,90»), ellers null
+  - discount_amount (number) eller null — samme beløp som POSITIVT fradrag når det er rabatt; null for påslag eller når ingen rabatt er trykt. Regn aldri ut rabatt fra differansen mellom antall×pris og linjesum.
+  - discount_kind (string) eller null — "rabatt" (fradrag) eller "paslag" (tillegg) etter kolonnens tekst, ellers null
   - vat_rate (number) eller null
   - package_size (number) eller null — størrelse per sub-enhet fra beskrivelsen (10 for "10l bib", 90 for "36X90G", 25 for "25KG")
   - package_unit (string) eller null — enhet for package_size ("g", "kg", "l", "ml", "dl", "cl", "stk")
