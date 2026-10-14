@@ -1,8 +1,8 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 import { AI_REASON_LABELS, fetchAiLineSuggestion } from "@/fakturaer/lib/aiLineSuggestion";
+import { AiSuggestionCard, useRawMaterialName } from "@/fakturaer/components/AiSuggestionCard";
 
 export function confidenceWord(c: number | null): "høy" | "middels" | "lav" {
   if (c == null) return "lav";
@@ -14,16 +14,8 @@ export function confidenceWord(c: number | null): "høy" | "middels" | "lav" {
 /** «Hent AI-forslag» på siste åpne linje. Forslaget velges aldri automatisk. */
 export function AiSuggestion({ lineId, onPick }: { lineId: string; onPick: (rawMaterialId: string) => void }) {
   const ai = useMutation({ mutationFn: () => fetchAiLineSuggestion({ invoiceLineId: lineId }) });
-  const rmId = ai.data?.suggestion?.rawMaterialId ?? null;
-  const rm = useQuery({
-    queryKey: ["ai-suggestion-rm", rmId],
-    enabled: !!rmId,
-    queryFn: async () => {
-      const { data, error } = await supabase.from("raw_materials").select("id, name").eq("id", rmId!).maybeSingle();
-      if (error) throw new Error("Kunne ikke hente råvaren");
-      return data;
-    },
-  });
+  const s = ai.data?.suggestion ?? null;
+  const rm = useRawMaterialName(s?.rawMaterialId ?? null);
 
   if (!ai.data) {
     return (
@@ -32,15 +24,10 @@ export function AiSuggestion({ lineId, onPick }: { lineId: string; onPick: (rawM
       </Button>
     );
   }
-  const s = ai.data.suggestion;
-  if (!s || !rmId) return <p className="text-caption text-ink-secondary">{ai.data.reason ? AI_REASON_LABELS[ai.data.reason] : "AI-hjelpen fant ikke noe forslag."}</p>;
+  if (!s) return <p className="text-caption text-ink-secondary">{ai.data.reason ? AI_REASON_LABELS[ai.data.reason] : "AI-hjelpen fant ikke noe forslag."}</p>;
+  // Ny vare opprettes fra varekortets egen «Ny råvare»-flyt; her vises utkastet som informasjon.
   return (
-    <div className="space-y-1 rounded-md border border-line-subtle p-2 text-sm">
-      <p>
-        AI foreslår <strong>{rm.data?.name ?? "…"}</strong> <span className="text-caption text-ink-secondary">(sikkerhet {confidenceWord(s.confidence)})</span>
-      </p>
-      {s.explanation && <p className="text-caption text-ink-secondary">{s.explanation}</p>}
-      <Button type="button" size="sm" variant="outline" onClick={() => onPick(rmId)}>Bruk forslaget</Button>
-    </div>
+    <AiSuggestionCard suggestion={s} rawMaterialName={rm.data ?? null} canWrite
+      onApply={s.rawMaterialId ? () => onPick(s.rawMaterialId!) : undefined} />
   );
 }

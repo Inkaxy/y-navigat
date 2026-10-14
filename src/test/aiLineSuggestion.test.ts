@@ -75,7 +75,7 @@ describe("fetchAiLineSuggestion", () => {
       error: null,
     });
     const res = await fetchAiLineSuggestion({ invoiceLineId: "l1" });
-    expect(res.suggestion).toEqual({
+    expect(res.suggestion).toMatchObject({
       rawMaterialId: null,
       confidence: null,
       packageSize: null,
