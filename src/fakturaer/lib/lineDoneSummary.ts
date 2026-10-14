@@ -1,4 +1,4 @@
-import { normalizeUnit, toBaseQuantity } from "@/fakturaer/lib/units";
+import { normalizeUnit, toBaseFactor } from "@/fakturaer/lib/units";
 import type { PriceGate } from "@/fakturaer/lib/financialPresentation";
 
 /** Bekreftet leverandørpakning slik den vises på linjen. */
@@ -40,8 +40,8 @@ function sameContent(lineSize: number | null | undefined, lineUnit: string | nul
   const ls = Number(lineSize);
   if (lineSize == null || !Number.isFinite(ls) || !lineUnit) return false;
   if (norm(lineUnit) === norm(unit)) return Math.abs(ls - size) <= 1e-9;
-  const a = toBaseQuantity(ls, lineUnit), b = toBaseQuantity(size, unit);
-  return !!a && !!b && a.unit === b.unit && Math.abs(a.quantity - b.quantity) <= 1e-9 * Math.max(1, b.quantity);
+  const f = toBaseFactor(lineUnit, unit);
+  return f != null && Math.abs(ls * f - size) <= 1e-9 * Math.max(1, size);
 }
 
 /**

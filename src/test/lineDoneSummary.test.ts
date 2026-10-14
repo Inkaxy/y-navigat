@@ -35,3 +35,22 @@ describe("ferdig linje", () => {
     expect(reasonGate("credit_note")).toMatchObject({ action: "review_credit_note" });
   });
 });
+
+describe("confirmedPackageFor – fysisk beholder", () => {
+  const link = { package_size: 100, package_unit: "g", base_units_per_package: 0.1, package_confirmed_at: "2026-10-14T12:31:51Z", container_unit: "pose" };
+  it("samme innhold, beholder pose vs sekk ⇒ null", () => {
+    expect(confirmedPackageFor(link, { package_size: 100, package_unit: "g", unit: "sekk" })).toBeNull();
+  });
+  it("alias «poser» ⇒ pose bekreftet, beholder fra koblingen", () => {
+    expect(confirmedPackageFor(link, { package_size: 100, package_unit: "g", unit: "Poser" })?.container).toBe("pose");
+  });
+  it("0,1 kg på linjen = 100 g bekreftet", () => {
+    expect(confirmedPackageFor(link, { package_size: 0.1, package_unit: "kg", unit: "pose" })).not.toBeNull();
+  });
+  it("ukjent lagret beholder ⇒ null", () => {
+    expect(confirmedPackageFor({ ...link, container_unit: null }, { package_size: 100, package_unit: "g", unit: "pose" })).toBeNull();
+  });
+  it("ubekreftet ⇒ null", () => {
+    expect(confirmedPackageFor({ ...link, package_confirmed_at: null }, { package_size: 100, package_unit: "g", unit: "pose" })).toBeNull();
+  });
+});
