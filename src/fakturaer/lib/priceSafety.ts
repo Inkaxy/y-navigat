@@ -149,9 +149,9 @@ const REASONS: Record<string, { label: string; action: ActionRequired; detail?: 
   base_quantity_conflicts: { label: "Avklar pakning og mengdegrunnlag", action: "complete_link_or_package" },
   price_observation_held: { label: "Prisgrunnlaget er til kontroll", action: "confirm_price_basis" },
   price_reference_unverified: {
-    label: "Ingen dokumentert tidligere kjøpspris å sammenligne med",
+    label: "Dokumentert tidligere kjøpspris er ikke avklart",
     action: "confirm_price_basis",
-    detail: "Sammenligningen krever en tidligere kjøpspris fra samme leverandør i NOK før fakturadatoen som er godkjent som kostgrunnlag, og linjens referanse må peke på nettopp den. Det finnes ikke ennå, så prisvirkning beregnes ikke og kostprisen settes ikke fra denne linjen. Neste steg: kontroller de eldste åpne fakturaene for varen først.",
+    detail: "Referansen mangler eller kan ikke bekreftes som en godkjent tidligere kjøpspris fra samme leverandør i NOK før fakturadatoen. Prisvirkning beregnes ikke, og kostprisen settes ikke fra denne linjen. Neste steg: kontroller de eldste åpne fakturaene for varen først.",
   },
 };
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -215,6 +216,16 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
   // Bare når koblingens varenummer er varekortets — ellers kan rms_id være en annen leverandørvare.
   const canMoveLink = item.rms_sku_matches === true && !!item.rms_id;
   const locked = lockedOpenLines(lines);
+  // Lagret fysisk beholder for leverandørkoblingen (ikke i varekort-DTO-en). Ukjent ⇒ pakningen vises ikke som bekreftet.
+  const container = useQuery({
+    queryKey: ["supplier-link-container", item.rms_id],
+    enabled: !!item.rms_id && !!item.package_confirmed_at,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("raw_material_suppliers").select("container_unit").eq("id", item.rms_id ?? "").maybeSingle();
+      if (error) throw new Error("Kunne ikke hente leverandørens beholder.");
+      return data?.container_unit ?? null;
+    },
+  });
   // Alle åpne linjer er låst (internt godkjent / ført kost): ingen skrivende skjema her, planen er autoritativ.
   const readOnly = locked != null;
 
@@ -263,7 +274,7 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
         <p className="text-sm font-medium" data-testid="valgt-faktura">Valgt faktura {insightSrc.invoice_number ?? "uten nummer"}{insightSrc.invoice_date ? ` · ${insightSrc.invoice_date.split("-").reverse().join(".")}` : ""}{insightSrc.is_credit_note ? " · kreditnota" : ""}</p>
       )}
       {insightSrc && discountArithmeticText(insightSrc) && <p className="rounded-md bg-muted/50 px-3 py-2 text-sm tabular-nums" data-testid="rabatt-regnestykke">Trykt på fakturaen: {discountArithmeticText(insightSrc)}</p>}
-      {insightLine && insightSrc && <LineInsightPanel line={insightLine} clarifications={lineClarifications(insightLine)} baseUnit={item.rm_base_unit} confirmedPackage={confirmedPackageFor(item, insightSrc)} />}
+      {insightLine && insightSrc && <LineInsightPanel line={insightLine} clarifications={lineClarifications(insightLine)} baseUnit={item.rm_base_unit} confirmedPackage={container.isSuccess ? confirmedPackageFor({ ...item, container_unit: container.data }, insightSrc) : null} />}
 
       {locked ? (
         <div role="status" className="space-y-1 rounded-md border border-line-subtle bg-muted/40 p-3 text-sm" data-testid="laast-varekort">

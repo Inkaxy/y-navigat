@@ -80,7 +80,7 @@ const link: SupplierLinkRow = {
   package_size: 25,
   package_unit: "kg",
   base_units_per_package: 25,
-  package_confirmed_at: "2026-02-01",
+  package_confirmed_at: "2026-02-01", container_unit: null,
   agreed_price_per_base_unit: 14.5,
   last_invoice_price: 15.2,
   last_invoice_date: "2026-09-08",

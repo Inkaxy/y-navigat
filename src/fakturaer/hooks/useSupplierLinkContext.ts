@@ -12,6 +12,7 @@ export interface SupplierLinkRow {
   package_unit: string | null;
   base_units_per_package: number | null;
   package_confirmed_at: string | null;
+  container_unit: string | null;
   agreed_price_per_base_unit: number | null;
   last_invoice_price: number | null;
   last_invoice_date: string | null;
@@ -55,7 +56,7 @@ export function useSupplierLinkContext(supplierIds: readonly string[]): Supplier
           .from("raw_material_suppliers")
           .select(
             `id, raw_material_id, supplier_sku, supplier_product_name, package_size, package_unit,
-             base_units_per_package, package_confirmed_at, agreed_price_per_base_unit,
+             base_units_per_package, package_confirmed_at, container_unit, agreed_price_per_base_unit,
              last_invoice_price, last_invoice_date,
              raw_material:raw_materials(name, sku, base_unit, category)`,
           )
