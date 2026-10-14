@@ -57,9 +57,7 @@ export function PackageSpecFields(p: Props) {
       {spec.state === "invalid" && <p role="alert" className="rounded-md bg-warning/10 px-3 py-2 text-caption text-warning">{spec.reason}</p>}
       {spec.containerMismatch && (
         <p className="rounded-md bg-warning/10 px-3 py-2 text-caption text-warning">
-          {p.containerEditable
-            ? `Fakturaen sier «${p.invoiceUnit}», du har valgt «${p.value.container}». Pakningen lagres for leverandøren som ${p.value.container}; fakturalinjen endres ikke.`
-            : `Fakturaen sier «${p.invoiceUnit}». Skal linjen være ${p.value.container}, rett fakturalinjen («Rett fakturalinje») med begrunnelse.`}
+          {`Fakturaen sier «${p.invoiceUnit}». Skal linjen være ${p.value.container}, rett fakturalinjen («Rett fakturalinje») med begrunnelse. Pakningen kan ikke lagres før beholderen stemmer.`}
         </p>
       )}
     </div>

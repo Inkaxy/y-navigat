@@ -68,7 +68,7 @@ export function PackageForm({ line, form }: { line: ReviewLineRow; form: LineMat
         invoiceUnit={line.unit}
         value={{ container, size: form.packageSize, contentUnit: form.packageUnit || base }}
         onChange={(v) => { setContainer(v.container); if (v.size !== form.packageSize) form.setPackageSize(v.size); if (v.contentUnit !== (form.packageUnit || base)) form.setPackageUnit(v.contentUnit); }}
-        containerEditable
+        containerEditable={false}
       />
       {draft.state === "invalid" ? (
         <p role="alert" className="rounded-md bg-warning/10 px-3 py-2 text-caption text-warning">

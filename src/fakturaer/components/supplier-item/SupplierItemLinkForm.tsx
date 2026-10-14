@@ -1,3 +1,4 @@
+import { packageSavePayload } from "@/fakturaer/lib/packageSpec";
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
@@ -131,7 +132,9 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
       };
     } else if (selectedId) body.raw_material_id = selectedId;
     if (pkgNeeded && !(existingPkg && !editPkg) && buppNum != null) {
-      body.package = { base_units_per_package: buppNum, package_unit: spec.container || refLine?.unit || undefined, confirm };
+      const payload = packageSavePayload(specState);
+      if (!payload) return;
+      body.package = { ...payload, confirm };
     }
     void submit(body);
   };
