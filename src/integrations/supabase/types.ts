@@ -3315,6 +3315,12 @@ export type Database = {
           created_at: string | null
           description: string | null
           discount_amount: number | null
+          excluded_at: string | null
+          excluded_by: string | null
+          excluded_raw_material_id: string | null
+          exclusion_category: string | null
+          exclusion_prev: Json | null
+          exclusion_reason: string | null
           expected_price_per_base_unit: number | null
           extraction_evidence: Json | null
           extraction_issues: Json
@@ -3355,6 +3361,12 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           discount_amount?: number | null
+          excluded_at?: string | null
+          excluded_by?: string | null
+          excluded_raw_material_id?: string | null
+          exclusion_category?: string | null
+          exclusion_prev?: Json | null
+          exclusion_reason?: string | null
           expected_price_per_base_unit?: number | null
           extraction_evidence?: Json | null
           extraction_issues?: Json
@@ -3395,6 +3407,12 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           discount_amount?: number | null
+          excluded_at?: string | null
+          excluded_by?: string | null
+          excluded_raw_material_id?: string | null
+          exclusion_category?: string | null
+          exclusion_prev?: Json | null
+          exclusion_reason?: string | null
           expected_price_per_base_unit?: number | null
           extraction_evidence?: Json | null
           extraction_issues?: Json
@@ -3761,6 +3779,11 @@ export type Database = {
           currency: string | null
           due_date: string | null
           ehf_payload: Json | null
+          excluded_at: string | null
+          excluded_by: string | null
+          exclusion_category: string | null
+          exclusion_prev: Json | null
+          exclusion_reason: string | null
           extraction_confidence: number | null
           extraction_issues: Json
           flag_action_type: string | null
@@ -3808,6 +3831,11 @@ export type Database = {
           currency?: string | null
           due_date?: string | null
           ehf_payload?: Json | null
+          excluded_at?: string | null
+          excluded_by?: string | null
+          exclusion_category?: string | null
+          exclusion_prev?: Json | null
+          exclusion_reason?: string | null
           extraction_confidence?: number | null
           extraction_issues?: Json
           flag_action_type?: string | null
@@ -3855,6 +3883,11 @@ export type Database = {
           currency?: string | null
           due_date?: string | null
           ehf_payload?: Json | null
+          excluded_at?: string | null
+          excluded_by?: string | null
+          exclusion_category?: string | null
+          exclusion_prev?: Json | null
+          exclusion_reason?: string | null
           extraction_confidence?: number | null
           extraction_issues?: Json
           flag_action_type?: string | null
@@ -16746,6 +16779,10 @@ export type Database = {
         Args: { p_invoice_id: string }
         Returns: string
       }
+      _rm_line_exclusion_blocker: {
+        Args: { p_line_id: string }
+        Returns: string
+      }
       _rm_manual_pdf_enqueue_match: {
         Args: { p_invoice_id: string; p_replay: boolean }
         Returns: boolean
@@ -19099,6 +19136,16 @@ export type Database = {
       rm_rematch_queue_cleanup: { Args: never; Returns: number }
       rm_rematch_status: { Args: { p_legal_entity_id: string }; Returns: Json }
       rm_rematch_tick: { Args: { p_slots?: number }; Returns: Json }
+      rm_reopen_invoice_exclusion: {
+        Args: {
+          p_expected_updated_at: string
+          p_invoice_id: string
+          p_line_id: string
+          p_reason: string
+          p_scope: string
+        }
+        Returns: Json
+      }
       rm_repair_invoice_vat: { Args: { p_invoice_id: string }; Returns: Json }
       rm_repair_invoice_vat_batch: {
         Args: { p_legal_entity_id: string; p_limit?: number }
@@ -19137,6 +19184,18 @@ export type Database = {
       }
       rm_set_extraction_example_active: {
         Args: { p_active: boolean; p_example_id: string; p_reason?: string }
+        Returns: Json
+      }
+      rm_set_invoice_exclusion: {
+        Args: {
+          p_category: string
+          p_expected_updated_at: string
+          p_invoice_id: string
+          p_line_id: string
+          p_op_id: string
+          p_reason: string
+          p_scope: string
+        }
         Returns: Json
       }
       rm_set_primary_supplier: {
