@@ -31,7 +31,7 @@ describe("ferdig linje", () => {
     expect(doneSummary(0, ok).price).toBeNull();
   });
   it("andre sperrer er uendret", () => {
-    expect(reasonGate("price_observation_held").label).toBe("Prisgrunnlaget er til kontroll");
-    expect(reasonGate("credit_note").action).toBe("review_credit_note");
+    expect(reasonGate("price_observation_held")).toMatchObject({ label: "Prisgrunnlaget er til kontroll" });
+    expect(reasonGate("credit_note")).toMatchObject({ action: "review_credit_note" });
   });
 });
