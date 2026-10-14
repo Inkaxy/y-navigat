@@ -1,6 +1,6 @@
 import { assertEquals } from "jsr:@std/assert@1";
 import { alignLineRow, readPdfText } from "../_shared/pdfText.ts";
-import { unpdfExtract } from "../_shared/pdfTextRuntime.ts";
+import { boundedExtract, unpdfExtract, type GetDocument } from "../_shared/pdfTextRuntime.ts";
 import { fetchVerifiedOriginal } from "../_shared/invoiceOriginal.ts";
 
 /** Minimal PDF med to tekstrader (syntetisk, ingen ekte faktura). */
@@ -33,7 +33,7 @@ Deno.test("unpdf leser tekstlag i Deno-runtime og finner fullt varenummer", asyn
 });
 
 Deno.test("tidsavbrudd og feil gir fallback, aldri ok", async () => {
-  const slow = () => new Promise<never>(() => {});
+  const slow = (_b: Uint8Array, _o: unknown) => new Promise<never>(() => {});
   const r = await readPdfText(new Uint8Array(10), slow, { maxBytes: 100, maxPages: 1, maxChars: 10, timeoutMs: 20, minCharsPerPage: 1 });
   assertEquals(r.status, "tidsavbrudd");
   const bad = await readPdfText(new Uint8Array(10), () => Promise.reject(new Error("x")));
@@ -52,4 +52,58 @@ Deno.test("original: endret versjon etter nedlasting avvises", async () => {
   assertEquals(r.bytes, null);
   const missing = await fetchVerifiedOriginal({ maxBytes: 100, documentVersion: () => Promise.resolve({ ok: true, available: false }), download: () => Promise.resolve(null) });
   assertEquals(missing.status, "mangler");
+});
+
+function fakeDoc(numPages: number, opts: { hangAt?: number; text?: string } = {}) {
+  const read: number[] = [];
+  let destroyed = 0;
+  const get: GetDocument = () => ({
+    promise: Promise.resolve({
+      numPages,
+      getPage: (n: number) => {
+        read.push(n);
+        if (opts.hangAt === n) return new Promise(() => {});
+        return Promise.resolve({ getTextContent: () => Promise.resolve({ items: [{ str: opts.text ?? `side ${n} med nok tekst til å telle` , hasEOL: true }] }) });
+      },
+    }),
+    destroy: () => { destroyed++; },
+  });
+  return { get, read, destroyed: () => destroyed };
+}
+
+Deno.test("side 21 leses aldri; dokumentet ryddes", async () => {
+  const f = fakeDoc(30);
+  const r = await readPdfText(new Uint8Array(10), boundedExtract(f.get), { maxBytes: 100, maxPages: 20, maxChars: 1e6, timeoutMs: 2000, minCharsPerPage: 1 });
+  assertEquals(Math.max(...f.read), 20);
+  assertEquals(r.pagesRead, 20);
+  assertEquals(r.truncated, true);
+  assertEquals(f.destroyed() >= 1, true);
+});
+
+Deno.test("tegngrense stopper sideiterasjonen før neste side", async () => {
+  const f = fakeDoc(30, { text: "x".repeat(500) });
+  await readPdfText(new Uint8Array(10), boundedExtract(f.get), { maxBytes: 100, maxPages: 20, maxChars: 1000, timeoutMs: 2000, minCharsPerPage: 1 });
+  assertEquals(f.read, [1, 2]);
+});
+
+Deno.test("tidsavbrudd ødelegger lastingen og leser ikke flere sider", async () => {
+  const f = fakeDoc(30, { hangAt: 3 });
+  const r = await readPdfText(new Uint8Array(10), boundedExtract(f.get), { maxBytes: 100, maxPages: 20, maxChars: 1e6, timeoutMs: 30, minCharsPerPage: 1 });
+  assertEquals(r.status, "tidsavbrudd");
+  assertEquals(f.destroyed() >= 1, true);
+  await new Promise((res) => setTimeout(res, 20));
+  assertEquals(f.read, [1, 2, 3]);
+});
+
+Deno.test("original: nedlasting som henger avbrytes med signal og gir ukjent", async () => {
+  let aborted = false;
+  const r = await fetchVerifiedOriginal({
+    maxBytes: 100, stepTimeoutMs: 30,
+    documentVersion: () => Promise.resolve({ ok: true, available: true, path: "p", version: "v1" }),
+    download: (_p, signal) => new Promise(() => { signal.addEventListener("abort", () => { aborted = true; }); }),
+  });
+  assertEquals(r.status, "ukjent");
+  assertEquals(aborted, true);
+  const rpcHang = await fetchVerifiedOriginal({ maxBytes: 100, stepTimeoutMs: 30, documentVersion: () => new Promise(() => {}), download: () => Promise.resolve(null) });
+  assertEquals(rpcHang.status, "ukjent");
 });
