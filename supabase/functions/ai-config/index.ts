@@ -3,6 +3,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { encryptWithKey } from "../_shared/crypto.ts";
+import { AI_MODEL_CATALOG, catalogEntry, validateModelSettings } from "../_shared/aiModelCatalog.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -47,7 +48,7 @@ Deno.serve(async (req) => {
         .order("purpose")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return new Response(JSON.stringify({ configs: data }), {
+      return new Response(JSON.stringify({ configs: data, catalog: AI_MODEL_CATALOG }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -85,6 +86,28 @@ Deno.serve(async (req) => {
       }).select("id").single();
       if (error) throw error;
       return new Response(JSON.stringify({ id: data.id }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "update_settings") {
+      // Bare modell/grenser på eksisterende aktiv konfig. Ingen nøkkel, provider eller endepunkt kan endres her.
+      const { id, purpose, provider, expected_updated_at, model, max_tokens, temperature } = body ?? {};
+      if (typeof id !== "string" || typeof purpose !== "string" || typeof provider !== "string" || typeof expected_updated_at !== "string" || !expected_updated_at) {
+        return jsonErr("id, purpose, provider og expected_updated_at er påkrevd", 400);
+      }
+      if ("api_key" in body || "azure_endpoint" in body || "azure_deployment" in body) return jsonErr("Nøkkel og endepunkt endres ikke her", 400);
+      const invalid = validateModelSettings(provider, model, max_tokens, temperature);
+      if (invalid) return jsonErr(invalid, 400);
+      const reasoning = catalogEntry(provider, String(model))?.reasoning === true;
+      // Én betinget UPDATE: id+purpose+provider+aktiv+eksakt revisjon (mikrosekundstreng sammenlignes av Postgres).
+      const { data, error } = await admin.from("ai_provider_config")
+        .update({ model, max_tokens, temperature })
+        .eq("id", id).eq("purpose", purpose).eq("provider", provider).eq("is_active", true).eq("updated_at", expected_updated_at)
+        .select("id, provider, model, max_tokens, temperature, is_active, purpose, azure_endpoint, azure_deployment, created_at, updated_at");
+      if (error) { console.error("ai-config update_settings", error.code); return jsonErr("Kunne ikke lagre innstillingene", 500); }
+      if (!Array.isArray(data) || data.length !== 1) return jsonErr("Konfigurasjonen er endret av noen andre — last inn på nytt", 409);
+      return new Response(JSON.stringify({ config: data[0], temperature_ignored: reasoning }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

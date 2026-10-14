@@ -27,26 +27,17 @@ import { Info, CheckCircle2, AlertCircle, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { SettingsSaveBar } from "./SettingsSaveBar";
 import { ModelEvalCard } from "./ModelEvalCard";
+import { catalogEntry, catalogModelsFor } from "../../../../supabase/functions/_shared/aiModelCatalog";
 
 type Provider = AiProvider;
 
-const MODELS: Record<Provider, { value: string; label: string; recommended?: boolean }[]> = {
-  anthropic: [
-    { value: "claude-sonnet-4-5", label: "Claude Sonnet 4.5", recommended: true },
-    { value: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet" },
-    { value: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku (raskere/billigere)" },
-  ],
-  openai: [
-    { value: "gpt-4o", label: "GPT-4o", recommended: true },
-    { value: "gpt-4o-mini", label: "GPT-4o mini" },
-    { value: "gpt-4.1", label: "GPT-4.1" },
-    { value: "gpt-4.1-mini", label: "GPT-4.1 mini" },
-  ],
-  azure_openai: [
-    { value: "gpt-4o", label: "GPT-4o (Azure deployment)" },
-    { value: "gpt-4o-mini", label: "GPT-4o-mini (Azure deployment)" },
-  ],
-};
+/** Felles katalog (samme som serverens allowlist). «Kandidat» = tilgjengelighetstestet, ikke kvalitetssikret. */
+const MODELS: Record<Provider, { value: string; label: string; reasoning: boolean }[]> = Object.fromEntries(
+  (["anthropic", "openai", "azure_openai"] as const).map((p) => [p, catalogModelsFor(p).map((m) => ({
+    value: m.id, reasoning: m.reasoning,
+    label: m.status === "kandidat" ? `${m.label} – kandidat, ikke kvalitetssikret` : m.label,
+  }))]),
+) as Record<Provider, { value: string; label: string; reasoning: boolean }[]>;
 
 export default function AiServicesSettings() {
   const embedded = useIsEmbedded();
@@ -145,7 +136,11 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
   const setProvider = (p: Provider) => set({ provider: p, model: MODELS[p].some((m) => m.value === d.model) || (existing?.provider === p && existing.model === d.model) ? d.model : "" });
   const setModel = (m: string) => set({ model: m });
   const modelOptions = [...MODELS[provider]];
-  if (model && !modelOptions.some((m) => m.value === model)) modelOptions.unshift({ value: model, label: `${model} (lagret)` });
+  if (model && !modelOptions.some((m) => m.value === model)) modelOptions.unshift({ value: model, label: `${model} (lagret)`, reasoning: false });
+  const isReasoning = !!model && (catalogEntry(provider, model)?.reasoning ?? /^(gpt-5|gpt-6|o\d)/i.test(model));
+  // Bare modell/grenser endret på lagret konfig: kan lagres uten ny nøkkel (update_settings).
+  const settingsOnly = !!existing && !apiKey.trim() && provider === existing.provider
+    && azureEndpoint === (existing.azure_endpoint ?? "") && azureDeployment === (existing.azure_deployment ?? "");
 
   const fieldError =
     !model ? "Velg modell." :
@@ -154,22 +149,22 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
     provider === "azure_openai" && (!azureEndpoint.trim() || !azureDeployment.trim()) ? "Azure krever endpoint og deployment." : null;
   // Tjenesten krever alltid ny nøkkel ved lagring — også for ikke-hemmelige endringer (ingen «behold nøkkel»).
   const keyNeeded = !apiKey.trim();
-  const saveBlock = fieldError ?? (keyNeeded ? (existing ? "Tjenesten lagrer alltid en ny konfigurasjon og krever at API-nøkkelen limes inn på nytt, også når du bare endrer modell eller grenser." : "Lim inn API-nøkkel.") : null);
+  const settingsModelBlock = settingsOnly && keyNeeded && model && !catalogEntry(provider, model) ? "Lagret modell står ikke i godkjent modelliste. Velg en modell fra listen for å lagre uten ny nøkkel." : null;
+  const saveBlock = fieldError ?? settingsModelBlock ?? (keyNeeded && !settingsOnly ? (existing ? "Bytte av leverandør eller endepunkt krever ny API-nøkkel." : "Lim inn API-nøkkel.") : null);
   // «Test lagret»: uten ny nøkkel kan bare den uendrede lagrede konfigurasjonen testes.
   const storedTestOnly = keyNeeded;
   const testBlock = storedTestOnly
-    ? !existing ? "Lim inn API-nøkkel for å teste." : draft && !sameAiDraft(d, baseline) ? "Ulagrede endringer kan bare testes med en ny API-nøkkel. Uten nøkkel testes lagret konfigurasjon — avbryt endringene først." : null
+    ? !existing ? "Lim inn API-nøkkel for å teste." : !settingsOnly ? "Bytte av leverandør eller endepunkt kan bare testes med ny API-nøkkel." : !model ? "Velg modell." : null
     : fieldError;
 
   const test = async () => {
     if (testBlock) return;
     setTesting(true); setTestResult(null);
-    const tested = storedTestOnly && existing ? `${existing.provider} · ${existing.model} (lagret)` : `${provider} · ${model}`;
+    const tested = storedTestOnly && existing ? `${existing.provider} · ${model} (lagret nøkkel)` : `${provider} · ${model}`;
     try {
       const body = storedTestOnly && existing
-        ? { provider: existing.provider, model: existing.model, purpose: "invoice_extraction",
-            azure_endpoint: existing.provider === "azure_openai" ? existing.azure_endpoint : undefined,
-            azure_deployment: existing.provider === "azure_openai" ? existing.azure_deployment : undefined }
+        // Lagret nøkkel: server avleder provider/endepunkt; bare modell innen samme provider kan velges.
+        ? { model, purpose: "invoice_extraction", config_id: existing.id }
         : { provider, api_key: apiKey.trim(), model, purpose: "invoice_extraction",
             azure_endpoint: provider === "azure_openai" ? azureEndpoint : undefined,
             azure_deployment: provider === "azure_openai" ? azureDeployment : undefined };
@@ -189,7 +184,7 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
         return;
       }
       if (isObj(data) && data.ok === true) {
-        setTestResult({ ok: true, message: `${tested}: modellen svarte «${typeof data.sample_response === "string" ? data.sample_response : ""}»` });
+        setTestResult({ ok: true, message: `${tested}: modellen svarte. Dette bekrefter bare tilkoblingen, ikke kvaliteten på fakturalesing.` });
       } else {
         setTestResult({ ok: false, message: `${tested}: ${isObj(data) && typeof data.error === "string" ? data.error : "Ukjent feil"}` });
       }
@@ -208,7 +203,12 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
     setSaveOutcome(null);
     let unknown = false;
     try {
-      const { data, error } = await supabase.functions.invoke("ai-config", {
+      const { data, error } = settingsOnly && existing ? await supabase.functions.invoke("ai-config", {
+        body: {
+          action: "update_settings", id: existing.id, purpose: existing.purpose, provider: existing.provider,
+          expected_updated_at: existing.updated_at, model, max_tokens: maxTokens, temperature,
+        },
+      }) : await supabase.functions.invoke("ai-config", {
         body: {
           action: "save", provider, api_key: frozen.key.trim(), model, max_tokens: maxTokens, temperature,
           purpose: "invoice_extraction",
@@ -218,9 +218,11 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
       });
       const status = error instanceof FunctionsHttpError ? error.context.status : null;
       if (!mounted.current) return;
-      if (error && status === 400) {
+      if (error && status === 409) {
+        setSaveOutcome({ kind: "rejected", message: "Konfigurasjonen er endret av noen andre. Ingenting er lagret — last inn på nytt og gjør endringen igjen." });
+      } else if (error && status === 400) {
         setSaveOutcome({ kind: "rejected", message: "Lagringen ble avvist (ugyldige felt eller nøkkel). Ingenting er endret." });
-      } else if (error || !parseAiSaveResult(data)) {
+      } else if (error || !(settingsOnly ? isObj(data) && isObj(data.config) && typeof data.config.id === "string" : parseAiSaveResult(data))) {
         unknown = true;
       } else {
         setApiKey((k) => (k === frozen.key ? "" : k));
@@ -330,7 +332,7 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
               className="min-h-[44px] md:min-h-10"
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              Krypteres før lagring og vises aldri tilbake. Lagring krever alltid nøkkel; sletting er en egen handling.
+              Krypteres før lagring og vises aldri tilbake. Modell og grenser kan endres uten ny nøkkel; ny leverandør eller nytt endepunkt krever nøkkel.
             </p>
           </div>
 
@@ -353,7 +355,8 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
           </div>
           <div>
             <Label htmlFor="ai-temp">Temperatur (variasjon)</Label>
-            <Input id="ai-temp" className="min-h-[44px] md:min-h-10" inputMode="decimal" value={d.temperature} onChange={(e) => set({ temperature: e.target.value })} />
+            <Input id="ai-temp" className="min-h-[44px] md:min-h-10" inputMode="decimal" value={d.temperature} onChange={(e) => set({ temperature: e.target.value })} aria-describedby="ai-temp-note" />
+            {isReasoning && <p id="ai-temp-note" className="mt-1 text-xs text-muted-foreground">Denne modellen resonnerer og bruker ikke temperatur; verdien lagres, men sendes ikke.</p>}
           </div>
         </div>
 
@@ -391,7 +394,7 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
         </div>
         <SettingsSaveBar dirty={dirty} saving={saving} canSave={dirty && !saveBlock && !saving && !recon}
           onSave={() => void save()} onCancel={() => { if (busy.current || recon) return; setDraft(null); setApiKey(""); setSaveOutcome(null); }}
-          saveLabel={existing ? "Erstatt konfigurasjon" : "Lagre konfigurasjon"} />
+          saveLabel={existing ? (settingsOnly ? "Lagre modell og grenser" : "Erstatt konfigurasjon") : "Lagre konfigurasjon"} />
       </CardContent>
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>

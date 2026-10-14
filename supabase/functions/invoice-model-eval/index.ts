@@ -11,6 +11,8 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { encodeBase64 } from "jsr:@std/encoding@1/base64";
+import { formatPdfTextForModel, pdfTextProfile } from "../_shared/pdfText.ts";
+import { readOriginalPdfText } from "../_shared/pdfTextRuntime.ts";
 import { decryptWithKey } from "../_shared/crypto.ts";
 import { AiCallError, callAi, COST_RATE_VERSION, extractJson, estimateCostUsd, hasCachedRate, usageOf, type AiCallResult, type AiUsage } from "../_shared/ai-providers.ts";
 import { runExtractionAttempts, type Hints, type LearningExample } from "../_shared/invoiceExtraction.ts";
@@ -71,7 +73,11 @@ Deno.serve(async (req) => {
     if (blob.size > EVAL_LIMITS.maxPdfBytes) return err("document_too_large", "Originalen er for stor for sammenligning", 413);
     const { data: dv2 } = await userClient.rpc("rm_invoice_document_version", { p_invoice_id: inv.id });
     if ((dv2 as { version?: string } | null)?.version !== doc.version) return err("document_changed", "Originalen ble endret under nedlasting", 409);
-    const pdfBase64 = encodeBase64(new Uint8Array(await blob.arrayBuffer()));
+    const pdfBytes = new Uint8Array(await blob.arrayBuffer());
+    const pdfBase64 = encodeBase64(pdfBytes);
+    // Samme tekstlag-helper som produksjonsleseren: endret input måles i profilen.
+    const pdfText = await readOriginalPdfText(pdfBytes);
+    const textBlock = formatPdfTextForModel(pdfText);
 
     // Eksisterende kryptert OpenAI-nøkkel (aktiv først). Aldri returnert.
     const { data: cfgs } = await admin.from("ai_provider_config").select("encrypted_api_key, is_active, temperature")
@@ -127,7 +133,7 @@ Deno.serve(async (req) => {
           last = await callAi({
             provider: "openai", apiKey, model, maxTokens: EVAL_LIMITS.maxOutputTokens,
             temperature: Number(cfg.temperature ?? 0.1),
-            systemPrompt: INVOICE_EXTRACTION_SYSTEM_PROMPT, userText, pdfBase64,
+            systemPrompt: INVOICE_EXTRACTION_SYSTEM_PROMPT, userText: textBlock ? `${userText}\n\n${textBlock}` : userText, pdfBase64,
             jsonSchema: { name: "invoice_extraction", schema: INVOICE_EXTRACTION_SCHEMA },
             timeoutMs: EVAL_LIMITS.timeoutMs,
           });
@@ -174,7 +180,7 @@ Deno.serve(async (req) => {
       cost_rate_version: COST_RATE_VERSION,
       cost_cached_rate: cost == null ? null : hasCachedRate(model) ? "egen_sats" : "full_inndatapris_konservativt",
       // Evalen bruker produksjonsprompten MED strict schema. Produksjonsleseren bruker schema bare når det er slått på.
-      request_profile: { prompt: "produksjon", schema: INVOICE_EXTRACTION_SCHEMA_VERSION, single_attempt: true },
+      request_profile: { prompt: "produksjon", schema: INVOICE_EXTRACTION_SCHEMA_VERSION, single_attempt: true, read: pdfTextProfile(pdfText) },
       latency_ms: latencyMs,
       document_version: doc.version,
       parsed: run.best ? { header, lines } : null,

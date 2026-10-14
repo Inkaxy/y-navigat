@@ -25,8 +25,11 @@ const nullable = (t: Record<string, unknown>) => ({ anyOf: [t, { type: "null" }]
 export const LINE_SUGGESTION_SCHEMA: Record<string, unknown> = {
   type: "object",
   additionalProperties: false,
-  required: ["decision", "raw_material_id", "line_class", "confidence", "package_size", "package_unit", "count_per_package", "price_basis", "draft", "evidence", "explanation", "uncertainties", "missing"],
+  required: ["decision", "raw_material_id", "line_class", "confidence", "package_size", "package_unit", "count_per_package", "price_basis", "draft", "evidence", "explanation", "uncertainties", "missing", "original_row_found", "original_row_text", "original_differences"],
   properties: {
+    original_row_found: nullable({ type: "boolean" }),
+    original_row_text: nullable({ type: "string" }),
+    original_differences: { type: "array", items: { type: "string" } },
     decision: { type: "string", enum: [...DECISIONS] },
     raw_material_id: nullable({ type: "string" }),
     line_class: { type: "string", enum: [...LINE_CLASSES] },
@@ -87,7 +90,15 @@ Pakning og pris:
 - Kopier aldri gamle priser; du får ingen og skal ikke oppgi noen.
 - evidence: hvert felt du har lest eller foreslått, med kilde (faktura/kjent_vare/korrigering/forslag).
 - uncertainties: konkrete usikkerheter. missing: felt som mangler for å kunne bekrefte.
-- confidence 0–1 er din egen vurdering. Den godkjenner ingenting.`;
+- confidence 0–1 er din egen vurdering. Den godkjenner ingenting.
+
+Original og registrert linje:
+- Den registrerte linjen kan være feillest. Får du originalen (PDF og/eller tekstlag), er ORIGINALEN autoritativ.
+- Finn målraden i originalen ENTYDIG med varenummer og beskrivelse. original_row_found=true bare når nøyaktig én rad passer;
+  ellers false og decision="unclear". Uten original: original_row_found=null.
+- original_row_text: raden slik den står i originalen, ellers null.
+- original_differences: konkrete forskjeller mellom original og registrert linje (mengde, enhet, pris, prisgrunnlag,
+  pakning, varenummer), f.eks. «Original: 0,90 per stk – registrert: 0,72 per eske». Tom liste når ingen/ukjent.`;
 
 export interface SuggestLine {
   description: string | null;

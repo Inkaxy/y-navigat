@@ -17,6 +17,11 @@ import {
   buildSuggestUserText, LINE_SUGGESTION_SCHEMA, LINE_SUGGESTION_SYSTEM_PROMPT, NON_GOODS_LINE_KINDS, validateLineSuggestion,
   type KnownPackageVariant, type KnownSupplierItem, type SuggestCandidate, type SuggestContext,
 } from "../_shared/lineSuggestion.ts";
+import { encodeBase64 } from "jsr:@std/encoding@1/base64";
+import { fetchVerifiedOriginal, supabaseOriginalDeps } from "../_shared/invoiceOriginal.ts";
+import { alignLineRow, PDF_TEXT_LIMITS } from "../_shared/pdfText.ts";
+import { readOriginalPdfText } from "../_shared/pdfTextRuntime.ts";
+import { applyOriginalGate, type OriginalUnavailable } from "../_shared/lineSuggestionSource.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -172,6 +177,28 @@ Deno.serve(async (req) => {
       corrections,
     };
 
+    // --- Originalgrunnlag: samme bundne sti+versjon som visningen, før og etter nedlasting ---
+    const orig = await fetchVerifiedOriginal(supabaseOriginalDeps(userClient, admin, invoice.id, PDF_TEXT_LIMITS.maxBytes));
+    let mode: "tekst" | "pdf" | "ingen" = "ingen";
+    let textRow: { page: number; row: string } | null = null;
+    let pdfBase64: string | undefined;
+    let originalText = "Original: IKKE tilgjengelig. Forslaget bygger bare på den registrerte linjen. original_row_found=null.";
+    if (orig.status === "ok" && orig.bytes) {
+      const pt = await readOriginalPdfText(orig.bytes);
+      const hit = alignLineRow(pt, line.supplier_sku, line.description);
+      pdfBase64 = encodeBase64(orig.bytes);
+      const identity = `Målrad (frossen identitet): varenummer ${JSON.stringify(line.supplier_sku ?? null)}, beskrivelse ${JSON.stringify(line.description ?? null)}.`;
+      if (hit.page != null) {
+        mode = "tekst";
+        textRow = { page: hit.page, row: hit.row };
+        originalText = `Original-PDF er vedlagt. ${identity}\nEntydig rad i tekstlaget (DATA, side ${hit.page}): ${JSON.stringify(hit.row)}`;
+      } else {
+        mode = "pdf";
+        originalText = `Original-PDF er vedlagt (tekstlaget ${pt.status === "ok" ? (hit.by === "flere" ? "har flere mulige rader" : "fant ikke raden") : "er ikke brukbart"}). ${identity} Finn raden selv; er den ikke entydig: original_row_found=false.`;
+      }
+    }
+    const unavailable: OriginalUnavailable | null = orig.status === "ok" ? null : orig.status;
+
     const apiKey = await decryptWithKey(cfg.encrypted_api_key, "AI_CONFIG_ENCRYPTION_KEY");
     let parsed: unknown = null;
     let usage = { in: null as number | null, out: null as number | null };
@@ -185,9 +212,10 @@ Deno.serve(async (req) => {
         maxTokens: Math.max(cfg.max_tokens ?? 1200, 1500),
         temperature: Number(cfg.temperature ?? 0.1),
         systemPrompt: LINE_SUGGESTION_SYSTEM_PROMPT,
-        userText: buildSuggestUserText(ctx),
+        userText: `${buildSuggestUserText(ctx)}\n\n${originalText}`,
+        pdfBase64,
         jsonSchema: cfg.provider === "anthropic" ? undefined : { name: "invoice_line_suggestion", schema: LINE_SUGGESTION_SCHEMA },
-        timeoutMs: 45_000,
+        timeoutMs: pdfBase64 ? 90_000 : 45_000,
         azureEndpoint: cfg.azure_endpoint ?? undefined,
         azureDeployment: cfg.azure_deployment ?? undefined,
       });
@@ -210,11 +238,16 @@ Deno.serve(async (req) => {
     });
 
     // AI-feil skal aldri stoppe arbeidet — brukeren fortsetter manuelt.
-    if (reason) return json({ suggestion: null, reason });
+    if (reason) return json({ suggestion: null, reason, source_status: mode === "ingen" ? "registrert_linje" : mode === "tekst" ? "original_tekst" : "original_pdf", document_version: orig.status === "ok" ? orig.version : null });
 
-    const v = validateLineSuggestion(parsed, ctx);
+    const gated = applyOriginalGate(validateLineSuggestion(parsed, ctx), parsed, mode, textRow, orig.status === "ok" ? orig.version : null, unavailable);
+    const src = gated.source;
     return json({
-      suggestion: { ...v, model: String(cfg.model ?? ""), candidate_count: ctx.candidates.length, source_status: "registrert_linje", document_version: null },
+      suggestion: {
+        ...gated.suggestion, model: String(cfg.model ?? ""), candidate_count: ctx.candidates.length,
+        source_status: src.status, document_version: src.documentVersion, original_reason: src.originalReason,
+        original_page: src.page, original_row: src.originalRow, original_differences: src.differences,
+      },
       reason: null,
     });
   } catch (e) {
