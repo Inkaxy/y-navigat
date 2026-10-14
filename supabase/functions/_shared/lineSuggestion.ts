@@ -81,6 +81,8 @@ Avgjør:
 Pakning og pris:
 - package_size/package_unit/count_per_package bare når tallene står på linjen eller i en bekreftet pakning for samme
   varenummer. Ukjent er null. Anta ALDRI at ukjent pakning er 1.
+- package_size er størrelsen på ÉN indre enhet, count_per_package antall indre enheter: «2x5kg» = package_size 5,
+  package_unit kg, count_per_package 2 (ALDRI package_size 10 med count 2 — det dobbeltteller).
 - price_basis: hva unit_price på linjen gjelder (per_enhet i quantity, per_pakning, per_kg, per_l, per_stk) eller ukjent.
 - Kopier aldri gamle priser; du får ingen og skal ikke oppgi noen.
 - evidence: hvert felt du har lest eller foreslått, med kilde (faktura/kjent_vare/korrigering/forslag).
