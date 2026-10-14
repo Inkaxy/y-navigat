@@ -13,7 +13,11 @@ export const STEP_LABEL: Record<StepKey, string> = {
   kilde: "Kilde og tall", vare: "Varegrunnlag", pakning: "Pakning", prisgrunnlag: "Prisgrunnlag", prisavvik: "Prisavvik", kontrollert: "Kontrollert",
 };
 
-export interface PlanAction { label: string; step: StepKey; invoiceId: string; lineId: string; invoiceNumber: string | null }
+export interface PlanAction {
+  label: string; step: StepKey; invoiceId: string; lineId: string; invoiceNumber: string | null;
+  /** Linjen er låst (internt godkjent faktura eller ført kost): handlingen er alltid å åpne fakturaen, aldri et lokalt skjema. */
+  readonly?: boolean;
+}
 export interface PlanStep { key: StepKey; state: StepState; detail: string; lines: number }
 export interface ReviewPlan {
   steps: PlanStep[];
@@ -30,7 +34,7 @@ export interface ReviewPlan {
   perInvoice: PlanAction[];
 }
 
-export interface PlanItem { rm_id: string | null; rm_base_unit: string | null; package_confirmed_at: string | null; base_units_per_package: number | null }
+export interface PlanItem { rm_id: string | null; rm_base_unit: string | null; package_confirmed_at: string | null; base_units_per_package: number | null; rm_cost?: number | null }
 
 const PKG_RX = /(\d+(?:[.,]\d+)?)\s*(g|gr|kg|ml|cl|dl|l)\b/i;
 
@@ -63,9 +67,18 @@ function basisUnclear(l: SupplierItemLine): boolean | null {
 
 const WEIGHT_UNITS = new Set(["g", "gr", "kg", "ml", "cl", "dl", "l"]);
 
-type LineStep = { step: StepKey; state: "todo" | "unknown"; label: string };
+type LineStep = { step: StepKey; state: "todo" | "unknown"; label: string; readonly?: boolean };
+
+/** Låst linje: serveren nekter retting/bekreftelse her. Eneste trygge vei er fakturaen (trekk godkjenning / ny kontroll). */
+export function lineLocked(l: Pick<SupplierItemLine, "invoice_approved" | "cost_posted">): "approved" | "cost" | null {
+  if (l.invoice_approved === true) return "approved";
+  if (l.cost_posted === true) return "cost";
+  return null;
+}
 
 function lineSteps(l: SupplierItemLine, item: PlanItem): LineStep[] {
+  const lock = lineLocked(l);
+  if (lock) return [{ step: "kontrollert", state: "todo", readonly: true, label: lock === "approved" ? "Åpne faktura for nykontroll (internt godkjent)" : "Åpne faktura for nykontroll (kostpris ført)" }];
   const r = allReasons(l);
   const out: LineStep[] = [];
   if (r.includes("extraction_unresolved") || hasIssues(l.extraction_issues)) out.push({ step: "kilde", state: "todo", label: "Kontroller tallene mot originalen" });
@@ -98,13 +111,13 @@ export function buildReviewPlan(item: PlanItem, lines: readonly SupplierItemLine
   const reviewUnknown = live.some((l) => typeof l.requires_review !== "boolean");
   // Eldste først: avklaringen starter på eldste gyldige dato.
   const ordered = [...open].sort((a, b) => (a.invoice_date ?? "").localeCompare(b.invoice_date ?? "") || (a.line_number ?? 0) - (b.line_number ?? 0));
-  const per = new Map<StepKey, { todo: number; unknown: number; first: { l: SupplierItemLine; label: string } | null }>();
+  const per = new Map<StepKey, { todo: number; unknown: number; first: { l: SupplierItemLine; label: string; readonly?: boolean } | null }>();
   STEP_ORDER.forEach((k) => per.set(k, { todo: 0, unknown: 0, first: null }));
   for (const l of ordered) {
     for (const s of lineSteps(l, item)) {
       const e = per.get(s.step)!;
       if (s.state === "todo") e.todo += 1; else e.unknown += 1;
-      if (!e.first) e.first = { l, label: s.label };
+      if (!e.first) e.first = { l, label: s.label, readonly: s.readonly };
     }
   }
   const steps: PlanStep[] = STEP_ORDER.map((k) => {
@@ -118,8 +131,8 @@ export function buildReviewPlan(item: PlanItem, lines: readonly SupplierItemLine
     return { key: k, state: "ok", detail: "Ingen mangler", lines: 0 };
   });
   const current = steps.find((s) => s.state !== "ok") ?? null;
-  const cur = current && current.key !== "kontrollert" ? per.get(current.key)!.first : ordered[0] ? { l: ordered[0], label: "Kontroller linjen" } : null;
-  const primary = current && cur ? { label: cur.label, step: current.key, invoiceId: cur.l.invoice_id, lineId: cur.l.id, invoiceNumber: cur.l.invoice_number ?? null } : null;
+  const cur = current && (current.key !== "kontrollert" || per.get("kontrollert")!.first) ? per.get(current.key)!.first : ordered[0] ? { l: ordered[0], label: "Kontroller linjen" } : null;
+  const primary = current && cur ? { label: cur.label, step: current.key, invoiceId: cur.l.invoice_id, lineId: cur.l.id, invoiceNumber: cur.l.invoice_number ?? null, readonly: cur.readonly === true } : null;
   const followUp = new Map<string, { invoiceId: string; invoiceNumber: string | null }>();
   for (const l of live) {
     if (l.requires_review === false && !l.invoice_approved && l.invoice_status && !["reconciled", "excluded"].includes(l.invoice_status)) {
@@ -131,7 +144,7 @@ export function buildReviewPlan(item: PlanItem, lines: readonly SupplierItemLine
   for (const l of ordered) {
     if (perInvoice.has(l.invoice_id)) continue;
     const st = lineSteps(l, item).sort((a, b) => STEP_ORDER.indexOf(a.step) - STEP_ORDER.indexOf(b.step))[0];
-    perInvoice.set(l.invoice_id, { label: st?.label ?? "Kontroller linjen", step: st?.step ?? "kontrollert", invoiceId: l.invoice_id, lineId: l.id, invoiceNumber: l.invoice_number ?? null });
+    perInvoice.set(l.invoice_id, { label: st?.label ?? "Kontroller linjen", step: st?.step ?? "kontrollert", invoiceId: l.invoice_id, lineId: l.id, invoiceNumber: l.invoice_number ?? null, readonly: st?.readonly === true });
   }
   return {
     perInvoice: [...perInvoice.values()],
@@ -148,4 +161,52 @@ export function discountArithmeticText(l: Pick<SupplierItemLine, "quantity" | "u
   const nb = (n: number) => n.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const u = l.unit ?? "";
   return `${fmtNum(q, 3)} ${u} × ${nb(p)} − rabatt ${nb(l.discount_amount)} = ${nb(t)} (netto ${nb(t / q)} per ${u || "enhet"})`.replace(/\s+/g, " ");
+}
+
+export type BasisState = "ok" | "todo" | "unknown";
+export interface BasisRow { key: "linjer" | "pakning" | "kost" | "godkjenning"; label: string; state: BasisState; detail: string }
+
+/**
+ * Skiller «linjene er kontrollert» fra leverandørens grunnlag: bekreftet pakning, aktivt kostgrunnlag og
+ * fakturagodkjenning. 0 åpne linjer betyr aldri «alt ferdig» når pakning/kost mangler. Bare visning – leses fra serverfelt.
+ */
+export function supplierBasis(item: PlanItem & { status?: string | null }, plan: ReviewPlan, lines: readonly SupplierItemLine[]): BasisRow[] {
+  const linked = !!item.rm_id && item.status !== "ukoblet" && item.status !== "ikke_vare";
+  const linesDone = plan.openLines === 0 && !plan.incomplete;
+  const rows: BasisRow[] = [{ key: "linjer", label: "Linjekontroll", state: plan.incomplete ? "unknown" : linesDone ? "ok" : "todo",
+    detail: plan.incomplete ? "Ikke alle linjer er hentet" : linesDone ? "Ingen åpne linjer" : `${plan.openLines} åpne`}];
+  if (!linked) return rows;
+  rows.push(item.package_confirmed_at
+    ? { key: "pakning", label: "Pakning for leverandøren", state: "ok", detail: "Bekreftet" }
+    : { key: "pakning", label: "Pakning for leverandøren", state: "todo", detail: "Ikke bekreftet – senere fakturaer kan ikke regnes om" });
+  const live = lines.filter((l) => !heldOutside(l) && l.raw_material_id);
+  const noBase = live.filter((l) => l.base_quantity == null).length;
+  const cost = item.rm_cost;
+  rows.push(cost === undefined
+    ? { key: "kost", label: "Kostgrunnlag", state: "unknown", detail: "Ukjent" }
+    : cost == null || noBase > 0
+      ? { key: "kost", label: "Kostgrunnlag", state: "todo", detail: cost == null ? (noBase > 0 ? `Ingen gyldig kostpris – ${noBase} ${noBase === 1 ? "linje mangler" : "linjer mangler"} mengde i grunnenhet` : "Ingen gyldig kostpris ennå") : `${noBase} ${noBase === 1 ? "linje mangler" : "linjer mangler"} mengde i grunnenhet` }
+      : { key: "kost", label: "Kostgrunnlag", state: "ok", detail: "Aktiv kostpris" });
+  const approvedLocked = live.filter((l) => l.invoice_approved === true && l.requires_review === true).length;
+  if (plan.invoiceFollowUp.length > 0 || approvedLocked > 0) {
+    rows.push({ key: "godkjenning", label: "Fakturagodkjenning", state: "todo",
+      detail: approvedLocked > 0 ? `${approvedLocked} ${approvedLocked === 1 ? "linje er" : "linjer er"} på internt godkjent faktura – åpnes for nykontroll` : `${plan.invoiceFollowUp.length} ${plan.invoiceFollowUp.length === 1 ? "faktura venter" : "fakturaer venter"}` });
+  }
+  return rows;
+}
+
+/** Neste handling for leverandørgrunnlaget når linjene er ferdige (eksisterende motorer: pakningssteget, kostverktøyet). */
+export function basisNextAction(rows: readonly BasisRow[]): { label: string; kind: "pakning" | "kost" } | null {
+  if (rows.find((r) => r.key === "linjer")?.state !== "ok") return null;
+  if (rows.find((r) => r.key === "pakning")?.state === "todo") return { label: "Bekreft pakning for leverandøren", kind: "pakning" };
+  if (rows.find((r) => r.key === "kost")?.state === "todo") return { label: "Beregn kostpris på nytt", kind: "kost" };
+  return null;
+}
+
+/** Kort-sammendrag for arbeidslisten fra SAMME plan som varekortet. null = grunnlaget mangler (vis serverens tekst, aldri grønt). */
+export function rowPlanSummary(lines: readonly SupplierItemLine[] | undefined, openLines: number | null, baseUnit: string | null): { cause: string; next: string; readonly: boolean } | null {
+  if (!lines || openLines == null || lines.length === 0) return null;
+  const plan = buildReviewPlan({ rm_id: lines[0].raw_material_id, rm_base_unit: baseUnit ?? lines[0].rm_base_unit ?? null, package_confirmed_at: null, base_units_per_package: null }, lines);
+  if (!plan.primary || !plan.current) return null;
+  return { cause: STEP_LABEL[plan.current.key] + (plan.current.state === "unknown" ? " (ukjent)" : ""), next: plan.primary.label, readonly: plan.primary.readonly === true };
 }
