@@ -138,7 +138,7 @@ export function parseAiSuggestion(raw: unknown): AiLineSuggestion | null {
     // Ukjent/manglende kilde = registrert linje; aldri antatt lest fra originalen.
     sourceStatus: raw.source_status === "original_tekst" || raw.source_status === "original_pdf" ? raw.source_status : "registrert_linje",
     documentVersion: str(raw.document_version),
-    originalReason: oneOf(raw.original_reason, ["mangler", "ukjent", "for_stor", "endret"] as const, null as never) ?? null,
+    originalReason: raw.original_reason === "mangler" || raw.original_reason === "ukjent" || raw.original_reason === "for_stor" || raw.original_reason === "endret" ? raw.original_reason : null,
     originalPage: num(raw.original_page),
     originalRow: str(raw.original_row),
     originalDifferences: strs(raw.original_differences),
