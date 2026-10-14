@@ -19387,6 +19387,10 @@ export type Database = {
           name: string
         }[]
       }
+      rm_work_item_plan_lines: {
+        Args: { p_keys: Json; p_legal_entity_id: string }
+        Returns: Json
+      }
       rm_work_items: {
         Args: {
           p_group?: string
