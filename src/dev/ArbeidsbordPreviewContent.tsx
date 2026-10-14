@@ -21,17 +21,17 @@ const cbBlocked = splitByGate(CB.map(([nr, d]) => ({ id: `l-${nr}`, invoice_id: 
  * syntetisk beslutningsflate i stedet for serverpanelene.
  */
 const items = [
-  { key: "varekort:s1:sku:3021", grp: "pakning", type: "varekort", kind: "mangler_pakning", supplier_id: "s1", supplier_name: "Demo Emballasje AS", item_key: "sku:3021", title: "Florapan L62 k, pose 100 g", sku: "3021", open_lines: 1, open_invoices: 1, amount: 6697.5, impact_nok: null, last_date: "2026-09-02" },
+  { key: "varekort:s1:sku:TEST-001", grp: "pakning", type: "varekort", kind: "mangler_pakning", supplier_id: "s1", supplier_name: "Demo Emballasje AS", item_key: "sku:TEST-001", title: "Testvare pose 100 g", sku: "TEST-001", open_lines: 1, open_invoices: 1, amount: 950, impact_nok: null, last_date: "2026-09-02" },
   { key: "varekort:s2:sku:11", grp: "pris", type: "varekort", kind: "prisavvik", supplier_id: "s2", supplier_name: "Demo Mølle AS", item_key: "sku:11", title: "Hvetemel siktet 6x1kg", sku: "11", open_lines: 2, open_invoices: 2, amount: 480, impact_nok: 24, effect_status: "verified_price_effect", read_integrity: "checked", last_date: "2026-09-05" },
   { key: "faktura:i3", grp: "fakturaer", type: "faktura", kind: "faktura_sumavvik", supplier_name: "Demo Meieri", invoice_id: "i3", invoice_number: "DEMO-3", title: "Demo Meieri · faktura DEMO-3", amount: 1200, impact_nok: null, last_date: "2026-09-08" },
   { key: "varekort:s4:sku:7", grp: "kobling", type: "varekort", kind: "ukoblet", supplier_id: "s4", supplier_name: "Demo Engros", item_key: "sku:7", title: "KARDEMOMME HEL 1 KG", sku: "7", open_lines: 3, open_invoices: 2, amount: 2100, impact_nok: null, last_date: "2026-09-10" },
 ];
-items.splice(2, 0, { key: "varekort:s5:sku:12113", grp: "pris", type: "varekort", kind: "prisavvik", action_required: "review_credit_note", supplier_id: "s5", supplier_name: "Demo Idun", item_key: "sku:12113", title: "Combisur Soft sekk 20 kg", sku: "12113", open_lines: 7, open_invoices: 7, amount: 9800, impact_nok: null, last_date: "2026-05-02" } as (typeof items)[number]);
+items.splice(2, 0, { key: "varekort:s5:sku:TEST-002", grp: "pris", type: "varekort", kind: "prisavvik", action_required: "review_credit_note", supplier_id: "s5", supplier_name: "Testleverandør B", item_key: "sku:TEST-002", title: "Testmiks sekk 20 kg", sku: "TEST-002", open_lines: 7, open_invoices: 7, amount: 9800, impact_nok: null, last_date: "2026-05-02" } as (typeof items)[number]);
 const work = parseWorkItems({ total: 5, counts: { alle: 5, kobling: 1, pakning: 1, pris: 2, kontroll: 0, fakturaer: 1, faktura_mangler_linjer: 0, faktura_sumavvik: 1, faktura_flagget: 0, faktura_klar: 0 }, items });
 const summary = parseWorkSummary({ invoice_access: true, invoices: { reconciled_7d: 12 }, data_quality: {}, other: {} });
 
 const lines: Record<string, InsightLine> = {
-  "varekort:s1:sku:3021": { description: "Florapan L62 k, pose 100 g", quantity: 10, unit: "sekk", unit_price: 977.74, total_amount: 6697.5, invoice: { is_credit_note: false }, matched_raw_material: { name: "Florapan L62 k, pose 100 g", category: "Emballasje", item_type: "emballasje", base_unit: "stk" } },
+  "varekort:s1:sku:TEST-001": { description: "Testvare pose 100 g", quantity: 10, unit: "sekk", unit_price: 120, total_amount: 950, invoice: { is_credit_note: false }, matched_raw_material: { name: "Testvare pose 100 g", category: "Emballasje", item_type: "emballasje", base_unit: "stk" } },
   "varekort:s2:sku:11": { description: "Hvetemel siktet 6x1kg", quantity: 2, unit: "krt", unit_price: 20, total_amount: 240, invoice: { is_credit_note: false }, matched_raw_material: { name: "Hvetemel siktet", category: "Mel", item_type: "ravare", base_unit: "kg" } },
   "faktura:i3": { description: "Kreditnota smør", quantity: -2, unit: "stk", unit_price: 10, total_amount: -20, invoice: { is_credit_note: true } },
   "varekort:s4:sku:7": { description: "KARDEMOMME HEL 1 KG", quantity: 3, unit: "stk", unit_price: 700, total_amount: 2100, invoice: { is_credit_note: false }, suggestions: [
@@ -56,7 +56,7 @@ export default function ArbeidsbordPreviewContent() {
             </div>
           )}
           renderDecision={(it, ctx) => {
-            if (it.key === "varekort:s5:sku:12113") return (
+            if (it.key === "varekort:s5:sku:TEST-002") return (
               <article className="space-y-3 rounded-xl border border-line-subtle bg-card p-4" aria-label="Beslutning (demo)">
                 <p className="text-sm font-medium">Valgt faktura 1542054 · 01.09.2026</p>
                 <PriceBlockView rows={[]} blocked={cbBlocked} status="ready" selected={new Set()} onToggle={() => undefined} hasAgreement={false} tolerancePct={3} hardCapPct={15} settings={null}
