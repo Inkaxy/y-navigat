@@ -233,7 +233,7 @@ export const toneStyle = (tokenVar: string) => ({
  */
 export const APPROVAL_BLOCKER_CODES = [
   "finnes_ikke", "flagget", "kansellert", "leverandor_mangler", "belop_mangler", "mva_ukjent", "valuta_mangler",
-  "mangler_linjer", "sumavvik", "sum_ukontrollert", "lavt_uttrekk", "duplikat", "mengde", "prisavvik", "leverandorsak", "lesefeil",
+  "mangler_linjer", "sumavvik", "sum_ukontrollert", "lavt_uttrekk", "duplikat", "mengde", "prisavvik", "leverandorsak", "lesefeil", "holdt_utenfor",
 ] as const;
 export type ApprovalBlockerCode = (typeof APPROVAL_BLOCKER_CODES)[number];
 
@@ -244,6 +244,7 @@ export function isApprovalBlockerCode(v: string): v is ApprovalBlockerCode {
 export const APPROVAL_BLOCKER_LABEL: Record<ApprovalBlockerCode, string> = {
   flagget: "Fakturaen er flagget",
   kansellert: "Fakturaen er kansellert",
+  holdt_utenfor: "Holdt utenfor råvarebehandling – ikke en råvarefaktura",
   sumavvik: "Linjesummen stemmer ikke med fakturabeløpet",
   mangler_linjer: "Fakturaen har ingen linjer",
   duplikat: "Samme fakturanummer finnes fra før hos leverandøren",
