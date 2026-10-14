@@ -29,7 +29,7 @@ describe("trykt linjerabatt", () => {
     expect(lineDiscountFrom({ discount_amount_raw: "250,00", discount_kind: "rabatt" }, null, 100)).toBe(250);
   });
   it("Tripletex-importen lagrer samme trykte rabatt", () => {
-    const rows = toInvoiceLineRows("inv", [{ ...florapan, discount_amount_raw: "-3 079,90", discount_amount: 3079.9 }] as never, null);
+    const rows = toInvoiceLineRows([{ ...florapan, discount_amount_raw: "-3 079,90", discount_amount: 3079.9 }], "inv", null);
     expect(rows[0].discount_amount).toBe(3079.9);
   });
 });
