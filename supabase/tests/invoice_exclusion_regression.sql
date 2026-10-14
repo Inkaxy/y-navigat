@@ -39,7 +39,7 @@ begin
   -- 1) Leserettighet: avvises.
   perform set_config('request.jwt.claims', json_build_object('sub', ro, 'role', 'authenticated')::text, true);
   begin
-    select updated_at::text into v from invoices where id = inv;
+    select to_jsonb(updated_at)#>>'{}' into v from invoices where id = inv;
     r := public.rm_set_invoice_exclusion(inv, 'invoice', null, 'erstatning_produksjonstap', 'Erstatning ødelagte varer', v, op);
     log := log || 'FEIL readonly_tillatt; ';
   exception when sqlstate '42501' then log := log || 'ok readonly_avvist; ';
@@ -51,7 +51,7 @@ begin
   -- 2) Versjon og validering.
   r := public.rm_set_invoice_exclusion(inv, 'invoice', null, 'erstatning_produksjonstap', 'Erstatning ødelagte varer', '2000-01-01 00:00:00+00', op);
   log := log || format('%s versjon=%s; ', case when r->>'error' = 'versjon_endret' then 'ok' else 'FEIL' end, r->>'error');
-  select updated_at::text into v from invoices where id = inv;
+  select to_jsonb(updated_at)#>>'{}' into v from invoices where id = inv;
   r := public.rm_set_invoice_exclusion(inv, 'invoice', null, 'erstatning_produksjonstap', 'kort', v, op);
   log := log || format('%s kort_begrunnelse=%s; ', case when r->>'error' = 'begrunnelse_mangler' then 'ok' else 'FEIL' end, r->>'error');
 
@@ -115,7 +115,7 @@ begin
 
   -- 7) Gjenåpne dokumentet: ny kontroll, ingen kobling/godkjenning/lager.
   perform set_config('request.jwt.claims', json_build_object('sub', w, 'role', 'authenticated')::text, true);
-  select updated_at::text into v from invoices where id = inv;
+  select to_jsonb(updated_at)#>>'{}' into v from invoices where id = inv;
   r := public.rm_reopen_invoice_exclusion(inv, 'invoice', null, v, 'Test gjenåpning');
   select count(*) into n from invoices where id = inv and status = 'needs_review' and excluded_at is null and reconciled_at is null;
   log := log || format('%s gjenapnet=%s %s; ', case when n = 1 then 'ok' else 'FEIL' end, n, r->>'lines');
@@ -125,7 +125,7 @@ begin
   log := log || format('%s audit_gjenapne=%s; ', case when n = 1 then 'ok' else 'FEIL' end, n);
 
   -- 8) Enkeltlinje: andre linjer behandles normalt.
-  select updated_at::text into v from invoice_lines where id = l3;
+  select to_jsonb(updated_at)#>>'{}' into v from invoice_lines where id = l3;
   r := public.rm_set_invoice_exclusion(inv2, 'line', l3, 'annet', 'Erstatningslinje, ikke råvarepris', v, op2);
   select count(*) into n from invoice_lines where id = l3 and excluded_at is not null and excluded_raw_material_id = rm;
   log := log || format('%s linje_utelatt=%s; ', case when n = 1 and (r->>'ok')::boolean then 'ok' else 'FEIL' end, r);
@@ -133,7 +133,7 @@ begin
   log := log || format('%s annen_linje_uendret=%s; ', case when n = 1 then 'ok' else 'FEIL' end, n);
   select count(*) into n from invoices where id = inv2 and status = 'needs_review';
   log := log || format('%s faktura_fortsatt_apen=%s; ', case when n = 1 then 'ok' else 'FEIL' end, n);
-  select updated_at::text into v from invoice_lines where id = l3;
+  select to_jsonb(updated_at)#>>'{}' into v from invoice_lines where id = l3;
   r := public.rm_reopen_invoice_exclusion(inv2, 'line', l3, v, null);
   select count(*) into n from invoice_lines where id = l3 and excluded_at is null and requires_review and review_reason = 'reopened_exclusion';
   log := log || format('%s linje_gjenapnet=%s; ', case when n = 1 then 'ok' else 'FEIL' end, n);
@@ -141,14 +141,26 @@ begin
   -- 9) Ført kostpris sperrer (linje og hele dokumentet).
   insert into invoice_line_cost_postings (invoice_line_id, invoice_id, legal_entity_id, first_cost, posted_by, posted_at)
   values (l4, inv2, le, false, w, now());
-  select updated_at::text into v from invoice_lines where id = l4;
+  select to_jsonb(updated_at)#>>'{}' into v from invoice_lines where id = l4;
   r := public.rm_set_invoice_exclusion(inv2, 'line', l4, 'annet', 'Skal sperres av kostføring', v, gen_random_uuid());
   log := log || format('%s kost_sperrer_linje=%s; ', case when r->>'error' = 'reversering_kreves' then 'ok' else 'FEIL' end, r->>'error');
-  select updated_at::text into v from invoices where id = inv2;
+  select to_jsonb(updated_at)#>>'{}' into v from invoices where id = inv2;
   r := public.rm_set_invoice_exclusion(inv2, 'invoice', null, 'annet', 'Skal sperres av kostføring', v, gen_random_uuid());
   log := log || format('%s kost_sperrer_dok=%s; ', case when r->>'error' = 'reversering_kreves' and jsonb_array_length(r->'blocked_lines') = 1 then 'ok' else 'FEIL' end, r);
   select count(*) into n from invoice_lines where invoice_id = inv2 and excluded_at is not null;
   log := log || format('%s ingenting_endret=%s; ', case when n = 0 then 'ok' else 'FEIL' end, n);
+
+  -- 10) Format fra API (ISO med T og +00:00) godtas; internt godkjent faktura sperrer både linje og dokument.
+  log := log || format('%s api_format=%s; ', case when v like '%T%+00:00' then 'ok' else 'FEIL' end, v);
+  insert into invoice_internal_approvals (invoice_id, legal_entity_id, approved_by) values (inv2, le, w);
+  select to_jsonb(updated_at)#>>'{}' into v from invoice_lines where id = l3;
+  r := public.rm_set_invoice_exclusion(inv2, 'line', l3, 'annet', 'Skal sperres av godkjenning', v, gen_random_uuid());
+  log := log || format('%s godkjent_sperrer_linje=%s; ', case when r->>'error' = 'faktura_godkjent' then 'ok' else 'FEIL' end, r->>'error');
+  select to_jsonb(updated_at)#>>'{}' into v from invoices where id = inv2;
+  r := public.rm_set_invoice_exclusion(inv2, 'invoice', null, 'annet', 'Skal sperres av godkjenning', v, gen_random_uuid());
+  log := log || format('%s godkjent_sperrer_dok=%s; ', case when r->>'error' = 'faktura_godkjent' then 'ok' else 'FEIL' end, r->>'error');
+  select count(*) into n from invoice_lines where invoice_id = inv2 and excluded_at is not null;
+  log := log || format('%s godkjent_ingenting_endret=%s; ', case when n = 0 then 'ok' else 'FEIL' end, n);
 
   raise exception 'RESULTAT: %', log;
 end $$;
