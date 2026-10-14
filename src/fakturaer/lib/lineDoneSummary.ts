@@ -1,3 +1,4 @@
+import { normalizeUnit, toBaseQuantity } from "@/fakturaer/lib/units";
 import type { PriceGate } from "@/fakturaer/lib/financialPresentation";
 
 /** Bekreftet leverandørpakning slik den vises på linjen. */
@@ -16,14 +17,31 @@ const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
  * OG linjens trykte innhold er det samme (100 g = 100 g). Ellers null: teksten forblir et forslag.
  */
 export function confirmedPackageFor(
-  link: { package_size: number | null; package_unit: string | null; base_units_per_package: number | null; package_confirmed_at: string | null } | null | undefined,
+  link: { package_size: number | null; package_unit: string | null; base_units_per_package: number | null; package_confirmed_at: string | null; container_unit?: string | null } | null | undefined,
   line: { package_size?: number | null; package_unit?: string | null; unit?: string | null },
 ): ConfirmedPackage | null {
   if (!link || !link.package_confirmed_at) return null;
   const size = Number(link.package_size), bupp = Number(link.base_units_per_package);
   if (!(size > 0) || !(bupp > 0) || !Number.isFinite(size) || !Number.isFinite(bupp) || !link.package_unit) return null;
-  if (line.package_size == null || Math.abs(Number(line.package_size) - size) > 1e-9 || norm(line.package_unit) !== norm(link.package_unit)) return null;
-  return { size, unit: link.package_unit, container: line.unit ?? null, baseUnitsPerPackage: bupp, confirmedAt: link.package_confirmed_at };
+  if (!sameContent(line.package_size, line.package_unit, size, link.package_unit)) return null;
+  // Fysisk beholder: bekreftet bare når koblingens lagrede beholder er linjens (pose ≠ sekk). Ukjent = ikke bekreftet.
+  const linkC = containerKey(link.container_unit), lineC = containerKey(line.unit);
+  if (!linkC || !lineC || linkC !== lineC) return null;
+  return { size, unit: link.package_unit, container: link.container_unit ?? null, baseUnitsPerPackage: bupp, confirmedAt: link.package_confirmed_at };
+}
+
+const containerKey = (u: string | null | undefined): string | null => {
+  const n = norm(u);
+  return n ? normalizeUnit(n) ?? n : null;
+};
+
+/** Samme innhold: lik enhet og størrelse, eller samme mengde i felles grunnenhet (100 g = 0,1 kg). */
+function sameContent(lineSize: number | null | undefined, lineUnit: string | null | undefined, size: number, unit: string): boolean {
+  const ls = Number(lineSize);
+  if (lineSize == null || !Number.isFinite(ls) || !lineUnit) return false;
+  if (norm(lineUnit) === norm(unit)) return Math.abs(ls - size) <= 1e-9;
+  const a = toBaseQuantity(ls, lineUnit), b = toBaseQuantity(size, unit);
+  return !!a && !!b && a.unit === b.unit && Math.abs(a.quantity - b.quantity) <= 1e-9 * Math.max(1, b.quantity);
 }
 
 /**
