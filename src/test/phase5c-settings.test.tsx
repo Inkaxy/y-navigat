@@ -258,8 +258,26 @@ describe("AI-tjenester", () => {
     await screen.findByText(/gpt-5-egen \(lagret\)/, { selector: "span" });
     expect((screen.getByLabelText(/Maks antall tokens/) as HTMLInputElement).value).toBe("0");
     fireEvent.change(screen.getByLabelText(/Maks antall tokens/), { target: { value: "3000" } });
-    expect(screen.getByText(/krever at API-nøkkelen limes inn på nytt/)).toBeTruthy();
-    expect((screen.getByRole("button", { name: "Erstatt konfigurasjon" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/står ikke i godkjent modelliste/)).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Lagre modell og grenser" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+  it("modell/grenser uten ny nøkkel: update_settings med eksakt revisjon, ingen nøkkel/provider/endepunkt", async () => {
+    const rev = "2026-10-14T08:00:00.123456+00:00";
+    setup();
+    const prev = db.invokeImpl!;
+    db.invokeImpl = async (fn, body) => {
+      if (fn === "ai-config" && (body as { action: string }).action === "list") return { data: { configs: [{ ...cfg, model: "gpt-4o", max_tokens: 2000, updated_at: rev }] }, error: null };
+      if (fn === "ai-config" && (body as { action: string }).action === "update_settings") return { data: { config: { id: cfg.id } }, error: null };
+      return prev(fn, body);
+    };
+    render(<AiServicesSettings />, { wrapper: Wrap });
+    fireEvent.change(await screen.findByLabelText(/Maks antall tokens/), { target: { value: "3000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Lagre modell og grenser" }));
+    await waitFor(() => expect(db.invoke.some((c) => (c.body as { action?: string }).action === "update_settings")).toBe(true));
+    const body = db.invoke.find((c) => (c.body as { action?: string }).action === "update_settings")!.body as Record<string, unknown>;
+    expect(body).toMatchObject({ id: cfg.id, provider: "openai", purpose: "invoice_extraction", expected_updated_at: rev, model: "gpt-4o", max_tokens: 3000 });
+    expect("api_key" in body || "azure_endpoint" in body).toBe(false);
+    expect(db.invoke.some((c) => (c.body as { action?: string }).action === "save")).toBe(false);
   });
   it("test uten ny nøkkel sender nøyaktig lagret konfigurasjon og lagrer ingenting", async () => {
     setup();
@@ -267,8 +285,8 @@ describe("AI-tjenester", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Test lagret konfigurasjon" }));
     await waitFor(() => expect(db.invoke.some((c) => c.fn === "ai-config-test")).toBe(true));
     const body = db.invoke.find((c) => c.fn === "ai-config-test")!.body as Record<string, unknown>;
-    expect(body).toMatchObject({ provider: "openai", model: "gpt-5-egen" });
-    expect("api_key" in body).toBe(false);
+    expect(body).toMatchObject({ model: "gpt-5-egen", config_id: cfg.id });
+    expect("api_key" in body || "provider" in body || "azure_endpoint" in body).toBe(false);
     expect(db.invoke.some((c) => (c.body as { action?: string }).action === "save")).toBe(false);
   });
   it("lagring med uventet svar er ukjent/delvis, nøkkel beholdes, ingen automatisk nytt forsøk", async () => {

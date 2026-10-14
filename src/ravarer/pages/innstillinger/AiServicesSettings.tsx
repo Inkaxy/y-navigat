@@ -149,7 +149,8 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
     provider === "azure_openai" && (!azureEndpoint.trim() || !azureDeployment.trim()) ? "Azure krever endpoint og deployment." : null;
   // Tjenesten krever alltid ny nøkkel ved lagring — også for ikke-hemmelige endringer (ingen «behold nøkkel»).
   const keyNeeded = !apiKey.trim();
-  const saveBlock = fieldError ?? (keyNeeded && !settingsOnly ? (existing ? "Bytte av leverandør eller endepunkt krever ny API-nøkkel." : "Lim inn API-nøkkel.") : null);
+  const settingsModelBlock = settingsOnly && keyNeeded && model && !catalogEntry(provider, model) ? "Lagret modell står ikke i godkjent modelliste. Velg en modell fra listen for å lagre uten ny nøkkel." : null;
+  const saveBlock = fieldError ?? settingsModelBlock ?? (keyNeeded && !settingsOnly ? (existing ? "Bytte av leverandør eller endepunkt krever ny API-nøkkel." : "Lim inn API-nøkkel.") : null);
   // «Test lagret»: uten ny nøkkel kan bare den uendrede lagrede konfigurasjonen testes.
   const storedTestOnly = keyNeeded;
   const testBlock = storedTestOnly
