@@ -183,7 +183,10 @@ export function planAiApply(
   if (sameMaterial && (s.packageSize != null || s.packageUnit)) {
     if (form.packageTouched || form.packageSize.trim() || form.packageUnit.trim()) kept.push("pakning");
     else {
-      packageSize = s.packageSize != null ? String(s.packageSize).replace(".", ",") : null;
+      // Forslaget følger linjekontrakten (package_size = indre enhet, count_per_package = antall), mens
+      // skjemafeltet er HELE pakningens innhold: «2x5kg» → 10 kg. Aldri size×count to ganger.
+      const total = s.packageSize != null ? s.packageSize * (s.countPerPackage ?? 1) : null;
+      packageSize = total != null ? String(Math.round(total * 1e6) / 1e6).replace(".", ",") : null;
       packageUnit = s.packageUnit;
     }
   }

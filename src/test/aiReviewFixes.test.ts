@@ -137,3 +137,26 @@ describe("7) strict schema i fakturaleseren", () => {
     expect(extractionSchemaEnabled("on", "anthropic")).toBe(false);
   });
 });
+
+describe("2x5kg: ingen dobbeltelling ende-til-ende", async () => {
+  const { validatePackage } = await import("../../supabase/functions/_shared/lineSuggestion");
+  const { planAiApply } = await import("@/fakturaer/lib/aiLineSuggestion");
+  const text = "Idun Combisur 2x5kg";
+  it("sub-enhet 5 × 2 godtas som faktura", () => {
+    expect(validatePackage({ size: 5, unit: "kg", count: 2 }, text, [], [])).toMatchObject({ size: 5, unit: "kg", count: 2 });
+  });
+  it("totalt 10 uten antall normaliseres til 5 × 2", () => {
+    expect(validatePackage({ size: 10, unit: "kg", count: null }, text, [], [])).toMatchObject({ size: 5, count: 2 });
+  });
+  it("10 × 2 (GPT-4o-feilen) avvises, aldri 20 kg", () => {
+    const r: string[] = [];
+    expect(validatePackage({ size: 10, unit: "kg", count: 2 }, text, [], r)).toMatchObject({ size: null, count: null });
+    expect(r.length).toBe(1);
+  });
+  it("skjemaet fylles med hele pakningen 10 kg, ikke 5 eller 20", () => {
+    const s = { decision: "existing", rawMaterialId: "rm1", packageSize: 5, packageUnit: "kg", countPerPackage: 2 } as never;
+    expect(planAiApply(s, { selectedRmId: null, packageSize: "", packageUnit: "", packageTouched: false }).packageSize).toBe("10");
+    const single = { decision: "existing", rawMaterialId: "rm1", packageSize: 12.5, packageUnit: "kg", countPerPackage: null } as never;
+    expect(planAiApply(single, { selectedRmId: null, packageSize: "", packageUnit: "", packageTouched: false }).packageSize).toBe("12,5");
+  });
+});
