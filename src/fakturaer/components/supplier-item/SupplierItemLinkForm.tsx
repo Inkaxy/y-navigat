@@ -6,6 +6,7 @@ import { useCompany } from "@/hooks/useCompany";
 import { useMaterialById, useMaterialChoices } from "@/fakturaer/hooks/useMaterialChoices";
 import { useLinkSupplierItem, usePackageInference } from "@/fakturaer/hooks/useSupplierItems";
 import { MaterialBlock, type NewMaterialDraft } from "./MaterialBlock";
+import { TypeUnitCorrectionDialog } from "./TypeUnitCorrectionDialog";
 import { PackageBlock } from "./PackageBlock";
 import { LinkResultBox } from "./LinkResultBox";
 import { useConfirmMany } from "@/ravarer/ui/useConfirmMany";
@@ -125,6 +126,7 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
     void submit(body);
   };
 
+  const [typeUnitOpen, setTypeUnitOpen] = useState(false);
   const disabled = !canWrite || link.isPending || !company;
   const materialLoading = mode === "existing" && !!selectedId && selected.isLoading;
   const onDraft = (d: NewMaterialDraft) => {
@@ -149,7 +151,18 @@ export function SupplierItemLinkForm({ item, lines, canWrite = true, onDone, onC
           onSearch={setSearch}
           draft={draft}
           onDraft={onDraft}
+          onCorrectTypeUnit={canWrite && selected.data ? () => setTypeUnitOpen(true) : undefined}
         />
+        {typeUnitOpen && selected.data && (
+          <TypeUnitCorrectionDialog
+            rawMaterialId={selected.data.id}
+            rawMaterialName={selected.data.name}
+            open={typeUnitOpen}
+            onOpenChange={setTypeUnitOpen}
+            canWrite={canWrite}
+            onSaved={() => { void selected.refetch(); void qc.invalidateQueries({ queryKey: ["supplier-item-rm", selected.data?.id] }); void qc.invalidateQueries({ queryKey: ["package-inference"] }); }}
+          />
+        )}
         {mode === "existing" && !item.rm_id && refLineId && <AiSuggestion lineId={refLineId} onPick={(id) => { setMode("existing"); setSelectedId(id); }} />}
       </Block>
       {pkgNeeded && baseUnit && (
