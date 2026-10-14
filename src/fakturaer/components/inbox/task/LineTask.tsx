@@ -25,6 +25,7 @@ import { PriceCheck } from "@/fakturaer/components/inbox/task/PriceCheck";
 import { OpenSupplierItemButton } from "@/fakturaer/components/supplier-item/OpenSupplierItemButton";
 import { lineClarifications, packageGateFromReview } from "@/fakturaer/lib/lineInsight";
 import { LineInsightPanel } from "@/fakturaer/components/inbox/task/LineInsightPanel";
+import { confirmedPackageFor, doneSummary } from "@/fakturaer/lib/lineDoneSummary";
 import { taskCopy, type TaskMode } from "@/fakturaer/components/inbox/task/taskCopy";
 
 export type SecondaryAction = "create" | "not_rm" | "conflict" | "start_price";
@@ -51,6 +52,8 @@ export interface LineTaskProps {
   onCorrectLine?: (line: ReviewLineRow) => void;
   /** Åpner «Endre råvare» (tast M i arbeidsflaten) — bare for linjen signalet gjelder. */
   editMaterialSignal?: EditMaterialSignal | null;
+  /** Antall andre åpne linjer på samme faktura i visningen; null = ukjent. */
+  otherOpenLines?: number | null;
 }
 
 /**
@@ -271,8 +274,18 @@ export function LineTask(p: LineTaskProps) {
             {readIssue.detail} Regnestykket under er en foreløpig tolkning — kontroller mot originalfakturaen.
           </p>
         )}
-        <LineInsightPanel line={line} clarifications={clarifications} />
+        <LineInsightPanel line={line} clarifications={clarifications} confirmedPackage={confirmedPackageFor(link, line)} baseUnit={baseUnit} />
         {mode !== "done" && <p className="pt-1 text-sm">{missingText}</p>}
+        {mode === "done" && status.key === "ready" && (() => {
+          const d = doneSummary(p.otherOpenLines ?? null, priceGate);
+          return (
+            <div className="space-y-1 pt-1 text-sm" aria-live="polite">
+              <p className="font-medium">{d.line}</p>
+              <p className="text-caption text-ink-secondary">{d.invoice}</p>
+              {d.price && <p className="rounded-md bg-warning/10 px-2 py-1 text-caption text-warning">{d.price}</p>}
+            </div>
+          );
+        })()}
         <OpenSupplierItemButton supplierId={line.invoice.supplier_id} line={line} variant="ghost" className="-ml-2 h-7 px-2 text-caption" />
       </header>
 

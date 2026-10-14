@@ -1,4 +1,4 @@
-import { AlertTriangle, Lightbulb } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Lightbulb } from "lucide-react";
 import {
   guessLineKind,
   LINE_KIND_LABEL,
@@ -7,16 +7,22 @@ import {
   type Clarification,
   type InsightLine,
 } from "@/fakturaer/lib/lineInsight";
+import type { ConfirmedPackage } from "@/fakturaer/lib/lineDoneSummary";
+import { formatDate } from "@/fakturaer/lib/constants";
 
 interface Props {
   line: InsightLine;
   clarifications: Clarification[];
+  /** Bekreftet leverandørpakning for samme innhold. Da vises den i stedet for tekstforslaget. */
+  confirmedPackage?: ConfirmedPackage | null;
+  /** Grunnenhet for omregningen i bekreftet pakning. */
+  baseUnit?: string | null;
 }
 
 const nb = (n: number) => n.toLocaleString("nb-NO", { maximumFractionDigits: 3 });
 
 /** Forslag og avklaringer lest fra linjens egne felt. Ingenting lagres herfra. */
-export function LineInsightPanel({ line, clarifications }: Props) {
+export function LineInsightPanel({ line, clarifications, confirmedPackage, baseUnit }: Props) {
   const kind = guessLineKind(line);
   const pkg = packageFromText(line.description);
   const ranked = line.matched_raw_material ? [] : rankedSuggestions(line);
@@ -37,7 +43,19 @@ export function LineInsightPanel({ line, clarifications }: Props) {
         <dd>
           {LINE_KIND_LABEL[kind.kind]} <span className="text-ink-secondary">— {kind.reason}</span>
         </dd>
-        {pkg && (
+        {confirmedPackage ? (
+          <>
+            <dt className="text-ink-secondary">Pakning</dt>
+            <dd className="flex items-start gap-1">
+              <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" aria-hidden />
+              <span>
+                {nb(confirmedPackage.size)} {confirmedPackage.unit} per {confirmedPackage.container ?? "enhet"}
+                {baseUnit ? ` = ${nb(confirmedPackage.baseUnitsPerPackage)} ${baseUnit}` : ""}{" "}
+                <span className="text-ink-secondary">— bekreftet for leverandøren {formatDate(confirmedPackage.confirmedAt)}</span>
+              </span>
+            </dd>
+          </>
+        ) : pkg && (
           <>
             <dt className="text-ink-secondary">Pakning i teksten</dt>
             <dd>

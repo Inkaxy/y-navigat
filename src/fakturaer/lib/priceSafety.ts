@@ -148,7 +148,11 @@ const REASONS: Record<string, { label: string; action: ActionRequired; detail?: 
   package_snapshot_conflicts: { label: "Avklar pakning og mengdegrunnlag", action: "complete_link_or_package" },
   base_quantity_conflicts: { label: "Avklar pakning og mengdegrunnlag", action: "complete_link_or_package" },
   price_observation_held: { label: "Prisgrunnlaget er til kontroll", action: "confirm_price_basis" },
-  price_reference_unverified: { label: "Sammenligningsprisen må avklares", action: "confirm_price_basis" },
+  price_reference_unverified: {
+    label: "Ingen dokumentert tidligere kjøpspris å sammenligne med",
+    action: "confirm_price_basis",
+    detail: "Sammenligningen krever en tidligere kjøpspris fra samme leverandør i NOK før fakturadatoen som er godkjent som kostgrunnlag, og linjens referanse må peke på nettopp den. Det finnes ikke ennå, så prisvirkning beregnes ikke og kostprisen settes ikke fra denne linjen. Neste steg: kontroller de eldste åpne fakturaene for varen først.",
+  },
 };
 
 export const UNCHECKED: PriceGate = { ok: false, reason: "unchecked", action: "confirm_price_basis", label: "Prisgrunnlag ikke kontrollert", detail: "Prisstatusen er ikke hentet, feilet eller er utdatert. Prisvirkning vises ikke." };

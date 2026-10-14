@@ -96,6 +96,7 @@ export function QueueWorkspace(p: QueueWorkspaceProps) {
       onReconcile={p.onReconcile}
       onCorrectLine={p.onCorrectLine}
       editMaterialSignal={p.editMaterialSignal}
+      otherOpenLines={p.reason === "all" ? p.lines.filter((l) => l.id !== a.id && l.invoice_id === a.invoice_id && p.statusOf(l).key !== "ready" && p.statusOf(l).key !== "not_applicable").length : null}
     />
   ) : null;
   const inspector = task ? <div className="space-y-2">{p.inspectorNote}{task}</div> : null;
