@@ -60,3 +60,10 @@ describe("rett fakturert enhet", () => {
   });
   it("tilbyr pose når linjen er sekk", () => { expect(unitCorrectionOptions("sekk")).toContain("pose"); expect(unitCorrectionOptions("sekk")).not.toContain("sekk"); });
 });
+
+import { rowEffect } from "@/ravarer/pages/priskontroll/gjore/WorkListView";
+describe("rowEffect – låst rad", () => {
+  const it0 = { effect_status: "unknown", effect_label: null, impact_nok: null, read_integrity: "needs_review", unknown_effect_lines: 1, action_required: "complete_link_or_package" } satisfies Parameters<typeof rowEffect>[0];
+  it("skjuler generell hjelpetekst når planen er låst", () => { expect(rowEffect(it0, { readonly: true })).toBeNull(); });
+  it("beholder den når raden ikke er låst", () => { expect(rowEffect(it0, { readonly: false })).not.toBeNull(); });
+});
