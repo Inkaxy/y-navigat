@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useInvoiceExclusion } from "@/fakturaer/hooks/useInvoiceExclusion";
+import { useInvoiceExclusion, type ExcludeInput } from "@/fakturaer/hooks/useInvoiceExclusion";
 import {
   EXCLUSION_CATEGORY_LABEL, MAX_REASON, MIN_REASON, exclusionErrorText,
-  type ExclusionCategory, type ExclusionScope,
+  type ExclusionCategory, type ExclusionResult, type ExclusionScope,
 } from "@/fakturaer/lib/invoiceExclusion";
 
 export type HoldOutsideTarget = {
@@ -22,12 +22,14 @@ type Props = {
   onOpenChange: (v: boolean) => void;
   canWrite: boolean;
   onDone?: (scope: ExclusionScope) => void;
+  /** Bare syntetisk forhåndsvisning: erstatter serverkallet (ingen nettverk). */
+  simulate?: (input: ExcludeInput) => Promise<ExclusionResult>;
 };
 
 const newOp = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
 
 /** «Hold utenfor råvarebehandling»: linje eller hele dokumentet, årsak og obligatorisk begrunnelse. Skriver bare via RPC. */
-export function HoldOutsideDialog({ target, onOpenChange, canWrite, onDone }: Props) {
+export function HoldOutsideDialog({ target, onOpenChange, canWrite, onDone, simulate }: Props) {
   const ex = useInvoiceExclusion();
   const [scope, setScope] = useState<ExclusionScope>("invoice");
   const [category, setCategory] = useState<ExclusionCategory>("erstatning_produksjonstap");
@@ -53,11 +55,12 @@ export function HoldOutsideDialog({ target, onOpenChange, canWrite, onDone }: Pr
   async function submit() {
     if (!target || !valid || !canWrite) return;
     setError(null);
-    const r = await ex.exclude({
+    const input: ExcludeInput = {
       invoiceId: target.invoice.id, scope, lineId: scope === "line" ? target.line?.id ?? null : null,
       category, reason: trimmed, opId,
       expectedUpdatedAt: scope === "line" && target.line ? target.line.updated_at : target.invoice.updated_at,
-    });
+    };
+    const r = simulate ? await simulate(input) : await ex.exclude(input);
     if (r.kind === "ok") { setUnknown(false); onDone?.(scope); onOpenChange(false); return; }
     if (r.kind === "denied") { setError("Du har ikke skrivetilgang til fakturaer i dette selskapet. Ingenting er endret."); return; }
     if (r.kind === "rejected") { setUnknown(false); setError(exclusionErrorText(r)); return; }
