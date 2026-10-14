@@ -15,7 +15,9 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { decryptWithKey } from "../_shared/crypto.ts";
-import { callAi, extractJson, estimateCostUsd, type AiProvider } from "../_shared/ai-providers.ts";
+import { callAi, extractJson, estimateCostUsd, usageOf, type AiProvider } from "../_shared/ai-providers.ts";
+import { INVOICE_EXTRACTION_SCHEMA } from "../_shared/modelEval.ts";
+import { extractionSchemaEnabled } from "../_shared/extractionSchemaFlag.ts";
 import {
   checkSum, computeConfidence, num, runExtractionAttempts, type Hints, type LearningExample,
 } from "../_shared/invoiceExtraction.ts";
@@ -169,6 +171,9 @@ Deno.serve(async (req) => {
 
     if (cfg && pdf_base64) {
       const apiKey = await decryptWithKey(cfg.encrypted_api_key, "AI_CONFIG_ENCRYPTION_KEY");
+      // Strict schema bare når eksplisitt slått på (server-hemmelighet) og bare for OpenAI/Azure. Av = som før.
+      const useSchema = extractionSchemaEnabled(Deno.env.get("INVOICE_EXTRACTION_STRICT_SCHEMA"), cfg.provider);
+      if (useSchema) warnings.push("Strict schema brukt i lesingen");
       const run = await runExtractionAttempts({
         hints, examples, maxAttempts, parseJson: extractJson,
         call: async (userText) => {
@@ -184,14 +189,19 @@ Deno.serve(async (req) => {
               pdfBase64: pdf_base64,
               azureEndpoint: cfg.azure_endpoint ?? undefined,
               azureDeployment: cfg.azure_deployment ?? undefined,
+              jsonSchema: useSchema ? { name: "invoice_extraction", schema: INVOICE_EXTRACTION_SCHEMA } : undefined,
             });
             aiUsage = { in: (aiUsage.in ?? 0) + (result.inputTokens ?? 0), out: (aiUsage.out ?? 0) + (result.outputTokens ?? 0), cost: null };
             aiUsage.cost = estimateCostUsd(cfg.model, aiUsage.in, aiUsage.out);
             return result;
           } catch (e) {
+            // Avslag/ufullstendig svar har kostet tokens: loggfør forbruket fra feilen.
+            const u = usageOf(e);
             await admin.from("ai_usage_log").insert({
               provider: cfg.provider, model: cfg.model, purpose: "invoice_extraction",
               legal_entity_id, invoice_id: usageInvoiceId, success: false, error_message: (e as Error).message,
+              input_tokens: u?.inputTokens ?? null, output_tokens: u?.outputTokens ?? null,
+              estimated_cost_usd: u ? estimateCostUsd(cfg.model, u.inputTokens, u.outputTokens, u.cachedInputTokens ?? null) : null,
             });
             throw e;
           }

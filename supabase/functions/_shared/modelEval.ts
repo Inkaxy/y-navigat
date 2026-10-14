@@ -20,16 +20,28 @@ export const EVAL_LIMITS = {
 
 const n = (t: string) => ({ anyOf: [{ type: t }, { type: "null" }] });
 
-/** Strict schema for fakturaleserens JSON (samme felt som prompten beskriver). */
+/** Versjon av schemaet. Følger hvert evalresultat slik at «nytt schema» ikke blandes med «ny modell». */
+export const INVOICE_EXTRACTION_SCHEMA_VERSION = "strict-v2-2026-10-14";
+const TOP_FIELDS = ["supplier_name", "supplier_org_number", "invoice_number", "invoice_date", "due_date", "total_amount", "total_excl_vat", "total_vat", "currency", "kid_number", "account_number"] as const;
+
+/**
+ * Strict schema for fakturaleserens JSON: ALLE felt prompten ber om og parseren leser
+ * (inkl. field_confidence, *_raw, unit_price_basis, discount_pct). discount_amount ber prompten ikke
+ * om — parseren avleder den fra discount_pct og linjesum — så den er bevisst ikke i schemaet.
+ */
 export const INVOICE_EXTRACTION_SCHEMA: Record<string, unknown> = {
   type: "object",
   additionalProperties: false,
-  required: ["supplier_name", "supplier_org_number", "invoice_number", "invoice_date", "due_date", "total_amount", "total_excl_vat", "total_vat", "currency", "kid_number", "account_number", "lines", "lines_sum_self_check"],
+  required: ["supplier_name", "supplier_org_number", "invoice_number", "invoice_date", "due_date", "total_amount", "total_excl_vat", "total_vat", "currency", "kid_number", "account_number", "lines", "lines_sum_self_check", "field_confidence"],
   properties: {
     supplier_name: n("string"), supplier_org_number: n("string"), invoice_number: n("string"),
     invoice_date: n("string"), due_date: n("string"), total_amount: n("number"), total_excl_vat: n("number"),
     total_vat: n("number"), currency: n("string"), kid_number: n("string"), account_number: n("string"),
     lines_sum_self_check: n("number"),
+    field_confidence: {
+      type: "object", additionalProperties: false, required: [...TOP_FIELDS],
+      properties: Object.fromEntries(TOP_FIELDS.map((f) => [f, n("number")])),
+    },
     lines: {
       type: "array",
       items: {
