@@ -282,7 +282,6 @@ export function LineTask(p: LineTaskProps) {
             <div className="space-y-1 pt-1 text-sm" aria-live="polite">
               <p className="font-medium">{d.line}</p>
               <p className="text-caption text-ink-secondary">{d.invoice}</p>
-              {d.price && <p className="rounded-md bg-warning/10 px-2 py-1 text-caption text-warning">{d.price}</p>}
             </div>
           );
         })()}
