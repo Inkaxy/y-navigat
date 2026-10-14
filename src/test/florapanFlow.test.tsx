@@ -117,12 +117,24 @@ describe("kildemerking fra dokumentets innhold", () => {
 });
 
 describe("fersk kvittering", () => {
-  it("feil = ukjent, aldri 0; 0 åpne = ferdig", () => {
-    expect(freshStatusFrom({ isError: true, data: undefined }).kind).toBe("unknown");
-    const st = freshStatusFrom({ isError: false, data: [base, { ...base, id: "l2", invoice_id: "i2", invoice_number: "2" }] });
-    expect(st).toMatchObject({ kind: "ok", remaining: 2 });
+  const it1 = (open: unknown, extra: Partial<SupplierItem> = {}) => ({ items: [{ supplier_id: "s1", item_key: "sku:3021", open_lines: open, ...extra } as unknown as SupplierItem] });
+  const ok = { isError: false, data: [base] };
+  const f = (item: { isError: boolean; data: { items: SupplierItem[] } | undefined }, lines = ok) => freshStatusFrom({ item, lines, supplierId: "s1", itemKey: "sku:3021" });
+  it("varekortfeil/tomt/annet kort/ugyldig tall = ukjent, aldri 0", () => {
+    expect(f({ isError: true, data: undefined }).kind).toBe("unknown");
+    expect(f({ isError: false, data: { items: [] } }).kind).toBe("unknown");
+    expect(f({ isError: false, data: it1(0, { item_key: "sku:9" }) }).kind).toBe("unknown");
+    expect(f({ isError: false, data: it1(null) }).kind).toBe("unknown");
+  });
+  it("antallet kommer fra serverens open_lines, ikke linjeutvalget", () => {
+    // 500 åpne, men ingen av de 200 første linjene er åpne: aldri ferdig.
+    const st = f({ isError: false, data: it1(500) }, { isError: false, data: Array.from({ length: 200 }, (_, k) => ({ ...base, id: `x${k}`, requires_review: false })) });
+    expect(st).toMatchObject({ kind: "ok", remaining: 500, complete: false });
     expect(cardFinished(st)).toBe(false);
-    expect(cardFinished(freshStatusFrom({ isError: false, data: [{ ...base, requires_review: false }] }))).toBe(true);
+    // Linjefeil eller ukjent requires_review gjør bare lenkene ufullstendige.
+    expect(f({ isError: false, data: it1(1) }, { isError: true, data: undefined })).toMatchObject({ remaining: 1, complete: false });
+    expect(f({ isError: false, data: it1(1) }, { isError: false, data: [{ ...base, requires_review: null as unknown as boolean }] })).toMatchObject({ complete: false });
+    expect(cardFinished(f({ isError: false, data: it1(0) }, { isError: false, data: [] }))).toBe(true);
   });
 });
 
