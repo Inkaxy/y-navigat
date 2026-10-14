@@ -13,8 +13,6 @@ begin
     perform set_config('request.jwt.claims', json_build_object('sub', w, 'role', 'authenticated')::text, true);
     exit when public.has_ravarer_invoice_access(le, 'write');
   end loop;
-  s0 := public.rm_work_summary(le, false);
-  c0 := public.rm_work_items(le, 'alle', null, null, 'oldest', 1, 0)->'counts';
 
   perform set_config('request.jwt.claims', '', true);
   insert into suppliers (legal_entity_id, name) values (le, 'TEST køklassifisering') returning id into sup;
@@ -31,6 +29,11 @@ begin
   values (le, sup, 'TEST-Q-C', '2026-09-02', 50, 12.5, 'NOK', 'needs_review', 'ok', now(), 'Test flagg') returning id into ic;
 
   perform set_config('request.jwt.claims', json_build_object('sub', w, 'role', 'authenticated')::text, true);
+  -- Før utelatelse: flagget dokument teller (beviser at testen måler noe).
+  s0 := public.rm_work_summary(le, false);
+  c0 := public.rm_work_items(le, 'alle', null, null, 'oldest', 1, 0)->'counts';
+  log := log || format('fixture flagged=%s faktura_flagget=%s items=%s; ', s0->'invoices'->>'flagged', c0->>'faktura_flagget',
+    (select string_agg(x->>'item_key' || ':' || coalesce(x->>'last_invoice_id','-'), ',') from jsonb_array_elements(public.rm_supplier_items(le, sup, null, null, 50, 0)->'items') x));
   select to_jsonb(updated_at)#>>'{}' into v from invoices where id = ib;
   r := public.rm_set_invoice_exclusion(ib, 'invoice', null, 'erstatning_produksjonstap', 'Erstatning, nyeste samme SKU', v, gen_random_uuid());
   log := log || format('%s utelat_nyeste=%s; ', case when (r->>'ok')::boolean then 'ok' else 'FEIL' end, r->>'error');
@@ -52,9 +55,9 @@ begin
   log := log || format('%s flagget_ikke_i_ko; ', case when ok then 'ok' else 'FEIL' end);
   s1 := public.rm_work_summary(le, false);
   c1 := public.rm_work_items(le, 'alle', null, null, 'oldest', 1, 0)->'counts';
-  log := log || format('%s summary_flagged %s->%s; ', case when s1->'invoices'->>'flagged' = s0->'invoices'->>'flagged' then 'ok' else 'FEIL' end,
+  log := log || format('%s summary_flagged %s->%s; ', case when (s1->'invoices'->>'flagged')::int = (s0->'invoices'->>'flagged')::int - 1 then 'ok' else 'FEIL' end,
     s0->'invoices'->>'flagged', s1->'invoices'->>'flagged');
-  log := log || format('%s faktura_flagget %s->%s; ', case when c1->>'faktura_flagget' = c0->>'faktura_flagget' then 'ok' else 'FEIL' end,
+  log := log || format('%s faktura_flagget %s->%s; ', case when (c1->>'faktura_flagget')::int = (c0->>'faktura_flagget')::int - 1 then 'ok' else 'FEIL' end,
     c0->>'faktura_flagget', c1->>'faktura_flagget');
 
   raise exception 'RESULTAT: %', log;
