@@ -26,10 +26,15 @@ const tables = (inv: Record<string, unknown>, approvals: Record<string, unknown>
   invoice_line_match_suggestions: [],
 });
 
-async function run(t: Tables, options?: FakeClientOptions) {
+/** RPC-er handleren bare leser med (tilgang, cron-secret, prisreferanse). Alle andre regnes som skriving. */
+const READ_RPCS = new Set(["has_ravarer_invoice_access", "verify_cron_secret", "rm_price_reference"]);
+type Calls = NonNullable<FakeClientOptions["calls"]>;
+const writes = (c: Calls) => c.filter((x) => x.kind === "rpc" ? !READ_RPCS.has(x.name) : x.mode !== "select");
+
+async function run(t: Tables, options: FakeClientOptions = {}, bearer = SERVICE) {
   (globalThis as Record<string, unknown>).__EDGE_SUPABASE_FACTORY__ = () => createFakeClient(t, options);
   const res = await handler(new Request("http://localhost/match-invoice-lines", {
-    method: "POST", headers: { Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json" }, body: JSON.stringify({ invoice_id: "inv-1" }),
+    method: "POST", headers: { Authorization: `Bearer ${bearer}`, "Content-Type": "application/json" }, body: JSON.stringify({ invoice_id: "inv-1" }),
   }));
   return { status: res.status, body: (await res.json()) as Record<string, unknown> };
 }
@@ -47,26 +52,60 @@ describe("match-invoice-lines: livsløpsvakt før all skriving", () => {
     it(`${name}: endelig låst kvittering og 0 endringer`, async () => {
       const t = tables(inv, appr);
       const before = JSON.stringify(t);
-      const r = await run(t);
+      const calls: Calls = [];
+      const r = await run(t, { calls });
       expect(r.status).toBe(200);
       expect(r.body).toMatchObject({ skipped: true, locked: true, reason, processed: 0 });
+      expect(writes(calls)).toEqual([]);
+      expect(calls.some((c) => c.kind === "table" && c.table === "invoice_lines")).toBe(false);
       expect(JSON.stringify(t)).toBe(before);
     });
   }
   it("tilbakekalt godkjenning låser ikke; åpen faktura kjører og skriver", async () => {
     const t = tables({ status: "needs_review" }, [{ id: "a1", invoice_id: "inv-1", status: "approved", revoked_at: "2026-10-02" }]);
     const before = JSON.stringify(t);
-    const r = await run(t);
+    const calls: Calls = [];
+    const r = await run(t, { calls });
     expect(r.status).toBe(200);
     expect(r.body.locked).toBeUndefined();
+    expect(writes(calls).length).toBeGreaterThan(0);
     expect(JSON.stringify(t)).not.toBe(before);
   });
   it("lesefeil på godkjenning: 503 og 0 endringer", async () => {
     const t = tables({ status: "ready" });
     const before = JSON.stringify(t);
-    const r = await run(t, { failTables: { invoice_internal_approvals: "boom" } });
+    const calls: Calls = [];
+    const r = await run(t, { failTables: { invoice_internal_approvals: "boom" }, calls });
     expect(r.status).toBe(503);
+    expect(writes(calls)).toEqual([]);
     expect(r.body.error).toBe("lifecycle_check_failed");
     expect(JSON.stringify(t)).toBe(before);
+  });
+  for (const status of ["imported", "needs_review", "ready"]) {
+    it(`åpen kjent status ${status} kjører`, async () => {
+      const calls: Calls = [];
+      const r = await run(tables({ status }), { calls });
+      expect(r.status).toBe(200);
+      expect(r.body.locked).toBeUndefined();
+      expect(writes(calls).length).toBeGreaterThan(0);
+    });
+  }
+  it("bruker uten skriverett til selskapet: 403 før livsløpsvakten, 0 skriving, ingen låseårsak lekker", async () => {
+    const t = tables({ status: "reconciled" });
+    const before = JSON.stringify(t);
+    const calls: Calls = [];
+    const r = await run(t, { calls, rpc: { has_ravarer_invoice_access: false } }, "user-jwt");
+    expect(r.status).toBe(403);
+    expect(r.body.reason).toBeUndefined();
+    expect(calls.some((c) => c.kind === "rpc" && c.name === "has_ravarer_invoice_access")).toBe(true);
+    expect(calls.some((c) => c.kind === "table" && c.table === "invoice_internal_approvals")).toBe(false);
+    expect(writes(calls)).toEqual([]);
+    expect(JSON.stringify(t)).toBe(before);
+  });
+  it("bruker med skriverett på åpen faktura kjører", async () => {
+    const calls: Calls = [];
+    const r = await run(tables({ status: "needs_review" }), { calls, rpc: { has_ravarer_invoice_access: true } }, "user-jwt");
+    expect(r.status).toBe(200);
+    expect(writes(calls).length).toBeGreaterThan(0);
   });
 });
