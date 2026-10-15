@@ -537,7 +537,7 @@ export function FakturaWorkspaceView({ id, embedded }: ViewProps) {
         targetInvoiceId={correctFor ? correctTarget?.invoiceId ?? null : null}
         returnFocus={correctionReturnFocus}
         invoice={{ id: data.id, status: data.status, approved: !!s.steps?.find((x) => x.key === "godkjent")?.done, supplier_id: data.supplier_id, supplier_name: data.suppliers?.name ?? null }}
-        canWrite={s.canWrite}
+        canWrite={lineWrite}
         key={correctFor ? `${correctTarget?.invoiceId}:${correctFor}` : "lukket"}
         document={correctDocEl}
         onSaved={(r) => { q.refresh(); void detail.refetch(); s.setResult({ title: "Fakturalinjen er rettet", items: [
