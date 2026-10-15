@@ -79,7 +79,7 @@ export function useInvoiceSteps(data: InvoiceDetailData | undefined) {
   }
 
   async function postCosts() {
-    if (!data) return;
+    if (!data || busy) return;
     setBusy(true);
     try {
       const [r] = await postSafeCosts([data.id]);

@@ -44,6 +44,7 @@ export function createFakeClient(tables: Tables, options: FakeClientOptions = {}
     let mode: "select" | "update" | "delete" | "insert" | "upsert" = "select";
     let payload: Row | Row[] | null = null;
     let limitN: number | null = null;
+    let rangeN: [number, number] | null = null;
 
     const failure = options.failTables?.[table];
 
@@ -68,7 +69,8 @@ export function createFakeClient(tables: Tables, options: FakeClientOptions = {}
         for (const r of hit) rows.splice(rows.indexOf(r), 1);
         return { data: hit, error: null };
       }
-      return { data: limitN == null ? hit : hit.slice(0, limitN), error: null };
+      const ranged = rangeN ? hit.slice(rangeN[0], rangeN[1] + 1) : hit;
+      return { data: limitN == null ? ranged : ranged.slice(0, limitN), error: null };
     };
 
     const chain = {
@@ -90,6 +92,10 @@ export function createFakeClient(tables: Tables, options: FakeClientOptions = {}
       },
       is: (col: string, value: unknown) => {
         filters.push({ kind: "is", col, value });
+        return chain;
+      },
+      range: (from: number, to: number) => {
+        rangeN = [from, to];
         return chain;
       },
       limit: (n: number) => {
