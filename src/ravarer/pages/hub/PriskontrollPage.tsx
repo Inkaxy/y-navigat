@@ -13,6 +13,7 @@ import { normalizePriskontrollSearch } from "@/ravarer/pages/priskontroll/faktur
 import { ImportSheet } from "@/ravarer/pages/priskontroll/import/ImportSheet";
 import { GjoreWorkspace } from "@/ravarer/pages/priskontroll/gjore/GjoreWorkspace";
 import { Arbeidsbord } from "@/ravarer/pages/priskontroll/arbeidsbord/Arbeidsbord";
+import { FakturaArbeid } from "@/ravarer/pages/priskontroll/arbeid/FakturaArbeid";
 import { MengdeDiagnostikk } from "@/ravarer/pages/priskontroll/gjore/mengde/MengdeDiagnostikk";
 import { Link } from "react-router-dom";
 import { PriskontrollToolsMenu } from "./PriskontrollToolsMenu";
@@ -21,12 +22,14 @@ import { PRISKONTROLL_TAB_PARAMS, PRISKONTROLL_TABS, priskontrollTabs, RAVARER_E
 const Godkjenning = lazy(() => import("@/ravarer/pages/priskontroll/godkjenning/GodkjenningTab").then((m) => ({ default: m.GodkjenningTab })));
 const Saker = lazy(() => import("@/ravarer/pages/priskontroll/saker/SakerTab").then((m) => ({ default: m.SakerTab })));
 
-/** Priskontroll: Å gjøre · Fakturaer · Godkjenning · Leverandørsaker. */
+/** Priskontroll: Fakturaer (arbeidsflate) · Fakturaliste · Varegrupper · Godkjenning · Leverandørsaker. */
 export default function PriskontrollPage() {
   const [sp, setSp] = useSearchParams();
   const { search } = useLocation();
   const redirect = normalizePriskontrollSearch(search);
-  const tab = activeTabFrom(sp, "fane", [...PRISKONTROLL_TABS], "gjore");
+  // Gamle lenker uten `fane` men med varegruppeparametre (`visning`, `valgt`) gjaldt «Å gjøre» — de beholder den visningen.
+  const legacyGjore = !sp.get("fane") && (sp.has("visning") || sp.has("valgt"));
+  const tab = legacyGjore ? "gjore" : activeTabFrom(sp, "fane", [...PRISKONTROLL_TABS], "arbeid");
   const { data: summary } = useWorkSummary({ includeApproval: true });
   if (redirect) return <Navigate to={redirect} replace />;
   const openImport = () => setSp((prev) => { const p = new URLSearchParams(prev); p.set("importer", "ehf"); return p; });
@@ -44,7 +47,7 @@ export default function PriskontrollPage() {
           </Button>
         </>
       }
-      tabs={<SectionTabs ariaLabel="Priskontroll" tabs={priskontrollTabs(summary)} defaultTab="gjore" clearParams={PRISKONTROLL_TAB_PARAMS} />}
+      tabs={<SectionTabs ariaLabel="Priskontroll" tabs={priskontrollTabs(summary)} defaultTab="arbeid" activeId={tab} clearParams={PRISKONTROLL_TAB_PARAMS} />}
     >
       <Suspense fallback={<QueryLoadingState rows={6} />}>
         {tab === "gjore" && sp.get("visning") === "mengde" && <MengdeDiagnostikk />}
@@ -64,6 +67,7 @@ export default function PriskontrollPage() {
             </div>
           </>
         )}
+        {tab === "arbeid" && <FakturaArbeid />}
         {tab === "fakturaer" && <FakturaerTab />}
         {tab === "godkjenning" && <Godkjenning />}
         {tab === "saker" && <Saker />}

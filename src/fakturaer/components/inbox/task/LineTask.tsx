@@ -194,6 +194,14 @@ export function LineTask(p: LineTaskProps) {
     primary = { label: "Bekreft startpris", run: () => p.onSecondary("start_price", line), hint: copy.missing };
   } else if (status.key === "recalculate") {
     primary = { label: "Beregn prisen på nytt", run: () => void retryRecalc([line.id]), hint: copy.missing };
+  } else if (mode === "price" && p.canWrite && !priceGate.ok && priceGate.reason === "price_reference_unverified" && form.selectedRmId) {
+    // Ingen sirkel: finnes ingen dokumentert tidligere kjøpspris, kan denne linjen selv bli første pris.
+    // Serveren (rm_start_price_eligibility) avgjør om grunnlaget holder; dialogen viser kilde, dato, enhet og eksisterende pris.
+    primary = {
+      label: "Kontroller som første dokumenterte pris",
+      run: () => p.onSecondary("start_price", line),
+      hint: `${priceGate.label}. Serveren kontrollerer kobling, pakning, mengde og dato før noe lagres; ingenting settes automatisk.`,
+    };
   } else if (mode === "price" && p.canWrite && priceAcceptable) {
     primary = {
       label: "Prisen er riktig",

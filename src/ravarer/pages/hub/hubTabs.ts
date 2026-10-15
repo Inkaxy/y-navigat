@@ -23,19 +23,21 @@ export function varerTabs(s: WorkSummary | undefined, sp: URLSearchParams = new 
   ];
 }
 
-export const PRISKONTROLL_TABS = ["gjore", "fakturaer", "godkjenning", "saker"] as const;
+export const PRISKONTROLL_TABS = ["arbeid", "fakturaer", "gjore", "godkjenning", "saker"] as const;
 export type PriskontrollTabId = (typeof PRISKONTROLL_TABS)[number];
 
 /** Parametre som tilhører en enkelt Priskontroll-fane og fjernes ved fanebytte. */
 export const PRISKONTROLL_TAB_PARAMS = [
-  "visning", "modus", "innboks", "faktura", "filter", "kilde", "kreditnota", "lav", "status", "leverandor", "q", "selskap", "fra", "til", "avvik", "betalt", "sort", "dir", "side", "sak",
+  "visning", "modus", "innboks", "faktura", "filter", "kilde", "kreditnota", "lav", "status", "leverandor", "q", "selskap", "fra", "til", "avvik", "betalt", "sort", "dir", "side", "sak", "vis", "valgt", "rekkefolge", "linje", "fokus",
 ];
 
 /** Godkjenning: `rm_work_summary.approval.ready_to_approve` har samme regel som listens «Klare» (ikke kansellert, ikke godkjent, ingen blokkere). */
 export function priskontrollTabs(s: WorkSummary | undefined): SectionTab[] {
   return [
-    { id: "gjore", label: "Å gjøre", count: s?.todo_total },
-    { id: "fakturaer", label: "Fakturaer", count: s?.invoices?.open_total },
+    // Primærinngang: én faktura om gangen. Tellerne står i arbeidsflatens egen filterrad (med enhet).
+    { id: "arbeid", label: "Fakturaer" },
+    { id: "fakturaer", label: "Fakturaliste", count: s?.invoices?.open_total },
+    { id: "gjore", label: "Varegrupper", count: s?.todo_total },
     { id: "godkjenning", label: "Godkjenning", count: s?.approval?.ready_to_approve },
     { id: "saker", label: "Leverandørsaker", count: s?.other.cases_open },
   ];

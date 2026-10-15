@@ -151,7 +151,7 @@ const REASONS: Record<string, { label: string; action: ActionRequired; detail?: 
   price_reference_unverified: {
     label: "Dokumentert tidligere kjøpspris er ikke avklart",
     action: "confirm_price_basis",
-    detail: "Referansen mangler eller kan ikke bekreftes som en godkjent tidligere kjøpspris fra samme leverandør i NOK før fakturadatoen. Prisvirkning beregnes ikke, og kostprisen settes ikke fra denne linjen. Neste steg: kontroller de eldste åpne fakturaene for varen først.",
+    detail: "Referansen mangler eller kan ikke bekreftes som en godkjent tidligere kjøpspris fra samme leverandør i NOK før fakturadatoen. Prisvirkning beregnes ikke, og kostprisen settes ikke fra denne linjen. Neste steg: kontroller linjen som første dokumenterte pris fra leverandøren (serveren avgjør om grunnlaget holder), eller avklar en eldre faktura fra samme leverandør.",
   },
 };
 

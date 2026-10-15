@@ -71,6 +71,9 @@ export function StartPriceDialog({
       void qc.invalidateQueries({ queryKey: ["start-price-candidates"] });
       REVIEW_QUERY_KEYS.forEach((key) => void qc.invalidateQueries({ queryKey: [key] }));
       void qc.invalidateQueries({ queryKey: ["invoice-supplier-links"] });
+      // Prisstatusen og fakturaens linjer leses på nytt fra serveren; ingen lokal «ferdig».
+      void qc.invalidateQueries({ queryKey: ["invoice-line-price-safety"] });
+      void qc.invalidateQueries({ queryKey: ["invoice"] });
     },
     onError: (e) => {
       setFailure(e instanceof Error ? e.message : "Kunne ikke bekrefte startprisen");

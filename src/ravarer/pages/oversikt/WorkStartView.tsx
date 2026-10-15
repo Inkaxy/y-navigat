@@ -51,7 +51,7 @@ export function WorkStartView({ summary, firstName }: { summary: WorkSummary | n
         </div>
         {access && (
           <Button asChild size="lg" className="min-h-[44px] gap-1.5">
-            <Link to={paths.fakturaer({ visning: "trenger", sort: "oldest" })}>
+            <Link to={paths.priskontroll({ fane: "arbeid" })}>
               Start behandling<ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
           </Button>
