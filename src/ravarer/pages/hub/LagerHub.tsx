@@ -22,8 +22,8 @@ export const LAGER_BEGREP: Record<LagerTab, string> = {
   varemottak: "Varemottak: mengde som er registrert mottatt. En kreditnota for kompensasjon gir ingen lagerføring.",
   telling: "Varetelling: faktisk opptalt mengde. Lageret justeres aldri automatisk fra en telling.",
   bevegelser: "Bevegelser: hver registrert endring i teoretisk beholdning, med kilde.",
-  fortjeneste: "Fortjeneste: salgspris mot dokumentert kostpris for handelsvarer.",
-  bestilling: "Bestilling: forslag fra teoretisk beholdning mot minimum — ingenting bestilles automatisk.",
+  fortjeneste: "Fortjeneste: margin beregnet fra registrert kostpris.",
+  bestilling: "Bestilling: forslag ut fra teoretisk beholdning og minimum.",
 };
 
 /** Faner som holdes montert etter første besøk: utkast og filtre overlever fanebytte. */
