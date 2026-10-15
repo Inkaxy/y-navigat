@@ -31,7 +31,8 @@ export type FakturaListe = {
  * (som innboksen gjorde). «Avstemt» og «Alle» sideinndeles på serveren.
  */
 export function useFakturaListe(a: Args): FakturaListe {
-  const open = useInboxInvoices({ legalEntityId: a.legalEntityId, supplierId: null });
+  // Ukjent selskap: ingen henting (aldri alle selskaper som mellomtilstand).
+  const open = useInboxInvoices({ legalEntityId: a.legalEntityId, supplierId: null, enabled: !!a.legalEntityId });
   const server = a.visning === "avstemt" || a.visning === "utenfor" || a.visning === "alle";
   const remote = useQuery({
     queryKey: ["fakturaer-liste", a.legalEntityId, a.visning, a.modus, a.filters, a.page, a.sort],
