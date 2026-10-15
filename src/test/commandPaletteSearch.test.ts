@@ -132,7 +132,7 @@ describe("Råvarer i ⌘K", () => {
   it("fakturahandlinger krever fakturatilgang, ny råvare krever skrivetilgang", () => {
     const labels = (x: Parameters<typeof buildRavarerActions>[0]) => buildRavarerActions(x).map((a) => a.label);
     expect(labels({ canRead: true, canWrite: false, hasInvoiceAccess: false })).toEqual(["Åpne vareliste"]);
-    expect(labels({ canRead: true, canWrite: true, hasInvoiceAccess: true })).toEqual(["Ny råvare", "Importer faktura", "Åpne priskontroll", "Åpne vareliste"]);
+    expect(labels({ canRead: true, canWrite: true, hasInvoiceAccess: true })).toEqual(["Ny råvare", "Importer faktura", "Åpne fakturaer", "Åpne vareliste"]);
     expect(labels({ canRead: false, canWrite: true, hasInvoiceAccess: true })).toEqual([]);
   });
   it("undertittel med kategori, kostpris per grunnenhet og inaktiv", () => {

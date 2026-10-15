@@ -19,6 +19,6 @@
 - [x] 1 Oversikt som arbeidsstart: statusstripe med enhet (ukjent = –), én «Start behandling» (eldste først), 5 neste oppgaver, snarveier; prisutvikling/aktivitet/datakvalitet bak «Mer»
 - [x] 2 Fakturaflyt (ny fane «Fakturaer», `fane=arbeid`): én liste → én faktura → oppgave → lagre → kvittering → neste; filtre Trenger deg/Klare/Ferdig/Holdt utenfor; 1280×800 over bretten; valgfri original
 - [x] 3 Guidet (førstepris via rm_confirm_start_price-dialog) blokkerrekkefølge lesing→råvare→pakning→pris→godkjenning; førstegangspris via rm_set_documented_cost_price
-- [ ] 4 Vareliste + råvarekort forenklet, avansert bak sekundær tilgang
-- [ ] 5 Leverandør/Lager/Innstillinger samme rytme, ingen dobbel header
+- [x] 4 Vareliste (delvis, se melding) + råvarekort forenklet, avansert bak sekundær tilgang
+- [~] 5 Leverandør/Lager/Innstillinger samme rytme, ingen dobbel header
 - [ ] Skjermbilder 390/1280/1440, full testsamling
