@@ -49,7 +49,7 @@ function PeekBody({ id, listSearch }: { id: string; listSearch: string }) {
     );
   }
   const nameOf = new Map(suppliers.map((s) => [s.id, s.name]));
-  const checklist = completenessChecklist({ rm, linkCount: page.links.length, nutrition: page.nutrition, hasDatasheet: page.hasDatasheet, costEvidence: priceEvidence.cost });
+  const checklist = completenessChecklist({ rm, linkCount: page.links.length, links: page.links.map((l) => ({ ...l, supplierName: nameOf.get(l.supplier_id) ?? null })), nutrition: page.nutrition, hasDatasheet: page.hasDatasheet, costEvidence: priceEvidence.cost });
   const cost = costSummary(rm, priceEvidence.cost);
   // Ett tydelig neste steg: lenker til seksjonen der det manglende feltet rettes. Ingen skriving her.
   const fix = nextFix(checklist, priceEvidence.loading || priceEvidence.isError);

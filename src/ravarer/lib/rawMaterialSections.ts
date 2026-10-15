@@ -3,7 +3,7 @@ import type { CostEvidence } from "@/ravarer/lib/listPriceEvidence";
  * Råvarekortets seksjoner (fase 4B): URL-kontrakt, oversetting av gamle `tab`-verdier
  * og komplett-sjekklisten. Rene funksjoner — testes uten React.
  */
-import { confirmedFactor } from "./supplierPackagePrice";
+import { confirmedFactor, packageLabel, type PackageFields } from "./supplierPackagePrice";
 import { NUTRITION_FIELD_LABEL, nutritionState, type NutritionValues } from "./nutritionCompleteness";
 
 export const SECTIONS = ["sammendrag", "pris", "leverandorer", "naering", "deklarasjon", "bruk", "lager", "grunndata", "historikk"] as const;
@@ -104,6 +104,7 @@ export interface CheckInput {
     package_confirmed_at: string | null;
     package_confirmed_by: string | null;
     item_type?: string | null;
+    base_unit?: string | null;
   };
   linkCount: number;
   /** Leverandørkoblinger med pakningsfelt (samme rader som «Pakning og leverandør»). */
@@ -131,7 +132,7 @@ export function packageCheck(rm: CheckInput["rm"], links: readonly SupplierPacka
   const name = (l: SupplierPackageLink) => l.supplierName?.trim() || "ukjent leverandør";
   if (confirmed.length > 0) {
     const what = confirmed.length === 1
-      ? `${name(confirmed[0])}: ${packageLabel(confirmed[0], "").label?.replace(/\s+per pakning$/, "") ?? "bekreftet"}`
+      ? `${name(confirmed[0])}: ${packageLabel(confirmed[0], rm.base_unit ?? "").label ?? "bekreftet"}`
       : `${confirmed.length} leverandører`;
     if (open.length === 0) return { ...base, status: "ok", detail: `Leverandørpakning bekreftet (${what})`, section: "leverandorer" };
     return { ...base, status: "partial", detail: `Leverandørpakning bekreftet (${what}) — ikke bekreftet for ${open.map(name).join(", ")}`, section: "leverandorer" };

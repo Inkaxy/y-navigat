@@ -129,7 +129,7 @@ export default function RawMaterialDetail() {
     setEditingName(false);
   };
 
-  const checklist = completenessChecklist({ rm, linkCount: page.links.length, nutrition: page.nutrition, hasDatasheet: page.hasDatasheet, costEvidence: priceEvidence.cost });
+  const checklist = completenessChecklist({ rm, linkCount: page.links.length, links: page.links.map((l) => ({ ...l, supplierName: supplierNameOf.get(l.supplier_id) ?? null })), nutrition: page.nutrition, hasDatasheet: page.hasDatasheet, costEvidence: priceEvidence.cost });
   const group = groupOf(section);
   const more = moreSections(rm.is_packaging);
   const sectionHref = (sid: SectionId) => `${paths.raavare(rm.id)}${sectionSearch(searchParams, sid)}`;
