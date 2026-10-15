@@ -455,6 +455,7 @@ export function FakturaWorkspaceView({ id, embedded }: ViewProps) {
         docOpen={docShown}
         onToggleDoc={toggleDoc}
         canWrite={s.canWrite}
+        linesLocked={lineLock.locked}
         canFetch={canFetchLines({ source: data.source, line_extraction_status: data.line_extraction_status, line_count: (data.invoice_lines ?? []).length })}
         backLabel={embedded?.backLabel ?? fakturaReturn(readReturnParam(sp)).label}
         sumMismatch={data.lines_sum_status === "mismatch"}
