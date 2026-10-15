@@ -76,7 +76,7 @@ export function FakturaArbeid() {
     queryKey: ["invoice-internal-approval-active", selected, detail.dataUpdatedAt],
     enabled: !!selected && !!detail.data,
     queryFn: async () => {
-      const { data, error } = await supabase.from("invoice_internal_approvals").select("status").eq("invoice_id", selected as string).eq("status", "approved").limit(1);
+      const { data, error } = await supabase.from("invoice_internal_approvals").select("status").eq("invoice_id", selected as string).eq("status", "approved").is("revoked_at", null).limit(1);
       if (error) throw new Error("Kunne ikke lese godkjenningsstatus.");
       return (data ?? []).length > 0;
     },

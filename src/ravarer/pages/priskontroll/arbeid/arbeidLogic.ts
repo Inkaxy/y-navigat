@@ -12,7 +12,7 @@ export const ARBEID_LABEL: Record<ArbeidState, string> = {
   trenger: "Trenger deg",
   klare: "Klare",
   etterkontroll: "Godkjent – etterkontroll",
-  ferdig: "Ferdig",
+  ferdig: "Avstemt",
   utenfor: "Holdt utenfor",
 };
 
@@ -21,7 +21,7 @@ export const ARBEID_HINT: Record<ArbeidState, string> = {
   trenger: "Fakturaer med linjer eller summer som må avklares.",
   klare: "Alle linjer er avklart; fakturaen kan avstemmes.",
   etterkontroll: "Internt godkjent, men ikke avstemt. Åpnes bare for eksplisitt ny kontroll; godkjenningen endres ikke her.",
-  ferdig: "Avstemt. Godkjenning og kostføring vises på fakturaen.",
+  ferdig: "Avstemt. Avstemt er ett steg — godkjenning og kostføring vises på fakturaen.",
   utenfor: "Holdt utenfor råvarebehandling med begrunnelse.",
 };
 
@@ -99,7 +99,7 @@ export type ReceiptInput = {
 };
 
 /**
- * «Ferdig»-kvittering bare for en kjent før→etter-overgang i samme utvalg, der fersk
+ * «Flyttet»-kvittering bare for en kjent før→etter-overgang i samme utvalg, der fersk
  * servertilstand faktisk tilhører en annen tilstand. Ellers nøytralt «ikke i utvalget».
  */
 export function arbeidReceipt(i: ReceiptInput): "moved" | "not_in_scope" | null {
