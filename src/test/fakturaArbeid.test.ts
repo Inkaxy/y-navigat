@@ -27,3 +27,13 @@ describe("fakturaarbeidsflaten", () => {
     expect(ids.slice(0, 3)).toEqual(["arbeid", "fakturaer", "gjore"]);
   });
 });
+
+import { openWorkCounts } from "@/ravarer/pages/priskontroll/fakturaer/useFakturaListe";
+import type { InboxInvoice } from "@/fakturaer/hooks/useInboxInvoices";
+describe("internt godkjente er ikke vanlig åpent arbeid", () => {
+  const mk = (tab: "open" | "ready", approved: boolean) => ({ tab, internally_approved: approved }) as unknown as InboxInvoice;
+  it("godkjente telles bare under etterkontroll", () => {
+    expect(openWorkCounts([mk("open", false), mk("open", true), mk("ready", true), mk("ready", false), mk("open", false)]))
+      .toEqual({ trenger: 2, klar: 1, etterkontroll: 2 });
+  });
+});

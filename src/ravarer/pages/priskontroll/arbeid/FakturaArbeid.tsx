@@ -142,6 +142,7 @@ export function FakturaArbeid() {
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-medium">{r.supplier_name ?? "Ukjent leverandør"}</span>
                       <span className="block text-caption text-ink-secondary">{r.invoice_number} · {dateNo(r.invoice_date)}{state === "trenger" ? ` · ${r.assessment.openCount} åpne linjer` : ""}</span>
+                      {r.internally_approved && <span className="mt-0.5 inline-block rounded border border-warning/50 bg-warning/10 px-1.5 text-caption">Internt godkjent – ny kontroll må startes eksplisitt</span>}
                     </span>
                     <span className="shrink-0 text-sm tabular-nums">{formatNok(r.total_amount)}</span>
                   </button>
