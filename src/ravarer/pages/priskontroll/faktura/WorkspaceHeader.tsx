@@ -56,6 +56,8 @@ export function WorkspaceHeader(p: Props) {
   const doc = useInvoiceDocumentUrl(p.docPath);
   const final = p.status === "reconciled";
   const excluded = p.status === "excluded";
+  // Frittstående side: fakturaen er sidens h1. Innebygd i arbeidsflaten har siden allerede h1.
+  const Heading = p.compact ? "h2" : "h1";
   return (
     <header className={cn("sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur", p.compact ? "flex flex-wrap items-center gap-x-3 gap-y-1 py-1" : "space-y-2 py-3")}>
       <div className={cn("flex flex-wrap items-center gap-2", p.compact && "shrink-0")}>
@@ -70,7 +72,7 @@ export function WorkspaceHeader(p: Props) {
       </div>
       <div className={cn("flex flex-wrap justify-between", p.compact ? "min-w-0 flex-1 items-center gap-2" : "items-end gap-3")}>
         <div className={cn("min-w-0", p.compact ? "flex flex-wrap items-center gap-x-3 gap-y-0.5" : "space-y-1")}>
-          <h2 className={cn("font-serif leading-tight", p.compact ? "text-base" : "text-xl")}>{p.supplier} · Faktura {p.invoiceNumber}</h2>
+          <Heading className={cn("font-serif leading-tight", p.compact ? "text-base" : "text-xl")}>{p.supplier} · Faktura {p.invoiceNumber}</Heading>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-ink-secondary">
             <span>{formatDate(p.invoiceDate)}</span>
             <span className="tabular-nums">{formatNok(p.amount)}</span>
