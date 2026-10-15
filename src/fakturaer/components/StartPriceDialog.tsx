@@ -11,6 +11,7 @@ import {
 } from "@/fakturaer/lib/startPrice";
 import { REVIEW_QUERY_KEYS } from "@/fakturaer/components/BulkLinkDialog";
 import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
+import { recalculateLines } from "@/fakturaer/lib/acceptMatch";
 
 interface Props {
   open: boolean;
@@ -56,24 +57,40 @@ export function StartPriceDialog({
   const confirm = useMutation({
     mutationFn: async () => {
       if (!invoiceLineId) throw new Error("Ingen fakturalinje er valgt");
-      return confirmStartPrice(invoiceLineId, eligibilityQuery.data?.price_per_base_unit ?? null);
+      const res = await confirmStartPrice(invoiceLineId, eligibilityQuery.data?.price_per_base_unit ?? null);
+      if (!res.created) return { res, rematch: "skipped" as const };
+      // Ny matching av linjen må faktisk kjøres og fullføres; bare cache-invalidering beviser ikke ny prisstatus.
+      const invoiceId = res.check?.invoice_id ?? eligibilityQuery.data?.invoice_id ?? null;
+      if (!invoiceId) return { res, rematch: "failed" as const };
+      try { await recalculateLines(invoiceId, [invoiceLineId]); } catch { return { res, rematch: "failed" as const }; }
+      // Les prisstatus, linje og faktura på nytt fra serveren og vent på svaret.
+      await Promise.all([
+        qc.refetchQueries({ queryKey: ["invoice-line-price-safety"] }),
+        qc.refetchQueries({ queryKey: ["invoice"] }),
+        ...REVIEW_QUERY_KEYS.map((key) => qc.refetchQueries({ queryKey: [key] })),
+      ]);
+      return { res, rematch: "done" as const };
     },
-    onSuccess: (res) => {
+    onSuccess: ({ res, rematch }) => {
       invalidateRavarerCounts(qc);
-      if (res.created) {
+      if (res.created && rematch === "done") {
         setConfirmed(true);
         setFailure(null);
-        toast.success("Startprisen er bekreftet");
+        toast.success("Startprisen er bekreftet og prisen er kontrollert på nytt");
+      } else if (res.created) {
+        setConfirmed(true);
+        setFailure("Startprisen er lagret, men linjen kunne ikke kontrolleres på nytt. Prisstatusen kan være utdatert — beregn linjen på nytt.");
       } else {
         setFailure(confirmReasonLabel(res.reason));
       }
       void qc.invalidateQueries({ queryKey: START_PRICE_QUERY_KEYS.eligibility(invoiceLineId ?? "none") });
       void qc.invalidateQueries({ queryKey: ["start-price-candidates"] });
-      REVIEW_QUERY_KEYS.forEach((key) => void qc.invalidateQueries({ queryKey: [key] }));
       void qc.invalidateQueries({ queryKey: ["invoice-supplier-links"] });
-      // Prisstatusen og fakturaens linjer leses på nytt fra serveren; ingen lokal «ferdig».
-      void qc.invalidateQueries({ queryKey: ["invoice-line-price-safety"] });
-      void qc.invalidateQueries({ queryKey: ["invoice"] });
+      if (rematch !== "done") {
+        REVIEW_QUERY_KEYS.forEach((key) => void qc.invalidateQueries({ queryKey: [key] }));
+        void qc.invalidateQueries({ queryKey: ["invoice-line-price-safety"] });
+        void qc.invalidateQueries({ queryKey: ["invoice"] });
+      }
     },
     onError: (e) => {
       setFailure(e instanceof Error ? e.message : "Kunne ikke bekrefte startprisen");

@@ -26,6 +26,7 @@ import { OpenSupplierItemButton } from "@/fakturaer/components/supplier-item/Ope
 import { lineClarifications, packageGateFromReview } from "@/fakturaer/lib/lineInsight";
 import { LineInsightPanel } from "@/fakturaer/components/inbox/task/LineInsightPanel";
 import { confirmedPackageFor, doneSummary } from "@/fakturaer/lib/lineDoneSummary";
+import { FirstPriceAction } from "@/fakturaer/components/inbox/task/FirstPriceAction";
 import { taskCopy, type TaskMode } from "@/fakturaer/components/inbox/task/taskCopy";
 
 export type SecondaryAction = "create" | "not_rm" | "conflict" | "start_price";
@@ -54,6 +55,8 @@ export interface LineTaskProps {
   editMaterialSignal?: EditMaterialSignal | null;
   /** Antall andre åpne linjer på samme faktura i visningen; null = ukjent. */
   otherOpenLines?: number | null;
+  /** Fakturaen er internt godkjent; ukjent (undefined) behandles som godkjent for nye prishandlinger på avklarte linjer. */
+  invoiceApproved?: boolean;
 }
 
 /**
@@ -250,6 +253,10 @@ export function LineTask(p: LineTaskProps) {
     }
   }
 
+  // Avklart linje uten gyldig sammenligningspris: første pris kan fortsatt kontrolleres (serveren avgjør).
+  const firstPriceOnDone = mode === "done" && p.canWrite && p.invoiceApproved === false && !priceGate.ok
+    && priceGate.reason === "price_reference_unverified" && !!(form.selectedRmId ?? line.raw_material_id);
+
   const rmName = form.selectedRm?.name ?? line.matched_raw_material?.name ?? null;
   const baseUnit = form.selectedRm?.base_unit ?? line.matched_raw_material?.base_unit ?? null;
 
@@ -290,6 +297,8 @@ export function LineTask(p: LineTaskProps) {
             <div className="space-y-1 pt-1 text-sm" aria-live="polite">
               <p className="font-medium">{d.line}</p>
               <p className="text-caption text-ink-secondary">{d.invoice}</p>
+              {d.price && <p className="text-caption text-ink-secondary" data-testid="done-price-note">{d.price}</p>}
+              {firstPriceOnDone && <FirstPriceAction lineId={line.id} onOpen={() => p.onSecondary("start_price", line)} />}
             </div>
           );
         })()}
