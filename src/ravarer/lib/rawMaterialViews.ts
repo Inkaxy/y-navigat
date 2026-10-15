@@ -131,7 +131,7 @@ export const BUILTIN_VIEWS: ViewDefinition[] = [
   { id: "all", label: "Alle", predicate: () => true },
   {
     id: "missing_package",
-    label: "Mangler pakning",
+    label: "Mangler standardpakning",
     predicate: (i) => i.packageState !== "confirmed",
   },
   {

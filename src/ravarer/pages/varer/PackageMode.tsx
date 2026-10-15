@@ -23,12 +23,12 @@ import { useActiveRow } from "./useActive";
 
 type Tone = "red" | "yellow" | "grey" | "green";
 export const PACKAGE_STATUS_CARDS: { key: string; label: string; tone: Tone }[] = [
-  { key: "mangler_pakning", label: "Mangler pakning", tone: "red" },
+  { key: "mangler_pakning", label: "Mangler standardpakning", tone: "red" },
   { key: "avviker_fra_referanse", label: "Avviker fra referanse", tone: "red" },
   { key: "ustabil_pris", label: "Ustabil pris", tone: "yellow" },
   { key: "linjer_uten_pris", label: "Linjer uten pris", tone: "yellow" },
   { key: "mangler_kostpris", label: "Mangler kostpris", tone: "grey" },
-  { key: "ikke_bekreftet", label: "Ikke bekreftet", tone: "grey" },
+  { key: "ikke_bekreftet", label: "Standardpakning ikke bekreftet", tone: "grey" },
   { key: "ok", label: "OK", tone: "green" },
   { key: "ingen_fakturaer", label: "Ingen fakturaer", tone: "grey" },
 ];
