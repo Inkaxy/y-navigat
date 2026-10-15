@@ -27,8 +27,11 @@ export const LIST_COLUMNS: ListColumn[] = [
   { id: "active", label: "Aktiv", sortKey: "active" },
 ];
 
-/** Kolonner som er skjult inntil brukeren slår dem på. */
-export const DEFAULT_HIDDEN_COLUMNS: string[] = ["stock", "price_source", "price_updated"];
+/**
+ * Kolonner som er skjult inntil brukeren slår dem på. Første inntrykk: navn, kategori, leverandør,
+ * kostpris med status, pakning og status. Lagret kolonnevalg beholdes; alle kolonner kan slås på i «Kolonner».
+ */
+export const DEFAULT_HIDDEN_COLUMNS: string[] = ["sku", "agreed", "deviation", "volume_12m", "last_invoice", "stock", "price_source", "price_updated", "active"];
 
 
 export function isColumnVisible(id: string, hidden: readonly string[]): boolean {
