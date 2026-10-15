@@ -353,10 +353,14 @@ export async function acceptMatch(opts: AcceptMatchOptions): Promise<AcceptMatch
  * Kaster ved feil — kalleren skal ikke kunne vise falsk suksess.
  */
 export async function recalculateLines(invoiceId: string, lineIds: string[]): Promise<void> {
-  const { error } = await supabase.functions.invoke("match-invoice-lines", {
+  const { data, error } = await supabase.functions.invoke("match-invoice-lines", {
     body: { invoice_id: invoiceId, line_ids: lineIds },
   });
   if (error) throw new Error(`Reberegningen feilet: ${error.message}`);
+  // Låst faktura (internt godkjent/utelatt/endelig): ingenting ble beregnet — aldri meld det som utført.
+  if (data && typeof data === "object" && (data as { locked?: unknown }).locked === true) {
+    throw new Error("Fakturaen er låst (internt godkjent, utelatt eller avsluttet), så linjen ble ikke beregnet på nytt.");
+  }
 }
 
 /** Norsk forklaring på hva som skjedde med startprisen i bekreftelsen. */
