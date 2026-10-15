@@ -37,6 +37,8 @@ export interface DeliveryExtras {
   costPostedLines?: number;
   /** Varelinjer (ikke «Ikke vare»). */
   costTotalLines?: number;
+  /** `false` = godkjenning/kostføring er ikke hentet ennå (lasting/feil). Udefinert = kjent. */
+  known?: boolean;
 }
 
 export type CostProgress = { state: "ingen" | "delvis" | "fullfort"; posted: number; total: number; remaining: number };
@@ -45,18 +47,21 @@ export type CostProgress = { state: "ingen" | "delvis" | "fullfort"; posted: num
 export function costProgress(posted: number, total: number): CostProgress {
   const p = Math.max(0, posted);
   const t = Math.max(0, total);
-  const state = p === 0 ? "ingen" : p >= t ? "fullfort" : "delvis";
+  // Ingen varelinjer (kun «Ikke vare»/kreditnota-lignende) = ingenting å føre; ukjent håndteres via `known`.
+  const state = t === 0 ? "fullfort" : p === 0 ? "ingen" : p >= t ? "fullfort" : "delvis";
   return { state, posted: p, total: t, remaining: Math.max(0, t - p) };
 }
 
 export function extrasFromCounts(approved: boolean, posted: number, total: number): DeliveryExtras {
-  return { approved, costPosted: costProgress(posted, total).state === "fullfort", costPostedLines: posted, costTotalLines: total };
+  return { approved, costPosted: costProgress(posted, total).state === "fullfort", costPostedLines: posted, costTotalLines: total, known: true };
 }
 
 function costDetail(e: DeliveryExtras, avstemt: boolean): string {
   const posted = e.costPostedLines ?? (e.costPosted ? 1 : 0);
   const total = e.costTotalLines ?? posted;
   const p = costProgress(posted, total);
+  if (e.known === false) return "Kostprisstatus er ikke hentet ennå";
+  if (e.costPosted && e.costTotalLines === 0) return "Ingen varelinjer å føre kostpris for";
   if (e.costPosted) return e.costTotalLines != null ? `Kostpris ført for alle ${p.total} varelinjer` : "Kostpris er ført";
   if (p.state === "delvis") return `Delvis ført: ${p.posted} av ${p.total} varelinjer${avstemt ? "" : " — resten kan føres når linjene er avklart"}`;
   return avstemt ? "Ikke ført – kostpris føres bare før avstemming" : "Kostpris er ikke ført";
@@ -131,7 +136,11 @@ export function deliverySteps(inv: DeliveryInvoice, extras: DeliveryExtras): Del
 }
 
 export type NextStepKey =
-  | "holdt_utenfor" | "flagget" | "koble_kreditnota" | "hent_linjer" | "registrer_linjer" | "rett_sum" | "avklar" | "avstem" | "godkjenn" | "kostpris" | "ferdig";
+  | "holdt_utenfor" | "flagget" | "koble_kreditnota" | "hent_linjer" | "registrer_linjer" | "rett_sum" | "avklar" | "avstem" | "godkjenn" | "kostpris"
+  | "kostkontroll" | "status_ukjent" | "venter_godkjenning" | "kost_etterkontroll" | "ferdig";
+
+/** Steg som betyr at fakturaen IKKE er helt ferdig, selv om ingen handling er åpen her. */
+export const NOT_DONE_KEYS: readonly NextStepKey[] = ["kostkontroll", "status_ukjent", "venter_godkjenning", "kost_etterkontroll"];
 
 export interface NextStep {
   key: NextStepKey;
@@ -182,14 +191,26 @@ export function nextInvoiceStep(i: NextStepInput): NextStep {
     const n = i.open_count;
     return { key: "avklar", label: `Avklar ${n} ${n === 1 ? "linje" : "linjer"}`, enabled: true, hint: "Går til første åpne linje." };
   }
+  // Ukjent godkjenning/kostføring er aldri «ferdig» og gir ingen kost-/godkjenningshandling.
+  if (i.known === false && !i.is_credit_note) {
+    return { key: "status_ukjent", label: "Henter kostpris- og godkjenningsstatus", enabled: false, hint: "Status er ikke bekreftet ennå — ingenting regnes som ferdig før den er hentet." };
+  }
+  const p = costProgress(i.costPostedLines ?? 0, i.costTotalLines ?? 0);
+  const ratio = i.costTotalLines != null ? `${p.posted} av ${p.total} varelinjer ført` : "antall førte varelinjer ukjent";
   // Kostpris føres FØR avstemming: `rm_post_safe_line_costs` godtar bare åpne
   // statuser og aldri kreditnota (krever ikke godkjenning).
   if (costPostingAllowed(i) && !i.costPosted && !i.noSafeLines) {
     const can = i.canPostCosts ?? i.canWrite;
-    const p = costProgress(i.costPostedLines ?? 0, i.costTotalLines ?? 0);
     return {
       key: "kostpris", label: p.state === "delvis" ? `Før kostpris for resten (${p.remaining} gjenstår)` : "Før kostpris", enabled: can,
       hint: can ? "Fører kostpris for de trygge linjene før fakturaen avstemmes." : "Føring av kostpris krever skrivetilgang til fakturaer.",
+    };
+  }
+  // Ingen trygge linjer igjen: kontrollbehov, ikke ferdig. Avstemming er fortsatt mulig ved siden av.
+  if (costPostingAllowed(i) && !i.costPosted && i.noSafeLines) {
+    return {
+      key: "kostkontroll", label: `Kontroller prisgrunnlaget (${ratio})`, enabled: true,
+      hint: `${p.remaining} ${p.remaining === 1 ? "varelinje er" : "varelinjer er"} ikke trygge nok for automatisk føring. Åpne linjen og avklar prisgrunnlaget (f.eks. «Kontroller første dokumenterte pris»).`,
     };
   }
   if (i.status !== "reconciled") {
@@ -200,21 +221,23 @@ export function nextInvoiceStep(i: NextStepInput): NextStep {
     };
   }
   if (!i.approved) {
-    return {
-      key: "godkjenn", label: "Godkjenn", enabled: i.canApprove,
-      hint: i.canApprove ? "Intern godkjenning. Utløser ikke betaling." : "Krever godkjennerrolle (godkjenne eller admin).",
-    };
+    return i.canApprove
+      ? { key: "godkjenn", label: "Godkjenn", enabled: true, hint: "Avstemt, venter intern godkjenning. Utløser ikke betaling." }
+      : { key: "venter_godkjenning", label: "Venter intern godkjenning", enabled: false, hint: "Avstemt. Intern godkjenning krever godkjennerrolle (godkjenne eller admin)." };
   }
   if (i.is_credit_note) {
     return { key: "ferdig", label: "Ferdig", enabled: false, hint: "Kreditnotaen er avstemt og godkjent. Kostprisføring gjelder ikke kreditnotaer." };
   }
-  if (!i.costPosted && (i.costPostedLines ?? 0) > 0) {
-    return { key: "ferdig", label: "Ferdig", enabled: false, hint: `Kostpris delvis ført (${i.costPostedLines} av ${i.costTotalLines ?? "?"} varelinjer).` };
-  }
   if (!i.costPosted) {
-    return { key: "ferdig", label: "Ferdig", enabled: false, hint: i.noSafeLines ? "Ingen trygge linjer å føre kostpris for." : "Fakturaen er avstemt og godkjent. Kostpris føres bare før avstemming." };
+    // Ingen tvungen gjenåpning: avstemt+godkjent med manglende kost er etterkontroll, aldri grønn «Ferdig».
+    return {
+      key: "kost_etterkontroll",
+      label: p.state === "delvis" ? `Kostpris delvis ført – ${ratio}` : `Kostpris ikke ført – ${ratio}`,
+      enabled: false,
+      hint: "Avstemt og godkjent, men ikke all kostpris er ført. Etterkontroll: kostpris føres bare før avstemming, så gjenstående linjer krever eksplisitt ny kontroll.",
+    };
   }
-  return { key: "ferdig", label: "Ferdig", enabled: false, hint: "Fakturaen er avstemt, godkjent og kostpris er ført." };
+  return { key: "ferdig", label: "Ferdig", enabled: false, hint: `Summen er kontrollert, fakturaen er avstemt og godkjent, og kostpris er ført (${ratio}).` };
 }
 
 /** Statusene `rm_post_safe_line_costs` godtar. */
