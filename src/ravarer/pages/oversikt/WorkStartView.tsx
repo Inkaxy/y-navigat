@@ -12,14 +12,18 @@ function n(v: number | null | undefined): string {
 export type StatusCell = { label: string; value: string; unit: string; href?: string; tone?: "warning" };
 
 /** Statusstripen: hver teller har én kilde og sier hva den teller (fakturaer, linjer, varekort). */
-export function statusCells(s: WorkSummary | null): StatusCell[] {
+/** Åpne fakturaer med samme filter som Fakturaer-flaten (uten internt godkjente). null = ukjent. */
+export type OpenInvoiceCounts = { trenger: number; klar: number; etterkontroll: number } | null;
+
+export function statusCells(s: WorkSummary | null, open: OpenInvoiceCounts = null): StatusCell[] {
   if (!s) return [];
   const cells: StatusCell[] = [];
   if (s.invoice_access) {
     const inv = s.invoices;
     cells.push(
-      { label: "Trenger deg", value: n(inv ? inv.open_total - inv.ready_to_reconcile : null), unit: "fakturaer", href: paths.fakturaer({ visning: "trenger" }), tone: "warning" },
-      { label: "Klare", value: n(inv?.ready_to_reconcile), unit: "fakturaer", href: paths.fakturaer({ visning: "klar" }) },
+      { label: "Trenger deg", value: n(open?.trenger), unit: "fakturaer", href: paths.priskontroll({ fane: "arbeid" }), tone: "warning" },
+      { label: "Klare", value: n(open?.klar), unit: "fakturaer", href: paths.priskontroll({ fane: "arbeid", vis: "klare" }) },
+      { label: "Godkjent – etterkontroll", value: n(open?.etterkontroll), unit: "fakturaer", href: paths.priskontroll({ fane: "arbeid", vis: "etterkontroll" }) },
       { label: "Linjer å kontrollere", value: n(s.lines_to_review), unit: "linjer", href: paths.priskontroll({ fane: "gjore" }) },
       { label: "Til godkjenning", value: n(s.approval?.ready_to_approve), unit: "fakturaer", href: paths.godkjenning() },
     );
@@ -33,8 +37,8 @@ export function statusCells(s: WorkSummary | null): StatusCell[] {
   return cells;
 }
 
-export function WorkStartView({ summary, firstName }: { summary: WorkSummary | null; firstName: string | null }) {
-  const cells = statusCells(summary);
+export function WorkStartView({ summary, firstName, open = null }: { summary: WorkSummary | null; firstName: string | null; open?: OpenInvoiceCounts }) {
+  const cells = statusCells(summary, open);
   const access = summary?.invoice_access === true;
   const todo = summary?.todo_total;
   return (
