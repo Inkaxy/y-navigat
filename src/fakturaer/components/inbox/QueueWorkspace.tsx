@@ -71,6 +71,8 @@ export interface QueueWorkspaceProps {
   editMaterialSignal?: EditMaterialSignal | null;
   /** Ekstra innhold over linjelisten (f.eks. fakta-kortet). */
   listHeader?: ReactNode;
+  /** Fakturaens interne godkjenning (fakturaflaten); undefined = ukjent. */
+  invoiceApproved?: boolean;
 }
 
 /** Smal linjeliste til venstre, valgt oppgave til høyre. Alt sekundært ligger under «Flere valg». */
@@ -96,6 +98,7 @@ export function QueueWorkspace(p: QueueWorkspaceProps) {
       onReconcile={p.onReconcile}
       onCorrectLine={p.onCorrectLine}
       editMaterialSignal={p.editMaterialSignal}
+      invoiceApproved={p.invoiceApproved}
       otherOpenLines={p.reason === "all" ? p.lines.filter((l) => l.id !== a.id && l.invoice_id === a.invoice_id && p.statusOf(l).key !== "ready" && p.statusOf(l).key !== "not_applicable").length : null}
     />
   ) : null;
