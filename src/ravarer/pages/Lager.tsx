@@ -17,7 +17,7 @@ import { StockPeek } from "@/ravarer/components/stock/StockPeek";
 import { DataTable, type Column } from "@/ravarer/ui/DataTable";
 import { SplitView } from "@/ravarer/ui/SplitView";
 import { Link } from "react-router-dom";
-import { MobileKpis } from "@/ravarer/components/stock/MobileKpis";
+import { KpiStrip, MobileKpis } from "@/ravarer/components/stock/MobileKpis";
 import { paths } from "@/ravarer/lib/paths";
 import { formatDate, formatNumber } from "@/ravarer/lib/constants";
 import { AllStockTable } from "@/ravarer/components/stock/AllStockTable";
@@ -134,28 +134,13 @@ export default function LagerPage() {
       <div className="space-y-5">
         <RavarerHeaderBanner />
 
-        <div className="hidden gap-4 sm:grid sm:grid-cols-2 lg:grid-cols-5" data-testid="stock-kpis-desktop">
-          <Card className="p-4">
-            <p className="text-xs uppercase tracking-wider text-ink-secondary">Handelsvarer med lager</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">{kpi(String(items.length))}</p>
-          </Card>
-          <Card className={`p-4 ${belowMinAll ? "border-warning/50" : ""}`}>
-            <p className="text-xs uppercase tracking-wider text-ink-secondary">Under minimum (alle lagerførte)</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">{belowMinAll ?? "–"}</p>
-          </Card>
-          <Card className={`p-4 ${ready && belowMin > 0 ? "border-warning/50" : ""}`}>
-            <p className="text-xs uppercase tracking-wider text-ink-secondary">Videresalg: disponibelt under minimum</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">{kpi(String(belowMin))}</p>
-          </Card>
-          <Card className={`p-4 ${ready && negatives > 0 ? "border-destructive/50" : ""}`}>
-            <p className="text-xs uppercase tracking-wider text-ink-secondary">Oversolgt</p>
-            <p className={`mt-1 text-2xl font-semibold tabular-nums ${ready && negatives > 0 ? "text-destructive" : ""}`}>{kpi(String(negatives))}</p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs uppercase tracking-wider text-ink-secondary">Lagerverdi</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">{kpi(kr(totalValue))}</p>
-          </Card>
-        </div>
+        <KpiStrip testId="stock-kpis-desktop" items={[
+          { label: "Handelsvarer med lager", value: kpi(String(items.length)) },
+          { label: "Under minimum (alle lagerførte)", value: belowMinAll == null ? "–" : String(belowMinAll), tone: belowMinAll ? "warning" : undefined },
+          { label: "Videresalg under minimum", value: kpi(String(belowMin)), tone: ready && belowMin > 0 ? "warning" : undefined },
+          { label: "Oversolgt", value: kpi(String(negatives)), tone: ready && negatives > 0 ? "destructive" : undefined },
+          { label: "Lagerverdi", value: kpi(kr(totalValue)) },
+        ]} />
 
         <div className="flex flex-wrap items-center justify-between gap-3">
         <div role="radiogroup" aria-label="Utvalg" className="inline-flex rounded-md border border-line-subtle p-1">

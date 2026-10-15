@@ -1,4 +1,4 @@
-import { MobileKpis } from "./MobileKpis";
+import { KpiStrip, MobileKpis } from "./MobileKpis";
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
@@ -90,20 +90,11 @@ export function AllStockTable({ q, selectedId, onSelect }: { q: string; selected
           { label: "Under minimum", value: kpi(String(belowMin)), tone: ready && belowMin > 0 ? "warning" : undefined },
         ]}
         secondary={[{ label: "Samlet lagerverdi", value: kpi(formatNok(totalValue)) }]} />
-      <div className="hidden gap-4 sm:grid sm:grid-cols-3" data-testid="all-stock-kpis">
-        <Card className="min-w-0 p-4">
-          <p className="text-xs uppercase tracking-wider text-ink-secondary">Lagerførte varer</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums">{kpi(String(rows.length))}</p>
-        </Card>
-        <Card className={`min-w-0 p-4 ${ready && belowMin > 0 ? "border-warning/50" : ""}`}>
-          <p className="text-xs uppercase tracking-wider text-ink-secondary">Under minimum</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums">{kpi(String(belowMin))}</p>
-        </Card>
-        <Card className="min-w-0 p-4">
-          <p className="text-xs uppercase tracking-wider text-ink-secondary">Samlet lagerverdi</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums">{kpi(formatNok(totalValue))}</p>
-        </Card>
-      </div>
+      <KpiStrip testId="all-stock-kpis" items={[
+        { label: "Lagerførte varer", value: kpi(String(rows.length)) },
+        { label: "Under minimum", value: kpi(String(belowMin)), tone: ready && belowMin > 0 ? "warning" : undefined },
+        { label: "Samlet lagerverdi", value: kpi(formatNok(totalValue)) },
+      ]} />
 
       <SplitView
         selected={!!selectedId}
