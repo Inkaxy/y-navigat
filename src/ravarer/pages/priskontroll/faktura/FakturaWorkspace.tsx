@@ -24,7 +24,7 @@ import { FakturaerDialogs, type DialogState } from "@/ravarer/pages/priskontroll
 import { fakturaReturn, readReturnParam } from "@/ravarer/pages/priskontroll/fakturaer/visning";
 import { ControlSummary } from "./ControlSummary";
 import { FocusNotice } from "./FocusNotice";
-import { finalLockNote, isExcludedInvoice } from "./exclusionView";
+import { invoiceLineLock, isExcludedInvoice } from "./exclusionView";
 import { FOCUS_PARAM, opensLineSheetForFocus, parseFocus } from "@/ravarer/pages/priskontroll/gjore/clarifyTarget";
 import { SumOverrideDialog } from "./SumOverrideDialog";
 import { recheckInvoiceLinesSum } from "@/fakturaer/lib/linesSum";
@@ -137,8 +137,9 @@ export function FakturaWorkspaceView({ id, embedded }: ViewProps) {
     return document.querySelector<HTMLElement>("[data-primary-action]:not([disabled])");
   };
   const final = data?.status === "reconciled" || data?.status === "flagged" || data?.status === "excluded";
-  // Linjene kan bare endres med skrivetilgang og når fakturaen ikke er avstemt/flagget.
-  const lineWrite = s.canWrite && !final;
+  // Linjene kan bare endres med skrivetilgang og når fakturaen verken er endelig, internt godkjent eller har ukjent godkjenning.
+  const lineLock = invoiceLineLock(data?.status, data?.excluded_at, { approved: !!s.extras?.approved, known: s.extras?.known });
+  const lineWrite = s.canWrite && !lineLock.locked;
   // Mobil: dokumentet vises via sonen; desktop: via docOpen. Én kilde for etikett/aria-pressed.
   const toggleDoc = () => {
     if (isMobile) { setZone((z) => (z === "dokument" ? "linjer" : "dokument")); return; }
@@ -247,7 +248,7 @@ export function FakturaWorkspaceView({ id, embedded }: ViewProps) {
     else if (k === "kostkontroll") void s.postCosts();
   };
   // Skrivbar, ikke avstemt/godkjent og ikke allerede utelatt; serveren kontrollerer det samme på nytt.
-  const canHold = !!data && s.canWrite && data.status !== "reconciled" && data.status !== "excluded" && !data.reconciled_at;
+  const canHold = !!data && lineWrite && data.status !== "reconciled" && data.status !== "excluded" && !data.reconciled_at;
   const openHold = (lineId: string | null, scope: "invoice" | "line") => {
     if (!data || !canHold) return;
     const l = lineId ? (data.invoice_lines ?? []).find((x) => x.id === lineId) : undefined;
@@ -334,7 +335,7 @@ export function FakturaWorkspaceView({ id, embedded }: ViewProps) {
   // Rettedialogen viser samme linje som skjemaet (tabell eller kø), aldri køens forrige valg.
   const correctDocEl = docFor(correctionDocLine(correctFor, q.linesQuery.data?.rows ?? [], null));
   const showDocZone = docOpen && wide && !!data.source_document_url;
-  const lockNote = finalLockNote(data.status, data.excluded_at);
+  const lockNote = lineLock.locked ? lineLock.note : null;
   const notApplicableCount = q.selectedLines.length;
 
   const control = (expanded?: boolean) => (
@@ -344,7 +345,7 @@ export function FakturaWorkspaceView({ id, embedded }: ViewProps) {
     <div className={embedded?.compact ? "min-w-0 space-y-2" : "min-w-0 space-y-3"}>
       {!isMobile && control()}
       {lineNotice && <p role="alert" className="rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-sm">{lineNotice}</p>}
-      {lockNote && <p role="note" className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-ink-secondary">{lockNote}</p>}
+      {lockNote && <p role="note" data-testid="invoice-line-lock" className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-ink-secondary">{lockNote}{lineLock.locked && lineLock.kind === "approved" && s.canWrite && <> <a className="underline" href={paths.godkjenning()}>Gå til Godkjenning</a></>}</p>}
       {s.result && <ResultBox title={s.result.title} items={s.result.items} onUndo={s.result.undoable && q.undoEntry ? () => { s.setResult(null); void q.undo(); } : undefined} onNext={() => s.setResult(null)} nextLabel="Lukk" />}
       {lastLinked && <SimilarLinesHint rmsId={lastLinked.rmsId} name={lastLinked.name} onOpen={() => q.setBulkLink(lastLinked)} onDismiss={() => setLastLinked(null)} />}
       <div className="flex justify-end">
@@ -518,7 +519,7 @@ export function FakturaWorkspaceView({ id, embedded }: ViewProps) {
           <SheetContent side="bottom" className="h-[90vh] p-0"><SheetTitle className="sr-only">Originalfaktura</SheetTitle>{docEl}</SheetContent>
         </Sheet>
       )}
-      <SumOverrideDialog open={overrideOpen} onOpenChange={setOverrideOpen} data={data} canOverride={s.canWrite && !final} onDone={() => { setOverrideOpen(false); void detail.refetch(); }} />
+      <SumOverrideDialog open={overrideOpen} onOpenChange={setOverrideOpen} data={data} canOverride={lineWrite} onDone={() => { setOverrideOpen(false); void detail.refetch(); }} />
       <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
           <SheetHeader><SheetTitle>Revisjonshistorikk</SheetTitle></SheetHeader>
