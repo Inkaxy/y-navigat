@@ -255,7 +255,8 @@ export function RavarerNavView({ summary, hasInvoiceAccess, canManage }: { summa
     },
   ];
   if (hasInvoiceAccess) {
-    items.push({ kind: "link", to: paths.priskontroll(), label: "Fakturaer", icon: ScanSearch, matches: [paths.priskontroll()], badge: summary?.todo_total ?? undefined });
+    items.push({ kind: "link", to: paths.priskontroll(), label: "Fakturaer", icon: ScanSearch, matches: [paths.priskontroll()] });
+    // Ingen merke: `todo_total` blander varegrupper og fakturaer. Eksakte fakturatellere står på arbeidsflaten.
   }
   items.push(
     { kind: "link", to: paths.leverandorer(), label: "Leverandører", icon: Truck, matches: [paths.leverandorer()], badge: summary?.other.agreements_expiring_30d, badgeTone: "warning" },

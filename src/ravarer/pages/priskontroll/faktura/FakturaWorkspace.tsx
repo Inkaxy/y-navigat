@@ -242,6 +242,11 @@ export function FakturaWorkspaceView({ id, embedded }: ViewProps) {
     else if (k === "avstem" && s.assessment) setDialog({ kind: "reconcile", inv: { id: data.id, invoice_number: data.invoice_number, assessment: s.assessment } });
     else if (k === "godkjenn") void s.approve();
     else if (k === "kostpris") void s.postCosts();
+    else if (k === "kostkontroll") {
+      // Kontrollbehov, ikke ferdig: vis linjene og forklar hva som gjenstår. Ingen skriving her.
+      setZone("linjer"); setInspectorOpen(true);
+      s.setResult({ title: s.next.label, items: [s.next.hint, "Avstemming er fortsatt mulig; kostpris på disse linjene føres da ikke."] });
+    }
   };
   // Skrivbar, ikke avstemt/godkjent og ikke allerede utelatt; serveren kontrollerer det samme på nytt.
   const canHold = !!data && s.canWrite && data.status !== "reconciled" && data.status !== "excluded" && !data.reconciled_at;
@@ -401,7 +406,7 @@ export function FakturaWorkspaceView({ id, embedded }: ViewProps) {
           toleranceFor={q.toleranceFor}
           showInvoice={false}
           canWrite={lineWrite}
-          reconcileReady={s.next.key === "avstem" && s.next.enabled}
+          reconcileReady={(s.next.key === "avstem" && s.next.enabled) || (s.next.key === "kostkontroll" && !!s.assessment?.canReconcile && canReconcileRight)}
           isMobile={isMobile}
           countsError={q.countsQuery.isError}
           onSaved={q.handleSaved}
