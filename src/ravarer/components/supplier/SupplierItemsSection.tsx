@@ -4,6 +4,7 @@ import { DataTable, type Column } from "@/ravarer/ui/DataTable";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
 import { formatDate, formatNok, formatNumber } from "@/ravarer/lib/constants";
 import { isAgreementConfirmed } from "@/ravarer/lib/priceTimeline";
+import { packageLabel } from "@/ravarer/lib/supplierPackagePrice";
 import { paths } from "@/ravarer/lib/paths";
 import { useSupplierItems, type SupplierItemRow } from "@/ravarer/hooks/useSupplierDetail";
 import type { SupplierRow } from "@/ravarer/hooks/useSuppliers";
@@ -37,6 +38,19 @@ export function latestCell(l: SupplierLatest) {
 /** Koblingens redigering skjer i råvarekortets leverandørseksjon (samme redigerere, samme RPC-er). */
 export const editLinkHref = (r: Pick<SupplierItemRow, "raw_material_id">) => paths.raavare(r.raw_material_id, { seksjon: "leverandorer" });
 
+/** Pakning slik den faktisk er dokumentert: bekreftet faktor, eller registrert/ukjent — aldri utfylt. */
+function packageCell(r: SupplierItemRow) {
+  const pk = packageLabel(r, r.raw_material?.base_unit ?? "grunnenhet");
+  return (
+    <span>
+      {pk.label ?? <span className="text-ink-secondary">Ikke registrert</span>}
+      <span className={pk.confirmed ? "block text-caption text-success" : "block text-caption text-warning"}>{pk.confirmed ? "Bekreftet pakning" : "Pakning ikke bekreftet"}</span>
+    </span>
+  );
+}
+
+const editLabel = (r: SupplierItemRow) => (packageLabel(r, r.raw_material?.base_unit ?? "").confirmed ? "Rediger kobling" : "Bekreft pakning");
+
 function agreementCell(r: SupplierItemRow) {
   if (r.agreed_price_per_base_unit == null) return <span className="text-ink-secondary">—</span>;
   return (
@@ -66,11 +80,11 @@ export function SupplierItemsSection({ supplier }: { supplier: SupplierRow }) {
         </span>
       ) },
     { id: "sku", header: "Lev.nr", sortKey: (r) => r.supplier_sku ?? "", cell: (r) => <span className="font-mono text-xs">{r.supplier_sku ?? "—"}</span> },
-    { id: "package", header: "Pakning", cell: (r) => (r.package_size != null ? `${formatNumber(r.package_size)} ${r.package_unit ?? ""}`.trim() : "—") },
+    { id: "package", header: "Pakning", cell: packageCell },
     { id: "agreed", header: "Avtalepris / grunnenhet", align: "right", sortKey: (r) => r.agreed_price_per_base_unit ?? -1, cell: agreementCell },
     { id: "latest", header: "Siste kjøpspris", align: "right", cell: (r) => latestCell(latestOf(r.raw_material_id)) },
     { id: "validity", header: "Gyldighet", cell: (r) => (r.agreement_valid_from || r.agreement_valid_to ? `${formatDate(r.agreement_valid_from)} – ${formatDate(r.agreement_valid_to)}` : "—") },
-    { id: "edit", header: "", cell: (r) => <Link to={editLinkHref(r)} className="inline-flex min-h-[44px] items-center text-primary hover:underline md:min-h-0">Rediger kobling</Link> },
+    { id: "edit", header: "", cell: (r) => <Link to={editLinkHref(r)} className="inline-flex min-h-[44px] items-center text-primary hover:underline md:min-h-0">{editLabel(r)}</Link> },
   ];
   return (
     <div className="space-y-4">
@@ -88,9 +102,10 @@ export function SupplierItemsSection({ supplier }: { supplier: SupplierRow }) {
           <div className="space-y-1">
             <Link to={paths.raavare(r.raw_material_id)} className="font-medium hover:underline">{r.raw_material?.name ?? "Ukjent råvare"}</Link>
             <div className="text-caption text-ink-secondary">{r.supplier_sku ? `Lev.nr ${r.supplier_sku}` : "Uten lev.nr"}</div>
+            <div className="text-sm">{packageCell(r)}</div>
             <div>{agreementCell(r)}</div>
             <div className="text-sm"><span className="text-caption text-ink-secondary">Siste kjøp: </span>{latestCell(latestOf(r.raw_material_id))}</div>
-            <Link to={editLinkHref(r)} className="inline-flex min-h-[44px] items-center text-primary hover:underline">Rediger kobling</Link>
+            <Link to={editLinkHref(r)} className="inline-flex min-h-[44px] items-center text-primary hover:underline">{editLabel(r)}</Link>
           </div>
         )}
       />

@@ -17,6 +17,9 @@ export interface SupplierItemRow {
   supplier_product_name: string | null;
   package_size: number | null;
   package_unit: string | null;
+  base_units_per_package: number | null;
+  package_confirmed_at: string | null;
+  package_confirmed_by: string | null;
   agreed_price_per_base_unit: number | null;
   agreed_price_set_at: string | null;
   agreed_price_set_by: string | null;
@@ -69,7 +72,7 @@ export function useSupplierItems(supplierId: string | undefined) {
     enabled: !!supplierId,
     queryFn: async () => {
       const cols =
-        "id, raw_material_id, supplier_sku, supplier_product_name, package_size, package_unit, agreed_price_per_base_unit, agreed_price_set_at, agreed_price_set_by, agreement_valid_from, agreement_valid_to, agreement_document_url, last_invoice_price, last_invoice_date, raw_material:raw_materials(id, name, base_unit, item_type)";
+        "id, raw_material_id, supplier_sku, supplier_product_name, package_size, package_unit, base_units_per_package, package_confirmed_at, package_confirmed_by, agreed_price_per_base_unit, agreed_price_set_at, agreed_price_set_by, agreement_valid_from, agreement_valid_to, agreement_document_url, last_invoice_price, last_invoice_date, raw_material:raw_materials(id, name, base_unit, item_type)";
       // Komplett med antallsbevis: aliasoppslaget bygger på disse ID-ene.
       const rows = await fetchAllCounted<{ id: string }>({
         count: () => supabase.from("raw_material_suppliers").select("id", { count: "exact", head: true }).eq("supplier_id", supplierId!),
