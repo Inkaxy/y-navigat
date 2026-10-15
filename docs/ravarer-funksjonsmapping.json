@@ -211,7 +211,7 @@
    "original_feature": "Prioritert topp-5 over beslutninger på tvers av fakturaer",
    "original_location": "/ravarer › «Til deg» (topp 7) + /priskontroll?fane=gjore sortert etter kronevirkning",
    "current_feature": "Prioritert topp-5 over beslutninger på tvers av fakturaer",
-   "current_location_or_disposition": "/ravarer › «Til deg» (topp 7) + /priskontroll?fane=gjore sortert etter kronevirkning",
+   "current_location_or_disposition": "/ravarer › «Neste fakturaer» (5 eldste handlingsbare, samme kø som «Trenger deg») + /priskontroll?fane=gjore sortert etter kronevirkning",
    "route_owner_path": "src/ravarer/pages/hub/RavarerOversikt.tsx",
    "action_component_paths": [
     "src/ravarer/pages/hub/RavarerOversikt.tsx"
@@ -219,7 +219,7 @@
    "handler_or_render_evidence": [
     {
      "file": "src/ravarer/pages/hub/RavarerOversikt.tsx",
-     "evidence": "sort: \"oldest\"",
+     "evidence": "NextInvoicesView",
      "note": "Topp etter kronevirkning",
      "reached_from_owner": true
     }
