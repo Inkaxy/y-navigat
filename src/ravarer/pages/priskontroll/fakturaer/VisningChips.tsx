@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import type { InvoiceCounts } from "@/ravarer/lib/workRpcTypes";
 import { FAKTURA_VISNINGER, VISNING_LABEL, type AvstemtModus, type FakturaVisning } from "./visning";
 
-type Counts = { trenger?: number; klar?: number; inv: InvoiceCounts | null; alle: number | null; utenfor?: number | null };
+type Counts = { trenger?: number; klar?: number; etterkontroll?: number; inv: InvoiceCounts | null; alle: number | null; utenfor?: number | null };
 
 type Props = {
   visning: FakturaVisning;
@@ -14,8 +14,9 @@ type Props = {
 /** Tall per chip: serverens sammendrag der det finnes, ellers listesvaret. */
 export function chipCount(v: FakturaVisning, c: Counts): number | null {
   if (v === "trenger") return c.trenger ?? null;
-  // Samme tall som listen viser (klientens vurdering), serverens sammendrag bare som reserve.
-  if (v === "klar") return c.klar ?? c.inv?.ready_to_reconcile ?? null;
+  // Samme tall og samme filter som listen (uten internt godkjente); aldri serverens ukorrigerte sammendrag.
+  if (v === "klar") return c.klar ?? null;
+  if (v === "etterkontroll") return c.etterkontroll ?? null;
   if (v === "avstemt") return c.inv?.reconciled_total ?? null;
   if (v === "utenfor") return c.utenfor ?? null;
   return c.alle;

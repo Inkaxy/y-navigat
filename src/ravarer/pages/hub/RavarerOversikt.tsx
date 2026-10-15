@@ -6,6 +6,9 @@ import { useHotkeys, type HotkeyBinding } from "@/ravarer/ui/hotkeys";
 import { ShortcutHelp } from "@/ravarer/ui/ShortcutHelp";
 import { paths } from "@/ravarer/lib/paths";
 import { useWorkSummary, useWorkItems, useActivityFeed, usePriceMovers } from "@/ravarer/hooks/useWorkData";
+import { useCompany } from "@/hooks/useCompany";
+import { useInboxInvoices } from "@/fakturaer/hooks/useInboxInvoices";
+import { openWorkCounts } from "@/ravarer/pages/priskontroll/fakturaer/useFakturaListe";
 import { WorkStartView } from "@/ravarer/pages/oversikt/WorkStartView";
 import { ToDoListView } from "@/ravarer/pages/oversikt/ToDoListView";
 import { ActivityView } from "@/ravarer/pages/oversikt/ActivityView";
@@ -27,6 +30,10 @@ export default function RavarerOversikt() {
 
   const summaryQ = useWorkSummary({ includeApproval: true });
   const invoiceAccess = summaryQ.data?.invoice_access === true;
+  // «Trenger deg»/«Klare» med nøyaktig samme filter som Fakturaer-flaten (komplett liste, uten internt godkjente).
+  const { data: company } = useCompany();
+  const openQ = useInboxInvoices({ legalEntityId: company?.id ?? null, supplierId: null, enabled: invoiceAccess && !!company?.id });
+  const openCounts = invoiceAccess && company?.id && openQ.data && !openQ.isError ? openWorkCounts(openQ.data) : null;
   const itemsQ = useWorkItems({ group: "alle", sort: "oldest", limit: 5, enabled: invoiceAccess });
   const [more, setMore] = useState(false);
   const activityQ = useActivityFeed({ days: 7, enabled: invoiceAccess && more });
@@ -50,7 +57,7 @@ export default function RavarerOversikt() {
     <div className="mx-auto w-full max-w-[1280px] space-y-6 px-page py-5">
       {summaryQ.isError
         ? <QueryErrorState error={summaryQ.error} scope="ravarer:oversikt:summary" onRetry={() => summaryQ.refetch()} />
-        : <WorkStartView summary={summaryQ.data ?? null} firstName={firstNameFromEmail(user?.email)} />}
+        : <WorkStartView summary={summaryQ.data ?? null} open={openCounts} firstName={firstNameFromEmail(user?.email)} />}
 
       {invoiceAccess && (itemsQ.isError
         ? <QueryErrorState error={itemsQ.error} scope="ravarer:oversikt:items" onRetry={() => itemsQ.refetch()} />

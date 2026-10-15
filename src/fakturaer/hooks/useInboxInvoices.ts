@@ -5,6 +5,8 @@ import { assessInboxInvoice, inboxTabOf, type InboxAssessment, type InboxLine, t
 
 export interface InboxInvoice {
   id: string;
+  /** Har en aktiv intern godkjenning (`invoice_internal_approvals.status='approved'`) — aldri vanlig åpent arbeid. */
+  internally_approved: boolean;
   invoice_number: string;
   invoice_date: string;
   received_at: string | null;
@@ -38,6 +40,8 @@ export interface InboxInvoice {
 interface Filters {
   legalEntityId?: string | null;
   supplierId?: string | null;
+  /** Standard true. */
+  enabled?: boolean;
 }
 
 /** Alle statuser som fortsatt er i arbeid — «ready» hører med. */
@@ -45,7 +49,7 @@ export const OPEN_INVOICE_STATUSES = ["imported", "needs_review", "flagged", "re
 
 const SELECT = `id, invoice_number, invoice_date, imported_at, created_at, due_date, status, legal_entity_id, supplier_id, is_credit_note,
   total_amount, total_vat, lines_sum_status, lines_sum_variance_pct, source_document_url,
-  line_extraction_status, line_extraction_attempts, line_extraction_error, reconciled_mode, lines_source, tripletex_voucher_number, source, notes, paid_at, tripletex_is_paid, currency, extraction_confidence, suppliers(name),
+  line_extraction_status, line_extraction_attempts, line_extraction_error, reconciled_mode, lines_source, tripletex_voucher_number, source, notes, paid_at, tripletex_is_paid, currency, extraction_confidence, suppliers(name), invoice_internal_approvals(status),
   invoice_lines(id, quantity, price_per_base_unit, raw_material_id, requires_review, review_reason, match_confidence, price_variance_pct, variance_status, raw_materials(category))`;
 
 interface RawInvoice {
@@ -77,6 +81,7 @@ interface RawInvoice {
   currency?: string | null;
   extraction_confidence?: number | null;
   suppliers: { name: string } | null;
+  invoice_internal_approvals?: { status: string | null }[] | null;
   invoice_lines: Array<{
     id?: string;
     quantity?: number | null;
@@ -129,6 +134,7 @@ export function toInboxInvoice(r: RawInvoice): InboxInvoice {
     legal_entity_id: r.legal_entity_id,
     supplier_id: r.supplier_id,
     supplier_name: r.suppliers?.name ?? null,
+    internally_approved: (r.invoice_internal_approvals ?? []).some((a) => a.status === "approved"),
     is_credit_note: r.is_credit_note,
     total_amount: r.total_amount,
     total_vat: r.total_vat,
@@ -159,7 +165,8 @@ export function toInboxInvoice(r: RawInvoice): InboxInvoice {
  */
 export function useInboxInvoices(filters: Filters) {
   return useQuery({
-    queryKey: ["fakturaer-inbox", filters],
+    queryKey: ["fakturaer-inbox", { legalEntityId: filters.legalEntityId, supplierId: filters.supplierId }],
+    enabled: filters.enabled !== false,
     refetchInterval: 30000,
     queryFn: async (): Promise<InboxInvoice[]> => {
       const rows = await fetchAllRows<RawInvoice>((from, to) => {
