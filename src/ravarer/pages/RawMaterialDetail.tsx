@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useGuardedNavigate } from "@/providers/UnsavedGuardProvider";
 import { QueryState } from "@/components/common/QueryState";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SellsAsSection } from "@/ravarer/components/stock/SellsAsSection";
 import { ChecklistCard } from "@/ravarer/components/detail/Completeness";
 import { completenessChecklist, GROUP_LABEL, groupOf, groupSection, listContext, moreSections, readSection, SECTION_GROUPS, sectionSearch, SECTION_LABEL, type SectionId } from "@/ravarer/lib/rawMaterialSections";
@@ -195,7 +196,7 @@ export default function RawMaterialDetail() {
       )}
 
       {/* Hovedarbeid: Oversikt · Pakning og leverandør · Pris · Mer. Gamle `seksjon`-lenker åpner sin plass. */}
-      <nav aria-label="Seksjoner på råvarekortet" className="-mx-1 overflow-x-auto">
+      <nav aria-label="Seksjoner på råvarekortet" className="-mx-1 hidden overflow-x-auto lg:block">
         <ul className="flex min-w-max gap-1 border-b border-line-subtle px-1">
           {SECTION_GROUPS.map((g) => (
             <li key={g}>
@@ -221,6 +222,17 @@ export default function RawMaterialDetail() {
           </ul>
         )}
       </nav>
+      {/* Mobil: én velger med samme plassering (gruppe · seksjon), via ulagret-vakten. */}
+      <div className="lg:hidden">
+        <Select value={section} onValueChange={(v) => navigate(sectionHref(v as SectionId), { replace: true })}>
+          <SelectTrigger className="h-11" aria-label="Velg seksjon"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {[groupSection("oversikt", rm.is_packaging), groupSection("pakning", rm.is_packaging), groupSection("pris", rm.is_packaging), ...more].map((sid) => (
+              <SelectItem key={sid} value={sid}>{groupOf(sid) === "mer" ? `Mer · ${SECTION_LABEL[sid]}` : GROUP_LABEL[groupOf(sid)]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       <div>
         <section aria-labelledby="rm-section-title" className="min-w-0 space-y-4">
