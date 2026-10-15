@@ -11,6 +11,7 @@ import { agreementStatusLabel, derivedPackagePrice, packageLabel } from "@/ravar
 import { ChecklistCard } from "@/ravarer/components/detail/Completeness";
 import { useMaterialPriceEvidence } from "@/ravarer/hooks/useMaterialPriceEvidence";
 import { costSummary } from "@/ravarer/lib/costSummary";
+import { nextFix } from "@/ravarer/lib/nextFix";
 
 
 /**
@@ -50,9 +51,18 @@ function PeekBody({ id, listSearch }: { id: string; listSearch: string }) {
   const nameOf = new Map(suppliers.map((s) => [s.id, s.name]));
   const checklist = completenessChecklist({ rm, linkCount: page.links.length, nutrition: page.nutrition, hasDatasheet: page.hasDatasheet, costEvidence: priceEvidence.cost });
   const cost = costSummary(rm, priceEvidence.cost);
+  // Ett tydelig neste steg: lenker til seksjonen der det manglende feltet rettes. Ingen skriving her.
+  const fix = nextFix(checklist, priceEvidence.loading || priceEvidence.isError);
   return (
     <div className="space-y-5">
       <p className="text-caption text-ink-secondary">SKU {rm.sku} · {rm.base_unit}{rm.is_active ? "" : " · Inaktiv"}</p>
+      {fix.kind === "fix" && (
+        <div className="space-y-1 rounded-md border border-warning/40 bg-warning/10 p-3" data-testid="peek-next-fix">
+          <p className="text-caption text-ink-secondary">Rett det som mangler · {fix.item.detail}</p>
+          <Button asChild size="sm" className="min-h-[44px]"><Link to={href(fix.item.section)}>{fix.label}</Link></Button>
+        </div>
+      )}
+      {fix.kind === "unknown" && <p className="text-caption text-ink-secondary" data-testid="peek-next-fix-unknown">{fix.label} — hva som mangler kan ikke avgjøres.</p>}
       <div className="flex flex-wrap gap-2">
         <Button asChild size="sm" variant="outline" className="min-h-[44px]"><Link to={href("pris")}>Pris</Link></Button>
         <Button asChild size="sm" variant="outline" className="min-h-[44px]"><Link to={href("leverandorer")}>Leverandører</Link></Button>

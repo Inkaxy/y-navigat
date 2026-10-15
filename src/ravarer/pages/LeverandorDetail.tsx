@@ -1,19 +1,19 @@
 import { useCallback, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Mail, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QueryState } from "@/components/common/QueryState";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { cn } from "@/lib/utils";
-import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
+import { SupplierStatusBadge } from "@/ravarer/components/supplier/TrackInvoiceToggle";
 import { SupplierDialog } from "@/ravarer/components/NewSupplierDialog";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
 import { useSupplier } from "@/ravarer/hooks/useSupplierDetail";
 import { paths } from "@/ravarer/lib/paths";
 import {
-  listReturnSearch, readSupplierSection, supplierSectionSearch, SUPPLIER_SECTION_LABEL, SUPPLIER_SECTIONS, type SupplierSectionId,
+  listReturnSearch, readSupplierSection, supplierSectionSearch, SUPPLIER_SECTION_LABEL, type SupplierSectionId,
+  SUPPLIER_GROUPS, SUPPLIER_GROUP_LABEL, supplierGroupOf, supplierGroupSection, supplierGroupSections, type SupplierGroup,
 } from "@/ravarer/lib/supplierSections";
 import { SupplierOverviewSection } from "@/ravarer/components/supplier/SupplierOverviewSection";
 import { SupplierItemsSection } from "@/ravarer/components/supplier/SupplierItemsSection";
@@ -50,6 +50,7 @@ export default function LeverandorDetailPage() {
   }
   const s = supplier.data;
   const listSearch = sp.get("liste") ?? "";
+  const group: SupplierGroup = supplierGroupOf(section);
 
   return (
     <div className="space-y-5">
@@ -59,50 +60,58 @@ export default function LeverandorDetailPage() {
           <Button size="sm" variant="outline" className="min-h-[44px] md:min-h-9" onClick={() => void supplier.refetch()}>Prøv igjen</Button>
         </div>
       )}
-      <RavarerHeaderBanner
-        title={s.name}
-        subtitle="Leverandørkort"
-        actions={
+      {/* Én kompakt header: navn, status, kontakt som faktisk er registrert, og handlinger. */}
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line-subtle pb-3">
+        <Button asChild variant="ghost" size="icon" className="h-11 w-11 shrink-0" aria-label="Tilbake til leverandørlisten">
+          <Link to={backHref}><ArrowLeft className="h-4 w-4" aria-hidden /></Link>
+        </Button>
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            {canWrite && <Button size="sm" variant="outline" className="min-h-[44px] md:min-h-9" onClick={() => setEditOpen(true)}>Rediger leverandør</Button>}
-            <Button asChild variant="outline" size="sm" className="min-h-[44px] gap-1.5 md:min-h-9">
-              <Link to={backHref}><ArrowLeft className="h-4 w-4" aria-hidden />Tilbake til listen</Link>
-            </Button>
+            <h1 className="font-display text-title [overflow-wrap:anywhere]">{s.name}</h1>
+            <SupplierStatusBadge s={s} />
           </div>
-        }
-      />
+          <div className="flex flex-wrap items-center gap-x-3 text-caption text-ink-secondary" data-testid="supplier-header-contact">
+            {s.contact_email && <a className="inline-flex min-h-[44px] items-center gap-1 hover:underline md:min-h-0" href={`mailto:${s.contact_email}`}><Mail className="h-3.5 w-3.5" aria-hidden />{s.contact_email}</a>}
+            {s.contact_phone && <a className="inline-flex min-h-[44px] items-center gap-1 hover:underline md:min-h-0" href={`tel:${s.contact_phone}`}><Phone className="h-3.5 w-3.5" aria-hidden />{s.contact_phone}</a>}
+            {!s.contact_email && !s.contact_phone && <span>Ingen kontaktinformasjon registrert</span>}
+            {s.org_number && <span>Org.nr {s.org_number}</span>}
+          </div>
+        </div>
+        {canWrite && <Button size="sm" variant="outline" className="min-h-[44px]" onClick={() => setEditOpen(true)}>Rediger leverandør</Button>}
+      </header>
       <SupplierDialog open={editOpen} onOpenChange={setEditOpen} supplier={s} />
 
-      <div className="grid gap-5 lg:grid-cols-[200px_minmax(0,1fr)]">
-        <nav aria-label="Seksjoner på leverandørkortet" className="hidden lg:block">
-          <ul className="sticky top-4 space-y-0.5">
-            {SUPPLIER_SECTIONS.map((sid) => (
-              <li key={sid}>
-                <Link to={hrefFor(sid)} replace aria-current={section === sid ? "page" : undefined}
-                  className={cn("flex min-h-10 items-center rounded-md px-3 text-sm transition-colors", section === sid ? "bg-muted font-semibold text-foreground" : "text-ink-secondary hover:bg-muted/60")}>
-                  {SUPPLIER_SECTION_LABEL[sid]}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <div className="lg:hidden">
-          <Select value={section} onValueChange={(v) => go(v as SupplierSectionId)}>
-            <SelectTrigger className="h-[44px]" aria-label="Velg seksjon"><SelectValue /></SelectTrigger>
-            <SelectContent>{SUPPLIER_SECTIONS.map((sid) => <SelectItem key={sid} value={sid}>{SUPPLIER_SECTION_LABEL[sid]}</SelectItem>)}</SelectContent>
-          </Select>
+      {/* Tre hovedinnganger + «Mer». All navigasjon går gjennom vakten for ulagrede notater. */}
+      <nav aria-label="Seksjoner på leverandørkortet" className="space-y-2">
+        <div className="flex flex-wrap gap-1" role="tablist">
+          {SUPPLIER_GROUPS.map((g) => (
+            <button key={g} type="button" role="tab" aria-selected={group === g} onClick={() => go(supplierGroupSection(g))}
+              className={cn("min-h-[44px] rounded-md px-3 text-sm", group === g ? "bg-muted font-semibold text-foreground" : "text-ink-secondary hover:bg-muted/60")}>
+              {SUPPLIER_GROUP_LABEL[g]}
+            </button>
+          ))}
         </div>
-        <section aria-labelledby="supplier-section-title" className="min-w-0 space-y-4">
-          <h2 id="supplier-section-title" className="font-display text-title">{SUPPLIER_SECTION_LABEL[section]}</h2>
-          {section === "oversikt" && <SupplierOverviewSection supplier={s} />}
-          {section === "varer" && <SupplierItemsSection supplier={s} />}
-          {section === "avtaler" && <SupplierAgreementsSection supplier={s} />}
-          {section === "fakturaer" && <SupplierInvoicesSection supplierId={s.id} listSearch={listSearch} />}
-          {section === "aliaser" && <SupplierAliasesSection supplierId={s.id} />}
-          {section === "forhandlinger" && <SupplierNegotiationsSection supplierId={s.id} />}
-          {section === "notater" && <SupplierNotesSection supplier={s} canWrite={canWrite} onDirtyChange={onDirty} />}
-        </section>
-      </div>
+        {group === "mer" && (
+          <div className="flex flex-wrap gap-1 border-l-2 border-line-subtle pl-2" aria-label="Under Mer">
+            {supplierGroupSections("mer").map((sid) => (
+              <button key={sid} type="button" aria-current={section === sid ? "page" : undefined} onClick={() => go(sid)}
+                className={cn("min-h-[44px] rounded-md px-3 text-sm", section === sid ? "bg-muted font-medium text-foreground" : "text-ink-secondary hover:bg-muted/60")}>
+                {SUPPLIER_SECTION_LABEL[sid]}
+              </button>
+            ))}
+          </div>
+        )}
+      </nav>
+      <section aria-labelledby="supplier-section-title" className="min-w-0 space-y-4">
+        <h2 id="supplier-section-title" className="sr-only">{SUPPLIER_SECTION_LABEL[section]}</h2>
+        {section === "oversikt" && <SupplierOverviewSection supplier={s} />}
+        {section === "varer" && <SupplierItemsSection supplier={s} />}
+        {section === "avtaler" && <SupplierAgreementsSection supplier={s} />}
+        {section === "fakturaer" && <SupplierInvoicesSection supplierId={s.id} listSearch={listSearch} />}
+        {section === "aliaser" && <SupplierAliasesSection supplierId={s.id} />}
+        {section === "forhandlinger" && <SupplierNegotiationsSection supplierId={s.id} />}
+        {section === "notater" && <SupplierNotesSection supplier={s} canWrite={canWrite} onDirtyChange={onDirty} />}
+      </section>
       <UnsavedChangesDialog {...guard.dialogProps} />
     </div>
   );
