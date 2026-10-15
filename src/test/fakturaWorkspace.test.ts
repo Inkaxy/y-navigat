@@ -93,7 +93,7 @@ describe("hurtigfiltre og gamle parametre", () => {
 });
 
 const row = (o: Partial<InboxInvoice>): InboxInvoice => ({
-  id: "i", invoice_number: "526301", invoice_date: "2026-10-01", received_at: "2026-10-02T10:00:00Z", due_date: null, status: "needs_review",
+  internally_approved: false, id: "i", invoice_number: "526301", invoice_date: "2026-10-01", received_at: "2026-10-02T10:00:00Z", due_date: null, status: "needs_review",
   legal_entity_id: "le", supplier_id: "s", supplier_name: "A/S Pals", is_credit_note: false, total_amount: 1234.5, total_vat: 0,
   lines_sum_status: "ok", lines_sum_variance_pct: 0, source_document_url: null, line_extraction_status: "done", source: "tripletex", notes: null,
   paid_at: null, tripletex_is_paid: false, line_extraction_attempts: 1, line_extraction_error: null, extraction_confidence: 0.9, reconciled_mode: null,

@@ -5,12 +5,13 @@
 import type { FakturaSort } from "../fakturaer/fakturaListLogic";
 import type { FakturaVisning } from "../fakturaer/visning";
 
-export const ARBEID_STATES = ["trenger", "klare", "ferdig", "utenfor"] as const;
+export const ARBEID_STATES = ["trenger", "klare", "etterkontroll", "ferdig", "utenfor"] as const;
 export type ArbeidState = (typeof ARBEID_STATES)[number];
 
 export const ARBEID_LABEL: Record<ArbeidState, string> = {
   trenger: "Trenger deg",
   klare: "Klare",
+  etterkontroll: "Godkjent – etterkontroll",
   ferdig: "Ferdig",
   utenfor: "Holdt utenfor",
 };
@@ -19,6 +20,7 @@ export const ARBEID_LABEL: Record<ArbeidState, string> = {
 export const ARBEID_HINT: Record<ArbeidState, string> = {
   trenger: "Fakturaer med linjer eller summer som må avklares.",
   klare: "Alle linjer er avklart; fakturaen kan avstemmes.",
+  etterkontroll: "Internt godkjent, men ikke avstemt. Åpnes bare for eksplisitt ny kontroll; godkjenningen endres ikke her.",
   ferdig: "Avstemt. Godkjenning og kostføring vises på fakturaen.",
   utenfor: "Holdt utenfor råvarebehandling med begrunnelse.",
 };
@@ -27,6 +29,7 @@ export const ARBEID_HINT: Record<ArbeidState, string> = {
 export const ARBEID_TO_VISNING: Record<ArbeidState, FakturaVisning> = {
   trenger: "trenger",
   klare: "klar",
+  etterkontroll: "etterkontroll",
   ferdig: "avstemt",
   utenfor: "utenfor",
 };

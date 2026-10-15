@@ -71,6 +71,7 @@ export function FakturaArbeid() {
   const counts: Record<ArbeidState, number | null> = {
     trenger: liste.openCounts?.trenger ?? null,
     klare: liste.openCounts?.klar ?? null,
+    etterkontroll: liste.openCounts?.etterkontroll ?? null,
     ferdig: statusCounts.isError ? null : statusCounts.data?.ferdig ?? null,
     utenfor: statusCounts.isError ? null : statusCounts.data?.utenfor ?? null,
   };

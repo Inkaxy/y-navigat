@@ -2,13 +2,14 @@
  * Hurtigfiltrene på Fakturaer-fanen (`?visning=`) og mappingen fra gamle
  * innboks-/listeparametre. Rene funksjoner — testes uten React.
  */
-export const FAKTURA_VISNINGER = ["trenger", "klar", "avstemt", "utenfor", "alle"] as const;
+export const FAKTURA_VISNINGER = ["trenger", "klar", "etterkontroll", "avstemt", "utenfor", "alle"] as const;
 export type FakturaVisning = (typeof FAKTURA_VISNINGER)[number];
 export type AvstemtModus = "auto" | "manuell";
 
 export const VISNING_LABEL: Record<FakturaVisning, string> = {
   trenger: "Trenger meg",
   klar: "Klare til avstemming",
+  etterkontroll: "Godkjent – etterkontroll",
   avstemt: "Avstemt",
   utenfor: "Holdt utenfor",
   alle: "Alle",

@@ -17,7 +17,7 @@ export type FakturaListe = {
   error: unknown;
   refetch: () => void;
   /** Tall fra den samlede listen over åpne fakturaer (alltid ekte totaler). */
-  openCounts: { trenger: number; klar: number } | null;
+  openCounts: { trenger: number; klar: number; etterkontroll: number } | null;
   /** Åpne fakturaer i utvalget — mål for «Oppdater matching». */
   openInSelection: InboxInvoice[];
   /** Hele utvalget (alle sider) — for CSV uten valg. */
@@ -40,9 +40,16 @@ export function useFakturaListe(a: Args): FakturaListe {
 
   const all = open.data ?? [];
   const filtered = all.filter((i) => matchesFilters(i, a.filters));
-  const trenger = sortInvoices(filtered.filter((i) => i.tab === "open"), a.sort);
-  const klar = sortInvoices(filtered.filter((i) => i.tab === "ready"), a.sort);
-  const openCounts = open.data ? { trenger: all.filter((i) => i.tab === "open").length, klar: all.filter((i) => i.tab === "ready").length } : null;
+  // Internt godkjente fakturaer er aldri vanlig åpent arbeid: de står under «Etterkontroll» og åpnes bare for eksplisitt ny kontroll.
+  const work = (i: InboxInvoice) => !i.internally_approved;
+  const trenger = sortInvoices(filtered.filter((i) => i.tab === "open" && work(i)), a.sort);
+  const klar = sortInvoices(filtered.filter((i) => i.tab === "ready" && work(i)), a.sort);
+  const etter = sortInvoices(filtered.filter((i) => i.internally_approved), a.sort);
+  const openCounts = open.data ? {
+    trenger: all.filter((i) => i.tab === "open" && work(i)).length,
+    klar: all.filter((i) => i.tab === "ready" && work(i)).length,
+    etterkontroll: all.filter((i) => i.internally_approved).length,
+  } : null;
 
   if (server) {
     return {
@@ -57,7 +64,7 @@ export function useFakturaListe(a: Args): FakturaListe {
       fetchAll: () => fetchAllServerRows(a),
     };
   }
-  const list = a.visning === "klar" ? klar : trenger;
+  const list = a.visning === "klar" ? klar : a.visning === "etterkontroll" ? etter : trenger;
   const from = (a.page - 1) * FAKTURA_PAGE_SIZE;
   return {
     rows: list.slice(from, from + FAKTURA_PAGE_SIZE),
@@ -67,7 +74,7 @@ export function useFakturaListe(a: Args): FakturaListe {
     error: open.error,
     refetch: () => void open.refetch(),
     openCounts,
-    openInSelection: list.filter((i) => i.status !== "flagged" && i.line_count > 0),
+    openInSelection: list.filter((i) => i.status !== "flagged" && i.line_count > 0 && !i.internally_approved),
     fetchAll: async () => list,
   };
 }
