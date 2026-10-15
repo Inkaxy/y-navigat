@@ -19,7 +19,6 @@ export function statusCells(s: WorkSummary | null, open: OpenInvoiceCounts = nul
   if (!s) return [];
   const cells: StatusCell[] = [];
   if (s.invoice_access) {
-    const inv = s.invoices;
     cells.push(
       { label: "Trenger deg", value: n(open?.trenger), unit: "fakturaer", href: paths.priskontroll({ fane: "arbeid" }), tone: "warning" },
       { label: "Klare", value: n(open?.klar), unit: "fakturaer", href: paths.priskontroll({ fane: "arbeid", vis: "klare" }) },

@@ -45,11 +45,7 @@ export function useFakturaListe(a: Args): FakturaListe {
   const trenger = sortInvoices(filtered.filter((i) => i.tab === "open" && work(i)), a.sort);
   const klar = sortInvoices(filtered.filter((i) => i.tab === "ready" && work(i)), a.sort);
   const etter = sortInvoices(filtered.filter((i) => i.internally_approved), a.sort);
-  const openCounts = open.data ? {
-    trenger: all.filter((i) => i.tab === "open" && work(i)).length,
-    klar: all.filter((i) => i.tab === "ready" && work(i)).length,
-    etterkontroll: all.filter((i) => i.internally_approved).length,
-  } : null;
+  const openCounts = open.data ? openWorkCounts(all) : null;
 
   if (server) {
     return {
@@ -77,6 +73,17 @@ export function useFakturaListe(a: Args): FakturaListe {
     openInSelection: list.filter((i) => i.status !== "flagged" && i.line_count > 0 && !i.internally_approved),
     fetchAll: async () => list,
   };
+}
+
+/** Tellere for åpne fakturaer med samme regel som listene; brukes også av Oversikt. */
+export function openWorkCounts(all: readonly InboxInvoice[]): { trenger: number; klar: number; etterkontroll: number } {
+  let trenger = 0, klar = 0, etterkontroll = 0;
+  for (const i of all) {
+    if (i.internally_approved) etterkontroll++;
+    else if (i.tab === "open") trenger++;
+    else if (i.tab === "ready") klar++;
+  }
+  return { trenger, klar, etterkontroll };
 }
 
 const EXPORT_PAGE = 500;
