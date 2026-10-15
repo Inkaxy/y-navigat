@@ -33,7 +33,7 @@ vi.mock("@/fakturaer/components/invoice-detail/fetchInvoiceDetail", () => ({
 vi.mock("@/ravarer/pages/priskontroll/faktura/useInvoiceSteps", () => ({
   useInvoiceSteps: (d: unknown) => ({
     next: d ? { key: "rett_sum", label: "Rett sumavvik", enabled: true, hint: "Summen stemmer ikke." } : null,
-    steps: [], canWrite: st.canWrite, busy: false, result: null, setResult: st.setResult, approve: vi.fn(), postCosts: vi.fn(), assessment: null,
+    steps: [], canWrite: st.canWrite, busy: false, result: null, setResult: st.setResult, approve: vi.fn(), postCosts: vi.fn(), assessment: null, extras: { approved: false, costPosted: false, known: true },
   }),
 }));
 vi.mock("@/ravarer/pages/priskontroll/faktura/useInvoiceLineQueue", () => ({

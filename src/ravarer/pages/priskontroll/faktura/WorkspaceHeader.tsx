@@ -31,6 +31,8 @@ type Props = {
   docOpen: boolean;
   onToggleDoc: () => void;
   canWrite: boolean;
+  /** Linjene er skrivebeskyttet (godkjent/ukjent godkjenning/endelig) — skjuler linjeendrende menyvalg. */
+  linesLocked?: boolean;
   /** «Hent linjer» gjør noe (Tripletex og linjene er ikke lest ennå). */
   canFetch: boolean;
   rematchBusy: boolean;
@@ -54,7 +56,7 @@ type Props = {
 /** Sticky header: hvem/hva, leveransestatus og ÉN primærknapp for neste steg. */
 export function WorkspaceHeader(p: Props) {
   const doc = useInvoiceDocumentUrl(p.docPath);
-  const final = p.status === "reconciled";
+  const final = p.status === "reconciled" || !!p.linesLocked;
   const excluded = p.status === "excluded";
   // Frittstående side: fakturaen er sidens h1. Innebygd i arbeidsflaten har siden allerede h1.
   const Heading = p.compact ? "h2" : "h1";

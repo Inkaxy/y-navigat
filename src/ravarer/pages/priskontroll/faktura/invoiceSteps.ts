@@ -184,6 +184,17 @@ export function nextInvoiceStep(i: NextStepInput): NextStep {
       ? { key: "hent_linjer", label: "Hent linjer", enabled: i.canWrite, hint: "Linjene er ikke hentet fra Tripletex ennå." }
       : { key: "registrer_linjer", label: "Registrer linjer", enabled: i.canWrite, hint: "Linjene må registreres manuelt." };
   }
+  // Linjearbeid på en faktura med aktiv intern godkjenning eller ukjent godkjenning er skrivebeskyttet (som serverens livsløpsvern).
+  // Ingen «Avklar»/«Rett sum»-handling; ny kontroll krever at godkjenningen trekkes tilbake via Godkjenning.
+  if (i.status !== "reconciled" && (i.lines_sum_status === "mismatch" || i.open_count > 0)) {
+    if (i.known === false) {
+      return { key: "status_ukjent", label: "Henter godkjenningsstatus", enabled: false, hint: "Linjene er låst til godkjenningsstatus er hentet." };
+    }
+    if (i.approved) {
+      return { key: "kontroll_etterkontroll", label: "Internt godkjent – skrivebeskyttet", enabled: false,
+        hint: "Fakturaen er allerede godkjent, men har åpne linjer eller sumavvik. Ny kontroll krever at godkjenningen trekkes tilbake med begrunnelse under Godkjenning." };
+    }
+  }
   if (i.status !== "reconciled" && i.lines_sum_status === "mismatch") {
     return { key: "rett_sum", label: "Rett sumavvik", enabled: true, hint: "Summen av linjene stemmer ikke med fakturabeløpet." };
   }

@@ -50,6 +50,7 @@ export function useInvoiceSteps(data: InvoiceDetailData | undefined) {
       is_credit_note: !!data.is_credit_note,
     };
     return {
+      extras,
       assessment,
       steps: deliverySteps(base, extras),
       next: nextInvoiceStep({
