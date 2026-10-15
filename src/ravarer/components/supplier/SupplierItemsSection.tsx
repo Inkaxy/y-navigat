@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { SupplierItemStatusChips } from "@/fakturaer/components/supplier-item/SupplierItemStatusChips";
 import { DataTable, type Column } from "@/ravarer/ui/DataTable";
 import { ItemTypeBadge } from "@/ravarer/components/ItemTypeBadge";
-import { formatDate, formatNok, formatNumber } from "@/ravarer/lib/constants";
+import { formatDate, formatNok } from "@/ravarer/lib/constants";
 import { isAgreementConfirmed } from "@/ravarer/lib/priceTimeline";
 import { packageLabel } from "@/ravarer/lib/supplierPackagePrice";
 import { paths } from "@/ravarer/lib/paths";
