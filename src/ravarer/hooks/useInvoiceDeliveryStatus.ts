@@ -5,7 +5,7 @@ import { extrasFromCounts, type DeliveryExtras } from "@/ravarer/pages/priskontr
 
 export type DeliveryExtrasMap = ReadonlyMap<string, DeliveryExtras>;
 
-const EMPTY: DeliveryExtras = { approved: false, costPosted: false };
+const EMPTY: DeliveryExtras = { approved: false, costPosted: false, known: false };
 
 export function extrasFor(map: DeliveryExtrasMap | undefined, id: string): DeliveryExtras {
   return map?.get(id) ?? EMPTY;

@@ -207,10 +207,10 @@ describe("delvis kostprisføring (3C)", () => {
     expect(canPostCosts({ ...r, cost_posted_lines: 3 })).toBe(false);
     expect(canPostCosts({ ...r, is_credit_note: true })).toBe(false);
   });
-  it("avstemt etter delvis føring: ferdig med delvis-merknad", () => {
+  it("avstemt etter delvis føring: etterkontroll med ført/totalt, aldri Ferdig", () => {
     const n = nextInvoiceStep({ ...base, status: "reconciled", ...extrasFromCounts(true, 1, 3) });
-    expect(n.key).toBe("ferdig");
-    expect(n.hint).toMatch(/delvis ført \(1 av 3/);
+    expect(n.key).toBe("kost_etterkontroll");
+    expect(n.label).toMatch(/delvis ført – 1 av 3/);
   });
 });
 

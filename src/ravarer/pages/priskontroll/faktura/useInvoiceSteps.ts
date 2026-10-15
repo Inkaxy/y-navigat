@@ -97,5 +97,5 @@ export function useInvoiceSteps(data: InvoiceDetailData | undefined) {
     }
   }
 
-  return { ...derived, canWrite, busy, result, setResult, approve, postCosts };
+  return { ...derived, canWrite, canReconcileRight: canReconcile, busy, result, setResult, approve, postCosts };
 }

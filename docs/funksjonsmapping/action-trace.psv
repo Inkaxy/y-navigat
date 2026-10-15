@@ -38,7 +38,7 @@ F25|src/ravarer/pages/priskontroll/faktura/WorkspaceHeader.tsx|Rett linjer mot o
 F26|src/ravarer/pages/priskontroll/gjore/logic.ts|GJORE_SORTS|Sorteringer
 F28|src/ravarer/pages/priskontroll/gjore/GjoreBulkBar.tsx|Opprett råvarer …|Masse
 F29|src/fakturaer/components/inbox/task/LineTask.tsx|LineTask|Oppgavekort
-F3|src/components/layout/SubAppNav.tsx|badge: summary?.todo_total|Badge
+F3|src/components/layout/SubAppNav.tsx|badge: summary?.data_quality.datasheet_changes|Badge
 F30|src/fakturaer/components/inbox/task/MaterialPicker.tsx|MaterialPicker|Forslag/søk
 F32|src/fakturaer/components/inbox/task/PackageForm.tsx|PackageForm|Pakningsskjema
 F38|src/ravarer/pages/priskontroll/gjore/PriceBlock.tsx|Bekreft startpris|Startpris

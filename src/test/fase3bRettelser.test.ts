@@ -85,10 +85,10 @@ describe("B9/B11/B13/B14", () => {
   it("«Klare»-tallet er listens tall", () => {
     expect(chipCount("klar", { klar: 4, inv: { open_total: 0, missing_lines: 0, sum_mismatch: 0, needs_review: 0, ready_to_reconcile: 9, credit_notes_open: 0, flagged: 0, reconciled_total: 0, reconciled_auto: 0, reconciled_7d: 0, reconciled_auto_7d: 0, imported_7d: 0 }, alle: null })).toBe(4);
   });
-  it("kreditnota: kostpris ikke relevant; ingen trygge linjer gir Ferdig", () => {
+  it("kreditnota: kostpris ikke relevant; ingen trygge linjer er aldri Ferdig", () => {
     expect(nextInvoiceStep({ ...base, is_credit_note: true }).key).toBe("ferdig");
     expect(deliverySteps({ ...base, is_credit_note: true }, { approved: true, costPosted: false }).find((s) => s.key === "kostpris")?.done).toBe(true);
-    expect(nextInvoiceStep({ ...base, canPostCosts: true, noSafeLines: true }).key).toBe("ferdig");
+    expect(nextInvoiceStep({ ...base, canPostCosts: true, noSafeLines: true }).key).toBe("kost_etterkontroll");
   });
   it("kreditnota uten kobling: «Koble kreditnota» er primærsteg", () => {
     expect(nextInvoiceStep({ ...base, status: "needs_review", is_credit_note: true, creditNoteUnlinked: true }).key).toBe("koble_kreditnota");

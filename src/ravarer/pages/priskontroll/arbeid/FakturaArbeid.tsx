@@ -151,9 +151,9 @@ export function FakturaArbeid() {
       </div>
 
       {left && (
-        <div role="status" className="flex flex-wrap items-center gap-3 rounded-md border border-success/40 bg-success/10 px-3 py-2 text-sm">
+        <div role="status" className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
           <span>
-            Faktura {detail.data?.invoice_number ?? ""} er ikke lenger i «{ARBEID_LABEL[state]}» — serveren viser nå {STATUS_LABEL[detail.data?.status ?? ""] ?? "en annen status"}.
+            Faktura {detail.data?.invoice_number ?? ""} er ikke lenger i «{ARBEID_LABEL[state]}» — serveren viser nå {STATUS_LABEL[detail.data?.status ?? ""] ?? "en annen status"}{detail.data?.status === "reconciled" ? (approval.data === true ? " og internt godkjent. Kostføring vises på fakturaen — avstemt er ikke nødvendigvis helt ferdig" : ", venter intern godkjenning") : ""}.
             {" "}{countLabel(liste.total)} {liste.total === 1 ? "faktura" : "fakturaer"} igjen her.
           </span>
           {pos.nextId && <Button size="sm" className="min-h-[44px]" onClick={goNext}>Neste faktura</Button>}
