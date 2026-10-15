@@ -35,6 +35,7 @@ import { StockTab } from "@/ravarer/components/tabs/StockTab";
 import { HistoryTab } from "@/ravarer/components/tabs/HistoryTab";
 import { lagerReturnHref } from "@/ravarer/lib/lagerReturn";
 import { paths } from "@/ravarer/lib/paths";
+import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 
 export default function RawMaterialDetail() {
   const { id } = useParams();
@@ -42,6 +43,8 @@ export default function RawMaterialDetail() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const page = useRawMaterialPage(id);
+  const { data: supplierList = [] } = useSuppliers();
+  const supplierNameOf = new Map(supplierList.map((s) => [s.id, s.name]));
   const rm = page.rm;
   const rename = useRenameRawMaterial();
   const { canWrite } = useRavarer();
