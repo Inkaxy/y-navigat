@@ -339,7 +339,7 @@ export function FakturaWorkspaceView({ id, embedded }: ViewProps) {
   const notApplicableCount = q.selectedLines.length;
 
   const control = (expanded?: boolean) => (
-    <ControlSummary data={data} openCount={q.needs} totalCount={q.total} canWrite={s.canWrite} locked={final} openSignal={factsSignal} expanded={expanded} compact={!!embedded?.compact && !expanded} />
+    <ControlSummary data={data} openCount={q.needs} totalCount={q.total} canWrite={s.canWrite} locked={final || lineLock.locked} openSignal={factsSignal} expanded={expanded} compact={!!embedded?.compact && !expanded} />
   );
   const linesZone = (
     <div className={embedded?.compact ? "min-w-0 space-y-2" : "min-w-0 space-y-3"}>
@@ -470,7 +470,7 @@ export function FakturaWorkspaceView({ id, embedded }: ViewProps) {
           excluded_at: data.excluded_at, excluded_by: data.excluded_by, exclusion_category: data.exclusion_category, exclusion_reason: data.exclusion_reason }}
         lines={(data.invoice_lines ?? []).map((l) => ({ id: l.id, line_number: l.line_number, description: l.description, updated_at: l.updated_at,
           excluded_at: l.excluded_at, excluded_by: l.excluded_by, exclusion_category: l.exclusion_category, exclusion_reason: l.exclusion_reason }))} />
-      <HoldOutsideDialog target={hold} canWrite={s.canWrite} onOpenChange={(v) => { if (!v) setHold(null); }}
+      <HoldOutsideDialog target={hold} canWrite={lineWrite} onOpenChange={(v) => { if (!v) setHold(null); }}
         onDone={(scope) => { setInspectorOpen(false); void detail.refetch(); q.refresh();
           s.setResult({ title: scope === "invoice" ? "Holdt utenfor råvarebehandling" : "Linjen er holdt utenfor råvarebehandling",
             items: ["Ikke avstemt og ikke godkjent. Du kan gjenåpne fra fakturasiden."] }); }} />
