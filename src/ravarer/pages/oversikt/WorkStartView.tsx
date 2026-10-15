@@ -18,7 +18,7 @@ export function statusCells(s: WorkSummary | null): StatusCell[] {
   if (s.invoice_access) {
     const inv = s.invoices;
     cells.push(
-      { label: "Trenger deg", value: n(inv?.needs_review != null && inv ? inv.open_total - inv.ready_to_reconcile : null), unit: "fakturaer", href: paths.fakturaer({ visning: "trenger" }), tone: "warning" },
+      { label: "Trenger deg", value: n(inv ? inv.open_total - inv.ready_to_reconcile : null), unit: "fakturaer", href: paths.fakturaer({ visning: "trenger" }), tone: "warning" },
       { label: "Klare", value: n(inv?.ready_to_reconcile), unit: "fakturaer", href: paths.fakturaer({ visning: "klar" }) },
       { label: "Linjer å kontrollere", value: n(s.lines_to_review), unit: "linjer", href: paths.priskontroll({ fane: "gjore" }) },
       { label: "Til godkjenning", value: n(s.approval?.ready_to_approve), unit: "fakturaer", href: paths.godkjenning() },
