@@ -4,9 +4,12 @@
 
 export const FINAL_INVOICE_STATUSES = ["flagged", "reconciled", "cancelled", "excluded"] as const;
 
+/** Eneste statuser som kan beregnes på nytt (samme som `rm_post_safe_line_costs`/importveiene). Alt annet, også null/ukjent, sperres. */
+export const OPEN_INVOICE_STATUSES = ["imported", "needs_review", "ready"] as const;
+
 export type LifecycleDecision =
   | { kind: "open" }
-  | { kind: "locked"; reason: "internally_approved" | "excluded" | "final_status"; status: string | null }
+  | { kind: "locked"; reason: "internally_approved" | "excluded" | "final_status" | "status_unknown"; status: string | null }
   | { kind: "error"; message: string };
 
 type Res<T> = { data: T | null; error: { message: string } | null };
@@ -22,6 +25,7 @@ export async function invoiceLifecycle(
   const status = inv.status == null ? null : String(inv.status);
   if (inv.excluded_at) return { kind: "locked", reason: "excluded", status };
   if (status && (FINAL_INVOICE_STATUSES as readonly string[]).includes(status)) return { kind: "locked", reason: "final_status", status };
+  if (!status || !(OPEN_INVOICE_STATUSES as readonly string[]).includes(status)) return { kind: "locked", reason: "status_unknown", status };
   let res: Res<{ id: string }[]>;
   try {
     res = await reader.activeApproval(inv.id);

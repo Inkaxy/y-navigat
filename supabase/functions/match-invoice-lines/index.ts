@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
     }
     if (lifecycle.kind === "locked") {
       return json({ ok: true, skipped: true, locked: true, reason: lifecycle.reason, invoice_status: lifecycle.status, processed: 0, results: [],
-        message: "Fakturaen er låst (internt godkjent, utelatt eller endelig) og ble ikke beregnet på nytt." });
+        message: lifecycle.reason === "status_unknown" ? "Fakturaens status er ukjent, så den ble ikke beregnet på nytt." : "Fakturaen er låst (internt godkjent, utelatt eller endelig) og ble ikke beregnet på nytt." });
     }
 
     // Prisgrunnlag hentes fra databasen per vare, med FAKTISK leverandør og

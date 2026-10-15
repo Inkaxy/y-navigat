@@ -26,3 +26,12 @@ Deno.test("lesefeil er fail-closed", async () => {
   const throwing: LifecycleReader = { activeApproval: () => Promise.reject(new Error("net")) };
   assertEquals((await invoiceLifecycle(open, throwing)).kind, "error");
 });
+Deno.test("manglende eller ukjent status sperres uten å lese godkjenning; åpne statuser kjører", async () => {
+  for (const s of [null, "", "draft", "NEEDS_REVIEW", "paid"]) {
+    const c = { n: 0 };
+    assertEquals(await invoiceLifecycle({ ...open, status: s }, reader([], null, c)), { kind: "locked", reason: "status_unknown", status: s === "" ? "" : s });
+    assertEquals(c.n, 0);
+  }
+  for (const s of ["imported", "needs_review", "ready"]) assertEquals((await invoiceLifecycle({ ...open, status: s }, reader([]))).kind, "open");
+  assertEquals((await invoiceLifecycle({ ...open, status: "ready" }, reader(null, "boom"))).kind, "error");
+});
