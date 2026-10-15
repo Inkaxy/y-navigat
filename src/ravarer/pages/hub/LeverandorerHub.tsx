@@ -20,7 +20,7 @@ export default function LeverandorerHub() {
   const tabs = leverandorTabs(summary, hasInvoiceAccess);
   const tab = activeTabFrom(sp, "fane", tabs.filter((t) => !t.hidden).map((t) => t.id), "leverandorer");
   return (
-    <ModulePage eyebrow={RAVARER_EYEBROW} title="Leverandører" tabs={<SectionTabs ariaLabel="Leverandører" tabs={tabs} defaultTab="leverandorer" />}>
+    <ModulePage eyebrow={RAVARER_EYEBROW} title="Leverandører" compact tabs={<SectionTabs ariaLabel="Leverandører" tabs={tabs} defaultTab="leverandorer" />}>
       <Suspense fallback={<QueryLoadingState rows={6} />}>
         {tab === "leverandorer" && <Leverandorer />}
         {tab === "avtaler" && <Avtaler />}
