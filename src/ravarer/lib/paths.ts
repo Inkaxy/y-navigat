@@ -21,7 +21,7 @@ type Id = string | null | undefined;
 const enc = (v: Id) => encodeURIComponent(v ?? "");
 export const RAVARER_ROOT = "/ravarer";
 
-export type PriskontrollFane = "gjore" | "fakturaer" | "godkjenning" | "saker";
+export type PriskontrollFane = "arbeid" | "gjore" | "fakturaer" | "godkjenning" | "saker";
 export type LeverandorFane = "leverandorer" | "avtaler" | "forhandlinger";
 export type LagerFane = "beholdning" | "varemottak" | "telling";
 export type InnstillingSeksjon = "priskontroll" | "tripletex" | "kategorier" | "ai";

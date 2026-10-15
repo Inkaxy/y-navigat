@@ -12,6 +12,8 @@ export type FakturaListe = {
   rows: InboxInvoice[];
   total: number;
   isLoading: boolean;
+  /** Henter på nytt fra serveren akkurat nå (data kan være utdatert). */
+  isFetching: boolean;
   error: unknown;
   refetch: () => void;
   /** Tall fra den samlede listen over åpne fakturaer (alltid ekte totaler). */
@@ -47,6 +49,7 @@ export function useFakturaListe(a: Args): FakturaListe {
       rows: remote.data?.rows ?? [],
       total: remote.data?.total ?? 0,
       isLoading: remote.isLoading,
+      isFetching: remote.isFetching || open.isFetching,
       error: remote.error,
       refetch: () => void remote.refetch(),
       openCounts,
@@ -60,6 +63,7 @@ export function useFakturaListe(a: Args): FakturaListe {
     rows: list.slice(from, from + FAKTURA_PAGE_SIZE),
     total: list.length,
     isLoading: open.isLoading,
+    isFetching: open.isFetching,
     error: open.error,
     refetch: () => void open.refetch(),
     openCounts,

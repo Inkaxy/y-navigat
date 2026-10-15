@@ -54,6 +54,8 @@ import { ExclusionPanel } from "@/fakturaer/components/ExclusionPanel";
 
 // v2: originaldokumentet er åpent som standard; bare et eksplisitt «skjul» huskes.
 const LS_DOC = "nbhub.faktura.docpanel.v2";
+// Innebygd: originalen er valgfri og lukket til brukeren åpner den.
+const LS_DOC_EMBEDDED = "nbhub.faktura.docpanel.embedded.v1";
 const HELP = [
   { keys: ["↑", "↓", "j", "k"], description: "Forrige / neste linje", handler: () => undefined },
   { keys: ["Enter"], description: "Godta toppforslag / hovedhandling", handler: () => undefined },
@@ -65,9 +67,20 @@ const HELP = [
   { keys: ["Esc"], description: "Lukk inspektør", handler: () => undefined },
 ];
 
-/** Faktura-arbeidsflaten: dokument · linjer · linjeinspektør, og ÉN neste-steg-knapp. */
+/** Egen side (`/faktura/:id`). */
 export default function FakturaWorkspace() {
   const { id } = useParams();
+  return <FakturaWorkspaceView id={id} />;
+}
+
+type ViewProps = {
+  id: string | undefined;
+  /** Innebygd i fakturaarbeidsflaten: originalen er valgfritt sidepanel (lukket som standard), tilbake = arbeidsflaten. */
+  embedded?: { backHref: string; backLabel: string };
+};
+
+/** Faktura-arbeidsflaten: dokument · linjer · linjeinspektør, og ÉN neste-steg-knapp. */
+export function FakturaWorkspaceView({ id, embedded }: ViewProps) {
   const [sp] = useSearchParams();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -87,7 +100,7 @@ export default function FakturaWorkspace() {
   const fetchLines = useFetchInvoiceLines();
   const rematch = useRematchWait(data?.legal_entity_id ?? null, () => { void detail.refetch(); q.refresh(); });
   const confirmMany = useConfirmMany();
-  const [docOpen, setDocOpen] = useState(() => localStorage.getItem(LS_DOC) !== "0" && typeof window !== "undefined" && window.matchMedia("(min-width: 1280px)").matches);
+  const [docOpen, setDocOpen] = useState(() => (embedded ? localStorage.getItem(LS_DOC_EMBEDDED) === "1" : localStorage.getItem(LS_DOC) !== "0") && typeof window !== "undefined" && window.matchMedia("(min-width: 1280px)").matches);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [editSignal, setEditSignal] = useState<EditMaterialSignal | null>(null);
   const [pendingFocus, setPendingFocus] = useState<string | null>(null);
@@ -128,7 +141,7 @@ export default function FakturaWorkspace() {
   // Mobil: dokumentet vises via sonen; desktop: via docOpen. Én kilde for etikett/aria-pressed.
   const toggleDoc = () => {
     if (isMobile) { setZone((z) => (z === "dokument" ? "linjer" : "dokument")); return; }
-    setDocOpen((v) => { localStorage.setItem(LS_DOC, v ? "0" : "1"); return !v; });
+    setDocOpen((v) => { localStorage.setItem(embedded ? LS_DOC_EMBEDDED : LS_DOC, v ? "0" : "1"); return !v; });
   };
   const docShown = isMobile ? zone === "dokument" : docOpen;
   const editMaterial = (lineId?: string) => {
@@ -418,7 +431,7 @@ export default function FakturaWorkspace() {
     <PriceGateProvider gateFor={gateFor}>
     <div className="space-y-4">
       <WorkspaceHeader
-        backHref={fakturaReturn(readReturnParam(sp)).href}
+        backHref={embedded?.backHref ?? fakturaReturn(readReturnParam(sp)).href}
         supplier={data.suppliers?.name ?? "Leverandør"}
         invoiceNumber={data.invoice_number}
         invoiceDate={data.invoice_date}
@@ -437,7 +450,7 @@ export default function FakturaWorkspace() {
         onToggleDoc={toggleDoc}
         canWrite={s.canWrite}
         canFetch={canFetchLines({ source: data.source, line_extraction_status: data.line_extraction_status, line_count: (data.invoice_lines ?? []).length })}
-        backLabel={fakturaReturn(readReturnParam(sp)).label}
+        backLabel={embedded?.backLabel ?? fakturaReturn(readReturnParam(sp)).label}
         sumMismatch={data.lines_sum_status === "mismatch"}
         canCorrect={(data.invoice_lines ?? []).length > 0}
         rematchBusy={rematch.busy}
@@ -527,7 +540,12 @@ export default function FakturaWorkspace() {
           ...(r.linesSumStatus === "mismatch" ? ["Linjesummen stemmer fortsatt ikke med fakturabeløpet."] : []),
         ] }); }}
       />
-      <LineDialogs dialog={lineDialog} onClose={() => setLineDialog(null)} q={q} canWrite={lineWrite} invoice={data} onEditMaterial={() => editMaterial()}
+      <LineDialogs dialog={lineDialog} onClose={() => {
+        // Startpris: hent linjens og fakturaens status på nytt fra serveren før neste steg vises.
+        const refresh = lineDialog?.kind === "start_price";
+        setLineDialog(null);
+        if (refresh) { q.refresh(); void detail.refetch(); }
+      }} q={q} canWrite={lineWrite} invoice={data} onEditMaterial={() => editMaterial()}
         onNotItemDone={(l, info) => { q.remember(l, `Ikke vare: ${l.description ?? "linje"}`); q.refresh(); s.setResult({ title: "Linjen er merket som ikke vare", items: notItemResultItems(l.description, info.patternId), undoable: true }); }} />
     </div>
     </PriceGateProvider>
