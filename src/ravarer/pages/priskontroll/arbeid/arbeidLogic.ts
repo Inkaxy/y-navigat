@@ -71,3 +71,46 @@ export function positionOf(ids: readonly string[], selected: string | null): Pos
   }
   return { inList: true, index, prevId: index > 0 ? ids[index - 1] : null, nextId: index < ids.length - 1 ? ids[index + 1] : null };
 }
+
+/** Tilstanden serveren faktisk viser for en faktura (samme klassedeling som listene). */
+export function arbeidClassOf(status: string | null | undefined, internallyApproved: boolean): ArbeidState | null {
+  if (status === "reconciled") return "ferdig";
+  if (status === "excluded") return "utenfor";
+  if (internallyApproved) return "etterkontroll";
+  if (status === "ready") return "klare";
+  if (status == null) return null;
+  return "trenger";
+}
+
+export type ReceiptInput = {
+  selected: string | null;
+  state: ArbeidState;
+  /** Nøkkel for selskap/tilstand/filter/side/rekkefølge for gjeldende liste. */
+  scopeKey: string;
+  /** Sist bekreftet at valgt faktura stod i en fersk liste med denne nøkkelen. */
+  witnessed: { id: string; scopeKey: string } | null;
+  /** Fakturaen er lest på nytt fra serveren etter at den ble sett i listen (faktisk lagring). */
+  refreshedAfterWitness: boolean;
+  /** Fersk liste: ikke lasting/feil/henting/plassholder, og detaljene er ferdig hentet. */
+  settled: boolean;
+  inList: boolean;
+  detailStatus: string | null | undefined;
+  detailApproved: boolean;
+};
+
+/**
+ * «Ferdig»-kvittering bare for en kjent før→etter-overgang i samme utvalg, der fersk
+ * servertilstand faktisk tilhører en annen tilstand. Ellers nøytralt «ikke i utvalget».
+ */
+export function arbeidReceipt(i: ReceiptInput): "moved" | "not_in_scope" | null {
+  if (!i.selected || !i.settled || i.inList) return null;
+  const known = i.witnessed?.id === i.selected && i.witnessed.scopeKey === i.scopeKey && i.refreshedAfterWitness;
+  const cls = arbeidClassOf(i.detailStatus, i.detailApproved);
+  if (known && cls != null && cls !== i.state) return "moved";
+  return "not_in_scope";
+}
+
+/** Automatisk førstevalg bare fra en fersk liste for gjeldende parametre. */
+export function canAutoSelect(a: { selected: string | null; isLoading: boolean; error: unknown; isFetching: boolean; isPlaceholderData: boolean; count: number }): boolean {
+  return !a.selected && !a.isLoading && !a.error && !a.isFetching && !a.isPlaceholderData && a.count > 0;
+}

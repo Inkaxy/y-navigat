@@ -39,7 +39,8 @@ export function statusCells(s: WorkSummary | null, open: OpenInvoiceCounts = nul
 export function WorkStartView({ summary, firstName, open = null }: { summary: WorkSummary | null; firstName: string | null; open?: OpenInvoiceCounts }) {
   const cells = statusCells(summary, open);
   const access = summary?.invoice_access === true;
-  const todo = summary?.todo_total;
+  // Samme tall som primærkøen «Trenger deg» (uten internt godkjente), aldri arbeidssammendragets eldre totalsum.
+  const todo = open ? open.trenger : null;
   return (
     <section aria-labelledby="ravarer-start" className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -49,7 +50,7 @@ export function WorkStartView({ summary, firstName, open = null }: { summary: Wo
           </h1>
           <p className="text-body text-ink-secondary">
             {!summary ? "Henter status …" : !access ? "Du har ikke tilgang til fakturaer. Bruk snarveiene under."
-              : todo == null ? "Antall oppgaver er ukjent akkurat nå." : todo === 0 ? "Ingen fakturaoppgaver venter." : `${n(todo)} oppgaver venter, eldste først.`}
+              : todo == null ? "Antall oppgaver er ukjent akkurat nå." : todo === 0 ? "Ingen fakturaer trenger deg nå." : `${n(todo)} ${todo === 1 ? "faktura trenger" : "fakturaer trenger"} deg, eldste først.`}
           </p>
         </div>
         {access && (

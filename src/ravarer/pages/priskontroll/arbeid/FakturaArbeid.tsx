@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useSearchParams } from "react-router-dom";
 import { ArrowDownUp, ChevronLeft, ChevronRight, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { FakturaWorkspaceView } from "../faktura/FakturaWorkspace";
 import { parseFilters } from "../fakturaer/fakturaListLogic";
 import { FAKTURA_PAGE_SIZE, useFakturaListe } from "../fakturaer/useFakturaListe";
-import { ARBEID_HINT, ARBEID_LABEL, ARBEID_STATES, ARBEID_TO_VISNING, arbeidSort, countLabel, parseArbeid, positionOf, type ArbeidState } from "./arbeidLogic";
+import { ARBEID_HINT, ARBEID_LABEL, ARBEID_STATES, ARBEID_TO_VISNING, arbeidReceipt, arbeidSort, canAutoSelect, countLabel, parseArbeid, positionOf, type ArbeidState } from "./arbeidLogic";
 import { useArbeidStatusCounts } from "./useArbeidCounts";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -50,20 +51,49 @@ export function FakturaArbeid() {
 
   const ids = useMemo(() => liste.rows.map((r) => r.id), [liste.rows]);
   const listReady = !liste.isLoading && !liste.error;
-  // Første besøk: åpne eldste faktura i utvalget. Valget fryses i adressen og byttes aldri stille.
+  const fresh = listReady && !liste.isFetching && !liste.isPlaceholderData;
+  const scopeKey = JSON.stringify([legalEntityId, state, filters, page, newestFirst]);
+  // Første besøk: åpne eldste faktura i et ferskt utvalg. Valget fryses i adressen og byttes aldri stille.
   useEffect(() => {
-    if (!selected && listReady && ids.length > 0) set({ valgt: ids[0] });
+    if (canAutoSelect({ selected, isLoading: liste.isLoading, error: liste.error, isFetching: liste.isFetching, isPlaceholderData: liste.isPlaceholderData, count: ids.length })) set({ valgt: ids[0] });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, listReady, ids[0]]);
+  }, [selected, fresh, ids[0]]);
+
+  // Selskapsbytte: gammelt valg og kvittering gjelder ikke lenger.
+  const prevCompany = useRef(legalEntityId);
+  useEffect(() => {
+    if (prevCompany.current !== legalEntityId) {
+      const had = prevCompany.current != null;
+      prevCompany.current = legalEntityId;
+      if (had && selected) set({ valgt: null, side: null, linje: null, fokus: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [legalEntityId]);
 
   // Valgt fakturas detaljer deler cache med arbeidsflaten; når de lastes på nytt (etter lagring) leses listen og tellerne på nytt.
   const detail = useQuery({ queryKey: ["invoice", selected], enabled: !!selected, queryFn: () => fetchInvoiceDetail(selected as string) });
+  const approval = useQuery({
+    queryKey: ["invoice-internal-approval-active", selected, detail.dataUpdatedAt],
+    enabled: !!selected && !!detail.data,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("invoice_internal_approvals").select("status").eq("invoice_id", selected as string).eq("status", "approved").limit(1);
+      if (error) throw new Error("Kunne ikke lese godkjenningsstatus.");
+      return (data ?? []).length > 0;
+    },
+  });
+  // Før→etter: fakturaen må ha stått i en fersk liste for samme utvalg, og deretter være lest på nytt fra serveren.
+  const witnessed = useRef<{ id: string; scopeKey: string; at: number } | null>(null);
   const lastUpdate = useRef(0);
+  const [refreshedAfterWitness, setRefreshed] = useState(false);
+  useEffect(() => { witnessed.current = null; setRefreshed(false); }, [scopeKey, selected]);
   useEffect(() => {
     if (!detail.dataUpdatedAt || detail.dataUpdatedAt === lastUpdate.current) return;
     const first = lastUpdate.current === 0;
     lastUpdate.current = detail.dataUpdatedAt;
-    if (!first) { liste.refetch(); void statusCounts.refetch(); }
+    if (!first) {
+      if (witnessed.current?.id === selected && detail.dataUpdatedAt > witnessed.current.at) setRefreshed(true);
+      liste.refetch(); void statusCounts.refetch();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail.dataUpdatedAt]);
 
@@ -81,9 +111,16 @@ export function FakturaArbeid() {
     if (pos.nextId) go(pos.nextId);
     else if (page < totalPages) set({ side: String(page + 1), valgt: null, linje: null, fokus: null });
   };
-  // Frosset kvittering: valgt faktura har forlatt utvalget først når en fersk liste fra serveren sier det.
-  const settled = listReady && !liste.isFetching && !detail.isFetching;
-  const left = !!selected && settled && !pos.inList && !!detail.data;
+  useEffect(() => {
+    if (selected && fresh && pos.inList && witnessed.current?.id !== selected) witnessed.current = { id: selected, scopeKey, at: Date.now() };
+  }, [selected, fresh, pos.inList, scopeKey]);
+  // Frosset kvittering: kun kjent overgang i samme utvalg, bekreftet av fersk servertilstand.
+  const settled = fresh && !!detail.data && !detail.isFetching && !detail.error && approval.isSuccess && !approval.isFetching;
+  const receipt = arbeidReceipt({
+    selected, state, scopeKey, witnessed: witnessed.current, refreshedAfterWitness, settled, inList: pos.inList,
+    detailStatus: detail.data?.status, detailApproved: approval.data === true,
+  });
+  const left = receipt === "moved";
 
   return (
     <div className="space-y-2 px-page pb-6">
@@ -120,6 +157,12 @@ export function FakturaArbeid() {
             {" "}{countLabel(liste.total)} {liste.total === 1 ? "faktura" : "fakturaer"} igjen her.
           </span>
           {pos.nextId && <Button size="sm" className="min-h-[44px]" onClick={goNext}>Neste faktura</Button>}
+        </div>
+      )}
+
+      {receipt === "not_in_scope" && (
+        <div role="status" className="rounded-md border border-border bg-muted px-3 py-2 text-sm text-ink-secondary">
+          Fakturaen finnes ikke i dette utvalget («{ARBEID_LABEL[state]}», denne siden). Det sier ingenting om at den er ferdig.
         </div>
       )}
 

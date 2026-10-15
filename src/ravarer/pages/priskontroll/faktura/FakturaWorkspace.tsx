@@ -368,6 +368,7 @@ export function FakturaWorkspaceView({ id, embedded }: ViewProps) {
         />
       ) : (
         <QueueWorkspace
+          invoiceApproved={s.steps ? !!s.steps.find((x) => x.key === "godkjent")?.done : undefined}
           lines={q.visible}
           statusOf={q.statusOf}
           showAll={!q.showOnlyOpen}
