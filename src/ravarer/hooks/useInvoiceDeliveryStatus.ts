@@ -26,7 +26,7 @@ export function useInvoiceDeliveryStatus(ids: readonly string[]) {
       // hent side for side og dedupliser, så ingen faktura mister «Kostpris ført».
       const [appr, cost, lines] = await Promise.all([
         fetchAllRows<{ invoice_id: string }>((from, to) =>
-          supabase.from("invoice_internal_approvals").select("invoice_id").in("invoice_id", sorted).eq("status", "approved").order("invoice_id").range(from, to)),
+          supabase.from("invoice_internal_approvals").select("invoice_id").in("invoice_id", sorted).eq("status", "approved").is("revoked_at", null).order("invoice_id").range(from, to)),
         fetchAllRows<{ invoice_id: string }>((from, to) =>
           supabase.from("invoice_line_cost_postings").select("invoice_id").in("invoice_id", sorted).is("revoked_at", null).order("invoice_id").range(from, to)),
         fetchAllRows<{ invoice_id: string }>((from, to) =>

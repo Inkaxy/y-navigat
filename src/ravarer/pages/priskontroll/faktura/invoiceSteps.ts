@@ -137,10 +137,10 @@ export function deliverySteps(inv: DeliveryInvoice, extras: DeliveryExtras): Del
 
 export type NextStepKey =
   | "holdt_utenfor" | "flagget" | "koble_kreditnota" | "hent_linjer" | "registrer_linjer" | "rett_sum" | "avklar" | "avstem" | "godkjenn" | "kostpris"
-  | "kostkontroll" | "status_ukjent" | "venter_godkjenning" | "kost_etterkontroll" | "ferdig";
+  | "kostkontroll" | "status_ukjent" | "venter_godkjenning" | "kost_etterkontroll" | "kontroll_etterkontroll" | "ferdig";
 
 /** Steg som betyr at fakturaen IKKE er helt ferdig, selv om ingen handling er åpen her. */
-export const NOT_DONE_KEYS: readonly NextStepKey[] = ["kostkontroll", "status_ukjent", "venter_godkjenning", "kost_etterkontroll"];
+export const NOT_DONE_KEYS: readonly NextStepKey[] = ["kostkontroll", "status_ukjent", "venter_godkjenning", "kost_etterkontroll", "kontroll_etterkontroll"];
 
 export interface NextStep {
   key: NextStepKey;
@@ -163,7 +163,7 @@ export interface NextStepInput extends DeliveryInvoice, DeliveryExtras {
   canPostCosts?: boolean;
   /** Kreditnotaen er ikke koblet til en opprinnelig faktura. */
   creditNoteUnlinked?: boolean;
-  /** Siste kostprisføring fant ingen trygge linjer — steget regnes som ferdig. */
+  /** Siste kostprisføring fant ingen trygge linjer for samme grunnlag — kontrollbehov, aldri ferdig. Ny retting/rematch nullstiller den (`noSafeKey`). */
   noSafeLines?: boolean;
 }
 
@@ -192,7 +192,7 @@ export function nextInvoiceStep(i: NextStepInput): NextStep {
     return { key: "avklar", label: `Avklar ${n} ${n === 1 ? "linje" : "linjer"}`, enabled: true, hint: "Går til første åpne linje." };
   }
   // Ukjent godkjenning/kostføring er aldri «ferdig» og gir ingen kost-/godkjenningshandling.
-  if (i.known === false && !i.is_credit_note) {
+  if (i.known === false && (!i.is_credit_note || i.status === "reconciled")) {
     return { key: "status_ukjent", label: "Henter kostpris- og godkjenningsstatus", enabled: false, hint: "Status er ikke bekreftet ennå — ingenting regnes som ferdig før den er hentet." };
   }
   const p = costProgress(i.costPostedLines ?? 0, i.costTotalLines ?? 0);
@@ -209,8 +209,8 @@ export function nextInvoiceStep(i: NextStepInput): NextStep {
   // Ingen trygge linjer igjen: kontrollbehov, ikke ferdig. Avstemming er fortsatt mulig ved siden av.
   if (costPostingAllowed(i) && !i.costPosted && i.noSafeLines) {
     return {
-      key: "kostkontroll", label: `Kontroller prisgrunnlaget (${ratio})`, enabled: true,
-      hint: `${p.remaining} ${p.remaining === 1 ? "varelinje er" : "varelinjer er"} ikke trygge nok for automatisk føring. Åpne linjen og avklar prisgrunnlaget (f.eks. «Kontroller første dokumenterte pris»).`,
+      key: "kostkontroll", label: `Prøv kostprisføring igjen (${ratio})`, enabled: i.canPostCosts ?? i.canWrite,
+      hint: `Sist var ${p.remaining} ${p.remaining === 1 ? "varelinje" : "varelinjer"} ikke trygge nok for automatisk føring. Avklar prisgrunnlaget på linjen (f.eks. «Kontroller første dokumenterte pris»), og prøv igjen.`,
     };
   }
   if (i.status !== "reconciled") {
@@ -224,6 +224,15 @@ export function nextInvoiceStep(i: NextStepInput): NextStep {
     return i.canApprove
       ? { key: "godkjenn", label: "Godkjenn", enabled: true, hint: "Avstemt, venter intern godkjenning. Utløser ikke betaling." }
       : { key: "venter_godkjenning", label: "Venter intern godkjenning", enabled: false, hint: "Avstemt. Intern godkjenning krever godkjennerrolle (godkjenne eller admin)." };
+  }
+  // Avstemt+godkjent er ikke helt ferdig uten faktisk kontroll: åpne linjer eller ukontrollert/avvikende sum gir etterkontroll.
+  if (i.open_count > 0 || !sumOk(i.lines_sum_status)) {
+    return {
+      key: "kontroll_etterkontroll", label: "Avstemt og godkjent – kontroll ufullstendig", enabled: false,
+      hint: i.open_count > 0
+        ? `${i.open_count} ${i.open_count === 1 ? "linje er" : "linjer er"} fortsatt åpne. Krever eksplisitt ny kontroll; ingenting endres automatisk.`
+        : `${sumStatusLabel(i.lines_sum_status)}. Krever eksplisitt ny kontroll; ingenting endres automatisk.`,
+    };
   }
   if (i.is_credit_note) {
     return { key: "ferdig", label: "Ferdig", enabled: false, hint: "Kreditnotaen er avstemt og godkjent. Kostprisføring gjelder ikke kreditnotaer." };
@@ -246,4 +255,13 @@ export const COST_POSTING_STATUSES = ["imported", "needs_review", "ready"] as co
 /** Samme regel som serveren: åpen status og ikke kreditnota. Godkjenning kreves ikke. */
 export function costPostingAllowed(i: { status: string | null; is_credit_note?: boolean | null }): boolean {
   return (COST_POSTING_STATUSES as readonly string[]).includes(i.status ?? "") && !i.is_credit_note;
+}
+
+/**
+ * Nøkkel for «ingen trygge linjer»-merket: faktura- og linjeversjoner + førte linjer.
+ * Endres grunnlaget (retting, rematch, startpris → ny linjeversjon), gjelder ikke merket lenger.
+ */
+export function noSafeKey(inv: { id: string; updated_at?: string | null; invoice_lines?: ReadonlyArray<{ id: string; updated_at?: string | null }> | null }, posted: number): string {
+  const lines = [...(inv.invoice_lines ?? [])].map((l) => `${l.id}@${l.updated_at ?? ""}`).sort().join(",");
+  return `${inv.id}@${inv.updated_at ?? ""}:${posted}:${lines}`;
 }
