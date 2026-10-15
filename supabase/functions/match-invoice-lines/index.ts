@@ -9,6 +9,7 @@ import { pickPackageRow } from "../_shared/packageSignature.ts";
 import { reconcileAcceptance } from "../_shared/priceAcceptance.ts";
 import { CREDIT_NOTE_REF_PREFIX, creditNoteOriginalRef } from "../_shared/creditNote.ts";
 import { authorizeCron } from "../_shared/cron-auth.ts";
+import { invoiceLifecycle, svcLifecycleReader } from "../_shared/invoiceLifecycleGuard.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -72,7 +73,7 @@ Deno.serve(async (req) => {
 
     // Fetch invoice + ensure caller has write
     const { data: inv, error: invErr } = await svc.from("invoices")
-      .select("id, legal_entity_id, supplier_id, total_amount, invoice_date, status, currency, is_credit_note, extraction_confidence, lines_sum_status, notes")
+      .select("id, legal_entity_id, supplier_id, total_amount, invoice_date, status, currency, is_credit_note, extraction_confidence, lines_sum_status, notes, excluded_at")
       .eq("id", invoiceId).single();
     if (invErr || !inv) return json({ error: "Invoice not found" }, 404);
 
@@ -88,6 +89,19 @@ Deno.serve(async (req) => {
         return json({ error: "Forbidden" }, 403);
       }
       if (allowed !== true) return json({ error: "Forbidden" }, 403);
+    }
+
+    // Livsløpsvakt (etter tilgangskontroll, før all skriving): internt godkjent, utelatt eller
+    // endelig faktura røres ikke — verken linjer, faktura, koblinger, prishistorikk eller kost.
+    // Svaret er en endelig kvittering (200), så køen avslutter uten ny runde. Lesefeil = stopp.
+    const lifecycle = await invoiceLifecycle(inv as { id: string; status: string | null; excluded_at: string | null }, svcLifecycleReader(svc));
+    if (lifecycle.kind === "error") {
+      console.error("invoice lifecycle guard", lifecycle.message);
+      return json({ error: "lifecycle_check_failed" }, 503);
+    }
+    if (lifecycle.kind === "locked") {
+      return json({ ok: true, skipped: true, locked: true, reason: lifecycle.reason, invoice_status: lifecycle.status, processed: 0, results: [],
+        message: "Fakturaen er låst (internt godkjent, utelatt eller endelig) og ble ikke beregnet på nytt." });
     }
 
     // Prisgrunnlag hentes fra databasen per vare, med FAKTISK leverandør og
