@@ -1,7 +1,6 @@
 import { KpiStrip, MobileKpis } from "./MobileKpis";
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ClipboardCheck } from "lucide-react";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
