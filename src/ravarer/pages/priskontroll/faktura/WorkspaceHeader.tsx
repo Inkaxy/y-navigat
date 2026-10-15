@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { ArrowLeft, FileText, Loader2, MoreHorizontal, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -46,6 +47,8 @@ type Props = {
   sumMismatch?: boolean;
   /** Fakturaen har linjer som kan rettes manuelt mot originalen. */
   canCorrect?: boolean;
+  /** Primær arbeidsflate: én linje (tilbake, identitet, status, handlinger), samme innhold. */
+  compact?: boolean;
 };
 
 /** Sticky header: hvem/hva, leveransestatus og ÉN primærknapp for neste steg. */
@@ -53,9 +56,11 @@ export function WorkspaceHeader(p: Props) {
   const doc = useInvoiceDocumentUrl(p.docPath);
   const final = p.status === "reconciled";
   const excluded = p.status === "excluded";
+  // Frittstående side: fakturaen er sidens h1. Innebygd i arbeidsflaten har siden allerede h1.
+  const Heading = p.compact ? "h2" : "h1";
   return (
-    <header className="sticky top-0 z-20 space-y-2 border-b border-border bg-background/95 py-3 backdrop-blur">
-      <div className="flex flex-wrap items-center gap-2">
+    <header className={cn("sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur", p.compact ? "flex flex-wrap items-center gap-x-3 gap-y-1 py-1" : "space-y-2 py-3")}>
+      <div className={cn("flex flex-wrap items-center gap-2", p.compact && "shrink-0")}>
         <Button asChild variant="ghost" size="sm" className="-ml-2 min-h-[44px] gap-1.5">
           <Link to={p.backHref}><ArrowLeft className="h-4 w-4" aria-hidden />{p.backLabel ?? "Fakturaer"}</Link>
         </Button>
@@ -65,9 +70,9 @@ export function WorkspaceHeader(p: Props) {
           </Button>
         )}
       </div>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0 space-y-1">
-          <h1 className="font-serif text-xl leading-tight">{p.supplier} · Faktura {p.invoiceNumber}</h1>
+      <div className={cn("flex flex-wrap justify-between", p.compact ? "min-w-0 flex-1 items-center gap-2" : "items-end gap-3")}>
+        <div className={cn("min-w-0", p.compact ? "flex flex-wrap items-center gap-x-3 gap-y-0.5" : "space-y-1")}>
+          <Heading className={cn("font-serif leading-tight", p.compact ? "text-base" : "text-xl")}>{p.supplier} · Faktura {p.invoiceNumber}</Heading>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-ink-secondary">
             <span>{formatDate(p.invoiceDate)}</span>
             <span className="tabular-nums">{formatNok(p.amount)}</span>
@@ -120,7 +125,7 @@ export function WorkspaceHeader(p: Props) {
           </Button>}
         </div>
       </div>
-      <p className="hidden text-right text-caption sm:block text-ink-secondary" aria-live="polite">{p.rematchNote ? `${p.rematchNote} · ` : ""}{p.next.hint}</p>
+      <p className={cn("hidden text-right text-caption sm:block text-ink-secondary", p.compact && "w-full truncate")} aria-live="polite">{p.rematchNote ? `${p.rematchNote} · ` : ""}{p.next.hint}</p>
     </header>
   );
 }
