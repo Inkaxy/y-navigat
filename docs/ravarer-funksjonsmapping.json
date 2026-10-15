@@ -219,7 +219,7 @@
    "handler_or_render_evidence": [
     {
      "file": "src/ravarer/pages/hub/RavarerOversikt.tsx",
-     "evidence": "sort: \"impact\"",
+     "evidence": "sort: \"oldest\"",
      "note": "Topp etter kronevirkning",
      "reached_from_owner": true
     }
