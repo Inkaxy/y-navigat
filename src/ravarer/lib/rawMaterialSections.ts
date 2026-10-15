@@ -103,12 +103,42 @@ export interface CheckInput {
     base_units_per_package: number | null;
     package_confirmed_at: string | null;
     package_confirmed_by: string | null;
+    item_type?: string | null;
   };
   linkCount: number;
+  /** Leverandørkoblinger med pakningsfelt (samme rader som «Pakning og leverandør»). */
+  links?: readonly SupplierPackageLink[];
   nutrition: (NutritionValues & { verified_at?: string | null; is_complete?: boolean | null }) | null;
   hasDatasheet: boolean;
   /** Gjeldende kostprisbeslutning fra bundet serverbevis (`costEvidenceFor`). Påkrevd: lagret status alene sertifiserer aldri. */
   costEvidence: CostEvidence;
+}
+
+export interface SupplierPackageLink extends PackageFields {
+  supplier_id: string;
+  supplierName?: string | null;
+}
+
+/**
+ * Pakning: global standardpakning er valgfri når hver koblet leverandør har bekreftet egen pakning.
+ * Leverandørpakning kopieres aldri til global, og ved flere ulike pakninger velges ingen.
+ */
+export function packageCheck(rm: CheckInput["rm"], links: readonly SupplierPackageLink[]): CheckItem {
+  const base = { id: "pakning" as const, label: "Pakning" };
+  if (confirmedFactor(rm) != null) return { ...base, status: "ok", detail: "Bekreftet standardpakning", section: "grunndata" };
+  const confirmed = links.filter((l) => confirmedFactor(l) != null);
+  const open = links.filter((l) => confirmedFactor(l) == null);
+  const name = (l: SupplierPackageLink) => l.supplierName?.trim() || "ukjent leverandør";
+  if (confirmed.length > 0) {
+    const what = confirmed.length === 1
+      ? `${name(confirmed[0])}: ${packageLabel(confirmed[0], "").label?.replace(/\s+per pakning$/, "") ?? "bekreftet"}`
+      : `${confirmed.length} leverandører`;
+    if (open.length === 0) return { ...base, status: "ok", detail: `Leverandørpakning bekreftet (${what})`, section: "leverandorer" };
+    return { ...base, status: "partial", detail: `Leverandørpakning bekreftet (${what}) — ikke bekreftet for ${open.map(name).join(", ")}`, section: "leverandorer" };
+  }
+  if (rm.base_units_per_package != null) return { ...base, status: "partial", detail: "Pakningsinnhold ikke bekreftet", section: "grunndata" };
+  if (links.length > 0) return { ...base, status: "missing", detail: `Pakning ikke bekreftet for ${links.map(name).join(", ")}`, section: "leverandorer" };
+  return { ...base, status: "missing", detail: "Pakningsinnhold mangler", section: "grunndata" };
 }
 
 /** Komplett-sjekklisten. Kalles bare når alle delspørringer er lastet uten feil. */
@@ -116,15 +146,15 @@ export function completenessChecklist(i: CheckInput): CheckItem[] {
   const { rm } = i;
   const ce = i.costEvidence;
   const items: CheckItem[] = [
-    confirmedFactor(rm) != null
-      ? { id: "pakning", label: "Pakning", status: "ok", detail: "Bekreftet pakningsinnhold", section: "grunndata" }
-      : { id: "pakning", label: "Pakning", status: rm.base_units_per_package != null ? "partial" : "missing", detail: rm.base_units_per_package != null ? "Pakningsinnhold ikke bekreftet" : "Pakningsinnhold mangler", section: "grunndata" },
+    packageCheck(rm, i.links ?? []),
     { id: "leverandor", label: "Leverandør", status: i.linkCount > 0 ? "ok" : "missing", detail: i.linkCount > 0 ? `${i.linkCount} koblet` : "Ingen leverandør koblet", section: "leverandorer" },
     { id: "prisgrunnlag", label: "Prisgrunnlag", status: ce.status === "verifisert" ? "ok" : ce.status === "mangler" ? "missing" : "partial",
       detail: ce.status === "verifisert" ? "Verifisert kostpris" : ce.reason ?? (ce.status === "uverifisert" ? "Uverifisert — ingen gyldig kilde" : ce.status === "mangler" ? "Mangler gyldig kostpris" : "Prisstatus ukjent"), section: "pris" },
     { id: "kategori", label: "Kategori", status: rm.category || (rm.categories?.length ?? 0) > 0 ? "ok" : "missing", detail: rm.category ?? rm.categories?.[0] ?? "Ingen kategori", section: "grunndata" },
   ];
-  if (!rm.is_packaging) {
+  // Eksplisitt varetype vinner over fritekstkategori/eldre flagg: «Emballasje» som kategori gjør ikke en råvare til emballasje.
+  const isPackaging = rm.item_type ? rm.item_type === "emballasje" : rm.is_packaging;
+  if (!isPackaging) {
     items.push(
       { id: "deklarasjonsnavn", label: "Deklarasjonsnavn", status: rm.declaration_name ? "ok" : "missing", detail: rm.declaration_name ?? "Mangler", section: "deklarasjon" },
       nutritionCheck(i.nutrition),
