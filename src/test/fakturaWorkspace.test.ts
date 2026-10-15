@@ -46,7 +46,7 @@ describe("nextInvoiceStep", () => {
     expect(nextInvoiceStep(ni({})).key).toBe("kostpris");
     expect(nextInvoiceStep(ni({ costPosted: true })).key).toBe("avstem");
     expect(nextInvoiceStep(ni({ status: "reconciled", costPosted: true })).key).toBe("godkjenn");
-    expect(nextInvoiceStep(ni({ status: "reconciled", approved: true })).key).toBe("ferdig");
+    expect(nextInvoiceStep(ni({ status: "reconciled", approved: true })).key).toBe("kost_etterkontroll");
     const f = nextInvoiceStep(ni({ status: "reconciled", approved: true, costPosted: true }));
     expect([f.key, f.enabled]).toEqual(["ferdig", false]);
   });

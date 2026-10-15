@@ -406,7 +406,7 @@ export function FakturaWorkspaceView({ id, embedded }: ViewProps) {
           toleranceFor={q.toleranceFor}
           showInvoice={false}
           canWrite={lineWrite}
-          reconcileReady={(s.next.key === "avstem" && s.next.enabled) || (s.next.key === "kostkontroll" && !!s.assessment?.canReconcile && canReconcileRight)}
+          reconcileReady={(s.next.key === "avstem" && s.next.enabled) || (s.next.key === "kostkontroll" && !!s.assessment?.canReconcile && s.canReconcileRight)}
           isMobile={isMobile}
           countsError={q.countsQuery.isError}
           onSaved={q.handleSaved}
