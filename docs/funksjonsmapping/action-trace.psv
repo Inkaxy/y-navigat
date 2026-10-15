@@ -50,7 +50,7 @@ F44|src/ravarer/pages/priskontroll/faktura/useWorkspaceHotkeys.ts|useWorkspaceHo
 F45|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|q.undo()|Angre
 F47|src/fakturaer/components/inbox/task/LineTask.tsx|MatchDrawer|Delt skjema
 F48|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|Godta forslag|Godta
-F5|src/ravarer/pages/hub/RavarerOversikt.tsx|sort: "impact"|Topp etter kronevirkning
+F5|src/ravarer/pages/hub/RavarerOversikt.tsx|NextInvoicesView|Topp 5 eldste handlingsbare fakturaer (samme kø som Trenger deg); kronevirkning i ?fane=gjore
 F51|src/ravarer/pages/priskontroll/gjore/GjoreBulkBar.tsx|Opprett råvarer fra valgte varekort|Masseopprett
 F52|src/fakturaer/components/BulkImportRawMaterialsDrawer.tsx|BulkImportRawMaterialsDrawer|Masseimport
 F53|src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx|Alle leverandører|Leverandørfilter
