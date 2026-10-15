@@ -32,6 +32,8 @@ export interface FakeClientOptions {
   failTables?: Record<string, string>;
   /** Svar per RPC-navn. */
   rpc?: Record<string, unknown>;
+  /** Logger hver utført spørring (tabell+modus) og hvert RPC-kall, for null-skriving-bevis. */
+  calls?: Array<{ kind: "table"; table: string; mode: string } | { kind: "rpc"; name: string }>;
 }
 
 export function createFakeClient(tables: Tables, options: FakeClientOptions = {}) {
@@ -46,6 +48,7 @@ export function createFakeClient(tables: Tables, options: FakeClientOptions = {}
     const failure = options.failTables?.[table];
 
     const run = () => {
+      options.calls?.push({ kind: "table", table, mode });
       if (failure) return { data: null, error: { message: failure } };
       const rows = rowsOf(table);
       if (mode === "insert" || mode === "upsert") {
@@ -130,7 +133,7 @@ export function createFakeClient(tables: Tables, options: FakeClientOptions = {}
 
   return {
     from: (table: string) => builder(table),
-    rpc: async (name: string) => ({ data: options.rpc?.[name] ?? null, error: null }),
+    rpc: async (name: string) => (options.calls?.push({ kind: "rpc", name }), { data: options.rpc?.[name] ?? null, error: null }),
     auth: { getUser: async () => ({ data: { user: { id: "u1" } }, error: null }) },
   };
 }
