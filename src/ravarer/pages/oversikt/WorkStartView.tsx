@@ -10,7 +10,7 @@ function n(v: number | null | undefined): string {
   return typeof v === "number" && Number.isFinite(v) ? v.toLocaleString("nb-NO") : "–";
 }
 
-export type StatusCell = { label: string; value: string; unit: string; href?: string; tone?: "warning" };
+export type StatusCell = { label: string; value: string; unit: string; href?: string; tone?: "warning"; help?: string };
 
 /** Statusstripen: hver teller har én kilde og sier hva den teller (fakturaer, linjer, varekort). */
 /** Åpne fakturaer med samme filter som Fakturaer-flaten (uten internt godkjente). null = ukjent. */
@@ -35,7 +35,8 @@ export function statusCells(s: WorkSummary | null, open: OpenInvoiceCounts = nul
     );
   }
   cells.push({
-    label: "Pakning mangler",
+    label: "Standardpakning mangler",
+    help: "Råvarer uten bekreftet standardpakning. Leverandørspesifikk pakning kan likevel være bekreftet.",
     value: n(s.data_quality ? s.data_quality.missing_package + s.data_quality.unconfirmed_package : null),
     unit: "råvarer",
     href: paths.pakninger(),
@@ -73,7 +74,7 @@ export function WorkStartView({ summary, firstName, open = null }: { summary: Wo
         <dl className={cn("grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border max-sm:[&>*:last-child:nth-child(odd)]:col-span-2", STATUS_GRID[cells.length] ?? "sm:grid-cols-3")}>
           {cells.map((c) => (
             <div key={c.label} className="bg-card">
-              <Link to={c.href ?? "#"} className="flex min-h-[44px] flex-col px-3 py-2 hover:bg-muted/50">
+              <Link to={c.href ?? "#"} title={c.help} aria-description={c.help} className="flex min-h-[44px] flex-col px-3 py-2 hover:bg-muted/50">
                 <dt className="text-caption text-ink-secondary">{c.label}</dt>
                 <dd className="text-lg font-semibold tabular-nums">
                   {c.value} <span className="text-caption font-normal text-ink-secondary">{c.unit}</span>
