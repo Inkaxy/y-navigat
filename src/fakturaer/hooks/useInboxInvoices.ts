@@ -40,6 +40,8 @@ export interface InboxInvoice {
 interface Filters {
   legalEntityId?: string | null;
   supplierId?: string | null;
+  /** Standard true. */
+  enabled?: boolean;
 }
 
 /** Alle statuser som fortsatt er i arbeid — «ready» hører med. */
@@ -163,7 +165,8 @@ export function toInboxInvoice(r: RawInvoice): InboxInvoice {
  */
 export function useInboxInvoices(filters: Filters) {
   return useQuery({
-    queryKey: ["fakturaer-inbox", filters],
+    queryKey: ["fakturaer-inbox", { legalEntityId: filters.legalEntityId, supplierId: filters.supplierId }],
+    enabled: filters.enabled !== false,
     refetchInterval: 30000,
     queryFn: async (): Promise<InboxInvoice[]> => {
       const rows = await fetchAllRows<RawInvoice>((from, to) => {

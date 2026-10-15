@@ -32,7 +32,7 @@ export default function RavarerOversikt() {
   const invoiceAccess = summaryQ.data?.invoice_access === true;
   // «Trenger deg»/«Klare» med nøyaktig samme filter som Fakturaer-flaten (komplett liste, uten internt godkjente).
   const { data: company } = useCompany();
-  const openQ = useInboxInvoices({ legalEntityId: invoiceAccess ? company?.id ?? null : null, supplierId: null });
+  const openQ = useInboxInvoices({ legalEntityId: company?.id ?? null, supplierId: null, enabled: invoiceAccess && !!company?.id });
   const openCounts = invoiceAccess && company?.id && openQ.data && !openQ.isError ? openWorkCounts(openQ.data) : null;
   const itemsQ = useWorkItems({ group: "alle", sort: "oldest", limit: 5, enabled: invoiceAccess });
   const [more, setMore] = useState(false);
