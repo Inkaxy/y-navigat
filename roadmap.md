@@ -14,3 +14,11 @@
 - [ ] Deploy til gjennomgang: suggest-invoice-line-match, ai-config-test, extract-invoice-from-pdf, invoice-model-eval
 - [x] Regresjon 1539842: rabatt/prisgrunnlag/lesevarsler i inspektør, varekort og plan; ingen død prisknapp; varetype vist atskilt fra kategori
 - [x] rm_infer_package v3: bare bekreftede ikke-erstattede varianter, g/ml-grunnlag regnes om til kg/l; matcher bruker bare bekreftede varianter (deployet)
+
+# Råvaremodul-remake (15.10.2026)
+- [x] 1 Oversikt som arbeidsstart: statusstripe med enhet (ukjent = –), én «Start behandling» (eldste først), 5 neste oppgaver, snarveier; prisutvikling/aktivitet/datakvalitet bak «Mer»
+- [ ] 2 Fakturaflyt: én liste → én faktura → oppgave → lagre → kvittering → neste; filtre Trenger deg/Klare/Ferdig/Holdt utenfor; 1280×800 over bretten; valgfri original
+- [ ] 3 Guidet blokkerrekkefølge lesing→råvare→pakning→pris→godkjenning; førstegangspris via rm_set_documented_cost_price
+- [ ] 4 Vareliste + råvarekort forenklet, avansert bak sekundær tilgang
+- [ ] 5 Leverandør/Lager/Innstillinger samme rytme, ingen dobbel header
+- [ ] Skjermbilder 390/1280/1440, full testsamling
