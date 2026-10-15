@@ -22,6 +22,9 @@ export function PriskontrollToolsMenu() {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-[240px]">
+          <DropdownMenuItem asChild><Link to={paths.priskontroll({ fane: "fakturaer" })}>Full fakturaliste</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link to={paths.priskontroll({ fane: "gjore" })}>Varegrupper</Link></DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => setOpen(true)}>Beregn alle åpne på nytt …</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild><Link to={paths.reberegn()}>Reberegn kostpriser</Link></DropdownMenuItem>

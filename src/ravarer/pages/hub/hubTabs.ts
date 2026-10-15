@@ -32,12 +32,13 @@ export const PRISKONTROLL_TAB_PARAMS = [
 ];
 
 /** Godkjenning: `rm_work_summary.approval.ready_to_approve` har samme regel som listens «Klare» (ikke kansellert, ikke godkjent, ingen blokkere). */
-export function priskontrollTabs(s: WorkSummary | undefined): SectionTab[] {
+export function priskontrollTabs(s: WorkSummary | undefined, active: string = "arbeid"): SectionTab[] {
   return [
     // Primærinngang: én faktura om gangen. Tellerne står i arbeidsflatens egen filterrad (med enhet).
     { id: "arbeid", label: "Fakturaer" },
-    { id: "fakturaer", label: "Fakturaliste", count: s?.invoices?.open_total },
-    { id: "gjore", label: "Varegrupper", count: s?.todo_total },
+    // Sekundære flater: åpnes fra «Verktøy»; fanen vises bare mens den er åpen, og gamle lenker virker uendret.
+    { id: "fakturaer", label: "Fakturaliste", hidden: active !== "fakturaer" },
+    { id: "gjore", label: "Varegrupper", hidden: active !== "gjore" },
     { id: "godkjenning", label: "Godkjenning", count: s?.approval?.ready_to_approve },
     { id: "saker", label: "Leverandørsaker", count: s?.other.cases_open },
   ];

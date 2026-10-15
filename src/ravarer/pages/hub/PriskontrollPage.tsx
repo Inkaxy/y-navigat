@@ -48,7 +48,7 @@ export default function PriskontrollPage() {
           </Button>
         </>
       }
-      tabs={<SectionTabs ariaLabel="Priskontroll" tabs={priskontrollTabs(summary)} defaultTab="arbeid" activeId={tab} clearParams={PRISKONTROLL_TAB_PARAMS} />}
+      tabs={<SectionTabs ariaLabel="Priskontroll" tabs={priskontrollTabs(summary, tab)} defaultTab="arbeid" activeId={tab} clearParams={PRISKONTROLL_TAB_PARAMS} />}
     >
       <Suspense fallback={<QueryLoadingState rows={6} />}>
         {tab === "gjore" && sp.get("visning") === "mengde" && <MengdeDiagnostikk />}
