@@ -23,6 +23,8 @@ type Props = {
   openSignal: number;
   /** Mobil «Kontroll»-fane: detaljene alltid åpne. */
   expanded?: boolean;
+  /** Én tett stripe; detaljer bak «Detaljer». Status/varsel vises fortsatt. */
+  compact?: boolean;
 };
 
 export type ControlFigures = { net: number | null; linesSum: number | null; diff: number | null; currency: string; gross: number | null };
@@ -43,7 +45,7 @@ function Figure({ label, value, tone }: { label: string; value: string; tone?: "
 }
 
 /** ÉN kontrollblokk: netto, lest sum, differanse og gjenstående — detaljer og lesevarsler bak «Detaljer». */
-export function ControlSummary({ data, openCount, totalCount, canWrite, locked, openSignal, expanded }: Props) {
+export function ControlSummary({ data, openCount, totalCount, canWrite, locked, openSignal, expanded, compact }: Props) {
   const invIssues = parseReadIssues(data.extraction_issues);
   const lineIssues = (data.invoice_lines ?? []).filter((l) => l.match_confidence !== "not_applicable" && parseReadIssues(l.extraction_issues).length > 0).length;
   const extractionFailed = data.line_extraction_status === "failed" && !!data.line_extraction_error;
@@ -61,22 +63,22 @@ export function ControlSummary({ data, openCount, totalCount, canWrite, locked, 
 
   return (
     <Collapsible open={expanded || open} onOpenChange={setOpen} className="rounded-lg border border-border bg-card">
-      <div className="space-y-2 px-4 py-3">
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+      <div className={compact ? "flex flex-wrap items-center gap-x-5 gap-y-1 px-3 py-1.5" : "space-y-2 px-4 py-3"}>
+        <dl className={compact ? "flex flex-wrap items-center gap-x-5 gap-y-1 [&>div]:flex [&>div]:items-baseline [&>div]:gap-1.5" : "grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4"}>
           <Figure label="Netto på fakturaen" value={f.net == null ? (f.gross == null ? "—" : "Ukjent – mva mangler") : formatMoney(f.net, f.currency)} tone={f.net == null && f.gross != null ? "muted" : undefined} />
           <Figure label="Lest linjesum" value={formatMoney(f.linesSum, f.currency)} />
           <Figure label={sumStatusLabel(data.lines_sum_status)} value={f.diff == null ? "—" : `${f.diff > 0 ? "+" : ""}${formatMoney(f.diff, f.currency)}`}
             tone={docExcluded ? "muted" : data.lines_sum_status === "mismatch" ? "warning" : checked ? "success" : "muted"} />
           <Figure label="Gjenstår" value={docExcluded ? "Holdt utenfor" : totalCount === 0 ? "—" : openCount === 0 ? "Alle avklart" : `${openCount} av ${totalCount} linjer`} tone={!docExcluded && openCount > 0 ? "warning" : undefined} />
         </dl>
-        <div className="flex items-center justify-between gap-2">
+        <div className={compact ? "flex min-w-0 flex-1 items-center justify-between gap-2" : "flex items-center justify-between gap-2"}>
           <p className={cn("min-w-0 text-xs", readNote ? "text-warning" : "text-ink-secondary")}>
             {readNote ?? (docExcluded
               ? (data.lines_sum_status === "mismatch" ? "Historisk sumvarsel – dokumentet er holdt utenfor råvarebehandling og krever ingen retting." : "Dokumentet er holdt utenfor råvarebehandling.")
               : data.lines_sum_status === "mismatch" ? sumDirectionText(sumDirection(f.linesSum, f.net)) : checked ? "Linjesummen er kontrollert mot fakturaen." : "Linjesummen er ikke kontrollert mot fakturaen ennå.")}
           </p>
           {!expanded && (
-            <CollapsibleTrigger className="flex shrink-0 items-center gap-1 rounded-sm text-caption text-ink-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <CollapsibleTrigger className="flex min-h-[44px] shrink-0 items-center gap-1 rounded-sm text-caption text-ink-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               Detaljer<ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} aria-hidden />
             </CollapsibleTrigger>
           )}

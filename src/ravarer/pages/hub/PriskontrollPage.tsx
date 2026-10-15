@@ -39,6 +39,7 @@ export default function PriskontrollPage() {
       eyebrow={RAVARER_EYEBROW}
       title="Fakturaer"
       compact
+      inlineHeader={tab === "arbeid"}
       fullBleed
       actions={
         <>

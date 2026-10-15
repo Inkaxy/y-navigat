@@ -76,7 +76,8 @@ export default function FakturaWorkspace() {
 type ViewProps = {
   id: string | undefined;
   /** Innebygd i fakturaarbeidsflaten: originalen er valgfritt sidepanel (lukket som standard), tilbake = arbeidsflaten. */
-  embedded?: { backHref: string; backLabel: string };
+  /** `compact`: primær arbeidsflate — tett hode og sumstripe så linjearbeidet er synlig på laptop. */
+  embedded?: { backHref: string; backLabel: string; compact?: boolean };
 };
 
 /** Faktura-arbeidsflaten: dokument · linjer · linjeinspektør, og ÉN neste-steg-knapp. */
@@ -337,10 +338,10 @@ export function FakturaWorkspaceView({ id, embedded }: ViewProps) {
   const notApplicableCount = q.selectedLines.length;
 
   const control = (expanded?: boolean) => (
-    <ControlSummary data={data} openCount={q.needs} totalCount={q.total} canWrite={s.canWrite} locked={final} openSignal={factsSignal} expanded={expanded} />
+    <ControlSummary data={data} openCount={q.needs} totalCount={q.total} canWrite={s.canWrite} locked={final} openSignal={factsSignal} expanded={expanded} compact={!!embedded?.compact && !expanded} />
   );
   const linesZone = (
-    <div className="min-w-0 space-y-3">
+    <div className={embedded?.compact ? "min-w-0 space-y-2" : "min-w-0 space-y-3"}>
       {!isMobile && control()}
       {lineNotice && <p role="alert" className="rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-sm">{lineNotice}</p>}
       {lockNote && <p role="note" className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-ink-secondary">{lockNote}</p>}
@@ -432,8 +433,9 @@ export function FakturaWorkspaceView({ id, embedded }: ViewProps) {
 
   return (
     <PriceGateProvider gateFor={gateFor}>
-    <div className="space-y-4">
+    <div className={embedded?.compact ? "space-y-2" : "space-y-4"}>
       <WorkspaceHeader
+        compact={!!embedded?.compact}
         backHref={embedded?.backHref ?? fakturaReturn(readReturnParam(sp)).href}
         supplier={data.suppliers?.name ?? "Leverandør"}
         invoiceNumber={data.invoice_number}

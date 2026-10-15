@@ -123,7 +123,7 @@ export function FakturaArbeid() {
   const left = receipt === "moved";
 
   return (
-    <div className="space-y-2 px-page pb-6">
+    <div className="space-y-1.5 px-page pb-6">
       <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="Fakturautvalg">
         <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="Status">
           {ARBEID_STATES.map((s) => (
@@ -135,7 +135,8 @@ export function FakturaArbeid() {
             </button>
           ))}
         </div>
-        <span className="text-caption text-ink-secondary">fakturaer · {ARBEID_HINT[state]}</span>
+        {/* Forklaringen står i hver knapps tooltip; her kort for skjermleser og brede skjermer. */}
+        <span className="sr-only">fakturaer · {ARBEID_HINT[state]}</span>
         <div className="ml-auto flex items-center gap-1">
           <Button variant="ghost" size="sm" className="min-h-[44px] gap-1" aria-label={newestFirst ? "Vis eldste først" : "Vis nyeste først"}
             onClick={() => set({ rekkefolge: newestFirst ? null : "nyeste", valgt: null, side: null })}>
@@ -169,7 +170,7 @@ export function FakturaArbeid() {
       <QueryState scope="fakturaarbeid" isLoading={liste.isLoading && !selected} isError={!!liste.error && !selected} error={liste.error} onRetry={liste.refetch}
         isEmpty={listReady && ids.length === 0 && !selected} emptyTitle={state === "trenger" ? "Ingen fakturaer trenger deg nå" : `Ingen fakturaer i «${ARBEID_LABEL[state]}»`}>
         {selected ? (
-          <FakturaWorkspaceView key={selected} id={selected} embedded={{ backHref: `/ravarer/priskontroll?${new URLSearchParams({ fane: "fakturaer", visning: ARBEID_TO_VISNING[state] }).toString()}`, backLabel: "Fakturaliste" }} />
+          <FakturaWorkspaceView key={selected} id={selected} embedded={{ compact: true, backHref: `/ravarer/priskontroll?${new URLSearchParams({ fane: "fakturaer", visning: ARBEID_TO_VISNING[state] }).toString()}`, backLabel: "Fakturaliste" }} />
         ) : null}
       </QueryState>
 
