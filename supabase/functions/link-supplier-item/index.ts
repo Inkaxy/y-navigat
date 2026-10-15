@@ -133,23 +133,42 @@ Deno.serve(async (req) => {
         linesByInvoice.set(k, [...(linesByInvoice.get(k) ?? []), String(l.id)]);
       }
     }
-    const invoices: AnyRec[] = [];
-    for (const invoiceId of invoiceIds) {
-      try {
+    // Omregning med tidsbudsjett og begrenset samtidighet: plattformen avbryter etter 150 s, og da
+    // mistet brukeren hele svaret selv om koblingen var lagret. Fakturaer som ikke rekkes, rapporteres
+    // som ikke omregnet (linjene står som «må beregnes på nytt» til neste kjøring) — koblingen er uendret.
+    const startedAt = Date.now();
+    const BUDGET_MS = 90_000;
+    const PER_CALL_MS = 45_000;
+    const CONCURRENCY = 4;
+    const invoices: AnyRec[] = invoiceIds.map((id) => ({ invoice_id: id }));
+    let next = 0;
+    const worker = async () => {
+      while (next < invoiceIds.length) {
+        const idx = next++;
+        const inv = invoices[idx];
+        const invoiceId = invoiceIds[idx];
         const scoped = requestedLineIds ? linesByInvoice.get(invoiceId) ?? [] : null;
-        if (scoped && scoped.length === 0) { invoices.push({ invoice_id: invoiceId, rematched: false, skipped: "ingen_endrede_linjer" }); continue; }
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/match-invoice-lines`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${SERVICE_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify(scoped ? { invoice_id: invoiceId, line_ids: scoped } : { invoice_id: invoiceId }),
-        });
-        const mj = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(String((mj as AnyRec)?.error ?? res.status));
-        invoices.push({ invoice_id: invoiceId, rematched: true, auto_reconcile: (mj as AnyRec)?.auto_reconcile ?? null });
-      } catch (e) {
-        invoices.push({ invoice_id: invoiceId, rematched: false, error: e instanceof Error ? e.message : String(e) });
+        if (scoped && scoped.length === 0) { Object.assign(inv, { rematched: false, skipped: "ingen_endrede_linjer" }); continue; }
+        const left = BUDGET_MS - (Date.now() - startedAt);
+        if (left < 5_000) { Object.assign(inv, { rematched: false, error: "Omregningen rakk ikke denne fakturaen — den regnes om ved neste kjøring" }); continue; }
+        try {
+          const res = await fetch(`${SUPABASE_URL}/functions/v1/match-invoice-lines`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${SERVICE_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify(scoped ? { invoice_id: invoiceId, line_ids: scoped } : { invoice_id: invoiceId }),
+            signal: AbortSignal.timeout(Math.min(PER_CALL_MS, left)),
+          });
+          const mj = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(String((mj as AnyRec)?.error ?? res.status));
+          Object.assign(inv, { rematched: true, auto_reconcile: (mj as AnyRec)?.auto_reconcile ?? null });
+        } catch (e) {
+          const timedOut = e instanceof DOMException && (e.name === "TimeoutError" || e.name === "AbortError");
+          // Et avbrutt kall kan fortsatt fullføres på serveren — utfallet er ukjent, ikke «feilet».
+          Object.assign(inv, { rematched: false, error: timedOut ? "Omregningen tok for lang tid — utfallet kontrolleres ved neste kjøring" : (e instanceof Error ? e.message : String(e)) });
+        }
       }
-    }
+    };
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, invoiceIds.length) }, worker));
 
     // Tilstand etterpå: status per faktura og åpne linjer for varen.
     if (invoiceIds.length) {
