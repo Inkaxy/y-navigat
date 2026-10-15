@@ -23,7 +23,7 @@ describe("ferdig linje", () => {
     expect(d.line).toMatch(/avklart/);
     expect(d.invoice).toMatch(/12 andre åpne linjer/);
     expect(d.price).toMatch(/Dokumentert tidligere kjøpspris er ikke avklart/);
-    expect(d.price).toMatch(/eldste/);
+    expect(d.price).toMatch(/første dokumenterte pris/);
   });
   it("ukjent antall er aldri 0, godkjent pris gir ingen prismelding", () => {
     const ok = { ok: true as const, safety: {} as never };
