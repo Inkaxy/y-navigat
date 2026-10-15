@@ -9,3 +9,4 @@ Endring: etter auth + `has_ravarer_invoice_access(...,'write')` og før all skri
 Ingen DDL/trigger. Linjevis cost-posted-vakt og øvrig logikk uendret.
 Ikke en atomisk lås over hele kjøringen: en godkjenning som settes mens kjøringen pågår fanges av eksisterende skrive-RPC-er, ikke av denne vakten.
 Utrullet: source_sha256 926d4a1308fdfdc9acaa5dbb883548c454b3991c1bb5d9198fa525e8a8853c3c.
+- 15.10 rev2: OPEN_INVOICE_STATUSES (imported/needs_review/ready); null/ukjent → locked status_unknown. Deployet source_sha256 7c5f97b6…6190.
