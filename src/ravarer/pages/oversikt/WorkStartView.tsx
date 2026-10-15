@@ -17,7 +17,7 @@ export type StatusCell = { label: string; value: string; unit: string; href?: st
 export type OpenInvoiceCounts = { trenger: number; klar: number; etterkontroll: number } | null;
 
 /** Balanserte rader (ingen tomme fargede celler): 6 → 6/3/2, 4 → 4/2, 3 → 3, osv. */
-const STATUS_GRID: Record<number, string> = {
+export const STATUS_GRID: Record<number, string> = {
   1: "grid-cols-1", 2: "grid-cols-2", 3: "sm:grid-cols-3", 4: "sm:grid-cols-4",
   5: "sm:grid-cols-5", 6: "sm:grid-cols-3 lg:grid-cols-6",
 };
@@ -70,7 +70,7 @@ export function WorkStartView({ summary, firstName, open = null }: { summary: Wo
       </div>
 
       {cells.length > 0 && (
-        <dl className={cn("grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border", STATUS_GRID[cells.length] ?? "sm:grid-cols-3")}>
+        <dl className={cn("grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border max-sm:[&>*:last-child:nth-child(odd)]:col-span-2", STATUS_GRID[cells.length] ?? "sm:grid-cols-3")}>
           {cells.map((c) => (
             <div key={c.label} className="bg-card">
               <Link to={c.href ?? "#"} className="flex min-h-[44px] flex-col px-3 py-2 hover:bg-muted/50">
