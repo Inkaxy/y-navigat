@@ -73,9 +73,13 @@ export function RawMaterialKpiStrip({ rm, links, evidence, recipeCount, spend12m
       />
       <OrderDeskKpi
         icon={Package}
-        label="Pris per pakning"
+        label="Pris per standardpakning"
         value={perPackage != null ? formatNok(perPackage) : "—"}
-        sub={pk.confirmed ? (pk.label ?? "") : rm.base_units_per_package ? "Pakningsgrunnlag må bekreftes" : "Pakningsstørrelse mangler"}
+        sub={
+          factor == null
+            ? (rm.base_units_per_package ? "Standardpakning må bekreftes – se leverandørpakning" : "Standardpakning ikke angitt – se leverandørpakning")
+            : !verified ? "Kostpris må kontrolleres" : (pk.label ?? "")
+        }
       />
       <OrderDeskKpi
         icon={FileText}
