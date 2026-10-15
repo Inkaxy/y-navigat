@@ -359,6 +359,7 @@ export async function recalculateLines(invoiceId: string, lineIds: string[]): Pr
   if (error) throw new Error(`Reberegningen feilet: ${error.message}`);
   // Låst faktura (internt godkjent/utelatt/endelig): ingenting ble beregnet — aldri meld det som utført.
   if (data && typeof data === "object" && (data as { locked?: unknown }).locked === true) {
+    if ((data as { reason?: unknown }).reason === "status_unknown") throw new Error("Fakturaens status er ukjent, så linjen ble ikke beregnet på nytt.");
     throw new Error("Fakturaen er låst (internt godkjent, utelatt eller avsluttet), så linjen ble ikke beregnet på nytt.");
   }
 }

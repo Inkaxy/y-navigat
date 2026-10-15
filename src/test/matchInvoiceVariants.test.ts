@@ -26,7 +26,7 @@ afterAll(() => {
 
 function tables(line: Row, opts: { variants?: Row[]; settings?: Row; posted?: boolean } = {}): Tables {
   return {
-    invoices: [{ id: INV, legal_entity_id: ENT, supplier_id: SUP, total_amount: 0, invoice_date: "2026-10-01", status: "processing", currency: "NOK", is_credit_note: false, extraction_confidence: 0.99, lines_sum_status: "ok", notes: null }],
+    invoices: [{ id: INV, legal_entity_id: ENT, supplier_id: SUP, total_amount: 0, invoice_date: "2026-10-01", status: "imported", currency: "NOK", is_credit_note: false, extraction_confidence: 0.99, lines_sum_status: "ok", notes: null }],
     invoice_match_settings: opts.settings ? [{ legal_entity_id: ENT, ...opts.settings }] : [],
     invoice_match_category_tolerances: [],
     invoice_line_exclusion_patterns: [],

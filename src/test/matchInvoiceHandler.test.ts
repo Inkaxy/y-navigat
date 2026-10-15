@@ -73,7 +73,7 @@ function buildTables({ line, rawMaterial }: Scenario): Tables {
         supplier_id: SUPPLIER,
         total_amount: 0,
         invoice_date: "2026-09-01",
-        status: "processing",
+        status: "imported",
         currency: "NOK",
         is_credit_note: false,
         extraction_confidence: 0.99,
