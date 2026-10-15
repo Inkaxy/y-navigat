@@ -111,7 +111,9 @@ export function FakturaArbeid() {
     if (pos.nextId) go(pos.nextId);
     else if (page < totalPages) set({ side: String(page + 1), valgt: null, linje: null, fokus: null });
   };
-  if (selected && fresh && pos.inList && witnessed.current?.id !== selected) witnessed.current = { id: selected, scopeKey, at: Date.now() };
+  useEffect(() => {
+    if (selected && fresh && pos.inList && witnessed.current?.id !== selected) witnessed.current = { id: selected, scopeKey, at: Date.now() };
+  }, [selected, fresh, pos.inList, scopeKey]);
   // Frosset kvittering: kun kjent overgang i samme utvalg, bekreftet av fersk servertilstand.
   const settled = fresh && !!detail.data && !detail.isFetching && !detail.error && approval.isSuccess && !approval.isFetching;
   const receipt = arbeidReceipt({
