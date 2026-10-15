@@ -43,7 +43,8 @@ describe("hovedflyten påstår aldri ferdig kost ved 0 eller delvis føring", ()
     }
   });
   it("kreditnota: kost ikke relevant (ikke 0), og ingen varelinjer gir ikke falsk mangel", () => {
-    expect(nextInvoiceStep(ni({ status: "reconciled", is_credit_note: true, approved: true, costPosted: false, known: false })).key).toBe("ferdig");
+    expect(nextInvoiceStep(ni({ status: "reconciled", is_credit_note: true, approved: true, costPosted: false, known: false })).key).toBe("status_ukjent");
+    expect(nextInvoiceStep(ni({ status: "reconciled", is_credit_note: true, ...extrasFromCounts(true, 0, 3) })).key).toBe("ferdig");
     expect(costProgress(0, 0).state).toBe("fullfort");
     expect(nextInvoiceStep(ni({ status: "reconciled", ...extrasFromCounts(true, 0, 0) })).key).toBe("ferdig");
   });

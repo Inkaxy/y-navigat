@@ -8,7 +8,7 @@ import { approveInvoiceInternal } from "@/fakturaer/lib/approval";
 import { postSafeCosts } from "@/fakturaer/lib/costPosting";
 import { creditNoteOriginalRef } from "@/fakturaer/lib/creditNote";
 import { useInvoiceDeliveryStatus, extrasFor } from "@/ravarer/hooks/useInvoiceDeliveryStatus";
-import { deliverySteps, nextInvoiceStep } from "./invoiceSteps";
+import { deliverySteps, nextInvoiceStep, noSafeKey } from "./invoiceSteps";
 import { invalidateInvoiceWork } from "./useInvoiceActions";
 
 export type StepResult = { title: string; items: string[]; error?: boolean; undoable?: boolean } | null;
@@ -56,7 +56,7 @@ export function useInvoiceSteps(data: InvoiceDetailData | undefined) {
         ...base, ...extras, source: data.source, canReconcile: assessment.canReconcile, reconcileBlockedReason: assessment.reconcileBlockedReason,
         canWrite, canReconcileRight: canReconcile, canApprove: rights.canApprove, canPostCosts: rights.canWrite,
         creditNoteUnlinked: !!data.is_credit_note && !creditNoteOriginalRef(data.notes),
-        noSafeLines: noSafeFor === `${data.id}:${extras.costPostedLines ?? 0}`,
+        noSafeLines: noSafeFor === noSafeKey(data, extras.costPostedLines ?? 0),
       }),
     };
   }, [data, extrasQ.data, canWrite, canReconcile, rights.canApprove, rights.canWrite, noSafeFor]);
@@ -79,13 +79,13 @@ export function useInvoiceSteps(data: InvoiceDetailData | undefined) {
   }
 
   async function postCosts() {
-    if (!data) return;
+    if (!data || busy) return;
     setBusy(true);
     try {
       const [r] = await postSafeCosts([data.id]);
       if (r.error) setResult({ title: "Kostpris ble ikke ført", items: [r.error], error: true });
       else if (r.posted === 0) {
-        setNoSafeFor(`${data.id}:${extrasFor(extrasQ.data, data.id).costPostedLines ?? 0}`);
+        setNoSafeFor(noSafeKey(data, extrasFor(extrasQ.data, data.id).costPostedLines ?? 0));
         setResult({ title: "Ingen trygge linjer å føre", items: r.skipped ? [`${r.skipped} ${r.skipped === 1 ? "linje" : "linjer"} er ikke trygge nok for automatisk føring`] : [] });
       } else setResult({ title: `Kostpris ført for ${r.posted} ${r.posted === 1 ? "linje" : "linjer"}`, items: r.skipped ? [`${r.skipped} ${r.skipped === 1 ? "linje" : "linjer"} hoppet over (ikke trygge nok)`] : [] });
     } catch (e) {
