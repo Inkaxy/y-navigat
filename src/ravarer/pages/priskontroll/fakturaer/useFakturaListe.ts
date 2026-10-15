@@ -76,7 +76,7 @@ export function useFakturaListe(a: Args): FakturaListe {
 }
 
 /** Tellere for åpne fakturaer med samme regel som listene; brukes også av Oversikt. */
-export function openWorkCounts(all: readonly InboxInvoice[]): { trenger: number; klar: number; etterkontroll: number } {
+export function openWorkCounts(all: readonly Pick<InboxInvoice, "tab" | "internally_approved">[]): { trenger: number; klar: number; etterkontroll: number } {
   let trenger = 0, klar = 0, etterkontroll = 0;
   for (const i of all) {
     if (i.internally_approved) etterkontroll++;
