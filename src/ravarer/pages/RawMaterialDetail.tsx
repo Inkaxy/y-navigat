@@ -2,11 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useGuardedNavigate } from "@/providers/UnsavedGuardProvider";
 import { QueryState } from "@/components/common/QueryState";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { SellsAsSection } from "@/ravarer/components/stock/SellsAsSection";
-import { CompletenessStrip, ChecklistCard } from "@/ravarer/components/detail/Completeness";
-import { completenessChecklist, listContext, readSection, sectionSearch, sectionsFor, SECTION_LABEL, type SectionId } from "@/ravarer/lib/rawMaterialSections";
+import { ChecklistCard } from "@/ravarer/components/detail/Completeness";
+import { completenessChecklist, GROUP_LABEL, groupOf, groupSection, listContext, moreSections, readSection, SECTION_GROUPS, sectionSearch, SECTION_LABEL, type SectionId } from "@/ravarer/lib/rawMaterialSections";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -130,7 +129,8 @@ export default function RawMaterialDetail() {
   };
 
   const checklist = completenessChecklist({ rm, linkCount: page.links.length, nutrition: page.nutrition, hasDatasheet: page.hasDatasheet, costEvidence: priceEvidence.cost });
-  const sections = sectionsFor(rm.is_packaging);
+  const group = groupOf(section);
+  const more = moreSections(rm.is_packaging);
   const sectionHref = (sid: SectionId) => `${paths.raavare(rm.id)}${sectionSearch(searchParams, sid)}`;
   const openCount = checklist.filter((c) => c.status !== "ok").length;
   const cost = costSummary(rm, priceEvidence.cost);
@@ -157,14 +157,19 @@ export default function RawMaterialDetail() {
         </div>
       )}
 
-      {/* Gjeldende kostpris holdes synlig mens man jobber i andre seksjoner (samme tolkning som prisvisningen). */}
-      <div className="sticky top-0 z-20 -mx-1 border-b border-line-subtle bg-background/95 px-1 py-2 backdrop-blur">
-        <Link to={sectionHref("pris")} className="inline-flex flex-wrap items-baseline gap-x-2 rounded-md text-sm hover:underline" aria-label={`Kostpris ${cost.value} per ${rm.base_unit}, ${cost.status}`} data-testid="header-cost">
-            <span className="font-semibold tabular-nums">{cost.value}{cost.precise ? ` / ${rm.base_unit}` : ""}</span>
-            <span className={cost.verified ? "text-success" : "text-warning"}>{cost.status}</span>
-            {cost.precise && <span className="tabular-nums text-ink-secondary">{cost.precise}</span>}
-            {cost.source && <span className="text-ink-secondary">{cost.source}</span>}
+      {/* Én kompakt linje: gjeldende kostpris med status og kilde (samme tolkning som prisvisningen), alltid synlig. */}
+      <div className="sticky top-0 z-20 -mx-1 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-line-subtle bg-background/95 px-1 py-2 backdrop-blur">
+        <Link to={sectionHref("pris")} className="inline-flex min-h-[44px] flex-wrap items-center gap-x-2 rounded-md text-sm hover:underline" aria-label={`Kostpris ${cost.value} per ${rm.base_unit}, ${cost.status}`} data-testid="header-cost">
+          <span className="font-semibold tabular-nums">{cost.value}{cost.precise ? ` / ${rm.base_unit}` : ""}</span>
+          <span className={cost.verified ? "text-success" : "text-warning"}>{cost.status}</span>
+          {cost.precise && <span className="tabular-nums text-ink-secondary">{cost.precise}</span>}
+          {cost.source && <span className="text-ink-secondary">{cost.source}</span>}
+        </Link>
+        {openCount > 0 && (
+          <Link to={sectionHref("sammendrag")} className="inline-flex min-h-[44px] items-center text-sm text-warning hover:underline">
+            {openCount} {openCount === 1 ? "punkt mangler" : "punkter mangler"}
           </Link>
+        )}
       </div>
 
       {editingName && (
@@ -189,38 +194,35 @@ export default function RawMaterialDetail() {
         </div>
       )}
 
-      <CompletenessStrip items={checklist} hrefFor={sectionHref} />
-
-      <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <nav aria-label="Seksjoner på råvarekortet" className="hidden lg:block">
-          <ul className="sticky top-4 space-y-0.5">
-            {sections.map((sid) => (
+      {/* Hovedarbeid: Oversikt · Pakning og leverandør · Pris · Mer. Gamle `seksjon`-lenker åpner sin plass. */}
+      <nav aria-label="Seksjoner på råvarekortet" className="-mx-1 overflow-x-auto">
+        <ul className="flex min-w-max gap-1 border-b border-line-subtle px-1">
+          {SECTION_GROUPS.map((g) => (
+            <li key={g}>
+              <Link to={sectionHref(groupSection(g, rm.is_packaging))} replace aria-current={group === g ? "page" : undefined}
+                className={cn("inline-flex min-h-[44px] items-center gap-1.5 border-b-2 px-3 text-sm transition-colors",
+                  group === g ? "border-primary font-semibold text-foreground" : "border-transparent text-ink-secondary hover:text-foreground")}>
+                {GROUP_LABEL[g]}
+                {g === "oversikt" && openCount > 0 && <span className="text-caption tabular-nums text-warning">{openCount}</span>}
+              </Link>
+            </li>
+          ))}
+        </ul>
+        {group === "mer" && (
+          <ul className="mt-1 flex min-w-max flex-wrap gap-1 px-1" aria-label="Mer">
+            {more.map((sid) => (
               <li key={sid}>
-                <Link
-                  to={sectionHref(sid)}
-                  replace
-                  aria-current={section === sid ? "page" : undefined}
-                  className={cn(
-                    "flex min-h-10 items-center justify-between rounded-md px-3 text-sm transition-colors",
-                    section === sid ? "bg-muted font-semibold text-foreground" : "text-ink-secondary hover:bg-muted/60",
-                  )}
-                >
+                <Link to={sectionHref(sid)} replace aria-current={section === sid ? "page" : undefined}
+                  className={cn("inline-flex min-h-[44px] items-center rounded-md px-3 text-sm", section === sid ? "bg-muted font-medium text-foreground" : "text-ink-secondary hover:bg-muted/60")}>
                   {SECTION_LABEL[sid]}
-                  {sid === "sammendrag" && openCount > 0 && <span className="text-caption tabular-nums text-warning">{openCount}</span>}
                 </Link>
               </li>
             ))}
           </ul>
-        </nav>
-        <div className="lg:hidden">
-          <Select value={section} onValueChange={(v) => navigate(sectionHref(v as SectionId), { replace: true })}>
-            <SelectTrigger className="h-11" aria-label="Velg seksjon"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {sections.map((sid) => <SelectItem key={sid} value={sid}>{SECTION_LABEL[sid]}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
+        )}
+      </nav>
 
+      <div>
         <section aria-labelledby="rm-section-title" className="min-w-0 space-y-4">
           <h2 id="rm-section-title" className="font-display text-title">{SECTION_LABEL[section]}</h2>
           {section === "sammendrag" && (
