@@ -14,6 +14,8 @@ export type FakturaListe = {
   isLoading: boolean;
   /** Henter på nytt fra serveren akkurat nå (data kan være utdatert). */
   isFetching: boolean;
+  /** Viser forrige parametres data mens nye hentes — aldri grunnlag for valg/kvittering. */
+  isPlaceholderData: boolean;
   error: unknown;
   refetch: () => void;
   /** Tall fra den samlede listen over åpne fakturaer (alltid ekte totaler). */
@@ -53,6 +55,7 @@ export function useFakturaListe(a: Args): FakturaListe {
       total: remote.data?.total ?? 0,
       isLoading: remote.isLoading,
       isFetching: remote.isFetching || open.isFetching,
+      isPlaceholderData: remote.isPlaceholderData,
       error: remote.error,
       refetch: () => void remote.refetch(),
       openCounts,
@@ -67,6 +70,7 @@ export function useFakturaListe(a: Args): FakturaListe {
     total: list.length,
     isLoading: open.isLoading,
     isFetching: open.isFetching,
+    isPlaceholderData: open.isPlaceholderData ?? false,
     error: open.error,
     refetch: () => void open.refetch(),
     openCounts,
