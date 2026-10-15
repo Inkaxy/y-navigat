@@ -224,11 +224,12 @@ export default function RawMaterialDetail() {
 
       <div>
         <section aria-labelledby="rm-section-title" className="min-w-0 space-y-4">
-          <h2 id="rm-section-title" className="font-display text-title">{SECTION_LABEL[section]}</h2>
+          <h2 id="rm-section-title" className="sr-only">{SECTION_LABEL[section]}</h2>
           {section === "sammendrag" && (
             <>
-              <RawMaterialKpiStrip rm={rm} evidence={priceEvidence} links={page.links} recipeCount={page.recipeCount} spend12m={stats?.cost_12m ?? null} />
+              {/* Det som mangler først; nøkkeltall etterpå. */}
               <ChecklistCard items={checklist} hrefFor={sectionHref} />
+              <RawMaterialKpiStrip rm={rm} evidence={priceEvidence} links={page.links} recipeCount={page.recipeCount} spend12m={stats?.cost_12m ?? null} />
             </>
           )}
           {section === "pris" && <SuppliersTab rm={rm} part="pris" />}
