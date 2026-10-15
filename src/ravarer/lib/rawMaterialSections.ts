@@ -150,3 +150,27 @@ function nutritionCheck(n: CheckInput["nutrition"]): CheckItem {
     case "verifisert": return { ...base, status: "ok", detail: "Fullstendig og verifisert" };
   }
 }
+
+/** Hovedarbeid på råvarekortet: tre faste grupper + «Mer». Seksjons-URL-ene er uendret. */
+export const SECTION_GROUPS = ["oversikt", "pakning", "pris", "mer"] as const;
+export type SectionGroup = (typeof SECTION_GROUPS)[number];
+export const GROUP_LABEL: Record<SectionGroup, string> = { oversikt: "Oversikt", pakning: "Pakning og leverandør", pris: "Pris", mer: "Mer" };
+const GROUP_SECTION: Record<Exclude<SectionGroup, "mer">, SectionId> = { oversikt: "sammendrag", pakning: "leverandorer", pris: "pris" };
+
+export function groupOf(s: SectionId): SectionGroup {
+  if (s === "sammendrag") return "oversikt";
+  if (s === "leverandorer") return "pakning";
+  if (s === "pris") return "pris";
+  return "mer";
+}
+
+/** Seksjonen en gruppe åpner. «Mer» åpner første tilgjengelige underseksjon. */
+export function groupSection(g: SectionGroup, isPackaging: boolean): SectionId {
+  if (g !== "mer") return GROUP_SECTION[g];
+  return moreSections(isPackaging)[0];
+}
+
+/** Underseksjonene under «Mer» (næring, deklarasjon, bruk, lager, grunndata, historikk). */
+export function moreSections(isPackaging: boolean): SectionId[] {
+  return sectionsFor(isPackaging).filter((s) => groupOf(s) === "mer");
+}

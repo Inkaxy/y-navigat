@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { lazyWithReload as lazy } from "@/lib/lazyWithReload";
 import { Link, useSearchParams } from "react-router-dom";
 import { useGuardedNavigate } from "@/providers/UnsavedGuardProvider";
@@ -16,12 +16,27 @@ const Tripletex = lazy(() => import("@/ravarer/pages/innstillinger/TripletexSett
 const Kategorier = lazy(() => import("@/ravarer/pages/innstillinger/KategorierSettings"));
 const AiTjenester = lazy(() => import("@/ravarer/pages/innstillinger/AiServicesSettings"));
 
-const SECTIONS: { id: InnstillingSeksjon; label: string; adminOnly?: boolean }[] = [
-  { id: "priskontroll", label: "Priskontroll" },
-  { id: "tripletex", label: "Tripletex" },
-  { id: "kategorier", label: "Kategorier" },
-  { id: "ai", label: "AI-tjenester", adminOnly: true },
+type Entry = { id: InnstillingSeksjon; del?: string; label: string; hint: string; adminOnly?: boolean };
+/**
+ * Tre norske avsnitt over de faktiske innstillingene. Verdiene ligger der de alltid har ligget;
+ * «del» ruller bare til riktig kort i samme seksjon (én kladd, én lagringslinje).
+ */
+const GROUPS: { title: string; entries: Entry[] }[] = [
+  { title: "Automatisk behandling", entries: [
+    { id: "priskontroll", del: "automatikk", label: "Matching og automatikk", hint: "Når linjer kobles og fakturaer avstemmes uten deg" },
+    { id: "priskontroll", del: "startpris", label: "Startpris", hint: "Første dokumenterte pris fra en leverandør" },
+  ] },
+  { title: "Hva må kontrolleres", entries: [
+    { id: "priskontroll", del: "prisavvik", label: "Prisavvik", hint: "Grenser for når en pris må vurderes" },
+    { id: "priskontroll", del: "kategori", label: "Toleranse per kategori", hint: "Egne grenser for varekategorier" },
+    { id: "kategorier", label: "Kategorier", hint: "Kategoriene varene sorteres i" },
+  ] },
+  { title: "Integrasjoner", entries: [
+    { id: "tripletex", label: "Tripletex", hint: "Import av fakturaer" },
+    { id: "ai", label: "AI-tjenester", hint: "Modell og tilkobling (plattformadministrator)", adminOnly: true },
+  ] },
 ];
+const keyOf = (e: Entry) => `${e.id}:${e.del ?? ""}`;
 
 /** Én innstillingsside med seksjonsnavigasjon. Krever Råvarer-nivå approve eller admin. */
 export default function RavarerInnstillinger() {
@@ -29,9 +44,19 @@ export default function RavarerInnstillinger() {
   const { data: isPlatformAdmin = false } = usePlatformAdmin();
   const [sp] = useSearchParams();
   const navigate = useGuardedNavigate();
-  const sections = SECTIONS.filter((s) => !s.adminOnly || isPlatformAdmin);
+  const groups = GROUPS.map((g) => ({ ...g, entries: g.entries.filter((e) => !e.adminOnly || isPlatformAdmin) }));
+  const entries = groups.flatMap((g) => g.entries);
   const wanted = sp.get("seksjon");
-  const active = sections.find((s) => s.id === wanted)?.id ?? "priskontroll";
+  const active: InnstillingSeksjon = entries.find((e) => e.id === wanted)?.id ?? "priskontroll";
+  const del = active === "priskontroll" ? sp.get("del") : null;
+  const activeKey = `${active}:${del ?? (active === "priskontroll" ? "automatikk" : "")}`;
+  const hrefOf = (e: Entry) => paths.innstillinger({ seksjon: e.id, ...(e.del ? { del: e.del } : {}) });
+  // Rull til kortet når innholdet er lastet; finnes det ikke, skjer ingenting.
+  useEffect(() => {
+    if (!del) return;
+    const t = window.setTimeout(() => document.getElementById(`innst-${del}`)?.scrollIntoView({ block: "start", behavior: "smooth" }), 150);
+    return () => window.clearTimeout(t);
+  }, [del, active]);
   const allowed = accessLevel === "approve" || accessLevel === "admin";
 
   if (loading) return <QueryLoadingState rows={4} />;
@@ -40,29 +65,30 @@ export default function RavarerInnstillinger() {
   }
 
   return (
-    <ModulePage eyebrow={RAVARER_EYEBROW} title="Innstillinger">
+    <ModulePage eyebrow={RAVARER_EYEBROW} title="Innstillinger" compact>
       <div className="grid gap-6 md:grid-cols-[200px_1fr]">
         <nav aria-label="Innstillinger" className="hidden md:block">
-          <ul className="space-y-1">
-            {sections.map((s) => (
-              <li key={s.id}>
-                <Link
-                  to={paths.innstillinger({ seksjon: s.id })}
-                  replace
-                  aria-current={s.id === active ? "page" : undefined}
-                  className={cn("block rounded-md px-3 py-2 text-sm", s.id === active ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:bg-muted")}
-                >
-                  {s.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
+          {groups.map((g) => (
+            <div key={g.title} className="mb-4">
+              <h2 className="mb-1 px-3 text-caption font-semibold uppercase tracking-wide text-ink-secondary">{g.title}</h2>
+              <ul className="space-y-0.5">
+                {g.entries.map((e) => (
+                  <li key={keyOf(e)}>
+                    <Link to={hrefOf(e)} replace aria-current={keyOf(e) === activeKey ? "page" : undefined} title={e.hint}
+                      className={cn("flex min-h-[44px] items-center rounded-md px-3 text-sm", keyOf(e) === activeKey ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:bg-muted")}>
+                      {e.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </nav>
         <div className="md:hidden">
-          <Select value={active} onValueChange={(v) => navigate(paths.innstillinger({ seksjon: v as InnstillingSeksjon }), { replace: true })}>
-            <SelectTrigger aria-label="Velg seksjon" className="min-h-[44px]"><SelectValue /></SelectTrigger>
+          <Select value={entries.find((e) => keyOf(e) === activeKey) ? activeKey : keyOf(entries[0])} onValueChange={(v) => { const e = entries.find((x) => keyOf(x) === v); if (e) navigate(hrefOf(e), { replace: true }); }}>
+            <SelectTrigger aria-label="Velg innstilling" className="min-h-[44px]"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {sections.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
+              {groups.map((g) => g.entries.map((e) => <SelectItem key={keyOf(e)} value={keyOf(e)}>{g.title} · {e.label}</SelectItem>))}
             </SelectContent>
           </Select>
         </div>

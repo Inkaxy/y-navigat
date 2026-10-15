@@ -37,7 +37,8 @@ export default function PriskontrollPage() {
   return (
     <ModulePage
       eyebrow={RAVARER_EYEBROW}
-      title="Priskontroll"
+      title="Fakturaer"
+      compact
       fullBleed
       actions={
         <>

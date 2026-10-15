@@ -16,6 +16,16 @@ const StockLedger = lazy(() => import("@/ravarer/components/stock/StockLedger").
 const MarginTable = lazy(() => import("@/ravarer/components/stock/MarginTable").then(m => ({ default: m.MarginTable })));
 const ReorderSuggestions = lazy(() => import("@/ravarer/components/stock/ReorderSuggestions").then(m => ({ default: m.ReorderSuggestions })));
 
+/** Begrepene holdes atskilt: teoretisk beholdning er beregnet, telling er faktisk opptalt, varemottak er registrert mottak. */
+export const LAGER_BEGREP: Record<LagerTab, string> = {
+  beholdning: "Teoretisk beholdning: beregnet fra varemottak, forbruk og justeringer — ikke en opptelling.",
+  varemottak: "Varemottak: mengde som er registrert mottatt. En kreditnota for kompensasjon gir ingen lagerføring.",
+  telling: "Varetelling: faktisk opptalt mengde. Lageret justeres aldri automatisk fra en telling.",
+  bevegelser: "Bevegelser: hver registrert endring i teoretisk beholdning, med kilde.",
+  fortjeneste: "Fortjeneste: margin beregnet fra registrert kostpris.",
+  bestilling: "Bestilling: forslag ut fra teoretisk beholdning og minimum.",
+};
+
 /** Faner som holdes montert etter første besøk: utkast og filtre overlever fanebytte. */
 const KEEP_ALIVE: LagerTab[] = ["telling", "bevegelser"];
 
@@ -53,8 +63,10 @@ export default function LagerHub() {
     <ModulePage
       eyebrow={RAVARER_EYEBROW}
       title="Lager"
+      compact
       tabs={<SectionTabs ariaLabel="Lager" tabs={lagerTabs(summary)} defaultTab="beholdning" clearParams={LAGER_TAB_PARAMS} />}
     >
+      <p className="px-0.5 text-caption text-ink-secondary" role="note" data-testid="lager-begrep">{LAGER_BEGREP[tab]}</p>
       <Suspense fallback={<QueryLoadingState rows={6} />}>
         {pane("beholdning", <Lager />)}
         {pane("varemottak", <Varemottak />)}

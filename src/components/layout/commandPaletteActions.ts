@@ -10,7 +10,7 @@ export function buildRavarerActions(a: { canRead: boolean; canWrite: boolean; ha
   if (a.canWrite) out.push({ to: paths.varer({ ny: "1" }), label: "Ny råvare", icon: Plus });
   if (a.hasInvoiceAccess) {
     out.push({ to: paths.importFaktura(), label: "Importer faktura", icon: FileUp });
-    out.push({ to: paths.priskontroll(), label: "Åpne priskontroll", icon: ScanSearch });
+    out.push({ to: paths.priskontroll(), label: "Åpne fakturaer", icon: ScanSearch });
   }
   out.push({ to: paths.varer(), label: "Åpne vareliste", icon: Wheat });
   return out;

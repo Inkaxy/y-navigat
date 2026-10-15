@@ -45,10 +45,10 @@ export default function MatchToleranserPage() {
               Selskapet har ingen lagrede innstillinger ennå. Feltene viser standardverdiene som gjelder nå; ingenting lagres før du trykker «Lagre endringer».
             </p>
           )}
-          <TieredPriceSettings draft={m.draft} update={m.update} disabled={dis} legalEntityId={legalEntityId} canWrite={canEdit} />
-          <MatchingCard d={m.draft} update={m.update} disabled={dis} />
-          <StartPriceCard d={m.draft} update={m.update} disabled={dis} />
-          <CategoryCard d={m.draft} update={m.update} disabled={dis} baseRows={m.baseRows} cats={cats} />
+          <div id="innst-prisavvik" className="scroll-mt-24"><TieredPriceSettings draft={m.draft} update={m.update} disabled={dis} legalEntityId={legalEntityId} canWrite={canEdit} /></div>
+          <div id="innst-automatikk" className="scroll-mt-24"><MatchingCard d={m.draft} update={m.update} disabled={dis} /></div>
+          <div id="innst-startpris" className="scroll-mt-24"><StartPriceCard d={m.draft} update={m.update} disabled={dis} /></div>
+          <div id="innst-kategori" className="scroll-mt-24"><CategoryCard d={m.draft} update={m.update} disabled={dis} baseRows={m.baseRows} cats={cats} /></div>
           {m.errors.length > 0 && (
             <ul role="alert" className="space-y-1 rounded-md border border-destructive/40 p-2 text-caption text-destructive">
               {m.errors.map((e) => <li key={e}>{e}</li>)}
