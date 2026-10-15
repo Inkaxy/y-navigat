@@ -4,13 +4,28 @@ export type SupplierSectionId = (typeof SUPPLIER_SECTIONS)[number];
 
 export const SUPPLIER_SECTION_LABEL: Record<SupplierSectionId, string> = {
   oversikt: "Oversikt",
-  varer: "Varer",
+  varer: "Varer og pakninger",
   avtaler: "Avtaler",
   fakturaer: "Fakturaer",
   aliaser: "Aliaser",
   forhandlinger: "Forhandlinger",
   notater: "Notater",
 };
+
+/** Tre hovedinnganger + «Mer». Seksjons-URL-ene (`?seksjon=`) er uendret. */
+export const SUPPLIER_GROUPS = ["oversikt", "varer", "avtaler", "mer"] as const;
+export type SupplierGroup = (typeof SUPPLIER_GROUPS)[number];
+export const SUPPLIER_GROUP_LABEL: Record<SupplierGroup, string> = { oversikt: "Oversikt", varer: "Varer og pakninger", avtaler: "Avtaler", mer: "Mer" };
+const MORE: SupplierSectionId[] = ["fakturaer", "aliaser", "forhandlinger", "notater"];
+export function supplierGroupOf(s: SupplierSectionId): SupplierGroup {
+  return s === "oversikt" || s === "varer" || s === "avtaler" ? s : "mer";
+}
+export function supplierGroupSections(g: SupplierGroup): SupplierSectionId[] {
+  return g === "mer" ? MORE : [g];
+}
+export function supplierGroupSection(g: SupplierGroup): SupplierSectionId {
+  return supplierGroupSections(g)[0];
+}
 
 /** Ukjent eller manglende seksjon → oversikt (aldri tom side). */
 export function readSupplierSection(sp: URLSearchParams): SupplierSectionId {
