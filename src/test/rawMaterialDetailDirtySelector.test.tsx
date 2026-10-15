@@ -93,7 +93,7 @@ describe("RawMaterialDetail — ekte mobil seksjonsvelger med ulagret vakt", () 
   it("Bli på siden: seksjonen og utkastet beholdes", async () => {
     renderAt("/ravarer/varer/A?seksjon=naering&liste=alle");
     fireEvent.change(screen.getByLabelText("Næringsfelt"), { target: { value: "12" } });
-    await pickSection("Historikk");
+    await pickSection("Mer · Historikk");
     fireEvent.click(await screen.findByRole("button", { name: "Bli på siden" }));
     expect(new URLSearchParams(loc).get("seksjon")).toBe("naering");
     expect((screen.getByLabelText("Næringsfelt") as HTMLInputElement).value).toBe("12");
@@ -102,7 +102,7 @@ describe("RawMaterialDetail — ekte mobil seksjonsvelger med ulagret vakt", () 
   it("Forkast endringer: navigerer til valgt seksjon og beholder listekonteksten", async () => {
     renderAt("/ravarer/varer/A?seksjon=naering&liste=alle");
     fireEvent.change(screen.getByLabelText("Næringsfelt"), { target: { value: "12" } });
-    await pickSection("Historikk");
+    await pickSection("Mer · Historikk");
     fireEvent.click(await screen.findByRole("button", { name: "Forkast endringer" }));
     await waitFor(() => expect(new URLSearchParams(loc).get("seksjon")).toBe("historikk"));
     expect(new URLSearchParams(loc).get("liste")).toBe("alle");
@@ -111,7 +111,7 @@ describe("RawMaterialDetail — ekte mobil seksjonsvelger med ulagret vakt", () 
 
   it("uten ulagrede endringer bytter velgeren direkte", async () => {
     renderAt("/ravarer/varer/A?seksjon=naering");
-    await pickSection("Historikk");
+    await pickSection("Mer · Historikk");
     await waitFor(() => expect(new URLSearchParams(loc).get("seksjon")).toBe("historikk"));
   });
 });
