@@ -137,7 +137,11 @@ export function LineTask(p: LineTaskProps) {
   const shownStatus = priceBlocked ? { ...status, label: isCredit ? "Kreditnota" : "Prisgrunnlag til kontroll" } : status;
   const missingText = priceBlocked
     ? (isCredit ? "Kreditnota – ikke en prisendring. Koble den til opprinnelig faktura; beløpene vises som på dokumentet." : `${priceGate.label}. ${priceGate.detail}`)
-    : copy.missing;
+    : (mode === "package" || mode === "material") && measured.kind === "direct"
+      ? "Mengden er målt direkte på fakturaen. Bekreft råvaren – ingen pakning trengs eller lagres."
+      : mode === "package" && measured.kind !== "package"
+        ? measured.text
+        : copy.missing;
   const [acceptBusy, setAcceptBusy] = useState(false);
   async function acceptPrice() {
     setError(null);
@@ -370,11 +374,11 @@ export function LineTask(p: LineTaskProps) {
           </div>
         )}
 
-        {(mode === "material" || mode === "package") && form.selectedRmId && (
+        {(mode === "material" || mode === "package") && form.selectedRmId && (measured.kind === "direct" || measured.kind === "package") && (
           <div className="rounded-md bg-muted/40 px-3 py-2 text-caption">
             <span className="font-medium">Dette lagres: </span>
             kobling til {rmName ?? "valgt råvare"}
-            {mode === "package" || pkgOk ? `, pakningen som bekreftet for ${supplier} (brukes på senere fakturaer)` : ", pakningen som forslag"}
+            {measured.kind === "direct" ? " med målt mengde (ingen pakning lagres eller bekreftes)" : mode === "package" || pkgOk ? `, pakningen som bekreftet for ${supplier} (brukes på senere fakturaer)` : ", pakningen som forslag"}
             {form.rememberSku || form.rememberName ? `, og ${supplier}s ${[form.rememberSku && "varenummer", form.rememberName && "varetekst"].filter(Boolean).join(" og ")} huskes for denne råvaren` : ""}.{" "}
             <button type="button" className="underline underline-offset-2" aria-expanded={showScope} onClick={() => setShowScope((v) => !v)}>
               Endre
