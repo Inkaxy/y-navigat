@@ -14,7 +14,7 @@ import { fmtNum, normalizeUnit, parsePackageFromDescription } from "@/fakturaer/
  * enhet som kan regnes om til den). Regnestykket viser bare det beregningen
  * faktisk bruker, og det er det samme tallet som lagres.
  */
-export function PackageForm({ line, form }: { line: ReviewLineRow; form: LineMatchForm }) {
+export function PackageForm({ line, form, onCorrectLine }: { line: ReviewLineRow; form: LineMatchForm; onCorrectLine?: () => void }) {
   const unit = line.unit ?? "fakturert enhet";
   const base = normalizeUnit(form.selectedRm?.base_unit) ?? form.selectedRm?.base_unit ?? null;
   const parsed = parsePackageFromDescription(line.description);
