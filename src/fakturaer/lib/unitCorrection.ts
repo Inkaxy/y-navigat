@@ -1,8 +1,10 @@
 // Ren logikk for «Rett fakturert enhet»: bare `unit` sendes til rm_correct_invoice_line. Ingen tall endres.
-import { CONTAINER_OPTIONS, CONTENT_UNITS } from "@/fakturaer/lib/packageSpec";
+// Valgene kommer fra den felles kanoniske lista i units.ts (grunnenheter + pakningsenheter, inkl. «bulk»),
+// ikke en egen kortliste. «bulk» er leveringsmåte for løs, veid vare — ingen fast størrelse.
+import { CANONICAL_BASE_UNITS, CANONICAL_PACKAGE_UNITS } from "@/fakturaer/lib/units";
 
 export function unitCorrectionOptions(current: string | null): string[] {
-  const all = [...CONTAINER_OPTIONS, ...CONTENT_UNITS.filter((u) => u !== "stk")];
+  const all: string[] = [...CANONICAL_BASE_UNITS, ...CANONICAL_PACKAGE_UNITS];
   const cur = (current ?? "").trim().toLowerCase();
   return all.filter((u, i) => all.indexOf(u) === i && u !== cur);
 }

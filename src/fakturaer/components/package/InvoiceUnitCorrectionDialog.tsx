@@ -83,6 +83,11 @@ export function InvoiceUnitCorrectionDialog({ open, onOpenChange, lineId, invoic
                 <SelectTrigger id={`unitfix-${frozenId}`} className="mt-1 min-h-[44px]"><SelectValue placeholder="Velg enhet" /></SelectTrigger>
                 <SelectContent>{unitCorrectionOptions(before).map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
               </Select>
+              {unit === "bulk" && (
+                <p className="mt-1 text-caption text-muted-foreground" data-testid="unit-bulk-hint">
+                  Bulk er leveringsmåte for løs, veid vare (f.eks. silo). Mengden må stå i kg på fakturaen – ingen fast pakningsstørrelse gjettes.
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor={`unitfix-reason-${frozenId}`} className="text-caption">Begrunnelse</Label>
