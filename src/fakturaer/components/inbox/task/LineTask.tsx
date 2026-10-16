@@ -20,6 +20,7 @@ import type { LineStatus } from "@/fakturaer/lib/lineStatus";
 import { LineStatusBadge } from "@/fakturaer/components/inbox/LineStatusBadge";
 import { MaterialPicker } from "@/fakturaer/components/inbox/task/MaterialPicker";
 import { PackageForm } from "@/fakturaer/components/inbox/task/PackageForm";
+import { measuredBasis } from "@/fakturaer/lib/measuredUnit";
 import { usePriceGate } from "@/fakturaer/lib/priceGateContext";
 import { PriceCheck } from "@/fakturaer/components/inbox/task/PriceCheck";
 import { OpenSupplierItemButton } from "@/fakturaer/components/supplier-item/OpenSupplierItemButton";
@@ -91,7 +92,10 @@ export function LineTask(p: LineTaskProps) {
   const readIssue = clarifications.find((c) => c.id === "read_issue") ?? null;
   const dataInconsistent = readIssue != null;
   const discount = registeredDiscount(line);
-  const pkgValid = form.packageDraft.state === "valid" && !!form.cost && !form.cost.needsInput && !!form.selectedRm;
+ const measured = measuredBasis(line.unit, line.quantity, form.selectedRm?.base_unit ?? null);
+  // Målt enhet (kg mot kg osv.): ingen pakning spørres eller bekreftes – heller ikke fra en leverandørsekk.
+  const measuredDirect = measured.kind === "direct" || measured.kind === "credit";
+  const pkgValid = !measuredDirect && form.packageDraft.state === "valid" && !!form.cost && !form.cost.needsInput && !!form.selectedRm;
   const pkgHint =
     form.materialLoading
       ? "Henter råvaren …"
@@ -176,12 +180,12 @@ export function LineTask(p: LineTaskProps) {
   } else if (mode === "material") {
     primary = {
       label: pkgOk ? "Bekreft råvare og pakning og fortsett" : "Bekreft råvare og fortsett",
-      run: form.selectedRmId && form.selectedRm && form.packageDraft.state !== "invalid" ? () => void save(pkgOk && pkgValid) : null,
+      run: form.selectedRmId && form.selectedRm && (measuredDirect || form.packageDraft.state !== "invalid") ? () => void save(!measuredDirect && pkgOk && pkgValid) : null,
       hint: !form.selectedRmId
         ? "Velg en råvare først."
         : form.materialLoading
           ? "Henter råvaren …"
-          : form.packageDraft.state === "invalid"
+          : !measuredDirect && form.packageDraft.state === "invalid"
             ? form.packageDraft.reason
             : "Pakning og pris kontrolleres på nytt etter lagring.",
     };
