@@ -745,7 +745,26 @@ export function resolveLineCost(input: ResolveLineCostInput): ResolveLineCostRes
   }
 
   const invoiceUnit = normalizeUnit(input.unit);
-  const pkg = resolvePackageContent(input);
+  // «bulk» er løs, veid levering (silo) — ingen fast størrelse. Leverandørens/varens
+  // sekkepakning eller beskrivelsen skal ALDRI gi «1 bulk = 25 kg» eller en gjettet
+  // silokapasitet. Bare linjens egen dokumenterte vekt (package_size i måleenhet) brukes.
+  let pkg: PackageResolution | null;
+  if (invoiceUnit === "bulk") {
+    const lineSize = toNum(input.packageSize);
+    const lineCount = toNum(input.countPerPackage);
+    const f = lineSize && lineSize > 0 ? toBaseFactor(input.packageUnit, base) : null;
+    if (f == null || !lineSize || !isBaseUnit(normalizeUnit(input.packageUnit))) {
+      return emptyResult(
+        "package_size",
+        `Linjen er ført som «bulk» uten levert vekt. Oppgi faktisk levert ${base} – bruk ${base} som enhet når mengden på fakturaen er i ${base}. ` +
+          `Bulk regnes aldri om med sekkestørrelse eller silokapasitet.`,
+        checks,
+      );
+    }
+    pkg = { baseUnitsPerPackage: lineSize * (lineCount && lineCount > 0 ? lineCount : 1) * f, source: "line", packageUnitLabel: "bulk" };
+  } else {
+    pkg = resolvePackageContent(input);
+  }
   const bupp = pkg?.unresolved ? null : (pkg?.baseUnitsPerPackage ?? null);
 
   // 2) Kandidater
