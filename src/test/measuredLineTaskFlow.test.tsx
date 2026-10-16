@@ -132,7 +132,7 @@ describe("Målt mengde i pakningsmodus — ingen blindvei", () => {
     expect(screen.queryByText(/Hvor mye inneholder/)).toBeNull();
     expect(screen.queryByText(/pakningen må bekreftes/)).toBeNull();
     expect(screen.queryByText(/pakningen som bekreftet/)).toBeNull();
-    expect(screen.getByText(/ingen pakning lagres eller bekreftes/)).toBeTruthy();
+    expect(screen.getAllByText(/ingen pakning lagres eller bekreftes/).length).toBeGreaterThan(0);
     const btn = await screen.findByRole("button", { name: /registrert målt mengde og fortsett/ });
     await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(btn);
