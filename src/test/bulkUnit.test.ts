@@ -23,13 +23,15 @@ describe("bulklevering med varierende levert kg", () => {
   it("levert kg × pris per kg gir kost uten fast pakning eller leverandørbekreftelse", () => {
     for (const kg of [23840, 27115.5]) {
       const r = resolveLineCost({ quantity: kg, unit: "kg", unitPrice: 6.2, totalAmount: kg * 6.2, baseUnit: "kg", description: "Hvetemel bulk silo" });
-      expect(r.costPerBaseUnit).toBeCloseTo(6.2, 4);
+      expect(r.needsInput).toBeNull();
+      expect(r.pricePerBaseUnit).toBeCloseTo(6.2, 4);
+      expect(r.baseQuantity).toBeCloseTo(kg, 4);
       expect(r.basis).not.toBe("pakning");
     }
   });
   it("tvetydig bulk uten kg-grunnlag gir ingen gjettet kapasitet", () => {
     const r = resolveLineCost({ quantity: 1, unit: "bulk", unitPrice: 150000, totalAmount: 150000, baseUnit: "kg", description: "Hvetemel bulk" });
-    expect(r.costPerBaseUnit ?? null).toBeNull();
+    expect(r.needsInput).toBe("package_size");
     expect(r.reason ?? "").not.toBe("");
   });
 });
