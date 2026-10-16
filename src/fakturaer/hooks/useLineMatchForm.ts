@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { measuredBasis } from "@/fakturaer/lib/measuredUnit";
 import { invalidateInvoice, invalidateRawMaterial } from "@/ravarer/lib/invalidate";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import { parseDecimal, resolveLineCost } from "@/fakturaer/lib/units";
@@ -277,8 +278,12 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
   async function save(opts: { applyToAll?: boolean; confirmPackage?: boolean } = {}): Promise<AcceptMatchResult & { stale: boolean }> {
     if (!line || !selectedRmId) throw new Error("Velg en råvare først");
     if (!selectedRm) throw new Error("Råvaren er ikke lastet ennå");
-    const wantsConfirm = opts.confirmPackage ?? confirmPackage;
-    if (packageDraft.state === "invalid") throw new Error("Ugyldig pakning");
+    // Målt enhet (kg mot kg, også kreditlinjer): pakningen er irrelevant og skjult.
+    // Skjult/gammel pakningstekst valideres ikke og sendes aldri, og ingenting bekreftes.
+    const mk = measuredBasis(line.unit, line.quantity, selectedRm.base_unit).kind;
+    const measuredDirect = mk === "direct" || mk === "credit";
+    const wantsConfirm = measuredDirect ? false : (opts.confirmPackage ?? confirmPackage);
+    if (!measuredDirect && packageDraft.state === "invalid") throw new Error("Ugyldig pakning");
     if (wantsConfirm && packageDraft.state !== "valid") throw new Error("Pakningen må fylles inn før den kan bekreftes");
     const lineId = line.id;
     setBusy(true);
@@ -294,7 +299,9 @@ export function useLineMatchForm(line: ReviewLineRow | null, resetKey: unknown =
         // Bare et bevisst utkast (bekreftet eller endret) sendes som pakning;
         // ellers samme forslag som før, så en lagring av f.eks. avtalepris ikke
         // overskriver kjent pakning med et ubekreftet standardforslag.
-        ...(packageDraft.state === "valid" && (wantsConfirm || packageTouched)
+        ...(measuredDirect
+          ? { packageSize: null, packageUnit: null, baseUnitsPerPackage: null }
+          : packageDraft.state === "valid" && (wantsConfirm || packageTouched)
           ? { packageSize: packageDraft.size, packageUnit: packageDraft.unit, baseUnitsPerPackage: packageDraft.baseUnitsPerPackage }
           : { packageSize: parseDecimal(packageSize), packageUnit: packageUnit.trim() || null, baseUnitsPerPackage: cost?.baseUnitsPerPackage ?? null }),
         agreedPricePerBaseUnit: agreedTouched ? parseDecimal(agreedPrice) : null,

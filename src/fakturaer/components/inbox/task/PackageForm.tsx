@@ -51,8 +51,11 @@ export function PackageForm({ line, form }: { line: ReviewLineRow; form: LineMat
     return (
       <div className="space-y-2" data-testid="measured-basis">
         <p className={warn ? "rounded-md bg-warning/10 px-3 py-2 text-caption text-warning" : "rounded-md bg-muted/60 px-3 py-2 text-sm"} aria-live="polite">{measured.text}</p>
+        {(measured.kind === "needs_kg" || measured.kind === "missing_quantity") && onCorrectLine && (
+          <Button size="sm" className="min-h-[44px]" onClick={onCorrectLine}>Rett fakturalinje (oppgi levert {base})</Button>
+        )}
         {measured.kind === "needs_kg" && (
-          <Button size="sm" variant="outline" className="min-h-[44px]" onClick={() => setUnitFix(true)}>Rett fakturert enhet</Button>
+          <Button size="sm" variant="outline" className="min-h-[44px]" onClick={() => setUnitFix(true)}>Rett bare fakturert enhet</Button>
         )}
         {unitFix && <InvoiceUnitCorrectionDialog open onOpenChange={setUnitFix} lineId={line.id} />}
       </div>
