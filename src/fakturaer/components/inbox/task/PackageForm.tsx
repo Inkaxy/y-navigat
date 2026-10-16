@@ -6,6 +6,7 @@ import { initialContainer } from "@/fakturaer/lib/packageSpec";
 import { Button } from "@/components/ui/button";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 import type { LineMatchForm } from "@/fakturaer/hooks/useLineMatchForm";
+import { measuredBasis } from "@/fakturaer/lib/measuredUnit";
 import { fmtNum, normalizeUnit, parsePackageFromDescription } from "@/fakturaer/lib/units";
 
 /**
@@ -43,6 +44,20 @@ export function PackageForm({ line, form }: { line: ReviewLineRow; form: LineMat
     );
   }
   if (!base) return <p className="text-caption text-ink-secondary">Velg råvare for å fylle inn pakningen.</p>;
+
+  const measured = measuredBasis(line.unit, line.quantity, base);
+  if (measured.kind !== "package") {
+    const warn = measured.kind !== "direct";
+    return (
+      <div className="space-y-2" data-testid="measured-basis">
+        <p className={warn ? "rounded-md bg-warning/10 px-3 py-2 text-caption text-warning" : "rounded-md bg-muted/60 px-3 py-2 text-sm"} aria-live="polite">{measured.text}</p>
+        {measured.kind === "needs_kg" && (
+          <Button size="sm" variant="outline" className="min-h-[44px]" onClick={() => setUnitFix(true)}>Rett fakturert enhet</Button>
+        )}
+        {unitFix && <InvoiceUnitCorrectionDialog open onOpenChange={setUnitFix} lineId={line.id} />}
+      </div>
+    );
+  }
 
   const isPieces = base === "stk";
   const used = cost && !cost.needsInput ? cost.baseUnitsPerPackage : null;
