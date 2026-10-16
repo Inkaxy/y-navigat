@@ -189,6 +189,19 @@ export function LineTask(p: LineTaskProps) {
             ? form.packageDraft.reason
             : "Pakning og pris kontrolleres på nytt etter lagring.",
     };
+  } else if (mode === "package" && measured.kind === "direct") {
+    primary = {
+      label: "Bekreft råvare og registrert målt mengde og fortsett",
+      run: form.selectedRmId && form.selectedRm ? () => void save(false) : null,
+      hint: "Mengden er målt direkte; ingen pakning lagres eller bekreftes.",
+    };
+  } else if (mode === "package" && measured.kind !== "package") {
+    // Kreditlinje / bulk uten vekt / manglende mengde: aldri kost- eller pakningsgodkjenning herfra.
+    primary = {
+      label: "Rett fakturalinje",
+      run: p.onCorrectLine ? () => p.onCorrectLine?.(line) : null,
+      hint: measured.text,
+    };
   } else if (mode === "package") {
     primary = {
       label: "Bekreft pakning og fortsett",
@@ -314,7 +327,7 @@ export function LineTask(p: LineTaskProps) {
           <SummaryRow label="Råvare" value={`${rmName} · ${itemTypeText(form.selectedRm?.item_type ?? line.matched_raw_material?.item_type ?? null)}${baseUnit ? ` · per ${baseUnit}` : ""}`} action={p.canWrite ? { label: "Endre", run: () => setEditMaterial(true) } : null} />
         )}
         {mode === "material" && <MaterialPicker form={form} lineId={line.id} />}
-        {(mode === "package" || (mode === "material" && form.selectedRmId)) && <PackageForm line={line} form={form} />}
+        {(mode === "package" || (mode === "material" && form.selectedRmId)) && <PackageForm line={line} form={form} onCorrectLine={p.onCorrectLine ? () => p.onCorrectLine?.(line) : undefined} />}
         {mode === "material" && form.selectedRmId && pkgValid && (
           <label className="flex items-start gap-2 text-sm">
             <Checkbox checked={pkgOk} onCheckedChange={(v) => setPkgOk(!!v)} />
