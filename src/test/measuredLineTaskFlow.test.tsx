@@ -130,6 +130,9 @@ describe("Målt mengde i pakningsmodus — ingen blindvei", () => {
     const { onSaved } = setup(makeLine({ unit: "kg", quantity: 23840, unit_price: 5.84, total_amount: 139225.6, package_size: -3, package_unit: "sekk" }));
     expect(await screen.findByText(/Målt mengde/)).toBeTruthy();
     expect(screen.queryByText(/Hvor mye inneholder/)).toBeNull();
+    expect(screen.queryByText(/pakningen må bekreftes/)).toBeNull();
+    expect(screen.queryByText(/pakningen som bekreftet/)).toBeNull();
+    expect(screen.getAllByText(/ingen pakning lagres eller bekreftes/).length).toBeGreaterThan(0);
     const btn = await screen.findByRole("button", { name: /registrert målt mengde og fortsett/ });
     await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(btn);
@@ -145,6 +148,8 @@ describe("Målt mengde i pakningsmodus — ingen blindvei", () => {
     const { onCorrectLine } = setup(makeLine({ unit: "kg", quantity: -3000, unit_price: 5.84, total_amount: -17520 }));
     expect((await screen.findAllByText(/Kreditlinje/)).length).toBeGreaterThan(0);
     expect(screen.queryByText(/mangler mengde/)).toBeNull();
+    expect(screen.queryByText(/pakningen må bekreftes/)).toBeNull();
+    expect(screen.queryByText(/Dette lagres/)).toBeNull();
     expect(screen.queryByRole("button", { name: "Bekreft pakning og fortsett" })).toBeNull();
     fireEvent.click(screen.getAllByRole("button", { name: "Rett fakturalinje" })[0]);
     expect(onCorrectLine).toHaveBeenCalled();
@@ -157,12 +162,15 @@ describe("Målt mengde i pakningsmodus — ingen blindvei", () => {
     expect(onCorrectLine).toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Rett bare fakturert enhet" })).toBeTruthy();
     expect(acceptMatch).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Dette lagres/)).toBeNull();
   });
 
   it("vanlig kartong uendret: spør innhold og bekrefter pakning", async () => {
     acceptMatch.mockResolvedValue(okResult);
     setup(makeLine());
     expect(await screen.findByText(/Hvor mye inneholder én kartong/)).toBeTruthy();
+    expect(screen.getByText(/pakningen må bekreftes/)).toBeTruthy();
+    expect(screen.getByText(/pakningen som bekreftet/)).toBeTruthy();
     const btn = await screen.findByRole("button", { name: "Bekreft pakning og fortsett" });
     await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(btn);
