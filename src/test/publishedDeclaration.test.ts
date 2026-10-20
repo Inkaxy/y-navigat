@@ -86,7 +86,7 @@ const product = {
 };
 
 describe("vareliste og filtre", () => {
-  const reviewed = { ...product, declaration_needs_review: true };
+  const reviewed = { ...product, id: "p3", declaration_needs_review: true };
   const never = { ...product, id: "p2", manual_ingredient_declaration: null, declaration_version_id: null, declaration_needs_review: true };
 
   it("godkjent vare med ventende endringer er «Krever gjennomgang», ikke borte", () => {
@@ -99,7 +99,7 @@ describe("vareliste og filtre", () => {
     const of = (p: typeof product) => productLabelingStatus(p, undefined);
     const approvedState = parseProductListParams(new URLSearchParams("merking=approved"));
     const staleState = parseProductListParams(new URLSearchParams("merking=stale"));
-    expect(filterProducts(all, approvedState, of).map((p) => p.id)).toEqual(["p1", "p1"]);
+    expect(filterProducts(all, approvedState, of).map((p) => p.id)).toEqual(["p1", "p3"]);
     expect(filterProducts(all, staleState, of)).toEqual([reviewed]);
   });
 
