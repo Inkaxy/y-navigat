@@ -267,6 +267,12 @@ function DeclarationView({ link, productName, canWrite, qc }: { link: any; produ
 
       {computed && <DataQualityBanner computed={computed} />}
 
+      {computed && mode !== "manual" && (
+        <p className="rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-xs">
+          <strong>Ny beregning – forslag.</strong> Feltene under er ikke publisert. Publisert innhold er sist godkjente
+          versjon; se den i «Forhåndsvisning». Forslaget tas i bruk først når det godkjennes i oppskriftens Merking.
+        </p>
+      )}
       {computed && (
         <Tabs defaultValue="ingredient">
           <div className="flex items-center justify-between">
@@ -481,7 +487,7 @@ function EffectiveStatusCard({
           <strong>Krever gjennomgang</strong>
           {snapshot.data?.declaration_review_reason ? ` — ${snapshot.data.declaration_review_reason}` : ""}.{" "}
           {snapshot.data?.manual_ingredient_declaration
-            ? "Sist godkjente opplysninger vises og brukes fortsatt til en ny versjon godkjennes i oppskriftens Merking."
+            ? "Sist godkjente versjon publiseres fortsatt til en ny versjon godkjennes i oppskriftens Merking. Forhåndsvisningen viser den som standard."
             : "Varen har ingen godkjent deklarasjon ennå."}
         </span>
         {onRecompute && (
