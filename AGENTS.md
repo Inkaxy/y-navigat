@@ -21,4 +21,4 @@
 - Root-migrasjoner kjørt direkte mot live speiles byte-identisk i `supabase/live-mirror/`, ikke i `supabase/migrations`. Why: migrasjonsmappen styres av verktøyet som ville kjørt SQL-en på nytt.
 - Prishistorikkens enhet/pakning/valuta per observasjon leses bare fra låst `snapshot_*` (satt av trigger ved innsetting, uforanderlig); dagens råvare/fakturalinje brukes aldri som historisk grunnlag. Why: prislikhet og tidsstempel-heuristikk merket gamle priser med dagens enhet/pakning.
 - Skrivebeskyttede testdatasider ligger i appen på `/forhandsvisning/pris` (også `/price-calc-preview.html`), `/forhandsvisning/pdf-import` og `/forhandsvisning/sidehode`, uten nettverk. Why: lokale HTML-innganger finnes ikke i publisert bygg.
-- Deklarasjonseksport (`declarations-export/page.ts`): versjonerte produkter hasher kun innhold fra godkjent versjon; ulastbar peker holder varen ute. Why: løpende data endret hash uten godkjenning.
+- Deklarasjonseksport (`declarations-export/page.ts`): versjonerte produkter hasher kun innhold fra godkjent versjon; ulastbar peker holder varen ute. Why: løpende data endret hash.
