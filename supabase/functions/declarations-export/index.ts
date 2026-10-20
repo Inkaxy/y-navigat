@@ -4,14 +4,8 @@
 // GET /declarations-export?updated_since=<ISO>&product_ids=a,b&page=1&page_size=200
 // GET /declarations-export?schema=1   -> JSON Schema for responsen
 import { createClient } from "npm:@supabase/supabase-js@2";
-import {
-  approvedContent,
-  checkApiKey,
-  contentHash,
-  exportDecision,
-  exportGrain,
-  type ApprovedVersion,
-} from "../_shared/declaration-export.ts";
+import { checkApiKey } from "../_shared/declaration-export.ts";
+import { buildDeclarationsPage } from "./page.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -120,11 +114,6 @@ async function sha256Hex(input: string): Promise<string> {
   return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** Fjerner *uthevingsmarkører* uten å røre selve teksten. */
-function stripMarkers(text: string): string {
-  return text.replace(/\*{1,2}(.+?)\*{1,2}/g, "$1").replace(/\s+/g, " ").trim();
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -171,162 +160,21 @@ Deno.serve(async (req) => {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  let productQuery = admin
-    .from("products")
-    .select(
-      "id, code, display_number, display_name, ean_code, unit_of_sale, in_web_shop, status, weight_per_unit_grams, keywords, " +
-        "manual_ingredient_declaration, manual_allergens_contains, manual_allergens_may_contain, " +
-        "manual_nutrition_per_100g, manual_declaration_updated_at, declaration_needs_review, declaration_review_reason, declaration_version_id, updated_at",
-    )
-    .eq("legal_entity_id", legalEntityId)
-    .neq("status", "discontinued")
-    .not("manual_ingredient_declaration", "is", null)
-    .order("display_number", { ascending: true })
-    .range((page - 1) * pageSize, page * pageSize); // henter én ekstra for has_more
-
-  if (productIds.length) productQuery = productQuery.in("id", productIds);
-  if (updatedSince) {
-    productQuery = productQuery.or(
-      `updated_at.gte.${updatedSince},manual_declaration_updated_at.gte.${updatedSince}`,
-    );
-  }
-
-  const { data: productRows, error: productErr } = await productQuery;
-  if (productErr) return jsonRes({ error: productErr.message, code: "query_failed" }, 500);
-
-  const rows = productRows ?? [];
-  const hasMore = rows.length > pageSize;
-  const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
-
-  const ids = pageRows.map((p) => p.id as string);
-  const { data: linkRows } = ids.length
-    ? await admin
-        .from("product_recipe_links")
-        .select("product_id, recipe_id, is_primary")
-        .in("product_id", ids)
-    : { data: [] as { product_id: string; recipe_id: string | null; is_primary: boolean | null }[] };
-
-  const linkByProduct = new Map<string, { recipe_id: string | null }>();
-  for (const l of linkRows ?? []) {
-    const existing = linkByProduct.get(l.product_id as string);
-    if (!existing || l.is_primary) linkByProduct.set(l.product_id as string, { recipe_id: l.recipe_id as string | null });
-  }
-  const recipeIds = [...new Set([...linkByProduct.values()].map((l) => l.recipe_id).filter(Boolean))] as string[];
-
-  const { data: recipeRows } = recipeIds.length
-    ? await admin
-        .from("recipes")
-        .select("id, name, unit_weight_grams, shelf_life_days, storage_instructions, country_of_origin, breadscale_mode, manual_breadscale_pct")
-        .in("id", recipeIds)
-    : { data: [] as Record<string, unknown>[] };
-  const recipeById = new Map((recipeRows ?? []).map((r) => [r.id as string, r]));
-
-  const { data: calcRows } = recipeIds.length
-    ? await admin.from("recipe_label_calculated").select("recipe_id, computed_at, is_stale, grain_category, grain_score_pct").in("recipe_id", recipeIds)
-    : { data: [] as { recipe_id: string; computed_at: string | null; is_stale: boolean | null }[] };
-  const calcByRecipe = new Map((calcRows ?? []).map((c) => [c.recipe_id as string, c]));
-
-  // Godkjente snapshots er fasit for publisert innhold. Feiler oppslaget,
-  // stopper vi heller enn å publisere løpende eller ufullstendige data.
-  const versionIds = [...new Set(pageRows.map((p) => p.declaration_version_id as string | null).filter(Boolean))] as string[];
-  const versionById = new Map<string, ApprovedVersion>();
-  if (versionIds.length) {
-    const { data: versionRows, error: versionErr } = await admin
-      .from("recipe_declaration_versions")
-      .select(
-        "id, version, approved_at, ingredient_text, allergens_contains, allergens_may_contain, nutrition_per_100g, " +
-          "shelf_life_days, storage_text, origin_text, claim_grain, claim_keyhole, breadscale_pct",
-      )
-      .in("id", versionIds);
-    if (versionErr) return jsonRes({ error: "Kunne ikke lese godkjente versjoner", code: "query_failed" }, 500);
-    for (const v of (versionRows ?? []) as unknown as ApprovedVersion[]) versionById.set(v.id, v);
-  }
-
-  const { data: entity } = await admin
-    .from("legal_entities")
-    .select("id, legal_name, display_name, organization_number, invoice_address_line1, invoice_postal_code, invoice_city")
-    .eq("id", legalEntityId)
-    .maybeSingle();
+  const built = await buildDeclarationsPage(admin, {
+    legalEntityId,
+    page,
+    pageSize,
+    updatedSince,
+    productIds,
+  });
+  if (!built.ok) return jsonRes({ error: built.error, code: built.code }, built.status);
+  const { products, hasMore } = built;
+  const entity = built.entity as Record<string, string | null> | null;
   const bakeryAddress = entity
     ? [entity.invoice_address_line1, [entity.invoice_postal_code, entity.invoice_city].filter(Boolean).join(" ")]
         .filter(Boolean)
         .join(", ") || null
     : null;
-
-  const products: Record<string, unknown>[] = [];
-  for (const p of pageRows) {
-    const link = linkByProduct.get(p.id as string) ?? null;
-    const recipe = link?.recipe_id ? recipeById.get(link.recipe_id) ?? null : null;
-    const calc = link?.recipe_id ? calcByRecipe.get(link.recipe_id) ?? null : null;
-
-    const versionId = (p.declaration_version_id as string | null) ?? null;
-    const version = versionId ? versionById.get(versionId) ?? null : null;
-    const decision = exportDecision({
-      ingredientText: p.manual_ingredient_declaration as string | null,
-      needsReview: p.declaration_needs_review as boolean | null,
-      calculated: link?.recipe_id
-        ? { computed_at: (calc?.computed_at as string | null) ?? null, is_stale: (calc?.is_stale as boolean | null) ?? null }
-        : null,
-      versionId,
-      version,
-    });
-    if (!decision.include) continue;
-
-    const legacyText = String(p.manual_ingredient_declaration ?? "");
-    const published = decision.source === "approved_version" && version
-      ? approvedContent(version, recipe?.breadscale_mode as string | null)
-      : {
-          ingredient_text: legacyText,
-          allergens_contains: (p.manual_allergens_contains as string[] | null) ?? [],
-          allergens_may_contain: (p.manual_allergens_may_contain as string[] | null) ?? [],
-          nutrition_per_100g: (p.manual_nutrition_per_100g as Record<string, number | null> | null) ?? null,
-          shelf_life_days: (recipe?.shelf_life_days as number | null) ?? null,
-          storage_instructions: (recipe?.storage_instructions as string | null) ?? null,
-          country_of_origin: (recipe?.country_of_origin as string | null) ?? null,
-          grain: recipe
-            ? exportGrain({
-                mode: recipe.breadscale_mode as string | null,
-                manualPct: recipe.manual_breadscale_pct as number | null,
-                calcCategory: (calc?.grain_category as string | null) ?? null,
-                calcPct: (calc?.grain_score_pct as number | null) ?? null,
-              })
-            : null,
-          approved_at: (p.manual_declaration_updated_at as string | null) ?? (calc?.computed_at as string | null) ?? null,
-        };
-    const text = published.ingredient_text;
-    const item = {
-      id: p.id,
-      product_number: p.display_number != null ? String(p.display_number) : null,
-      code: p.code ?? null,
-      name: p.display_name ?? "",
-      ean: p.ean_code ?? null,
-      unit_of_sale: p.unit_of_sale ?? null,
-      in_web_shop: p.in_web_shop ?? null,
-      keywords: ((p.keywords as string[] | null) ?? []).map((k) => String(k).trim()).filter(Boolean),
-      ingredient_text: text,
-      ingredient_text_plain: stripMarkers(text),
-      allergens_contains: published.allergens_contains,
-      allergens_may_contain: published.allergens_may_contain,
-      nutrition_per_100g: published.nutrition_per_100g,
-      net_weight_grams:
-        (p.weight_per_unit_grams as number | null) ?? ((recipe?.unit_weight_grams as number | null) ?? null),
-      shelf_life_days: published.shelf_life_days,
-      storage_instructions: published.storage_instructions,
-      country_of_origin: published.country_of_origin,
-      recipe_name: (recipe?.name as string | null) ?? null,
-      grain: published.grain,
-      approved_at: published.approved_at,
-    };
-    // Review-feltene er tillegg utenfor content_hash: et nytt flagg endrer ikke
-    // publisert innhold, så mottakerens cache forblir gyldig.
-    const review = {
-      needs_review: decision.needsReview,
-      review_reason: decision.needsReview ? ((p.declaration_review_reason as string | null) ?? null) : null,
-      declaration_version: version?.version ?? null,
-      declaration_source: decision.source,
-    };
-    products.push({ ...item, ...review, content_hash: await contentHash(item) });
-  }
 
   const payload = {
     schema_version: SCHEMA_VERSION,

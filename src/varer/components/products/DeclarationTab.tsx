@@ -583,7 +583,7 @@ function usePublishedDeclaration(productId: string) {
   });
 }
 
-function PreviewDialog({ open, onClose, productName, productId, computed }: { open: boolean; onClose: () => void; productName: string; productId: string; computed: ComputedDeclaration }) {
+export function PreviewDialog({ open, onClose, productName, productId, computed }: { open: boolean; onClose: () => void; productName: string; productId: string; computed: ComputedDeclaration }) {
   const published = usePublishedDeclaration(productId);
   const [choice, setChoice] = useState<"approved" | "draft">("approved");
   const hasPublished = !!published.data;
@@ -710,7 +710,7 @@ function PreviewDialog({ open, onClose, productName, productId, computed }: { op
   );
 }
 
-type ComputedDeclaration = {
+export type ComputedDeclaration = {
   mode: Mode;
   mode_source: "link" | "recipe" | "default" | "recipe_label";
   product_recipe_link_id: string;
