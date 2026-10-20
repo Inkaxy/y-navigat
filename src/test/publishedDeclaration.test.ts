@@ -5,7 +5,6 @@ import {
   exportDecision,
   type ApprovedVersion,
 } from "../../supabase/functions/_shared/declaration-export";
-import { hasPublishedSnapshot, syncAutoProductsForRecipe } from "../../supabase/functions/_shared/effective-declaration";
 import { productLabelingStatus } from "@/varer/pages/ProductList";
 import { deriveLabelingStatusFromDb, matchesLabelingFilter, LABELING_STATUS_LABEL } from "@/varer/lib/labelStaleness";
 import { filterProducts } from "@/varer/lib/productListFilter";
@@ -115,6 +114,13 @@ describe("vareliste og filtre", () => {
   });
 });
 
+// Lastes dynamisk: modulen importerer Deno-URL-er som appens typesjekk ikke løser.
+const EFFECTIVE: string = "../../supabase/functions/_shared/effective-declaration";
+interface SyncModule {
+  syncAutoProductsForRecipe: (service: unknown, recipeId: string, calc: unknown) => Promise<number>;
+  hasPublishedSnapshot: (p: { declaration_version_id?: string | null; manual_ingredient_declaration?: string | null } | null) => boolean;
+}
+
 type Update = { table: string; values: Record<string, unknown>; id: unknown };
 function fakeService(links: unknown[]) {
   const updates: Update[] = [];
@@ -149,8 +155,8 @@ describe("beregningssynk", () => {
       { id: "l1", product_id: "pv", declaration_mode: null, products: { declaration_version_id: "ver-1", manual_ingredient_declaration: "Gammel" } },
       { id: "l2", product_id: "pl", declaration_mode: null, products: { declaration_version_id: null, manual_ingredient_declaration: "Legacy" } },
     ]);
-    // @ts-expect-error forenklet testklient
-    await syncAutoProductsForRecipe(service, "r1", calc);
+    const mod = (await import(EFFECTIVE)) as SyncModule;
+    await mod.syncAutoProductsForRecipe(service, "r1", calc);
     expect(updates).toHaveLength(2);
     for (const u of updates) {
       expect(Object.keys(u.values).sort()).toEqual(["declaration_needs_review", "declaration_review_reason"]);
@@ -158,7 +164,8 @@ describe("beregningssynk", () => {
     }
   });
 
-  it("hasPublishedSnapshot", () => {
+  it("hasPublishedSnapshot", async () => {
+    const { hasPublishedSnapshot } = (await import(EFFECTIVE)) as SyncModule;
     expect(hasPublishedSnapshot({ declaration_version_id: "v" })).toBe(true);
     expect(hasPublishedSnapshot({ manual_ingredient_declaration: " " })).toBe(false);
     expect(hasPublishedSnapshot(null)).toBe(false);
