@@ -34,6 +34,7 @@ import { GrainSection } from "./GrainSection";
 import { KeyholeSection, type KeyholeResult } from "./KeyholeSection";
 import { LabelInfoCard } from "./LabelInfoCard";
 import { ConsumerLabelSection } from "./ConsumerLabelSection";
+import { approvedLabelInput, type LabelSource } from "@/varer/lib/approvedLabel";
 import { LinkedProductsCard } from "./LinkedProductsCard";
 
 /** Feltene fra `recipes`-raden som merkefanen bruker. */
@@ -143,6 +144,7 @@ export function LabelTab({
   const approve = useApproveDeclaration();
   const [approveOpen, setApproveOpen] = useState(false);
   const [checklistBlocked, setChecklistBlocked] = useState(false);
+  const [labelSource, setLabelSource] = useState<LabelSource>("approved");
   const onChecklistChange = useCallback((v: boolean) => setChecklistBlocked(v), []);
 
   const label = labelQuery.data ?? null;
@@ -339,8 +341,11 @@ export function LabelTab({
     );
   }
 
-  const preview = (
+  const approvedInput = latestVersion ? approvedLabelInput(latestVersion) : null;
+  const shownSource: LabelSource = approvedInput ? labelSource : "draft";
+  const draftPreview = (
     <ConsumerLabelSection
+      variant={approvedInput ? "draft" : undefined}
       recipeName={recipeName}
       effective={effective}
       effectiveGrainPct={
@@ -364,6 +369,47 @@ export function LabelTab({
       onFixField={onFixField}
       nutritionUsable={declarationManual ? !!effective.nutrition : coverageOk && !!effective.nutrition}
     />
+  );
+
+  // Godkjent versjon er standard for forhåndsvisning og utskrift. Kladden holdes
+  // montert (skjult) så pliktfeltsjekken for godkjenning fortsatt gjelder den nye beregningen.
+  const preview = (
+    <div className="space-y-2">
+      {approvedInput && (
+        <div role="group" aria-label="Kilde for etiketten" className="flex flex-wrap gap-2">
+          <Button type="button" size="sm" variant={shownSource === "approved" ? "default" : "outline"} className="min-h-11" aria-pressed={shownSource === "approved"} onClick={() => setLabelSource("approved")}>
+            Sist godkjente (versjon {latestVersion?.version})
+          </Button>
+          <Button type="button" size="sm" variant={shownSource === "draft" ? "default" : "outline"} className="min-h-11" aria-pressed={shownSource === "draft"} onClick={() => setLabelSource("draft")}>
+            Ny beregning – forslag
+          </Button>
+        </div>
+      )}
+      {approvedInput && shownSource === "approved" && (
+        <ConsumerLabelSection
+          variant="approved"
+          approvedVersion={latestVersion?.version ?? null}
+          recipeName={recipeName}
+          effective={approvedInput.effective}
+          effectiveGrainPct={approvedInput.grainPct}
+          declarationManual={declarationManual}
+          breadscaleManual={breadscaleMode === "manual"}
+          claimGrain={approvedInput.claimGrain}
+          claimKeyhole={approvedInput.claimKeyhole}
+          unitWeightGrams={recipe.unit_weight_grams ?? approvedInput.unitWeightGrams}
+          shelfLifeDays={approvedInput.shelfLifeDays}
+          storageInstructions={approvedInput.storageInstructions}
+          countryOfOrigin={approvedInput.countryOfOrigin}
+          entity={entityQuery.data ?? null}
+          profile={labelProfileQuery.data ?? null}
+          blocked={false}
+          keyholeQualifies={approvedInput.claimKeyhole}
+          coveragePct={approvedInput.effective.coveragePct}
+          nutritionUsable={approvedInput.nutritionUsable}
+        />
+      )}
+      <div className={shownSource === "draft" ? undefined : "hidden"}>{draftPreview}</div>
+    </div>
   );
 
   const previewNote = (
