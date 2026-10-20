@@ -46,7 +46,7 @@ describe("PreviewDialog etter ny beregning", () => {
   let blobs: string[];
   beforeEach(() => {
     clip = []; blobs = [];
-    Object.assign(navigator, { clipboard: { writeText: (t: string) => { clip.push(t); return Promise.resolve(); } } });
+    vi.spyOn(navigator.clipboard, "writeText").mockImplementation((t: string) => { clip.push(t); return Promise.resolve(); });
     URL.createObjectURL = (b: Blob | MediaSource) => { void (b as Blob).text().then((t) => blobs.push(t)); return "blob:x"; };
     URL.revokeObjectURL = () => {};
     window.open = () => null;
