@@ -35,7 +35,7 @@ import { GrainSection } from "./GrainSection";
 import { KeyholeSection, type KeyholeResult } from "./KeyholeSection";
 import { LabelInfoCard } from "./LabelInfoCard";
 import { ConsumerLabelSection } from "./ConsumerLabelSection";
-import { approvedLabelInput, type LabelSource } from "@/varer/lib/approvedLabel";
+import { approvedLabelInput, type LabelSource as PreviewSource } from "@/varer/lib/approvedLabel";
 import { LinkedProductsCard } from "./LinkedProductsCard";
 
 /** Feltene fra `recipes`-raden som merkefanen bruker. */
@@ -145,7 +145,7 @@ export function LabelTab({
   const approve = useApproveDeclaration();
   const [approveOpen, setApproveOpen] = useState(false);
   const [checklistBlocked, setChecklistBlocked] = useState(false);
-  const [labelSource, setLabelSource] = useState<LabelSource>("approved");
+  const [labelSource, setLabelSource] = useState<PreviewSource>("approved");
   const onChecklistChange = useCallback((v: boolean) => setChecklistBlocked(v), []);
 
   const label = labelQuery.data ?? null;
@@ -343,7 +343,7 @@ export function LabelTab({
   }
 
   const approvedInput = latestVersion ? approvedLabelInput(latestVersion) : null;
-  const shownSource: LabelSource = approvedInput ? labelSource : "draft";
+  const shownSource: PreviewSource = approvedInput ? labelSource : "draft";
   const draftPreview = (
     <ConsumerLabelSection
       variant={approvedInput ? "draft" : undefined}
