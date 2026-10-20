@@ -31,7 +31,7 @@ function world() {
   return {
     products: [{
       id: "p1", legal_entity_id: ENT, display_number: 7, code: "K", display_name: "Kneipp", ean_code: null,
-      unit_of_sale: "stk", in_web_shop: true, status: "active", weight_per_unit_grams: null, keywords: [],
+      unit_of_sale: "stk", in_web_shop: true, status: "active", weight_per_unit_grams: null as number | null, keywords: [],
       manual_ingredient_declaration: "Hvetemel (*hvete*), vann", manual_allergens_contains: ["hvete"],
       manual_allergens_may_contain: [], manual_nutrition_per_100g: { energy_kj: 1000 },
       manual_declaration_updated_at: "2026-10-01T10:00:00Z", declaration_needs_review: false,
@@ -84,7 +84,7 @@ describe("declarations-export endepunkt (falsk database)", () => {
 
   it("produktets egen vekt (variant) overstyrer godkjent vekt", async () => {
     const w = world();
-    w.products[0].weight_per_unit_grams = 250 as unknown as null;
+    w.products[0].weight_per_unit_grams = 250;
     const r = await buildDeclarationsPage(fakeDb(w), input);
     if (!r.ok) throw new Error("forventet ok");
     expect(r.products[0].net_weight_grams).toBe(250);
