@@ -75,6 +75,18 @@ interface CalculatedRow {
   blocked?: boolean;
 }
 
+export interface ProductSnapshotRef {
+  declaration_version_id?: string | null;
+  manual_ingredient_declaration?: string | null;
+}
+
+/** Sann når produktet har en publisert (sist godkjent eller eldre) deklarasjon. */
+export function hasPublishedSnapshot(p: ProductSnapshotRef | null | undefined): boolean {
+  if (!p) return false;
+  if (p.declaration_version_id) return true;
+  return !!(p.manual_ingredient_declaration && p.manual_ingredient_declaration.trim());
+}
+
 /**
  * Synkroniserer effektiv deklarasjon for alle produkter koblet til en oppskrift.
  * «auto» får beregningen som snapshot, «auto_with_overrides» beregnes på nytt via
@@ -99,7 +111,7 @@ export async function syncAutoProductsForRecipe(
 
   const { data: links, error: linksErr } = await service
     .from("product_recipe_links")
-    .select("id, product_id, declaration_mode, products(declaration_version_id)")
+    .select("id, product_id, declaration_mode, products(declaration_version_id, manual_ingredient_declaration)")
     .eq("recipe_id", recipeId);
   if (linksErr) {
     console.error("syncAutoProductsForRecipe: kunne ikke lese koblinger", recipeId, linksErr.message);
@@ -124,11 +136,11 @@ export async function syncAutoProductsForRecipe(
     const mode = ((link.declaration_mode as DeclarationMode | null) ?? recipeMode) as DeclarationMode;
     if (mode === "manual") continue;
 
-    // Produktet har en godkjent deklarasjonsversjon fra før: den skal ikke overskrives
-    // stille av en ny beregning. Flagg for ny godkjenning i stedet.
-    const declarationVersionId = (link as { products?: { declaration_version_id?: string | null } | null })
-      .products?.declaration_version_id ?? null;
-    if (declarationVersionId) {
+    // Produktet har en publisert deklarasjon (godkjent versjon eller eldre
+    // snapshot): den skal aldri overskrives eller nulles stille av en ny
+    // beregning. Flagg for ny gjennomgang i stedet — sist godkjente gjelder.
+    const product = (link as { products?: ProductSnapshotRef | null }).products ?? null;
+    if (hasPublishedSnapshot(product)) {
       const { error } = await service
         .from("products")
         .update({
@@ -136,7 +148,7 @@ export async function syncAutoProductsForRecipe(
           declaration_review_reason: "Ny beregning – godkjenn på nytt",
         })
         .eq("id", link.product_id);
-      if (error) console.error("syncAutoProductsForRecipe (versjonert)", link.product_id, error.message);
+      if (error) console.error("syncAutoProductsForRecipe (publisert)", link.product_id, error.message);
       continue;
     }
 
