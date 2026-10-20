@@ -51,6 +51,9 @@ interface Props {
   /** «Rett felt»: etiketten for snarveien til feltet, eller null når den ikke kan rettes her. */
   fixLabelFor?: (key: string) => string | null;
   onFixField?: (key: string) => void;
+  /** «approved» = sist godkjente versjon (fasit); «draft» = ny beregning som kladd/forslag. */
+  variant?: "approved" | "draft";
+  approvedVersion?: number | null;
 }
 
 async function toDataUrl(url: string): Promise<string | null> {
@@ -90,7 +93,10 @@ export function ConsumerLabelSection({
   onChecklistChange,
   fixLabelFor,
   onFixField,
+  variant,
+  approvedVersion,
 }: Props) {
+  const isDraft = variant === "draft";
   const [size, setSize] = useState<LabelSizeKey | "profile">(profile ? "profile" : "100x70");
   const [printing, setPrinting] = useState(false);
 
@@ -164,7 +170,8 @@ export function ConsumerLabelSection({
           size={pdfSize}
           customSize={size === "profile" ? profileSize : null}
           data={{
-            productName: recipeName,
+            // En kladd skal aldri kunne forveksles med en godkjent etikett.
+            productName: isDraft ? `KLADD – ikke godkjent · ${recipeName}` : recipeName,
             ingredientText: effective.ingredientText ?? "",
             allergenTerms: effective.contains,
             netWeightText,
@@ -197,7 +204,17 @@ export function ConsumerLabelSection({
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Forbrukeretikett</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          Forbrukeretikett
+          {variant === "approved" && (
+            <Badge variant="outline" className="border-success/40 text-success">
+              Sist godkjente versjon{approvedVersion != null ? ` ${approvedVersion}` : ""}
+            </Badge>
+          )}
+          {isDraft && (
+            <Badge variant="outline" className="border-warning/50 text-warning">Kladd – ny beregning, ikke godkjent</Badge>
+          )}
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-end gap-3">
