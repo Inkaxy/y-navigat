@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -414,7 +415,10 @@ export function LabelTab({
 
   const previewNote = (
     <p className="text-xs text-muted-foreground">
-      Forhåndsvisningen viser lagret kilde ({declarationManual ? "manuell" : "beregnet"}). Ulagrede endringer i
+      {latestVersion
+        ? "Standard er sist godkjente versjon — det som gjelder for etikett og API til en ny versjon godkjennes. «Ny beregning» er bare et forslag."
+        : `Ingen godkjent versjon ennå — forhåndsvisningen er en kladd (${declarationManual ? "manuell" : "beregnet"}).`}{" "}
+      Ulagrede endringer i
       redigeringsfeltene vises ikke her og påvirker ikke utskrift eller API.
     </p>
   );
