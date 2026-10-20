@@ -100,6 +100,8 @@ export function useApproveDeclaration() {
       qc.invalidateQueries({ queryKey: ["recipes"] });
       qc.invalidateQueries({ queryKey: ["recipes-labeling-status"] });
       qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["product-published-declaration"] });
+      qc.invalidateQueries({ queryKey: ["product-effective-decl"] });
       toast.success(
         res.productsUpdated > 0
           ? `Deklarasjonen er godkjent (v${res.version}) og synket til ${res.productsUpdated} produkt(er)`
