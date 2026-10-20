@@ -43,6 +43,35 @@ export function stripMarkers(text: string): string {
   return text.replace(/\*{1,2}(.+?)\*{1,2}/g, "$1").replace(/\s+/g, " ").trim();
 }
 
+const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
+const num = (v: unknown): number | null => (v == null || v === "" ? null : Number.isFinite(Number(v)) ? Number(v) : null);
+const strArr = (v: unknown): string[] | null => (Array.isArray(v) ? v.map(String) : null);
+const bool = (v: unknown): boolean | null => (typeof v === "boolean" ? v : null);
+
+export function parseVersion(v: Row): ApprovedVersion {
+  const n = v.nutrition_per_100g;
+  return {
+    id: String(v.id),
+    version: Number(v.version),
+    source: str(v.source),
+    approved_at: str(v.approved_at),
+    ingredient_text: str(v.ingredient_text),
+    ingredient_html: str(v.ingredient_html),
+    net_weight_g: num(v.net_weight_g),
+    allergens_contains: strArr(v.allergens_contains),
+    allergens_may_contain: strArr(v.allergens_may_contain),
+    nutrition_per_100g: n && typeof n === "object" && !Array.isArray(n)
+      ? Object.fromEntries(Object.entries(n as Row).map(([k, x]) => [k, num(x)]))
+      : null,
+    shelf_life_days: num(v.shelf_life_days),
+    storage_text: str(v.storage_text),
+    origin_text: str(v.origin_text),
+    claim_grain: bool(v.claim_grain),
+    claim_keyhole: bool(v.claim_keyhole),
+    breadscale_pct: num(v.breadscale_pct),
+  };
+}
+
 const rows = (d: Res["data"]): Row[] => (Array.isArray(d) ? d : d ? [d] : []);
 
 export async function buildDeclarationsPage(admin: Db, o: PageInput): Promise<PageResult> {
@@ -109,7 +138,7 @@ export async function buildDeclarationsPage(admin: Db, o: PageInput): Promise<Pa
       )
       .in("id", versionIds);
     if (vErr) return { ok: false, status: 500, error: "Kunne ikke lese godkjente versjoner", code: "query_failed" };
-    for (const v of rows(vData)) versionById.set(v.id as string, v as unknown as ApprovedVersion);
+    for (const v of rows(vData)) versionById.set(v.id as string, parseVersion(v));
   }
 
   const entityRes = await admin
@@ -142,8 +171,8 @@ export async function buildDeclarationsPage(admin: Db, o: PageInput): Promise<Pa
     const published = decision.source === "approved_version" && version
       ? {
           ...approvedContent(version),
-          // Produktets egen vekt er bevisst produktdata (variant); ellers godkjent vekt — null er autoritativt.
-          net_weight_grams: productWeight ?? (version.net_weight_g ?? null),
+          // Produktets egen vekt er bevisst produktvariant; ellers godkjent vekt — null er autoritativt.
+          net_weight_grams: productWeight ?? approvedContent(version).net_weight_grams,
         }
       : {
           // Legacy uten versjon: produktets lagrede snapshot + oppskriftens felt (uendret regel).

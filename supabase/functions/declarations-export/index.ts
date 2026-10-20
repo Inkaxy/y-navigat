@@ -5,7 +5,7 @@
 // GET /declarations-export?schema=1   -> JSON Schema for responsen
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { checkApiKey } from "../_shared/declaration-export.ts";
-import { buildDeclarationsPage, type Db } from "./page.ts";
+import { buildDeclarationsPage } from "./page.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -160,7 +160,7 @@ Deno.serve(async (req) => {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const built = await buildDeclarationsPage(admin as unknown as Db, {
+  const built = await buildDeclarationsPage(admin, {
     legalEntityId,
     page,
     pageSize,
