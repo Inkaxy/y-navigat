@@ -576,7 +576,9 @@ function usePublishedDeclaration(productId: string) {
           .eq("id", p.declaration_version_id)
           .maybeSingle();
         if (vErr) throw vErr;
-        version = v ?? null;
+        // Eksplisitt peker uten rad: feil, aldri stille fallback til kladd.
+        if (!v) throw new Error("Godkjent deklarasjonsversjon mangler");
+        version = v;
       }
       return publishedProductDeclaration({ versionId: p.declaration_version_id, version, product: p });
     },
