@@ -270,7 +270,7 @@ function DeclarationView({ link, productName, canWrite, qc }: { link: any; produ
       {computed && mode !== "manual" && (
         <p className="rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-xs">
           <strong>Ny beregning – forslag.</strong> Feltene under er ikke publisert. Publisert innhold er sist godkjente
-          versjon; se den i «Forhåndsvisning». Forslaget tas i bruk først når det godkjennes i oppskriftens Merking.
+          versjon; se den med «Forhåndsvis etikett». Forslaget tas i bruk først når det godkjennes i oppskriftens Merking.
         </p>
       )}
       {computed && (
