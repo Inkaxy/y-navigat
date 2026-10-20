@@ -35,7 +35,7 @@ function world() {
       manual_ingredient_declaration: "Hvetemel (*hvete*), vann", manual_allergens_contains: ["hvete"],
       manual_allergens_may_contain: [], manual_nutrition_per_100g: { energy_kj: 1000 },
       manual_declaration_updated_at: "2026-10-01T10:00:00Z", declaration_needs_review: false,
-      declaration_review_reason: null, declaration_version_id: "v1", updated_at: "2026-10-01T10:00:00Z",
+      declaration_review_reason: null as string | null, declaration_version_id: "v1", updated_at: "2026-10-01T10:00:00Z",
     }],
     product_recipe_links: [{ product_id: "p1", recipe_id: "r1", is_primary: true }],
     recipes: [{ id: "r1", name: "Kneipp", unit_weight_grams: 500, shelf_life_days: 3, storage_instructions: "Tørt",
