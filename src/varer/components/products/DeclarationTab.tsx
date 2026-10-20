@@ -583,7 +583,7 @@ function usePublishedDeclaration(productId: string) {
   });
 }
 
-function PreviewDialog({ open, onClose, productName, productId, computed }: { open: boolean; onClose: () => void; productName: string; productId: string; computed: ComputedDeclaration }) {
+export function PreviewDialog({ open, onClose, productName, productId, computed }: { open: boolean; onClose: () => void; productName: string; productId: string; computed: ComputedDeclaration }) {
   const published = usePublishedDeclaration(productId);
   const [choice, setChoice] = useState<"approved" | "draft">("approved");
   const hasPublished = !!published.data;
