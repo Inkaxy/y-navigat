@@ -34,4 +34,20 @@ begin
   if j ? 'brodskala_pct' or j ? 'nokkelhull' then raise exception 'godkjent «nei» skal ikke overstyres: %', j; end if;
   raise notice 'PASS';
 end $$;
+-- Statisk kontroll av kildene etter kjøring (FK gjør manglende versjonsrad
+-- umulig å konstruere uten superbruker; derfor sjekkes grenen i kildeteksten).
+do $$
+begin
+  if position('godkjent_versjon_mangler' in (select prosrc from pg_proc where proname = 'label_product_declaration' limit 1)) = 0 then
+    raise exception 'label_product_declaration mangler feilgren for manglende versjon';
+  end if;
+  if position('dv.nutrition_per_100g' in (select prosrc from pg_proc where proname = 'push_products_to_nettside')) = 0
+     or position('n.product_id = p.id and p.declaration_version_id is null' in (select prosrc from pg_proc where proname = 'push_products_to_nettside')) = 0 then
+    raise exception 'push_products_to_nettside bruker ikke godkjent versjon';
+  end if;
+  if exists (select 1 from pg_proc where proname = 'product_approved_declaration_version') then
+    raise exception 'ny rettighetsoverflate skal ikke finnes';
+  end if;
+  raise notice 'PASS kilde';
+end $$;
 rollback;
