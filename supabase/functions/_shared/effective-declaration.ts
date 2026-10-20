@@ -138,7 +138,9 @@ export async function syncAutoProductsForRecipe(
 
     // Produktet har en publisert deklarasjon (godkjent versjon eller eldre
     // snapshot): den skal aldri overskrives eller nulles stille av en ny
-    // beregning. Flagg for ny gjennomgang i stedet — sist godkjente gjelder.
+    // beregning. Flagg for ny gjennomgang i stedet. Godkjent versjon publiseres
+    // videre; et eldre snapshot uten versjon bevares lagret, men eksporteres ikke
+    // mens det krever gjennomgang (ingen dokumentert godkjenning å vise til).
     const product = (link as { products?: ProductSnapshotRef | null }).products ?? null;
     if (hasPublishedSnapshot(product)) {
       const { error } = await service
