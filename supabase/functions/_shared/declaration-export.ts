@@ -8,6 +8,8 @@
  * beregningsrad som finnes må ikke være utdatert.
  */
 
+import { htmlToMarkedText } from "./declaration-core.ts";
+
 export const DECLARATIONS_SCOPE = "declarations";
 
 export interface ExportCandidate {
@@ -19,7 +21,7 @@ export interface ExportCandidate {
   calculated: { computed_at: string | null; is_stale: boolean | null } | null;
 }
 
-export type ExportRejection = "mangler_deklarasjon" | "krever_ny_gjennomgang" | "utdatert";
+export type ExportRejection = "mangler_deklarasjon" | "krever_ny_gjennomgang" | "utdatert" | "godkjent_versjon_mangler";
 
 /** Null når varen kan eksporteres, ellers årsaken til at den holdes tilbake. */
 export function exportRejection(row: ExportCandidate): ExportRejection | null {
@@ -143,8 +145,14 @@ export function exportGrain(input: {
 export interface ApprovedVersion {
   id: string;
   version: number;
+  /** Kilde for godkjenningen: 'manual' eller 'calculated'. */
+  source: string | null;
   approved_at: string | null;
   ingredient_text: string | null;
+  /** H2-beregnede versjoner har allergenuthevingen her; ingredient_text er strippet. */
+  ingredient_html: string | null;
+  /** Godkjent nettovekt — null er autoritativt. */
+  net_weight_g: number | null;
   allergens_contains: string[] | null;
   allergens_may_contain: string[] | null;
   nutrition_per_100g: Record<string, number | null> | null;
@@ -176,19 +184,32 @@ export function exportDecision(
   row: ExportCandidate & { versionId: string | null | undefined; version: ApprovedVersion | null },
 ): ExportDecision {
   const calcStale = !!row.calculated && (!row.calculated.computed_at || row.calculated.is_stale === true);
-  if (row.versionId && row.version && row.version.id === row.versionId && row.version.ingredient_text?.trim()) {
-    return { include: true, source: "approved_version", needsReview: row.needsReview === true || calcStale, rejection: null };
+  if (row.versionId) {
+    // Eksplisitt peker: bare den godkjente versjonen kan publiseres. Kan den ikke
+    // lastes (eller er tom), lukkes varen — aldri fallback til løpende/legacy.
+    const v = row.version;
+    if (v && v.id === row.versionId && approvedIngredientText(v).trim()) {
+      return { include: true, source: "approved_version", needsReview: row.needsReview === true || calcStale, rejection: null };
+    }
+    return { include: false, source: null, needsReview: row.needsReview === true || calcStale, rejection: "godkjent_versjon_mangler" };
   }
   const rejection = exportRejection(row);
   return { include: rejection === null, source: rejection === null ? "legacy" : null, needsReview: false, rejection };
 }
 
-/** Grovhet fra godkjent snapshot — aldri fra løpende beregning. */
-export function approvedGrain(version: ApprovedVersion, recipeMode: string | null | undefined): ExportGrain | null {
+/** Godkjent ingrediensliste med *allergenmarkering*: HTML-snapshot foretrekkes. */
+export function approvedIngredientText(version: ApprovedVersion): string {
+  const html = version.ingredient_html?.trim();
+  if (html) return htmlToMarkedText(html);
+  return version.ingredient_text ?? "";
+}
+
+/** Grovhet fra godkjent snapshot — kilde og prosent avgjøres bare av versjonen. */
+export function approvedGrain(version: ApprovedVersion): ExportGrain | null {
   const pct = version.breadscale_pct == null ? null : Number(version.breadscale_pct);
   if (pct == null || !Number.isFinite(pct)) return null;
   return exportGrain({
-    mode: recipeMode === "manual" ? "manual" : "auto",
+    mode: version.source === "manual" ? "manual" : "auto",
     manualPct: pct,
     calcCategory: null,
     calcPct: pct,
@@ -197,18 +218,19 @@ export function approvedGrain(version: ApprovedVersion, recipeMode: string | nul
 
 /**
  * Publisert innhold for en vare med godkjent versjon: tekst, allergener,
- * næring, holdbarhet/oppbevaring/opprinnelse og grovhet kommer fra snapshotet.
+ * næring, holdbarhet/oppbevaring/opprinnelse, grovhet og vekt fra snapshotet.
  */
-export function approvedContent(version: ApprovedVersion, recipeMode: string | null | undefined) {
+export function approvedContent(version: ApprovedVersion) {
   return {
-    ingredient_text: version.ingredient_text ?? "",
+    ingredient_text: approvedIngredientText(version),
     allergens_contains: version.allergens_contains ?? [],
     allergens_may_contain: version.allergens_may_contain ?? [],
     nutrition_per_100g: version.nutrition_per_100g ?? null,
     shelf_life_days: version.shelf_life_days ?? null,
     storage_instructions: version.storage_text ?? null,
     country_of_origin: version.origin_text ?? null,
-    grain: approvedGrain(version, recipeMode),
+    grain: approvedGrain(version),
     approved_at: version.approved_at ?? null,
+    net_weight_grams: version.net_weight_g ?? null,
   };
 }
