@@ -461,7 +461,7 @@ function EffectiveStatusCard({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("manual_declaration_updated_at, manual_ingredient_declaration, declaration_needs_review")
+        .select("manual_declaration_updated_at, manual_ingredient_declaration, declaration_needs_review, declaration_review_reason, declaration_version_id")
         .eq("id", productId)
         .maybeSingle();
       if (error) throw error;
@@ -477,7 +477,11 @@ function EffectiveStatusCard({
       <div className="flex flex-wrap items-center gap-2 rounded-md border-2 border-amber-500/60 bg-amber-500/10 px-3 py-2 text-xs">
         <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
         <span className="flex-1">
-          En råvare er endret siden sist — deklarasjonen bør gjennomgås.
+          <strong>Krever gjennomgang</strong>
+          {snapshot.data?.declaration_review_reason ? ` — ${snapshot.data.declaration_review_reason}` : ""}.{" "}
+          {snapshot.data?.manual_ingredient_declaration
+            ? "Sist godkjente opplysninger vises og brukes fortsatt til en ny versjon godkjennes i oppskriftens Merking."
+            : "Varen har ingen godkjent deklarasjon ennå."}
         </span>
         {onRecompute && (
           <Button size="sm" variant="outline" onClick={onRecompute} disabled={recomputing}>

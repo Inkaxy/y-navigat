@@ -46,14 +46,14 @@ export function productLabelingStatus(
   labelRow: { computed_at: string | null; is_stale: boolean } | undefined,
 ): LabelingStatus {
   if (!p.manual_ingredient_declaration) return "missing";
-  if (p.declaration_needs_review) return "stale";
-  // En godkjent versjon er et eksplisitt snapshot. Det gjelder også manuelle
-  // deklarasjoner og skal ikke nedgraderes av en eldre beregningsrad.
-  if (p.declaration_version_id) return "approved";
+  // En godkjent versjon er et eksplisitt snapshot og forblir gjeldende til en ny
+  // versjon godkjennes. Ventende endringer gir «Krever gjennomgang», ikke utfall.
+  if (p.declaration_version_id) return p.declaration_needs_review ? "stale" : "approved";
+  // Eldre (legacy) deklarasjon uten versjon: teksten på produktet er den som gjaldt.
   if (!labelRow) return p.declaration_needs_review ? "stale" : "approved";
   return deriveLabelingStatusFromDb({
-    // Ingen eget godkjenningstidspunkt på produktet ennå — deklarasjonen regnes
-    // som godkjent på beregningstidspunktet, med mindre basen selv sier utdatert.
+    // Ingen eget godkjenningstidspunkt på produktet — deklarasjonen regnes som
+    // godkjent på beregningstidspunktet, med mindre basen selv sier utdatert.
     approvedAt: labelRow.computed_at,
     computedAt: labelRow.computed_at,
     isStale: labelRow.is_stale,
@@ -197,6 +197,11 @@ export default function ProductList() {
     labelingFilterActive: state.labeling !== "all",
   });
   const filtered = useMemo(() => filterProducts(all, state, labelingOf), [all, state, labelingOf]);
+  // Antall varer der sist godkjente opplysninger gjelder, men nye endringer venter.
+  const reviewCount = useMemo(
+    () => (load.labelingPending || load.isError ? null : all.filter((p) => labelingOf(p) === "stale").length),
+    [all, labelingOf, load.labelingPending, load.isError],
+  );
 
   /** «Beregn nå» — kjører batch-jobben på kostbufferen og oppsummerer på norsk. */
   const [recalculating, setRecalculating] = useState(false);
@@ -368,8 +373,8 @@ export default function ProductList() {
               </LabeledSelect>
               <LabeledSelect id="product-labeling" label="Merking" value={state.labeling} onChange={(v) => update({ labeling: v as "all" | LabelingStatus })}>
                 <SelectItem value="all">All merking</SelectItem>
-                <SelectItem value="approved">Godkjent</SelectItem>
-                <SelectItem value="stale">Utdatert</SelectItem>
+                <SelectItem value="approved">Godkjent (inkl. ventende endringer)</SelectItem>
+                <SelectItem value="stale">Krever gjennomgang{reviewCount != null ? ` (${reviewCount})` : ""}</SelectItem>
                 <SelectItem value="missing">Mangler</SelectItem>
               </LabeledSelect>
               <LabeledSelect id="product-status" label="Status" value={state.status} onChange={(v) => update({ status: v as ProductStatusFilter })}>

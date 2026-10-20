@@ -74,9 +74,25 @@ export function deriveLabelingStatus(input: {
 
 export const LABELING_STATUS_LABEL: Record<LabelingStatus, string> = {
   approved: "Godkjent",
-  stale: "Utdatert",
+  stale: "Krever gjennomgang",
   missing: "Mangler",
 };
+
+/**
+ * «Godkjent»-filteret viser alt som har en gyldig sist godkjent versjon —
+ * også når nye endringer venter på gjennomgang («stale»). «stale» alene er
+ * gjennomgangsfilteret (gamle URL-er med merking=stale virker uendret).
+ */
+export function matchesLabelingFilter(status: LabelingStatus, filter: "all" | LabelingStatus): boolean {
+  if (filter === "all") return true;
+  if (filter === "approved") return status === "approved" || status === "stale";
+  return status === filter;
+}
+
+/** Sann når varen/oppskriften har en sist godkjent versjon som fortsatt gjelder. */
+export function hasPublishedApproval(status: LabelingStatus): boolean {
+  return status !== "missing";
+}
 
 /**
  * Status basert på databasens egne flagg (`recipe_label_calculated.is_stale`).
@@ -89,9 +105,11 @@ export function deriveLabelingStatusFromDb(input: {
   isStale: boolean | null | undefined;
   blocked?: boolean;
 }): LabelingStatus {
-  if (!input.computedAt) return "missing";
-  if (!input.approvedAt || input.blocked) return "missing";
-  if (input.isStale) return "stale";
+  // Uten godkjenning finnes ingen publisert versjon — aldri «godkjent».
+  if (!input.approvedAt) return "missing";
+  // En godkjent versjon forblir gjeldende til en ny er godkjent; endringer
+  // (sperre, utdatert eller manglende beregning) gir «Krever gjennomgang».
+  if (input.blocked || input.isStale || !input.computedAt) return "stale";
   const approved = ms(input.approvedAt);
   const computed = ms(input.computedAt);
   if (approved != null && computed != null && approved < computed) return "stale";

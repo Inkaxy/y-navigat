@@ -13,7 +13,7 @@ export function LabelingBadge({ status, withPrefix = false }: { status: Labeling
     return <Badge variant="outline" className="text-muted-foreground">Laster merking</Badge>;
   }
   return (
-    <Badge variant="outline" className={CLS[status]}>
+    <Badge variant="outline" className={CLS[status]} title={status === "stale" ? "Sist godkjente opplysninger vises og gjelder til en ny versjon godkjennes" : undefined}>
       {withPrefix ? `Merking: ${LABELING_STATUS_LABEL[status].toLowerCase()}` : LABELING_STATUS_LABEL[status]}
     </Badge>
   );

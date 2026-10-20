@@ -1,6 +1,6 @@
 import { asDepartment } from "@/varer/lib/departments";
 import type { RecipeListState } from "@/varer/lib/listUrlState";
-import type { LabelingStatus } from "@/varer/lib/labelStaleness";
+import { matchesLabelingFilter, type LabelingStatus } from "@/varer/lib/labelStaleness";
 
 /** Feltene filtrering og sortering trenger — `RecipeRow` oppfyller dette. */
 export interface FilterableRecipe {
@@ -25,7 +25,7 @@ export function filterAndSortRecipes<T extends FilterableRecipe>(rows: T[], s: R
 
   return rows
     .filter((r) => (s.status === "all" ? true : (r.status ?? "draft") === s.status))
-    .filter((r) => (s.labeling === "all" ? true : r.labeling === s.labeling))
+    .filter((r) => matchesLabelingFilter(r.labeling, s.labeling))
     .filter((r) => {
       if (s.dept === "all") return true;
       const d = asDepartment(r.department);

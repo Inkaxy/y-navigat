@@ -4,7 +4,14 @@
 // GET /declarations-export?updated_since=<ISO>&product_ids=a,b&page=1&page_size=200
 // GET /declarations-export?schema=1   -> JSON Schema for responsen
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { checkApiKey, contentHash, exportGrain, exportRejection } from "../_shared/declaration-export.ts";
+import {
+  approvedContent,
+  checkApiKey,
+  contentHash,
+  exportDecision,
+  exportGrain,
+  type ApprovedVersion,
+} from "../_shared/declaration-export.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -89,6 +96,10 @@ const JSON_SCHEMA = {
             },
           },
           approved_at: { type: ["string", "null"], format: "date-time" },
+          needs_review: { type: "boolean", description: "Nye endringer venter på gjennomgang; publisert innhold er sist godkjente versjon." },
+          review_reason: { type: ["string", "null"] },
+          declaration_version: { type: ["integer", "null"] },
+          declaration_source: { enum: ["approved_version", "legacy"] },
           content_hash: { type: "string" },
         },
       },
@@ -165,7 +176,7 @@ Deno.serve(async (req) => {
     .select(
       "id, code, display_number, display_name, ean_code, unit_of_sale, in_web_shop, status, weight_per_unit_grams, keywords, " +
         "manual_ingredient_declaration, manual_allergens_contains, manual_allergens_may_contain, " +
-        "manual_nutrition_per_100g, manual_declaration_updated_at, declaration_needs_review, updated_at",
+        "manual_nutrition_per_100g, manual_declaration_updated_at, declaration_needs_review, declaration_review_reason, declaration_version_id, updated_at",
     )
     .eq("legal_entity_id", legalEntityId)
     .neq("status", "discontinued")
@@ -215,6 +226,22 @@ Deno.serve(async (req) => {
     : { data: [] as { recipe_id: string; computed_at: string | null; is_stale: boolean | null }[] };
   const calcByRecipe = new Map((calcRows ?? []).map((c) => [c.recipe_id as string, c]));
 
+  // Godkjente snapshots er fasit for publisert innhold. Feiler oppslaget,
+  // stopper vi heller enn å publisere løpende eller ufullstendige data.
+  const versionIds = [...new Set(pageRows.map((p) => p.declaration_version_id as string | null).filter(Boolean))] as string[];
+  const versionById = new Map<string, ApprovedVersion>();
+  if (versionIds.length) {
+    const { data: versionRows, error: versionErr } = await admin
+      .from("recipe_declaration_versions")
+      .select(
+        "id, version, approved_at, ingredient_text, allergens_contains, allergens_may_contain, nutrition_per_100g, " +
+          "shelf_life_days, storage_text, origin_text, claim_grain, claim_keyhole, breadscale_pct",
+      )
+      .in("id", versionIds);
+    if (versionErr) return jsonRes({ error: "Kunne ikke lese godkjente versjoner", code: "query_failed" }, 500);
+    for (const v of (versionRows ?? []) as unknown as ApprovedVersion[]) versionById.set(v.id, v);
+  }
+
   const { data: entity } = await admin
     .from("legal_entities")
     .select("id, legal_name, display_name, organization_number, invoice_address_line1, invoice_postal_code, invoice_city")
@@ -232,16 +259,41 @@ Deno.serve(async (req) => {
     const recipe = link?.recipe_id ? recipeById.get(link.recipe_id) ?? null : null;
     const calc = link?.recipe_id ? calcByRecipe.get(link.recipe_id) ?? null : null;
 
-    const rejection = exportRejection({
+    const versionId = (p.declaration_version_id as string | null) ?? null;
+    const version = versionId ? versionById.get(versionId) ?? null : null;
+    const decision = exportDecision({
       ingredientText: p.manual_ingredient_declaration as string | null,
       needsReview: p.declaration_needs_review as boolean | null,
       calculated: link?.recipe_id
         ? { computed_at: (calc?.computed_at as string | null) ?? null, is_stale: (calc?.is_stale as boolean | null) ?? null }
         : null,
+      versionId,
+      version,
     });
-    if (rejection) continue;
+    if (!decision.include) continue;
 
-    const text = String(p.manual_ingredient_declaration ?? "");
+    const legacyText = String(p.manual_ingredient_declaration ?? "");
+    const published = decision.source === "approved_version" && version
+      ? approvedContent(version, recipe?.breadscale_mode as string | null)
+      : {
+          ingredient_text: legacyText,
+          allergens_contains: (p.manual_allergens_contains as string[] | null) ?? [],
+          allergens_may_contain: (p.manual_allergens_may_contain as string[] | null) ?? [],
+          nutrition_per_100g: (p.manual_nutrition_per_100g as Record<string, number | null> | null) ?? null,
+          shelf_life_days: (recipe?.shelf_life_days as number | null) ?? null,
+          storage_instructions: (recipe?.storage_instructions as string | null) ?? null,
+          country_of_origin: (recipe?.country_of_origin as string | null) ?? null,
+          grain: recipe
+            ? exportGrain({
+                mode: recipe.breadscale_mode as string | null,
+                manualPct: recipe.manual_breadscale_pct as number | null,
+                calcCategory: (calc?.grain_category as string | null) ?? null,
+                calcPct: (calc?.grain_score_pct as number | null) ?? null,
+              })
+            : null,
+          approved_at: (p.manual_declaration_updated_at as string | null) ?? (calc?.computed_at as string | null) ?? null,
+        };
+    const text = published.ingredient_text;
     const item = {
       id: p.id,
       product_number: p.display_number != null ? String(p.display_number) : null,
@@ -253,26 +305,27 @@ Deno.serve(async (req) => {
       keywords: ((p.keywords as string[] | null) ?? []).map((k) => String(k).trim()).filter(Boolean),
       ingredient_text: text,
       ingredient_text_plain: stripMarkers(text),
-      allergens_contains: (p.manual_allergens_contains as string[] | null) ?? [],
-      allergens_may_contain: (p.manual_allergens_may_contain as string[] | null) ?? [],
-      nutrition_per_100g: (p.manual_nutrition_per_100g as Record<string, number | null> | null) ?? null,
+      allergens_contains: published.allergens_contains,
+      allergens_may_contain: published.allergens_may_contain,
+      nutrition_per_100g: published.nutrition_per_100g,
       net_weight_grams:
         (p.weight_per_unit_grams as number | null) ?? ((recipe?.unit_weight_grams as number | null) ?? null),
-      shelf_life_days: (recipe?.shelf_life_days as number | null) ?? null,
-      storage_instructions: (recipe?.storage_instructions as string | null) ?? null,
-      country_of_origin: (recipe?.country_of_origin as string | null) ?? null,
+      shelf_life_days: published.shelf_life_days,
+      storage_instructions: published.storage_instructions,
+      country_of_origin: published.country_of_origin,
       recipe_name: (recipe?.name as string | null) ?? null,
-      grain: recipe
-        ? exportGrain({
-            mode: recipe.breadscale_mode as string | null,
-            manualPct: recipe.manual_breadscale_pct as number | null,
-            calcCategory: (calc?.grain_category as string | null) ?? null,
-            calcPct: (calc?.grain_score_pct as number | null) ?? null,
-          })
-        : null,
-      approved_at: (p.manual_declaration_updated_at as string | null) ?? (calc?.computed_at as string | null) ?? null,
+      grain: published.grain,
+      approved_at: published.approved_at,
     };
-    products.push({ ...item, content_hash: await contentHash(item) });
+    // Review-feltene er tillegg utenfor content_hash: et nytt flagg endrer ikke
+    // publisert innhold, så mottakerens cache forblir gyldig.
+    const review = {
+      needs_review: decision.needsReview,
+      review_reason: decision.needsReview ? ((p.declaration_review_reason as string | null) ?? null) : null,
+      declaration_version: version?.version ?? null,
+      declaration_source: decision.source,
+    };
+    products.push({ ...item, ...review, content_hash: await contentHash(item) });
   }
 
   const payload = {

@@ -138,3 +138,77 @@ export function exportGrain(input: {
   if (p != null && Number.isFinite(p)) return build(levelFromPct(p), p, "auto");
   return null;
 }
+
+/** Godkjent snapshot fra `recipe_declaration_versions` — fasit for publisering. */
+export interface ApprovedVersion {
+  id: string;
+  version: number;
+  approved_at: string | null;
+  ingredient_text: string | null;
+  allergens_contains: string[] | null;
+  allergens_may_contain: string[] | null;
+  nutrition_per_100g: Record<string, number | null> | null;
+  shelf_life_days: number | null;
+  storage_text: string | null;
+  origin_text: string | null;
+  claim_grain: boolean | null;
+  claim_keyhole: boolean | null;
+  breadscale_pct: number | null;
+}
+
+export type ExportSource = "approved_version" | "legacy";
+
+export interface ExportDecision {
+  include: boolean;
+  source: ExportSource | null;
+  /** Nye endringer venter på gjennomgang; publisert innhold er uendret. */
+  needsReview: boolean;
+  rejection: ExportRejection | null;
+}
+
+/**
+ * Skiller «har gyldig sist godkjent versjon» fra «nye endringer krever
+ * gjennomgang». En vare med godkjent versjon publiseres alltid med sitt
+ * snapshot; review-flagget og utdatert beregning eksponeres bare som tillegg.
+ * Uten versjon (eldre data) gjelder den opprinnelige, strenge regelen.
+ */
+export function exportDecision(
+  row: ExportCandidate & { versionId: string | null | undefined; version: ApprovedVersion | null },
+): ExportDecision {
+  const calcStale = !!row.calculated && (!row.calculated.computed_at || row.calculated.is_stale === true);
+  if (row.versionId && row.version && row.version.id === row.versionId && row.version.ingredient_text?.trim()) {
+    return { include: true, source: "approved_version", needsReview: row.needsReview === true || calcStale, rejection: null };
+  }
+  const rejection = exportRejection(row);
+  return { include: rejection === null, source: rejection === null ? "legacy" : null, needsReview: false, rejection };
+}
+
+/** Grovhet fra godkjent snapshot — aldri fra løpende beregning. */
+export function approvedGrain(version: ApprovedVersion, recipeMode: string | null | undefined): ExportGrain | null {
+  const pct = version.breadscale_pct == null ? null : Number(version.breadscale_pct);
+  if (pct == null || !Number.isFinite(pct)) return null;
+  return exportGrain({
+    mode: recipeMode === "manual" ? "manual" : "auto",
+    manualPct: pct,
+    calcCategory: null,
+    calcPct: pct,
+  });
+}
+
+/**
+ * Publisert innhold for en vare med godkjent versjon: tekst, allergener,
+ * næring, holdbarhet/oppbevaring/opprinnelse og grovhet kommer fra snapshotet.
+ */
+export function approvedContent(version: ApprovedVersion, recipeMode: string | null | undefined) {
+  return {
+    ingredient_text: version.ingredient_text ?? "",
+    allergens_contains: version.allergens_contains ?? [],
+    allergens_may_contain: version.allergens_may_contain ?? [],
+    nutrition_per_100g: version.nutrition_per_100g ?? null,
+    shelf_life_days: version.shelf_life_days ?? null,
+    storage_instructions: version.storage_text ?? null,
+    country_of_origin: version.origin_text ?? null,
+    grain: approvedGrain(version, recipeMode),
+    approved_at: version.approved_at ?? null,
+  };
+}
