@@ -164,7 +164,7 @@ export default function Recipes() {
           >
             <span className="text-lg font-semibold tabular-nums">{data.staleCount}</span>
             <span className="text-sm">
-              {data.staleCount === 1 ? "deklarasjon er utdatert" : "deklarasjoner er utdaterte"} — vis dem
+              {data.staleCount === 1 ? "godkjent deklarasjon krever gjennomgang" : "godkjente deklarasjoner krever gjennomgang"} — sist godkjente gjelder til ny godkjenning. Vis dem
             </span>
           </button>
         )}
@@ -187,8 +187,8 @@ export default function Recipes() {
             </FilterSelect>
             <FilterSelect id="recipe-labeling" label="Merking" value={state.labeling} onChange={(v) => update({ labeling: v as "all" | LabelingStatus })}>
               <option value="all">All merking</option>
-              <option value="approved">Godkjent</option>
-              <option value="stale">Utdatert</option>
+              <option value="approved">Godkjent (inkl. ventende endringer)</option>
+              <option value="stale">Krever gjennomgang ({data.staleCount})</option>
               <option value="missing">Mangler</option>
             </FilterSelect>
             <FilterSelect id="recipe-category" label="Kategori" value={state.category} onChange={(v) => update({ category: v })}>
