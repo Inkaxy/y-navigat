@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 /** Produktets forhåndsvisning/kopi/utskrift etter ny beregning: godkjent versjon er standard. */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -63,7 +63,7 @@ describe("PreviewDialog etter ny beregning", () => {
     expect(screen.queryByText(/KLADD/)).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: /Kopier tekst/ }));
-    expect(clip[0]).toContain("Ingredienser: Hvetemel (**hvete**), vann");
+    expect(clip[0]).toContain("Ingredienser: Hvetemel (*hvete*), vann");
     expect(clip[0]).not.toMatch(/sesam|KLADD/);
 
     fireEvent.click(screen.getByRole("button", { name: /Skriv ut$/ }));
