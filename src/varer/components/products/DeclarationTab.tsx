@@ -710,7 +710,7 @@ export function PreviewDialog({ open, onClose, productName, productId, computed 
   );
 }
 
-type ComputedDeclaration = {
+export type ComputedDeclaration = {
   mode: Mode;
   mode_source: "link" | "recipe" | "default" | "recipe_label";
   product_recipe_link_id: string;
