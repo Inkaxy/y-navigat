@@ -1,5 +1,5 @@
 import type { ProductListState } from "@/varer/lib/listUrlState";
-import type { LabelingStatus } from "@/varer/lib/labelStaleness";
+import { matchesLabelingFilter, type LabelingStatus } from "@/varer/lib/labelStaleness";
 
 export interface FilterableProduct {
   id: string;
@@ -48,7 +48,7 @@ export function filterProducts<T extends FilterableProduct>(
     if (s.status !== "all" && p.status !== s.status) return false;
     if (s.variant === "parents" && p.variant_of_product_id) return false;
     if (s.variant === "variants" && !p.variant_of_product_id) return false;
-    if (s.labeling !== "all" && labelingOf(p) !== s.labeling) return false;
+    if (s.labeling !== "all" && !matchesLabelingFilter(labelingOf(p), s.labeling)) return false;
     return true;
   });
 }
