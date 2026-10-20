@@ -346,7 +346,7 @@ export function LabelTab({
   const shownSource: PreviewSource = approvedInput ? labelSource : "draft";
   const draftPreview = (
     <ConsumerLabelSection
-      variant={approvedInput ? "draft" : undefined}
+      variant="draft"
       recipeName={recipeName}
       effective={effective}
       effectiveGrainPct={
@@ -397,7 +397,7 @@ export function LabelTab({
           breadscaleManual={breadscaleMode === "manual"}
           claimGrain={approvedInput.claimGrain}
           claimKeyhole={approvedInput.claimKeyhole}
-          unitWeightGrams={recipe.unit_weight_grams ?? approvedInput.unitWeightGrams}
+          unitWeightGrams={approvedInput.unitWeightGrams}
           shelfLifeDays={approvedInput.shelfLifeDays}
           storageInstructions={approvedInput.storageInstructions}
           countryOfOrigin={approvedInput.countryOfOrigin}

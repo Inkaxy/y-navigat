@@ -4,6 +4,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+const state: { versionRow: "ok" | "missing" | "error" } = { versionRow: "ok" };
 const tables: Record<string, Record<string, unknown>> = {
   products: {
     declaration_version_id: "v1",
@@ -22,7 +23,12 @@ const tables: Record<string, Record<string, unknown>> = {
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/integrations/supabase/client", () => {
   const from = (t: string) => {
-    const q = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: tables[t] ?? null, error: null }) };
+    const q = { select: () => q, eq: () => q, maybeSingle: async () =>
+      t === "recipe_declaration_versions" && state.versionRow === "error"
+        ? { data: null, error: { message: "nett" } }
+        : t === "recipe_declaration_versions" && state.versionRow === "missing"
+          ? { data: null, error: null }
+          : { data: tables[t] ?? null, error: null } };
     return q;
   };
   return { supabase: { from } };
@@ -45,7 +51,7 @@ describe("PreviewDialog etter ny beregning", () => {
   let clip: string[];
   let blobs: string[];
   beforeEach(() => {
-    clip = []; blobs = [];
+    clip = []; blobs = []; state.versionRow = "ok";
     vi.spyOn(navigator.clipboard, "writeText").mockImplementation((t: string) => { clip.push(t); return Promise.resolve(); });
     URL.createObjectURL = (b: Blob | MediaSource) => { void (b as Blob).text().then((t) => blobs.push(t)); return "blob:x"; };
     URL.revokeObjectURL = () => {};
@@ -74,5 +80,19 @@ describe("PreviewDialog etter ny beregning", () => {
     fireEvent.click(screen.getByRole("button", { name: /Ny beregning – forslag/ }));
     fireEvent.click(screen.getByRole("button", { name: /Kopier kladd/ }));
     expect(clip[1]).toMatch(/^KLADD – ikke godkjent/);
+  });
+
+  it.each(["missing", "error"] as const)("versjonspeker uten lesbar rad (%s): feil, kopi/utskrift sperret, ingen kladd", async (mode) => {
+    state.versionRow = mode;
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <PreviewDialog open onClose={() => {}} productName="Kneipp" productId={`p-${mode}`} computed={draft} />
+      </QueryClientProvider>,
+    );
+    await screen.findByRole("alert");
+    expect(screen.queryByText(/ingen godkjent/i)).toBeNull();
+    expect(screen.queryByText(/KLADD/)).toBeNull();
+    expect(screen.getByRole("button", { name: /Kopier/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Skriv ut/ })).toBeDisabled();
   });
 });
