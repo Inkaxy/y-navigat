@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /** Produktets forhåndsvisning/kopi/utskrift etter ny beregning: godkjent versjon er standard. */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -48,7 +49,7 @@ describe("PreviewDialog etter ny beregning", () => {
     Object.assign(navigator, { clipboard: { writeText: (t: string) => { clip.push(t); return Promise.resolve(); } } });
     URL.createObjectURL = (b: Blob | MediaSource) => { void (b as Blob).text().then((t) => blobs.push(t)); return "blob:x"; };
     URL.revokeObjectURL = () => {};
-    window.open = () => ({ addEventListener: () => {}, print: () => {} }) as unknown as Window;
+    window.open = () => null;
   });
 
   it("viser, kopierer og skriver ut godkjent versjon som standard; kladd er merket", async () => {
