@@ -2,6 +2,7 @@ import { NUTRITION_FIELDS as NUTRITION_FIELD_CATALOG } from "@/varer/lib/nutriti
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { htmlToMarkerText } from "@/varer/lib/declarationFormat";
+import { publishedProductDeclaration, type PublishedProductDeclaration } from "@/varer/lib/approvedLabel";
 import DOMPurify from "dompurify";
 import { DeclarationAssistantPanel } from "@/varer/components/declaration/DeclarationAssistantPanel";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -430,7 +431,7 @@ function DeclarationView({ link, productName, canWrite, qc }: { link: any; produ
       )}
 
       {computed && (
-        <PreviewDialog open={previewOpen} onClose={() => setPreviewOpen(false)} productName={productName} computed={computed} />
+        <PreviewDialog open={previewOpen} onClose={() => setPreviewOpen(false)} productName={productName} productId={link.product_id} computed={computed} />
       )}
     </div>
   );
@@ -553,38 +554,86 @@ function DataQualityBanner({ computed }: { computed: ComputedDeclaration }) {
   );
 }
 
-function PreviewDialog({ open, onClose, productName, computed }: { open: boolean; onClose: () => void; productName: string; computed: ComputedDeclaration }) {
+type PreviewDoc = { ingredientHtml: string; contains: string[]; mayContain: string[]; nutrition: Record<string, number | null> | null };
+
+/** Publisert deklarasjon for produktet: godkjent versjon, ellers eksplisitt legacy-snapshot. */
+function usePublishedDeclaration(productId: string) {
+  return useQuery({
+    queryKey: ["product-published-declaration", productId],
+    queryFn: async (): Promise<PublishedProductDeclaration | null> => {
+      const { data: p, error } = await supabase
+        .from("products")
+        .select("declaration_version_id, manual_ingredient_declaration, manual_allergens_contains, manual_allergens_may_contain, manual_nutrition_per_100g")
+        .eq("id", productId)
+        .maybeSingle();
+      if (error) throw error;
+      if (!p) return null;
+      let version: Parameters<typeof publishedProductDeclaration>[0]["version"] = null;
+      if (p.declaration_version_id) {
+        const { data: v, error: vErr } = await supabase
+          .from("recipe_declaration_versions")
+          .select("id, version, approved_at, ingredient_text, ingredient_html, allergens_contains, allergens_may_contain, nutrition_per_100g, coverage_pct, net_weight_g, shelf_life_days, storage_text, origin_text, claim_grain, claim_keyhole, breadscale_pct")
+          .eq("id", p.declaration_version_id)
+          .maybeSingle();
+        if (vErr) throw vErr;
+        version = v ?? null;
+      }
+      return publishedProductDeclaration({ versionId: p.declaration_version_id, version, product: p });
+    },
+  });
+}
+
+function PreviewDialog({ open, onClose, productName, productId, computed }: { open: boolean; onClose: () => void; productName: string; productId: string; computed: ComputedDeclaration }) {
+  const published = usePublishedDeclaration(productId);
+  const [choice, setChoice] = useState<"approved" | "draft">("approved");
+  const hasPublished = !!published.data;
+  const source: "approved" | "draft" = hasPublished ? choice : "draft";
+  const isDraft = source === "draft";
+  const doc: PreviewDoc = source === "approved" && published.data
+    ? {
+        ingredientHtml: published.data.ingredientHtml,
+        contains: published.data.contains,
+        mayContain: published.data.mayContain,
+        nutrition: published.data.nutrition as Record<string, number | null> | null,
+      }
+    : {
+        ingredientHtml: computed.ingredient_declaration_html || "",
+        contains: computed.allergens_contains,
+        mayContain: computed.allergens_may_contain,
+        nutrition: computed.nutrition_per_100g as Record<string, number | null> | null,
+      };
+  const draftTitle = `KLADD – ikke godkjent · ${productName}`;
+
   /** Uthevede allergener beholdes som **markering** når teksten kopieres. */
   function plainText(): string {
-    const text = htmlToMarkerText(computed.ingredient_declaration_html || "");
+    const text = htmlToMarkerText(doc.ingredientHtml);
     const lines: string[] = [];
-    lines.push(productName);
+    lines.push(isDraft ? draftTitle : productName);
     lines.push("");
     lines.push(`Ingredienser: ${text}`);
     // Allergener er allerede uthevet i ingredienslisten (jf. 1169/2011 vedlegg II) — «Inneholder»-setningen
     // er kun nødvendig når det ikke finnes noen ingrediensliste å utheve dem i.
-    if (!text.trim() && computed.allergens_contains.length) lines.push(`Inneholder: ${computed.allergens_contains.join(", ")}.`);
-    if (computed.allergens_may_contain.length) lines.push(`Kan inneholde spor av: ${computed.allergens_may_contain.join(", ")}.`);
+    if (!text.trim() && doc.contains.length) lines.push(`Inneholder: ${doc.contains.join(", ")}.`);
+    if (doc.mayContain.length) lines.push(`Kan inneholde spor av: ${doc.mayContain.join(", ")}.`);
     lines.push("");
     lines.push("Næring pr 100 g:");
     for (const f of NUTRITION_FIELDS) {
-      const v = (computed.nutrition_per_100g as any)?.[f.key];
+      const v = doc.nutrition?.[f.key];
       if (v != null) lines.push(`  ${f.label}: ${formatNutrient(f.key, v)}`);
     }
     return lines.join("\n");
   }
-  function copyText() { navigator.clipboard.writeText(plainText()); toast.success("Kopiert til utklippstavle"); }
+  function copyText() { navigator.clipboard.writeText(plainText()); toast.success(isDraft ? "Kladd kopiert til utklippstavle" : "Kopiert til utklippstavle"); }
   function printNow() {
     // Ingen document.write: vi bygger et blob-dokument og åpner det.
-    // Utskriften må vise allergenene uthevet, ellers er etiketten ikke i tråd
-    // med 1169/2011. Derfor skrives ingredienslinja som renset HTML, ikke som
-    // ren tekst slik den gjorde før.
-    const ingredientHtml = DOMPurify.sanitize(computed.ingredient_declaration_html || "—", {
+    // Utskriften må vise allergenene uthevet (1169/2011), derfor renset HTML.
+    const ingredientHtml = DOMPurify.sanitize(doc.ingredientHtml || "—", {
       ALLOWED_TAGS: ["strong", "b", "em", "i", "br"],
       ALLOWED_ATTR: [],
     });
     const rest = plainText().split("\n").slice(3).join("\n").replace(/</g, "&lt;");
-    const html = `<!doctype html><html lang="nb"><head><meta charset="utf-8"><title>Deklarasjon</title></head><body style="font-family:Inter,system-ui;font-size:12px;padding:16px"><p style="font-weight:600">${productName.replace(/</g, "&lt;")}</p><p>Ingredienser: ${ingredientHtml}</p><pre style="font-family:inherit;font-size:12px;white-space:pre-wrap;margin:0">${rest}</pre></body></html>`;
+    const title = (isDraft ? draftTitle : productName).replace(/</g, "&lt;");
+    const html = `<!doctype html><html lang="nb"><head><meta charset="utf-8"><title>Deklarasjon</title></head><body style="font-family:Inter,system-ui;font-size:12px;padding:16px"><p style="font-weight:600">${title}</p><p>Ingredienser: ${ingredientHtml}</p><pre style="font-family:inherit;font-size:12px;white-space:pre-wrap;margin:0">${rest}</pre></body></html>`;
     const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
     const w = window.open(url, "_blank", "width=600,height=800");
     if (!w) {
@@ -601,34 +650,59 @@ function PreviewDialog({ open, onClose, productName, computed }: { open: boolean
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader><DialogTitle>Etikett-forhåndsvisning</DialogTitle></DialogHeader>
-        <div className="rounded-md border border-border bg-background p-4 text-sm space-y-2">
-          <div className="font-semibold">{productName}</div>
-          <div>
-            <span className="font-medium">Ingredienser: </span>
-            <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(computed.ingredient_declaration_html || "—", { USE_PROFILES: { html: true } }) }} />
-          </div>
-          {!computed.ingredient_declaration_html && computed.allergens_contains.length > 0 && (
-            <div><span className="font-medium">Inneholder:</span> {computed.allergens_contains.join(", ")}.</div>
-          )}
-          {computed.allergens_may_contain.length > 0 && (
-            <div><span className="font-medium">Kan inneholde spor av:</span> {computed.allergens_may_contain.join(", ")}.</div>
-          )}
-          <div className="pt-2">
-            <div className="font-medium">Næringsinnhold pr 100 g:</div>
-            <table className="mt-1 w-full text-xs">
-              <tbody>
-                {NUTRITION_FIELDS.map((f) => {
-                  const v = (computed.nutrition_per_100g as any)?.[f.key];
-                  if (v == null) return null;
-                  return <tr key={f.key}><td className="py-0.5">{f.label}</td><td className="py-0.5 text-right tabular-nums">{v}</td></tr>;
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        {published.isLoading ? (
+          <p className="text-sm text-muted-foreground">Henter sist godkjente deklarasjon…</p>
+        ) : published.isError ? (
+          <p role="alert" className="text-sm text-destructive">Kunne ikke hente sist godkjente deklarasjon. Forhåndsvisning og utskrift er stoppet.</p>
+        ) : (
+          <>
+            {hasPublished && (
+              <div role="group" aria-label="Kilde for forhåndsvisning" className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" className="min-h-11" variant={source === "approved" ? "default" : "outline"} aria-pressed={source === "approved"} onClick={() => setChoice("approved")}>
+                  {published.data?.kind === "approved_version" ? `Sist godkjente (versjon ${published.data.version})` : "Lagret deklarasjon"}
+                </Button>
+                <Button type="button" size="sm" className="min-h-11" variant={source === "draft" ? "default" : "outline"} aria-pressed={source === "draft"} onClick={() => setChoice("draft")}>
+                  Ny beregning – forslag
+                </Button>
+              </div>
+            )}
+            {isDraft && (
+              <p className="rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-xs">
+                {hasPublished
+                  ? "Kladd: ny beregning som ikke er godkjent. Godkjenn i oppskriftens Merking for å ta den i bruk."
+                  : "Varen har ingen godkjent deklarasjon. Dette er en kladd og merkes som ikke godkjent ved kopi og utskrift."}
+              </p>
+            )}
+            <div className="rounded-md border border-border bg-background p-4 text-sm space-y-2">
+              <div className="font-semibold">{isDraft ? draftTitle : productName}</div>
+              <div>
+                <span className="font-medium">Ingredienser: </span>
+                <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(doc.ingredientHtml || "—", { USE_PROFILES: { html: true } }) }} />
+              </div>
+              {!doc.ingredientHtml && doc.contains.length > 0 && (
+                <div><span className="font-medium">Inneholder:</span> {doc.contains.join(", ")}.</div>
+              )}
+              {doc.mayContain.length > 0 && (
+                <div><span className="font-medium">Kan inneholde spor av:</span> {doc.mayContain.join(", ")}.</div>
+              )}
+              <div className="pt-2">
+                <div className="font-medium">Næringsinnhold pr 100 g:</div>
+                <table className="mt-1 w-full text-xs">
+                  <tbody>
+                    {NUTRITION_FIELDS.map((f) => {
+                      const v = doc.nutrition?.[f.key];
+                      if (v == null) return null;
+                      return <tr key={f.key}><td className="py-0.5">{f.label}</td><td className="py-0.5 text-right tabular-nums">{v}</td></tr>;
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
         <DialogFooter className="gap-2 sm:gap-2">
-          <Button variant="outline" onClick={copyText}><Copy className="mr-1.5 h-4 w-4" /> Kopier tekst</Button>
-          <Button variant="outline" onClick={printNow}><Printer className="mr-1.5 h-4 w-4" /> Skriv ut</Button>
+          <Button variant="outline" onClick={copyText} disabled={published.isLoading || published.isError}><Copy className="mr-1.5 h-4 w-4" /> {isDraft ? "Kopier kladd" : "Kopier tekst"}</Button>
+          <Button variant="outline" onClick={printNow} disabled={published.isLoading || published.isError}><Printer className="mr-1.5 h-4 w-4" /> {isDraft ? "Skriv ut kladd" : "Skriv ut"}</Button>
           <Button onClick={onClose}>Lukk</Button>
         </DialogFooter>
       </DialogContent>
