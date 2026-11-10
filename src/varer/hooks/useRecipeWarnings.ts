@@ -120,6 +120,9 @@ export interface RecipeWarningsResult {
   /** Advarselstekst per linje-id — mates rett inn i linjegriddet. */
   byLine: Record<string, string | undefined>;
   isLoading: boolean;
+  /** Dekningsoppslaget feilet: listen er ukjent, ikke tom. */
+  isError: boolean;
+  refetch: () => void;
 }
 
 export function useRecipeWarnings({
@@ -256,5 +259,13 @@ export function useRecipeWarnings({
     return map;
   }, [warnings]);
 
-  return { warnings, byLine, isLoading: coverage.isLoading };
+  return {
+    warnings,
+    byLine,
+    isLoading: coverage.isLoading,
+    isError: coverage.isError,
+    refetch: () => {
+      void coverage.refetch();
+    },
+  };
 }
