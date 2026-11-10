@@ -47,8 +47,8 @@ const M1: ProductMargins = {
 const M2: ProductMargins = { ...M1, levels: [lvl({ price_list_id: "u2", price_level: "utsalg", name: "Butikk", price: 64, brutto_pct: 85.28, db2: 41.18, dg2_pct: 64.34, status: "gronn" }), lvl({ price_list_id: "e2", price_level: "engros", name: "Engros", status: "ingen_pris" })] };
 const M3: ProductMargins = { has_cost: false, calc_type: "oppskrift", cost: { notes: ["Vekt per salgsenhet mangler på koblingen", "«Solsikkekjerner» mangler verifisert kostpris"] }, levels: [] };
 
-const TOTALS = { totalFlourG: 10000, totalDoughG: 36200, unitCount: 48, doughPerUnitG: 754, incomplete: false, warnings: [], hydrationPct: 78, saltPct: 2, leavenPct: 20 } as unknown as BakersTotals;
-const COST = { totalCost: 452.16, costPerKg: 12.49, costPerUnit: 9.42, incomplete: true, unverifiedCount: 0, missing: [{ name: "Solsikkekjerner", reason: "mangler verifisert kostpris" }], newestVerifiedDate: null } as unknown as RecipeCostTotals;
+const TOTALS: BakersTotals = { totalFlourG: 10000, totalWaterG: 7800, totalDoughG: 36200, hydrationPct: 78, saltPct: 2, leavenPct: 20, unitCount: 48, doughPerUnitG: 754, warnings: [], incomplete: false };
+const COST: RecipeCostTotals = { totalCost: 452.16, costPerKg: null, costPerUnit: null, incomplete: true, unverifiedCount: 0, missing: [{ name: "Solsikkekjerner", reason: "mangler verifisert kostpris" }], newestVerifiedDate: null, sources: [] };
 
 export default function RecipeOverviewPreview() {
   const [tab, setTab] = useState<RecipeTabId>("varer");
@@ -60,9 +60,9 @@ export default function RecipeOverviewPreview() {
   ];
   const summary = composeRemaining([
     warningItems([{ kind: "missing_allergens", message: "«Solsikkekjerner» mangler allergeninformasjon", lineId: "x", rawMaterialId: "rm", name: "Solsikkekjerner", action: { label: "Åpne råvare", href: "/forhandsvisning/oppskrift" } } satisfies RecipeWarning], "p1"),
-    [costItem(COST)!],
+    [costItem(COST)].filter((x): x is NonNullable<typeof x> => x != null),
     labelItems({ checklist: [{ key: "storage", label: "Oppbevaring", level: "warn", detail: "Oppbevaring mangler." }], blockReasons: [], declarationManual: false }),
-    marginItems(rows.map((r) => ({ productId: r.link.product_id, name: r.link.products?.display_name ?? "", data: r.margins! }))),
+    marginItems(rows.map((r) => ({ productId: r.link.product_id, name: r.link.products?.display_name ?? "", data: r.margins ?? M3 }))),
   ]);
   return (
     <main className="space-y-4 px-page py-5">
