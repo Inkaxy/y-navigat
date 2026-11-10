@@ -7,7 +7,8 @@ export const RECIPE_SECTIONS = [
   { id: "seksjon-info", label: "Oppskriftsinfo og vekt" },
   { id: "seksjon-prosess", label: "Prosess" },
   { id: "seksjon-notater", label: "Notater og ferdiggjøring" },
-  { id: "seksjon-koblinger", label: "Koblede varer og historikk" },
+  { id: "seksjon-koblinger", label: "Koblede varer" },
+  { id: "seksjon-historikk", label: "Historikk" },
 ] as const;
 export type RecipeSectionId = (typeof RECIPE_SECTIONS)[number]["id"];
 
@@ -35,8 +36,12 @@ export function RecipeSection({ id, title, actions, children }: { id: RecipeSect
   );
 }
 
-/** Kompakt «Gå til»-navigasjon, rullbar på mobil. */
-export function RecipeSectionNav() {
+/**
+ * Kompakt «Gå til»-navigasjon, rullbar på mobil. Med `onGoTo` (oppskriftssiden
+ * med faner) bytter et klikk fane før fokus flyttes, og nettleseren navigerer
+ * ikke — da slår heller ikke vakten for ulagrede endringer inn.
+ */
+export function RecipeSectionNav({ onGoTo }: { onGoTo?: (id: RecipeSectionId) => void } = {}) {
   return (
     <nav aria-label="Gå til i oppskriften">
       <ul className="flex flex-wrap items-center gap-1.5 py-0.5">
@@ -46,6 +51,11 @@ export function RecipeSectionNav() {
             <a
               href={`#${s.id}`}
               onClick={(e) => {
+                if (onGoTo) {
+                  e.preventDefault();
+                  onGoTo(s.id);
+                  return;
+                }
                 if (goToSection(s.id)) e.preventDefault();
               }}
               className="inline-flex rounded-full border border-border bg-background px-3 py-1 text-caption text-foreground transition-colors hover:border-app/50 hover:bg-app/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
