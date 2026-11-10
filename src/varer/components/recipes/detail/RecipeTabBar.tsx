@@ -84,7 +84,7 @@ export function RecipeTabBar({
               <span
                 aria-hidden="true"
                 className={cn(
-                  "inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-caption font-semibold tabular-nums",
+                  "inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-caption font-semibold tabular-nums",
                   tone === "must" ? "bg-destructive text-destructive-foreground" : "bg-warning/20 text-warning",
                 )}
               >
