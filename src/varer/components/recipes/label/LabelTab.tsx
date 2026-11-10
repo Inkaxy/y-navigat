@@ -194,11 +194,7 @@ export function LabelTab({
   }, [recipe.manual_allergen_summary, recipe.manual_ingredient_declaration, recipe.manual_nutrition]);
 
   const entity = entityQuery.data ?? null;
-  const producerAddress = entity
-    ? [entity.address_line1, [entity.postal_code, entity.city].filter(Boolean).join(" ")]
-        .filter(Boolean)
-        .join(", ")
-    : null;
+  const producerAddress = entity ? labelProducerAddress(entity) : null;
 
   /**
    * Pliktfeltene vurderes per kilde. En sperret beregning skal ikke hindre
