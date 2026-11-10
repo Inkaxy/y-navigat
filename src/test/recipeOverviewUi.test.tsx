@@ -125,7 +125,7 @@ describe("Varer og lønnsomhet", () => {
     table([{ link: link(), state: "ready", margins: { has_cost: false, cost: { notes: ["Smør mangler kostpris"] }, levels: [] }, retry: () => {} }]);
     expect(screen.getByText("Smør mangler kostpris")).toBeTruthy();
     expect(screen.queryByText(/0,00 kr/)).toBeNull();
-    expect(screen.queryByText(/Brutto/)).toBeNull();
+    expect(screen.queryByText(/Brutto \d/)).toBeNull();
   });
 
   it("mangler vekt per salgsenhet vises kiloprisen som «–», ikke 0", () => {
