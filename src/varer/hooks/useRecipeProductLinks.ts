@@ -38,7 +38,13 @@ export const RECIPE_LINKS_KEY = (recipeId: string) => ["recipe-links", recipeId]
  */
 export function useRecipeProductLinks(recipeId: string, legalEntityId: string | null | undefined) {
   const qc = useQueryClient();
-  const [busy, setBusy] = useState(false);
+  // Synkron lås før await: et dobbeltklikk skal ikke gi to innsettinger.
+  const lockRef = useRef(false);
+  const [busy, setBusyState] = useState(false);
+  const setBusy = (v: boolean) => {
+    lockRef.current = v;
+    setBusyState(v);
+  };
 
   const linksQuery = useQuery({
     queryKey: RECIPE_LINKS_KEY(recipeId),
