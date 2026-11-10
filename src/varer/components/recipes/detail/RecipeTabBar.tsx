@@ -44,7 +44,7 @@ export function RecipeTabBar({
       role="tablist"
       aria-label="Deler av oppskriften"
       onKeyDown={onKeyDown}
-      className="-mx-1 flex gap-1 overflow-x-auto border-b border-line-subtle px-1"
+      className="relative -mx-1 flex gap-1 overflow-x-auto border-b border-line-subtle px-1"
     >
       {RECIPE_TABS.map((t) => {
         const selected = t.id === active;
