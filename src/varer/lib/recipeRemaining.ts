@@ -186,7 +186,7 @@ export function marginItems(products: LinkedProductMargins[]): RemainingItem[] {
           id: `lonnsomhet:${p.productId}:${level.price_list_id}:rod`,
           severity: "should",
           tab: "varer",
-          title: `${p.name}: ${name.toLocaleLowerCase("nb-NO")} under mål`,
+          title: `${p.name}: svak margin på ${name.toLocaleLowerCase("nb-NO")}`,
           details: level.needed_price != null ? [`Pris som trengs: ${nKr(level.needed_price)}`] : [],
           target,
           action: null,
