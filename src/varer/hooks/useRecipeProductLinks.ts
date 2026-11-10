@@ -89,7 +89,7 @@ export function useRecipeProductLinks(recipeId: string, legalEntityId: string | 
 
   /** Returnerer sann når koblingen ble lagret. */
   async function addLink(productId: string): Promise<boolean> {
-    if (busy) return false;
+    if (lockRef.current) return false;
     setBusy(true);
     try {
       // DB-en avgjør selv om koblingen blir primær (første kobling for produktet).
@@ -115,7 +115,7 @@ export function useRecipeProductLinks(recipeId: string, legalEntityId: string | 
       toast.error("Du kan ikke koble fra produktet du er på nå.");
       return;
     }
-    if (busy) return;
+    if (lockRef.current) return;
     setBusy(true);
     try {
       const { error } = await supabase.from("product_recipe_links").delete().eq("id", linkId);
