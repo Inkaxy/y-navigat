@@ -4,7 +4,6 @@ import { RecipeSection } from "@/varer/components/recipes/editor/RecipeSections"
 import { RecipePartCard, type EditorLine, type EditorPart } from "@/varer/components/recipes/RecipePartCard";
 import type { useRecipeEditor } from "@/varer/hooks/useRecipeEditor";
 import { entryModeFor } from "@/varer/lib/percentFirst";
-import type { BakersRawMaterialMap } from "@/varer/lib/bakersRawMaterials";
 
 type Editor = ReturnType<typeof useRecipeEditor>;
 
@@ -25,7 +24,7 @@ export function RecipeIngredientsSection({
   displayLines: EditorLine[];
   editable: boolean;
   totalFlourG: number;
-  rmMap: BakersRawMaterialMap;
+  rmMap: Parameters<typeof RecipePartCard>[0]["rmMap"];
   recipeId: string;
   warningsByLine: Record<string, string | undefined>;
   onRemovePart: (part: EditorPart) => void;
