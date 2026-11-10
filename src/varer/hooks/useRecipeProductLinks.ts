@@ -48,6 +48,7 @@ export function useRecipeProductLinks(recipeId: string, legalEntityId: string | 
 
   const linksQuery = useQuery({
     queryKey: RECIPE_LINKS_KEY(recipeId),
+    enabled: !!recipeId,
     queryFn: async (): Promise<RecipeProductLinkRow[]> => {
       const { data, error } = await supabase
         .from("product_recipe_links")
@@ -85,6 +86,7 @@ export function useRecipeProductLinks(recipeId: string, legalEntityId: string | 
     qc.invalidateQueries({ queryKey: ["recipe-label-calculated", recipeId] });
     qc.invalidateQueries({ queryKey: ["recipe-linked-products", recipeId] });
     qc.invalidateQueries({ queryKey: ["products"] });
+    qc.invalidateQueries({ queryKey: ["product-margins"] });
   }
 
   /** Returnerer sann når koblingen ble lagret. */
