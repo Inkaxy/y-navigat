@@ -53,7 +53,7 @@ describe("OpenAI avviser nøkkelen (502 provider_error)", () => {
         target="recipe"
         targetId="recipe-1"
         value="*hvete*mel, vann"
-        current={{ contains: [], mayContain: [] }}
+        current={{ contains: "", mayContain: "" }}
         canWrite
         onApply={onApply}
         invoke={() => Promise.resolve(rejectedKeyResponse())}
