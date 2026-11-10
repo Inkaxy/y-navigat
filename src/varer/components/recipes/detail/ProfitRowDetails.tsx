@@ -2,7 +2,7 @@ import type { ProductMargins } from "@/varer/hooks/useProductCalc";
 import { CALC_TYPE_LABEL, PRICE_LEVEL_LABEL, TARGET_SOURCE_LABEL, type CalcType, type PriceLevel } from "@/varer/hooks/useProductCalc";
 import { nKr, nNum, nPct } from "@/varer/lib/calcFormat";
 import { perKg, SALES_UNIT_WEIGHT_SOURCE_LABEL, type SalesUnitWeight } from "@/varer/lib/salesUnitPrice";
-import { MarginStatusBadge } from "./ProfitTable";
+import { MarginStatusBadge } from "./MarginStatusBadge";
 
 /** Den åpnede raden: kostoppsett og avvik per prisnivå. Bare visning. */
 export function ProfitRowDetails({

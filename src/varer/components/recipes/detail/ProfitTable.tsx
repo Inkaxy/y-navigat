@@ -1,15 +1,15 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, CheckCircle2, ChevronDown, CircleHelp, ExternalLink, Loader2, MinusCircle, Star, Trash2, XCircle } from "lucide-react";
+import { AlertTriangle, ChevronDown, ExternalLink, Loader2, Star, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { RecipeProductLinkRow } from "@/varer/hooks/useRecipeProductLinks";
 import { PRICE_LEVEL_LABEL, PRICE_LEVEL_ORDER, type MarginLevel, type PriceLevel, type ProductMargins } from "@/varer/hooks/useProductCalc";
 import { nKr, nPct } from "@/varer/lib/calcFormat";
-import { marginStatusMeta, type MarginTone } from "@/varer/lib/marginStatus";
 import { perKg, salesUnitWeight, SALES_UNIT_WEIGHT_SOURCE_LABEL, type SalesUnitWeight } from "@/varer/lib/salesUnitPrice";
 import { ProfitRowDetails } from "./ProfitRowDetails";
+import { MarginStatusBadge } from "./MarginStatusBadge";
 
 export interface ProfitRow {
   link: RecipeProductLinkRow;
@@ -164,24 +164,6 @@ function CostCell({ margins, weight }: { margins: ProductMargins; weight: SalesU
         <span className="tabular-nums">{selfKg != null ? nKr(selfKg) : "–"}</span>
       </div>
     </div>
-  );
-}
-
-const TONE_CLASS: Record<MarginTone, string> = {
-  ok: "border-success/40 bg-success/10 text-success",
-  warn: "border-warning/40 bg-warning/10 text-warning",
-  bad: "border-destructive/40 bg-destructive/10 text-destructive",
-  neutral: "border-border bg-muted text-muted-foreground",
-};
-const TONE_ICON = { ok: CheckCircle2, warn: AlertTriangle, bad: XCircle, neutral: MinusCircle } as const;
-
-export function MarginStatusBadge({ status }: { status: string | null | undefined }) {
-  const meta = marginStatusMeta(status);
-  const Icon = status ? TONE_ICON[meta.tone] : CircleHelp;
-  return (
-    <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-caption font-medium", TONE_CLASS[meta.tone])}>
-      <Icon className="h-3 w-3" aria-hidden="true" /> {meta.label}
-    </span>
   );
 }
 
