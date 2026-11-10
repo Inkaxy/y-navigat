@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLegalEntityLabelInfo } from "@/varer/hooks/useLegalEntityLabelInfo";
+import { draftLabelFlags, labelProducerAddress } from "@/varer/lib/recipeLabelIssues";
 import { Button } from "@/components/ui/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -289,6 +291,24 @@ export function LabelTab({
     goTo(t.section, t.anchor);
   };
 
+  // Klikk i «Gjenstår» på oppskriftssiden: samme snarvei som «Rett felt».
+  const fixSeq = fixRequest?.seq ?? 0;
+  const fixKey = fixRequest?.key ?? null;
+  const fixRef = useRef<(key: string) => void>(() => undefined);
+  fixRef.current = (key: string) => {
+    if (key === "datakvalitet") {
+      setQualitySignal((n) => n + 1);
+      goTo("datakvalitet", "merking-datakvalitet");
+      return;
+    }
+    const t = fixTargetForChecklistKey(key, declarationManual);
+    if (t) onFixField(key);
+    else goTo("etikett");
+  };
+  useEffect(() => {
+    if (fixSeq > 0 && fixKey) fixRef.current(fixKey);
+  }, [fixSeq, fixKey]);
+
   if (labelQuery.isLoading || versionsQuery.isLoading) {
     return (
       <div className="space-y-3" aria-busy="true" aria-label="Laster merkedata">
@@ -314,14 +334,23 @@ export function LabelTab({
 
   const approvedInput = latestVersion ? approvedLabelInput(latestVersion) : null;
   const shownSource: PreviewSource = approvedInput ? labelSource : "draft";
+  // Samme regler som «Gjenstår» (draftLabelFlags).
+  const draftFlags = draftLabelFlags({
+    declarationManual,
+    coveragePct,
+    calculationBlocked: !!missing?.blocked,
+    hasNutrition: !!effective.nutrition,
+    effectiveGrainPct: effectiveGrain.data,
+    breadscaleManual: breadscaleMode === "manual",
+    manualBreadscalePct: recipe.manual_breadscale_pct ?? null,
+    calculatedGrainPct: label?.grain_score_pct ?? null,
+  });
   const draftPreview = (
     <ConsumerLabelSection
       variant="draft"
       recipeName={recipeName}
       effective={effective}
-      effectiveGrainPct={
-        effectiveGrain.data ?? (breadscaleMode === "manual" ? recipe.manual_breadscale_pct ?? null : label?.grain_score_pct ?? null)
-      }
+      effectiveGrainPct={draftFlags.grainPct}
       declarationManual={declarationManual}
       breadscaleManual={breadscaleMode === "manual"}
       claimGrain={!!recipe.label_claim_grain}
@@ -332,13 +361,13 @@ export function LabelTab({
       countryOfOrigin={recipe.country_of_origin ?? null}
       entity={entityQuery.data ?? null}
       profile={labelProfileQuery.data ?? null}
-      blocked={declarationManual ? false : !!missing?.blocked}
+      blocked={draftFlags.blocked}
       keyholeQualifies={keyhole?.status === "oppfylt"}
       coveragePct={coveragePct}
       onChecklistChange={onChecklistChange}
       fixLabelFor={(key) => fixTargetForChecklistKey(key, declarationManual)?.label ?? null}
       onFixField={onFixField}
-      nutritionUsable={declarationManual ? !!effective.nutrition : coverageOk && !!effective.nutrition}
+      nutritionUsable={draftFlags.nutritionUsable}
     />
   );
 
