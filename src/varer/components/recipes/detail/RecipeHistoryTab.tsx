@@ -104,7 +104,7 @@ export function RecipeHistoryTab({
               {(declarations.data ?? []).map((d, i) => (
                 <div key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-border px-3 py-2 text-sm">
                   <span className="font-medium">Versjon {d.version}</span>
-                  {i === 0 && <Badge variant="outline" className="border-app/50 text-app">Gjeldende</Badge>}
+                  {i === 0 && <Badge variant="outline">Nyeste</Badge>}
                   <Badge variant="outline">{d.source === "manual" ? "Manuell" : "Beregnet"}</Badge>
                   <span className="text-muted-foreground">Godkjent {fmtTime(d.approved_at)}</span>
                   {d.restored_from_version_id && <span className="text-caption text-muted-foreground">Gjenopprettet fra tidligere versjon</span>}
