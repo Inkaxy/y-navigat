@@ -58,22 +58,6 @@ export interface LabelRecipe {
   label_claims_approved_at?: string | null;
 }
 
-interface LegalEntityLabelInfo {
-  name: string | null;
-  address_line1: string | null;
-  postal_code: string | null;
-  city: string | null;
-}
-
-/** Kolonnenavnene i `legal_entities` — feltene heter invoice_* i basen. */
-interface LegalEntityRow {
-  legal_name: string | null;
-  display_name: string | null;
-  invoice_address_line1: string | null;
-  invoice_postal_code: string | null;
-  invoice_city: string | null;
-}
-
 interface Props {
   recipeId: string;
   recipeName: string;
@@ -83,6 +67,11 @@ interface Props {
   canWrite: boolean;
   /** Bytter til Oppskrift-fanen (brukes av datakvalitet-kortet). */
   onGoToRecipeTab?: () => void;
+  /**
+   * Fokusforespørsel fra «Gjenstår»: en nøkkel fra etikettkontrollen eller
+   * «datakvalitet». Ny `seq` gir nytt fokus også for samme nøkkel.
+   */
+  fixRequest?: { key: string; seq: number } | null;
 }
 
 /** Merking — kan vi trykke dette på posen, og hvis ikke, hva må endres? */
@@ -94,6 +83,7 @@ export function LabelTab({
   legalEntityId,
   canWrite,
   onGoToRecipeTab,
+  fixRequest,
 }: Props) {
   const qc = useQueryClient();
   const labelQuery = useRecipeLabelCalculated(recipeId);
@@ -101,27 +91,7 @@ export function LabelTab({
   const linksQuery = useRecipeLinkedProducts(recipeId);
   const effectiveGrain = useRecipeBreadscaleEffective(recipeId);
 
-  const entityQuery = useQuery({
-    queryKey: ["legal-entity-label", legalEntityId],
-    enabled: !!legalEntityId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("legal_entities")
-        .select("legal_name, display_name, invoice_address_line1, invoice_postal_code, invoice_city")
-        .eq("id", legalEntityId!)
-        .maybeSingle();
-      if (error) throw error;
-      const row = (data ?? null) as LegalEntityRow | null;
-      if (!row) return null;
-      return {
-        // Etiketten skal bære det juridiske navnet, med visningsnavn som reserve.
-        name: row.legal_name ?? row.display_name ?? null,
-        address_line1: row.invoice_address_line1 ?? null,
-        postal_code: row.invoice_postal_code ?? null,
-        city: row.invoice_city ?? null,
-      } satisfies LegalEntityLabelInfo;
-    },
-  });
+  const entityQuery = useLegalEntityLabelInfo(legalEntityId);
 
   const saveClaim = useMutation({
     mutationFn: async (input: { field: "label_claim_keyhole" | "label_claim_grain"; value: boolean }) => {
