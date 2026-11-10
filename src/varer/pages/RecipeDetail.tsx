@@ -2,20 +2,17 @@ import { useKeepCostFresh } from "@/varer/hooks/useKeepCostFresh";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { listReturnHref, RETURN_PARAM } from "@/varer/lib/listReturn";
-import { focusRecipeLine } from "@/varer/lib/recipeWarningGroups";
-import { RecipeSection, RecipeSectionNav, StickySaveBar, useAnchorRef } from "@/varer/components/recipes/editor/RecipeSections";
+import { RecipeSectionNav, StickySaveBar, useAnchorRef } from "@/varer/components/recipes/editor/RecipeSections";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppContext } from "@/varer/context/AppContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { saveAsHalvfabrikat } from "@/varer/lib/saveAsHalvfabrikat";
-import { AlertTriangle, ArrowLeft, Copy, FileText, Loader2, Lock, MoreHorizontal, Package, Pencil, Plus, Printer, RefreshCw, Layers, Save, Share2, Wheat } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Copy, FileText, Loader2, Lock, MoreHorizontal, Package, Pencil, Printer, Layers, Save, Share2, Wheat } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,20 +21,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { logAudit } from "@/varer/lib/audit";
-import { RecipeProductLinks } from "@/varer/components/products/RecipeProductLinks";
 import { RecipeStatsBar } from "@/varer/components/recipes/RecipeStatsBar";
-import { DoughTempPanel } from "@/varer/components/recipes/DoughTempPanel";
-import { RecipeStepsEditor } from "@/varer/components/recipes/RecipeStepsEditor";
-import { StepTimeline } from "@/varer/components/recipes/StepTimeline";
-import { RecipePartCard, type EditorLine, type EditorPart } from "@/varer/components/recipes/RecipePartCard";
-import { RecipeWarningsBanner } from "@/varer/components/recipes/RecipeWarningsBanner";
+import { type EditorLine, type EditorPart } from "@/varer/components/recipes/RecipePartCard";
 import { DraftRecoveryBanner } from "@/varer/components/recipes/DraftRecoveryBanner";
 import {
   useRecipeEditor, type RecipeDetailRow, type RecipeEditorState,
 } from "@/varer/hooks/useRecipeEditor";
 import { useRecipeDraft } from "@/varer/hooks/useRecipeDraft";
 import { useRecipeWarnings } from "@/varer/hooks/useRecipeWarnings";
-import { entryModeFor } from "@/varer/lib/percentFirst";
 import { scaleRecipe, type RoundingStep, type ScaleMode } from "@/varer/lib/scaling";
 import { ScalePanel } from "@/varer/components/recipes/ScalePanel";
 import { PrintRecipeCardDialog } from "@/varer/components/recipes/PrintRecipeCardDialog";
@@ -60,7 +51,6 @@ import {
 } from "@/components/ui/dialog";
 import { UnsavedChangesDialog } from "@/varer/components/products/detail/UnsavedChangesDialog";
 import { useComputeRecipeLabel } from "@/varer/hooks/useRecipeLabel";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LabelTab } from "@/varer/components/recipes/label/LabelTab";
 import {
   BRAN_CLASSIFICATIONS,
@@ -69,18 +59,31 @@ import {
   type FlourLine,
 } from "@/varer/lib/breadscale";
 import { SaveAsRawMaterialDialog, type CompositeRawMaterial } from "@/varer/components/recipes/SaveAsRawMaterialDialog";
-import { RecipeImageUpload } from "@/varer/components/recipes/RecipeImageUpload";
 import { BASE_RECIPE_CATEGORY, costPerKg, costPerKgBlockedReason } from "@/varer/lib/halvfabrikat";
 import { copyRecipe } from "@/varer/lib/copyRecipe";
 import { useProductMargins } from "@/varer/hooks/useProductCalc";
 import { makeSku } from "@/varer/lib/halvfabrikat";
 import { buildRestoreInput, type RecipeVersionRow } from "@/varer/lib/recipeVersions";
-import { asDepartment, RECIPE_DEPARTMENT_LABEL, RECIPE_DEPARTMENTS } from "@/varer/lib/departments";
-import { Switch } from "@/components/ui/switch";
+import { asDepartment } from "@/varer/lib/departments";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useRecipeProductLinks } from "@/varer/hooks/useRecipeProductLinks";
+import { orderLinks, useRecipeOverview } from "@/varer/hooks/useRecipeOverview";
+import { useRecipeTab } from "@/varer/hooks/useRecipeTab";
+import { useRecipeTabFocus } from "@/varer/hooks/useRecipeTabFocus";
+import { useMatchMedia } from "@/varer/hooks/useIsDesktop";
+import { salesUnitWeight } from "@/varer/lib/salesUnitPrice";
+import { recipeTabForAnchor } from "@/varer/lib/recipeTabs";
+import { RecipeTabBar } from "@/varer/components/recipes/detail/RecipeTabBar";
+import { RecipeRemainingPanel } from "@/varer/components/recipes/detail/RecipeRemainingPanel";
+import { RecipeKeyFigures } from "@/varer/components/recipes/detail/RecipeKeyFigures";
+import { RecipeIngredientsSection } from "@/varer/components/recipes/detail/RecipeIngredientsSection";
+import { RecipeInfoSection } from "@/varer/components/recipes/detail/RecipeInfoSection";
+import { RecipeProcessTab } from "@/varer/components/recipes/detail/RecipeProcessTab";
+import { RecipeProductsTab } from "@/varer/components/recipes/detail/RecipeProductsTab";
+import { RecipeHistoryTab } from "@/varer/components/recipes/detail/RecipeHistoryTab";
 
 
 export default function RecipeDetail() {
@@ -147,22 +150,11 @@ export default function RecipeDetail() {
   });
   const usedIn = usedInQuery.data ?? [];
 
-  /** Primærproduktet oppskriften er koblet til — brukes til dekningsgraden i statuslinjen. */
-  const primaryProductQuery = useQuery({
-    queryKey: ["recipe-primary-product", id],
-    enabled: !!id,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("product_recipe_links")
-        .select("product_id, is_primary")
-        .eq("recipe_id", id!)
-        .order("is_primary", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      return (data?.product_id as string | undefined) ?? null;
-    },
-  });
-  const marginsQuery = useProductMargins(primaryProductQuery.data);
+  /** Koblede varer — samme spørring og skriveveier som før (`addLink`/`removeLink` + `afterLinkChange`). */
+  const productLinks = useRecipeProductLinks(id ?? "", legalEntityId);
+  /** Primærvaren (eller første kobling) — gir dekningsgraden til varselet om lav margin. */
+  const primaryLink = useMemo(() => orderLinks(productLinks.linksQuery.data ?? [])[0] ?? null, [productLinks.linksQuery.data]);
+  const marginsQuery = useProductMargins(primaryLink?.product_id ?? null);
   const marginPct = marginsQuery.data?.levels?.find((l) => l.price_level === "utsalg")?.dg2_pct ?? null;
   const marginTargetPct = marginsQuery.data?.levels?.find((l) => l.price_level === "utsalg")?.target_dg2_pct ?? null;
 
@@ -199,14 +191,8 @@ export default function RecipeDetail() {
   const isBaseRecipe = (header.category ?? "") === BASE_RECIPE_CATEGORY;
   /** Tilbake til samme listevalg; kun oppskriftslisten er et gyldig mål. */
   const backHref = listReturnHref("recipes", searchParams.get(RETURN_PARAM));
-  const [warningsOpen, setWarningsOpen] = useState(false);
   const [scaleOpen, setScaleOpen] = useState(false);
   const saveAnchorRef = useAnchorRef<HTMLDivElement>();
-  /** Åpner advarselsdetaljene og ruller dit. */
-  const showWarningDetails = useCallback(() => {
-    setWarningsOpen(true);
-    requestAnimationFrame(() => document.getElementById("oppskrift-advarsler")?.scrollIntoView({ block: "start", behavior: "smooth" }));
-  }, []);
 
 
 
@@ -387,6 +373,25 @@ export default function RecipeDetail() {
     marginTargetPct,
   });
 
+  /** «Gjenstår», fanemerker og lønnsomhet per koblet vare. */
+  const overview = useRecipeOverview({
+    recipeId: recipe?.id,
+    recipeName: header.name || recipe?.name || "Oppskrift",
+    recipe,
+    legalEntityId,
+    warnings,
+    cost,
+    totals: isScaled ? scaleSummary.totals : totals,
+    links: productLinks.linksQuery,
+  });
+  const primaryRow = overview.profitRows[0] ?? null;
+  const primaryInfo = {
+    name: primaryRow?.link.products?.display_name ?? "Primærvaren",
+    state: primaryRow ? primaryRow.state : productLinks.linksQuery.isLoading ? ("loading" as const) : productLinks.linksQuery.isError ? ("error" as const) : ("none" as const),
+    margins: primaryRow?.margins,
+    weight: salesUnitWeight(primaryRow?.link ?? null, primaryRow?.link.products ?? null),
+  };
+
   /**
    * Rom- og meltemperatur er arbeidsplassens verdier, ikke oppskriftens.
    * De lagres lokalt per oppskrift slik at både panelet og PDF-en viser de
@@ -457,9 +462,16 @@ export default function RecipeDetail() {
   const [productionDialogOpen, setProductionDialogOpen] = useState(false);
   const [batchId, setBatchId] = useState("");
   const [productionDate, setProductionDate] = useState(() => osloTodayISO());
-  const [activeTab, setActiveTab] = useState(
-    searchParams.get("tab") === "merking" ? "merking" : "oppskrift",
-  );
+  const [activeTab, setActiveTab] = useRecipeTab();
+  const tabFocus = useRecipeTabFocus(activeTab, setActiveTab);
+  const wide = useMatchMedia("(min-width: 1280px)");
+
+  // Gamle lenker med `#seksjon-*` åpner riktig fane.
+  const goToAnchor = tabFocus.goToAnchor;
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && recipeTabForAnchor(hash)) goToAnchor(hash);
+  }, [goToAnchor]);
 
   const labelCalculated = useRecipeLabelCalculated(recipe?.id);
   const allergens = useMemo(() => {
