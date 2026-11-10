@@ -61,7 +61,7 @@ describe("OpenAI avviser nøkkelen (502 provider_error)", () => {
     );
     const btn = screen.getAllByRole("button")[0];
     fireEvent.click(btn);
-    await waitFor(() => expect(screen.getByText(/OpenAI avviste nøkkelen|AI-hjelpen/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(KEY_REJECTED)).toBeTruthy());
     expect(onApply).not.toHaveBeenCalled();
   });
 });
