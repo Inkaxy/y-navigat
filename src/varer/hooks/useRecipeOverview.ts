@@ -65,7 +65,7 @@ export function useRecipeOverview(input: {
   const profitRows: ProfitRow[] = orderedLinks.map((link, i) => {
     const q = marginQueries[i];
     const state: State = q?.isError ? "error" : q?.isLoading || !q ? "loading" : "ready";
-    return { link, state, margins: q?.data as ProductMargins | undefined, retry: () => void q?.refetch() };
+    return { link, state, margins: q?.data, retry: () => void q?.refetch() };
   });
 
   const warningsState: State = input.warnings.isError ? "error" : input.warnings.isLoading ? "loading" : "ready";
@@ -77,9 +77,12 @@ export function useRecipeOverview(input: {
       : "ready";
 
   const primaryId = orderedLinks[0]?.product_id ?? null;
-  const readyMargins = profitRows
-    .filter((r) => r.state === "ready" && r.margins)
-    .map((r) => ({ productId: r.link.product_id, name: r.link.products?.display_name ?? "Uten navn", data: r.margins as ProductMargins }));
+  const readyMargins: { productId: string; name: string; data: ProductMargins }[] = [];
+  for (const r of profitRows) {
+    if (r.state === "ready" && r.margins) {
+      readyMargins.push({ productId: r.link.product_id, name: r.link.products?.display_name ?? "Uten navn", data: r.margins });
+    }
+  }
 
   const summary = composeRemaining([
     warningsState === "ready" ? warningItems(input.warnings.warnings, primaryId) : [],
