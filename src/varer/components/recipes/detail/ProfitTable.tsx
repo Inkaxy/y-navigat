@@ -71,7 +71,7 @@ function ProductRow({ row, isCurrent, canWrite, busy, onUnlink }: {
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <Link
               to={`/varer/vareliste/${link.product_id}?tab=deklarasjon`}
-              className="inline-flex min-h-[44px] items-center gap-1 font-medium text-foreground underline-offset-2 hover:underline lg:min-h-0"
+              className="inline-flex min-h-[44px] items-center gap-1 font-medium text-foreground underline-offset-2 hover:underline"
               title="Åpne deklarasjon for dette produktet"
             >
               {name}
