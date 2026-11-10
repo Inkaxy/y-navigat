@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export type CalcType =
@@ -118,16 +118,26 @@ export interface ProductMargins {
 }
 
 /** Kalkyle og marginer for en vare — regnes i databasen. */
-export function useProductMargins(productId: string | null | undefined) {
-  return useQuery({
-    queryKey: ["product-margins", productId],
-    enabled: !!productId,
-    queryFn: async (): Promise<ProductMargins> => {
-      const { data, error } = await (supabase as any).rpc("product_margins", {
-        p_product_id: productId,
-      });
-      if (error) throw error;
-      return (data ?? {}) as ProductMargins;
-    },
+/** RPC `product_margins` — Brutto og DG2 per prisnivå regnes i databasen. */
+async function fetchProductMargins(productId: string): Promise<ProductMargins> {
+  const { data, error } = await (supabase as any).rpc("product_margins", {
+    p_product_id: productId,
   });
+  if (error) throw error;
+  return (data ?? {}) as ProductMargins;
+}
+
+export const productMarginsQueryOptions = (productId: string | null | undefined) => ({
+  queryKey: ["product-margins", productId] as const,
+  enabled: !!productId,
+  queryFn: () => fetchProductMargins(productId!),
+});
+
+export function useProductMargins(productId: string | null | undefined) {
+  return useQuery(productMarginsQueryOptions(productId));
+}
+
+/** Samme spørring for flere varer (én per vare, samme nøkkel og cache). */
+export function useProductMarginsMany(productIds: string[]) {
+  return useQueries({ queries: productIds.map((id) => productMarginsQueryOptions(id)) });
 }

@@ -2,20 +2,17 @@ import { useKeepCostFresh } from "@/varer/hooks/useKeepCostFresh";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { listReturnHref, RETURN_PARAM } from "@/varer/lib/listReturn";
-import { focusRecipeLine } from "@/varer/lib/recipeWarningGroups";
-import { RecipeSection, RecipeSectionNav, StickySaveBar, useAnchorRef } from "@/varer/components/recipes/editor/RecipeSections";
+import { RecipeSectionNav, StickySaveBar, useAnchorRef } from "@/varer/components/recipes/editor/RecipeSections";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppContext } from "@/varer/context/AppContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { saveAsHalvfabrikat } from "@/varer/lib/saveAsHalvfabrikat";
-import { AlertTriangle, ArrowLeft, Copy, FileText, Loader2, Lock, MoreHorizontal, Package, Pencil, Plus, Printer, RefreshCw, Layers, Save, Share2, Wheat } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Copy, FileText, Loader2, Lock, MoreHorizontal, Package, Pencil, Printer, Layers, Save, Share2, Wheat } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,20 +21,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { logAudit } from "@/varer/lib/audit";
-import { RecipeProductLinks } from "@/varer/components/products/RecipeProductLinks";
 import { RecipeStatsBar } from "@/varer/components/recipes/RecipeStatsBar";
-import { DoughTempPanel } from "@/varer/components/recipes/DoughTempPanel";
-import { RecipeStepsEditor } from "@/varer/components/recipes/RecipeStepsEditor";
-import { StepTimeline } from "@/varer/components/recipes/StepTimeline";
-import { RecipePartCard, type EditorLine, type EditorPart } from "@/varer/components/recipes/RecipePartCard";
-import { RecipeWarningsBanner } from "@/varer/components/recipes/RecipeWarningsBanner";
+import { type EditorLine, type EditorPart } from "@/varer/components/recipes/RecipePartCard";
 import { DraftRecoveryBanner } from "@/varer/components/recipes/DraftRecoveryBanner";
 import {
   useRecipeEditor, type RecipeDetailRow, type RecipeEditorState,
 } from "@/varer/hooks/useRecipeEditor";
 import { useRecipeDraft } from "@/varer/hooks/useRecipeDraft";
 import { useRecipeWarnings } from "@/varer/hooks/useRecipeWarnings";
-import { entryModeFor } from "@/varer/lib/percentFirst";
 import { scaleRecipe, type RoundingStep, type ScaleMode } from "@/varer/lib/scaling";
 import { ScalePanel } from "@/varer/components/recipes/ScalePanel";
 import { PrintRecipeCardDialog } from "@/varer/components/recipes/PrintRecipeCardDialog";
@@ -60,7 +51,6 @@ import {
 } from "@/components/ui/dialog";
 import { UnsavedChangesDialog } from "@/varer/components/products/detail/UnsavedChangesDialog";
 import { useComputeRecipeLabel } from "@/varer/hooks/useRecipeLabel";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LabelTab } from "@/varer/components/recipes/label/LabelTab";
 import {
   BRAN_CLASSIFICATIONS,
@@ -69,18 +59,31 @@ import {
   type FlourLine,
 } from "@/varer/lib/breadscale";
 import { SaveAsRawMaterialDialog, type CompositeRawMaterial } from "@/varer/components/recipes/SaveAsRawMaterialDialog";
-import { RecipeImageUpload } from "@/varer/components/recipes/RecipeImageUpload";
 import { BASE_RECIPE_CATEGORY, costPerKg, costPerKgBlockedReason } from "@/varer/lib/halvfabrikat";
 import { copyRecipe } from "@/varer/lib/copyRecipe";
 import { useProductMargins } from "@/varer/hooks/useProductCalc";
 import { makeSku } from "@/varer/lib/halvfabrikat";
 import { buildRestoreInput, type RecipeVersionRow } from "@/varer/lib/recipeVersions";
-import { asDepartment, RECIPE_DEPARTMENT_LABEL, RECIPE_DEPARTMENTS } from "@/varer/lib/departments";
-import { Switch } from "@/components/ui/switch";
+import { asDepartment } from "@/varer/lib/departments";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useRecipeProductLinks } from "@/varer/hooks/useRecipeProductLinks";
+import { orderLinks, useRecipeOverview } from "@/varer/hooks/useRecipeOverview";
+import { useRecipeTab } from "@/varer/hooks/useRecipeTab";
+import { useRecipeTabFocus } from "@/varer/hooks/useRecipeTabFocus";
+import { useMatchMedia } from "@/varer/hooks/useIsDesktop";
+import { salesUnitWeight } from "@/varer/lib/salesUnitPrice";
+import { recipeTabForAnchor } from "@/varer/lib/recipeTabs";
+import { RecipeTabBar } from "@/varer/components/recipes/detail/RecipeTabBar";
+import { RecipeRemainingPanel } from "@/varer/components/recipes/detail/RecipeRemainingPanel";
+import { RecipeKeyFigures } from "@/varer/components/recipes/detail/RecipeKeyFigures";
+import { RecipeIngredientsSection } from "@/varer/components/recipes/detail/RecipeIngredientsSection";
+import { RecipeInfoSection } from "@/varer/components/recipes/detail/RecipeInfoSection";
+import { RecipeProcessTab } from "@/varer/components/recipes/detail/RecipeProcessTab";
+import { RecipeProductsTab } from "@/varer/components/recipes/detail/RecipeProductsTab";
+import { RecipeHistoryTab } from "@/varer/components/recipes/detail/RecipeHistoryTab";
 
 
 export default function RecipeDetail() {
@@ -147,22 +150,11 @@ export default function RecipeDetail() {
   });
   const usedIn = usedInQuery.data ?? [];
 
-  /** Primærproduktet oppskriften er koblet til — brukes til dekningsgraden i statuslinjen. */
-  const primaryProductQuery = useQuery({
-    queryKey: ["recipe-primary-product", id],
-    enabled: !!id,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("product_recipe_links")
-        .select("product_id, is_primary")
-        .eq("recipe_id", id!)
-        .order("is_primary", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      return (data?.product_id as string | undefined) ?? null;
-    },
-  });
-  const marginsQuery = useProductMargins(primaryProductQuery.data);
+  /** Koblede varer — samme spørring og skriveveier som før (`addLink`/`removeLink` + `afterLinkChange`). */
+  const productLinks = useRecipeProductLinks(id ?? "", legalEntityId);
+  /** Primærvaren (eller første kobling) — gir dekningsgraden til varselet om lav margin. */
+  const primaryLink = useMemo(() => orderLinks(productLinks.linksQuery.data ?? [])[0] ?? null, [productLinks.linksQuery.data]);
+  const marginsQuery = useProductMargins(primaryLink?.product_id ?? null);
   const marginPct = marginsQuery.data?.levels?.find((l) => l.price_level === "utsalg")?.dg2_pct ?? null;
   const marginTargetPct = marginsQuery.data?.levels?.find((l) => l.price_level === "utsalg")?.target_dg2_pct ?? null;
 
@@ -199,14 +191,8 @@ export default function RecipeDetail() {
   const isBaseRecipe = (header.category ?? "") === BASE_RECIPE_CATEGORY;
   /** Tilbake til samme listevalg; kun oppskriftslisten er et gyldig mål. */
   const backHref = listReturnHref("recipes", searchParams.get(RETURN_PARAM));
-  const [warningsOpen, setWarningsOpen] = useState(false);
   const [scaleOpen, setScaleOpen] = useState(false);
   const saveAnchorRef = useAnchorRef<HTMLDivElement>();
-  /** Åpner advarselsdetaljene og ruller dit. */
-  const showWarningDetails = useCallback(() => {
-    setWarningsOpen(true);
-    requestAnimationFrame(() => document.getElementById("oppskrift-advarsler")?.scrollIntoView({ block: "start", behavior: "smooth" }));
-  }, []);
 
 
 
@@ -387,6 +373,25 @@ export default function RecipeDetail() {
     marginTargetPct,
   });
 
+  /** «Gjenstår», fanemerker og lønnsomhet per koblet vare. */
+  const overview = useRecipeOverview({
+    recipeId: recipe?.id,
+    recipeName: header.name || recipe?.name || "Oppskrift",
+    recipe,
+    legalEntityId,
+    warnings,
+    cost,
+    totals: isScaled ? scaleSummary.totals : totals,
+    links: productLinks.linksQuery,
+  });
+  const primaryRow = overview.profitRows[0] ?? null;
+  const primaryInfo = {
+    name: primaryRow?.link.products?.display_name ?? "Primærvaren",
+    state: primaryRow ? primaryRow.state : productLinks.linksQuery.isLoading ? ("loading" as const) : productLinks.linksQuery.isError ? ("error" as const) : ("none" as const),
+    margins: primaryRow?.margins,
+    weight: salesUnitWeight(primaryRow?.link ?? null, primaryRow?.link.products ?? null),
+  };
+
   /**
    * Rom- og meltemperatur er arbeidsplassens verdier, ikke oppskriftens.
    * De lagres lokalt per oppskrift slik at både panelet og PDF-en viser de
@@ -457,9 +462,16 @@ export default function RecipeDetail() {
   const [productionDialogOpen, setProductionDialogOpen] = useState(false);
   const [batchId, setBatchId] = useState("");
   const [productionDate, setProductionDate] = useState(() => osloTodayISO());
-  const [activeTab, setActiveTab] = useState(
-    searchParams.get("tab") === "merking" ? "merking" : "oppskrift",
-  );
+  const [activeTab, setActiveTab] = useRecipeTab();
+  const tabFocus = useRecipeTabFocus(activeTab, setActiveTab);
+  const wide = useMatchMedia("(min-width: 1280px)");
+
+  // Gamle lenker med `#seksjon-*` åpner riktig fane.
+  const goToAnchor = tabFocus.goToAnchor;
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && recipeTabForAnchor(hash)) goToAnchor(hash);
+  }, [goToAnchor]);
 
   const labelCalculated = useRecipeLabelCalculated(recipe?.id);
   const allergens = useMemo(() => {
@@ -956,26 +968,7 @@ export default function RecipeDetail() {
         </header>
 
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="oppskrift">Oppskrift</TabsTrigger>
-            <TabsTrigger value="merking">Merking</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="merking" className="space-y-4">
-            <LabelTab
-              recipeId={recipe.id}
-              recipeName={header.name || recipe.name || "Oppskrift"}
-              recipe={recipe}
-              flourLines={flourLines}
-              legalEntityId={legalEntityId ?? undefined}
-              onGoToRecipeTab={() => setActiveTab("oppskrift")}
-              canWrite={canWrite}
-            />
-          </TabsContent>
-
-          <TabsContent value="oppskrift" className="space-y-4">
-        {isScaled && (
+                {isScaled && (
           <div className="flex items-center gap-2 rounded-md border border-app/40 bg-app/[0.06] px-3 py-2 text-sm">
             <Lock className="h-4 w-4 shrink-0 text-app" />
             <span>
@@ -1016,24 +1009,30 @@ export default function RecipeDetail() {
           />
         )}
 
-        <RecipeStatsBar
-          onShowDetails={warnings.warnings.length > 0 ? showWarningDetails : undefined}
-          totals={displayTotals}
-          cost={isScaled ? undefined : cost}
-          margin={marginPct != null ? { marginPct, targetPct: marginTargetPct } : undefined}
-          prefermentedFlourPct={prefermentedFlourPct}
-        />
 
+        <RecipeTabBar active={activeTab} onChange={setActiveTab} indicators={overview.indicators} />
 
-        <RecipeWarningsBanner
-          warnings={warnings.warnings}
-          open={warningsOpen}
-          onOpenChange={setWarningsOpen}
-          onFocusLine={(lineId) => { focusRecipeLine(lineId); }}
-        />
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+          <aside aria-label="Nøkkeltall og gjenstår" className="space-y-4 xl:sticky xl:top-4 xl:col-start-2 xl:row-start-1 xl:self-start">
+            <RecipeKeyFigures totals={displayTotals} cost={cost} isScaled={isScaled} primary={primaryInfo} />
+            <RecipeRemainingPanel
+              summary={overview.summary}
+              sources={overview.sources}
+              collapsible={!wide}
+              onSelect={(item) => tabFocus.goTo(item.tab, item.target)}
+            />
+          </aside>
 
-        <RecipeSectionNav />
-
+          <div
+            role="tabpanel"
+            id={`oppskrift-panel-${activeTab}`}
+            aria-labelledby={`oppskrift-fane-${activeTab}`}
+            className="min-w-0 space-y-4 xl:col-start-1 xl:row-start-1"
+          >
+            {activeTab === "oppskrift" && (
+              <>
+                <RecipeStatsBar totals={displayTotals} prefermentedFlourPct={prefermentedFlourPct} hideNotices />
+                <RecipeSectionNav onGoTo={goToAnchor} />
         <details
           className="rounded-md border border-border bg-card"
           open={scaleOpen || isScaled}
@@ -1070,352 +1069,125 @@ export default function RecipeDetail() {
           </div>
         </details>
 
-        <RecipeSection id="seksjon-ingredienser" title="Ingredienser">
-        <div className="space-y-3">
-          {parts.map((p, i) => (
-            <RecipePartCard
-              key={p.id}
-              part={p}
-              lines={displayLines.filter((l) => l.recipe_part_id === p.id)}
-              canWrite={editable}
-              totalFlourG={isScaled ? displayTotals.totalFlourG : totals.totalFlourG}
-              rmMap={rmMap}
-              currentRecipeId={recipe.id}
-              isFirst={i === 0}
-              isLast={i === parts.length - 1}
-              onUpdate={(patch) => updatePart(p.id, patch)}
-              onRemove={() => setPartToDelete(p)}
-              onDuplicate={() => duplicatePart(p.id)}
-              onMove={(dir) => movePart(p.id, dir)}
-              onAddLine={() => addLine(p.id)}
-              onUpdateLine={updateLine}
-              onRemoveLine={removeLine}
-              onReorderLines={reorderLines}
-              entryMode={entryModeFor(entryModes, p.id)}
-              onEntryModeChange={(mode) => editor.setEntryMode(p.id, mode)}
-              warningsByLine={warnings.byLine}
-            />
-          ))}
-          {editable && (
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => addPart("dough")}>
-                <Plus className="mr-1 h-3.5 w-3.5" /> Legg til del
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => addPart("preferment")}>
-                <Plus className="mr-1 h-3.5 w-3.5" /> Legg til fordeig
-              </Button>
-            </div>
-          )}
-        </div>
+                <RecipeIngredientsSection
+                  editor={editor}
+                  parts={parts}
+                  displayLines={displayLines}
+                  editable={editable}
+                  totalFlourG={isScaled ? displayTotals.totalFlourG : totals.totalFlourG}
+                  rmMap={rmMap}
+                  recipeId={recipe.id}
+                  warningsByLine={warnings.byLine}
+                  onRemovePart={setPartToDelete}
+                />
+                <RecipeInfoSection
+                  header={header}
+                  patchHeader={patchHeader}
+                  editable={editable}
+                  canWrite={canWrite}
+                  composite={composite}
+                  repricing={repricing}
+                  onUpdateCompositePrice={() => void updateCompositePrice()}
+                  isBaseRecipe={isBaseRecipe}
+                  onToggleBaseRecipe={toggleBaseRecipe}
+                  usedIn={usedIn}
+                  onOpenRecipe={(rid) => navigate(`/varer/oppskrifter/${rid}`)}
+                  doughGramsTotal={doughGramsTotal}
+                />
+              </>
+            )}
 
-        </RecipeSection>
-
-        <RecipeSection id="seksjon-info" title="Oppskriftsinfo og vekt">
-        <Card>
-          <CardHeader className="pb-3"><CardTitle className="text-base">Oppskriftsinfo</CardTitle></CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="col-span-full flex flex-wrap items-start gap-4">
-              <RecipeImageUpload
+            {activeTab === "fremgangsmate" && (
+              <RecipeProcessTab
                 recipeId={recipe.id}
                 legalEntityId={legalEntityId ?? null}
-                imageUrl={imageUrl}
+                header={header}
+                patchHeader={patchHeader}
+                steps={steps}
+                onStepsChange={editor.setSteps}
+                editable={editable}
                 canWrite={canWrite}
-                onChange={(url) => {
+                temps={{
+                  roomTemp,
+                  flourTemp,
+                  onRoomTempChange: (v) => {
+                    setRoomTemp(v);
+                    persistTemps({ roomTemp: v, flourTemp });
+                    patchHeader({ room_temp_celsius: v });
+                  },
+                  onFlourTempChange: (v) => {
+                    setFlourTemp(v);
+                    persistTemps({ roomTemp, flourTemp: v });
+                    patchHeader({ flour_temp_celsius: v });
+                  },
+                }}
+                prefermentTemp={prefermentTemp}
+                prefermentGrams={prefermentGrams}
+                totalDoughG={totals.totalDoughG}
+                imageUrl={imageUrl}
+                onImageChange={(url) => {
                   editor.setImage(url);
                   qc.invalidateQueries({ queryKey: ["recipes-list"] });
                 }}
               />
-              {composite && (
-                <div className="flex items-center gap-2 rounded-md border border-app/40 bg-app/[0.06] px-3 py-2">
-                  <Badge variant="outline" className="border-app/50 text-app">Halvfabrikat</Badge>
-                  <span className="text-sm">
-                    {composite.name}
-                    <span className="ml-1 text-xs text-muted-foreground tabular-nums">
-                      {composite.current_cost_price != null
-                        ? `${Number(composite.current_cost_price).toFixed(2).replace(".", ",")} kr/kg`
-                        : "ingen pris"}
-                    </span>
-                  </span>
-                  {canWrite && (
-                    <Button size="sm" variant="ghost" disabled={repricing} onClick={updateCompositePrice}>
-                      {repricing ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
-                      Oppdater pris
-                    </Button>
-                  )}
-                </div>
-              )}
-            </div>
+            )}
 
-            {/* Grunnoppskrift — gjør oppskriften valgbar som ingredienslinje andre steder. */}
-            <div className="col-span-full rounded-md border border-border bg-muted/20 p-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <Switch
-                  id="base-recipe"
-                  checked={isBaseRecipe}
-                  disabled={!editable}
-                  onCheckedChange={toggleBaseRecipe}
-                />
-                <Label htmlFor="base-recipe" className="cursor-pointer text-sm font-medium">
-                  Grunnoppskrift — kan brukes som linje i andre oppskrifter
-                </Label>
-                {composite ? (
-                  <Badge variant="outline" className="border-app/50 text-app">Koblet råvare: {composite.name}</Badge>
-                ) : isBaseRecipe ? (
-                  <Badge variant="outline" className="border-warning/50 text-warning">Ingen råvare koblet ennå</Badge>
-                ) : null}
-              </div>
-              {composite && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {usedIn.length === 0
-                    ? "Brukes ikke i andre oppskrifter ennå."
-                    : `Brukes i ${usedIn.length} oppskrift${usedIn.length === 1 ? "" : "er"}:`}
-                  {usedIn.map((u) => (
-                    <button
-                      key={u.id}
-                      type="button"
-                      className="ml-2 underline underline-offset-2 hover:text-foreground"
-                      onClick={() => navigate(`/varer/oppskrifter/${u.id}`)}
-                    >
-                      {u.name}
-                    </button>
-                  ))}
-                </p>
-              )}
-            </div>
-
-            <div className="sm:col-span-2">
-              <Label className="text-xs">Navn</Label>
-              <Input value={header.name ?? ""} disabled={!editable} onChange={(e) => patchHeader({ name: e.target.value })} />
-            </div>
-            <div>
-              <Label className="text-xs">Kategori</Label>
-              <Input value={header.category ?? ""} disabled={!editable} placeholder="f.eks. Surdeigsbrød"
-                onChange={(e) => patchHeader({ category: e.target.value })} />
-            </div>
-            <div>
-              <Label className="text-xs">Avdeling</Label>
-              <select
-                value={header.department ?? ""} disabled={!editable}
-                onChange={(e) => patchHeader({ department: e.target.value })}
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              >
-                <option value="">Ingen</option>
-                {RECIPE_DEPARTMENTS.map((d) => (
-                  <option key={d} value={d}>{RECIPE_DEPARTMENT_LABEL[d]}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <Label className="text-xs">Status</Label>
-              <select
-                value={header.status ?? "draft"} disabled={!editable}
-                onChange={(e) => patchHeader({ status: e.target.value })}
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              >
-                {RECIPE_STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-            <div className="col-span-full mt-1 border-t pt-3">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Vekt og utbytte
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div>
-                  <Label className="text-xs">Deigemnevekt (g)</Label>
-                  <Input type="number" value={header.dough_piece_grams ?? ""} disabled={!editable}
-                    onChange={(e) => patchHeader({ dough_piece_grams: e.target.value })} />
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Vekten på deigemnet før steking. Denne styrer kalkylen.
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-xs">Deigsvinn (%)</Label>
-                  <Input type="number" value={header.dough_waste_pct ?? ""} disabled={!editable}
-                    onChange={(e) => patchHeader({ dough_waste_pct: e.target.value })} />
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Rester, avskjær, feilvekt og vraket bakst.
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-xs">Ferdigvekt (g)</Label>
-                  <Input type="number" value={header.finished_weight_grams ?? ""} disabled={!editable}
-                    onChange={(e) => patchHeader({ finished_weight_grams: e.target.value })} />
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Vekt per stk etter steking — ganges med antall for deklarasjon og grovhet. Brukes ikke til kostprisen.
-                  </p>
-                </div>
-              </div>
-              <YieldPreview
-                doughGrams={doughGramsTotal}
-                doughPieceGrams={Number(header.dough_piece_grams) || null}
-                doughWastePct={Number(header.dough_waste_pct) || 0}
-                finishedWeightGrams={Number(header.finished_weight_grams) || null}
+            {activeTab === "varer" && (
+              <RecipeProductsTab
+                links={{
+                  rows: overview.orderedLinks,
+                  isLoading: productLinks.linksQuery.isLoading,
+                  isError: productLinks.linksQuery.isError,
+                  error: productLinks.linksQuery.error,
+                  retry: () => void productLinks.linksQuery.refetch(),
+                }}
+                rows={overview.profitRows}
+                primary={primaryInfo}
+                cost={cost}
+                currentProductId={recipe.product_id ?? null}
+                canWrite={canWrite}
+                picker={{
+                  products: productLinks.productsQuery.data ?? [],
+                  isLoading: productLinks.productsQuery.isLoading,
+                  isError: productLinks.productsQuery.isError,
+                }}
+                onAdd={productLinks.addLink}
+                onRemove={(linkId) => void productLinks.removeLink(linkId, false)}
+                busy={productLinks.busy}
               />
-              <label className="mt-3 flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="mt-0.5 h-4 w-4 rounded border-input"
-                  checked={!!header.measured_per_kg}
-                  disabled={!editable}
-                  onChange={(e) => patchHeader({ measured_per_kg: e.target.checked })}
-                />
-                <span>
-                  Oppskriften er målt per kg
-                  <span className="block text-xs font-normal text-muted-foreground">
-                    For halvfabrikat som deig, krem og fyll. Sett deigemnevekt til 1000 g.
-                  </span>
-                </span>
-              </label>
-            </div>
-            <div>
-              <Label className="text-xs">Antall per batch</Label>
-              <Input type="number" value={header.units_per_batch ?? ""} disabled={!editable}
-                onChange={(e) => patchHeader({ units_per_batch: e.target.value })} />
-            </div>
-            <div>
-              <Label className="text-xs">Autolyse (min)</Label>
-              <Input type="number" value={header.autolyse_minutes ?? ""} disabled={!editable}
-                onChange={(e) => patchHeader({ autolyse_minutes: e.target.value })} />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs">Elting 1. gir (min)</Label>
-                <Input type="number" value={header.mixing_speed1_minutes ?? ""} disabled={!editable}
-                  onChange={(e) => patchHeader({ mixing_speed1_minutes: e.target.value })} />
-              </div>
-              <div>
-                <Label className="text-xs">2. gir (min)</Label>
-                <Input type="number" value={header.mixing_speed2_minutes ?? ""} disabled={!editable}
-                  onChange={(e) => patchHeader({ mixing_speed2_minutes: e.target.value })} />
-              </div>
-            </div>
-            <div className="sm:col-span-2 lg:col-span-4">
-              <Label className="text-xs">Beskrivelse</Label>
-              <Textarea rows={2} value={header.description ?? ""} disabled={!editable}
-                onChange={(e) => patchHeader({ description: e.target.value })} />
-            </div>
-          </CardContent>
-        </Card>
-
-        </RecipeSection>
-
-        <RecipeSection id="seksjon-prosess" title="Prosess">
-        <DoughTempPanel
-          roomTemp={roomTemp}
-          flourTemp={flourTemp}
-          onRoomTempChange={(v) => {
-            setRoomTemp(v);
-            persistTemps({ roomTemp: v, flourTemp });
-            patchHeader({ room_temp_celsius: v });
-          }}
-          onFlourTempChange={(v) => {
-            setFlourTemp(v);
-            persistTemps({ roomTemp, flourTemp: v });
-            patchHeader({ flour_temp_celsius: v });
-          }}
-          onPrefermentTempChange={(v) => patchHeader({ preferment_temp_celsius: v })}
-          targetDoughTemp={header.target_dough_temp_celsius ?? null}
-          frictionFactor={header.friction_factor_celsius ?? null}
-          prefermentTemp={prefermentTemp}
-          prefermentGrams={prefermentGrams}
-          totalDoughG={totals.totalDoughG}
-          canWrite={canWrite}
-          onChange={patchHeader}
-        />
-
-        <StepTimeline
-          steps={steps}
-          header={{
-            autolyse_minutes: header.autolyse_minutes ?? null,
-            mixing_speed1_minutes: header.mixing_speed1_minutes ?? null,
-            mixing_speed2_minutes: header.mixing_speed2_minutes ?? null,
-          }}
-        />
-
-        <RecipeStepsEditor
-          steps={steps}
-          canWrite={editable}
-          onChange={editor.setSteps}
-        />
-
-
-        </RecipeSection>
-
-        <RecipeSection id="seksjon-notater" title="Notater og ferdiggjøring">
-        <Card>
-          <CardHeader className="pb-3"><CardTitle className="text-base">Dekor / ferdiggjøring</CardTitle></CardHeader>
-          <CardContent>
-            <Textarea
-              rows={3}
-              value={header.decor_notes ?? ""}
-              disabled={!editable}
-              placeholder="Pynt, glasur, strø, ferdiggjøring…"
-              onChange={(e) => patchHeader({ decor_notes: e.target.value })}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3"><CardTitle className="text-base">Notater</CardTitle></CardHeader>
-          <CardContent>
-            <Textarea rows={3} value={header.notes ?? ""} disabled={!editable}
-              onChange={(e) => patchHeader({ notes: e.target.value })} />
-          </CardContent>
-        </Card>
-
-        </RecipeSection>
-
-        <RecipeSection id="seksjon-koblinger" title="Koblede varer og historikk">
-        <RecipeProductLinks recipeId={recipe.id} currentProductId={recipe.product_id ?? undefined} canWrite={canWrite} />
-
-        <details className="group rounded-md border border-border bg-card">
-          <summary className="cursor-pointer select-none px-4 py-2.5 text-sm font-medium">
-            Versjonshistorikk{versionsQuery.data ? ` (${versionsQuery.data.length})` : ""}
-          </summary>
-        <Card>
-          <CardHeader className="pb-3"><CardTitle className="text-base">Versjonshistorikk</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            {versionsQuery.isLoading && (
-              <p className="text-sm text-muted-foreground">Laster versjoner…</p>
             )}
-            {!versionsQuery.isLoading && (versionsQuery.data ?? []).length === 0 && (
-              <p className="text-sm text-muted-foreground">Ingen tidligere versjoner ennå.</p>
+
+            {activeTab === "merking" && (
+              <LabelTab
+                recipeId={recipe.id}
+                recipeName={header.name || recipe.name || "Oppskrift"}
+                recipe={recipe}
+                flourLines={flourLines}
+                legalEntityId={legalEntityId ?? undefined}
+                onGoToRecipeTab={() => setActiveTab("oppskrift")}
+                canWrite={canWrite}
+                fixRequest={tabFocus.labelFix}
+              />
             )}
-            {(versionsQuery.data ?? []).map((v) => (
-              <div
-                key={v.id}
-                className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-sm"
-              >
-                <div>
-                  <span className="font-medium">v{v.version}</span>{" "}
-                  <span className="text-muted-foreground">
-                    {new Date(v.changed_at).toLocaleString("nb-NO")}
-                  </span>
-                  {v.change_summary && (
-                    <div className="text-muted-foreground">{v.change_summary}</div>
-                  )}
-                </div>
-                {canWrite && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={restoringVersion !== null}
-                    onClick={() => restoreVersion(v)}
-                  >
-                    {restoringVersion === v.version ? (
-                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                    ) : null}
-                    Gjenopprett
-                  </Button>
-                )}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-        </details>
-        </RecipeSection>
-          </TabsContent>
-        </Tabs>
+
+            {activeTab === "historikk" && (
+              <RecipeHistoryTab
+                recipeId={recipe.id}
+                versions={{
+                  data: versionsQuery.data,
+                  isLoading: versionsQuery.isLoading,
+                  isError: versionsQuery.isError,
+                  error: versionsQuery.error,
+                  refetch: () => void versionsQuery.refetch(),
+                }}
+                canWrite={canWrite}
+                restoringVersion={restoringVersion}
+                onRestore={(v) => void restoreVersion(v)}
+                onShare={() => setShareOpen(true)}
+              />
+            )}
+          </div>
+        </div>
       </div>
 
       <Dialog open={productionDialogOpen} onOpenChange={setProductionDialogOpen}>
@@ -1541,7 +1313,7 @@ export default function RecipeDetail() {
 
       <StickySaveBar
         anchorRef={saveAnchorRef}
-        visible={canWrite && dirty && activeTab === "oppskrift"}
+        visible={canWrite && dirty && activeTab !== "merking"}
         saving={saving}
         disabled={isScaled}
         onSave={() => void save()}
@@ -1555,66 +1327,5 @@ export default function RecipeDetail() {
     </>
 
 
-  );
-}
-
-/** Forhåndsvisning av utbytte og steketap. Kun visning — kalkylen kommer fra product_cost. */
-function YieldPreview({
-  doughGrams,
-  doughPieceGrams,
-  doughWastePct,
-  finishedWeightGrams,
-}: {
-  doughGrams: number;
-  doughPieceGrams: number | null;
-  doughWastePct: number;
-  finishedWeightGrams: number | null;
-}) {
-  const nb = (n: number, d = 1) =>
-    n.toLocaleString("nb-NO", { minimumFractionDigits: d, maximumFractionDigits: d });
-
-  if (!doughPieceGrams || doughPieceGrams <= 0) {
-    return (
-      <p className="mt-3 text-sm text-muted-foreground">
-        Sett deigemnevekt for å beregne antall enheter
-      </p>
-    );
-  }
-
-  const units = (doughGrams * (1 - (doughWastePct || 0) / 100)) / doughPieceGrams;
-
-  let bake: { pct: number; tone: "grey" | "warn" | "bad" } | null = null;
-  if (finishedWeightGrams && finishedWeightGrams > 0) {
-    const pct = (1 - finishedWeightGrams / doughPieceGrams) * 100;
-    bake = {
-      pct,
-      tone: finishedWeightGrams > doughPieceGrams ? "bad" : pct < 3 || pct > 25 ? "warn" : "grey",
-    };
-  }
-
-  return (
-    <div className="mt-3 space-y-1">
-      <p className="text-sm text-muted-foreground">
-        {nb(doughGrams, 0)} g deig · {nb(doughWastePct || 0, 0)} % svinn · {nb(doughPieceGrams, 0)} g per emne →{" "}
-        <span className="font-semibold text-foreground">{nb(units, 1)} enheter</span>
-      </p>
-      {bake && bake.tone === "grey" && (
-        <p className="text-sm text-muted-foreground">
-          Steketap <span className="font-semibold text-foreground">{nb(bake.pct, 1)} %</span>
-        </p>
-      )}
-      {bake && bake.tone === "warn" && (
-        <p className="flex items-center gap-1.5 text-sm text-warning">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          Steketap <span className="font-semibold">{nb(bake.pct, 1)} %</span> — Sjekk vektene, dette ser ikke ut som et vanlig steketap
-        </p>
-      )}
-      {bake && bake.tone === "bad" && (
-        <p className="flex items-center gap-1.5 text-sm text-destructive">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          Ferdigvekt kan ikke være høyere enn deigemnevekt
-        </p>
-      )}
-    </div>
   );
 }

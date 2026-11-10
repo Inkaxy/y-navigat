@@ -7,7 +7,8 @@ export const RECIPE_SECTIONS = [
   { id: "seksjon-info", label: "Oppskriftsinfo og vekt" },
   { id: "seksjon-prosess", label: "Prosess" },
   { id: "seksjon-notater", label: "Notater og ferdiggjøring" },
-  { id: "seksjon-koblinger", label: "Koblede varer og historikk" },
+  { id: "seksjon-koblinger", label: "Koblede varer" },
+  { id: "seksjon-historikk", label: "Historikk" },
 ] as const;
 export type RecipeSectionId = (typeof RECIPE_SECTIONS)[number]["id"];
 
@@ -35,23 +36,36 @@ export function RecipeSection({ id, title, actions, children }: { id: RecipeSect
   );
 }
 
-/** Kompakt «Gå til»-navigasjon, rullbar på mobil. */
-export function RecipeSectionNav() {
+const NAV_PILL =
+  "inline-flex min-h-[44px] items-center rounded-full border border-border bg-background px-3 py-1 text-caption text-foreground transition-colors hover:border-app/50 hover:bg-app/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-0";
+
+/**
+ * Kompakt «Gå til»-navigasjon, rullbar på mobil. Med `onGoTo` (oppskriftssiden
+ * med faner) er punktene knapper: et klikk bytter fane før fokus flyttes, og
+ * ingen navigasjon skjer — vakten for ulagrede endringer slår ikke inn.
+ */
+export function RecipeSectionNav({ onGoTo }: { onGoTo?: (id: RecipeSectionId) => void } = {}) {
   return (
     <nav aria-label="Gå til i oppskriften">
       <ul className="flex flex-wrap items-center gap-1.5 py-0.5">
         <li className="shrink-0 text-caption text-muted-foreground">Gå til:</li>
         {RECIPE_SECTIONS.map((s) => (
           <li key={s.id} className="shrink-0">
-            <a
-              href={`#${s.id}`}
-              onClick={(e) => {
-                if (goToSection(s.id)) e.preventDefault();
-              }}
-              className="inline-flex rounded-full border border-border bg-background px-3 py-1 text-caption text-foreground transition-colors hover:border-app/50 hover:bg-app/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {s.label}
-            </a>
+            {onGoTo ? (
+              <button type="button" onClick={() => onGoTo(s.id)} className={NAV_PILL}>
+                {s.label}
+              </button>
+            ) : (
+              <a
+                href={`#${s.id}`}
+                onClick={(e) => {
+                  if (goToSection(s.id)) e.preventDefault();
+                }}
+                className={NAV_PILL}
+              >
+                {s.label}
+              </a>
+            )}
           </li>
         ))}
       </ul>

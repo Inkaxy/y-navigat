@@ -27,7 +27,13 @@ export function RecipeStatsBar({
   prefermentedFlourPct,
   className,
   onShowDetails,
+  hideNotices = false,
 }: {
+  /**
+   * Skjul varslene om ufullstendig kost/deigvekt. Oppskriftssiden viser dem i
+   * «Gjenstår» i stedet; andre visninger beholder dem.
+   */
+  hideNotices?: boolean;
   /** Åpner advarselsoversikten med detaljer per ingrediens. */
   onShowDetails?: () => void;
   totals: BakersTotals;
@@ -119,7 +125,7 @@ export function RecipeStatsBar({
             {it.hint && <div className="text-[11px] text-muted-foreground">{it.hint}</div>}
           </div>
         ))}
-        {cost?.incomplete && (
+        {!hideNotices && cost?.incomplete && (
           <Alert className="col-span-2 py-2 sm:col-span-3 lg:col-span-6">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
@@ -131,7 +137,7 @@ export function RecipeStatsBar({
             </AlertDescription>
           </Alert>
         )}
-        {totals.incomplete && (
+        {!hideNotices && totals.incomplete && (
           <Alert variant="destructive" className="col-span-2 py-2 sm:col-span-3 lg:col-span-6">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>

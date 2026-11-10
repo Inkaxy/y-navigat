@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLegalEntityLabelInfo } from "@/varer/hooks/useLegalEntityLabelInfo";
+import { draftLabelFlags, labelProducerAddress } from "@/varer/lib/recipeLabelIssues";
 import { Button } from "@/components/ui/button";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -58,22 +60,6 @@ export interface LabelRecipe {
   label_claims_approved_at?: string | null;
 }
 
-interface LegalEntityLabelInfo {
-  name: string | null;
-  address_line1: string | null;
-  postal_code: string | null;
-  city: string | null;
-}
-
-/** Kolonnenavnene i `legal_entities` — feltene heter invoice_* i basen. */
-interface LegalEntityRow {
-  legal_name: string | null;
-  display_name: string | null;
-  invoice_address_line1: string | null;
-  invoice_postal_code: string | null;
-  invoice_city: string | null;
-}
-
 interface Props {
   recipeId: string;
   recipeName: string;
@@ -83,6 +69,11 @@ interface Props {
   canWrite: boolean;
   /** Bytter til Oppskrift-fanen (brukes av datakvalitet-kortet). */
   onGoToRecipeTab?: () => void;
+  /**
+   * Fokusforespørsel fra «Gjenstår»: en nøkkel fra etikettkontrollen eller
+   * «datakvalitet». Ny `seq` gir nytt fokus også for samme nøkkel.
+   */
+  fixRequest?: { key: string; seq: number } | null;
 }
 
 /** Merking — kan vi trykke dette på posen, og hvis ikke, hva må endres? */
@@ -94,6 +85,7 @@ export function LabelTab({
   legalEntityId,
   canWrite,
   onGoToRecipeTab,
+  fixRequest,
 }: Props) {
   const qc = useQueryClient();
   const labelQuery = useRecipeLabelCalculated(recipeId);
@@ -101,27 +93,7 @@ export function LabelTab({
   const linksQuery = useRecipeLinkedProducts(recipeId);
   const effectiveGrain = useRecipeBreadscaleEffective(recipeId);
 
-  const entityQuery = useQuery({
-    queryKey: ["legal-entity-label", legalEntityId],
-    enabled: !!legalEntityId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("legal_entities")
-        .select("legal_name, display_name, invoice_address_line1, invoice_postal_code, invoice_city")
-        .eq("id", legalEntityId!)
-        .maybeSingle();
-      if (error) throw error;
-      const row = (data ?? null) as LegalEntityRow | null;
-      if (!row) return null;
-      return {
-        // Etiketten skal bære det juridiske navnet, med visningsnavn som reserve.
-        name: row.legal_name ?? row.display_name ?? null,
-        address_line1: row.invoice_address_line1 ?? null,
-        postal_code: row.invoice_postal_code ?? null,
-        city: row.invoice_city ?? null,
-      } satisfies LegalEntityLabelInfo;
-    },
-  });
+  const entityQuery = useLegalEntityLabelInfo(legalEntityId);
 
   const saveClaim = useMutation({
     mutationFn: async (input: { field: "label_claim_keyhole" | "label_claim_grain"; value: boolean }) => {
@@ -222,11 +194,7 @@ export function LabelTab({
   }, [recipe.manual_allergen_summary, recipe.manual_ingredient_declaration, recipe.manual_nutrition]);
 
   const entity = entityQuery.data ?? null;
-  const producerAddress = entity
-    ? [entity.address_line1, [entity.postal_code, entity.city].filter(Boolean).join(" ")]
-        .filter(Boolean)
-        .join(", ")
-    : null;
+  const producerAddress = entity ? labelProducerAddress(entity) : null;
 
   /**
    * Pliktfeltene vurderes per kilde. En sperret beregning skal ikke hindre
@@ -319,6 +287,24 @@ export function LabelTab({
     goTo(t.section, t.anchor);
   };
 
+  // Klikk i «Gjenstår» på oppskriftssiden: samme snarvei som «Rett felt».
+  const fixSeq = fixRequest?.seq ?? 0;
+  const fixKey = fixRequest?.key ?? null;
+  const fixRef = useRef<(key: string) => void>(() => undefined);
+  fixRef.current = (key: string) => {
+    if (key === "datakvalitet") {
+      setQualitySignal((n) => n + 1);
+      goTo("datakvalitet", "merking-datakvalitet");
+      return;
+    }
+    const t = fixTargetForChecklistKey(key, declarationManual);
+    if (t) onFixField(key);
+    else goTo("etikett");
+  };
+  useEffect(() => {
+    if (fixSeq > 0 && fixKey) fixRef.current(fixKey);
+  }, [fixSeq, fixKey]);
+
   if (labelQuery.isLoading || versionsQuery.isLoading) {
     return (
       <div className="space-y-3" aria-busy="true" aria-label="Laster merkedata">
@@ -344,14 +330,23 @@ export function LabelTab({
 
   const approvedInput = latestVersion ? approvedLabelInput(latestVersion) : null;
   const shownSource: PreviewSource = approvedInput ? labelSource : "draft";
+  // Samme regler som «Gjenstår» (draftLabelFlags).
+  const draftFlags = draftLabelFlags({
+    declarationManual,
+    coveragePct,
+    calculationBlocked: !!missing?.blocked,
+    hasNutrition: !!effective.nutrition,
+    effectiveGrainPct: effectiveGrain.data,
+    breadscaleManual: breadscaleMode === "manual",
+    manualBreadscalePct: recipe.manual_breadscale_pct ?? null,
+    calculatedGrainPct: label?.grain_score_pct ?? null,
+  });
   const draftPreview = (
     <ConsumerLabelSection
       variant="draft"
       recipeName={recipeName}
       effective={effective}
-      effectiveGrainPct={
-        effectiveGrain.data ?? (breadscaleMode === "manual" ? recipe.manual_breadscale_pct ?? null : label?.grain_score_pct ?? null)
-      }
+      effectiveGrainPct={draftFlags.grainPct}
       declarationManual={declarationManual}
       breadscaleManual={breadscaleMode === "manual"}
       claimGrain={!!recipe.label_claim_grain}
@@ -362,13 +357,13 @@ export function LabelTab({
       countryOfOrigin={recipe.country_of_origin ?? null}
       entity={entityQuery.data ?? null}
       profile={labelProfileQuery.data ?? null}
-      blocked={declarationManual ? false : !!missing?.blocked}
+      blocked={draftFlags.blocked}
       keyholeQualifies={keyhole?.status === "oppfylt"}
       coveragePct={coveragePct}
       onChecklistChange={onChecklistChange}
       fixLabelFor={(key) => fixTargetForChecklistKey(key, declarationManual)?.label ?? null}
       onFixField={onFixField}
-      nutritionUsable={declarationManual ? !!effective.nutrition : coverageOk && !!effective.nutrition}
+      nutritionUsable={draftFlags.nutritionUsable}
     />
   );
 

@@ -14,6 +14,7 @@ import { NUT_ROWS, nutritionValueText } from "./labelShared";
 import { MarkedText } from "@/varer/components/label/MarkedText";
 import type { EffectiveDeclaration } from "@/varer/lib/effectiveDeclaration";
 import { buildLabelChecklist } from "@/varer/lib/labelChecklist";
+import { labelChecklistInput, labelProducerAddress } from "@/varer/lib/recipeLabelIssues";
 import { mmToPt, type RecipeLabelProfile } from "@/varer/hooks/useRecipeLabelProfile";
 
 interface EntityInfo {
@@ -113,9 +114,7 @@ export function ConsumerLabelSection({
   const grainCategory = effectiveGrainPct != null ? grainCategoryFromPct(effectiveGrainPct) : null;
   const netWeightText = unitWeightGrams ? `${Math.round(unitWeightGrams)} g` : null;
   const shelfLifeText = shelfLifeDays ? `Best før: ${shelfLifeDays} dager fra produksjonsdato` : null;
-  const producerAddress = entity
-    ? [entity.address_line1, [entity.postal_code, entity.city].filter(Boolean).join(" ")].filter(Boolean).join(", ")
-    : null;
+  const producerAddress = entity ? labelProducerAddress(entity) : null;
 
   const nutritionRows = NUT_ROWS.map((r) => ({
     key: r.key,
@@ -125,24 +124,25 @@ export function ConsumerLabelSection({
   }));
 
   // Pliktfeltene etter 1169/2011 — røde punkter sperrer utskrift og godkjenning.
-  const checklist = buildLabelChecklist({
-    productName: recipeName,
-    ingredientText: effective.ingredientText,
-    contains: effective.contains,
-    mayContain: effective.mayContain,
-    netWeightGrams: unitWeightGrams,
-    shelfLifeDays,
-    storageInstructions,
-    producerName: entity?.name ?? null,
-    producerAddress: producerAddress || null,
-    nutrition: nutritionUsable ? (effective.nutrition as Record<string, number | null> | null) : null,
-    coveragePct: declarationManual ? null : coveragePct ?? null,
-    blocked,
-    claimGrain,
-    grainPct: effectiveGrainPct,
-    claimKeyhole,
-    keyholeQualifies,
-  });
+  // Samme oppsett som «Gjenstår» på oppskriftssiden (labelChecklistInput).
+  const checklist = buildLabelChecklist(
+    labelChecklistInput({
+      recipeName,
+      effective,
+      effectiveGrainPct,
+      declarationManual,
+      claimGrain,
+      claimKeyhole,
+      unitWeightGrams,
+      shelfLifeDays,
+      storageInstructions,
+      entity,
+      nutritionUsable,
+      blocked,
+      keyholeQualifies,
+      coveragePct,
+    }),
+  );
   useEffect(() => {
     onChecklistChange?.(checklist.blocked);
   }, [checklist.blocked, onChecklistChange]);
