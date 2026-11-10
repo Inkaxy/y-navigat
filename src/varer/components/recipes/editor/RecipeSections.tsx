@@ -36,10 +36,13 @@ export function RecipeSection({ id, title, actions, children }: { id: RecipeSect
   );
 }
 
+const NAV_PILL =
+  "inline-flex min-h-[44px] items-center rounded-full border border-border bg-background px-3 py-1 text-caption text-foreground transition-colors hover:border-app/50 hover:bg-app/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-0";
+
 /**
  * Kompakt «Gå til»-navigasjon, rullbar på mobil. Med `onGoTo` (oppskriftssiden
- * med faner) bytter et klikk fane før fokus flyttes, og nettleseren navigerer
- * ikke — da slår heller ikke vakten for ulagrede endringer inn.
+ * med faner) er punktene knapper: et klikk bytter fane før fokus flyttes, og
+ * ingen navigasjon skjer — vakten for ulagrede endringer slår ikke inn.
  */
 export function RecipeSectionNav({ onGoTo }: { onGoTo?: (id: RecipeSectionId) => void } = {}) {
   return (
@@ -48,20 +51,21 @@ export function RecipeSectionNav({ onGoTo }: { onGoTo?: (id: RecipeSectionId) =>
         <li className="shrink-0 text-caption text-muted-foreground">Gå til:</li>
         {RECIPE_SECTIONS.map((s) => (
           <li key={s.id} className="shrink-0">
-            <a
-              href={`#${s.id}`}
-              onClick={(e) => {
-                if (onGoTo) {
-                  e.preventDefault();
-                  onGoTo(s.id);
-                  return;
-                }
-                if (goToSection(s.id)) e.preventDefault();
-              }}
-              className="inline-flex rounded-full border border-border bg-background px-3 py-1 text-caption text-foreground transition-colors hover:border-app/50 hover:bg-app/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {s.label}
-            </a>
+            {onGoTo ? (
+              <button type="button" onClick={() => onGoTo(s.id)} className={NAV_PILL}>
+                {s.label}
+              </button>
+            ) : (
+              <a
+                href={`#${s.id}`}
+                onClick={(e) => {
+                  if (goToSection(s.id)) e.preventDefault();
+                }}
+                className={NAV_PILL}
+              >
+                {s.label}
+              </a>
+            )}
           </li>
         ))}
       </ul>
