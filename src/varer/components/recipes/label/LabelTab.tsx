@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLegalEntityLabelInfo } from "@/varer/hooks/useLegalEntityLabelInfo";
 import { draftLabelFlags, labelProducerAddress } from "@/varer/lib/recipeLabelIssues";
 import { Button } from "@/components/ui/button";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
