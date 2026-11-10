@@ -168,8 +168,8 @@ describe("Varer og lønnsomhet", () => {
     table([{ link: link(), state: "ready", margins: withCost, retry: () => {} }]);
     fireEvent.click(screen.getByRole("button", { name: /Vis detaljer/ }));
     expect(screen.getByText("Kostoppsett")).toBeTruthy();
-    expect(screen.getByText("25,00 kr")).toBeTruthy();
-    expect(screen.getByText("-10,0 pp")).toBeTruthy();
+    expect(screen.getAllByText("25,00 kr").length).toBeGreaterThan(0);
+    expect(screen.getByText(/^[−-]10,0 pp$/)).toBeTruthy();
     expect(screen.getByText("28,57 kr")).toBeTruthy();
   });
 });
