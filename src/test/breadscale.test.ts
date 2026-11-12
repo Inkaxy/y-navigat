@@ -98,11 +98,11 @@ describe("Brødskala'n — klient", () => {
     ).toBe(50);
   });
 
-  it("prosenten formateres med komma og trykkes på etiketten", () => {
+  it("prosenten formateres med komma, og under merket trykkes helt tall rundet ned", () => {
     expect(fmtPct(77.25)).toBe("77,3 %");
     expect(
       brodskalaPctText({ felter: { brodskala_pct: 77.25 } } as never),
-    ).toBe("77,3 %");
+    ).toBe("77 %");
     expect(brodskalaPctText({ felter: {} } as never)).toBeNull();
   });
 });
