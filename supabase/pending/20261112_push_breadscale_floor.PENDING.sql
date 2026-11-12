@@ -305,7 +305,6 @@ begin
     'forced', v_force,
     'skipped_no_price', v_skipped_no_price);
 end;
-$function$
-;
+$function$;
 
 commit;
