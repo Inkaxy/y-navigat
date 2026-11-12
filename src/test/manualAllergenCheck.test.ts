@@ -74,3 +74,29 @@ describe("checkManualAllergens", () => {
     expect(marked).toEqual([true, true, false]);
   });
 });
+
+import { labelApproveIssues } from "@/varer/lib/labelApproveIssues";
+
+describe("labelApproveIssues — manuell kilde", () => {
+  const nut = { energy_kj: 1, energy_kcal: 1, fat_g: 1, saturated_fat_g: 1, carbs_g: 1, sugars_g: 1, protein_g: 1, salt_g: 1 };
+  const base = {
+    recipeName: "Grovbrød",
+    calculated: { ingredientText: "<strong>hvete</strong>mel", contains: ["hvete"], mayContain: [], nutrition: nut },
+    netWeightGrams: null, shelfLifeDays: null, storageInstructions: null, producerName: null, producerAddress: null,
+    coveragePct: 95, calculationBlocked: false, claimGrain: false, grainPct: null, claimKeyhole: false, keyholeQualifies: false,
+    knownAllergens: ["hvete"],
+  };
+  it("sperrer godkjenning av manuell kilde når allergenet ikke er fremhevet", () => {
+    const r = labelApproveIssues({ ...base, manual: { ingredientText: "Hvetemel, vann", contains: [], mayContain: [], nutrition: nut } });
+    expect(r.manual.some((m) => m.startsWith("Allergener:"))).toBe(true);
+    expect(r.auto).toEqual([]);
+  });
+  it("gir ingen sperre når allergenet er fremhevet", () => {
+    const r = labelApproveIssues({ ...base, manual: { ingredientText: "HVETEMEL, vann", contains: ["hvete"], mayContain: [], nutrition: nut } });
+    expect(r.manual).toEqual([]);
+  });
+  it("ukjente allergener (ikke beregnet) sperrer ikke manuell godkjenning", () => {
+    const r = labelApproveIssues({ ...base, knownAllergens: null, manual: { ingredientText: "Hvetemel", contains: [], mayContain: [], nutrition: nut } });
+    expect(r.manual).toEqual([]);
+  });
+});

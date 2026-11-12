@@ -264,3 +264,20 @@ export function manualAllergenIssues(input: ManualAllergenIssueInput): { errors:
     warnings: [...check.warnings.map(allergenFindingText), ...warnings],
   };
 }
+
+/** Som rader i etikettkontrollen, til «Gjenstår» (røde sperrer, gule advarsler). */
+export function manualAllergenChecklistItems(issues: { errors: string[]; warnings: string[] }): Array<{
+  key: string;
+  label: string;
+  level: "error" | "warn";
+  detail: string;
+}> {
+  const out: Array<{ key: string; label: string; level: "error" | "warn"; detail: string }> = [];
+  if (issues.errors.length) {
+    out.push({ key: "manual_allergens", label: "Allergener i ingredienslisten", level: "error", detail: issues.errors.join(" ") });
+  }
+  if (issues.warnings.length) {
+    out.push({ key: "manual_allergens_warn", label: "Allergener bør sjekkes", level: "warn", detail: issues.warnings.join(" ") });
+  }
+  return out;
+}
