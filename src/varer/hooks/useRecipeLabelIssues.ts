@@ -8,6 +8,7 @@ import {
 } from "@/varer/lib/effectiveDeclaration";
 import { buildLabelChecklist, type ChecklistItem } from "@/varer/lib/labelChecklist";
 import { draftLabelFlags, labelChecklistInput } from "@/varer/lib/recipeLabelIssues";
+import { checkManualAllergens, manualAllergenChecklistItems, manualAllergenIssues } from "@/varer/lib/manualAllergenCheck";
 import type { LabelRecipe } from "@/varer/components/recipes/label/LabelTab";
 import type { MissingData } from "@/varer/components/recipes/label/DataQualityCard";
 
@@ -89,7 +90,16 @@ export function useRecipeLabelIssues(input: {
         coveragePct: label?.coverage_by_weight_pct ?? null,
       }),
     );
-    return { checklist: checklist.items, blockReasons: missing?.block_reasons ?? [] };
+    // Manuell kilde: allergenene fra råvarene må stå fremhevet i den lagrede teksten (art. 21).
+    const allergenItems = declarationManual
+      ? manualAllergenChecklistItems(
+          manualAllergenIssues({
+            check: checkManualAllergens(recipe.manual_ingredient_declaration ?? null, label ? label.allergens?.contains ?? [] : null),
+            unreviewedCount: missing?.allergens_unreviewed?.length ?? 0,
+          }),
+        )
+      : [];
+    return { checklist: [...checklist.items, ...allergenItems], blockReasons: missing?.block_reasons ?? [] };
   }, [recipe, labelQuery.data, entityQuery.data, grainQuery.data, declarationManual, input.recipeId, input.recipeName]);
 
   const loading =
