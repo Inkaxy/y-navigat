@@ -74,8 +74,7 @@ export function LabelTab({
   const {
     labelQuery, compute, effectiveGrain, saveClaim, labelProfileQuery, approve, label, coveragePct, coverageOk,
     keyhole, links, primaryCount, versionsQuery, latestVersion, approvedAt, approverQuery, missing, labelState,
-    hasCalc, declarationManual, savedSource, breadscaleMode, recompute, effective, manualSource, entity,
-    approveIssues, sourceIssues, nextAction,
+    hasCalc, declarationManual, savedSource, breadscaleMode, recompute, effective, entity, sourceIssues, nextAction,
   } = d;
   const [approveOpen, setApproveOpen] = useState(false);
   const [, setChecklistBlocked] = useState(false);
