@@ -11,6 +11,7 @@ select md5(pg_get_functiondef('public.push_products_to_nettside()'::regprocedure
 -- 2) Varer som får et annet tall i push enn i dag. Samme utvalg og samme
 --    prosentkilde som funksjonen (versjonert → godkjent versjon, legacy → varen),
 --    og samme merkeregel (product_breadscale_claim_ok). Tom liste = ingen endring.
+--    Varer uten gyldig pris hoppes over av push, men tas med her.
 select p.display_number,
        p.display_name,
        x.breadscale_pct                as lagret_pct,
