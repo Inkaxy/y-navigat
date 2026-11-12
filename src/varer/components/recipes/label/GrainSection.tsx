@@ -16,6 +16,7 @@ import {
   COARSE_CLASSIFICATIONS,
   GRAIN_LEVELS,
   SIFTED_CLASSIFICATIONS,
+  fmtGrainDisplayPct,
   fmtGrams,
   fmtNum,
   fmtPct,
@@ -457,7 +458,7 @@ export function GrainSection({
               <p className="text-xs text-muted-foreground">
                 {claimLocked
                   ? "Låst til det finnes en effektiv grovhet — beregn merkedata eller legg inn manuell prosent."
-                  : `Merket som trykkes: ${brodskalanFor(effectiveCategory)?.label ?? "—"} (${fmtPct(effectivePct)}).`}
+                  : `Merket som trykkes: ${brodskalanFor(effectiveCategory)?.label ?? "—"} (${fmtGrainDisplayPct(effectivePct) ?? "—"}).`}
               </p>
             </div>
             <Switch

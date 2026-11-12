@@ -29,6 +29,9 @@ const v1: ApprovedVersion = {
   breadscale_pct: 60,
 };
 
+/** Varen viser merket — grovhet kan da følge godkjent versjon. */
+const SHOW = { show_breadscale: true };
+
 const base = {
   ingredientText: v1.ingredient_text,
   versionId: "ver-1",
@@ -46,8 +49,8 @@ describe("publisert deklarasjon etter råvareendring", () => {
     });
     expect(before).toMatchObject({ include: true, source: "approved_version", needsReview: false });
     expect(after).toMatchObject({ include: true, source: "approved_version", needsReview: true });
-    const a = approvedContent(v1);
-    const b = approvedContent(v1);
+    const a = approvedContent(v1, SHOW);
+    const b = approvedContent(v1, SHOW);
     expect(b).toEqual(a);
     expect(await contentHash(b)).toBe(await contentHash(a));
     expect(a.grain).toMatchObject({ level: "grovt", pct: 60 });
@@ -57,10 +60,10 @@ describe("publisert deklarasjon etter råvareendring", () => {
   it("ny godkjenning erstatter snapshotet", async () => {
     const v2: ApprovedVersion = { ...v1, id: "ver-2", version: 2, ingredient_text: "Hvetemel, vann", breadscale_pct: 20 };
     expect(exportDecision({ ...base, needsReview: false, versionId: "ver-2", version: v2 }).include).toBe(true);
-    const c = approvedContent(v2);
+    const c = approvedContent(v2, SHOW);
     expect(c.ingredient_text).toBe("Hvetemel, vann");
     expect(c.grain?.level).toBe("fint");
-    expect(await contentHash(c)).not.toBe(await contentHash(approvedContent(v1)));
+    expect(await contentHash(c)).not.toBe(await contentHash(approvedContent(v1, SHOW)));
   });
 
   it("aldri godkjent vare eksporteres ikke", () => {
@@ -85,8 +88,8 @@ describe("publisert deklarasjon etter råvareendring", () => {
   });
 
   it("grovhetens kilde kommer fra godkjent versjon, ikke oppskriftens modus", () => {
-    expect(approvedContent({ ...v1, source: "manual" }).grain?.source).toBe("manual");
-    expect(approvedContent({ ...v1, source: "calculated" }).grain?.source).toBe("auto");
+    expect(approvedContent({ ...v1, source: "manual" }, SHOW).grain?.source).toBe("manual");
+    expect(approvedContent({ ...v1, source: "calculated" }, SHOW).grain?.source).toBe("auto");
   });
 
   it("beregnet versjon bevarer allergenutheving fra godkjent HTML", () => {
@@ -95,14 +98,14 @@ describe("publisert deklarasjon etter råvareendring", () => {
       ingredient_html: "Hvetemel (<strong>hvete</strong>), vann, salt",
       ingredient_text: "Hvetemel (hvete), vann, salt",
     };
-    expect(approvedContent(calc).ingredient_text).toBe("Hvetemel (*hvete*), vann, salt");
+    expect(approvedContent(calc, SHOW).ingredient_text).toBe("Hvetemel (*hvete*), vann, salt");
     // Legacy manuell uten HTML: teksten brukes som den er.
-    expect(approvedContent(v1).ingredient_text).toBe("Hvetemel (*hvete*), vann, salt");
+    expect(approvedContent(v1, SHOW).ingredient_text).toBe("Hvetemel (*hvete*), vann, salt");
   });
 
   it("godkjent nettovekt brukes; null er autoritativt", () => {
-    expect(approvedContent(v1).net_weight_grams).toBe(500);
-    expect(approvedContent({ ...v1, net_weight_g: null }).net_weight_grams).toBeNull();
+    expect(approvedContent(v1, SHOW).net_weight_grams).toBe(500);
+    expect(approvedContent({ ...v1, net_weight_g: null }, SHOW).net_weight_grams).toBeNull();
   });
 });
 

@@ -8,7 +8,7 @@ describe("exportGrain", () => {
   });
   it("automatisk bruker beregnet kategori", () => {
     expect(exportGrain({ mode: "auto", manualPct: 90, calcCategory: "ekstra_grovt", calcPct: 77.25 }))
-      .toMatchObject({ level: "ekstra_grovt", label: "Ekstra grovt", pct: 77.3, pieces: 4, source: "auto" });
+      .toMatchObject({ level: "ekstra_grovt", label: "Ekstra grovt", pct: 77, pieces: 4, source: "auto" });
   });
   it("uten grunnlag gir null", () => {
     expect(exportGrain({ mode: "auto", manualPct: null, calcCategory: null, calcPct: null })).toBeNull();

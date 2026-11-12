@@ -138,3 +138,23 @@ export function fmtNum(n: number | null | undefined, decimals = 1): string {
   if (n == null || !Number.isFinite(Number(n))) return "—";
   return Number(n).toFixed(decimals).replace(".", ",");
 }
+
+/**
+ * Grovhetsprosent slik den vises og trykkes sammen med Brødskala'n-merket:
+ * helt tall rundet NED, så tallet alltid stemmer med kategorien
+ * (`grainCategoryFromPct` på uavrundet prosent). 25,6 → 25 (Fint), 26,4 → 26.
+ * Lagrede verdier endres ikke. Interne arbeidsflater bruker fortsatt `fmtPct`.
+ * Speiler `grainDisplayPct` i `supabase/functions/_shared/grain-display.ts`.
+ */
+export function grainDisplayPct(pct: number | string | null | undefined): number | null {
+  if (pct == null || pct === "") return null;
+  const n = typeof pct === "number" ? pct : Number(pct);
+  if (!Number.isFinite(n)) return null;
+  return Math.floor(n);
+}
+
+/** «25 %» for merket, eller null når prosent mangler. */
+export function fmtGrainDisplayPct(pct: number | string | null | undefined): string | null {
+  const v = grainDisplayPct(pct);
+  return v == null ? null : `${v} %`;
+}

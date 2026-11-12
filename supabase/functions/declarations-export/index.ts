@@ -79,11 +79,11 @@ const JSON_SCHEMA = {
           recipe_name: { type: ["string", "null"] },
           grain: {
             type: ["object", "null"],
-            description: "Brødskala'n. Null når varen ikke har grovhetsgrunnlag.",
+            description: "Brødskala'n. Null når varen ikke skal bære merket (samme regel som nettsiden) eller mangler grovhetsgrunnlag.",
             properties: {
               level: { enum: ["fint", "halvgrovt", "grovt", "ekstra_grovt"] },
               label: { type: "string" },
-              pct: { type: ["number", "null"] },
+              pct: { type: ["number", "null"], description: "Helt tall rundet ned, stemmer alltid med level (25,6 % → 25)." },
               pieces: { type: "integer", minimum: 1, maximum: 4 },
               pieces_total: { const: 4 },
               source: { enum: ["manual", "auto"] },
