@@ -4,29 +4,28 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { ClipboardCopy, Copy, GitCompare, Loader2, Save } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { showError } from "@/lib/userError";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { UnsavedChangesDialog } from "@/varer/components/products/detail/UnsavedChangesDialog";
 import { useUserDisplayName, type RecipeLabelCalculated } from "@/varer/hooks/useRecipeLabel";
-import { NUTRITION_KEYS, parseAllergenSummary, pickNutrition, stripHtml, type DeclarationMode } from "@/varer/lib/effectiveDeclaration";
-import { DeclarationAssistantPanel } from "@/varer/components/declaration/DeclarationAssistantPanel";
-import { DeclarationAllergenExtractor } from "@/varer/components/declaration/DeclarationAllergenExtractor";
+import type { ReactNode } from "react";
+import {
+  NUTRITION_KEYS,
+  declarationDisplayText,
+  parseAllergenSummary,
+  pickNutrition,
+  stripHtml,
+  type DeclarationMode,
+} from "@/varer/lib/effectiveDeclaration";
 import { ALLERGEN_FIELD_LABEL, type AllergenApplyPlan } from "@/varer/lib/declarationAllergenSuggestion";
-import { SourceSegmented, formatDateTimeNb, type LabelSource } from "./labelShared";
-import { CalculatedDeclarationView } from "./CalculatedDeclarationView";
+import { checkManualAllergens } from "@/varer/lib/manualAllergenCheck";
+import type { LabelSource } from "./labelShared";
 import { ConfirmPendingDialog } from "./ConfirmPendingDialog";
-import { NUT_LABELS, formToDoc, type Form, type Pending } from "./declarationForm";
-
-/** Samme rekkefølge som på etiketten, slik at manuell innføring kan følge et datablad linje for linje. */
-const NUTRITION_ENTRY_ORDER = [
-  "energy_kj", "energy_kcal", "fat_g", "saturated_fat_g", "carbs_g", "sugars_g", "fiber_g", "protein_g", "salt_g",
-] as const;
-import { DeclarationDiffView, type DeclarationDoc } from "./DeclarationDiffView";
+import { formToDoc, type Form, type Pending } from "./declarationForm";
+import type { DeclarationDoc } from "./DeclarationDiffView";
+import { CalculatedDeclarationPane } from "./CalculatedDeclarationPane";
+import { ManualDeclarationFields } from "./ManualDeclarationFields";
 
 
 interface Props {
@@ -52,6 +51,12 @@ interface Props {
   approvedManualActive: boolean;
   onDirtyChange: (dirty: boolean) => void;
   onOpenApprove: () => void;
+  /** Åpner datakvaliteten nederst i kortet og går til linjene som mangler data. */
+  onShowQuality: () => void;
+  /** Råvarer som ikke er vurdert for allergener (fra beregningen). */
+  unreviewedAllergenCount: number;
+  /** Datadekning og datakvalitet — vises nederst i kortet. */
+  qualitySlot: ReactNode;
 }
 
 /** Én editor for valgt kilde. Ingenting skrives før brukeren eksplisitt lagrer eller godkjenner. */
@@ -160,8 +165,9 @@ export function DeclarationNutritionSection(p: Props) {
 
   function fillFromCalculation() {
     const calc = pickNutrition(calculated?.nutrition_per_100g);
+    // Markørene (*hvete*) beholdes, så fremhevingen av allergenene følger med.
     const next: Form = {
-      ingredientText: plain,
+      ingredientText: declarationDisplayText(calculated?.ingredient_declaration),
       contains: (calculated?.allergens?.contains ?? []).join(", "),
       mayContain: (calculated?.allergens?.may_contain ?? []).join(", "),
       nutrition: Object.fromEntries(NUTRITION_KEYS.map((k) => [k, calc?.[k] != null ? String(calc[k]) : ""])),
@@ -173,6 +179,23 @@ export function DeclarationNutritionSection(p: Props) {
     setForm(next);
     p.onCandidateChange("manual");
     toast.success("Kladden er fylt ut fra beregningen — husk «Lagre kladd»");
+    focusLater("merking-editor-tekst");
+  }
+  function focusLater(id: string) {
+    window.setTimeout(() => {
+      const el = document.getElementById(id);
+      el?.scrollIntoView({ block: "center" });
+      el?.focus({ preventScroll: true });
+    }, 50);
+  }
+  function fetchAllergens() {
+    setForm((f) => ({
+      ...f,
+      contains: (calculated?.allergens?.contains ?? []).join(", "),
+      mayContain: (calculated?.allergens?.may_contain ?? []).join(", "),
+    }));
+    p.onCandidateChange("manual");
+    toast.success("Allergenene er hentet fra råvarene — husk «Lagre kladd»");
   }
   function onAssistant(text: string) {
     if (form.ingredientText.trim() && form.ingredientText.trim() !== text.trim()) setPending({ kind: "assistant", text });
@@ -235,31 +258,45 @@ export function DeclarationNutritionSection(p: Props) {
     setPending(null);
   }
 
+  const knownAllergens = calculated ? calculated.allergens?.contains ?? [] : null;
+  const allergenCheck = checkManualAllergens(form.ingredientText, knownAllergens);
+
   return (
     <Card id="merking-editor" tabIndex={-1} className="scroll-mt-4 outline-none">
-      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 pb-3">
+      <CardHeader className="space-y-3 pb-3">
         <div>
-          <CardTitle className="text-base">Deklarasjon &amp; næringsinnhold</CardTitle>
+          <CardTitle className="text-base">Deklarasjon og næringsinnhold</CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            Gjeldende kilde: <b>{savedMode === "manual" ? "Manuell" : "Beregnet"}</b> · gjelder {p.linkedProductCount} koblede
-            varer.
+            {candidate === "auto"
+              ? "Beregnes fra oppskriften og råvarenes datablad."
+              : "Du skriver ingrediensliste og næringsinnhold selv."}{" "}
+            Gjeldende kilde: <b>{savedMode === "manual" ? "Manuell" : "Beregnet"}</b> · gjelder {p.linkedProductCount} koblede varer.
           </p>
         </div>
-        <SourceSegmented caption="Vis og rediger:" value={candidate} disabled={busy} onChange={p.onCandidateChange} />
+        <div className="flex min-h-11 items-center gap-3">
+          <label htmlFor="merking-automatisk" className="text-sm font-medium">Automatisk beregning</label>
+          <Switch
+            id="merking-automatisk"
+            checked={candidate === "auto"}
+            disabled={busy}
+            onCheckedChange={(v) => p.onCandidateChange(v ? "auto" : "manual")}
+          />
+          <span className="text-sm text-muted-foreground" aria-hidden>{candidate === "auto" ? "På" : "Av"}</span>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {candidate !== savedMode && (
           <div role="note" className="flex flex-wrap items-center gap-2 rounded-md border border-dashed p-2 text-xs">
             <span className="flex-1">
               Du ser på <b>{candidate === "manual" ? "manuell" : "beregnet"}</b>. Gjeldende kilde er fortsatt{" "}
-              <b>{savedMode === "manual" ? "manuell" : "beregnet"}</b> — visningen alene endrer ingenting. «Lagre som gjeldende kilde» bytter kilde uten å godkjenne; «Godkjenn denne» åpner godkjenningen.
+              <b>{savedMode === "manual" ? "manuell" : "beregnet"}</b> — bryteren alene endrer ingenting. «Lagre som gjeldende kilde» bytter kilde uten å godkjenne; «Godkjenn denne» åpner godkjenningen.
             </span>
             {canWrite && (
               <>
-                <Button size="sm" variant="outline" className="h-7" disabled={busy} onClick={() => setPending({ kind: "source" })}>
+                <Button variant="outline" className="min-h-11" disabled={busy} onClick={() => setPending({ kind: "source" })}>
                   Lagre som gjeldende kilde
                 </Button>
-                <Button size="sm" className="h-7" onClick={p.onOpenApprove}>
+                <Button className="min-h-11" onClick={p.onOpenApprove}>
                   Godkjenn denne
                 </Button>
               </>
@@ -267,174 +304,51 @@ export function DeclarationNutritionSection(p: Props) {
           </div>
         )}
 
-        {/* Beregnet */}
-        <div className={candidate === "auto" ? "space-y-3" : "hidden"}>
-          {!calculated ? (
-            <div className="space-y-3 py-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                Ikke beregnet ennå. Bruk «Beregn merkedata» øverst i Merking.
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="flex flex-wrap gap-2">
-                {plain && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      void navigator.clipboard.writeText(plain);
-                      toast.success("Ingredienslisten er kopiert");
-                    }}
-                  >
-                    <Copy className="mr-1.5 h-4 w-4" /> Kopier tekst
-                  </Button>
-                )}
-                {canWrite && (
-                  <Button variant="outline" size="sm" onClick={fillFromCalculation} disabled={busy}>
-                    <ClipboardCopy className="mr-1.5 h-4 w-4" /> Rediger som manuell kladd
-                  </Button>
-                )}
-              </div>
-              <CalculatedDeclarationView calculated={calculated} unitWeight={recipe.unit_weight_grams ?? null} />
-            </>
-          )}
+        <div className={candidate === "auto" ? undefined : "hidden"}>
+          <CalculatedDeclarationPane
+            calculated={calculated}
+            unitWeight={recipe.unit_weight_grams ?? null}
+            plainText={plain}
+            canWrite={canWrite}
+            busy={busy}
+            onEditAsManual={fillFromCalculation}
+            onShowMissingLine={p.onShowQuality}
+            onEnterManually={() => {
+              p.onCandidateChange("manual");
+              focusLater("merking-editor-naering");
+            }}
+          />
         </div>
 
         {/* Manuell kladd — alltid montert, så kladden overlever kildebytte og fanebytte. */}
-        <div className={candidate === "manual" ? "space-y-4" : "hidden"}>
-          <div className="flex flex-wrap items-center gap-2">
-            {dirty && (
-              <Badge variant="outline" className="border-amber-500/60 text-amber-700 dark:text-amber-300">
-                Ulagret kladd
-              </Badge>
-            )}
-            <div className="flex-1" />
-            <Button variant="outline" size="sm" onClick={() => setCompare((v) => !v)} disabled={!calcDoc} aria-pressed={compare}>
-              <GitCompare className="mr-1.5 h-4 w-4" /> {compare ? "Skjul sammenligning" : "Sammenlign med beregningen"}
-            </Button>
-            {canWrite && (
-              <Button variant="outline" size="sm" onClick={fillFromCalculation} disabled={busy || !calculated}>
-                <ClipboardCopy className="mr-1.5 h-4 w-4" /> Fyll fra beregningen
-              </Button>
-            )}
-          </div>
-
-          {compare && calcDoc && (
-            <div className="rounded-md border bg-muted/20 p-3">
-              <DeclarationDiffView from={calcDoc} to={formToDoc(form)} fromLabel="beregningen" toLabel="kladden" />
-            </div>
-          )}
-
-          <div>
-            <Label htmlFor="merking-editor-tekst" className="text-xs">Ingrediensdeklarasjon</Label>
-            <Textarea
-              id="merking-editor-tekst"
-              rows={5}
-              value={form.ingredientText}
-              disabled={!canWrite}
-              onChange={(e) => setForm((f) => ({ ...f, ingredientText: e.target.value }))}
-              placeholder="Hvetemel, vann, salt, gjær …"
-            />
-          </div>
-          <DeclarationAssistantPanel
-            target="recipe"
-            targetId={recipeId}
-            value={form.ingredientText}
+        <div className={candidate === "manual" ? undefined : "hidden"}>
+          <ManualDeclarationFields
+            recipeId={recipeId}
+            form={form}
+            setForm={setForm}
+            dirty={dirty}
             canWrite={canWrite}
-            onApply={onAssistant}
+            busy={busy}
+            saving={saveDraft.isPending}
+            hasCalculation={!!calculated}
+            calcDoc={calcDoc}
+            compare={compare}
+            onToggleCompare={() => setCompare((v) => !v)}
+            onFillFromCalculation={fillFromCalculation}
+            onFetchAllergens={fetchAllergens}
+            onAssistant={onAssistant}
+            onAllergenSuggestion={onAllergenSuggestion}
+            onSave={requestSave}
+            allergenCheck={allergenCheck}
+            unreviewedAllergenCount={p.unreviewedAllergenCount}
+            updatedAt={recipe.declaration_updated_at ?? null}
+            updatedByName={updatedByName ?? null}
           />
-          <DeclarationAllergenExtractor
-            target="recipe"
-            targetId={recipeId}
-            value={form.ingredientText}
-            canWrite={canWrite}
-            current={{ contains: form.contains, mayContain: form.mayContain }}
-            onApply={onAllergenSuggestion}
-          />
-          {canWrite && (
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs text-muted-foreground">
-                Allergenene kan hentes fra råvarene i oppskriften. Ingenting lagres før du trykker «Lagre kladd».
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy || !calculated}
-                onClick={() => {
-                  setForm((f) => ({
-                    ...f,
-                    contains: (calculated?.allergens?.contains ?? []).join(", "),
-                    mayContain: (calculated?.allergens?.may_contain ?? []).join(", "),
-                  }));
-                  p.onCandidateChange("manual");
-                  toast.success("Allergenene er hentet fra råvarene — husk «Lagre kladd»");
-                }}
-              >
-                <ClipboardCopy className="mr-1.5 h-4 w-4" /> Hent allergener fra råvarene
-              </Button>
-            </div>
-          )}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <Label className="text-xs">Inneholder (kommaseparert)</Label>
-              <Input
-                value={form.contains}
-                disabled={!canWrite}
-                onChange={(e) => setForm((f) => ({ ...f, contains: e.target.value }))}
-                placeholder="hvete, melk"
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Kan inneholde spor av (kommaseparert)</Label>
-              <Input
-                value={form.mayContain}
-                disabled={!canWrite}
-                onChange={(e) => setForm((f) => ({ ...f, mayContain: e.target.value }))}
-                placeholder="nøtter, sesam"
-              />
-            </div>
-          </div>
-          <div id="merking-editor-naering" tabIndex={-1} className="max-w-md scroll-mt-4 divide-y rounded-md border outline-none">
-            {NUTRITION_ENTRY_ORDER.map((k) => {
-              const indent = k === "saturated_fat_g" || k === "sugars_g";
-              const id = `naering-${k}`;
-              return (
-                <div key={k} className="flex items-center gap-3 px-3 py-1.5">
-                  <Label htmlFor={id} className={`flex-1 text-sm font-normal ${indent ? "pl-4 text-muted-foreground" : ""}`}>
-                    {indent ? "– " : ""}{NUT_LABELS[k]}
-                  </Label>
-                  <Input
-                    id={id}
-                    type="number"
-                    step="0.1"
-                    inputMode="decimal"
-                    value={form.nutrition[k] ?? ""}
-                    disabled={!canWrite}
-                    onChange={(e) => setForm((f) => ({ ...f, nutrition: { ...f.nutrition, [k]: e.target.value } }))}
-                    className="h-8 w-28 text-right tabular-nums"
-                  />
-                </div>
-              );
-            })}
-          </div>
-          {canWrite && (
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <span className="mr-auto text-xs text-muted-foreground">
-                «Lagre kladd» lagrer teksten. Den gjelder for varene først når den er godkjent.
-              </span>
-              <Button onClick={requestSave} disabled={busy || !dirty}>
-                {saveDraft.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Lagre kladd
-              </Button>
-            </div>
-          )}
-          {recipe.declaration_updated_at && (
-            <p className="text-xs text-muted-foreground">
-              Sist lagret {formatDateTimeNb(recipe.declaration_updated_at)}
-              {updatedByName ? ` av ${updatedByName}` : ""}. Lagring er ikke det samme som godkjenning.
-            </p>
-          )}
+        </div>
+
+        <div className="border-t pt-4">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Datadekning og datakvalitet</div>
+          {p.qualitySlot}
         </div>
       </CardContent>
 
