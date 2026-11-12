@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ListChecks, Loader2, Printer } from "lucide-react";
 import { toast } from "sonner";
-import { fmtPct, grainCategoryFromPct, grainLevelLabel } from "@/varer/lib/breadscale";
+import { fmtGrainDisplayPct, grainCategoryFromPct, grainLevelLabel } from "@/varer/lib/breadscale";
 import { BRODSKALAN_MARKS } from "@/varer/lib/brodskalan";
 import nokkelhulletSrc from "@/assets/nokkelhullet.svg";
 import { LABEL_SIZES, type LabelSizeKey } from "../ConsumerLabelPDFDocument";
@@ -180,9 +180,9 @@ export function ConsumerLabelSection({
             producerName: entity?.name ?? profile?.company_name ?? null,
             producerAddress,
             grainMarkImage,
-            // Grovhetsprosenten skal trykkes under merket (BKLF pkt. 4.4).
+            // Grovhetsprosenten skal trykkes under merket (BKLF pkt. 4.4) — helt tall rundet ned.
             mayContain: effective.mayContain,
-            grainPctText: effectiveGrainPct != null ? fmtPct(effectiveGrainPct) : null,
+            grainPctText: fmtGrainDisplayPct(effectiveGrainPct),
             keyholeMarkImage,
           }}
         />,
@@ -333,7 +333,7 @@ export function ConsumerLabelSection({
             <div className="flex flex-wrap items-center gap-2 pt-1">
               {claimGrain && grainCategory && (
                 <Badge variant="outline">
-                  Brødskala'n: {grainLevelLabel(grainCategory)} ({fmtPct(effectiveGrainPct)})
+                  Brødskala'n: {grainLevelLabel(grainCategory)} ({fmtGrainDisplayPct(effectiveGrainPct) ?? "—"})
                 </Badge>
               )}
               {claimKeyhole && (
