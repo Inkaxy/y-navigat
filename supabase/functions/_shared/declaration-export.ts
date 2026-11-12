@@ -305,16 +305,28 @@ export interface RecipeLinkOrderRow {
 export function effectiveRecipeId(links: RecipeLinkOrderRow[]): string | null {
   if (links.length === 0) return null;
   if (links.length === 1) return links[0].recipe_id;
-  if (links.some((l) => !l.created_at || !l.id)) return null;
-  const sorted = [...links].sort((a, b) => {
-    const pa = a.is_primary === true ? 1 : 0;
-    const pb = b.is_primary === true ? 1 : 0;
+  const keyed = links.map((l) => ({ l, t: l.created_at ? timestampKey(l.created_at) : null }));
+  if (keyed.some((k) => !k.t || !k.l.id)) return null;
+  keyed.sort((a, b) => {
+    const pa = a.l.is_primary === true ? 1 : 0;
+    const pb = b.l.is_primary === true ? 1 : 0;
     if (pa !== pb) return pb - pa;
-    const ta = Date.parse(a.created_at!);
-    const tb = Date.parse(b.created_at!);
-    if (!Number.isFinite(ta) || !Number.isFinite(tb)) return Number.NaN;
-    if (ta !== tb) return ta - tb;
-    return a.id! < b.id! ? -1 : a.id! > b.id! ? 1 : 0;
+    if (a.t![0] !== b.t![0]) return a.t![0] - b.t![0];
+    if (a.t![1] !== b.t![1]) return a.t![1] - b.t![1];
+    return a.l.id! < b.l.id! ? -1 : a.l.id! > b.l.id! ? 1 : 0;
   });
-  return sorted[0].recipe_id;
+  return keyed[0].l.recipe_id;
+}
+
+/**
+ * [hele sekunder i ms, mikrosekunder] — uten Date-avrunding av brøkdelen,
+ * slik at to koblinger i samme millisekund sorteres som i Postgres.
+ */
+function timestampKey(v: string): [number, number] | null {
+  const m = /^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?(Z|[+-]\d{2}(?::?\d{2})?)$/.exec(v.trim());
+  if (!m) return null;
+  const zone = m[3] === "Z" ? "Z" : m[3].length === 3 ? `${m[3]}:00` : m[3].includes(":") ? m[3] : `${m[3].slice(0, 3)}:${m[3].slice(3)}`;
+  const base = Date.parse(`${m[1].replace(" ", "T")}${zone}`);
+  if (!Number.isFinite(base)) return null;
+  return [base, Number((m[2] ?? "").padEnd(6, "0"))];
 }
