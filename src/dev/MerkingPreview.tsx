@@ -28,7 +28,7 @@ const CALC: RecipeLabelCalculated = {
 const LINKS: RecipeLinkedProduct[] = [
   { id: "l1", product_id: "p1", recipe_id: RID, updated_at: NOW, is_primary: true, declaration_mode: null, sales_unit_basis: null, units_per_sales_unit: null, sales_unit_weight_g: null, units_per_batch_override: null, sales_unit_confirmed_at: null,
     products: { id: "p1", display_name: "Blåbærmuffins", display_number: "2041", breadscale_mode: null, breadscale_pct: null, breadscale_value: null, weight_per_unit_grams: null, cert_norsk_100: false } },
-  { id: "l2", product_id: "p2", recipe_id: RID, updated_at: NOW, is_primary: false, declaration_mode: null, sales_unit_basis: "stk", units_per_sales_unit: 4, sales_unit_weight_g: 344, units_per_batch_override: null, sales_unit_confirmed_at: NOW,
+  { id: "l2", product_id: "p2", recipe_id: RID, updated_at: NOW, is_primary: false, declaration_mode: null, sales_unit_basis: "flerpakk", units_per_sales_unit: 4, sales_unit_weight_g: 344, units_per_batch_override: null, sales_unit_confirmed_at: NOW,
     products: { id: "p2", display_name: "Blåbærmuffins 4-pk", display_number: "2042", breadscale_mode: null, breadscale_pct: null, breadscale_value: null, weight_per_unit_grams: 344, cert_norsk_100: true } },
 ];
 
