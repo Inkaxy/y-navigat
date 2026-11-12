@@ -94,6 +94,11 @@ export function fixTargetForChecklistKey(key: string, declarationManual: boolean
       return { section: "etikett", anchor: "etikett-holdbarhet", label: "Rett holdbarhet" };
     case "storage":
       return { section: "etikett", anchor: "etikett-oppbevaring", label: "Rett oppbevaring" };
+    case "manual_allergens":
+    case "manual_allergens_warn":
+      return { section: "deklarasjon", anchor: "merking-allergenkontroll", label: "Rett ingredienslisten" };
+    case "origin":
+      return { section: "etikett", anchor: "etikett-opprinnelse", label: "Rett opprinnelse" };
     case "mark_grain":
       return { section: "merker", anchor: "merking-grovhet", label: "Rett grovhetsmerket" };
     case "mark_keyhole":
