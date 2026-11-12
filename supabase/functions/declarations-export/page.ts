@@ -78,8 +78,22 @@ export function parseVersion(v: Row): ApprovedVersion {
 const rows = (d: Res["data"]): Row[] => (Array.isArray(d) ? d : d ? [d] : []);
 
 /** Legacy-grovhet tillatt: merkeregelen holder og eksportens oppskrift er den effektive. */
-function legacyGrainOk(p: Row, usedRecipeId: string | null, recipe: Row, calc: Row | null): boolean {
-  return false;
+function legacyGrainOk(p: Row, usedRecipeId: string | null, effectiveId: string | null, recipe: Row, calc: Row | null): boolean {
+  if (!usedRecipeId || !effectiveId || usedRecipeId !== effectiveId) return false;
+  return legacyGrainClaimOk({
+    product: {
+      show_breadscale: bool(p.show_breadscale),
+      breadscale_pct: num(p.breadscale_pct),
+      breadscale_mode: str(p.breadscale_mode),
+      breadscale_manual_value: num(p.breadscale_manual_value),
+    },
+    effectiveRecipe: {
+      label_claim_grain: bool(recipe.label_claim_grain),
+      breadscale_mode: str(recipe.breadscale_mode),
+      manual_breadscale_pct: num(recipe.manual_breadscale_pct),
+    },
+    effectiveCalc: calc ? { grain_score_pct: num(calc.grain_score_pct), is_stale: bool(calc.is_stale) } : null,
+  });
 }
 
 export async function buildDeclarationsPage(admin: Db, o: PageInput): Promise<PageResult> {
@@ -203,7 +217,7 @@ export async function buildDeclarationsPage(admin: Db, o: PageInput): Promise<Pa
           // Grovhet bare når varen skal bære merket (legacy-regelen i
           // product_breadscale_claim_ok), og bare når tallet hentes fra varens
           // effektive oppskrift. Kan det ikke avgjøres sikkert: null.
-          grain: recipe && legacyGrainOk(p, link?.recipe_id ?? null, recipe, calc)
+          grain: recipe && legacyGrainOk(p, link?.recipe_id ?? null, effectiveRecipeId(linksByProduct.get(p.id as string) ?? []), recipe, calc)
             ? exportGrain({
                 mode: recipe.breadscale_mode as string | null,
                 manualPct: recipe.manual_breadscale_pct as number | null,
