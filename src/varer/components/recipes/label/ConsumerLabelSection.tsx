@@ -261,57 +261,6 @@ export function ConsumerLabelSection({
         )}
 
         {profile && (
-                  <SelectItem value="profile">
-                    {`Profil: ${profile.name} (${profile.paper_width_mm} × ${profile.paper_height_mm} mm)`}
-                  </SelectItem>
-                )}
-                {Object.entries(LABEL_SIZES).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>
-                    {v.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button onClick={printLabel} disabled={printing || !canPrint}>
-            {printing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
-            Skriv ut etikett
-          </Button>
-          {!canPrint && (
-            <p className="text-xs text-amber-700">
-              {checklist.blocked
-                ? "Utskrift er sperret — pliktfelt mangler (se sjekklisten under)."
-                : "Ingen effektiv deklarasjon ennå — beregn merkedata eller legg inn en manuell deklarasjon først."}
-            </p>
-          )}
-        </div>
-
-        {printBlockers.length > 0 && (
-          <div role="note" aria-label="Rett felt før utskrift" className="rounded-md border border-destructive/40 bg-destructive/5 p-2">
-            <p className="text-xs font-medium">Rett dette før utskrift:</p>
-            <ul className="mt-1 space-y-1">
-              {printBlockers.map((item) => {
-                const label = fixable(item.key);
-                return (
-                  <li key={item.key} className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                    <span>
-                      <b>{item.label}:</b> {item.detail}
-                    </span>
-                    {label ? (
-                      <Button size="sm" variant="outline" className="h-7" onClick={() => onFixField?.(item.key)}>
-                        {label}
-                      </Button>
-                    ) : item.key === "producer" ? (
-                      <span className="text-muted-foreground">Rettes i firmaopplysningene</span>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-
-        {profile && (
           <p className="text-xs text-muted-foreground">
             Etikettprofil fra hovedproduktet: <b>{profile.name}</b>
             {profile.company_note ? ` · ${profile.company_note}` : ""}
