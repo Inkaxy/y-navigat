@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildDeclarationsPage, type Db, type Query } from "../../supabase/functions/declarations-export/page";
+import { effectiveRecipeId, legacyGrainClaimOk } from "../../supabase/functions/_shared/declaration-export";
 
 type Row = Record<string, unknown>;
 
@@ -179,11 +180,24 @@ describe("declarations-export: grovhet bare når merket er godkjent (beslutning 
     expect((await only(noClaim)).grain).toBeNull();
   });
 
-  it("legacy: utdatert beregning teller ikke i automatisk modus", async () => {
-    const w = legacy();
-    w.recipes[0].breadscale_mode = "auto";
-    w.recipe_label_calculated[0] = { ...w.recipe_label_calculated[0], is_stale: true };
-    expect((await only(w)).grain).toBeNull();
+  it("legacy: utdatert beregning teller ikke i automatisk modus (ren regel)", () => {
+    // Utdatert legacy-vare holdes helt ute av eksporten, så regelen prøves direkte.
+    const product = { show_breadscale: true, breadscale_pct: 60, breadscale_mode: "auto", breadscale_manual_value: null };
+    const recipe = { label_claim_grain: true, breadscale_mode: "auto", manual_breadscale_pct: null };
+    expect(legacyGrainClaimOk({ product, effectiveRecipe: recipe, effectiveCalc: { grain_score_pct: 60, is_stale: true } })).toBe(false);
+    expect(legacyGrainClaimOk({ product, effectiveRecipe: recipe, effectiveCalc: { grain_score_pct: 60, is_stale: null } })).toBe(true);
+    expect(legacyGrainClaimOk({ product, effectiveRecipe: recipe, effectiveCalc: { grain_score_pct: null, is_stale: false } })).toBe(false);
+    expect(legacyGrainClaimOk({ product, effectiveRecipe: null, effectiveCalc: { grain_score_pct: 60, is_stale: false } })).toBe(false);
+  });
+
+  it("effektiv oppskrift velges som product_effective_recipe_id", () => {
+    const l = (id: string, recipe_id: string, is_primary: boolean | null, created_at: string | null) => ({ id, recipe_id, is_primary, created_at });
+    expect(effectiveRecipeId([])).toBeNull();
+    expect(effectiveRecipeId([l("a", "r1", null, null)])).toBe("r1");
+    expect(effectiveRecipeId([l("a", "r1", false, "2026-09-02T10:00:00+00:00"), l("b", "r2", true, "2026-09-03T10:00:00+00:00")])).toBe("r2");
+    expect(effectiveRecipeId([l("b", "r2", false, "2026-09-02T10:00:00.5+00:00"), l("a", "r1", false, "2026-09-02T10:00:00.400001+00:00")])).toBe("r1");
+    expect(effectiveRecipeId([l("b", "r2", false, "2026-09-02T10:00:00Z"), l("a", "r1", false, "2026-09-02T10:00:00+00:00")])).toBe("r1");
+    expect(effectiveRecipeId([l("a", "r1", false, "ugyldig"), l("b", "r2", false, "2026-09-02T10:00:00Z")])).toBeNull();
   });
 
   it("legacy: manuell prosent på varen godkjenner merket selv uten oppskriftens merkevalg", async () => {
