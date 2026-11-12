@@ -123,3 +123,29 @@ Prototypen viser struktur, innhold og oppførsel. Den er ikke en pikselmal.
 - `04-merking-automatisk.png` – Merking, automatisk beregning
 - `05-merking-manuell.png` – Merking, manuell inntasting
 - `06-historikk.png` – Historikk
+
+---
+
+## Fase 2 – slik ble det bygget
+
+Bygget på `/varer/oppskrifter/:id?tab=merking` uten databaseendringer. Godkjent deklarasjon (`recipe_declaration_versions` via `products.declaration_version_id`) er fortsatt fasit; ny versjon oppstår bare i `ApproveDeclarationDialog`.
+
+**A. Én side.** Underfanene Deklarasjon / Datakvalitet / Etikett / Merker er fjernet. Venstre kolonne har kortene Status og neste handling → Deklarasjon og næringsinnhold → Pliktfelt på etiketten → Koblede varer → Merker. Etiketten står til høyre fra 1280 px (fast ved rulling), under kortene på smal skjerm. Ankrene `merking-*` og «Gjenstår» ruller nå direkte til kortet/feltet; snarveien venter til kortet er montert.
+
+**B. Deklarasjon og næringsinnhold.** Bryteren «Automatisk beregning» er det gamle valget Beregnet/Manuell: den bytter bare visningen og skriver ingenting; «Lagre som gjeldende kilde» og «Godkjenn» er som før. På: beregnet tekst og næring skrivebeskyttet, og når næringen ikke kan brukes vises årsaken med «Gå til linjen som mangler data» og «Legg inn manuelt». Av: tekstfelt, allergenfelt og næring per 100 g som før, med merknad om at manuelle verdier ikke følger oppskriften. «Kopier fra beregnet» fyller bare skjemaet. Datadekning og datakvalitet ligger nederst i kortet, åpent når noe mangler.
+
+**C. Pliktfelt.** «Rett dette før utskrift» og «Pliktfelt etter 1169/2011» er slått sammen til én liste fra `buildLabelChecklist` (samme kladdgrunnlag som forhåndsvisningen og «Gjenstår»), delt i Påkrevd og Anbefalt/frivillig. Nettovekt, holdbarhet, oppbevaring og opprinnelse redigeres i raden med samme lagring og samme vakt som det tidligere kortet «Etikettopplysninger».
+
+**D. Koblede varer.** Som før, med «Synk alle nå» og lenke til varens deklarasjon. Hver vare viser nettovekt per salgsenhet (koblingen eller varen) og om den er bekreftet. «Sett nettovekt» åpner salgsenhetsskjemaet fra varekortet og lagrer via `conditionalLinkUpdate` (samme betingede skrivevei). Forslaget (antall × ferdigvekt, ellers deigvekt) fyller bare feltet. «Bruk forslag på alle» er ikke bygget, fordi det ville vært flere skrivinger på én gang.
+
+**E. Merker.** Brødskala'n og Nøkkelhullet er rader med bryter (`label_claim_grain`/`label_claim_keyhole`, lagret med `saveClaim`), status, kort begrunnelse og «Vis detaljer». Låsene bruker de eksisterende vurderingene (`lib/labelClaims.ts`). 100 % norsk vises per vare, bare lesing, med lenke til varen.
+
+**F. Allergenkontroll (art. 21).** `lib/manualAllergenCheck.ts` sammenligner manuell ingrediensliste med beregnede allergener. Fremheving er `*stjerner*`, `<strong>`/`<b>` eller VERSALER. Manglende eller ufremhevet allergen er feil (vises i kortet, i «Gjenstår» og blant sperrene for manuell kilde). Treff bare via synonym eller delvis fremheving er «Bør sjekkes». Spormerking har veiledning om risikovurdering.
+
+**G. Etiketten.** Forhåndsvisning, «Sist godkjente»/«Ny beregning», etikettprofil og utskrift er uendret. Utskriftsknappen viser «(N gjenstår)», og «N gjenstår — vis sjekklisten» fører til pliktfeltene. Varevelger og antall er ikke bygget: etikettkoden har bare størrelsesvalg.
+
+**Åpne punkter som krever databaseendring:** lagret begrunnelse for spormerking (nytt felt). 100 % norsk fra oppskriftssiden (i dag skrives feltet bare sammen med andre sertifiseringer på varen).
+
+**Funn:** Den trykte etiketten har ingen «Inneholder»-linje. Skjermvisningen viser «Inneholder:» bare når ingredienslisten mangler. Den eksisterende sjekken `allergenIsHighlighted` i `labelChecklist.ts` godtar et allergen som står i teksten selv uten fremheving. Den er ikke endret, men den manuelle kontrollen over fanger dette for manuell kilde.
+
+Syntetisk forhåndsvisning: `/forhandsvisning/merking` (`?modus=manuell`).
