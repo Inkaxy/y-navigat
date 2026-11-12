@@ -28,6 +28,7 @@ import { BrodskalanMark } from "@/varer/components/label/BrodskalanMark";
 import { brodskalanFor, hasBrodskalanWarning } from "@/varer/lib/brodskalan";
 import { useSyncBreadscaleProducts, useUserDisplayName } from "@/varer/hooks/useRecipeLabel";
 import { DiffNote, SourceColumn, SourceSegmented, formatDateTimeNb } from "./labelShared";
+import { grainClaimState } from "@/varer/lib/labelClaims";
 
 /** NBhubs egen strektegning av skalaen — ikke merkeordningens offisielle logo. */
 export function GrainScaleSvg({ active, compact }: { active: GrainCategory | null; compact?: boolean }) {
@@ -108,6 +109,8 @@ interface Props {
   canWrite: boolean;
   savingClaim: boolean;
   onToggleClaim: (value: boolean) => void;
+  /** Merkeraden i «Merker» eier bryteren; da skjules den her. */
+  showClaimToggle?: boolean;
 }
 
 /** Grovhet — Brødskala'n: beregnet og manuell side om side, egen bryter. */
@@ -131,6 +134,7 @@ export function GrainSection({
   canWrite,
   savingClaim,
   onToggleClaim,
+  showClaimToggle = true,
 }: Props) {
   const qc = useQueryClient();
   const manualActive = breadscaleMode === "manual";
@@ -205,7 +209,12 @@ export function GrainSection({
   });
 
   const busy = setMode.isPending || saveManual.isPending || syncProducts.isPending;
-  const claimLocked = effectivePct == null || (freeTextGrainLines?.length ?? 0) > 0;
+  const claimLocked = grainClaimState({
+    breadscaleMode,
+    manualPct,
+    grainPct,
+    freeTextGrainLineCount: freeTextGrainLines?.length ?? 0,
+  }).locked;
 
   return (
     <Card>
@@ -437,6 +446,7 @@ export function GrainSection({
           </DiffNote>
         )}
 
+        {showClaimToggle && (
         <div className="space-y-2 rounded-md border p-3">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -463,6 +473,7 @@ export function GrainSection({
             </p>
           )}
         </div>
+        )}
       </CardContent>
     </Card>
   );

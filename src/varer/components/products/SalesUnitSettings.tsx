@@ -44,12 +44,14 @@ function formatTimestamp(value: string | number | null | undefined): string {
  * endret kladd mot ny versjon vises som konflikt og lagres aldri med ny token. Etter bekreftet
  * oppskriftsbytte (`resetSignal`) hydreres kladden fra den nye raden.
  */
-export function SalesUnitSettings({ base, canWrite, pending, resetSignal, onSave }: {
+export function SalesUnitSettings({ base, canWrite, pending, resetSignal, onSave, suggestion }: {
   base: LinkBase | null;
   canWrite: boolean;
   pending: boolean;
   resetSignal: number;
   onSave: (frozen: LinkBase, values: SalesUnitValues) => Promise<LinkWriteResult>;
+  /** Forslag til vekt per salgsenhet. Fyller bare feltet — brukeren må lagre selv. */
+  suggestion?: { grams: number; text: string } | null;
 }) {
   const [draft, setDraft] = useState<Draft>(() => hydrate(base));
   const [dirty, setDirty] = useState(false);
@@ -131,6 +133,11 @@ export function SalesUnitSettings({ base, canWrite, pending, resetSignal, onSave
           <div className="space-y-1.5">
             <Label className="text-xs" htmlFor="settings-weight">Vekt per salgsenhet (g)</Label>
             <Input id="settings-weight" inputMode="decimal" value={draft.weight} onChange={(e) => edit({ weight: e.target.value })} disabled={!editable} />
+            {suggestion && editable && draft.weight !== String(suggestion.grams) && (
+              <Button type="button" size="sm" variant="outline" className="min-h-11" onClick={() => edit({ weight: String(suggestion.grams) })}>
+                Bruk forslag {suggestion.grams.toLocaleString("nb-NO")} g ({suggestion.text})
+              </Button>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs" htmlFor="settings-batch">Emner per batch (overstyrt)</Label>

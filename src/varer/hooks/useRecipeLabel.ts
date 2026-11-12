@@ -78,8 +78,16 @@ export function useComputeRecipeLabel() {
 export interface RecipeLinkedProduct {
   id: string;
   product_id: string;
+  recipe_id: string;
+  /** Rå databasestreng — token for betinget skriving (`recipeLinkWrite.ts`). */
+  updated_at: string;
   is_primary: boolean | null;
   declaration_mode: string | null;
+  sales_unit_basis: string | null;
+  units_per_sales_unit: number | null;
+  sales_unit_weight_g: number | null;
+  units_per_batch_override: number | null;
+  sales_unit_confirmed_at: string | null;
   products: {
     id: string;
     display_name: string | null;
@@ -87,6 +95,8 @@ export interface RecipeLinkedProduct {
     breadscale_mode: string | null;
     breadscale_pct: number | null;
     breadscale_value: number | null;
+    weight_per_unit_grams: number | null;
+    cert_norsk_100: boolean | null;
   } | null;
 }
 
@@ -98,7 +108,7 @@ export function useRecipeLinkedProducts(recipeId: string | undefined) {
       const { data, error } = await supabase
         .from("product_recipe_links")
         .select(
-          "id, product_id, is_primary, declaration_mode, products(id, display_name, display_number, breadscale_mode, breadscale_pct, breadscale_value)",
+          "id, product_id, recipe_id, updated_at, is_primary, declaration_mode, sales_unit_basis, units_per_sales_unit, sales_unit_weight_g, units_per_batch_override, sales_unit_confirmed_at, products(id, display_name, display_number, breadscale_mode, breadscale_pct, breadscale_value, weight_per_unit_grams, cert_norsk_100)",
         )
         .eq("recipe_id", recipeId!);
       if (error) throw error;

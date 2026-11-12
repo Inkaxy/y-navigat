@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { fmtNum } from "@/varer/lib/breadscale";
 import { useUserDisplayName } from "@/varer/hooks/useRecipeLabel";
 import { formatDateTimeNb } from "./labelShared";
+import { keyholeClaimState } from "@/varer/lib/labelClaims";
 
 export interface KeyholeCriterion {
   key: string;
@@ -41,6 +42,8 @@ interface Props {
   saving: boolean;
   /** Antall primærkoblede produkter merket kopieres til. */
   primaryProductCount: number;
+  /** Merkeraden i «Merker» eier bryteren; da skjules den her. */
+  showClaimToggle?: boolean;
 }
 
 /** Rådstekstene starter med et fast ord per kriterium — kobles eksplisitt her. */
@@ -81,10 +84,11 @@ export function KeyholeSection({
   onToggleClaim,
   saving,
   primaryProductCount,
+  showClaimToggle = true,
 }: Props) {
   const criteria = keyhole?.criteria ?? [];
   const advice = keyhole?.advice ?? [];
-  const locked = !coverageOk || keyhole?.status !== "oppfylt";
+  const locked = keyholeClaimState({ coverageOk, status: keyhole?.status }).locked;
   /** Påstanden står uten kvalifiserende beregning. */
   const missingBasis = claimKeyhole && !!keyhole && keyhole.status !== "oppfylt";
 
@@ -188,6 +192,7 @@ export function KeyholeSection({
         )}
 
         <div className="space-y-3 rounded-md border p-3">
+          {showClaimToggle && (
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <Label className="flex items-center gap-1.5">
@@ -206,6 +211,7 @@ export function KeyholeSection({
               onCheckedChange={onToggleClaim}
             />
           </div>
+          )}
 
           {missingBasis && (
             <div className="rounded-md border border-destructive/50 bg-destructive/5 p-2 text-sm">

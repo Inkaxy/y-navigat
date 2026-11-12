@@ -1,44 +1,24 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLegalEntityLabelInfo } from "@/varer/hooks/useLegalEntityLabelInfo";
-import { draftLabelFlags, labelProducerAddress } from "@/varer/lib/recipeLabelIssues";
-import { Button } from "@/components/ui/button";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import {
-  useComputeRecipeLabel,
-  useRecipeBreadscaleEffective,
-  useRecipeLabelCalculated,
-  useRecipeLinkedProducts,
-} from "@/varer/hooks/useRecipeLabel";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { FlourLine } from "@/varer/lib/breadscale";
-import {
-  buildEffectiveDeclaration,
-  declarationDisplayText,
-  type DeclarationMode,
-  type RecipeLabelSnapshot,
-} from "@/varer/lib/effectiveDeclaration";
+import type { DeclarationMode } from "@/varer/lib/effectiveDeclaration";
 import { buildLabelChecklist } from "@/varer/lib/labelChecklist";
-import { useApproveDeclaration, useRecipeDeclarationVersions } from "@/varer/hooks/useLabelApproval";
-import { useRecipeLabelProfile } from "@/varer/hooks/useRecipeLabelProfile";
-import { useUserDisplayName } from "@/varer/hooks/useRecipeLabel";
-import { checkState, deriveLabelState, deriveNextAction, fixTargetForChecklistKey } from "@/varer/lib/labelWorkspace";
+import { grainClaimState, keyholeClaimState } from "@/varer/lib/labelClaims";
+import { draftLabelFlags, labelChecklistInput } from "@/varer/lib/recipeLabelIssues";
+import type { RecipeBasisInput } from "@/varer/lib/recipeLinkBasis";
+import { checkState, fixTargetForChecklistKey } from "@/varer/lib/labelWorkspace";
+import { approvedLabelInput } from "@/varer/lib/approvedLabel";
+import { useLabelTabData } from "@/varer/hooks/useLabelTabData";
 import type { LabelSource } from "./labelShared";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useIsDesktop } from "@/varer/hooks/useIsDesktop";
-import { parseAllergenSummary, pickNutrition, type NutritionPer100g } from "@/varer/lib/effectiveDeclaration";
-import { ApproveDeclarationDialog, type ApproveSourceData } from "./ApproveDeclarationDialog";
+import { LabelApproveHost } from "./LabelApproveHost";
 import { LabelSummaryPanel } from "./LabelSummaryPanel";
-
-type LabelSection = "deklarasjon" | "datakvalitet" | "etikett" | "merker";
-import { DataQualityCard, type MissingData } from "./DataQualityCard";
+import { DataQualityCard } from "./DataQualityCard";
 import { DeclarationNutritionSection } from "./DeclarationNutritionSection";
 import { GrainSection } from "./GrainSection";
-import { KeyholeSection, type KeyholeResult } from "./KeyholeSection";
-import { LabelInfoCard } from "./LabelInfoCard";
-import { ConsumerLabelSection } from "./ConsumerLabelSection";
-import { approvedLabelInput, type LabelSource as PreviewSource } from "@/varer/lib/approvedLabel";
+import { KeyholeSection } from "./KeyholeSection";
 import { LinkedProductsCard } from "./LinkedProductsCard";
+import { LabelFieldsCard } from "./LabelFieldsCard";
+import { LabelMarksCard } from "./LabelMarksCard";
+import { LabelPreviewPanel } from "./LabelPreviewPanel";
 
 /** Feltene fra `recipes`-raden som merkefanen bruker. */
 export interface LabelRecipe {
@@ -74,6 +54,8 @@ interface Props {
    * «datakvalitet». Ny `seq` gir nytt fokus også for samme nøkkel.
    */
   fixRequest?: { key: string; seq: number } | null;
+  /** Oppskriftens utbytte (emner, deig- og ferdigvekt) — bare til forslag om nettovekt per vare. */
+  basisInput?: RecipeBasisInput | null;
 }
 
 /** Merking — kan vi trykke dette på posen, og hvis ikke, hva må endres? */
@@ -86,197 +68,48 @@ export function LabelTab({
   canWrite,
   onGoToRecipeTab,
   fixRequest,
+  basisInput = null,
 }: Props) {
-  const qc = useQueryClient();
-  const labelQuery = useRecipeLabelCalculated(recipeId);
-  const compute = useComputeRecipeLabel();
-  const linksQuery = useRecipeLinkedProducts(recipeId);
-  const effectiveGrain = useRecipeBreadscaleEffective(recipeId);
-
-  const entityQuery = useLegalEntityLabelInfo(legalEntityId);
-
-  const saveClaim = useMutation({
-    mutationFn: async (input: { field: "label_claim_keyhole" | "label_claim_grain"; value: boolean }) => {
-      const { data: u } = await supabase.auth.getUser();
-      const patch: Record<string, unknown> = { [input.field]: input.value };
-      if (input.value) {
-        patch.label_claims_approved_by = u.user?.id ?? null;
-        patch.label_claims_approved_at = new Date().toISOString();
-      }
-      const { error } = await supabase.from("recipes").update(patch as never).eq("id", recipeId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["recipe-detail", recipeId] });
-      toast.success("Merkevalget er lagret");
-    },
-    onError: (e: unknown) => toast.error((e as Error).message ?? "Kunne ikke lagre"),
-  });
-
-  const labelProfileQuery = useRecipeLabelProfile(recipeId);
-  const approve = useApproveDeclaration();
+  const d = useLabelTabData(recipeId, recipeName, recipe, legalEntityId);
+  const {
+    labelQuery, compute, effectiveGrain, saveClaim, labelProfileQuery, approve, label, coveragePct, coverageOk,
+    keyhole, links, primaryCount, versionsQuery, latestVersion, approvedAt, approverQuery, missing, labelState,
+    hasCalc, declarationManual, savedSource, breadscaleMode, recompute, effective, entity, sourceIssues, nextAction,
+  } = d;
   const [approveOpen, setApproveOpen] = useState(false);
-  const [checklistBlocked, setChecklistBlocked] = useState(false);
-  const [labelSource, setLabelSource] = useState<PreviewSource>("approved");
+  const [, setChecklistBlocked] = useState(false);
   const onChecklistChange = useCallback((v: boolean) => setChecklistBlocked(v), []);
-
-  const label = labelQuery.data ?? null;
-  const coveragePct = label?.coverage_by_weight_pct ?? null;
-  const coverageOk = (coveragePct ?? 0) >= 90;
-  const keyhole = (label?.keyhole ?? null) as KeyholeResult | null;
-  const links = linksQuery.data ?? [];
-  const primaryCount = links.filter((l) => l.is_primary).length;
-
-  // Godkjenningsgrunnlag = nyeste deklarasjonsversjon, aldri lagringsdatoen.
-  const versionsQuery = useRecipeDeclarationVersions(recipeId);
-  const latestVersion = versionsQuery.data?.[0] ?? null;
-  const approvedAt = latestVersion?.approved_at ?? null;
-  const approverQuery = useUserDisplayName(latestVersion?.approved_by ?? null);
-  const missing = (label?.missing_data ?? null) as MissingData | null;
-  const labelState = deriveLabelState({
-    computedAt: label?.computed_at ?? null,
-    isStale: label?.is_stale ?? null,
-    approvedAt,
-  });
-  const hasCalc = !!label?.computed_at;
-  const [section, setSection] = useState<LabelSection>("deklarasjon");
-  const isDesktop = useIsDesktop();
-
-  const declarationManual = ((recipe.declaration_mode as DeclarationMode | null) ?? "auto") === "manual";
-  const savedSource: LabelSource = declarationManual ? "manual" : "auto";
   const [candidate, setCandidate] = useState<LabelSource>(savedSource);
   useEffect(() => setCandidate(savedSource), [savedSource]);
   const [manualDirty, setManualDirty] = useState(false);
   const [qualitySignal, setQualitySignal] = useState(0);
-  const breadscaleMode: "auto" | "manual" = recipe.breadscale_mode === "manual" ? "manual" : "auto";
 
-  const recompute = () =>
-    compute.mutate(recipeId, {
-      onSuccess: () => {
-        toast.success("Merkedata beregnet på nytt");
-        qc.invalidateQueries({ queryKey: ["recipe-breadscale-effective", recipeId] });
-      },
-    });
-
-  /** Det som faktisk følger produktet — brukes i etikett og forhåndsvisning. */
-  const effective = useMemo(
-    () =>
-      buildEffectiveDeclaration(
-        {
-          id: "",
-          product_id: "",
-          recipe_id: recipeId,
-          declaration_mode: null,
-          manual_ingredient_declaration: null,
-          manual_nutrition: null,
-          manual_allergen_summary: null,
-          recipes: {
-            declaration_mode: (recipe.declaration_mode as DeclarationMode | null) ?? "auto",
-            manual_ingredient_declaration: recipe.manual_ingredient_declaration ?? null,
-            manual_nutrition: recipe.manual_nutrition ?? null,
-            manual_allergen_summary: recipe.manual_allergen_summary ?? null,
-          },
-        },
-        (label ?? null) as RecipeLabelSnapshot | null,
-      ),
-    [recipe, label, recipeId],
-  );
-
-  const manualSource: ApproveSourceData = useMemo(() => {
-    const al = parseAllergenSummary(recipe.manual_allergen_summary);
-    const nut = pickNutrition(recipe.manual_nutrition) as NutritionPer100g | null;
-    return {
-      ingredientText: recipe.manual_ingredient_declaration ?? null,
-      contains: al.contains,
-      mayContain: al.may_contain,
-      nutrition: (nut ?? null) as Record<string, number | null> | null,
-    };
-  }, [recipe.manual_allergen_summary, recipe.manual_ingredient_declaration, recipe.manual_nutrition]);
-
-  const entity = entityQuery.data ?? null;
-  const producerAddress = entity ? labelProducerAddress(entity) : null;
-
-  /**
-   * Pliktfeltene vurderes per kilde. En sperret beregning skal ikke hindre
-   * godkjenning av en komplett manuell deklarasjon.
-   */
-  const approveIssues = useMemo(() => {
-    const issuesFor = (src: ApproveSourceData, isManual: boolean) =>
-      buildLabelChecklist({
-        productName: recipeName,
-        ingredientText: declarationDisplayText(src.ingredientText) || null,
-        contains: src.contains,
-        mayContain: src.mayContain,
-        netWeightGrams: recipe.unit_weight_grams ?? null,
-        shelfLifeDays: recipe.shelf_life_days ?? null,
-        storageInstructions: recipe.storage_instructions ?? null,
-        producerName: entity?.name ?? null,
-        producerAddress: producerAddress || null,
-        nutrition: isManual ? src.nutrition : coverageOk ? src.nutrition : null,
-        coveragePct: isManual ? null : coveragePct,
-        blocked: isManual ? false : !!missing?.blocked,
-        claimGrain: !!recipe.label_claim_grain,
-        grainPct: label?.grain_score_pct ?? null,
-        claimKeyhole: !!recipe.label_claim_keyhole,
-        keyholeQualifies: keyhole?.status === "oppfylt",
-      })
-        // Godkjenningen gjelder deklarasjon og næringsinnhold. Nettovekt,
-        // holdbarhet, produsent og allergenpresentasjon kontrolleres fortsatt
-        // i etikettkontrollen, men skal ikke sperre et gyldig manuelt snapshot.
-        .errors.filter((e) => e.key === "ingredients" || e.key === "nutrition")
-        .map((e) => `${e.label}: ${e.detail}`);
-    return {
-      auto: issuesFor(
-        {
-          ingredientText: label?.ingredient_declaration ?? null,
-          contains: label?.allergens?.contains ?? [],
-          mayContain: label?.allergens?.may_contain ?? [],
-          nutrition: (label?.nutrition_per_100g ?? null) as Record<string, number | null> | null,
-        },
-        false,
-      ),
-      manual: issuesFor(manualSource, true),
-    };
-  }, [
-    coverageOk,
-    coveragePct,
-    entity,
-    keyhole,
-    label,
-    manualSource,
-    missing,
-    producerAddress,
-    recipe.label_claim_grain,
-    recipe.label_claim_keyhole,
-    recipe.shelf_life_days,
-    recipe.storage_instructions,
-    recipe.unit_weight_grams,
-    recipeName,
-  ]);
-
-  const sourceIssues = declarationManual ? approveIssues.manual : approveIssues.auto;
-  const nextAction = deriveNextAction({ state: labelState, approveIssues: sourceIssues });
-  const keyholeRelevant = recipe.label_claim_keyhole || keyhole?.status === "oppfylt";
-  const grainRelevant = !!recipe.label_claim_grain || (label?.grain_score_pct ?? null) != null;
-
-  const goTo = (s: LabelSection, anchor?: string) => {
-    setSection(s);
-    if (anchor) {
-      window.setTimeout(() => {
-        const el = document.getElementById(anchor);
-        el?.scrollIntoView({ block: "start" });
-        el?.focus({ preventScroll: true });
-      }, 50);
-    }
+  /** Én side: snarveiene ruller til kortet eller feltet. */
+  const goTo = (anchor: string, attempt = 0) => {
+    window.setTimeout(() => {
+      const el = document.getElementById(anchor);
+      // Kortene kan fortsatt laste når snarveien kommer fra en annen fane.
+      if (!el) {
+        if (attempt < 20) goTo(anchor, attempt + 1);
+        return;
+      }
+      el.scrollIntoView({ block: "start" });
+      el.focus({ preventScroll: true });
+    }, attempt === 0 ? 50 : 100);
+  };
+  const showQuality = () => {
+    setQualitySignal((n) => n + 1);
+    goTo("merking-datakvalitet");
   };
 
   const onNextAction = () => {
     if (nextAction === "compute") recompute();
     else if (nextAction === "show_missing") {
-      setQualitySignal((n) => n + 1);
-      goTo("datakvalitet", "merking-datakvalitet");
-    }
-    else setApproveOpen(true);
+      if (declarationManual) {
+        setCandidate(savedSource);
+        goTo("merking-editor");
+      } else showQuality();
+    } else setApproveOpen(true);
   };
 
   const onFixField = (key: string) => {
@@ -284,7 +117,7 @@ export function LabelTab({
     if (!t) return;
     if (t.section === "deklarasjon") setCandidate(savedSource);
     if (t.section === "datakvalitet") setQualitySignal((n) => n + 1);
-    goTo(t.section, t.anchor);
+    goTo(t.anchor);
   };
 
   // Klikk i «Gjenstår» på oppskriftssiden: samme snarvei som «Rett felt».
@@ -292,14 +125,9 @@ export function LabelTab({
   const fixKey = fixRequest?.key ?? null;
   const fixRef = useRef<(key: string) => void>(() => undefined);
   fixRef.current = (key: string) => {
-    if (key === "datakvalitet") {
-      setQualitySignal((n) => n + 1);
-      goTo("datakvalitet", "merking-datakvalitet");
-      return;
-    }
-    const t = fixTargetForChecklistKey(key, declarationManual);
-    if (t) onFixField(key);
-    else goTo("etikett");
+    if (key === "datakvalitet") return showQuality();
+    if (fixTargetForChecklistKey(key, declarationManual)) onFixField(key);
+    else goTo("merking-pliktfelt");
   };
   useEffect(() => {
     if (fixSeq > 0 && fixKey) fixRef.current(fixKey);
@@ -329,7 +157,7 @@ export function LabelTab({
   }
 
   const approvedInput = latestVersion ? approvedLabelInput(latestVersion) : null;
-  const shownSource: PreviewSource = approvedInput ? labelSource : "draft";
+  const breadscaleManual = breadscaleMode === "manual";
   // Samme regler som «Gjenstår» (draftLabelFlags).
   const draftFlags = draftLabelFlags({
     declarationManual,
@@ -337,240 +165,131 @@ export function LabelTab({
     calculationBlocked: !!missing?.blocked,
     hasNutrition: !!effective.nutrition,
     effectiveGrainPct: effectiveGrain.data,
-    breadscaleManual: breadscaleMode === "manual",
+    breadscaleManual,
     manualBreadscalePct: recipe.manual_breadscale_pct ?? null,
     calculatedGrainPct: label?.grain_score_pct ?? null,
   });
-  const draftPreview = (
-    <ConsumerLabelSection
-      variant="draft"
-      recipeName={recipeName}
-      effective={effective}
-      effectiveGrainPct={draftFlags.grainPct}
-      declarationManual={declarationManual}
-      breadscaleManual={breadscaleMode === "manual"}
-      claimGrain={!!recipe.label_claim_grain}
-      claimKeyhole={!!recipe.label_claim_keyhole}
-      unitWeightGrams={recipe.unit_weight_grams ?? null}
-      shelfLifeDays={recipe.shelf_life_days ?? null}
-      storageInstructions={recipe.storage_instructions ?? null}
-      countryOfOrigin={recipe.country_of_origin ?? null}
-      entity={entityQuery.data ?? null}
-      profile={labelProfileQuery.data ?? null}
-      blocked={draftFlags.blocked}
-      keyholeQualifies={keyhole?.status === "oppfylt"}
-      coveragePct={coveragePct}
-      onChecklistChange={onChecklistChange}
-      fixLabelFor={(key) => fixTargetForChecklistKey(key, declarationManual)?.label ?? null}
-      onFixField={onFixField}
-      nutritionUsable={draftFlags.nutritionUsable}
-    />
-  );
-
-  // Godkjent versjon er standard for forhåndsvisning og utskrift. Kladden holdes
-  // montert (skjult) så pliktfeltsjekken for godkjenning fortsatt gjelder den nye beregningen.
-  const preview = (
-    <div className="space-y-2">
-      {approvedInput && (
-        <div role="group" aria-label="Kilde for etiketten" className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" variant={shownSource === "approved" ? "default" : "outline"} className="min-h-11" aria-pressed={shownSource === "approved"} onClick={() => setLabelSource("approved")}>
-            Sist godkjente (versjon {latestVersion?.version})
-          </Button>
-          <Button type="button" size="sm" variant={shownSource === "draft" ? "default" : "outline"} className="min-h-11" aria-pressed={shownSource === "draft"} onClick={() => setLabelSource("draft")}>
-            Ny beregning – forslag
-          </Button>
-        </div>
-      )}
-      {approvedInput && shownSource === "approved" && (
-        <ConsumerLabelSection
-          variant="approved"
-          approvedVersion={latestVersion?.version ?? null}
-          recipeName={recipeName}
-          effective={approvedInput.effective}
-          effectiveGrainPct={approvedInput.grainPct}
-          declarationManual={declarationManual}
-          breadscaleManual={breadscaleMode === "manual"}
-          claimGrain={approvedInput.claimGrain}
-          claimKeyhole={approvedInput.claimKeyhole}
-          unitWeightGrams={approvedInput.unitWeightGrams}
-          shelfLifeDays={approvedInput.shelfLifeDays}
-          storageInstructions={approvedInput.storageInstructions}
-          countryOfOrigin={approvedInput.countryOfOrigin}
-          entity={entityQuery.data ?? null}
-          profile={labelProfileQuery.data ?? null}
-          blocked={false}
-          keyholeQualifies={approvedInput.claimKeyhole}
-          coveragePct={approvedInput.effective.coveragePct}
-          nutritionUsable={approvedInput.nutritionUsable}
-        />
-      )}
-      <div className={shownSource === "draft" ? undefined : "hidden"}>{draftPreview}</div>
-    </div>
-  );
-
-  const previewNote = (
-    <p className="text-xs text-muted-foreground">
-      {latestVersion
-        ? "Standard er sist godkjente versjon — det som gjelder for etikett og API til en ny versjon godkjennes. «Ny beregning» er bare et forslag."
-        : `Ingen godkjent versjon ennå — forhåndsvisningen er en kladd (${declarationManual ? "manuell" : "beregnet"}).`}{" "}
-      Ulagrede endringer i
-      redigeringsfeltene vises ikke her og påvirker ikke utskrift eller API.
-    </p>
-  );
-
-  const tabContentClass = "mt-4 space-y-4 data-[state=inactive]:hidden";
+  const draftLabel = {
+    recipeName,
+    effective,
+    effectiveGrainPct: draftFlags.grainPct,
+    declarationManual,
+    claimGrain: !!recipe.label_claim_grain,
+    claimKeyhole: !!recipe.label_claim_keyhole,
+    unitWeightGrams: recipe.unit_weight_grams ?? null,
+    shelfLifeDays: recipe.shelf_life_days ?? null,
+    storageInstructions: recipe.storage_instructions ?? null,
+    entity,
+    nutritionUsable: draftFlags.nutritionUsable,
+    blocked: draftFlags.blocked,
+    keyholeQualifies: keyhole?.status === "oppfylt",
+    coveragePct,
+  };
+  // Kladdens sjekkliste — den samme som forhåndsvisningen og «Gjenstår» bygger.
+  const draftChecklist = buildLabelChecklist(labelChecklistInput(draftLabel)).items;
+  const showChecklist = () => goTo("merking-pliktfelt");
+  const grainClaim = grainClaimState({ breadscaleMode, manualPct: recipe.manual_breadscale_pct ?? null, grainPct: label?.grain_score_pct ?? null });
+  const keyholeClaim = keyholeClaimState({ coverageOk, status: keyhole?.status });
+  const toggleClaim = (field: "label_claim_keyhole" | "label_claim_grain", value: boolean) => saveClaim.mutate({ field, value });
 
   return (
     <div className="space-y-4">
-      <LabelSummaryPanel
-        state={labelState}
-        computedAt={label?.computed_at ?? null}
-        coveragePct={coveragePct}
-        declarationManual={declarationManual}
-        breadscaleManual={breadscaleMode === "manual"}
-        approvedAt={approvedAt}
-        approvedByName={approverQuery.data ?? null}
-        staleReason={label?.stale_reason ?? null}
-        linkedCount={links.length}
-        allergenCheck={checkState(hasCalc, missing ? missing.allergens_unreviewed?.length ?? 0 : null)}
-        nameCheck={checkState(hasCalc, missing ? missing.declaration_names?.length ?? 0 : null)}
-        sourceIssues={sourceIssues}
-        nextAction={nextAction}
-        canWrite={canWrite}
-        computing={compute.isPending}
-        approving={approve.isPending}
-        onNextAction={onNextAction}
-        onRecompute={recompute}
-        onShowLinked={() => goTo("deklarasjon", "merking-koblede-varer")}
-      />
-
-      <ApproveDeclarationDialog
+      <LabelApproveHost
         open={approveOpen}
         onOpenChange={setApproveOpen}
-        currentMode={candidate}
-        issues={approveIssues}
+        recipeId={recipeId}
+        candidate={candidate}
         manualDirty={manualDirty}
-        previous={
-          latestVersion
-            ? {
-                version: latestVersion.version,
-                approvedAt: latestVersion.approved_at,
-                source: latestVersion.source,
-                doc: {
-                  ingredientText: latestVersion.ingredient_text,
-                  contains: latestVersion.allergens_contains ?? [],
-                  mayContain: latestVersion.allergens_may_contain ?? [],
-                  nutrition: (latestVersion.nutrition_per_100g ?? null) as Record<string, number | null> | null,
-                },
-              }
-            : null
-        }
-        affected={links.map((l) => ({
-          id: l.product_id,
-          name: l.products?.display_name ?? "Uten navn",
-          number: l.products?.display_number ?? null,
-        }))}
-        saving={approve.isPending}
-        calculated={{
-          ingredientText: label?.ingredient_declaration ?? null,
-          contains: label?.allergens?.contains ?? [],
-          mayContain: label?.allergens?.may_contain ?? [],
-          nutrition: (label?.nutrition_per_100g ?? null) as Record<string, number | null> | null,
-        }}
-        manual={manualSource}
-        onApprove={(mode, adopt) =>
-          approve.mutate(
-            {
-              recipeId,
-              source: mode === "manual" ? "manual" : "calculated",
-              claims: { grain: !!recipe.label_claim_grain, keyhole: !!recipe.label_claim_keyhole },
-              overrides: adopt
-                ? {
-                    ingredient_text: adopt.ingredientText,
-                    allergens_contains: adopt.contains,
-                    allergens_may_contain: adopt.mayContain,
-                    nutrition_per_100g: adopt.nutrition,
-                  }
-                : {},
-            },
-            { onSuccess: () => setApproveOpen(false) },
-          )
-        }
+        data={d}
       />
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
-        <Tabs value={section} onValueChange={(v) => setSection(v as LabelSection)} className="min-w-0">
-          <TabsList aria-label="Deler av merkingen" className="flex h-auto flex-wrap justify-start">
-            <TabsTrigger value="deklarasjon">Deklarasjon</TabsTrigger>
-            <TabsTrigger value="datakvalitet">Datakvalitet</TabsTrigger>
-            <TabsTrigger value="etikett">Etikett</TabsTrigger>
-            <TabsTrigger value="merker">Merker</TabsTrigger>
-          </TabsList>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(300px,380px)]">
+        <div className="min-w-0 space-y-4">
+          <LabelSummaryPanel
+            state={labelState}
+            computedAt={label?.computed_at ?? null}
+            coveragePct={coveragePct}
+            declarationManual={declarationManual}
+            breadscaleManual={breadscaleManual}
+            approvedAt={approvedAt}
+            approvedByName={approverQuery.data ?? null}
+            staleReason={label?.stale_reason ?? null}
+            linkedCount={links.length}
+            allergenCheck={checkState(hasCalc, missing ? missing.allergens_unreviewed?.length ?? 0 : null)}
+            nameCheck={checkState(hasCalc, missing ? missing.declaration_names?.length ?? 0 : null)}
+            sourceIssues={sourceIssues}
+            nextAction={nextAction}
+            canWrite={canWrite}
+            computing={compute.isPending}
+            approving={approve.isPending}
+            onNextAction={onNextAction}
+            onRecompute={recompute}
+            onShowLinked={() => goTo("merking-koblede-varer")}
+          />
 
-          <TabsContent value="deklarasjon" forceMount className={tabContentClass}>
-            <DeclarationNutritionSection
-              recipeId={recipeId}
-              recipe={recipe}
-              calculated={label}
-              canWrite={canWrite}
-              linkedProductCount={links.length}
-              computing={compute.isPending}
-              onRecompute={recompute}
-              candidate={candidate}
-              onCandidateChange={setCandidate}
-              approvedManualActive={declarationManual && labelState === "approved"}
-              onDirtyChange={setManualDirty}
-              onOpenApprove={() => setApproveOpen(true)}
-            />
-            <div id="merking-koblede-varer" tabIndex={-1} className="scroll-mt-4 outline-none">
-              <LinkedProductsCard recipeId={recipeId} links={links} canWrite={canWrite} />
-            </div>
-          </TabsContent>
+          <DeclarationNutritionSection
+            recipeId={recipeId}
+            recipe={recipe}
+            calculated={label}
+            canWrite={canWrite}
+            linkedProductCount={links.length}
+            computing={compute.isPending}
+            onRecompute={recompute}
+            candidate={candidate}
+            onCandidateChange={setCandidate}
+            approvedManualActive={declarationManual && labelState === "approved"}
+            onDirtyChange={setManualDirty}
+            onOpenApprove={() => setApproveOpen(true)}
+            onShowQuality={showQuality}
+            unreviewedAllergenCount={missing?.allergens_unreviewed?.length ?? 0}
+            qualitySlot={
+              <div id="merking-datakvalitet" tabIndex={-1} className="scroll-mt-4 outline-none">
+                <DataQualityCard
+                  coveragePct={coveragePct}
+                  missingData={missing}
+                  warnings={label?.warnings ?? null}
+                  onRecalculate={recompute}
+                  recalculating={compute.isPending}
+                  canWrite={canWrite}
+                  onGoToRecipeTab={onGoToRecipeTab}
+                  recipeId={recipeId}
+                  openSignal={qualitySignal}
+                  autoOpen
+                />
+              </div>
+            }
+          />
 
-          <TabsContent value="datakvalitet" forceMount className={tabContentClass}>
-            <div id="merking-datakvalitet" tabIndex={-1} className="scroll-mt-4 outline-none">
-              <DataQualityCard
-                coveragePct={coveragePct}
-                missingData={missing}
-                warnings={label?.warnings ?? null}
-                onRecalculate={recompute}
-                recalculating={compute.isPending}
-                canWrite={canWrite}
-                onGoToRecipeTab={onGoToRecipeTab}
-                recipeId={recipeId}
-                openSignal={qualitySignal}
-              />
-            </div>
-          </TabsContent>
+          <LabelFieldsCard
+            recipeId={recipeId}
+            checklist={draftChecklist}
+            values={{
+              unitWeightGrams: recipe.unit_weight_grams ?? null,
+              shelfLifeDays: recipe.shelf_life_days ?? null,
+              storageInstructions: recipe.storage_instructions ?? null,
+              countryOfOrigin: recipe.country_of_origin ?? null,
+            }}
+            canWrite={canWrite}
+            fixLabelFor={(key) => fixTargetForChecklistKey(key, declarationManual)?.label ?? null}
+            onFixField={onFixField}
+          />
 
-          <TabsContent value="etikett" forceMount className={tabContentClass}>
-            <LabelInfoCard
-              recipeId={recipeId}
-              unitWeightGrams={recipe.unit_weight_grams ?? null}
-              shelfLifeDays={recipe.shelf_life_days ?? null}
-              storageInstructions={recipe.storage_instructions ?? null}
-              countryOfOrigin={recipe.country_of_origin ?? null}
-              canWrite={canWrite}
-            />
-            {!isDesktop && (
-              <>
-                {previewNote}
-                {preview}
-              </>
-            )}
-          </TabsContent>
+          <div id="merking-koblede-varer" tabIndex={-1} className="scroll-mt-4 outline-none">
+            <LinkedProductsCard recipeId={recipeId} links={links} canWrite={canWrite} basisInput={basisInput} />
+          </div>
 
-          <TabsContent value="merker" forceMount className={tabContentClass}>
-            <details id="merking-grovhet" open={grainRelevant} className="group scroll-mt-4 rounded-lg border bg-card">
-              <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium">
-                Grovhet / Brødskala&apos;n
-                {!grainRelevant && (
-                  <span className="ml-2 font-normal text-muted-foreground">
-                    — ikke beregnet for denne oppskriften. Åpne for detaljer.
-                  </span>
-                )}
-              </summary>
-              <div className="p-2 pt-0">
+          <LabelMarksCard
+            canWrite={canWrite}
+            saving={saveClaim.isPending}
+            onToggleClaim={toggleClaim}
+            links={links}
+            grain={{
+              claim: !!recipe.label_claim_grain,
+              effectivePct: grainClaim.effectivePct,
+              manual: breadscaleManual,
+              locked: grainClaim.locked,
+              lockedReason: grainClaim.reason,
+              details: (
                 <GrainSection
                   recipeId={recipeId}
                   breadscaleMode={breadscaleMode}
@@ -589,21 +308,17 @@ export function LabelTab({
                   flourLines={flourLines}
                   canWrite={canWrite}
                   savingClaim={saveClaim.isPending}
-                  onToggleClaim={(value) => saveClaim.mutate({ field: "label_claim_grain", value })}
+                  onToggleClaim={(value) => toggleClaim("label_claim_grain", value)}
+                  showClaimToggle={false}
                 />
-              </div>
-            </details>
-            <details id="merking-nokkelhull" open={!!keyholeRelevant} className="group scroll-mt-4 rounded-lg border bg-card">
-              <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium">
-                Nøkkelhullet
-                {!keyholeRelevant && (
-                  <span className="ml-2 font-normal text-muted-foreground">
-                    — {!keyhole ? "ingen vurdering ennå" : keyhole.status === "ukjent" ? "kan ikke vurderes ennå" : "kriteriene er ikke oppfylt, ikke aktuelt å merke"}. Åpne
-                    for detaljer.
-                  </span>
-                )}
-              </summary>
-              <div className="p-2 pt-0">
+              ),
+            }}
+            keyhole={{
+              claim: !!recipe.label_claim_keyhole,
+              result: keyhole,
+              locked: keyholeClaim.locked,
+              lockedReason: keyholeClaim.reason,
+              details: (
                 <KeyholeSection
                   keyhole={keyhole}
                   coverageOk={coverageOk}
@@ -613,19 +328,57 @@ export function LabelTab({
                   canWrite={canWrite}
                   saving={saveClaim.isPending}
                   primaryProductCount={primaryCount}
-                  onToggleClaim={(value) => saveClaim.mutate({ field: "label_claim_keyhole", value })}
+                  onToggleClaim={(value) => toggleClaim("label_claim_keyhole", value)}
+                  showClaimToggle={false}
                 />
-              </div>
-            </details>
-          </TabsContent>
-        </Tabs>
+              ),
+            }}
+          />
+        </div>
 
-        {isDesktop && (
-          <aside aria-label="Etikettforhåndsvisning" className="space-y-2 lg:sticky lg:top-4 lg:self-start">
-            {previewNote}
-            {preview}
-          </aside>
-        )}
+        <aside aria-label="Etikett" className="min-w-0 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:self-start xl:overflow-y-auto">
+          <LabelPreviewPanel
+            declarationManual={declarationManual}
+            approved={
+              approvedInput && latestVersion
+                ? {
+                    version: latestVersion.version,
+                    props: {
+                      variant: "approved",
+                      approvedVersion: latestVersion.version,
+                      recipeName,
+                      effective: approvedInput.effective,
+                      effectiveGrainPct: approvedInput.grainPct,
+                      declarationManual,
+                      breadscaleManual,
+                      claimGrain: approvedInput.claimGrain,
+                      claimKeyhole: approvedInput.claimKeyhole,
+                      unitWeightGrams: approvedInput.unitWeightGrams,
+                      shelfLifeDays: approvedInput.shelfLifeDays,
+                      storageInstructions: approvedInput.storageInstructions,
+                      countryOfOrigin: approvedInput.countryOfOrigin,
+                      entity,
+                      profile: labelProfileQuery.data ?? null,
+                      blocked: false,
+                      keyholeQualifies: approvedInput.claimKeyhole,
+                      coveragePct: approvedInput.effective.coveragePct,
+                      nutritionUsable: approvedInput.nutritionUsable,
+                      onShowChecklist: showChecklist,
+                    },
+                  }
+                : null
+            }
+            draft={{
+              ...draftLabel,
+              variant: "draft",
+              breadscaleManual,
+              countryOfOrigin: recipe.country_of_origin ?? null,
+              profile: labelProfileQuery.data ?? null,
+              onChecklistChange,
+              onShowChecklist: showChecklist,
+            }}
+          />
+        </aside>
       </div>
     </div>
   );

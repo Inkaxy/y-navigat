@@ -67,6 +67,7 @@ const RegnestykkePreviewContent = lazy(() => import("./dev/RegnestykkePreviewCon
 const ArbeidsbordPreviewContent = lazy(() => import("./dev/ArbeidsbordPreviewContent"));
 const HoldUtenforPreview = lazy(() => import("./dev/HoldUtenforPreview"));
 const RecipeOverviewPreview = lazy(() => import("./dev/RecipeOverviewPreview"));
+const MerkingPreview = lazy(() => import("./dev/MerkingPreview"));
 const AiForslagPreview = lazy(() => import("./dev/AiForslagPreview"));
 const FakturaflytPreview = lazy(() => import("./dev/FakturaflytPreview"));
 const VaretellingPreviewContent = lazy(() => import("./dev/VaretellingPreviewContent"));
@@ -298,6 +299,7 @@ const App = () => (
               <Route path="/forhandsvisning/arbeidsbord" element={<ArbeidsbordPreviewContent />} />
               <Route path="/forhandsvisning/hold-utenfor" element={<HoldUtenforPreview />} />
               <Route path="/forhandsvisning/oppskrift" element={<RecipeOverviewPreview />} />
+              <Route path="/forhandsvisning/merking" element={<MerkingPreview />} />
               <Route path="/forhandsvisning/ai-forslag" element={<AiForslagPreview />} />
               <Route path="/forhandsvisning/fakturaflyt" element={<FakturaflytPreview />} />
               <Route path="/forhandsvisning/florapan-flyt" element={<Navigate to="/forhandsvisning/fakturaflyt" replace />} />
