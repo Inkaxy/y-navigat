@@ -16,6 +16,7 @@ import {
   COARSE_CLASSIFICATIONS,
   GRAIN_LEVELS,
   SIFTED_CLASSIFICATIONS,
+  fmtGrainDisplayPct,
   fmtGrams,
   fmtNum,
   fmtPct,

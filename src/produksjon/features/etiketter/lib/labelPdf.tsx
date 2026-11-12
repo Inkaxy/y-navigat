@@ -16,6 +16,7 @@ import { fitFontSizePt } from "@/produksjon/features/utskriftsprofiler/lib/fitTe
 import type { LabelProductRow } from "../types";
 import { code128Modules } from "./code128";
 import { splitMarkedText } from "@/varer/lib/markedText";
+import { fmtGrainDisplayPct } from "@/varer/lib/breadscale";
 import {
   brodskalanFor,
   grainCategoryFromBreadscaleValue,
@@ -103,12 +104,15 @@ const styles = StyleSheet.create({
   },
 });
 
-/** Prosenten under Brødskala-merket — fra etikettdata, ellers beregningen. */
+/**
+ * Prosenten under Brødskala-merket — fra etikettdata, ellers beregningen.
+ * Helt tall rundet ned (`fmtGrainDisplayPct`), så tallet stemmer med merket.
+ */
 export function brodskalaPctText(data: LabelPdfData): string | null {
   const raw = data.felter?.brodskala_pct ?? data.felter?.brodskala_beregnet_pct;
   const n = typeof raw === "number" ? raw : Number(raw);
   if (!Number.isFinite(n)) return null;
-  return `${n.toFixed(1).replace(".", ",")} %`;
+  return fmtGrainDisplayPct(n);
 }
 
 function barcodeText(data: LabelPdfData): string {
