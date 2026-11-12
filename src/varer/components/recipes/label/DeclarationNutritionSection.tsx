@@ -274,9 +274,11 @@ export function DeclarationNutritionSection(p: Props) {
           </p>
         </div>
         <div className="flex min-h-11 items-center gap-3">
-          <label htmlFor="merking-automatisk" className="text-sm font-medium">Automatisk beregning</label>
+          <label htmlFor="merking-automatisk" className="flex min-h-11 cursor-pointer items-center text-sm font-medium">Automatisk beregning</label>
           <Switch
             id="merking-automatisk"
+            // Usynlig utvidelse gir 44 px trykkflate uten å endre bryterens størrelse.
+            className="relative after:absolute after:-inset-3 after:content-['']"
             checked={candidate === "auto"}
             disabled={busy}
             onCheckedChange={(v) => p.onCandidateChange(v ? "auto" : "manual")}

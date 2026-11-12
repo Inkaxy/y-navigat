@@ -35,6 +35,8 @@ function MarkRow(p: RowProps) {
         <div className="flex min-h-11 min-w-11 items-center">
           <Switch
             id={switchId}
+            // Usynlig utvidelse gir 44 px trykkflate uten å endre bryterens størrelse.
+            className="relative after:absolute after:-inset-3 after:content-['']"
             checked={p.checked}
             disabled={p.disabled || (p.locked && !p.checked)}
             onCheckedChange={p.onToggle}
