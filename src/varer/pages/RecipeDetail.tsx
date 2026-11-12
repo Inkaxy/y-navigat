@@ -52,6 +52,8 @@ import {
 import { UnsavedChangesDialog } from "@/varer/components/products/detail/UnsavedChangesDialog";
 import { useComputeRecipeLabel } from "@/varer/hooks/useRecipeLabel";
 import { LabelTab } from "@/varer/components/recipes/label/LabelTab";
+import { resolveFinalWeight } from "@/varer/lib/units-recipe";
+import type { RecipeBasisInput } from "@/varer/lib/recipeLinkBasis";
 import {
   BRAN_CLASSIFICATIONS,
   COARSE_CLASSIFICATIONS,
@@ -277,6 +279,19 @@ export default function RecipeDetail() {
     () => computeRecipeCost(hydratedLines, { unitCount: totals.unitCount, totalDoughG: totals.totalDoughG }),
     [hydratedLines, totals.unitCount, totals.totalDoughG],
   );
+
+  /** Utbytte til forslag om nettovekt per vare i Merking (samme motor som varekortet). */
+  const labelBasisInput = useMemo<RecipeBasisInput | null>(() => {
+    if (!recipe) return null;
+    const final = resolveFinalWeight(recipe, totals.totalDoughG);
+    return {
+      unitCount: totals.unitCount,
+      totalDoughG: totals.totalDoughG,
+      // Bare dokumentert ferdigvekt; ellers foreslås deigvekt per emne.
+      finalWeightG: final.source ? final.grams : null,
+      pieceWeightG: Number(header.dough_piece_grams) || recipe.unit_weight_grams || null,
+    };
+  }, [recipe, totals.unitCount, totals.totalDoughG, header.dough_piece_grams]);
 
   // ===== Skalering (kun visning — basen røres ikke) =====
   const baseUnits = useMemo(() => {
@@ -1167,6 +1182,7 @@ export default function RecipeDetail() {
                 onGoToRecipeTab={() => setActiveTab("oppskrift")}
                 canWrite={canWrite}
                 fixRequest={tabFocus.labelFix}
+                basisInput={labelBasisInput}
               />
             )}
 
