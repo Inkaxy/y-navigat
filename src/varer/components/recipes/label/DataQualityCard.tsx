@@ -225,7 +225,7 @@ export function DataQualityCard({
               ) : (
                 <AlertTriangle className="h-6 w-6 shrink-0 text-amber-600" />
               )}
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 basis-56">
                 <p className="text-lg font-semibold tracking-tight">
                   Næringsberegningen dekker {fmtPct(coveragePct)} av deigvekten
                 </p>
