@@ -229,12 +229,17 @@ export function LabelTab({
   const sourceIssues = declarationManual ? approveIssues.manual : approveIssues.auto;
   const nextAction = deriveNextAction({ state: labelState, approveIssues: sourceIssues });
   /** Én side: snarveiene ruller til kortet eller feltet. */
-  const goTo = (anchor: string) => {
+  const goTo = (anchor: string, attempt = 0) => {
     window.setTimeout(() => {
       const el = document.getElementById(anchor);
-      el?.scrollIntoView({ block: "start" });
-      el?.focus({ preventScroll: true });
-    }, 50);
+      // Kortene kan fortsatt laste når snarveien kommer fra en annen fane.
+      if (!el) {
+        if (attempt < 20) goTo(anchor, attempt + 1);
+        return;
+      }
+      el.scrollIntoView({ block: "start" });
+      el.focus({ preventScroll: true });
+    }, attempt === 0 ? 50 : 100);
   };
   const showQuality = () => {
     setQualitySignal((n) => n + 1);
@@ -295,3 +300,275 @@ export function LabelTab({
     );
   }
 
+  const approvedInput = latestVersion ? approvedLabelInput(latestVersion) : null;
+  const breadscaleManual = breadscaleMode === "manual";
+  // Samme regler som «Gjenstår» (draftLabelFlags).
+  const draftFlags = draftLabelFlags({
+    declarationManual,
+    coveragePct,
+    calculationBlocked: !!missing?.blocked,
+    hasNutrition: !!effective.nutrition,
+    effectiveGrainPct: effectiveGrain.data,
+    breadscaleManual,
+    manualBreadscalePct: recipe.manual_breadscale_pct ?? null,
+    calculatedGrainPct: label?.grain_score_pct ?? null,
+  });
+  const draftLabel = {
+    recipeName,
+    effective,
+    effectiveGrainPct: draftFlags.grainPct,
+    declarationManual,
+    claimGrain: !!recipe.label_claim_grain,
+    claimKeyhole: !!recipe.label_claim_keyhole,
+    unitWeightGrams: recipe.unit_weight_grams ?? null,
+    shelfLifeDays: recipe.shelf_life_days ?? null,
+    storageInstructions: recipe.storage_instructions ?? null,
+    entity,
+    nutritionUsable: draftFlags.nutritionUsable,
+    blocked: draftFlags.blocked,
+    keyholeQualifies: keyhole?.status === "oppfylt",
+    coveragePct,
+  };
+  // Kladdens sjekkliste — den samme som forhåndsvisningen og «Gjenstår» bygger.
+  const draftChecklist = buildLabelChecklist(labelChecklistInput(draftLabel)).items;
+  const showChecklist = () => goTo("merking-pliktfelt");
+  const grainClaim = grainClaimState({ breadscaleMode, manualPct: recipe.manual_breadscale_pct ?? null, grainPct: label?.grain_score_pct ?? null });
+  const keyholeClaim = keyholeClaimState({ coverageOk, status: keyhole?.status });
+  const toggleClaim = (field: "label_claim_keyhole" | "label_claim_grain", value: boolean) => saveClaim.mutate({ field, value });
+
+  return (
+    <div className="space-y-4">
+      <ApproveDeclarationDialog
+        open={approveOpen}
+        onOpenChange={setApproveOpen}
+        currentMode={candidate}
+        issues={approveIssues}
+        manualDirty={manualDirty}
+        previous={
+          latestVersion
+            ? {
+                version: latestVersion.version,
+                approvedAt: latestVersion.approved_at,
+                source: latestVersion.source,
+                doc: {
+                  ingredientText: latestVersion.ingredient_text,
+                  contains: latestVersion.allergens_contains ?? [],
+                  mayContain: latestVersion.allergens_may_contain ?? [],
+                  nutrition: (latestVersion.nutrition_per_100g ?? null) as Record<string, number | null> | null,
+                },
+              }
+            : null
+        }
+        affected={links.map((l) => ({
+          id: l.product_id,
+          name: l.products?.display_name ?? "Uten navn",
+          number: l.products?.display_number ?? null,
+        }))}
+        saving={approve.isPending}
+        calculated={{
+          ingredientText: label?.ingredient_declaration ?? null,
+          contains: label?.allergens?.contains ?? [],
+          mayContain: label?.allergens?.may_contain ?? [],
+          nutrition: (label?.nutrition_per_100g ?? null) as Record<string, number | null> | null,
+        }}
+        manual={manualSource}
+        onApprove={(mode, adopt) =>
+          approve.mutate(
+            {
+              recipeId,
+              source: mode === "manual" ? "manual" : "calculated",
+              claims: { grain: !!recipe.label_claim_grain, keyhole: !!recipe.label_claim_keyhole },
+              overrides: adopt
+                ? {
+                    ingredient_text: adopt.ingredientText,
+                    allergens_contains: adopt.contains,
+                    allergens_may_contain: adopt.mayContain,
+                    nutrition_per_100g: adopt.nutrition,
+                  }
+                : {},
+            },
+            { onSuccess: () => setApproveOpen(false) },
+          )
+        }
+      />
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(300px,380px)]">
+        <div className="min-w-0 space-y-4">
+          <LabelSummaryPanel
+            state={labelState}
+            computedAt={label?.computed_at ?? null}
+            coveragePct={coveragePct}
+            declarationManual={declarationManual}
+            breadscaleManual={breadscaleManual}
+            approvedAt={approvedAt}
+            approvedByName={approverQuery.data ?? null}
+            staleReason={label?.stale_reason ?? null}
+            linkedCount={links.length}
+            allergenCheck={checkState(hasCalc, missing ? missing.allergens_unreviewed?.length ?? 0 : null)}
+            nameCheck={checkState(hasCalc, missing ? missing.declaration_names?.length ?? 0 : null)}
+            sourceIssues={sourceIssues}
+            nextAction={nextAction}
+            canWrite={canWrite}
+            computing={compute.isPending}
+            approving={approve.isPending}
+            onNextAction={onNextAction}
+            onRecompute={recompute}
+            onShowLinked={() => goTo("merking-koblede-varer")}
+          />
+
+          <DeclarationNutritionSection
+            recipeId={recipeId}
+            recipe={recipe}
+            calculated={label}
+            canWrite={canWrite}
+            linkedProductCount={links.length}
+            computing={compute.isPending}
+            onRecompute={recompute}
+            candidate={candidate}
+            onCandidateChange={setCandidate}
+            approvedManualActive={declarationManual && labelState === "approved"}
+            onDirtyChange={setManualDirty}
+            onOpenApprove={() => setApproveOpen(true)}
+            onShowQuality={showQuality}
+            unreviewedAllergenCount={missing?.allergens_unreviewed?.length ?? 0}
+            qualitySlot={
+              <div id="merking-datakvalitet" tabIndex={-1} className="scroll-mt-4 outline-none">
+                <DataQualityCard
+                  coveragePct={coveragePct}
+                  missingData={missing}
+                  warnings={label?.warnings ?? null}
+                  onRecalculate={recompute}
+                  recalculating={compute.isPending}
+                  canWrite={canWrite}
+                  onGoToRecipeTab={onGoToRecipeTab}
+                  recipeId={recipeId}
+                  openSignal={qualitySignal}
+                  autoOpen
+                />
+              </div>
+            }
+          />
+
+          <LabelFieldsCard
+            recipeId={recipeId}
+            checklist={draftChecklist}
+            values={{
+              unitWeightGrams: recipe.unit_weight_grams ?? null,
+              shelfLifeDays: recipe.shelf_life_days ?? null,
+              storageInstructions: recipe.storage_instructions ?? null,
+              countryOfOrigin: recipe.country_of_origin ?? null,
+            }}
+            canWrite={canWrite}
+            fixLabelFor={(key) => fixTargetForChecklistKey(key, declarationManual)?.label ?? null}
+            onFixField={onFixField}
+          />
+
+          <div id="merking-koblede-varer" tabIndex={-1} className="scroll-mt-4 outline-none">
+            <LinkedProductsCard recipeId={recipeId} links={links} canWrite={canWrite} basisInput={basisInput} />
+          </div>
+
+          <LabelMarksCard
+            canWrite={canWrite}
+            saving={saveClaim.isPending}
+            onToggleClaim={toggleClaim}
+            links={links}
+            grain={{
+              claim: !!recipe.label_claim_grain,
+              effectivePct: grainClaim.effectivePct,
+              manual: breadscaleManual,
+              locked: grainClaim.locked,
+              lockedReason: grainClaim.reason,
+              details: (
+                <GrainSection
+                  recipeId={recipeId}
+                  breadscaleMode={breadscaleMode}
+                  manualPct={recipe.manual_breadscale_pct ?? null}
+                  claimGrain={!!recipe.label_claim_grain}
+                  approvedAt={recipe.label_claims_approved_at ?? null}
+                  approvedBy={recipe.label_claims_approved_by ?? null}
+                  grainPct={label?.grain_score_pct ?? null}
+                  grainCategory={label?.grain_category ?? null}
+                  flourGrams={label?.flour_grams ?? null}
+                  coarseWeightedGrams={label?.lines?.coarse_weighted_grams ?? null}
+                  wholeGrainPctOfDry={label?.whole_grain_pct_of_dry ?? null}
+                  dryMatterPct={label?.dry_matter_pct ?? null}
+                  finalWeightGrams={label?.final_weight_grams ?? null}
+                  warnings={label?.warnings ?? null}
+                  flourLines={flourLines}
+                  canWrite={canWrite}
+                  savingClaim={saveClaim.isPending}
+                  onToggleClaim={(value) => toggleClaim("label_claim_grain", value)}
+                  showClaimToggle={false}
+                />
+              ),
+            }}
+            keyhole={{
+              claim: !!recipe.label_claim_keyhole,
+              result: keyhole,
+              locked: keyholeClaim.locked,
+              lockedReason: keyholeClaim.reason,
+              details: (
+                <KeyholeSection
+                  keyhole={keyhole}
+                  coverageOk={coverageOk}
+                  claimKeyhole={!!recipe.label_claim_keyhole}
+                  approvedBy={recipe.label_claims_approved_by ?? null}
+                  approvedAt={recipe.label_claims_approved_at ?? null}
+                  canWrite={canWrite}
+                  saving={saveClaim.isPending}
+                  primaryProductCount={primaryCount}
+                  onToggleClaim={(value) => toggleClaim("label_claim_keyhole", value)}
+                  showClaimToggle={false}
+                />
+              ),
+            }}
+          />
+        </div>
+
+        <aside aria-label="Etikett" className="min-w-0 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:self-start xl:overflow-y-auto">
+          <LabelPreviewPanel
+            declarationManual={declarationManual}
+            approved={
+              approvedInput && latestVersion
+                ? {
+                    version: latestVersion.version,
+                    props: {
+                      variant: "approved",
+                      approvedVersion: latestVersion.version,
+                      recipeName,
+                      effective: approvedInput.effective,
+                      effectiveGrainPct: approvedInput.grainPct,
+                      declarationManual,
+                      breadscaleManual,
+                      claimGrain: approvedInput.claimGrain,
+                      claimKeyhole: approvedInput.claimKeyhole,
+                      unitWeightGrams: approvedInput.unitWeightGrams,
+                      shelfLifeDays: approvedInput.shelfLifeDays,
+                      storageInstructions: approvedInput.storageInstructions,
+                      countryOfOrigin: approvedInput.countryOfOrigin,
+                      entity,
+                      profile: labelProfileQuery.data ?? null,
+                      blocked: false,
+                      keyholeQualifies: approvedInput.claimKeyhole,
+                      coveragePct: approvedInput.effective.coveragePct,
+                      nutritionUsable: approvedInput.nutritionUsable,
+                      onShowChecklist: showChecklist,
+                    },
+                  }
+                : null
+            }
+            draft={{
+              ...draftLabel,
+              variant: "draft",
+              breadscaleManual,
+              countryOfOrigin: recipe.country_of_origin ?? null,
+              profile: labelProfileQuery.data ?? null,
+              onChecklistChange,
+              onShowChecklist: showChecklist,
+            }}
+          />
+        </aside>
+      </div>
+    </div>
+  );
+}
