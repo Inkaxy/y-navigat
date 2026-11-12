@@ -3,9 +3,12 @@
 import {
   approvedContent,
   contentHash,
+  effectiveRecipeId,
   exportDecision,
   exportGrain,
+  legacyGrainClaimOk,
   type ApprovedVersion,
+  type RecipeLinkOrderRow,
 } from "../_shared/declaration-export.ts";
 
 type Row = Record<string, unknown>;
@@ -74,13 +77,19 @@ export function parseVersion(v: Row): ApprovedVersion {
 
 const rows = (d: Res["data"]): Row[] => (Array.isArray(d) ? d : d ? [d] : []);
 
+/** Legacy-grovhet tillatt: merkeregelen holder og eksportens oppskrift er den effektive. */
+function legacyGrainOk(p: Row, usedRecipeId: string | null, recipe: Row, calc: Row | null): boolean {
+  return false;
+}
+
 export async function buildDeclarationsPage(admin: Db, o: PageInput): Promise<PageResult> {
   let productQuery = admin
     .from("products")
     .select(
       "id, code, display_number, display_name, ean_code, unit_of_sale, in_web_shop, status, weight_per_unit_grams, keywords, " +
         "manual_ingredient_declaration, manual_allergens_contains, manual_allergens_may_contain, " +
-        "manual_nutrition_per_100g, manual_declaration_updated_at, declaration_needs_review, declaration_review_reason, declaration_version_id, updated_at",
+        "manual_nutrition_per_100g, manual_declaration_updated_at, declaration_needs_review, declaration_review_reason, declaration_version_id, updated_at, " +
+        "show_breadscale, breadscale_pct, breadscale_mode, breadscale_manual_value",
     )
     .eq("legal_entity_id", o.legalEntityId)
     .neq("status", "discontinued")
@@ -100,9 +109,16 @@ export async function buildDeclarationsPage(admin: Db, o: PageInput): Promise<Pa
   const ids = pageRows.map((p) => p.id as string);
 
   const linkRows = ids.length
-    ? rows((await admin.from("product_recipe_links").select("product_id, recipe_id, is_primary").in("product_id", ids)).data)
+    ? rows((await admin.from("product_recipe_links").select("id, product_id, recipe_id, is_primary, created_at").in("product_id", ids)).data)
     : [];
   const linkByProduct = new Map<string, { recipe_id: string | null }>();
+  // Alle koblinger per vare — bare for å avgjøre effektiv oppskrift i grovhetsregelen.
+  const linksByProduct = new Map<string, RecipeLinkOrderRow[]>();
+  for (const l of linkRows) {
+    const list = linksByProduct.get(l.product_id as string) ?? [];
+    list.push({ recipe_id: str(l.recipe_id), is_primary: bool(l.is_primary), created_at: str(l.created_at), id: str(l.id) });
+    linksByProduct.set(l.product_id as string, list);
+  }
   for (const l of linkRows) {
     const existing = linkByProduct.get(l.product_id as string);
     if (!existing || l.is_primary) linkByProduct.set(l.product_id as string, { recipe_id: l.recipe_id as string | null });
@@ -112,7 +128,7 @@ export async function buildDeclarationsPage(admin: Db, o: PageInput): Promise<Pa
   const recipeRows = recipeIds.length
     ? rows((await admin
         .from("recipes")
-        .select("id, name, unit_weight_grams, shelf_life_days, storage_instructions, country_of_origin, breadscale_mode, manual_breadscale_pct")
+        .select("id, name, unit_weight_grams, shelf_life_days, storage_instructions, country_of_origin, breadscale_mode, manual_breadscale_pct, label_claim_grain")
         .in("id", recipeIds)).data)
     : [];
   const recipeById = new Map(recipeRows.map((r) => [r.id as string, r]));
@@ -168,11 +184,12 @@ export async function buildDeclarationsPage(admin: Db, o: PageInput): Promise<Pa
     if (!decision.include) continue;
 
     const productWeight = (p.weight_per_unit_grams as number | null) ?? null;
+    const grainFlags = { show_breadscale: bool(p.show_breadscale) };
     const published = decision.source === "approved_version" && version
       ? {
-          ...approvedContent(version),
+          ...approvedContent(version, grainFlags),
           // Produktets egen vekt er bevisst produktvariant; ellers godkjent vekt — null er autoritativt.
-          net_weight_grams: productWeight ?? approvedContent(version).net_weight_grams,
+          net_weight_grams: productWeight ?? approvedContent(version, grainFlags).net_weight_grams,
         }
       : {
           // Legacy uten versjon: produktets lagrede snapshot + oppskriftens felt (uendret regel).
@@ -183,7 +200,10 @@ export async function buildDeclarationsPage(admin: Db, o: PageInput): Promise<Pa
           shelf_life_days: (recipe?.shelf_life_days as number | null) ?? null,
           storage_instructions: (recipe?.storage_instructions as string | null) ?? null,
           country_of_origin: (recipe?.country_of_origin as string | null) ?? null,
-          grain: recipe
+          // Grovhet bare når varen skal bære merket (legacy-regelen i
+          // product_breadscale_claim_ok), og bare når tallet hentes fra varens
+          // effektive oppskrift. Kan det ikke avgjøres sikkert: null.
+          grain: recipe && legacyGrainOk(p, link?.recipe_id ?? null, recipe, calc)
             ? exportGrain({
                 mode: recipe.breadscale_mode as string | null,
                 manualPct: recipe.manual_breadscale_pct as number | null,
