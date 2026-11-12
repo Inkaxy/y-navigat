@@ -9,6 +9,7 @@
  */
 
 import { htmlToMarkedText } from "./declaration-core.ts";
+import { grainDisplayPct } from "./grain-display.ts";
 
 export const DECLARATIONS_SCOPE = "declarations";
 
@@ -104,6 +105,7 @@ function levelFromPct(pct: number): GrainLevel {
 export interface ExportGrain {
   level: GrainLevel;
   label: string;
+  /** Helt tall rundet NED (`grainDisplayPct`) — stemmer alltid med `level`. */
   pct: number | null;
   /** Antall fylte kakestykker i Brødskala'n-merket (1–4). */
   pieces: number;
@@ -124,7 +126,8 @@ export function exportGrain(input: {
   const build = (level: GrainLevel, pct: number | null, source: "manual" | "auto"): ExportGrain => ({
     level,
     label: GRAIN_LABEL[level],
-    pct: pct == null ? null : Math.round(pct * 10) / 10,
+    // Nivået er satt fra uavrundet prosent; tallet som går ut rundes ned.
+    pct: grainDisplayPct(pct),
     pieces: GRAIN_PIECES[level],
     pieces_total: 4,
     source,
@@ -204,8 +207,20 @@ export function approvedIngredientText(version: ApprovedVersion): string {
   return version.ingredient_text ?? "";
 }
 
-/** Grovhet fra godkjent snapshot — kilde og prosent avgjøres bare av versjonen. */
-export function approvedGrain(version: ApprovedVersion): ExportGrain | null {
+/** Varens merkevalg — `products.show_breadscale`. */
+export interface GrainProductFlags {
+  show_breadscale: boolean | null;
+}
+
+/**
+ * Grovhet fra godkjent snapshot — kilde og prosent avgjøres bare av versjonen.
+ * Samme regel som `product_breadscale_claim_ok` (versjonert gren): varen må
+ * vise merket (`show_breadscale`), versjonen må ha godkjent merket
+ * (`claim_grain`) og ha prosent. Ellers null — eksporten sender ikke grovhet
+ * for en vare som ikke skal bære merket.
+ */
+export function approvedGrain(version: ApprovedVersion, product: GrainProductFlags): ExportGrain | null {
+  if (product.show_breadscale !== true || version.claim_grain !== true) return null;
   const pct = version.breadscale_pct == null ? null : Number(version.breadscale_pct);
   if (pct == null || !Number.isFinite(pct)) return null;
   return exportGrain({
@@ -220,7 +235,7 @@ export function approvedGrain(version: ApprovedVersion): ExportGrain | null {
  * Publisert innhold for en vare med godkjent versjon: tekst, allergener,
  * næring, holdbarhet/oppbevaring/opprinnelse, grovhet og vekt fra snapshotet.
  */
-export function approvedContent(version: ApprovedVersion) {
+export function approvedContent(version: ApprovedVersion, product: GrainProductFlags) {
   return {
     ingredient_text: approvedIngredientText(version),
     allergens_contains: version.allergens_contains ?? [],
@@ -229,8 +244,77 @@ export function approvedContent(version: ApprovedVersion) {
     shelf_life_days: version.shelf_life_days ?? null,
     storage_instructions: version.storage_text ?? null,
     country_of_origin: version.origin_text ?? null,
-    grain: approvedGrain(version),
+    grain: approvedGrain(version, product),
     approved_at: version.approved_at ?? null,
     net_weight_grams: version.net_weight_g ?? null,
   };
+}
+
+/** Produktfeltene legacy-regelen i `product_breadscale_claim_ok` leser. */
+export interface LegacyGrainProduct extends GrainProductFlags {
+  breadscale_pct: number | null;
+  breadscale_mode: string | null;
+  breadscale_manual_value: number | null;
+}
+
+export interface LegacyGrainRecipe {
+  label_claim_grain: boolean | null;
+  breadscale_mode: string | null;
+  manual_breadscale_pct: number | null;
+}
+
+/**
+ * Legacy-grenen av `product_breadscale_claim_ok` (vare uten godkjent versjon),
+ * gjenskapt med dataene eksporten har:
+ *
+ *   show_breadscale og products.breadscale_pct finnes, og enten
+ *   (a) varen er manuell med breadscale_manual_value, eller
+ *   (b) varens effektive oppskrift (`product_effective_recipe_id`) har
+ *       label_claim_grain og manuell prosent eller en ikke-utdatert beregnet prosent.
+ *
+ * `effectiveRecipe` er null når den effektive oppskriften ikke kan avgjøres
+ * sikkert (se `effectiveRecipeId`) — da kan gren (b) ikke bekreftes og gir nei.
+ */
+export function legacyGrainClaimOk(i: {
+  product: LegacyGrainProduct;
+  effectiveRecipe: LegacyGrainRecipe | null;
+  effectiveCalc: { grain_score_pct: number | null; is_stale: boolean | null } | null;
+}): boolean {
+  const p = i.product;
+  if (p.show_breadscale !== true || p.breadscale_pct == null) return false;
+  if (p.breadscale_mode === "manual" && p.breadscale_manual_value != null) return true;
+  const r = i.effectiveRecipe;
+  if (!r || r.label_claim_grain !== true) return false;
+  if (r.breadscale_mode === "manual" && r.manual_breadscale_pct != null) return true;
+  const c = i.effectiveCalc;
+  return !!c && c.grain_score_pct != null && c.is_stale !== true;
+}
+
+export interface RecipeLinkOrderRow {
+  recipe_id: string | null;
+  is_primary: boolean | null;
+  created_at: string | null;
+  id: string | null;
+}
+
+/**
+ * Samme valg som `product_effective_recipe_id`: primær først, deretter
+ * eldste `created_at`, deretter `id`. Null når det ikke kan avgjøres sikkert
+ * (ingen koblinger, eller flere koblinger uten fullstendig sorteringsgrunnlag).
+ */
+export function effectiveRecipeId(links: RecipeLinkOrderRow[]): string | null {
+  if (links.length === 0) return null;
+  if (links.length === 1) return links[0].recipe_id;
+  if (links.some((l) => !l.created_at || !l.id)) return null;
+  const sorted = [...links].sort((a, b) => {
+    const pa = a.is_primary === true ? 1 : 0;
+    const pb = b.is_primary === true ? 1 : 0;
+    if (pa !== pb) return pb - pa;
+    const ta = Date.parse(a.created_at!);
+    const tb = Date.parse(b.created_at!);
+    if (!Number.isFinite(ta) || !Number.isFinite(tb)) return Number.NaN;
+    if (ta !== tb) return ta - tb;
+    return a.id! < b.id! ? -1 : a.id! > b.id! ? 1 : 0;
+  });
+  return sorted[0].recipe_id;
 }
