@@ -39,7 +39,7 @@ function world() {
       show_breadscale: true as boolean | null, breadscale_pct: 60 as number | null, breadscale_mode: "auto",
       breadscale_manual_value: null as number | null,
     }],
-    product_recipe_links: [{ id: "l1", product_id: "p1", recipe_id: "r1", is_primary: true, created_at: "2026-09-01T10:00:00.123456+00:00" }],
+    product_recipe_links: [{ id: "l1", product_id: "p1", recipe_id: "r1", is_primary: true, created_at: "2026-09-01T10:00:00.123456+00:00" as string | null }],
     recipes: [{ id: "r1", name: "Kneipp", unit_weight_grams: 500, shelf_life_days: 3, storage_instructions: "Tørt",
       country_of_origin: "Norge", breadscale_mode: "manual", manual_breadscale_pct: 60 as number | null,
       label_claim_grain: true as boolean | null }],
@@ -199,8 +199,22 @@ describe("declarations-export: grovhet bare når merket er godkjent (beslutning 
     // To ikke-primære koblinger, én uten created_at: product_effective_recipe_id kan ikke gjenskapes.
     w.product_recipe_links = [
       { id: "l1", product_id: "p1", recipe_id: "r1", is_primary: false, created_at: "2026-09-01T10:00:00.123456+00:00" },
-      { id: "l2", product_id: "p1", recipe_id: "r2", is_primary: false, created_at: null as unknown as string },
+      { id: "l2", product_id: "p1", recipe_id: "r2", is_primary: false, created_at: null },
     ];
     expect((await only(w)).grain).toBeNull();
+  });
+
+  it("legacy: eksportens oppskrift er ikke den effektive → grain null (ingen gjetning)", async () => {
+    const w = legacy();
+    w.recipes[0].breadscale_mode = "auto";
+    // Nyeste kobling kommer først: eksporten bruker r1, men effektiv (eldste) er r2.
+    w.product_recipe_links = [
+      { id: "l1", product_id: "p1", recipe_id: "r1", is_primary: false, created_at: "2026-09-02T10:00:00.000001+00:00" },
+      { id: "l2", product_id: "p1", recipe_id: "r2", is_primary: false, created_at: "2026-09-02T10:00:00+00:00" },
+    ];
+    expect((await only(w)).grain).toBeNull();
+    // Samme rekkefølge, men r1 er eldst på mikrosekund → effektiv = r1 → grain.
+    w.product_recipe_links[1].created_at = "2026-09-02T10:00:00.000002+00:00";
+    expect((await only(w)).grain).toMatchObject({ level: "grovt", pct: 60 });
   });
 });
