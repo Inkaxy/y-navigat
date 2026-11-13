@@ -74,14 +74,14 @@ export function classifyAiFailure(e: unknown, provider: string | null = null): A
   const k = kindOf(e);
   const low = text.toLowerCase();
   let kind: AiFailureKind;
-  if (status === 401 || status === 403 || /invalid(ated)?[_ ]api[_ ]key|incorrect api key|api key has been invalidated|authentication|api-key er tom|unauthori[sz]ed/i.test(text)) kind = "auth";
-  else if (status === 429 || status === 402 || /insufficient_quota|quota|billing|credit balance|rate limit/i.test(low)) kind = "quota";
+  if (status === 401 || status === 403 || /invalid(ated)?[_ ]api[_ ]key|incorrect api key|api key has been invalidated|authentication|api-key er tom|unauthori[sz]ed|avviste nøkkelen/i.test(text)) kind = "auth";
+  else if (status === 429 || status === 402 || /insufficient_quota|quota|billing|credit balance|rate limit|kvoten/i.test(low)) kind = "quota";
   else if (k === "timeout" || /svarte ikke innen|timed? ?out|deadline/i.test(low)) kind = "timeout";
   else if (k === "incomplete" || /ufullstendig|max_output_tokens|max_tokens/i.test(low)) kind = "incomplete";
   else if (k === "refusal" || /avslo forespørselen/i.test(low)) kind = "refusal";
-  else if (k === "model_unavailable" || (status != null && status >= 500) || status === 404 || /overloaded|service unavailable|model.*(does not exist|not found)/i.test(low)) kind = "unavailable";
-  else if (/failed to fetch|network|econn|dns|connection (reset|refused|closed)|error sending request|tcp/i.test(low)) kind = "network";
-  else if (/azure endpoint og deployment|unsupported provider|decrypt|ai_config_encryption_key|ingen aktiv ai/i.test(low)) kind = "config";
+  else if (k === "model_unavailable" || (status != null && status >= 500) || status === 404 || /overloaded|service unavailable|model.*(does not exist|not found)|er utilgjengelig/i.test(low)) kind = "unavailable";
+  else if (/failed to fetch|network|econn|dns|connection (reset|refused|closed)|error sending request|tcp|nettverksfeil/i.test(low)) kind = "network";
+  else if (/azure endpoint og deployment|unsupported provider|decrypt|ai_config_encryption_key|ingen aktiv ai|ikke satt opp riktig/i.test(low)) kind = "config";
   else kind = "other";
   return { kind, systemic: SYSTEMIC.has(kind), httpStatus: status, provider, message: aiFailureMessage(kind, provider, status) };
 }
