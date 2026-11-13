@@ -152,18 +152,18 @@ describe("H – tallkontroll uten AI (PALS 526301)", () => {
   const pals = [line(10000, 110, 110000), line(10000, 113, 113000), line(11340, 86, 97524), line(396000, 52, 20592), line(25000, 79.5, 1987.5)];
   it("entydige tusenskille-/desimalfeil rettes når summen da stemmer med kontrollsummen", () => {
     const r = applyNumberCheck(pals, 25784.74, false);
-    expect(r.corrected).toBe(5);
+    expect(r.corrected.length).toBe(5);
     expect(r.lines.map((l) => l.quantity)).toEqual([10, 10, 11.34, 396, 25]);
     const sum = r.lines.reduce((s, l) => s + (l.total_amount ?? 0), 0);
     expect(Math.abs(sum - 25784.74)).toBeLessThan(0.5);
     expect(r.invoiceIssue?.code).toBe("tall_rettet");
   });
   it("ingen retting uten kjent kontrollsum, og beløp skaleres aldri for å treffe summen", () => {
-    expect(applyNumberCheck(pals, null, false).corrected).toBe(0);
+    expect(applyNumberCheck(pals, null, false).corrected).toEqual([]);
     // Linjer som allerede går opp, men ikke treffer kontrollsummen: ingenting endres.
     const ok = [line(10, 110, 1100), line(10, 113, 1130)];
     const r = applyNumberCheck(ok, 22300, false);
-    expect(r.corrected).toBe(0);
+    expect(r.corrected).toEqual([]);
     expect(r.lines.map((l) => l.total_amount)).toEqual([1100, 1130]);
   });
 });
