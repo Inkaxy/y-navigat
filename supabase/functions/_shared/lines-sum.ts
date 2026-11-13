@@ -16,13 +16,25 @@ export const LINES_SUM_TOLERANCE_PCT = 2;
 export const LINES_SUM_TOLERANCE_PCT_NO_VAT = 20;
 
 /**
+ * Kreditnota: total og linjer kan være lagret med motsatt fortegn (total positiv, linjer negative).
+ * Da sammenlignes beløpene med linjenes fortegn. Gjelder BARE kreditnota; på en vanlig faktura er motsatt
+ * fortegn et reelt avvik. Størrelsen sammenlignes fortsatt med samme toleranse.
+ */
+export function creditAlignedExpected(expected: number, linesSum: number, isCredit: boolean): number {
+  if (!isCredit || expected === 0 || linesSum === 0) return expected;
+  return Math.sign(expected) !== Math.sign(linesSum) ? -expected : expected;
+}
+
+/**
  * Sammenlign summen av varelinjene (eks. mva) mot fakturaens totalbeløp.
  * Fakturaens total_amount er inkl. mva, så vi trekker fra total_vat når den finnes.
+ * `isCredit` (kreditnota) tillater motsatt fortegn mellom total og linjer, se creditAlignedExpected.
  */
 export function computeLinesSum(input: {
   lineTotals: Array<number | null | undefined>;
   totalAmount: number | null | undefined;
   totalVat: number | null | undefined;
+  isCredit?: boolean;
 }): LinesSumCheck {
   const { lineTotals, totalAmount, totalVat } = input;
 
@@ -39,7 +51,9 @@ export function computeLinesSum(input: {
   }
 
   const vatKnown = totalVat != null && Number.isFinite(Number(totalVat));
-  const expected = vatKnown ? total - Number(totalVat) : total;
+  // Mva følger totalens fortegn: kreditnota kan ha total -3612 og mva 471 lagret positivt.
+  const vatAbs = vatKnown ? Math.abs(Number(totalVat)) : 0;
+  const expected = creditAlignedExpected(vatKnown ? total - Math.sign(total) * vatAbs : total, rounded, input.isCredit === true);
   const tolerance = vatKnown ? LINES_SUM_TOLERANCE_PCT : LINES_SUM_TOLERANCE_PCT_NO_VAT;
 
   if (expected === 0) {
