@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const { legal_entity_id, pdf_base64, pdf_text } = body;
     if (!legal_entity_id) return jsonErr("legal_entity_id påkrevd", 400);
-    if (!pdf_base64 && !pdf_text) return jsonErr("pdf_base64 eller pdf_text påkrevd", 400);
+    if (!pdf_base64 && !pdf_text && body.probe !== true) return jsonErr("pdf_base64 eller pdf_text påkrevd", 400);
 
     if (!isServiceCall) {
       const { data: hasAccess } = await userClient.rpc("has_ravarer_invoice_access", {
