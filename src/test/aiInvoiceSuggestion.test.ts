@@ -96,8 +96,9 @@ describe("Modellsammenligning", () => {
     expect(o.statusLabel).toMatch(/ikke tilgjengelig/); expect(o.costUsd).toBeNull(); expect(o.checkCount).toBeNull();
     expect(parseEvalOutcome(null, "i", "gpt-4o").status).toBe("invalid_json");
   });
+  // 13.11.2026: prompten fikk regel 8 (avgifter/gebyrer i oppsummeringen) og 9 (alle sider) – bevisst endring.
   it("prompten er byte-identisk med produksjonens", () => {
-    expect(createHash("sha256").update(INVOICE_EXTRACTION_SYSTEM_PROMPT).digest("hex")).toBe("9ba81f093413faa7b2aac9d5a2dadecd71e052ee32227a30513dccf6d81631a9");
+    expect(createHash("sha256").update(INVOICE_EXTRACTION_SYSTEM_PROMPT).digest("hex")).toBe("e29c8518890ae0d7ce790e09d73cf57e0757d03daf61216180aad919b566fa23");
   });
 });
 
