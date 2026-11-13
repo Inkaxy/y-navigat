@@ -28,3 +28,14 @@
 - [x] Fase 0: verifiser fase a-punkter + undersøk Tripletex EHF/strukturerte linjer (bare lesing)
 - [x] Fase a1: «Alle priser» (bare lesing) i RawMaterialPeek og råvarekortets Pris-seksjon + tester
 - [ ] a2 «Rett pris» – venter på Henriks ja til DB-endring 1
+
+# Rettepakke fakturalesing (13.11.2026)
+- [ ] A AI-feil ≠ «ingen lesbare linjer» (extract + import, stopp ved auth-feil, null linjer med beløp = kontroll)
+- [ ] B Varsel Oversikt/Fakturaer + e-post til Henrik (2 på rad, maks 1/døgn)
+- [ ] C Reserveleverandør (forslag/PENDING + kode klar)
+- [ ] D Kreditnota-fortegn i sumkontroll
+- [ ] E Mva 0 på hode = mangler når posteringer viser mva
+- [ ] F Avgift/gebyr/frakt/pant i oppsummering som linjer (prompt/skjema)
+- [ ] G Lange fakturaer: oppdeling ved kutt
+- [ ] H Tallkontroll antall×pris=beløp, entydig retting
+- [ ] I Klargjør gjenlesing (45/28/60), ikke kjør
