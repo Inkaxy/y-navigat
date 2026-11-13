@@ -6,6 +6,12 @@ export interface FailurePlanInput {
   message: string;
   status: string | null;
   pdfFail: boolean;
+  /**
+   * Feilen gjelder AI-tjenesten (nøkkel/kvote/nede/nettverk/oppsett), ikke fakturaen. Forsøket skal ikke
+   * telles: patch.release_attempt=true (brukes av rm_fail_invoice_line_extraction etter PENDING-SQL
+   * 20261113_line_extraction_release_requeue; eldre funksjon ignorerer feltet og teller som før).
+   */
+  aiSystemic?: boolean;
 }
 
 export interface FailurePlanResult {
@@ -24,6 +30,21 @@ export const MAX_LINE_EXTRACTION_ATTEMPTS = 3;
 export function planLineExtractionFailure(input: FailurePlanInput): FailurePlanResult {
   const { attempts, message, status, pdfFail } = input;
   const now = new Date().toISOString();
+
+  if (input.aiSystemic === true) {
+    // Fakturaen gis ikke opp på grunn av tjenesten: den blir liggende i køen (eller «failed» med AI-tekst
+    // når telleren allerede er brukt opp, slik at gjenlesingen kan legge den tilbake).
+    const exhausted = attempts >= MAX_LINE_EXTRACTION_ATTEMPTS;
+    return {
+      patch: {
+        line_extraction_status: exhausted ? "failed" : "pending",
+        line_extraction_error: message,
+        line_extraction_at: now,
+        release_attempt: true,
+      },
+      gaveOpp: false,
+    };
+  }
 
   if (attempts >= MAX_LINE_EXTRACTION_ATTEMPTS) {
     const patch: Record<string, unknown> = {
