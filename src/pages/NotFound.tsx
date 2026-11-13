@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Compass, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import BrandMark from "@/assets/brand/logo-login.svg?react";
+import BrandMark from "@/components/brand/svg/LogoLogin";
 
 
 export default function NotFound() {

@@ -215,6 +215,8 @@ export function buildOperations(cands: Candidate[], sel: Record<string, Selectio
 }
 
 const ERR: Record<string, string> = {
+  ai_feil_nokkel: "AI-tjenesten avviste nøkkelen. Legg inn ny nøkkel under AI-tjenester og prøv igjen. Ingenting er endret.",
+  ai_feil: "AI-tjenesten svarte ikke som den skulle. Prøv igjen senere. Ingenting er endret.",
   snapshot_endret: "Fakturaen eller originalen er endret siden lesingen startet. Forslaget kan ikke brukes — start en ny lesing.",
   reread_utlopt: "Forslaget er eldre enn 24 timer. Start en ny lesing.",
   reread_ikke_klar: "Lesingen er ikke klar, eller er avbrutt.",

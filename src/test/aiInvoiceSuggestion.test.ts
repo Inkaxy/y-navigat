@@ -96,8 +96,9 @@ describe("Modellsammenligning", () => {
     expect(o.statusLabel).toMatch(/ikke tilgjengelig/); expect(o.costUsd).toBeNull(); expect(o.checkCount).toBeNull();
     expect(parseEvalOutcome(null, "i", "gpt-4o").status).toBe("invalid_json");
   });
+  // 13.11.2026: prompten fikk regel 8 (avgifter/gebyrer i oppsummeringen) og 9 (alle sider) – bevisst endring.
   it("prompten er byte-identisk med produksjonens", () => {
-    expect(createHash("sha256").update(INVOICE_EXTRACTION_SYSTEM_PROMPT).digest("hex")).toBe("9ba81f093413faa7b2aac9d5a2dadecd71e052ee32227a30513dccf6d81631a9");
+    expect(createHash("sha256").update(INVOICE_EXTRACTION_SYSTEM_PROMPT).digest("hex")).toBe("e29c8518890ae0d7ce790e09d73cf57e0757d03daf61216180aad919b566fa23");
   });
 });
 
@@ -134,7 +135,11 @@ describe("Fasit og bruksloggkobling", () => {
     expect(buildExtractorRequest({ legalEntityId: "le", invoice: { supplier_id: null, invoice_number: null, is_credit_note: false, total_amount: 1, total_vat: 0 }, lines: [], supplierName: null, pdfBase64: "x", invoiceId: "inv-1" }).invoice_id).toBe("inv-1");
     expect(readFileSync("supabase/functions/tripletex-import-invoice-lines/index.ts", "utf8")).toContain("invoice_id: inv.id,");
     const ex = readFileSync("supabase/functions/extract-invoice-from-pdf/index.ts", "utf8");
-    expect(ex.match(/invoice_id: usageInvoiceId/g)?.length).toBe(2);
+    const rd = readFileSync("supabase/functions/extract-invoice-from-pdf/aiRead.ts", "utf8");
+    // All bruksloggføring går gjennom én helper som alltid tar med faktura-id-en.
+    expect(rd.match(/invoice_id: ctx\.usageInvoiceId/g)?.length).toBe(1);
+    expect(rd.match(/from\("ai_usage_log"\)/g)?.length).toBe(1);
+    expect(ex).toContain("usageInvoiceId");
     expect(ex).toContain('.eq("legal_entity_id", legal_entity_id)');
   });
 });

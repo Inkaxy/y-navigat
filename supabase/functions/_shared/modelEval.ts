@@ -26,7 +26,7 @@ const n = (t: string) => ({ anyOf: [{ type: t }, { type: "null" }] });
 /** Versjon av schemaet. Følger hvert evalresultat slik at «nytt schema» ikke blandes med «ny modell». */
 /** Pipeline: versjonsbundet original med frist + side-/tegnbegrenset tekstlag. */
 export const EVAL_PIPELINE_VERSION = "eval-pipeline-v2-2026-10-14";
-export const INVOICE_EXTRACTION_SCHEMA_VERSION = "strict-v3-2026-10-14-raw-discount";
+export const INVOICE_EXTRACTION_SCHEMA_VERSION = "strict-v4-2026-11-13-summary-fees";
 const TOP_FIELDS = ["supplier_name", "supplier_org_number", "invoice_number", "invoice_date", "due_date", "total_amount", "total_excl_vat", "total_vat", "currency", "kid_number", "account_number"] as const;
 
 /**
@@ -54,7 +54,7 @@ export const INVOICE_EXTRACTION_SCHEMA: Record<string, unknown> = {
         additionalProperties: false,
         required: ["line_kind", "sku", "sku_raw", "ean", "description", "quantity", "quantity_raw", "unit", "unit_price", "unit_price_raw", "unit_price_unit_raw", "unit_price_basis", "total_amount", "total_amount_raw", "discount_pct", "discount_amount", "discount_amount_raw", "discount_kind", "vat_rate", "package_size", "package_unit", "count_per_package", "package_raw", "page_number", "confidence"],
         properties: {
-          line_kind: { anyOf: [{ type: "string", enum: ["vare", "pant", "frakt", "gebyr", "rabatt", "avrunding", "mva", "annet"] }, { type: "null" }] },
+          line_kind: { description: "gebyr = avgift/gebyr/tillegg, frakt, pant – også linjer fra oppsummeringen nederst på fakturaen", anyOf: [{ type: "string", enum: ["vare", "pant", "frakt", "gebyr", "rabatt", "avrunding", "mva", "annet"] }, { type: "null" }] },
           sku: n("string"), sku_raw: n("string"), ean: n("string"), description: n("string"),
           quantity: n("number"), quantity_raw: n("string"), unit: n("string"),
           unit_price: n("number"), unit_price_raw: n("string"), unit_price_unit_raw: n("string"),

@@ -14,6 +14,7 @@ import { useInvoiceDeliveryStatus } from "@/ravarer/hooks/useInvoiceDeliveryStat
 import { paths } from "@/ravarer/lib/paths";
 import { DataTable } from "@/ravarer/ui/DataTable";
 import { TripletexStatusCard } from "@/ravarer/components/TripletexStatusCard";
+import { InvoiceReadingAlert } from "@/ravarer/components/reading/InvoiceReadingAlert";
 import { useRematchInvoices } from "@/ravarer/pages/priskontroll/gjore/useGjoreMutations";
 import { DeliveryTimeline } from "@/ravarer/pages/priskontroll/faktura/DeliveryTimeline";
 import { useFetchInvoiceLines } from "@/ravarer/pages/priskontroll/faktura/useInvoiceActions";
@@ -123,6 +124,7 @@ export function FakturaerTab() {
 
   return (
     <div className="space-y-3">
+      <InvoiceReadingAlert />
       <TripletexStatusCard />
       <div className="flex flex-wrap items-center gap-2">
         <VisningChips visning={visning} modus={modus} counts={{ ...liste.openCounts, inv: summary?.invoices ?? null, alle: visning === "alle" ? liste.total : null, utenfor: visning === "utenfor" ? liste.total : null }} onChange={(v, m) => update({ visning: v, modus: m })} />

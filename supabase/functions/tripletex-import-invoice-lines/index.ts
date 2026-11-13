@@ -11,11 +11,22 @@
 //  - Leverandør-id sendes til uthentingen, som henter bekreftede rettelser for selskap + leverandør.
 //  - Linjetype (vare/pant/frakt/gebyr …) lagres på linjen, så motoren kan utelate det som ikke er varer.
 //  - Rettet: bilagsoppslaget manglet «/v2» og ga aldri hovedbokskonto.
+//
+// Rettepakke 13.11.2026:
+//  - AI-feil (ai_status=failed) ferdigstiller aldri fakturaen; feilteksten sier hva som feilet, og
+//    tjenestefeil (nøkkel/kvote/nede) stopper kjøringen ved første feil og teller ikke som forsøk.
+//  - Køen tas én faktura om gangen; aiGate sjekker tilgangen gratis før køen tas når forrige kall feilet.
+//  - Varsel-e-post til Henrik når lesingen har feilet to ganger på rad (høyst én per døgn per feiltype).
+//  - Kreditnota: kontrollsummen tåler motsatt fortegn mellom total og linjer (computeLinesSum isCredit).
+//  - Mva 0 på hodet erstattes av bilagets inngående mva når posteringene viser mva (resolveHeaderVat).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getSessionToken, baseUrl, authHeader } from "../_shared/tripletex.ts";
-import { computeLinesSum, needsReviewFromConfidence } from "../_shared/lines-sum.ts";
+import { computeLinesSum, expectedExclVat, needsReviewFromConfidence } from "../_shared/lines-sum.ts";
+import type { AiFailure } from "../_shared/aiFailure.ts";
+import { aiGate, maybeQueueReadingAlert } from "./aiGate.ts";
+import { extractionOutcome } from "./extraction-outcome.ts";
 import { planLineExtractionFailure } from "./failure-plan.ts";
-import { pickLedgerAccount, vatFromPostings } from "./ledger-account.ts";
+import { pickLedgerAccount, resolveHeaderVat, vatFromPostings } from "./ledger-account.ts";
 import { toInvoiceLineRows } from "./rows.ts";
 
 const corsHeaders = {
@@ -144,23 +155,51 @@ Deno.serve(async (req) => {
     // retry_failed er en no-op: kø-RPC-en avgjør selv hvilke fakturaer som kan claimes.
     const limit = Math.max(1, Math.min(50, Number(body.limit ?? 20)));
 
-    const { data: invoices, error: invErr } = await admin.rpc("rm_claim_invoice_line_extraction", {
-      p_legal_entity_id: legalEntityId,
-      p_limit: limit,
-      p_invoice_id: body.invoice_id ?? null,
-    });
-    if (invErr) throw new Error(invErr.message);
+    const singleId = body.invoice_id ?? null;
+
+    // «gjenstaar» = pending med forsøk igjen (attempts < maks) — utmattede fakturaer
+    // er «failed»/«needs_review» og skal ikke telles som noe cronen kan ta senere.
+    const pendingCount = async () => {
+      const { count } = await admin
+        .from("invoices")
+        .select("id", { count: "exact", head: true })
+        .eq("legal_entity_id", legalEntityId)
+        .eq("line_extraction_status", "pending")
+        .lt("line_extraction_attempts", 3);
+      return count ?? 0;
+    };
+
+    // AI-vern for køkjøringer: feilet forrige kall på tjenesten, sjekkes tilgangen gratis før noe tas fra køen.
+    if (!singleId) {
+      const gate = await aiGate(admin, SUPABASE_URL, SERVICE_KEY, legalEntityId);
+      if (!gate.open) {
+        if (gate.probed) await maybeQueueReadingAlert(admin);
+        return json({ ok: true, behandlet: 0, vellykket: 0, feilet: 0, stoppet: gate.failure.kind, melding: gate.failure.message, gjenstaar: await pendingCount(), detaljer: [] });
+      }
+    }
 
     let behandlet = 0;
     let vellykket = 0;
     let feilet = 0;
     const detaljer: Array<Record<string, unknown>> = [];
+    // Første tjenestefeil (nøkkel/kvote/nede) stopper kjøringen: resten av køen tas ikke.
+    let stopped: AiFailure | null = null;
+    let sessionToken: string | null = null;
+    const knownCache = new Map<string, Array<{ sku: string | null; name: string | null }>>();
 
-    if ((invoices ?? []).length > 0) {
-      const sessionToken = await getSessionToken(admin, legalEntityId);
-      const knownCache = new Map<string, Array<{ sku: string | null; name: string | null }>>();
-
-      for (const inv of invoices ?? []) {
+    // Én faktura tas om gangen, slik at en tjenestefeil ikke bruker opp forsøk på fakturaer som aldri ble lest.
+    const loopLimit = singleId ? 1 : limit;
+    for (let n = 0; n < loopLimit && !stopped; n++) {
+        const { data: claimed, error: invErr } = await admin.rpc("rm_claim_invoice_line_extraction", {
+          p_legal_entity_id: legalEntityId,
+          p_limit: 1,
+          p_invoice_id: singleId,
+        });
+        if (invErr) throw new Error(invErr.message);
+        const inv = (claimed ?? [])[0];
+        if (!inv) break;
+        sessionToken ??= await getSessionToken(admin, legalEntityId);
+        const tt: string = sessionToken;
         behandlet++;
         const ttId = inv.tripletex_supplier_invoice_id as string;
         // Eierskap for denne kjøringen: alle skriv på fakturaen krever samme token.
@@ -180,7 +219,7 @@ Deno.serve(async (req) => {
           // 1) Hent PDF
           const url = `${baseUrl()}/v2/supplierInvoice/${ttId}/pdf`;
           const res = await fetch(url, {
-            headers: { Authorization: authHeader(sessionToken), Accept: "application/octet-stream" },
+            headers: { Authorization: authHeader(tt), Accept: "application/octet-stream" },
           });
           if (!res.ok) {
             const text = await res.text().catch(() => "");
@@ -211,22 +250,23 @@ Deno.serve(async (req) => {
           //     Feil her skal ikke velte fakturaen.
           let ledgerAccount: string | null = null;
           let vatInferred = false;
+          let vatZeroReplaced = false;
           try {
             const vRes = await fetch(
               `${baseUrl()}/v2/supplierInvoice/${ttId}?fields=voucher(postings(account(number),amountGross,amount))`,
-              { headers: { Authorization: authHeader(sessionToken), Accept: "application/json" } },
+              { headers: { Authorization: authHeader(tt), Accept: "application/json" } },
             );
             if (vRes.ok) {
               const vJson = await vRes.json().catch(() => null);
               const postings = vJson?.value?.voucher?.postings;
               ledgerAccount = pickLedgerAccount(postings);
-              if (totalVat == null) {
-                const vat = vatFromPostings(postings);
-                if (vat != null && totalAmount != null && vat < Math.abs(totalAmount)) {
-                  // Lagres først i ferdigstillingen (samme transaksjon som linjene).
-                  totalVat = vat;
-                  vatInferred = true;
-                }
+              // Mangler mva, eller er den 0 mens bilaget viser inngående mva: bruk bilagets beløp.
+              // Lagres først i ferdigstillingen (samme transaksjon som linjene). Aldri fra linjesummen.
+              const r = resolveHeaderVat(totalVat, vatFromPostings(postings), totalAmount);
+              if (r.fromPostings) {
+                totalVat = r.vat;
+                vatInferred = true;
+                vatZeroReplaced = r.zeroReplaced;
               }
             } else {
               await vRes.text().catch(() => "");
@@ -241,7 +281,8 @@ Deno.serve(async (req) => {
             if (!knownCache.has(supplierId)) knownCache.set(supplierId, await knownItemsForSupplier(admin, supplierId));
             known = knownCache.get(supplierId) ?? [];
           }
-          const expectedExcl = totalAmount != null && totalVat != null ? Number((totalAmount - totalVat).toFixed(2)) : null;
+          const isCredit = (head as any)?.is_credit_note === true;
+          const expectedExcl = expectedExclVat(totalAmount, totalVat, isCredit);
           const extractRes = await fetch(`${SUPABASE_URL}/functions/v1/extract-invoice-from-pdf`, {
             method: "POST",
             headers: {
@@ -259,7 +300,7 @@ Deno.serve(async (req) => {
               invoice_number: (head as any)?.invoice_number ?? inv.invoice_number ?? null,
               known_items: known,
               supplier_id: supplierId,
-              is_credit: (head as any)?.is_credit_note === true,
+              is_credit: isCredit,
               max_attempts: 2,
             }),
           });
@@ -268,6 +309,11 @@ Deno.serve(async (req) => {
             throw new Error(
               `Uthenting feilet: ${extractJsonBody?.error ?? extractRes.status}`,
             );
+          }
+          // AI-kallet feilet (nøkkel/kvote/nede/nettverk/tid): fakturaen ferdigstilles IKKE som «ingen linjer».
+          const outcome = extractionOutcome(extractJsonBody);
+          if (outcome.kind === "ai_failed") {
+            throw Object.assign(new Error(outcome.failure.message), { aiFailure: outcome.failure });
           }
 
           const rawLines = Array.isArray(extractJsonBody?.extracted?.lines)
@@ -279,7 +325,7 @@ Deno.serve(async (req) => {
           const confidence = num(extractJsonBody?.confidence);
           const lowConfidence = needsReviewFromConfidence(confidence);
 
-          const sumCheck0 = computeLinesSum({ lineTotals: rows.map((r) => r.total_amount), totalAmount, totalVat });
+          const sumCheck0 = computeLinesSum({ lineTotals: rows.map((r) => r.total_amount), totalAmount, totalVat, isCredit });
           // Fakturanivåets forklaringer (manglende beløp, mva-lignende forhold) lagres på fakturaen.
           const invoiceIssues = Array.isArray(extractJsonBody?.issues) ? extractJsonBody.issues
             : Array.isArray(extractJsonBody?.sum_check?.issues) ? extractJsonBody.sum_check.issues : [];
@@ -292,6 +338,9 @@ Deno.serve(async (req) => {
               extraction_confidence: confidence,
               ...(rows.length ? sumCheck0 : computeLinesSum({ lineTotals: [], totalAmount, totalVat })),
               total_vat_from_postings: vatInferred ? totalVat : null,
+              // Hodet hadde mva 0, bilaget viser mva: lagres av ferdigstillingen etter PENDING-SQL
+              // 20261113_lines_sum_credit_vat (eldre funksjon ignorerer feltet og beholder 0).
+              total_vat_zero_replaced: vatZeroReplaced,
               issues: invoiceIssues,
               low_confidence: lowConfidence,
             },
@@ -304,8 +353,9 @@ Deno.serve(async (req) => {
             continue;
           }
           if (rows.length === 0) {
+            // AI svarte, men fant ingen linjer. Med beløp på fakturaen settes «trenger kontroll» via fakturavarselet.
             vellykket++;
-            detaljer.push({ invoice_id: inv.id, lines: 0 });
+            detaljer.push({ invoice_id: inv.id, lines: 0, trenger_kontroll: (totalAmount ?? 0) !== 0, status: (fin as any)?.status ?? null });
             continue;
           }
           let sumCheck: Record<string, unknown> = { ...sumCheck0 };
@@ -364,32 +414,30 @@ Deno.serve(async (req) => {
         } catch (e) {
           feilet++;
           const msg = e instanceof Error ? e.message : String(e);
+          const aiFailure = (e as { aiFailure?: AiFailure })?.aiFailure ?? null;
+          if (aiFailure?.systemic) stopped = aiFailure;
           const { patch } = planLineExtractionFailure({
             attempts: Number((inv as any).line_extraction_attempts ?? 0),
             message: msg,
             status: (inv as any).status ?? null,
             pdfFail: !!(e as any)?.pdfFail,
+            aiSystemic: aiFailure?.systemic === true,
           });
           // Bare kjøringen som eier tokenet kan skrive feilstatus; en utdatert kjøring rører ingenting.
           const { error: failErr } = await admin.rpc("rm_fail_invoice_line_extraction", {
             p_invoice_id: inv.id, p_token: (inv as any).claim_token, p_patch: patch,
           });
           if (failErr) console.error("rm_fail_invoice_line_extraction", failErr.message);
-          detaljer.push({ invoice_id: inv.id, error: msg });
+          detaljer.push({ invoice_id: inv.id, error: msg, ai_feil: aiFailure?.kind ?? null });
         }
-      }
     }
 
-    // «gjenstaar» = pending med forsøk igjen (attempts < maks) — utmattede fakturaer
-    // er «failed»/«needs_review» og skal ikke telles som noe cronen kan ta senere.
-    const { count } = await admin
-      .from("invoices")
-      .select("id", { count: "exact", head: true })
-      .eq("legal_entity_id", legalEntityId)
-      .eq("line_extraction_status", "pending")
-      .lt("line_extraction_attempts", 3);
+    if (stopped) await maybeQueueReadingAlert(admin);
 
-    return json({ ok: true, behandlet, vellykket, feilet, gjenstaar: count ?? 0, detaljer });
+    return json({
+      ok: true, behandlet, vellykket, feilet, gjenstaar: await pendingCount(), detaljer,
+      ...(stopped ? { stoppet: stopped.kind, melding: stopped.message } : {}),
+    });
   } catch (err) {
     return json({ error: err instanceof Error ? err.message : String(err) }, 500);
   }

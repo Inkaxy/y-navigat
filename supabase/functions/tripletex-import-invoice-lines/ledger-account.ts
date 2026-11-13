@@ -58,3 +58,24 @@ export function vatFromPostings(postings: unknown): number | null {
   return Math.round(Math.abs(sum) * 100) / 100;
 }
 
+
+export interface HeaderVatResolution {
+  /** Mva som brukes i kontrollsummen (null = ukjent). */
+  vat: number | null;
+  /** Mva er hentet fra bilagets posteringer (lagres som vat_inferred). */
+  fromPostings: boolean;
+  /** Fakturahodet hadde 0 i mva, men bilaget viser inngående mva. */
+  zeroReplaced: boolean;
+}
+
+/**
+ * Mva på fakturahodet mot bilagets posteringer. Mangler mva (null) eller er den 0 mens posteringene
+ * viser inngående mva (> 0), brukes posteringenes beløp — men bare når det er mindre enn totalen.
+ * Mva gjettes ALDRI ut fra linjesummen. 0 uten mva i posteringene er en gyldig 0 (mva-fritt).
+ */
+export function resolveHeaderVat(headerVat: number | null, postingsVat: number | null, totalAmount: number | null): HeaderVatResolution {
+  const usable = postingsVat != null && Number.isFinite(postingsVat) && totalAmount != null && postingsVat < Math.abs(totalAmount);
+  if (headerVat == null) return usable ? { vat: postingsVat, fromPostings: true, zeroReplaced: false } : { vat: null, fromPostings: false, zeroReplaced: false };
+  if (headerVat === 0 && usable && postingsVat! > 0) return { vat: postingsVat, fromPostings: true, zeroReplaced: true };
+  return { vat: headerVat, fromPostings: false, zeroReplaced: false };
+}

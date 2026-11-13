@@ -28,6 +28,7 @@ const SupplierCase = lazy(() => import("@/fakturaer/pages/SupplierCase"));
 const AlleVarekort = lazy(() => import("./pages/priskontroll/AlleVarekort"));
 const VarekortPage = lazy(() => import("./pages/priskontroll/VarekortPage"));
 const ReberegnKostpriser = lazy(() => import("@/ravarer/pages/ReberegnKostpriser"));
+const LesPaNyttBolk = lazy(() => import("@/ravarer/pages/priskontroll/verktoy/LesPaNyttBolk"));
 
 const LeverandorDetail = lazy(() => import("@/ravarer/pages/LeverandorDetail"));
 const ForhandlingWizard = lazy(() => import("@/ravarer/pages/forhandlinger/ForhandlingWizard"));
@@ -63,6 +64,7 @@ export function ravarerRoutes(Shell: ShellType) {
     <Route key="pk-vk" path="/ravarer/priskontroll/varekort" element={inv(<AlleVarekort />)} />,
     <Route key="pk-vk-d" path="/ravarer/priskontroll/varekort/:supplierId/:itemKey" element={inv(<VarekortPage />)} />,
     <Route key="pk-reb" path="/ravarer/priskontroll/verktoy/reberegn" element={rv(<InvoiceAccessGuard><ReberegnKostpriser /></InvoiceAccessGuard>)} />,
+    <Route key="pk-lesbolk" path="/ravarer/priskontroll/verktoy/les-pa-nytt" element={rv(<InvoiceAccessGuard><LesPaNyttBolk /></InvoiceAccessGuard>)} />,
     <Route key="pk-saker-root" path="/ravarer/priskontroll/saker" element={<Navigate to={paths.saker()} replace />} />,
     <Route key="pk-fak-root" path="/ravarer/priskontroll/faktura" element={<Navigate to={paths.alleFakturaer()} replace />} />,
     <Route key="pk-sak" path="/ravarer/priskontroll/saker/:id" element={inv(<SupplierCase />)} />,

@@ -56,7 +56,7 @@ export default function RegistrerLinjerPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("invoices")
-        .select("id, invoice_number, status, source, lines_source, source_document_url, total_amount, total_vat, supplier:suppliers(name), legal_entity:legal_entities(legal_name)")
+        .select("id, invoice_number, status, source, lines_source, source_document_url, total_amount, total_vat, is_credit_note, supplier:suppliers(name), legal_entity:legal_entities(legal_name)")
         .eq("id", id!)
         .single();
       if (error) throw error;
@@ -163,6 +163,7 @@ export default function RegistrerLinjerPage() {
         lineTotals: lines.map((l) => l.total_amount),
         totalAmount: header?.total_amount ?? null,
         totalVat: header?.total_vat ?? null,
+        isCredit: header?.is_credit_note === true,
       });
 
       const { error: invErr } = await supabase

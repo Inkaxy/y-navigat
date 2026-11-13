@@ -93,7 +93,7 @@ export function parseNumberToken(input: unknown): TokenParse {
   return fin(/^\d+$/.test(i) ? i : null, d);
 }
 
-export interface NumberEvidence { field: NumberField; raw: string; value: number | null; how: "entydig" | "regnestykke" | "tvetydig" | "ugyldig" | "modelltall" }
+export interface NumberEvidence { field: NumberField; raw: string; value: number | null; how: "entydig" | "regnestykke" | "tvetydig" | "ugyldig" | "modelltall" | "tallkontroll" }
 
 export interface ResolvedNumbers {
   quantity: number | null;

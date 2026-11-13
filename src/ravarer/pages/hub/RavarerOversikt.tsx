@@ -14,6 +14,7 @@ import { WorkStartView } from "@/ravarer/pages/oversikt/WorkStartView";
 import { ActivityView } from "@/ravarer/pages/oversikt/ActivityView";
 import { PriceMoversView } from "@/ravarer/pages/oversikt/PriceMoversView";
 import { DataQualityView } from "@/ravarer/pages/oversikt/DataQualityView";
+import { InvoiceReadingAlert } from "@/ravarer/components/reading/InvoiceReadingAlert";
 
 function firstNameFromEmail(email: string | null | undefined): string | null {
   if (!email) return null;
@@ -54,6 +55,7 @@ export default function RavarerOversikt() {
 
   return (
     <div className="mx-auto w-full max-w-[1280px] space-y-6 px-page py-5">
+      <InvoiceReadingAlert enabled={invoiceAccess} />
       {summaryQ.isError
         ? <QueryErrorState error={summaryQ.error} scope="ravarer:oversikt:summary" onRetry={() => summaryQ.refetch()} />
         : <WorkStartView summary={summaryQ.data ?? null} open={openCounts} firstName={firstNameFromEmail(user?.email)} />}
