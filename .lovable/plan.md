@@ -14,7 +14,7 @@ Planmodus. Ingen kode, SQL eller data endres i denne runden. Punkter merket «ve
 | Varekoblinger / varekort (14) | Uendret. Varekort-ruter består og lenkes fra linjene. |
 | Fakturadetalj (15) | Endres. Blir høyre panel i bilde 02. Originalvisning, gjenlesing og «Rett fakturalinje» består. |
 | Fakturaliste (4) | Endres i formen: venstre liste. Filtrene trenger/klar/avstemt/alle beholdes. |
-| Godkjenning / Fakturaoversikt (5) | **Avklares.** Attestering skjer i Tripletex. Forslag: fanen beholdes, men det bygges ikke mer på den (se spørsmål). |
+| Godkjenning / Fakturaoversikt (5) | Beholdes uendret. Fakturaer godkjennes både i NBhub (priskontroll) og i Tripletex. |
 | Leverandørsaker, flagg og kreditnota (5) | Beholdes. «Spør leverandøren» blir et vennlig utkast med `case_kind=price_inquiry`. Over avtale blir et kreditnotaforslag (`documented_claim`). |
 | Import (3), Registrer linjer (1) | Uendret. Ligger under «Importer faktura». |
 | Reberegn kostpriser (7) | Beholdes. Brukes i tillegg som motor bak «Rett pris», «Rett pakning» og forhåndsvisningen. |
@@ -30,11 +30,11 @@ Planmodus. Ingen kode, SQL eller data endres i denne runden. Punkter merket «ve
 | Kryssmodul-funksjoner (8) | Må virke. Lønnsomhet, priser og oppskrifter leses i fase c og d. |
 
 **Kollisjoner og punkter som må avklares**
-- **Godkjenningsfanen og attestering i Tripletex.** Dagens «Ferdig»-regel (`nextInvoiceStep`) krever aktiv intern godkjenning. Krav 6 betyr at regelen må endres, ellers blir ingen faktura «Ferdig».
+- **Godkjenning (besluttet 13.11.2026):** intern godkjenning i NBhub beholdes som selve priskontrollen; fanen og «Ferdig»-regelen (`nextInvoiceStep`) endres ikke.
 - **Pant.** I dag kan pant havne under «Ikke råvare» eller `auto_exclude_line_kinds`. Kravet er at pant aldri utelates. Da trengs egen linjetype og egen kostpost.
 - **«Ingenting låst etter godkjenning».** Dette kolliderer med dagens lås på linjer med aktiv `invoice_line_cost_postings`. Forslaget er at låsen består for vanlig ny matching, og at retting går gjennom en ny, eksplisitt og loggført vei som fører kost om fra en dato. Låsen fjernes ikke.
 - **«Eldste først uten lås».** Det stemmer med dagens prisreferanse (forrige kjøp før fakturadato). Retting av en eldre pris kan likevel endre referansen for nyere, allerede godkjente linjer. Disse må få nytt spørsmål, ikke endres stille.
-- **Påslag 1,2 %.** Er det 1,2 prosent eller faktor 1,2 (20 %)? Se spørsmål.
+- **Påslag:** 1,2 prosent, justerbart per prisgruppe/prisliste og per handelsvare.
 
 ## 2. Kartlegging per skjermbilde
 
@@ -68,7 +68,6 @@ Topbar, SubAppNav/NavBar, ikoner og farger endres ikke. Eneste tillegg er nye `l
 8. **Prisgrunnlag:** RPC som returnerer innsatsfaktorer med endring i en periode, varer som rammes, og Brutto og DG2 før og nå.
 9. **Oversikt:** RPC-er for «gjort automatisk siste døgn» og «kroner per måned».
 10. **Oppdatert kø:** en planlagt jobb (pg_cron eller edge med cron-secret) som kjører `rm_rematch_invoices` på åpne fakturaer, eldste først, i begrensede bolker, pluss en trigger som kølegger når pris, pakning eller avtale endres.
-11. **Ferdig uten intern godkjenning:** `nextInvoiceStep` og serverens tellere må endres (avhenger av spørsmål 1).
 
 Tabeller (3 og 6) foreslås bare. De opprettes ikke før Henrik sier ja.
 
@@ -91,13 +90,16 @@ Hver fase legges bak egen `visning`/`view`-parameter eller en ny fane, så dagen
 - **Midt i arbeid:** kladder, ukjente utfall (kostreberegning, avtaler, mottak) og varetelling ligger i fanehukommelse. Ved utrulling består de gamle URL-ene, og ingen nøkler endres. Retting tilbake i tid kan endre margin og prisforslag mens noen har en ulagret prisrunde åpen. Prisrunden må derfor vise «grunnlaget er endret».
 - **Kost:** retting fra dato skal aldri gjenta en bekreftet føring. Opp-id og delkvitteringer brukes som i dag.
 
-## 7. Spørsmål til Henrik før fase (a)
+## 7. Henriks beslutninger (13.11.2026)
 
-1. Skal intern godkjenning fjernes fra «Ferdig»-regelen, og skal fanen Godkjenning skjules eller bli stående?
-2. Hvem kan rette en godkjent pris i etterkant: alle med skriverett, eller bare approve/admin?
-3. «Avviker fra normalen i perioden»: hvilken regel gjelder? Forslag: mer enn dagens toleranse fra medianen i perioden.
-4. Når en eldre pris rettes: skal nyere godkjente linjer få nytt spørsmål eller bare føres om?
-5. Er standardpåslaget 1,2 % eller faktor 1,2?
-6. Hvilken dato skal «Siden»-velgeren starte på som standard (12 måneder?).
+1. Intern godkjenning i NBhub beholdes i tillegg til Tripletex. Fanen Godkjenning og «Ferdig»-regelen endres ikke. Databaseendring 11 er strøket.
+2. Bare Henrik og de med godkjenningstilgang (approve/admin) kan rette en godkjent pris i ettertid.
+3. Grensen for avviksmerket i historikken blir en justerbar innstilling (databaseendring senere). I a1 brukes dagens toleranse for varens kategori.
+4. Retting av en eldre pris endrer bare det ene kjøpet. Nyere godkjente kjøp røres ikke og får ikke nytt spørsmål.
+5. Standard påslag er 1,2 prosent, justerbart per prisgruppe/prisliste og per handelsvare.
+6. «Siden» står som standard 12 måneder tilbake, uten nedre grense.
 
-EHF, EPD og antall emballasje per vare planlegges, men bygges ikke. EHF undersøkes ved å lese Tripletex-integrasjonen i fase 0.
+## Status
+- Fase 0 og a1 (bare lesing) er bygget. a2 («Rett pris») venter på godkjenning av databaseendring 1.
+
+EHF, EPD og antall emballasje per vare planlegges, men bygges ikke.

@@ -24,7 +24,7 @@
 - [ ] Skjermbilder 390/1280/1440, full testsamling
 
 # Demo C – faktura/råvare/pris (13.11.2026)
-- [ ] Oppdater plan med Henriks svar (intern godkjenning beholdes, DB 11 strykes)
-- [ ] Fase 0: verifiser fase a-punkter + undersøk Tripletex EHF/strukturerte linjer (bare lesing)
-- [ ] Fase a1: «Alle priser» (bare lesing) i RawMaterialPeek og råvarekortets Pris-seksjon + tester
+- [x] Oppdater plan med Henriks svar (intern godkjenning beholdes, DB 11 strykes)
+- [x] Fase 0: verifiser fase a-punkter + undersøk Tripletex EHF/strukturerte linjer (bare lesing)
+- [x] Fase a1: «Alle priser» (bare lesing) i RawMaterialPeek og råvarekortets Pris-seksjon + tester
 - [ ] a2 «Rett pris» – venter på Henriks ja til DB-endring 1
