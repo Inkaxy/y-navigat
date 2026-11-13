@@ -30,12 +30,14 @@
 - [ ] a2 «Rett pris» – venter på Henriks ja til DB-endring 1
 
 # Rettepakke fakturalesing (13.11.2026)
-- [ ] A AI-feil ≠ «ingen lesbare linjer» (extract + import, stopp ved auth-feil, null linjer med beløp = kontroll)
-- [ ] B Varsel Oversikt/Fakturaer + e-post til Henrik (2 på rad, maks 1/døgn)
-- [ ] C Reserveleverandør (forslag/PENDING + kode klar)
-- [ ] D Kreditnota-fortegn i sumkontroll
-- [ ] E Mva 0 på hode = mangler når posteringer viser mva
-- [ ] F Avgift/gebyr/frakt/pant i oppsummering som linjer (prompt/skjema)
-- [ ] G Lange fakturaer: oppdeling ved kutt
-- [ ] H Tallkontroll antall×pris=beløp, entydig retting
-- [ ] I Klargjør gjenlesing (45/28/60), ikke kjør
+- [x] A AI-feil ≠ «ingen lesbare linjer» (extract + import, stopp ved auth-feil, null linjer med beløp = kontroll)
+- [x] B Varsel Oversikt/Fakturaer + e-post til Henrik (2 på rad, maks 1/døgn)
+- [x] C Reserveleverandør (forslag/PENDING + kode klar)
+- [x] D Kreditnota-fortegn i sumkontroll
+- [x] E Mva 0 på hode = mangler når posteringer viser mva
+- [x] F Avgift/gebyr/frakt/pant i oppsummering som linjer (prompt/skjema)
+- [x] G Lange fakturaer: oppdeling ved kutt
+- [x] H Tallkontroll antall×pris=beløp, entydig retting
+- [x] I Klargjør gjenlesing (45/28/60), ikke kjør
+- [ ] Venter på root: fire PENDING-SQL 20261113_* (kreditnota/mva 0, forsøk/requeue, reserve, e-postmal)
+- [ ] Venter på Henrik: ny OpenAI-nøkkel under AI-tjenester, deretter start «Les på nytt i bolk»
