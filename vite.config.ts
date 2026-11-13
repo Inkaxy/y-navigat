@@ -16,7 +16,9 @@ function svgrCompat(): Plugin {
     async load(id, opts) {
       if (typeof load !== "function") return undefined;
       const ctx: typeof this = Object.create(this, { meta: { value: { ...this.meta, rolldownVersion: undefined } } });
-      return load.call(ctx, id, opts);
+      const out = await load.call(ctx, id, opts);
+      (await import("node:fs")).writeFileSync("/tmp/svgr-debug.txt", JSON.stringify({ id, meta: this.meta, out }).slice(0, 2000));
+      return out;
     },
   };
 }
