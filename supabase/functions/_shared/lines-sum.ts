@@ -26,6 +26,16 @@ export function creditAlignedExpected(expected: number, linesSum: number, isCred
 }
 
 /**
+ * Kontrollsum eks. mva fra total inkl. mva og mva-beløp. Kreditnota: mva trekkes fra i totalens retning
+ * (total 3612 / -3612 med mva 471 gir 3141 / -3141). Vanlig faktura: total − mva som før.
+ */
+export function expectedExclVat(totalAmount: number | null, totalVat: number | null, isCredit: boolean): number | null {
+  if (totalAmount == null || totalVat == null || !Number.isFinite(totalAmount) || !Number.isFinite(totalVat)) return null;
+  const vat = isCredit ? Math.sign(totalAmount) * Math.abs(totalVat) : totalVat;
+  return Number((totalAmount - vat).toFixed(2));
+}
+
+/**
  * Sammenlign summen av varelinjene (eks. mva) mot fakturaens totalbeløp.
  * Fakturaens total_amount er inkl. mva, så vi trekker fra total_vat når den finnes.
  * `isCredit` (kreditnota) tillater motsatt fortegn mellom total og linjer, se creditAlignedExpected.
