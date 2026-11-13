@@ -12,16 +12,21 @@
 //  - Bekreftede menneskelige rettelser (selskap + leverandør) gis modellen som data, ikke instruks.
 //  - Logikken ligger i ../_shared/invoiceExtraction.ts og testes i vitest.
 // Logger bruk og kostnad per kall.
+//
+// Rettepakke 13.11.2026:
+//  - Svaret har ai_status («ok» | «no_lines» | «failed» | «not_configured») og ai_failure (type + norsk tekst).
+//    En AI-feil (nøkkel, kvote, nede, nettverk, tid) blir aldri «ingen lesbare linjer».
+//  - Reserveleverandør (ai_provider_config.use_as_fallback, PENDING-SQL) brukes bare ved tjenestefeil.
+//  - { probe: true } (bare tjenesten): gratis tilgangssjekk av nøkkel/modell, ingen tokens.
+//  - Lange fakturaer leses i sidebolker når svaret kuttes eller senere sider mangler (aiRead.ts).
+//  - Tallkontroll uten AI retter bare entydige tusenskille/desimalfeil (_shared/numberCheck.ts).
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { decryptWithKey } from "../_shared/crypto.ts";
-import { callAi, extractJson, estimateCostUsd, usageOf, type AiProvider } from "../_shared/ai-providers.ts";
-import { INVOICE_EXTRACTION_SCHEMA } from "../_shared/modelEval.ts";
-import { extractionSchemaEnabled } from "../_shared/extractionSchemaFlag.ts";
 import {
-  checkSum, computeConfidence, num, runExtractionAttempts, type Hints, type LearningExample,
+  checkSum, computeConfidence, num, type Hints, type LearningExample,
 } from "../_shared/invoiceExtraction.ts";
-import { INVOICE_EXTRACTION_SYSTEM_PROMPT } from "../_shared/invoiceExtractionPrompt.ts";
+import { classifyAiFailure, type AiFailure } from "../_shared/aiFailure.ts";
+import { probeConfig, readWithConfig, type AiConfigRow, type ReadContext } from "./aiRead.ts";
 import { decodeBase64 } from "jsr:@std/encoding@1/base64";
 import { formatPdfTextForModel, PDF_TEXT_LIMITS, pdfTextProfile, type PdfTextResult } from "../_shared/pdfText.ts";
 import { readOriginalPdfText } from "../_shared/pdfTextRuntime.ts";
@@ -32,8 +37,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
-
-const SYSTEM_PROMPT = INVOICE_EXTRACTION_SYSTEM_PROMPT;
 
 function jsonErr(msg: string, status: number) {
   return new Response(JSON.stringify({ error: msg }), {
@@ -160,82 +163,92 @@ Deno.serve(async (req) => {
       examples = (Array.isArray(ex) ? ex : []).map((e: any) => ({ original: e.original, corrected: e.corrected, note: e.note ?? null }));
     }
 
-    const { data: cfg } = await admin
-      .from("ai_provider_config")
-      .select("*")
-      .eq("purpose", "invoice_extraction")
-      .eq("is_active", true)
-      .maybeSingle();
+    // Hovedleverandør (aktiv) og ev. reserve. Kolonnen use_as_fallback finnes først etter PENDING-SQL
+    // 20261113_ai_fallback_provider; uten den gir spørringen feil og ingen reserve brukes (som før).
+    const CFG_COLS = "id, provider, model, encrypted_api_key, max_tokens, temperature, azure_endpoint, azure_deployment";
+    const { data: cfgRow } = await admin.from("ai_provider_config").select(CFG_COLS)
+      .eq("purpose", "invoice_extraction").eq("is_active", true).maybeSingle();
+    const cfg = (cfgRow ?? null) as AiConfigRow | null;
+    const loadFallback = async (): Promise<AiConfigRow | null> => {
+      const { data, error } = await admin.from("ai_provider_config").select(CFG_COLS)
+        .eq("purpose", "invoice_extraction").eq("is_active", false).eq("use_as_fallback", true).limit(1).maybeSingle();
+      if (error) return null;
+      return (data ?? null) as AiConfigRow | null;
+    };
+
+    // Tilgangssjekk uten tokens (brukes av importen før køen tas, når forrige kall feilet på tjenesten).
+    if (body.probe === true) {
+      if (!isServiceCall) return jsonErr("Kun tjenesten", 403);
+      const primary = cfg ? await probeConfig(cfg) : classifyAiFailure("ingen aktiv ai", null);
+      const fb = primary !== "ok" && primary !== null ? await loadFallback() : null;
+      const fbRes = fb ? await probeConfig(fb) : null;
+      const ok = primary === "ok" || primary === null || fbRes === "ok";
+      return new Response(JSON.stringify({
+        ai_status: ok ? "ok" : "failed",
+        ai_failure: ok ? null : primary,
+        ai_provider_used: primary === "ok" || primary === null ? "primary" : fbRes === "ok" ? "fallback" : null,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     let extractionMethod: "ai" | "regex" | "hybrid" = "regex";
     let aiData: any = null;
     let aiUsage: { in: number | null; out: number | null; cost: number | null } = { in: null, out: null, cost: null };
     const warnings: string[] = [];
     let attempts = 0;
+    // ai_status skiller «AI-kallet feilet» fra «AI svarte, men fant ingen linjer».
+    let aiStatus: "ok" | "no_lines" | "failed" | "not_configured" | "not_attempted" = "not_attempted";
+    let aiFailure: AiFailure | null = null;
+    let providerUsed: "primary" | "fallback" | null = null;
+    let chunked: { chunks: number; reason: string } | null = null;
 
     // Tekstlaget i original-PDF-en som ekstra lesestøtte (samme helper som linjeforslag og eval). Ikke logget.
     let pdfText: PdfTextResult | null = null;
+    let pdfBytes: Uint8Array | null = null;
     if (pdf_base64) {
       try {
-        const bytes = decodeBase64(pdf_base64);
-        pdfText = bytes.byteLength <= PDF_TEXT_LIMITS.maxBytes ? await readOriginalPdfText(bytes) : null;
+        pdfBytes = decodeBase64(pdf_base64);
+        pdfText = pdfBytes.byteLength <= PDF_TEXT_LIMITS.maxBytes ? await readOriginalPdfText(pdfBytes) : null;
       } catch { pdfText = null; }
       if (pdfText && pdfText.status !== "ok") warnings.push("PDF-en har ikke brukbart tekstlag – lest bare visuelt");
     }
     const textBlock = pdfText ? formatPdfTextForModel(pdfText) : null;
 
-    if (cfg && pdf_base64) {
-      const apiKey = await decryptWithKey(cfg.encrypted_api_key, "AI_CONFIG_ENCRYPTION_KEY");
-      // Strict schema bare når eksplisitt slått på (server-hemmelighet) og bare for OpenAI/Azure. Av = som før.
-      const useSchema = extractionSchemaEnabled(Deno.env.get("INVOICE_EXTRACTION_STRICT_SCHEMA"), cfg.provider);
-      if (useSchema) warnings.push("Strict schema brukt i lesingen");
-      const run = await runExtractionAttempts({
-        hints, examples, maxAttempts, parseJson: extractJson,
-        call: async (userText) => {
-          try {
-            const result = await callAi({
-              provider: cfg.provider as AiProvider,
-              apiKey,
-              model: cfg.model,
-              maxTokens: Math.max(Number(cfg.max_tokens ?? 2000), 12000),
-              temperature: Number(cfg.temperature),
-              systemPrompt: SYSTEM_PROMPT,
-              userText: textBlock ? `${userText}\n\n${textBlock}` : userText,
-              pdfBase64: pdf_base64,
-              azureEndpoint: cfg.azure_endpoint ?? undefined,
-              azureDeployment: cfg.azure_deployment ?? undefined,
-              jsonSchema: useSchema ? { name: "invoice_extraction", schema: INVOICE_EXTRACTION_SCHEMA } : undefined,
-            });
-            aiUsage = { in: (aiUsage.in ?? 0) + (result.inputTokens ?? 0), out: (aiUsage.out ?? 0) + (result.outputTokens ?? 0), cost: null };
-            aiUsage.cost = estimateCostUsd(cfg.model, aiUsage.in, aiUsage.out);
-            return result;
-          } catch (e) {
-            // Avslag/ufullstendig svar har kostet tokens: loggfør forbruket fra feilen.
-            const u = usageOf(e);
-            await admin.from("ai_usage_log").insert({
-              provider: cfg.provider, model: cfg.model, purpose: "invoice_extraction",
-              legal_entity_id, invoice_id: usageInvoiceId, success: false, error_message: (e as Error).message,
-              input_tokens: u?.inputTokens ?? null, output_tokens: u?.outputTokens ?? null,
-              estimated_cost_usd: u ? estimateCostUsd(cfg.model, u.inputTokens, u.outputTokens, u.cachedInputTokens ?? null) : null,
-            });
-            throw e;
-          }
-        },
-      });
-      attempts = run.attempts;
-      warnings.push(...run.warnings);
-      for (const l of run.log) {
-        if (l.reason === "call_failed") continue;
-        await admin.from("ai_usage_log").insert({
-          provider: cfg.provider, model: cfg.model, purpose: "invoice_extraction", invoice_id: usageInvoiceId,
-          input_tokens: l.inputTokens ?? null, output_tokens: l.outputTokens ?? null,
-          estimated_cost_usd: estimateCostUsd(cfg.model, l.inputTokens ?? null, l.outputTokens ?? null),
-          legal_entity_id, success: l.reason !== "invalid_json", error_message: l.reason === "invalid_json" ? (l.error ?? "invalid_json") : l.reason === "empty" ? "tomt_resultat" : null,
-        });
+    if (pdf_base64) {
+      const ctx: ReadContext = { admin, legalEntityId: legal_entity_id, usageInvoiceId, hints, examples, maxAttempts, pdfBase64: pdf_base64, pdfBytes, pdfText, textBlock };
+      let out = cfg ? await readWithConfig(ctx, cfg) : null;
+      if (cfg) providerUsed = "primary";
+      // Reserve bare når hovedleverandøren feiler på tjenesten (nøkkel/kvote/nede/nettverk/oppsett) eller mangler.
+      if (!out || (out.failure?.systemic && !out.best)) {
+        const fb = await loadFallback();
+        if (fb) {
+          const primaryFailure = out?.failure ?? null;
+          if (out) warnings.push(...out.warnings);
+          warnings.push(`Hovedleverandøren feilet (${primaryFailure?.message ?? "ingen aktiv AI-tjeneste"}); leser med reserveleverandøren`);
+          out = await readWithConfig(ctx, fb);
+          providerUsed = "fallback";
+          if (!out.best && primaryFailure) out = { ...out, failure: out.failure ?? primaryFailure };
+        }
       }
-      if (run.best) {
-        aiData = run.best;
-        extractionMethod = "ai";
+      if (out) {
+        attempts = out.attempts;
+        warnings.push(...out.warnings);
+        aiUsage = out.usage;
+        chunked = out.chunked;
+        if (out.best) {
+          aiData = out.best;
+          extractionMethod = "ai";
+          aiStatus = Array.isArray(out.best.lines) && out.best.lines.length > 0 ? "ok" : "no_lines";
+        } else if (out.failure) {
+          aiStatus = "failed";
+          aiFailure = out.failure;
+          warnings.push(out.failure.message);
+        } else {
+          aiStatus = "no_lines";
+        }
+      } else {
+        aiStatus = "not_configured";
+        aiFailure = classifyAiFailure("ingen aktiv ai", null);
+        warnings.push("Ingen aktiv AI-konfigurasjon — bruker regex");
       }
     } else if (!cfg) {
       warnings.push("Ingen aktiv AI-konfigurasjon — bruker regex");
@@ -269,7 +282,13 @@ Deno.serve(async (req) => {
     if (Array.isArray(extracted.lines) && pdfText?.status === "ok") extracted.lines = annotateSkuTextCheck(extracted.lines, pdfText.pages);
     const lines = (extracted.lines ?? []) as any[];
     const expected = hints.expected_total_excl_vat;
-    const sum = checkSum(lines, expected, hints.expected_total_incl_vat, hints.expected_vat);
+    const sum = checkSum(lines, expected, hints.expected_total_incl_vat, hints.expected_vat, hints.is_credit);
+    // Tallkontrollens retting (tusenskille/desimaltegn) er et fakturavarsel: fakturaen skal gjennomgås.
+    const numberIssue = aiData && aiData.number_check_issue && typeof aiData.number_check_issue === "object" ? aiData.number_check_issue : null;
+    if (numberIssue) { sum.issues.push(numberIssue); warnings.push(numberIssue.message); }
+    if (aiStatus === "no_lines" && (hints.expected_total_incl_vat ?? 0) !== 0) {
+      sum.issues.push({ code: "tomt_resultat", message: "AI-lesingen fant ingen linjer, men fakturaen har et beløp. Kontroller originalen og registrer linjene." });
+    }
     for (const i of sum.issues) warnings.push(i.message);
     const arithmeticIssues = lines.filter((l) => Array.isArray(l.read_issues) && l.read_issues.length > 0).length;
     if (arithmeticIssues > 0) warnings.push(`${arithmeticIssues} linje(r) har regne-, enhets- eller fortegnsavvik og må kontrolleres`);
@@ -300,6 +319,10 @@ Deno.serve(async (req) => {
     }
 
     return new Response(JSON.stringify({
+      ai_status: aiStatus,
+      ai_failure: aiFailure,
+      ai_provider_used: providerUsed,
+      chunked,
       extraction_method: extractionMethod,
       confidence,
       warnings,
