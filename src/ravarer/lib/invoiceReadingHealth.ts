@@ -47,7 +47,8 @@ export function invoiceReadingHealth(i: ReadingHealthInput): ReadingHealth {
     }
     return { state: "failing", failure, failingSince: since, lastSuccessAt: i.lastSuccessAt, failedCalls: n, waitingInvoices: waiting?.length ?? null };
   }
-  if (waiting === null) return i.usage === null ? { state: "unknown" } : { state: "unknown" };
+  if (waiting === null) return { state: "unknown" };
+  // Ingen ventende AI-feil i fakturaene. Uten lesbar logg vet vi likevel ikke at tjenesten virker.
   if (waiting.length === 0) return i.usage === null ? { state: "unknown" } : { state: "ok" };
   const newest = waiting[0];
   const oldest = waiting[waiting.length - 1];
