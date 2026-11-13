@@ -265,11 +265,10 @@ async function callAnthropic(p: AiCallParams): Promise<AiCallResult> {
   if (!res.ok) throw classifyHttpError("Anthropic", res.status, text);
   const data = JSON.parse(text);
   const raw = data?.content?.[0]?.text ?? "";
-  return {
-    rawText: raw,
-    inputTokens: data?.usage?.input_tokens ?? null,
-    outputTokens: data?.usage?.output_tokens ?? null,
-  };
+  const usage = { inputTokens: data?.usage?.input_tokens ?? null, outputTokens: data?.usage?.output_tokens ?? null };
+  // Kuttet svar (maks svarlengde) gir tydelig feil i stedet for halv tekst — samme som OpenAI «incomplete».
+  if (data?.stop_reason === "max_tokens") throw new AiCallError("incomplete", "Svaret ble ufullstendig (max_tokens)", null, "max_tokens", usage);
+  return { rawText: raw, ...usage };
 }
 
 async function callOpenAi(p: AiCallParams): Promise<AiCallResult> {
