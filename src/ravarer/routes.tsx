@@ -28,6 +28,7 @@ const SupplierCase = lazy(() => import("@/fakturaer/pages/SupplierCase"));
 const AlleVarekort = lazy(() => import("./pages/priskontroll/AlleVarekort"));
 const VarekortPage = lazy(() => import("./pages/priskontroll/VarekortPage"));
 const ReberegnKostpriser = lazy(() => import("@/ravarer/pages/ReberegnKostpriser"));
+const LesPaNyttBolk = lazy(() => import("@/ravarer/pages/priskontroll/verktoy/LesPaNyttBolk"));
 
 const LeverandorDetail = lazy(() => import("@/ravarer/pages/LeverandorDetail"));
 const ForhandlingWizard = lazy(() => import("@/ravarer/pages/forhandlinger/ForhandlingWizard"));
