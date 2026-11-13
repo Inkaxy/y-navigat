@@ -69,6 +69,7 @@ export const paths = {
     return withQuery(`${RAVARER_ROOT}/priskontroll`, { ...rest, importer: tab ?? "ehf" });
   },
   reberegn: () => `${RAVARER_ROOT}/priskontroll/verktoy/reberegn`,
+  lesPaNyttBolk: () => `${RAVARER_ROOT}/priskontroll/verktoy/les-pa-nytt`,
 
   // Leverandører
   leverandorer: (q?: { fane?: LeverandorFane } & Q) => withQuery(`${RAVARER_ROOT}/leverandorer`, q),

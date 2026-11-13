@@ -28,6 +28,7 @@ export function PriskontrollToolsMenu() {
           <DropdownMenuItem onSelect={() => setOpen(true)}>Beregn alle åpne på nytt …</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild><Link to={paths.reberegn()}>Reberegn kostpriser</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link to={paths.lesPaNyttBolk()}>Les fakturaer på nytt i bolk</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link to={paths.alleVarekort()}>Alle varekort</Link></DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
