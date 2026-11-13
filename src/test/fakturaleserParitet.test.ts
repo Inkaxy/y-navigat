@@ -105,7 +105,8 @@ describe("Tripletex-import: rader", () => {
 });
 
 describe("kildeparitet", () => {
-  const ex = readFileSync("supabase/functions/extract-invoice-from-pdf/index.ts", "utf8");
+  // Leseren er delt i index.ts (inngang) og aiRead.ts (AI-forsøk); paritetskravene gjelder begge.
+  const ex = readFileSync("supabase/functions/extract-invoice-from-pdf/index.ts", "utf8") + readFileSync("supabase/functions/extract-invoice-from-pdf/aiRead.ts", "utf8");
   const imp = readFileSync("supabase/functions/tripletex-import-invoice-lines/index.ts", "utf8");
   it("ingen stille mva-skalering i leseren", () => {
     expect(ex).not.toMatch(/fixVatScaledLines|\* factor/);

@@ -134,7 +134,11 @@ describe("Fasit og bruksloggkobling", () => {
     expect(buildExtractorRequest({ legalEntityId: "le", invoice: { supplier_id: null, invoice_number: null, is_credit_note: false, total_amount: 1, total_vat: 0 }, lines: [], supplierName: null, pdfBase64: "x", invoiceId: "inv-1" }).invoice_id).toBe("inv-1");
     expect(readFileSync("supabase/functions/tripletex-import-invoice-lines/index.ts", "utf8")).toContain("invoice_id: inv.id,");
     const ex = readFileSync("supabase/functions/extract-invoice-from-pdf/index.ts", "utf8");
-    expect(ex.match(/invoice_id: usageInvoiceId/g)?.length).toBe(2);
+    const rd = readFileSync("supabase/functions/extract-invoice-from-pdf/aiRead.ts", "utf8");
+    // All bruksloggføring går gjennom én helper som alltid tar med faktura-id-en.
+    expect(rd.match(/invoice_id: ctx\.usageInvoiceId/g)?.length).toBe(1);
+    expect(rd.match(/from\("ai_usage_log"\)/g)?.length).toBe(1);
+    expect(ex).toContain("usageInvoiceId");
     expect(ex).toContain('.eq("legal_entity_id", legal_entity_id)');
   });
 });
