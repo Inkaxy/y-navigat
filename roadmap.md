@@ -22,3 +22,9 @@
 - [x] 4 Vareliste (delvis, se melding) + råvarekort forenklet, avansert bak sekundær tilgang
 - [~] 5 Leverandør/Lager/Innstillinger samme rytme, ingen dobbel header
 - [ ] Skjermbilder 390/1280/1440, full testsamling
+
+# Demo C – faktura/råvare/pris (13.11.2026)
+- [x] Oppdater plan med Henriks svar (intern godkjenning beholdes, DB 11 strykes)
+- [x] Fase 0: verifiser fase a-punkter + undersøk Tripletex EHF/strukturerte linjer (bare lesing)
+- [x] Fase a1: «Alle priser» (bare lesing) i RawMaterialPeek og råvarekortets Pris-seksjon + tester
+- [ ] a2 «Rett pris» – venter på Henriks ja til DB-endring 1

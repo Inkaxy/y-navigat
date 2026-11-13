@@ -63,7 +63,7 @@ export function toTimelineRow(h: PriceHistoryRow): TimelineHistoryRow {
     source: h.source ?? "manual", invoice_id: h.invoice_id, invoiceNumber: h.invoices?.invoice_number ?? null,
     isCreditNote: h.invoices?.is_credit_note ?? false, notes: h.notes ?? null,
     supersededAt: h.superseded_at ?? null, supersededReason: h.superseded_reason ?? null,
-    isLegacy: !!h.is_legacy, isCredit: !!h.is_credit, currency: h.provenance.currency, createdAt: h.created_at ?? null,
+    isLegacy: !!h.is_legacy, isCredit: !!h.is_credit, currency: h.provenance.currency, createdAt: h.created_at ?? null, createdBy: h.created_by ?? null,
     unit: h.provenance.unit, unitSource: h.provenance.unitSource, packageText: h.provenance.packageText,
     corrections: h.provenance.corrections,
     invoice_line_id: h.invoice_line_id ?? h.invoice_line_ref ?? null,

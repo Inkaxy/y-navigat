@@ -25,6 +25,7 @@ export interface PriceHistoryDbRow {
   invoice_line_ref: string | null;
   notes: string | null;
   created_at: string;
+  created_by: string | null;
   superseded_at: string | null;
   superseded_reason: string | null;
   is_legacy: boolean | null;
@@ -54,7 +55,7 @@ export async function fetchPriceHistory(rawMaterialId: string): Promise<PriceHis
   const rows = await fetchAllRows<PriceHistoryDbRow>((from, to) =>
     supabase
       .from("raw_material_price_history")
-      .select("id, raw_material_id, supplier_id, price, effective_date, source, source_reference, invoice_id, invoice_line_id, invoice_line_ref, notes, created_at, superseded_at, superseded_reason, is_legacy, is_credit, currency, snapshot_unit, snapshot_package, snapshot_currency, snapshot_source, snapshot_at")
+      .select("id, raw_material_id, supplier_id, price, effective_date, source, source_reference, invoice_id, invoice_line_id, invoice_line_ref, notes, created_at, created_by, superseded_at, superseded_reason, is_legacy, is_credit, currency, snapshot_unit, snapshot_package, snapshot_currency, snapshot_source, snapshot_at")
       .eq("raw_material_id", rawMaterialId)
       .order("effective_date", { ascending: false })
       .order("created_at", { ascending: false })

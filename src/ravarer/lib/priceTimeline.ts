@@ -27,6 +27,8 @@ export interface TimelineHistoryRow {
   currency?: string | null;
   /** Registreringstidspunkt — skiller rader med samme dato (serverens rekkefølge: dato, created_at, id). */
   createdAt?: string | null;
+  /** Bruker som registrerte raden (null = registrert av systemet). */
+  createdBy?: string | null;
   /** Historisk grunnenhet (null = ikke dokumentert). Undefined = grunnlag ikke hentet. */
   unit?: string | null;
   unitSource?: UnitSource | null;
