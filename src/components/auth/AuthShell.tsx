@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import LoginLogo from "@/assets/brand/logo-login.svg?react";
+import LoginLogo from "@/components/brand/svg/LogoLogin";
 
 interface AuthShellProps {
   title: string;

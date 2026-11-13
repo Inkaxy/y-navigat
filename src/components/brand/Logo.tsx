@@ -1,6 +1,6 @@
-import LogoLang from "@/assets/brand/logo-lang.svg?react";
-import LogoRund from "@/assets/brand/logo-rund.svg?react";
-import LogoEmblem from "@/assets/brand/logo-emblem.svg?react";
+import LogoLang from "@/components/brand/svg/LogoLang";
+import LogoRund from "@/components/brand/svg/LogoRund";
+import LogoEmblem from "@/components/brand/svg/LogoEmblem";
 
 type Variant = "horizontal" | "seal" | "monogram";
 
