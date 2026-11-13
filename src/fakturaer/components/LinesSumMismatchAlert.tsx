@@ -44,6 +44,8 @@ export function LinesSumMismatchAlert({
     setBusy(true);
     try {
       await onRecheck();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Summen kunne ikke kontrolleres. Prøv igjen.");
     } finally {
       setBusy(false);
     }
