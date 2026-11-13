@@ -223,3 +223,36 @@ describe("PENDING-SQL – forutsetninger og minimale tekstbytter", () => {
     expect(release).toContain("cardinality(p_invoice_ids) > 200");
   });
 });
+
+describe("I – les på nytt i bolk (bare klargjort)", async () => {
+  const { estimateCost, classifyStep, runSequential, parseRequeueResult } = await import("@/fakturaer/lib/bulkReread");
+  it("kostnad er snitt per faktura fra loggen, ukjent uten nok grunnlag", () => {
+    const rows = [
+      { invoice_id: "a", estimated_cost_usd: 0.02, success: true }, { invoice_id: "a", estimated_cost_usd: 0.02, success: true },
+      { invoice_id: "b", estimated_cost_usd: "0.04", success: true }, { invoice_id: "c", estimated_cost_usd: 0.04, success: true },
+      { invoice_id: "d", estimated_cost_usd: 9, success: false },
+    ];
+    const e = estimateCost(rows, 45);
+    expect(e.perInvoiceUsd).toBeCloseTo(0.04);
+    expect(e.totalUsd).toBeCloseTo(1.8);
+    expect(estimateCost(rows.slice(0, 3), 45).totalUsd).toBeNull();
+    expect(estimateCost(null, 45).totalUsd).toBeNull();
+  });
+  it("utfall: sperret faktura hoppes over, AI-feil stopper resten", async () => {
+    expect(classifyStep({ ok: false, code: "kostpris_fort" }, null)).toBe("hoppet_over");
+    expect(classifyStep({ ok: true }, { code: null })).toBe("forslag");
+    expect(classifyStep({ ok: true }, { code: "ai_feil_nokkel" })).toBe("ai_feil");
+    expect(classifyStep({ ok: true }, { code: "ukjent_utfall" })).toBe("ukjent");
+    const seen: number[] = [];
+    const p = await runSequential([1, 2, 3, 4], async (n) => { seen.push(n); return n === 2 ? "ai_feil" : "forslag"; });
+    expect(seen).toEqual([1, 2]);
+    expect(p.stopped).toBe("ai_feil");
+    const ac = new AbortController(); ac.abort();
+    expect((await runSequential([1], async () => "forslag", { signal: ac.signal })).stopped).toBe("avbrutt");
+  });
+  it("svar fra requeue leses strengt", () => {
+    expect(parseRequeueResult({ ok: true, requeued: 44, skipped: [{ invoice_id: "x", reason: "har_linjer" }] })?.requeued).toBe(44);
+    expect(parseRequeueResult({ ok: true, requeued: 1 })).toBeNull();
+    expect(parseRequeueResult(null)).toBeNull();
+  });
+});
