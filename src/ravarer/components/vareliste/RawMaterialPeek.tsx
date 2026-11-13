@@ -12,6 +12,7 @@ import { ChecklistCard } from "@/ravarer/components/detail/Completeness";
 import { useMaterialPriceEvidence } from "@/ravarer/hooks/useMaterialPriceEvidence";
 import { costSummary } from "@/ravarer/lib/costSummary";
 import { nextFix } from "@/ravarer/lib/nextFix";
+import { AllPricesList } from "@/ravarer/components/prices/AllPricesList";
 
 
 /**
@@ -103,6 +104,8 @@ function PeekBody({ id, listSearch }: { id: string; listSearch: string }) {
           </ul>
         )}
       </section>
+
+      <AllPricesList rawMaterialId={rm.id} baseUnit={rm.base_unit} category={rm.category} compact />
     </div>
   );
 }

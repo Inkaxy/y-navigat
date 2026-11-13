@@ -11,6 +11,7 @@ import type { RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 import { PriceTimeline } from "@/ravarer/components/PriceTimeline";
 import { RecentInvoiceLinesCard } from "@/ravarer/components/RecentInvoiceLinesCard";
 import { isAgreementConfirmed, type TimelineLink } from "@/ravarer/lib/priceTimeline";
+import { AllPricesList } from "@/ravarer/components/prices/AllPricesList";
 import { PurchaseStatsCard } from "@/ravarer/components/PurchaseStatsCard";
 import { StartPriceCard } from "@/ravarer/components/tabs/StartPriceCard";
 import { useRawMaterialUnits } from "@/ravarer/hooks/useRawMaterialUnits";
@@ -120,6 +121,8 @@ export function SuppliersTab({ rm, part }: Props) {
         }
       />
       )}
+
+      {show("pris") && <AllPricesList rawMaterialId={rm.id} baseUnit={rm.base_unit} category={rm.category} />}
 
       {show("pris") && <RecentInvoiceLinesCard rawMaterialId={rm.id} baseUnit={rm.base_unit} eligibleLineIds={historyQuery.eligibleLineIds} unknownLineIds={historyQuery.unknownLineIds} />}
       {show("pris") && <PurchaseStatsCard rawMaterialId={rm.id} baseUnit={rm.base_unit} />}
