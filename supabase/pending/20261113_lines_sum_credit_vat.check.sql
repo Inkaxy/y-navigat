@@ -14,17 +14,20 @@ select position('coalesce(v.is_credit_note, false))' in pg_get_functiondef('publ
         - length(replace(pg_get_functiondef('public.rm_finalize_invoice_line_extraction(uuid,uuid,jsonb,jsonb)'::regprocedure), 'total_vat_zero_replaced', '')))
         / length('total_vat_zero_replaced') = 2 as finalize_mva0;
 
--- 3) Kreditnotaer som i dag har sumavvik, og hva ny regel gir (etter kjøring). Bare lesing.
---    Forventet: de med samme størrelse og motsatt fortegn blir ok; reelle størrelsesavvik forblir mismatch.
-select i.invoice_number, s.name as leverandor, i.total_amount, i.total_vat, i.lines_sum_excl_vat, i.lines_sum_variance_pct,
-       public.rm_lines_sum_check(i.lines_sum_excl_vat, (select count(*)::int from public.invoice_lines l where l.invoice_id = i.id),
-                                 i.total_amount, i.total_vat) as i_dag,
-       case when to_regprocedure('public.rm_lines_sum_check(numeric,integer,numeric,numeric,boolean)') is not null
-            then public.rm_lines_sum_check(i.lines_sum_excl_vat, (select count(*)::int from public.invoice_lines l where l.invoice_id = i.id),
-                                 i.total_amount, i.total_vat, true) end as etter
+-- 3a) Kreditnotaer som i dag har sumavvik (kan kjøres før).
+select i.invoice_number, s.name as leverandor, i.total_amount, i.total_vat, i.lines_sum_excl_vat, i.lines_sum_variance_pct
   from public.invoices i left join public.suppliers s on s.id = i.supplier_id
  where i.is_credit_note = true and i.lines_sum_status = 'mismatch'
  order by i.invoice_date desc;
+
+-- 3b) KUN ETTER KJØRING (5-argumentsversjonen finnes ikke før): hva ny regel gir for de samme.
+--     Forventet: samme størrelse og motsatt fortegn → ok; reelle størrelsesavvik forblir mismatch.
+-- select i.invoice_number, s.name as leverandor, i.total_amount, i.total_vat, i.lines_sum_excl_vat,
+--        public.rm_lines_sum_check(i.lines_sum_excl_vat, (select count(*)::int from public.invoice_lines l where l.invoice_id = i.id),
+--                                  i.total_amount, i.total_vat, true) as etter
+--   from public.invoices i left join public.suppliers s on s.id = i.supplier_id
+--  where i.is_credit_note = true and i.lines_sum_status = 'mismatch'
+--  order by i.invoice_date desc;
 
 -- 4) Fakturaer med mva 0 på hodet (punkt E). Lantmännen-tilfellene får bilagets mva ved neste lesing.
 select s.name as leverandor, count(*) as antall, sum(case when i.is_credit_note then 1 else 0 end) as kreditnotaer
