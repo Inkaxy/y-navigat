@@ -17,8 +17,8 @@ function svgrCompat(): Plugin {
       if (typeof load !== "function") return undefined;
       const ctx: typeof this = Object.create(this, { meta: { value: { ...this.meta, rolldownVersion: undefined } } });
       const out = await load.call(ctx, id, opts);
-      (await import("node:fs")).writeFileSync("/tmp/svgr-debug.txt", JSON.stringify({ id, meta: this.meta, out }).slice(0, 2000));
-      return out;
+      // Ferdig transformert JavaScript: si det eksplisitt, ellers tolkes resultatet ut fra filendelsen.
+      return out && typeof out === "object" && "code" in out ? { ...out, moduleType: "js" } : out;
     },
   };
 }
