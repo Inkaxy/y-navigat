@@ -77,6 +77,14 @@ export async function runPreview(deps: Deps, userId: string, runId: unknown): Pr
     await deps.fail(run.id, "leser_feilet");
     return { status: 502, body: { ok: false, code: "leser_feilet", run_id: run.id } };
   }
+  // AI-tjenesten feilet (nøkkel/kvote/nede/tid): ingen forslag, tydelig kode — aldri «ingen linjer».
+  const aiStatus = ex.json && typeof ex.json === "object" ? (ex.json as { ai_status?: unknown }).ai_status : undefined;
+  if (aiStatus === "failed" || aiStatus === "not_configured") {
+    const kind = (ex.json as { ai_failure?: { kind?: unknown } | null }).ai_failure?.kind;
+    const code = kind === "auth" ? "ai_feil_nokkel" : "ai_feil";
+    await deps.fail(run.id, code);
+    return { status: 502, body: { ok: false, code, run_id: run.id } };
+  }
   const built = buildProposal(ex.json, { invoice: inv });
   if (!built.ok) {
     await deps.fail(run.id, built.code);
