@@ -188,7 +188,8 @@ Deno.serve(async (req) => {
     const knownCache = new Map<string, Array<{ sku: string | null; name: string | null }>>();
 
     // Én faktura tas om gangen, slik at en tjenestefeil ikke bruker opp forsøk på fakturaer som aldri ble lest.
-    for (let n = 0; n < limit && !stopped; n++) {
+    const loopLimit = singleId ? 1 : limit;
+    for (let n = 0; n < loopLimit && !stopped; n++) {
         const { data: claimed, error: invErr } = await admin.rpc("rm_claim_invoice_line_extraction", {
           p_legal_entity_id: legalEntityId,
           p_limit: 1,
@@ -198,6 +199,7 @@ Deno.serve(async (req) => {
         const inv = (claimed ?? [])[0];
         if (!inv) break;
         sessionToken ??= await getSessionToken(admin, legalEntityId);
+        const tt: string = sessionToken;
         behandlet++;
         const ttId = inv.tripletex_supplier_invoice_id as string;
         // Eierskap for denne kjøringen: alle skriv på fakturaen krever samme token.
@@ -217,7 +219,7 @@ Deno.serve(async (req) => {
           // 1) Hent PDF
           const url = `${baseUrl()}/v2/supplierInvoice/${ttId}/pdf`;
           const res = await fetch(url, {
-            headers: { Authorization: authHeader(sessionToken), Accept: "application/octet-stream" },
+            headers: { Authorization: authHeader(tt), Accept: "application/octet-stream" },
           });
           if (!res.ok) {
             const text = await res.text().catch(() => "");
@@ -252,7 +254,7 @@ Deno.serve(async (req) => {
           try {
             const vRes = await fetch(
               `${baseUrl()}/v2/supplierInvoice/${ttId}?fields=voucher(postings(account(number),amountGross,amount))`,
-              { headers: { Authorization: authHeader(sessionToken), Accept: "application/json" } },
+              { headers: { Authorization: authHeader(tt), Accept: "application/json" } },
             );
             if (vRes.ok) {
               const vJson = await vRes.json().catch(() => null);
@@ -354,7 +356,6 @@ Deno.serve(async (req) => {
             // AI svarte, men fant ingen linjer. Med beløp på fakturaen settes «trenger kontroll» via fakturavarselet.
             vellykket++;
             detaljer.push({ invoice_id: inv.id, lines: 0, trenger_kontroll: (totalAmount ?? 0) !== 0, status: (fin as any)?.status ?? null });
-            if (singleId) break;
             continue;
           }
           let sumCheck: Record<string, unknown> = { ...sumCheck0 };
@@ -429,7 +430,6 @@ Deno.serve(async (req) => {
           if (failErr) console.error("rm_fail_invoice_line_extraction", failErr.message);
           detaljer.push({ invoice_id: inv.id, error: msg, ai_feil: aiFailure?.kind ?? null });
         }
-        if (singleId) break;
     }
 
     if (stopped) await maybeQueueReadingAlert(admin);
