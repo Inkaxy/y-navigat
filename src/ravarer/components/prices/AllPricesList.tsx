@@ -70,7 +70,7 @@ export function AllPricesList({ rawMaterialId, baseUnit, category, compact }: Pr
           </p>
           <ul className="divide-y divide-line-subtle text-sm">
             {result.rows.map((r) => (
-              <li key={r.row.id} className={compact ? "py-2" : "grid gap-1 py-2 sm:grid-cols-[7rem_1fr_6rem_1fr] sm:items-center"} data-testid="all-prices-row">
+              <li key={r.row.id} className={compact ? "flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2" : "grid gap-1 py-2 sm:grid-cols-[7rem_1fr_6rem_1fr] sm:items-center"} data-testid="all-prices-row">
                 <span className="tabular-nums text-ink-secondary">{dateFmt(r.row.effective_date)}</span>
                 <span className="tabular-nums font-medium">
                   {formatNok(Number(r.row.price))} / {r.row.unit ?? baseUnit}
