@@ -78,7 +78,7 @@ export function classifyAiFailure(e: unknown, provider: string | null = null): A
   else if (status === 429 || status === 402 || /insufficient_quota|quota|billing|credit balance|rate limit|kvoten/i.test(low)) kind = "quota";
   else if (k === "timeout" || /svarte ikke innen|timed? ?out|deadline/i.test(low)) kind = "timeout";
   else if (k === "incomplete" || /ufullstendig|max_output_tokens|max_tokens/i.test(low)) kind = "incomplete";
-  else if (k === "refusal" || /avslo forespørselen/i.test(low)) kind = "refusal";
+  else if (k === "refusal" || /avslo forespørselen|avslo å lese/i.test(low)) kind = "refusal";
   else if (k === "model_unavailable" || (status != null && status >= 500) || status === 404 || /overloaded|service unavailable|model.*(does not exist|not found)|er utilgjengelig/i.test(low)) kind = "unavailable";
   else if (/failed to fetch|network|econn|dns|connection (reset|refused|closed)|error sending request|tcp|nettverksfeil/i.test(low)) kind = "network";
   else if (/azure endpoint og deployment|unsupported provider|decrypt|ai_config_encryption_key|ingen aktiv ai|ikke satt opp riktig/i.test(low)) kind = "config";
