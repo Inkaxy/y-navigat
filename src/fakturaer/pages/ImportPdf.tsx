@@ -38,6 +38,9 @@ interface ExtractedData {
 }
 
 interface ParseResult {
+  /** «failed»/«not_configured»: AI-kallet feilet — tom linjeliste betyr da ikke at PDF-en mangler linjer. */
+  ai_status?: "ok" | "no_lines" | "failed" | "not_configured" | "not_attempted";
+  ai_failure?: { message?: string } | null;
   extraction_method: "ai" | "regex" | "hybrid";
   confidence: number;
   warnings: string[];
@@ -134,6 +137,11 @@ export default function ImportPdfPage({ embedded = false, onImported }: { embedd
       });
       if (error) throw error;
       const result = data as ParseResult;
+      if (result.ai_status === "failed" || result.ai_status === "not_configured") {
+        toast.error(result.ai_failure?.message ?? "AI-tjenesten feilet. Linjene er ikke lest.", {
+          description: "Feltene under er bare fylt der tekstlesingen fant noe. Prøv igjen når AI-tjenesten virker, eller fyll inn selv.",
+        });
+      }
       setParseResult(result);
       setParsedWithSupplier(sid);
 
