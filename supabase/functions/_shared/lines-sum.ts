@@ -51,9 +51,10 @@ export function computeLinesSum(input: {
   }
 
   const vatKnown = totalVat != null && Number.isFinite(Number(totalVat));
-  // Mva følger totalens fortegn: kreditnota kan ha total -3612 og mva 471 lagret positivt.
-  const vatAbs = vatKnown ? Math.abs(Number(totalVat)) : 0;
-  const expected = creditAlignedExpected(vatKnown ? total - Math.sign(total) * vatAbs : total, rounded, input.isCredit === true);
+  const isCredit = input.isCredit === true;
+  // Kreditnota: mva følger totalens fortegn (total -3612 med mva lagret som 471). Vanlig faktura: som før.
+  const vat = !vatKnown ? 0 : isCredit ? Math.sign(total) * Math.abs(Number(totalVat)) : Number(totalVat);
+  const expected = creditAlignedExpected(total - vat, rounded, isCredit);
   const tolerance = vatKnown ? LINES_SUM_TOLERANCE_PCT : LINES_SUM_TOLERANCE_PCT_NO_VAT;
 
   if (expected === 0) {
