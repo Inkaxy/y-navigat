@@ -4,13 +4,13 @@
 //    slik at ingen forsøk brukes opp mens nøkkelen er ugyldig.
 //  - Etter en tjenestefeil: e-post til Henrik via e-postkøen når lesingen har feilet to ganger på rad,
 //    høyst én per døgn for samme feiltype. Sendes bare når malen finnes og er aktiv (PENDING-SQL).
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
   classifyAiFailure, lastCallFailedSystemically, PROBE_INTERVAL_MS, shouldSendReadingAlert,
   type AiFailure, type UsageLogRow,
 } from "../_shared/aiFailure.ts";
 
-type Admin = ReturnType<typeof createClient>;
+type Admin = SupabaseClient;
 
 export const READING_ALERT_TEMPLATE = "invoice_reading_stopped";
 /** Mottaker bestemmes av serveren, aldri av kalleren. */

@@ -4,7 +4,7 @@
 //  - AI-feil (nøkkel/kvote/nede/nettverk/tid) returneres som `failure`, aldri som «ingen linjer».
 //  - Oppdelt lesing (sidebolker) brukes bare når svaret ble kuttet eller tydelig mangler senere sider,
 //    og bare når ALLE bolker lyktes og resultatet er nærmere kontrollsummen enn enkeltlesingen.
-import { createClient } from "npm:@supabase/supabase-js@2";
+import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { decryptWithKey } from "../_shared/crypto.ts";
 import { callAi, extractJson, estimateCostUsd, usageOf, type AiProvider } from "../_shared/ai-providers.ts";
 import { INVOICE_EXTRACTION_SCHEMA } from "../_shared/modelEval.ts";
@@ -17,7 +17,7 @@ import { applyNumberCheck } from "../_shared/numberCheck.ts";
 import type { PdfTextResult } from "../_shared/pdfText.ts";
 import { splitPdf } from "./pdfSplit.ts";
 
-type Admin = ReturnType<typeof createClient>;
+type Admin = SupabaseClient;
 
 export interface AiConfigRow {
   id: string; provider: string; model: string; encrypted_api_key: string; max_tokens: number | null;
