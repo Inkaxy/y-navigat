@@ -15,6 +15,8 @@ import {
   type ReadIssue,
 } from "./invoiceReadCheck.ts";
 import { resolveLineNumbers, type NumberEvidence } from "./numberTokens.ts";
+import { creditAlignedExpected } from "./lines-sum.ts";
+import { applyNumberCheck } from "./numberCheck.ts";
 
 export const LINE_KINDS = ["vare", "pant", "frakt", "gebyr", "rabatt", "avrunding", "mva", "annet"] as const;
 export type LineKind = (typeof LINE_KINDS)[number];
@@ -201,9 +203,13 @@ export interface SumCheck {
   issues: ReadIssue[];
 }
 
-/** Linjesum mot sum eks. mva. Rapporterer manglende beløp; endrer aldri tallene. */
-export function checkSum(lines: readonly { total_amount: number | null }[], expectedExcl: number | null, totalIncl: number | null, totalVat: number | null): SumCheck {
+/**
+ * Linjesum mot sum eks. mva. Rapporterer manglende beløp; endrer aldri tallene.
+ * Kreditnota: total og linjer kan ha motsatt fortegn; da sammenlignes med linjenes fortegn.
+ */
+export function checkSum(lines: readonly { total_amount: number | null }[], expectedExcl0: number | null, totalIncl: number | null, totalVat: number | null, isCredit = false): SumCheck {
   const s = sumLines(lines);
+  const expectedExcl = expectedExcl0 == null ? null : creditAlignedExpected(expectedExcl0, s, isCredit);
   const dev = expectedExcl != null && expectedExcl !== 0 ? Number((((s - expectedExcl) / expectedExcl) * 100).toFixed(3)) : null;
   const missing = expectedExcl != null ? r2(expectedExcl - s) : null;
   const issues: ReadIssue[] = [];
@@ -304,14 +310,27 @@ export type ModelCall = (userText: string, attempt: number) => Promise<{ rawText
 
 export interface AttemptLog { attempt: number; ok: boolean; reason: "ok" | "invalid_json" | "empty" | "sum_mismatch" | "call_failed"; error?: string; inputTokens?: number | null; outputTokens?: number | null }
 
+/** Svar som ble kuttet av maks svarlengde (OpenAI «incomplete», Anthropic «max_tokens»). */
+export function isTruncationError(e: unknown): boolean {
+  const kind = e && typeof e === "object" && "kind" in e ? (e as { kind: unknown }).kind : null;
+  const detail = e && typeof e === "object" && "detail" in e ? String((e as { detail: unknown }).detail ?? "") : "";
+  return kind === "incomplete" && (detail === "" || /max_output_tokens|max_tokens|length/i.test(detail));
+}
+
 /**
  * Forsøksløkken: nytt forsøk ved ugyldig JSON, tomt linjeresultat eller sumavvik > 2 %,
  * med konkret hint. Beste forsøk (minst avvik, ellers flest linjer) beholdes. Ingen skalering.
  */
 export async function runExtractionAttempts(opts: {
   call: ModelCall; parseJson: (raw: string) => unknown; hints: Hints; examples: readonly LearningExample[]; maxAttempts: number;
-}): Promise<{ best: ParsedExtraction | null; attempts: number; log: AttemptLog[]; warnings: string[]; userTexts: string[] }> {
+  /** Ekstra tekst til hvert forsøk (f.eks. sideutsnitt ved oppdelt lesing). */
+  extraHint?: string | null;
+  /** Tallkontroll uten AI (tusenskille/desimaltegn), se numberCheck.ts. Standard på. */
+  numberCheck?: boolean;
+}): Promise<{ best: ParsedExtraction | null; attempts: number; log: AttemptLog[]; warnings: string[]; userTexts: string[]; callError: unknown; truncated: boolean }> {
   const { call, parseJson, hints, examples } = opts;
+  let callError: unknown = null;
+  let truncated = false;
   const max = Math.max(1, Math.min(3, opts.maxAttempts));
   const warnings: string[] = [];
   const log: AttemptLog[] = [];
@@ -321,13 +340,15 @@ export async function runExtractionAttempts(opts: {
   let attempts = 0;
   for (let attempt = 1; attempt <= max; attempt++) {
     attempts = attempt;
-    const text = buildUserText(hints, hint, examples);
+    const text = buildUserText(hints, hint, examples) + (opts.extraHint ? `\n\n${opts.extraHint}` : "");
     userTexts.push(text);
     let res: Awaited<ReturnType<ModelCall>>;
     try { res = await call(text, attempt); } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       warnings.push(`AI-kall feilet (forsøk ${attempt}): ${msg}`);
       log.push({ attempt, ok: false, reason: "call_failed", error: msg });
+      callError = e;
+      truncated = isTruncationError(e);
       break;
     }
     let parsed: unknown;
@@ -339,8 +360,11 @@ export async function runExtractionAttempts(opts: {
       continue;
     }
     const obj = isRecord(parsed) ? parsed : {};
-    const lines = sanitizeLines(obj.lines, hints.is_credit);
-    const data: ParsedExtraction = { ...obj, lines };
+    const raw = sanitizeLines(obj.lines, hints.is_credit);
+    // Tallkontroll uten AI før sumkontrollen: rett bare entydige tusenskille/desimal-feil.
+    const nc = opts.numberCheck === false ? null : applyNumberCheck(raw, hints.expected_total_excl_vat, hints.is_credit);
+    const lines = nc ? nc.lines : raw;
+    const data: ParsedExtraction = { ...obj, lines, number_check_issue: nc?.invoiceIssue ?? null };
     if (shouldRetryExtraction(lines, attempt, max)) {
       log.push({ attempt, ok: false, reason: "empty", inputTokens: res.inputTokens, outputTokens: res.outputTokens });
       warnings.push(`Ingen linjer i forsøk ${attempt}; prøver igjen`);
@@ -348,7 +372,7 @@ export async function runExtractionAttempts(opts: {
       hint = "Forrige svar hadde INGEN linjer. Les hele dokumentet, alle sider, og ta med hver varelinje, frakt, pant, gebyr og rabatt.";
       continue;
     }
-    const sc = checkSum(lines, hints.expected_total_excl_vat, hints.expected_total_incl_vat, hints.expected_vat);
+    const sc = checkSum(lines, hints.expected_total_excl_vat, hints.expected_total_incl_vat, hints.expected_vat, hints.is_credit);
     const dev = sc.deviation_pct;
     const better = !best || best.data.lines.length === 0
       || (dev != null && (best.dev == null || Math.abs(dev) < Math.abs(best.dev)));
@@ -367,7 +391,7 @@ export async function runExtractionAttempts(opts: {
         : "Du har trolig regnet inn mva, rabattlinjer dobbelt, eller lest en «brutto»-kolonne. Bruk nettokolonnen etter rabatt.") +
       " Ikke skaler tallene for å treffe summen.";
   }
-  return { best: best?.data ?? null, attempts, log, warnings, userTexts };
+  return { best: best?.data ?? null, attempts, log, warnings, userTexts, callError: best ? null : callError, truncated: best ? false : truncated };
 }
 
 /**

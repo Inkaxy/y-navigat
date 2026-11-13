@@ -97,11 +97,10 @@ export interface NumberCheckResult<T> {
  */
 export function applyNumberCheck<T extends CheckLine>(lines: readonly T[], expectedExcl: number | null, isCredit: boolean): NumberCheckResult<T> {
   const proposals: LineFixProposal[] = [];
-  const ambiguous = new Set<number>();
   lines.forEach((l, index) => {
     const p = proposeLineFix(l, isCredit);
-    if (p === "flere") ambiguous.add(index);
-    else if (p) proposals.push({ index, fixes: p });
+    // «flere» = flere tolkninger går opp: ingen retting; lesekontrollens regnestykke-varsel står.
+    if (p && p !== "flere") proposals.push({ index, fixes: p });
   });
   if (proposals.length === 0) return { lines: [...lines], corrected: [], invoiceIssue: null };
 
@@ -128,7 +127,6 @@ export function applyNumberCheck<T extends CheckLine>(lines: readonly T[], expec
     next.read_issues = l.read_issues.filter((r) => !ARITH_CODES.has(String(r.code)));
     return next;
   });
-  void ambiguous;
   if (!sumOk) return { lines: out, corrected: [], invoiceIssue: null };
   const n = proposals.reduce((s, p) => s + p.fixes.length, 0);
   return {
