@@ -17,8 +17,13 @@ export const EVAL_LIMITS = {
   maxPdfBytes: 15 * 1024 * 1024,
   /** Samme faktura+modell innen dette vinduet avvises (dobbeltklikk/duplikat). */
   dedupWindowMs: 2 * 60 * 1000,
-  /** Maks evalkall per selskap per døgn (første test: ca. 6 PDF × 3 modeller). */
-  maxPerDay: 24,
+  /** Frist per sidebolk ved oppdelt lesing (bolkene kjøres samtidig). */
+  chunkTimeoutMs: 120_000,
+  /**
+   * Maks evalkall per selskap per døgn. Kvalitetstesten før gjenlesing er 22 fakturaer × opptil 4 oppsett
+   * pluss sidebolker for lange fakturaer (≈ 100). Hvert kall teller, også feilede.
+   */
+  maxPerDay: 120,
 } as const;
 
 const n = (t: string) => ({ anyOf: [{ type: t }, { type: "null" }] });
