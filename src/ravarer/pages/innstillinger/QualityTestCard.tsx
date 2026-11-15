@@ -60,7 +60,7 @@ export function QualityTestCard() {
           )}
           {t.phase === "ready" && (
             <Button onClick={() => void t.run()} disabled={t.plan.run.length === 0}>
-              Bekreft og les {est.calls.toLocaleString("nb-NO")} fakturaer · omtrent {usd(est.total)}
+              Bekreft og start: {est.calls.toLocaleString("nb-NO")} lesinger, omtrent {usd(est.total)}
             </Button>
           )}
           {t.phase === "running" && (
