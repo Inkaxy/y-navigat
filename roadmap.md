@@ -41,3 +41,8 @@
 - [x] I Klargjør gjenlesing (45/28/60), ikke kjør
 - [ ] Venter på root: fire PENDING-SQL 20261113_* (kreditnota/mva 0, forsøk/requeue, reserve, e-postmal)
 - [ ] Venter på Henrik: ny OpenAI-nøkkel under AI-tjenester, deretter start «Les på nytt i bolk»
+
+# Kvalitetstest fakturalesing før gjenlesing (15.11.2026)
+- [x] Nøkkelsjekk per lagret oppsett, lesing med valgt oppsetts nøkkel (OpenAI/Anthropic), sidebolker, målinger mot kontrollsum/fasit
+- [x] Fast testsett (10 fasit, 9 vanskelige, 3 uten linjer) + knapp under AI-tjenester + tester; invoice-model-eval rullet ut
+- [ ] Venter på Henrik: kjør «Start kvalitetstest» i forhåndsvisningen og send eksportert JSON, deretter tabeller og anbefaling
