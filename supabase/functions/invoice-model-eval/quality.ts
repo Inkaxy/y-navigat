@@ -6,7 +6,7 @@ import { isCatalogModel } from "../_shared/aiModelCatalog.ts";
 import { classifyAiFailure } from "../_shared/aiFailure.ts";
 import { EVAL_FASIT } from "../_shared/evalFasit.ts";
 import { fasitRowsFromVerified, type FasitRow, type FasitScoreV2 } from "../_shared/qualityTest.ts";
-import { probeConfig, type AiConfigRow } from "../extract-invoice-from-pdf/aiRead.ts";
+import { probeConfig, type AiConfigRow } from "./readerCopies.ts";
 import type { QualityTestInvoice } from "../_shared/qualityTestSet.ts";
 
 type Client = SupabaseClient;

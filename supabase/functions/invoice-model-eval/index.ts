@@ -32,8 +32,7 @@ import { applyNumberCheck } from "../_shared/numberCheck.ts";
 import { checkSum, type ParsedExtraction } from "../_shared/invoiceExtraction.ts";
 import { scoreQuality } from "../_shared/qualityTest.ts";
 import { QUALITY_TEST_VERSION, qualityTestEntry } from "../_shared/qualityTestSet.ts";
-import { pageTextBlock } from "../extract-invoice-from-pdf/aiRead.ts";
-import { pdfPageCount, splitPdf } from "../extract-invoice-from-pdf/pdfSplit.ts";
+import { pageTextBlock, pdfPageCount, splitPdf } from "./readerCopies.ts";
 import { checkInvoiceConfigs, loadConfigCredential, loadQualityFasit, type EvalCredential } from "./quality.ts";
 
 const corsHeaders = {
