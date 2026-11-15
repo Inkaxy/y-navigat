@@ -57,7 +57,8 @@ async function logUsage(ctx: ReadContext, cfg: AiConfigRow, row: { success: bool
   if (error) console.error("ai_usage_log", error.message);
 }
 
-function pageTextBlock(t: PdfTextResult | null, from: number, to: number): string | null {
+/** Tekstlaget for et sideutsnitt. Eksportert for modellsammenligningens oppdelte lesing (samme tekst). */
+export function pageTextBlock(t: PdfTextResult | null, from: number, to: number): string | null {
   if (!t || t.status !== "ok") return null;
   const pages = t.pages.slice(from - 1, to);
   if (!pages.length) return null;
