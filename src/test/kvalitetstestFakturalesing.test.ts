@@ -139,3 +139,13 @@ describe("rammer i serverkoden", () => {
     expect(src).toContain('from("ai_usage_log").update(');
   });
 });
+
+describe("kopiene av leserens hjelpere", () => {
+  const body = (src: string, name: string) => src.match(new RegExp(`function ${name}\\(.*?\\n}\\n`, "s"))?.[0] ?? null;
+  const copy = readFileSync("supabase/functions/invoice-model-eval/readerCopies.ts", "utf8");
+  const orig = readFileSync("supabase/functions/extract-invoice-from-pdf/aiRead.ts", "utf8") + readFileSync("supabase/functions/extract-invoice-from-pdf/pdfSplit.ts", "utf8");
+  it.each(["pageTextBlock", "probeConfig", "pdfPageCount", "splitPdf"])("%s er byte-identisk med fakturaleseren", (name) => {
+    expect(body(orig, name)).not.toBeNull();
+    expect(body(copy, name)).toBe(body(orig, name));
+  });
+});
