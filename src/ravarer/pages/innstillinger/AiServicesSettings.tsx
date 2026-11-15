@@ -27,6 +27,7 @@ import { Info, CheckCircle2, AlertCircle, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { SettingsSaveBar } from "./SettingsSaveBar";
 import { ModelEvalCard } from "./ModelEvalCard";
+import { QualityTestCard } from "./QualityTestCard";
 import { catalogEntry, catalogModelsFor } from "../../../../supabase/functions/_shared/aiModelCatalog";
 
 type Provider = AiProvider;
@@ -99,6 +100,7 @@ export default function AiServicesSettings() {
       ) : (
         <UsageSummaryCard entries={usage.data ?? []} loading={usage.isLoading} />
       )}
+      <QualityTestCard />
       <ModelEvalCard />
     </div>
   );
