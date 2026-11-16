@@ -9,7 +9,7 @@ export function usePrisgrunnlagMaterials(legalEntityId: string | null) {
   return useQuery({ queryKey: BAKERS_RM_KEY(legalEntityId), enabled: !!legalEntityId, queryFn: () => fetchBakersRawMaterials(legalEntityId) });
 }
 
-type HRow = { raw_material_id: string; price: number; effective_date: string; snapshot_unit: string | null; snapshot_currency: string | null; currency: string | null };
+type HRow = { raw_material_id: string; price: number; effective_date: string; snapshot_unit: string | null; snapshot_currency: string | null; currency: string | null; rm: { legal_entity_id: string } | null };
 
 /** Gyldige fakturapriser (ikke kreditnota, ikke erstattet/eldre) med låst enhet. Komplett uthenting. */
 export function usePrisgrunnlagHistory(legalEntityId: string | null) {
@@ -22,7 +22,7 @@ export function usePrisgrunnlagHistory(legalEntityId: string | null) {
           .select("raw_material_id, price, effective_date, snapshot_unit, snapshot_currency, currency, rm:raw_materials!raw_material_price_history_raw_material_id_fkey!inner(legal_entity_id)")
           .eq("rm.legal_entity_id", legalEntityId!).eq("source", "invoice").eq("is_legacy", false)
           .is("superseded_at", null).not("is_credit", "is", true).gt("price", 0)
-          .order("id").range(from, to) as unknown as PromiseLike<{ data: HRow[] | null; error: { message: string } | null }>);
+          .order("id").range(from, to));
       return rows.map((r) => ({
         rawMaterialId: r.raw_material_id, price: Number(r.price), date: r.effective_date,
         unit: r.snapshot_unit, currency: r.snapshot_currency ?? null,
