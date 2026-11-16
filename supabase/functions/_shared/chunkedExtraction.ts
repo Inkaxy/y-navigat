@@ -97,3 +97,86 @@ export function maxPageOf(lines: readonly { page_number?: number | null }[]): nu
   const ps = lines.map((l) => l.page_number).filter((p): p is number => typeof p === "number" && Number.isInteger(p));
   return ps.length ? Math.max(...ps) : null;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Rettelse 16.11.2026 (Drammen Papir 9041438168, 6 sider, 170 344 kr eks. mva):
+// hele-faktura-kallet ble kuttet, sidelesingen svarte på alle sider, men én side uten varelinjer
+// (oppsummeringsside) ble regnet som «feilet bolk». Da ble sammensettingen forkastet, enkeltlesingen
+// (tom) brukt, og fakturaen endte som «PDF-en ga ingen lesbare linjer».
+//  - En side som svarte uten linjer er LEST (kalleren sender svaret, ikke null).
+//  - Feiler noen sider, lagres linjene fra de andre sidene likevel når enkeltlesingen ikke har linjer,
+//    med et fakturavarsel som krever kontroll.
+//  - Sider ble lest, men ingen linjer: aldri «ingen lesbare linjer»; kalleren melder ufullstendig lesing.
+//  - Fakturaer med mange sider leses side for side direkte (sparer kuttede hele-faktura-kall og tid).
+// ---------------------------------------------------------------------------------------------
+
+/** Fra dette antallet sider leses fakturaen side for side uten å prøve hele fakturaen først. */
+export const DIRECT_CHUNK_MIN_PAGES = 5;
+
+export function directChunkReason(totalPages: number | null): string | null {
+  if (totalPages == null || !Number.isInteger(totalPages) || totalPages < DIRECT_CHUNK_MIN_PAGES) return null;
+  return `fakturaen har ${totalPages} sider og leses side for side`;
+}
+
+export interface InvoiceLevelIssue { code: string; message: string }
+
+export interface ChunkedResolution {
+  best: ParsedExtraction | null;
+  /** true = sammensettingen fra sidelesingen er brukt. */
+  usedMerged: boolean;
+  issues: InvoiceLevelIssue[];
+  warnings: string[];
+  /** Antall sidebolker som svarte (også uten linjer). */
+  pagesRead: number;
+  /** Sider ble lest, men verken sidelesing eller enkeltlesing ga linjer. */
+  pagesReadNoLines: boolean;
+}
+
+const pagesText = (cs: readonly PageChunk[]) => cs.map((c) => (c.from === c.to ? `side ${c.from}` : `side ${c.from}–${c.to}`)).join(", ");
+
+/**
+ * Velger mellom enkeltlesing og sidelesing. Ren funksjon.
+ * `singleDev`/`mergedDev` = sumavvik i prosent (null = ukjent).
+ */
+export function resolveChunkedRead(i: {
+  single: ParsedExtraction | null;
+  singleDev: number | null;
+  merged: { data: ParsedExtraction; complete: boolean; failedChunks: readonly PageChunk[] };
+  mergedDev: number | null;
+  chunkCount: number;
+}): ChunkedResolution {
+  const issues: InvoiceLevelIssue[] = [];
+  const warnings: string[] = [];
+  const pagesRead = Math.max(0, i.chunkCount - i.merged.failedChunks.length);
+  const singleHas = !!i.single && i.single.lines.length > 0;
+  const mergedHas = i.merged.data.lines.length > 0;
+  let useMerged = false;
+  if (i.merged.complete) {
+    if (!singleHas) useMerged = mergedHas;
+    else {
+      const closer = i.mergedDev == null || i.singleDev == null || Math.abs(i.mergedDev) < Math.abs(i.singleDev);
+      useMerged = mergedHas && closer;
+      if (!useMerged) warnings.push("Oppdelt lesing ga ikke nærmere kontrollsum; bruker enkeltlesingen");
+    }
+  } else if (!singleHas && mergedHas) {
+    useMerged = true;
+    const failed = pagesText(i.merged.failedChunks);
+    warnings.push(`Oppdelt lesing ufullstendig (${failed} feilet); linjene fra de andre sidene er lagret`);
+    issues.push({
+      code: "sidelesing_delvis",
+      message: `${failed[0].toUpperCase()}${failed.slice(1)} kunne ikke leses. Linjene fra de andre sidene er lagret. Kontroller originalen og registrer det som mangler.`,
+    });
+  } else if (!i.merged.complete) {
+    warnings.push(`Oppdelt lesing ufullstendig (${pagesText(i.merged.failedChunks)} feilet); bruker enkeltlesingen`);
+  }
+  const best = useMerged ? i.merged.data : i.single;
+  const bestHas = !!best && best.lines.length > 0;
+  const pagesReadNoLines = !bestHas && pagesRead > 0;
+  return { best: pagesReadNoLines ? null : best, usedMerged: useMerged, issues, warnings, pagesRead, pagesReadNoLines };
+}
+
+/** Norsk tekst når sider ble lest uten at noen linjer kunne settes sammen (lagres aldri som «ingen lesbare linjer»). */
+export function pagesReadNoLinesMessage(pagesRead: number, totalPages: number | null): string {
+  const of = totalPages != null ? ` av ${totalPages}` : "";
+  return `AI-tjenesten leste ${pagesRead}${of} sider, men ingen linjer kunne settes sammen. Fakturaen må kontrolleres mot originalen.`;
+}
