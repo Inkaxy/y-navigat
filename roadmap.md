@@ -39,7 +39,8 @@
 - [x] G Lange fakturaer: oppdeling ved kutt
 - [x] H Tallkontroll antall×pris=beløp, entydig retting
 - [x] I Klargjør gjenlesing (45/28/60), ikke kjør
-- [ ] Venter på root: fire PENDING-SQL 20261113_* (kreditnota/mva 0, forsøk/requeue, reserve, e-postmal)
+- [x] Root kjørte 20261113_lines_sum_credit_vat og 20261113_line_extraction_release_requeue 15.11.2026
+- [ ] Venter på root: 20261113_ai_fallback_provider og 20261113_invoice_reading_alert_template
 - [ ] Venter på Henrik: ny OpenAI-nøkkel under AI-tjenester, deretter start «Les på nytt i bolk»
 
 # Kvalitetstest fakturalesing før gjenlesing (15.11.2026)
@@ -52,11 +53,13 @@
 - [x] 0 Haster: sidelesing lagres alltid (Drammen Papir 9041438168), aldri «ingen lesbare linjer» når sider ble lest, ≥5 sider leses side for side direkte; extract-invoice-from-pdf + invoice-model-eval rullet ut
 - [ ] 0b Venter på Henrik: legg 9041438168 tilbake i køen via «Les på nytt» (ikke kjørt av meg)
 - [x] 1a Beslutninger (B1): meny med teller, kø eldste først, 12 spørsmålstyper, fakta (regnestykke, kjøp, «Det systemet vet», fakturautdrag, bruk), svar via dagens paneler, kvittering + Neste, tom kø, vennlig «Spør leverandøren»-tekst
-- [ ] 1b Tre svarknapper direkte i spørsmålet (Ja godta / Spør leverandøren / Pakningen er feil) med forhåndsvisning av pakningsretting
-- [ ] 1c «Angre» og «Angre siste» – krever PENDING-SQL (angre-RPC per svartype)
+- [x] 1b Svarknapper direkte i spørsmålet (dagens skriveveier) + pakningsretting med forhåndsvisning
+- [x] 1c «Angre»/«Angre siste» bygget; pris/«ikke vare» skjult til root kjører 20261117_beslutninger_angre («én gang» virker nå)
 - [ ] 1d Brutto/DG2 før og etter per vare i spørsmålet (bygges sammen med fase 5)
-- [ ] 2 Prislinje (B4): «Alle priser», «Rett pris», «Endre godkjent pakning»
-- [ ] 3 Automatikk (B7): regler, logg, nøkkelråvarer, hopp over, pant, morgen-e-post
+- [x] 2 Prislinje (B4): meny, søyler, «Alle priser», kost, andre leverandører, klar for bruk, endringslogg; «Rett pris»/«Endre godkjent pakning»/avviksgrense venter på 20261117_prislinje
+- [x] 3 Automatikk (B7): regler som setninger (dagens innstillinger), logg, hopp over, morgen-e-post (forhåndsvisning); pant/bolk/nøkkelråvarer venter på 20261117_automatikk (+ DATAENDRING-fil for timekjøring)
+- [ ] 3b Neste: matchmotoren bruker nøkkelgrenser og pant-som-følgevare (edge-endring, root-gjennomgang)
+- [ ] 3c Morgen-e-post faktisk utsending (planlagt kjøring + mal)
 - [ ] 4 Handelsvarer (B5) i Varer
 - [ ] 5 Prisgrunnlag (B6) i Varer
 - [ ] 6 Fakturaer som arkiv + ny Oversikt
