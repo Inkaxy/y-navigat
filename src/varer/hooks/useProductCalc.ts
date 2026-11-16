@@ -77,6 +77,8 @@ export interface ProductCost {
   storage_cost?: number | null;
   packaging_mode?: "legges_til" | "trekkes_fra" | string;
   hourly_rate?: number | null;
+  /** Oppskriften kalkylen bygger på (fra product_cost). */
+  recipe_id?: string | null;
 }
 
 export type MarginStatus =
@@ -115,6 +117,8 @@ export interface ProductMargins {
   calc_type?: CalcType | string;
   cost?: ProductCost;
   levels?: MarginLevel[];
+  /** Finnes når PENDING 20261118_prisgrunnlag er kjørt: om emballasje teller i Brutto og DG2. */
+  packaging_in_margins?: boolean;
 }
 
 /** Kalkyle og marginer for en vare — regnes i databasen. */
