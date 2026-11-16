@@ -26,6 +26,10 @@ fordi den mappen kjøres av verktøyet. Root kjører eksakt godkjent fil, aldri 
 
 Edge `generate-rfq-credentials` er allerede utrullet live (v141, kilde lik b845). Skal ikke rulles ut på nytt fra denne mappen.
 
+## Variant B (17.11.2026)
+
+| Fil | Status |
+|---|---|
 | `20261117_beslutninger_angre.PENDING.sql` | **VENTER PÅ ROOT.** Variant B fase 1: `rm_undo_price_acceptance` og `rm_undo_not_item` (angre svar i Beslutninger) + `rm_cap_beslutninger_v1`. Ett tekstbytte i `_rm_retain_price_acceptance` bundet til live-md5 `35d0e2bd…` (16.11.2026). Endrer ingen data ved kjøring. |
 | `20261117_beslutninger_angre.check.sql` | Bare SELECT: md5, rettigheter, antall godtatte linjer på åpne fakturaer. |
 | `20261117_prislinje.PENDING.sql` | **VENTER PÅ ROOT.** Variant B fase 2: to nullbare kolonner for avviksgrense/periode, tabellen `rm_purchase_corrections`, `rm_correct_purchase_price` (+ angre), `rm_change_approved_package`, `rm_cap_prislinje_v1`. Ingen eksisterende funksjon endres. |
