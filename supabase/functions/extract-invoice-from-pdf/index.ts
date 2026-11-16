@@ -20,6 +20,10 @@
 //  - { probe: true } (bare tjenesten): gratis tilgangssjekk av nøkkel/modell, ingen tokens.
 //  - Lange fakturaer leses i sidebolker når svaret kuttes eller senere sider mangler (aiRead.ts).
 //  - Tallkontroll uten AI retter bare entydige tusenskille/desimalfeil (_shared/numberCheck.ts).
+//
+// Rettelse 16.11.2026: sidelesingens linjer settes sammen og lagres også når én side feiler eller summen
+// ikke treffer (merket for kontroll); sider som ble lest gir aldri «ingen lesbare linjer»; fakturaer med
+// mange sider leses side for side direkte (se _shared/chunkedExtraction.ts).
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
@@ -200,6 +204,8 @@ Deno.serve(async (req) => {
     let aiFailure: AiFailure | null = null;
     let providerUsed: "primary" | "fallback" | null = null;
     let chunked: { chunks: number; reason: string } | null = null;
+    let readIssues: { code: string; message: string }[] = [];
+    let pagesRead: number | null = null;
 
     // Tekstlaget i original-PDF-en som ekstra lesestøtte (samme helper som linjeforslag og eval). Ikke logget.
     let pdfText: PdfTextResult | null = null;
@@ -234,6 +240,8 @@ Deno.serve(async (req) => {
         warnings.push(...out.warnings);
         aiUsage = out.usage;
         chunked = out.chunked;
+        readIssues = out.issues;
+        pagesRead = out.pagesRead;
         if (out.best) {
           aiData = out.best;
           extractionMethod = "ai";
@@ -286,6 +294,8 @@ Deno.serve(async (req) => {
     // Tallkontrollens retting (tusenskille/desimaltegn) er et fakturavarsel: fakturaen skal gjennomgås.
     const numberIssue = aiData && aiData.number_check_issue && typeof aiData.number_check_issue === "object" ? aiData.number_check_issue : null;
     if (numberIssue) { sum.issues.push(numberIssue); warnings.push(numberIssue.message); }
+    // Sider som ikke kunne leses ved sidelesing: fakturaen lagres med linjene som ble lest, men må kontrolleres.
+    for (const ri of readIssues) sum.issues.push(ri);
     if (aiStatus === "no_lines" && (hints.expected_total_incl_vat ?? 0) !== 0) {
       sum.issues.push({ code: "tomt_resultat", message: "AI-lesingen fant ingen linjer, men fakturaen har et beløp. Kontroller originalen og registrer linjene." });
     }
@@ -323,6 +333,7 @@ Deno.serve(async (req) => {
       ai_failure: aiFailure,
       ai_provider_used: providerUsed,
       chunked,
+      pages_read: pagesRead,
       extraction_method: extractionMethod,
       confidence,
       warnings,
