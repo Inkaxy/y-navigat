@@ -89,7 +89,7 @@ begin
   if v_uid is not null and not public.has_ravarer_invoice_access(p_legal_entity_id, 'write') then
     raise exception 'Mangler skrivetilgang til fakturaer' using errcode = '42501';
   end if;
-  if v_uid is null and coalesce(current_user, '') not in ('postgres', 'service_role', 'supabase_admin') then
+  if v_uid is null and coalesce(auth.role(), '') <> 'service_role' and session_user not in ('postgres', 'supabase_admin') then
     raise exception 'Krever pålogging' using errcode = '28000';
   end if;
   for r in
@@ -155,7 +155,7 @@ begin
       raise exception 'Mangler skrivetilgang til fakturaer' using errcode = '42501';
     end if;
   else
-    if coalesce(current_user, '') not in ('postgres', 'service_role', 'supabase_admin') then
+    if coalesce(auth.role(), '') <> 'service_role' and session_user not in ('postgres', 'supabase_admin') then
       raise exception 'Krever pålogging' using errcode = '28000';
     end if;
     -- Planlagt kjøring bare når bryteren er slått på.
