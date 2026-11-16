@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,13 +9,19 @@ import { osloTodayISO } from "@/lib/osloDate";
 import { paths } from "@/ravarer/lib/paths";
 import { DECISION_LABEL, DECISION_TONE, decisionQuestion, solvesText, type Decision, type DecisionType } from "@/ravarer/lib/decisions";
 import { priceFacts, refineType, type Certainty } from "@/ravarer/lib/decisionFacts";
+import { quickAnswersFor, type UndoAnswer } from "@/ravarer/lib/quickAnswers";
+import { useInvoiceRights } from "@/fakturaer/hooks/useInvoiceRights";
+import { cardFinished, freshStatusFrom } from "@/fakturaer/lib/freshReceipt";
+import { lockedOpenLines } from "../priskontroll/gjore/VarekortPanel";
+import { QuickAnswers } from "./QuickAnswers";
+import type { QuickDone } from "./useQuickAnswers";
 import { VarekortPanel } from "../priskontroll/gjore/VarekortPanel";
 import { FakturasakPanel } from "../priskontroll/gjore/FakturasakPanel";
 import type { PanelResult } from "../priskontroll/gjore/types";
 import { PriceFactsView } from "./PriceFactsView";
 import { InvoiceExcerpt } from "./InvoiceExcerpt";
 
-export interface DecisionCtx { onDone: (r: PanelResult | null) => void; onNext: () => void; onSkip: () => void; retur: string }
+export interface DecisionCtx { onDone: (r: PanelResult | null, undo?: UndoAnswer | null) => void; onNext: () => void; onSkip: () => void; retur: string }
 
 const LEAD: Record<DecisionType, string> = {
   pris: "Stemmer denne prisen? Vi har ikke registrert noe varsel om prisendring.",
@@ -82,7 +88,9 @@ export function DecisionPanel({ d, ctx }: { d: Decision; ctx: DecisionCtx }) {
 }
 
 function VarekortDecision({ d, supplierId, itemKey, ctx }: { d: Decision; supplierId: string; itemKey: string; ctx: DecisionCtx }) {
-  const item = useSupplierItems({ supplierId, itemKey, pageSize: 1 }).data?.items[0] ?? null;
+  const itemQ = useSupplierItems({ supplierId, itemKey, pageSize: 1 });
+  const item = itemQ.data?.items[0] ?? null;
+  const { canWrite } = useInvoiceRights();
   const lines = useSupplierItemLines(supplierId, itemKey);
   const facts = useMemo(() => (lines.data ? priceFacts(lines.data, osloTodayISO(), { baseUnit: item?.rm_base_unit ?? null }) : null), [lines.data, item?.rm_base_unit]);
   const type = refineType(d.type, facts);
@@ -92,6 +100,25 @@ function VarekortDecision({ d, supplierId, itemKey, ctx }: { d: Decision; suppli
   const recipes = useRecipeCount(rmId);
   const cur = facts?.current ?? null;
   const showFacts = facts && (facts.purchases.length > 0 || facts.arithmetic.length > 0);
+  const locked = lines.data ? lockedOpenLines(lines.data) != null : false;
+  const hasQuick = !!item && !!lines.data && quickAnswersFor(type, { linked: !!item.rm_id && item.status !== "ukoblet", locked }).length > 0;
+  const allRef = useRef<HTMLDetailsElement>(null);
+  const openAll = () => { if (allRef.current) { allRef.current.open = true; allRef.current.scrollIntoView({ behavior: "smooth", block: "start" }); } };
+  // Etter et svar: fersk serverstatus før spørsmålet regnes som besvart (samme regel som varekortet).
+  const [after, setAfter] = useState<{ kind: "pending" } | { kind: "rest"; text: string } | null>(null);
+  const gen = useRef(0);
+  const answered = (q: QuickDone) => {
+    const my = ++gen.current;
+    setAfter({ kind: "pending" });
+    void Promise.all([lines.refetch(), itemQ.refetch()]).then(([lr, qr]) => {
+      if (my !== gen.current) return;
+      const st = freshStatusFrom({ item: { isError: qr.isError, data: qr.data }, lines: { isError: lr.isError, data: lr.data }, supplierId, itemKey });
+      if (cardFinished(st)) { setAfter(null); ctx.onDone(q.result, q.undo); return; }
+      setAfter({ kind: "rest", text: st.kind === "ok"
+        ? `${q.result.title}. ${st.remaining} ${st.remaining === 1 ? "linje gjenstår" : "linjer gjenstår"} – se «Alle valg».`
+        : `${q.result.title}. Status etter lagringen er ukjent; spørsmålet regnes ikke som besvart.` });
+    }, () => { if (my === gen.current) setAfter({ kind: "rest", text: `${q.result.title}. Status etter lagringen er ukjent.` }); });
+  };
   return (
     <div className="space-y-4">
       <Header d={d} type={type} question={question}>
@@ -118,10 +145,17 @@ function VarekortDecision({ d, supplierId, itemKey, ctx }: { d: Decision; suppli
           <Link className="mt-1 inline-flex min-h-[44px] items-center font-semibold text-primary underline-offset-2 hover:underline sm:min-h-0" to={paths.raavare(rmId, { seksjon: "bruk" })}>Se hvor råvaren brukes</Link>
         </section>
       )}
-      <section aria-label="Svar" className="space-y-2">
-        <h3 className="text-caption font-semibold uppercase tracking-[0.12em] text-ink-secondary">Svar</h3>
-        <VarekortPanel key={d.key} supplierId={supplierId} itemKey={itemKey} onDone={ctx.onDone} onNext={ctx.onNext} onSkip={ctx.onSkip} />
-      </section>
+      {item && lines.data && (
+        <QuickAnswers type={type} item={item} lines={lines.data} canWrite={canWrite} locked={locked} onAnswered={answered} onOpenAll={openAll} />
+      )}
+      {after?.kind === "pending" && <p className="text-caption text-ink-secondary" aria-live="polite">Lagret. Henter faktisk status fra serveren …</p>}
+      {after?.kind === "rest" && <p role="status" className="rounded-md border border-line-subtle bg-muted/40 px-3 py-2 text-sm">{after.text}</p>}
+      <details ref={allRef} open={!hasQuick} className="rounded-xl border border-line-subtle p-3">
+        <summary className="min-h-[44px] cursor-pointer content-center text-caption font-semibold uppercase tracking-[0.12em] text-ink-secondary">{hasQuick ? "Alle valg" : "Svar"}</summary>
+        <div className="mt-2">
+          <VarekortPanel key={d.key} supplierId={supplierId} itemKey={itemKey} onDone={(r) => ctx.onDone(r)} onNext={ctx.onNext} onSkip={ctx.onSkip} />
+        </div>
+      </details>
     </div>
   );
 }
