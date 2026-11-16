@@ -21,6 +21,8 @@ export type ReadingHealth =
       /** Antall feilede kall i rekken (bare fra bruksloggen). */
       failedCalls: number | null;
       waitingInvoices: number | null;
+      /** Siste feilede forsøk (nyeste), brukes mot tidspunkt for vellykket nøkkeltest. */
+      lastFailureAt: string | null;
     };
 
 export interface ReadingHealthInput {
@@ -45,7 +47,7 @@ export function invoiceReadingHealth(i: ReadingHealthInput): ReadingHealth {
       n++;
       since = r.created_at;
     }
-    return { state: "failing", failure, failingSince: since, lastSuccessAt: i.lastSuccessAt, failedCalls: n, waitingInvoices: waiting?.length ?? null };
+    return { state: "failing", failure, failingSince: since, lastSuccessAt: i.lastSuccessAt, failedCalls: n, waitingInvoices: waiting?.length ?? null, lastFailureAt: head.created_at };
   }
   if (waiting === null) return { state: "unknown" };
   // Ingen ventende AI-feil i fakturaene. Uten lesbar logg vet vi likevel ikke at tjenesten virker.
@@ -59,7 +61,23 @@ export function invoiceReadingHealth(i: ReadingHealthInput): ReadingHealth {
     lastSuccessAt: i.lastSuccessAt,
     failedCalls: null,
     waitingInvoices: waiting.length,
+    lastFailureAt: newest.line_extraction_at,
   };
+}
+
+export type ReadingBanner = "failing" | "key_ok_waiting" | null;
+
+/**
+ * Hvilket varsel som vises. En vellykket nøkkeltest etter siste feil gir «venter på første lesing»
+ * i stedet for stillstand. Ukjent tidspunkt for siste feil = stillstand vises fortsatt.
+ */
+export function readingBannerState(h: ReadingHealth | undefined, keyTestOkAt: string | null): ReadingBanner {
+  if (!h || h.state !== "failing") return null;
+  if (!keyTestOkAt || !h.lastFailureAt) return "failing";
+  const ok = Date.parse(keyTestOkAt);
+  const fail = Date.parse(h.lastFailureAt);
+  if (Number.isNaN(ok) || Number.isNaN(fail)) return "failing";
+  return ok > fail ? "key_ok_waiting" : "failing";
 }
 
 const OSLO = new Intl.DateTimeFormat("nb-NO", { timeZone: "Europe/Oslo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
