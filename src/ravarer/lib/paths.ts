@@ -28,6 +28,8 @@ export type InnstillingSeksjon = "priskontroll" | "tripletex" | "kategorier" | "
 
 export const paths = {
   oversikt: () => RAVARER_ROOT,
+  /** Variant B: køen av spørsmål (`?valgt=` = valgt spørsmål). */
+  beslutninger: (q?: Q) => withQuery(`${RAVARER_ROOT}/beslutninger`, q),
 
   // Varer
   varer: (q?: Q) => withQuery(`${RAVARER_ROOT}/varer`, q),
