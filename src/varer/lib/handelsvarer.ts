@@ -152,3 +152,26 @@ export function marginPerUnit(price: number | null, purchase: number | null): nu
   if (price == null || purchase == null) return null;
   return round2(price - purchase);
 }
+
+export type MarkupChange =
+  | { kind: "list"; priceListId: string; factor: number | null }
+  | { kind: "cell"; priceListId: string; rawMaterialId: string; factor: number | null; blocked: boolean };
+
+export const changeKey = (c: MarkupChange): string =>
+  c.kind === "list" ? `list:${c.priceListId}` : `cell:${cellKey(c.rawMaterialId, c.priceListId)}`;
+
+/** Lagrede påslag med ulagret kladd lagt over (kladden vinner). */
+export function applyMarkupDraft(stored: readonly MarkupRow[], draft: readonly MarkupChange[]): MarkupRow[] {
+  const out = new Map<string, MarkupRow>();
+  for (const r of stored) {
+    const k = r.priceListId && r.rawMaterialId ? `cell:${cellKey(r.rawMaterialId, r.priceListId)}`
+      : r.priceListId ? `list:${r.priceListId}` : `item:${r.rawMaterialId}`;
+    out.set(k, r);
+  }
+  for (const c of draft) {
+    out.set(changeKey(c), c.kind === "list"
+      ? { priceListId: c.priceListId, rawMaterialId: null, factor: c.factor, blocked: false }
+      : { priceListId: c.priceListId, rawMaterialId: c.rawMaterialId, factor: c.factor, blocked: c.blocked });
+  }
+  return [...out.values()];
+}

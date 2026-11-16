@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaging";
 import { pendingDelete, pendingInsert, pendingPatch, pendingSelect, useCapability } from "@/lib/pendingRpc";
-import type { MarkupRow, ResaleKind, ResaleLink, ResaleMaterial } from "@/varer/lib/handelsvarer";
+import type { MarkupChange, MarkupRow, ResaleKind, ResaleLink, ResaleMaterial } from "@/varer/lib/handelsvarer";
 
 export const HANDELSVARER_KEY = (le: string | null) => ["varer", "handelsvarer", le] as const;
 export const RESALE_MARKUP_KEY = (le: string | null) => ["varer", "handelsvarer", "pasla", le] as const;
@@ -112,10 +112,6 @@ export function useResaleMarkups(legalEntityId: string | null) {
   });
   return { cap, ...q };
 }
-
-export type MarkupChange =
-  | { kind: "list"; priceListId: string; factor: number | null }
-  | { kind: "cell"; priceListId: string; rawMaterialId: string; factor: number | null; blocked: boolean };
 
 /** Lagrer en samlet påslagskladd. Kaster ved første feil; allerede lagrede rader står (leses på nytt). */
 export function useSaveResaleMarkups(legalEntityId: string | null) {
