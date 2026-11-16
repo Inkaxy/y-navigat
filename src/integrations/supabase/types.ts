@@ -19011,10 +19011,26 @@ export type Database = {
         }
         Returns: Json
       }
-      rm_lines_sum_check: {
-        Args: { p_count: number; p_sum: number; p_total: number; p_vat: number }
-        Returns: Json
-      }
+      rm_lines_sum_check:
+        | {
+            Args: {
+              p_count: number
+              p_sum: number
+              p_total: number
+              p_vat: number
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_count: number
+              p_is_credit: boolean
+              p_sum: number
+              p_total: number
+              p_vat: number
+            }
+            Returns: Json
+          }
       rm_link_supplier_item: {
         Args: {
           p_item_key: string
@@ -19195,6 +19211,10 @@ export type Database = {
           status: string
           supplier_name: string
         }[]
+      }
+      rm_requeue_invoice_line_extraction: {
+        Args: { p_invoice_ids: string[]; p_legal_entity_id: string }
+        Returns: Json
       }
       rm_save_manual_pdf_invoice: {
         Args: {
