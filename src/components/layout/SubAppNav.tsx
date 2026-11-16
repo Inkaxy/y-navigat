@@ -365,6 +365,7 @@ function VarerNav() {
         { to: "/varer/priser", label: "Priser" },
         { to: "/varer/spesialpriser", label: "Spesialpriser" },
         { to: "/varer/prisrunder", label: "Prisrunder" },
+        { to: "/varer/priser?view=handelsvarer", label: "Handelsvarer" },
       ],
     },
     {
@@ -372,8 +373,12 @@ function VarerNav() {
       label: "Lønnsomhet",
       icon: TrendingUp,
       basePath: "/varer/lonnsomhet",
+      matches: ["/varer/lonnsomhet", "/varer/prisgrunnlag"],
       badge: marginAlerts.length,
-      links: [{ to: "/varer/lonnsomhet", label: "Lønnsomhet", badge: marginAlerts.length }],
+      links: [
+        { to: "/varer/lonnsomhet", label: "Lønnsomhet", badge: marginAlerts.length },
+        { to: "/varer/prisgrunnlag", label: "Prisgrunnlag" },
+      ],
     },
     {
       kind: "dropdown",
