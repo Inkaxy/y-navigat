@@ -59,7 +59,8 @@ export function arithmeticFor(l: SupplierItemLine | null, baseUnit: string | nul
   return out;
 }
 
-export function priceFacts(lines: readonly SupplierItemLine[], todayIso: string, maxShown = 8): PriceFacts {
+export function priceFacts(lines: readonly SupplierItemLine[], todayIso: string, opts: { baseUnit?: string | null; maxShown?: number } = {}): PriceFacts {
+  const maxShown = opts.maxShown ?? 8;
   const priced = lines.filter((l) => l.price_per_base_unit != null && l.invoice_date && l.is_credit_note !== true).sort(cmp);
   const current = priced.find(isOpen) ?? null;
   const purchases: Purchase[] = [];
@@ -76,7 +77,7 @@ export function priceFacts(lines: readonly SupplierItemLine[], todayIso: string,
   const curIdx = current ? purchases.findIndex((p) => p.lineId === current.id) : -1;
   const previous = curIdx > 0 ? [...purchases.slice(0, curIdx)].reverse().find((p) => p.status === "godkjent") ?? purchases[curIdx - 1] : null;
   const changePct = current && previous && previous.price !== 0 ? round2(((current.price_per_base_unit as number) / previous.price - 1) * 100) : null;
-  const baseUnit = baseUnitOf(current);
+  const baseUnit = opts.baseUnit ?? baseUnitOf(current);
 
   // Sikkerhet: bekreftet pris lest likt på flere åpne fakturaer uten lesevarsler = sikkert.
   let certainty: Certainty = "middels";

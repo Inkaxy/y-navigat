@@ -47,9 +47,9 @@ export function PriceFactsView({ facts, item }: { facts: PriceFacts; item: Suppl
         <h3 className="mb-1 text-caption font-semibold uppercase tracking-[0.12em] text-ink-secondary">Det systemet vet</h3>
         <dl className="divide-y divide-line-subtle border-y border-line-subtle text-body">
           <Fact k="Sammenlignet med" v={previousText(facts.previous, bu)} />
-          <Fact k="Avtale" v={facts.current?.price_reference_source === "agreement" ? "Avtalepris er brukt som sammenligning" : "Ingen avtale brukt i sammenligningen"} />
+          <Fact k="Avtale" v={item?.agreed_price_per_base_unit != null ? `Avtalt ${kr(item.agreed_price_per_base_unit)}${per}` : `Ingen registrert hos ${item?.supplier_name ?? "leverandøren"}`} />
           <Fact k="Pakning" v={facts.current?.package_size != null
-            ? `${facts.current.package_size.toLocaleString("nb-NO")} ${facts.current.package_unit ?? ""}${item?.package_confirmed ? ", bekreftet" : ", ikke bekreftet"}`
+            ? `${facts.current.package_size.toLocaleString("nb-NO")} ${facts.current.package_unit ?? ""}${item?.package_confirmed_at ? ", bekreftet" : ", ikke bekreftet"}`
             : "Ukjent"} />
           <Fact k="Merkostnad" v={merText(facts)} />
         </dl>
