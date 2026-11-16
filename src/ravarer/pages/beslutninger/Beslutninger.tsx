@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QueryState } from "@/components/common/QueryState";
 import { ModulePage } from "@/ravarer/ui/ModulePage";
@@ -12,8 +12,11 @@ import { DecisionQueue } from "./DecisionQueue";
 import { DecisionPanel, type DecisionCtx } from "./DecisionPanel";
 import { ExplainSteps } from "./ExplainSteps";
 import { useIsWide } from "./useIsWide";
+import { useDecisionUndo, type UndoState } from "./useDecisionUndo";
+import { useCompany } from "@/hooks/useCompany";
+import { saveLastAnswer, type UndoAnswer } from "@/ravarer/lib/quickAnswers";
 
-type Receipt = { question: string; result: PanelResult | null; index: number };
+type Receipt = { question: string; result: PanelResult | null; index: number; undo: UndoAnswer | null };
 
 /** Råvarer › Beslutninger (variant B): én kø av spørsmål, eldste faktura øverst. */
 export default function Beslutninger() {
@@ -23,6 +26,8 @@ export default function Beslutninger() {
   const today = useTodayActivity();
   const valgt = sp.get("valgt");
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const { data: company } = useCompany();
+  const undo = useDecisionUndo();
   const lastIndex = useRef(0);
 
   const select = (key: string | null, push = true) => {
@@ -46,7 +51,11 @@ export default function Beslutninger() {
   // Retur fra fakturasiden tilbake til samme spørsmål (trygg appsti, se fakturaReturn).
   const retur = `${paths.beslutninger()}${sp.toString() ? `?${sp.toString()}` : ""}`;
   const ctx: DecisionCtx = {
-    onDone: (r) => setReceipt({ question: sel?.question ?? "", result: r, index: lastIndex.current }),
+    onDone: (r, u) => {
+      undo.reset();
+      if (u && company) { saveLastAnswer(company.id, u); undo.refresh(); }
+      setReceipt({ question: sel?.question ?? "", result: r, index: lastIndex.current, undo: u ?? null });
+    },
     onNext: next, onSkip: next, retur,
   };
 
@@ -67,6 +76,15 @@ export default function Beslutninger() {
       subtitle="Systemet har gjort resten. Eldste faktura ligger alltid øverst. Hvert svar gjelder alle fakturaer med samme vare.">
       <div className="space-y-4 px-page pb-8">
         {tiles}
+        {undo.last && undo.canUndo(undo.last) && !receipt?.undo && (
+          <div className="flex flex-wrap items-center gap-2 text-caption text-ink-secondary">
+            <span>Siste svar: {undo.last.label}</span>
+            <Button variant="outline" size="sm" className="min-h-[44px] gap-1.5" disabled={undo.state.kind === "busy"} onClick={() => undo.last && void undo.undo(undo.last)}>
+              <Undo2 className="h-4 w-4" aria-hidden />Angre siste
+            </Button>
+          </div>
+        )}
+        {!receipt && <UndoStatus s={undo.state} />}
         <ExplainSteps />
         <QueryState isLoading={work.isLoading} isError={work.isError} error={work.error} scope="ravarer:beslutninger" onRetry={() => void work.refetch()}>
           {decisions.length === 0 ? (
@@ -89,7 +107,8 @@ export default function Beslutninger() {
                   {!wide && (
                     <Button variant="ghost" className="mb-2 min-h-[44px] gap-1" onClick={() => select(null)}><ChevronLeft className="h-4 w-4" aria-hidden />Alle spørsmål</Button>
                   )}
-                  {receipt && <ReceiptBox r={receipt} onNext={next} canNext={decisions.some((d) => d.key !== valgt)} />}
+                  {receipt && <ReceiptBox r={receipt} onNext={next} canNext={decisions.some((d) => d.key !== valgt)}
+                    canUndo={!!receipt.undo && undo.canUndo(receipt.undo)} undoState={undo.state} onUndo={() => receipt.undo && void undo.undo(receipt.undo)} />}
                   {sel ? <DecisionPanel key={sel.key} d={sel} ctx={ctx} />
                     : !receipt && <p className="text-body text-ink-secondary">Velg et spørsmål i listen.</p>}
                 </div>
@@ -111,7 +130,14 @@ function Tile({ label, value }: { label: string; value: number | null }) {
   );
 }
 
-function ReceiptBox({ r, onNext, canNext }: { r: Receipt; onNext: () => void; canNext: boolean }) {
+function UndoStatus({ s }: { s: UndoState }) {
+  if (s.kind === "busy") return <p className="text-caption text-ink-secondary" aria-live="polite">Angrer …</p>;
+  if (s.kind === "done") return <p role="status" className="text-caption">{s.text}</p>;
+  if (s.kind === "error") return <p role="alert" className="text-caption text-destructive">{s.text}</p>;
+  return null;
+}
+
+function ReceiptBox({ r, onNext, canNext, canUndo, undoState, onUndo }: { r: Receipt; onNext: () => void; canNext: boolean; canUndo: boolean; undoState: UndoState; onUndo: () => void }) {
   return (
     <div role="status" className="mb-4 rounded-xl border border-line-subtle bg-muted/40 p-3">
       <p className="text-body font-semibold">Besvart{r.result?.title ? `: ${r.result.title}` : ""}</p>
@@ -120,7 +146,11 @@ function ReceiptBox({ r, onNext, canNext }: { r: Receipt; onNext: () => void; ca
       <div className="mt-2 flex flex-wrap gap-2">
         {canNext && <Button className="min-h-[44px]" onClick={onNext}>Neste spørsmål</Button>}
         {r.result?.link && <Button asChild variant="outline" className="min-h-[44px]"><Link to={r.result.link.to}>{r.result.link.label}</Link></Button>}
+        {canUndo && undoState.kind !== "done" && (
+          <Button variant="ghost" className="min-h-[44px] gap-1.5" disabled={undoState.kind === "busy"} onClick={onUndo}><Undo2 className="h-4 w-4" aria-hidden />Angre</Button>
+        )}
       </div>
+      <UndoStatus s={undoState} />
     </div>
   );
 }
