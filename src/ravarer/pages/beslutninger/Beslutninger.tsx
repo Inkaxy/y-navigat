@@ -43,7 +43,8 @@ export default function Beslutninger() {
     const n = decisions[i] && decisions[i].key !== valgt ? decisions[i] : decisions.find((d) => d.key !== valgt) ?? null;
     select(n?.key ?? null, false);
   };
-  const retur = new URLSearchParams({ retur: `${paths.beslutninger()}?${sp.toString()}` }).get("retur") ?? "";
+  // Retur fra fakturasiden tilbake til samme spørsmål (trygg appsti, se fakturaReturn).
+  const retur = `${paths.beslutninger()}${sp.toString() ? `?${sp.toString()}` : ""}`;
   const ctx: DecisionCtx = {
     onDone: (r) => setReceipt({ question: sel?.question ?? "", result: r, index: lastIndex.current }),
     onNext: next, onSkip: next, retur,
