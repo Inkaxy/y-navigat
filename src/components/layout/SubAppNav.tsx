@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/sheet";
 import { useAccessibleApps } from "@/hooks/useAccessibleApps";
 import { useWorkSummary } from "@/ravarer/hooks/useWorkData";
+import { useOpenQuestionCount } from "@/ravarer/hooks/useDecisions";
 import type { WorkSummary } from "@/ravarer/lib/workRpc";
 import { paths } from "@/ravarer/lib/paths";
 import { useInvoiceAccess } from "@/ravarer/hooks/useInvoiceAccess";
@@ -26,6 +27,7 @@ import {
 import {
   ChevronDown,
   LayoutDashboard,
+  ListChecks,
   Ticket,
   CalendarRange,
   ShoppingBag,
