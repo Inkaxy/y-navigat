@@ -34,6 +34,7 @@ import {
   Loader2,
   RotateCcw,
   Search,
+  ShoppingBasket,
   SlidersHorizontal,
   Upload,
 } from "lucide-react";
@@ -46,9 +47,11 @@ import { BatchAdjustDialog } from "@/varer/components/prices/BatchAdjustDialog";
 import { OfferPriceListsDialog } from "@/varer/components/prices/OfferPriceListsDialog";
 import { ImportPricesDialog } from "@/varer/components/prices/ImportPricesDialog";
 import { ReturView } from "@/varer/components/prices/ReturView";
+import { HandelsvarerView } from "@/varer/components/prices/HandelsvarerView";
+import { useAuth } from "@/hooks/useAuth";
 import { osloTodayISO, osloDateISO } from "@/lib/osloDate";
 
-type ViewMode = "simple" | "matrix" | "retur";
+type ViewMode = "simple" | "matrix" | "retur" | "handelsvarer";
 
 const TODAY = () => osloTodayISO();
 const SHOW_MVA_KEY = "varer_show_mva";
@@ -64,6 +67,7 @@ export default function PriceLists() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { canWrite, legalEntityId } = useAppContext();
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const view: ViewMode =
@@ -71,6 +75,8 @@ export default function PriceLists() {
       ? "simple"
       : searchParams.get("view") === "retur"
       ? "retur"
+      : searchParams.get("view") === "handelsvarer"
+      ? "handelsvarer"
       : "matrix";
   const highlight = searchParams.get("highlight");
   const priceDateParam = searchParams.get("pricedate");
@@ -255,7 +261,7 @@ export default function PriceLists() {
   /* ----- Priser for matrix-visning (kun gyldig på priceDate) ----- */
   const pricesQuery = useQuery({
     queryKey: ["matrix-prices", legalEntityId, priceDate],
-    enabled: view === "matrix",
+    enabled: view === "matrix" || view === "handelsvarer",
     queryFn: async () => {
       const all = await fetchAllRows<{ price_list_id: string; product_id: string; price: number; valid_from: string; valid_to: string | null }>(
         (from, to) =>
@@ -473,9 +479,10 @@ export default function PriceLists() {
 
   const productNames = useMemo(() => {
     const m: Record<string, string> = {};
-    for (const p of products) m[p.id] = p.display_name;
+    // Alle varer (ikke bare filtrerte), slik at lagrelinjen viser navn også fra Handelsvarer.
+    for (const p of productsQuery.data ?? []) m[p.id] = p.display_name;
     return m;
-  }, [products]);
+  }, [productsQuery.data]);
 
   /* ----- Selection ----- */
   const visibleIds = useMemo(() => products.map((p) => p.id), [products]);
@@ -612,6 +619,19 @@ export default function PriceLists() {
               <RotateCcw className="h-4 w-4" />
               Retur
             </button>
+            <button
+              onClick={() => setView("handelsvarer")}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition",
+                view === "handelsvarer"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+              aria-pressed={view === "handelsvarer"}
+            >
+              <ShoppingBasket className="h-4 w-4" />
+              Handelsvarer
+            </button>
           </div>
 
           <Badge className="bg-app-dark text-app-foreground hover:bg-app-dark">
@@ -716,7 +736,7 @@ export default function PriceLists() {
         </div>
 
         {/* Sentral prisdato (F82-stil, grønn tekst) */}
-        {view === "matrix" && (
+        {(view === "matrix" || view === "handelsvarer") && (
           <div className="flex items-center justify-center">
             <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
               <PopoverTrigger asChild>
@@ -783,6 +803,19 @@ export default function PriceLists() {
           />
         ) : view === "retur" ? (
           <ReturView priceDate={priceDate} search={search} />
+        ) : view === "handelsvarer" ? (
+          <HandelsvarerView
+            legalEntityId={legalEntityId}
+            userId={user?.id ?? null}
+            priceLists={activeLists}
+            prices={pricesQuery.data ?? new Map()}
+            pricesLoading={pricesQuery.isLoading || productsQuery.isLoading}
+            pendingEdits={pendingEdits}
+            onCellChange={handleCellChange}
+            canWrite={canWrite}
+            search={search}
+            products={(productsQuery.data ?? []).map((p) => ({ id: p.id, display_number: p.display_number, display_name: p.display_name }))}
+          />
         ) : (
           <>
             {pricesQuery.isLoading || productsQuery.isLoading ? (
