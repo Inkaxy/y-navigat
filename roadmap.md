@@ -60,6 +60,9 @@
 - [x] 3 Automatikk (B7): regler som setninger (dagens innstillinger), logg, hopp over, morgen-e-post (forhåndsvisning); pant/bolk/nøkkelråvarer venter på 20261117_automatikk (+ DATAENDRING-fil for timekjøring)
 - [ ] 3b Neste: matchmotoren bruker nøkkelgrenser og pant-som-følgevare (edge-endring, root-gjennomgang)
 - [ ] 3c Morgen-e-post faktisk utsending (planlagt kjøring + mal)
-- [ ] 4 Handelsvarer (B5) i Varer
-- [ ] 5 Prisgrunnlag (B6) i Varer
-- [ ] 6 Fakturaer som arkiv + ny Oversikt
+- [ ] Runde 3 (16.11): SQL fra runde 2 IKKE kjørt — alt bak rm_cap_* forblir skjult/deaktivert uten feilmelding
+- [ ] 4 Handelsvarer (B5) i Varer › Priser: matrise handelsvare × prisliste, innpris/påslag/salgspris, standard 1,2, overstyring per vare/prisgruppe, via ulagrede endringer + set_prices
+- [ ] 5 Prisgrunnlag (B6) i Varer: kalkylekort, emballasje/handelsvare som linje, emballasje i Brutto+DG2 (innstilling), innsatsfaktorer siste 12 mnd / hele historikken
+- [ ] 6 Råvarer-Oversikt: åpne beslutninger, lesestatus, største prisendringer, lenker; Fakturaer uendret
+- [ ] 3b Nøkkelgrenser + pant som følgevare i matchingen bak cap
+- [ ] Banner «Fakturalesingen står stille» → «Nøkkelen er testet og virker, venter på første lesing» etter vellykket nøkkeltest
