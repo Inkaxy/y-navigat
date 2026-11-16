@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it, beforeEach } from "vitest";
 import { clearLastAnswer, loadLastAnswer, packagePreview, parseUndoAnswer, parseUndoResult, quickAnswersFor, quickLabel, saveLastAnswer, suggestSkipReason, undoNeedsSql, undoSummary } from "@/ravarer/lib/quickAnswers";
 import { classifyPending } from "@/lib/pendingRpc";
