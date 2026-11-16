@@ -43,17 +43,18 @@ const fail = (m) => { console.error("FEIL:", m); process.exit(1); };
 const check = (cond, m) => { if (!cond) fail(m); ok++; };
 
 const db = new PGlite();
-await db.exec(stub);
-await db.exec(read("scripts/fixtures/live-20261116/h4_margin_eval.sql"));
-await db.exec(read("scripts/fixtures/live-20261116/product_margins.sql"));
-await db.exec(`insert into products values ('${P}', '${LE}', 'Kransekake', 'oppskrift', 15);
+const step = async (name, fn) => { try { return await fn(); } catch (e) { fail(`${name}: ${e.message}`); } };
+await step("stubb", () => db.exec(stub));
+await step("h4", () => db.exec(read("scripts/fixtures/live-20261116/h4_margin_eval.sql")));
+await step("pm", () => db.exec(read("scripts/fixtures/live-20261116/product_margins.sql")));
+await step("data", () => db.exec(`insert into products values ('${P}', '${LE}', 'Kransekake', 'oppskrift', 15);
   insert into price_lists values ('${PL}', '${LE}', 'engros_base', 'Engros', 'engros');
   insert into price_list_items values ('${PL}', '${P}', 100, '2026-01-01', null);
   insert into raw_materials values ('${RM}', '${LE}');
-  insert into entity_calc_settings values ('${LE}', 'legges_til');`);
+  insert into entity_calc_settings values ('${LE}', 'legges_til');`));
 
 const h4 = async () => (await db.query(`select * from h4_margin_eval('${P}', 'engros', 100, false, 'oppskrift', product_cost('${P}'))`)).rows[0];
-const before = await h4();
+const before = await step("h4 før", h4);
 check(Number(before.brutto_pct) === 70 && Number(before.dg2_pct) === 50, "før: Brutto 70 / DG2 50 uten emballasje");
 
 // Prisgrunnlag
