@@ -137,6 +137,7 @@ export function useSaveResaleMarkups(legalEntityId: string | null) {
                       raw_material_id: c.kind === "cell" ? c.rawMaterialId : null,
                     });
         if (r.kind !== "ok") throw new Error(r.kind === "denied" ? "Du har ikke skrivetilgang til påslag." : "Påslaget ble ikke lagret. Last inn på nytt og kontroller.");
+        if (found && (!Array.isArray(r.data) || r.data.length !== 1)) throw new Error("Påslaget er endret et annet sted. Last inn på nytt og kontroller.");
         saved++;
       }
       return saved;

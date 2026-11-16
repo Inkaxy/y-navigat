@@ -18,6 +18,7 @@ import {
 import { Calculator, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { parseNum } from "@/varer/lib/calcFormat";
+import { MarginExtrasSettings } from "@/varer/components/settings/MarginExtrasSettings";
 import {
   CALC_TYPE_LABEL,
   PRICE_LEVEL_LABEL,
@@ -241,6 +242,8 @@ export default function SettingsCalc() {
           )}
         </CardContent>
       </Card>
+
+      <MarginExtrasSettings legalEntityId={legalEntityId} canWrite={canWrite} />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 pb-3">
