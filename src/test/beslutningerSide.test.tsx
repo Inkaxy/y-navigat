@@ -39,7 +39,11 @@ function renderPage(url = "/ravarer/beslutninger") {
 }
 
 describe("Beslutninger-siden", () => {
-  beforeEach(() => { window.localStorage.clear(); });
+  beforeEach(() => {
+    window.localStorage.clear();
+    // Bred skjerm (1280+): kø og spørsmål side om side.
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as typeof window.matchMedia;
+  });
   it("tom kø viser «Alt er besvart»", () => {
     state = { items: [], counts: { alle: 0 } };
     renderPage();
