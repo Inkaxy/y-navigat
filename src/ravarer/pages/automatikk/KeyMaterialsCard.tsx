@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCompany } from "@/hooks/useCompany";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useDebouncedValue } from "@/kunder/hooks/useDebouncedValue";
 import { parseDecimal } from "@/fakturaer/lib/units";
 import { pendingDelete, pendingInsert, pendingPatch } from "@/lib/pendingRpc";
 import type { KeyLimit } from "@/ravarer/lib/automatikk";
