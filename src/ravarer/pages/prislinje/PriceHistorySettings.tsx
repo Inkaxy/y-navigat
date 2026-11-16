@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ const txt = (n: number | null) => (n == null ? "" : String(n).replace(".", ","))
 
 /**
  * Avviksgrense og standardperiode for «Alle priser» (admin). Kladd med Lagre/Forkast; tomt felt =
- * standard (kategoriens toleranse / 12 måneder). Skriver bare de to nye kolonnene.
+ * standard (kategoriens toleranse / 12 måneder). Skriver bare de to nye kolonnene. Forelderen gir `key` per lagret verdi.
  */
 export function PriceHistorySettings({ value, canEdit }: { value: S; canEdit: boolean }) {
   const qc = useQueryClient();
@@ -22,7 +22,6 @@ export function PriceHistorySettings({ value, canEdit }: { value: S; canEdit: bo
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
-  useEffect(() => { setDev(txt(value.deviationPct)); setMonths(txt(value.sinceMonths)); }, [value.deviationPct, value.sinceMonths]);
   const d = dev.trim() === "" ? null : parseDecimal(dev);
   const m = months.trim() === "" ? null : parseDecimal(months);
   const errors: string[] = [];
