@@ -37,7 +37,7 @@ export interface RecipeUsage {
   products: { id: string; number: number | null; name: string }[];
 }
 
-type RecipeRow = { id: string; name: string; product_id: string | null; units_per_batch: number | null };
+type RecipeRow = { id: string; name: string | null; product_id: string | null; units_per_batch: number | null };
 type LineRow = { recipe_id: string; raw_material_id: string | null; quantity: number | null; unit: string | null; quantity_grams: number | null; waste_percent: number | null };
 type LinkRow = { recipe_id: string; product_id: string };
 type ProdRow = { id: string; display_number: number | null; display_name: string; status: string | null };
@@ -72,7 +72,7 @@ export function useRecipeUsage(legalEntityId: string | null) {
       return recipes.map((r) => {
         const pids = new Set<string>([...(r.product_id ? [r.product_id] : []), ...links.filter((k) => k.recipe_id === r.id).map((k) => k.product_id)]);
         return {
-          recipeId: r.id, recipeName: r.name, unitsPerBatch: r.units_per_batch == null ? null : Number(r.units_per_batch),
+          recipeId: r.id, recipeName: r.name ?? "Uten navn", unitsPerBatch: r.units_per_batch == null ? null : Number(r.units_per_batch),
           lines: lines.filter((l) => l.recipe_id === r.id && l.raw_material_id).map((l) => ({
             rawMaterialId: l.raw_material_id!, quantity: l.quantity == null ? null : Number(l.quantity), unit: l.unit,
             quantityGrams: l.quantity_grams == null ? null : Number(l.quantity_grams), wastePct: l.waste_percent == null ? null : Number(l.waste_percent),
