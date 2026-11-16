@@ -55,11 +55,14 @@
 - [x] 1a Beslutninger (B1): meny med teller, kø eldste først, 12 spørsmålstyper, fakta (regnestykke, kjøp, «Det systemet vet», fakturautdrag, bruk), svar via dagens paneler, kvittering + Neste, tom kø, vennlig «Spør leverandøren»-tekst
 - [x] 1b Svarknapper direkte i spørsmålet (dagens skriveveier) + pakningsretting med forhåndsvisning
 - [x] 1c «Angre»/«Angre siste» bygget; pris/«ikke vare» skjult til root kjører 20261117_beslutninger_angre («én gang» virker nå)
-- [ ] 1d Brutto/DG2 før og etter per vare i spørsmålet (bygges sammen med fase 5)
+- [ ] 1d Brutto/DG2 før og etter per vare i spørsmålet (Prisgrunnlag viser det per vare; ikke koblet inn i spørsmålet ennå)
 - [x] 2 Prislinje (B4): meny, søyler, «Alle priser», kost, andre leverandører, klar for bruk, endringslogg; «Rett pris»/«Endre godkjent pakning»/avviksgrense venter på 20261117_prislinje
 - [x] 3 Automatikk (B7): regler som setninger (dagens innstillinger), logg, hopp over, morgen-e-post (forhåndsvisning); pant/bolk/nøkkelråvarer venter på 20261117_automatikk (+ DATAENDRING-fil for timekjøring)
-- [ ] 3b Neste: matchmotoren bruker nøkkelgrenser og pant-som-følgevare (edge-endring, root-gjennomgang)
+- [x] 3b Matchmotoren bruker nøkkelgrenser og pant-som-følgevare (i repo, ikke rullet ut; venter root-gjennomgang + 20261117_automatikk)
 - [ ] 3c Morgen-e-post faktisk utsending (planlagt kjøring + mal)
-- [ ] 4 Handelsvarer (B5) i Varer
-- [ ] 5 Prisgrunnlag (B6) i Varer
-- [ ] 6 Fakturaer som arkiv + ny Oversikt
+- [x] Runde 3 (16.11): SQL fra runde 2 IKKE kjørt — alt bak rm_cap_* forblir skjult/deaktivert uten feilmelding
+- [x] 4 Handelsvarer (B5) i Varer › Priser: matrise handelsvare × prisliste, innpris/påslag/salgspris, standard 1,2, overstyring per vare/prisgruppe, via ulagrede endringer + set_prices
+- [x] 5 Prisgrunnlag (B6) i Varer: kalkylekort, emballasje/handelsvare som linje, emballasje i Brutto+DG2 (innstilling), innsatsfaktorer siste 12 mnd / hele historikken
+- [x] 6 Råvarer-Oversikt: åpne beslutninger, lesestatus, største prisendringer, lenker; Fakturaer uendret
+- [x] 3b Nøkkelgrenser + pant som følgevare i matchingen bak cap
+- [x] Banner «Fakturalesingen står stille» → «Nøkkelen er testet og virker, venter på første lesing» etter vellykket nøkkeltest

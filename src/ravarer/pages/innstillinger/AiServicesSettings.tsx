@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
 import { useEffect, useRef, useState } from "react";
+import { saveKeyTestOk } from "@/ravarer/lib/keyTestMarker";
 import { parseDecimal } from "@/fakturaer/lib/units";
 import { QueryState } from "@/components/common/QueryState";
 import { UnsavedChangesDialog } from "@/components/common/UnsavedChangesDialog";
@@ -116,6 +117,8 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
   const [saveOutcome, setSaveOutcome] = useState<{ kind: "saved" | "unknown" | "rejected"; message: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const busy = useRef(false);
+  /** Ny nøkkel som har bestått test i denne økten (markeres som testet først når den er lagret). */
+  const testedOkKey = useRef<string | null>(null);
   const [saving, setSaving] = useState(false);
   /** Ukjent lagringsutfall: lagring forblir sperret til gjeldende konfigurasjon faktisk er lest på nytt. */
   const [recon, setRecon] = useState<null | "reading" | "failed">(null);
@@ -186,6 +189,9 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
         return;
       }
       if (isObj(data) && data.ok === true) {
+        // Lagret nøkkel testet ok: varselet viser «venter på første lesing». Ny nøkkel huskes til den er lagret.
+        if (storedTestOnly) { saveKeyTestOk(); void qc.invalidateQueries({ queryKey: ["invoice-reading-health"] }); }
+        else testedOkKey.current = apiKey.trim();
         setTestResult({ ok: true, message: `${tested}: modellen svarte. Dette bekrefter bare tilkoblingen, ikke kvaliteten på fakturalesing.` });
       } else {
         setTestResult({ ok: false, message: `${tested}: ${isObj(data) && typeof data.error === "string" ? data.error : "Ukjent feil"}` });
@@ -227,6 +233,11 @@ function ExtractionConfigCard({ existing, onSaved }: { existing: AiConfig | null
       } else if (error || !(settingsOnly ? isObj(data) && isObj(data.config) && typeof data.config.id === "string" : parseAiSaveResult(data))) {
         unknown = true;
       } else {
+        if (!settingsOnly && testedOkKey.current != null && testedOkKey.current === frozen.key.trim()) {
+          saveKeyTestOk();
+          void qc.invalidateQueries({ queryKey: ["invoice-reading-health"] });
+        }
+        testedOkKey.current = null;
         setApiKey((k) => (k === frozen.key ? "" : k));
         setDraft((cur) => (cur && cur.rev === frozen.rev ? null : cur));
         setSaveOutcome({ kind: "saved", message: "Konfigurasjonen er lagret." });

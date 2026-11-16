@@ -85,6 +85,7 @@ import { RecipeIngredientsSection } from "@/varer/components/recipes/detail/Reci
 import { RecipeInfoSection } from "@/varer/components/recipes/detail/RecipeInfoSection";
 import { RecipeProcessTab } from "@/varer/components/recipes/detail/RecipeProcessTab";
 import { RecipeProductsTab } from "@/varer/components/recipes/detail/RecipeProductsTab";
+import { RecipePackagingSection } from "@/varer/components/recipes/detail/RecipePackagingSection";
 import { RecipeHistoryTab } from "@/varer/components/recipes/detail/RecipeHistoryTab";
 
 
@@ -1170,6 +1171,16 @@ export default function RecipeDetail() {
                 onRemove={(linkId) => void productLinks.removeLink(linkId, false)}
                 busy={productLinks.busy}
               />
+            )}
+            {activeTab === "varer" && (
+              <div className="mt-6">
+                <RecipePackagingSection
+                  recipeId={recipe.id}
+                  legalEntityId={legalEntityId ?? null}
+                  unitsPerBatch={recipe.units_per_batch ?? null}
+                  canWrite={editable}
+                />
+              </div>
             )}
 
             {activeTab === "merking" && (

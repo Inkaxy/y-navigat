@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useCompany } from "@/hooks/useCompany";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { useInvoiceReadingHealth } from "@/ravarer/hooks/useInvoiceReadingHealth";
-import { fmtOsloDateTime } from "@/ravarer/lib/invoiceReadingHealth";
+import { fmtOsloDateTime, readingBannerState } from "@/ravarer/lib/invoiceReadingHealth";
+import { loadKeyTestOk } from "@/ravarer/lib/keyTestMarker";
 import { paths } from "@/ravarer/lib/paths";
 
 /** Varsel når fakturalesingen står stille fordi AI-tjenesten feiler. Vises ikke ved ok/ukjent. */
@@ -14,7 +15,24 @@ export function InvoiceReadingAlert({ enabled = true }: { enabled?: boolean }) {
   const { data: isAdmin = false } = usePlatformAdmin();
   const q = useInvoiceReadingHealth(company?.id ?? null, enabled);
   const h = q.data;
-  if (!h || h.state !== "failing") return null;
+  const keyOkAt = loadKeyTestOk();
+  const banner = readingBannerState(h, keyOkAt);
+  if (!h || h.state !== "failing" || banner == null) return null;
+  if (banner === "key_ok_waiting") {
+    return (
+      <Alert role="status" aria-live="polite">
+        <CheckCircle2 className="h-4 w-4" aria-hidden />
+        <AlertTitle>Nøkkelen er testet og virker, venter på første lesing</AlertTitle>
+        <AlertDescription className="space-y-1">
+          <p className="text-sm">
+            Testet {fmtOsloDateTime(keyOkAt)}. Siste vellykkede lesing: {fmtOsloDateTime(h.lastSuccessAt)}.
+            {h.waitingInvoices ? ` ${h.waitingInvoices.toLocaleString("nb-NO")} faktura(er) venter på lesing.` : ""}
+            {" "}Varselet forsvinner når neste faktura er lest.
+          </p>
+        </AlertDescription>
+      </Alert>
+    );
+  }
   return (
     <Alert variant="destructive" role="alert" aria-live="polite">
       <AlertTriangle className="h-4 w-4" aria-hidden />

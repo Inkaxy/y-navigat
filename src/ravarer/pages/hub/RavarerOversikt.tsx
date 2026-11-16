@@ -15,6 +15,11 @@ import { ActivityView } from "@/ravarer/pages/oversikt/ActivityView";
 import { PriceMoversView } from "@/ravarer/pages/oversikt/PriceMoversView";
 import { DataQualityView } from "@/ravarer/pages/oversikt/DataQualityView";
 import { InvoiceReadingAlert } from "@/ravarer/components/reading/InvoiceReadingAlert";
+import { DecisionsOverviewCard } from "@/ravarer/pages/oversikt/DecisionsOverviewCard";
+import { useOpenQuestionCount } from "@/ravarer/hooks/useDecisions";
+import { useInvoiceReadingHealth } from "@/ravarer/hooks/useInvoiceReadingHealth";
+import { readingBannerState } from "@/ravarer/lib/invoiceReadingHealth";
+import { loadKeyTestOk } from "@/ravarer/lib/keyTestMarker";
 
 function firstNameFromEmail(email: string | null | undefined): string | null {
   if (!email) return null;
@@ -38,6 +43,8 @@ export default function RavarerOversikt() {
   const [more, setMore] = useState(false);
   const activityQ = useActivityFeed({ days: 7, enabled: invoiceAccess && more });
   const moversQ = usePriceMovers({ days: period });
+  const openQuestions = useOpenQuestionCount(invoiceAccess);
+  const healthQ = useInvoiceReadingHealth(company?.id ?? null, invoiceAccess);
   const [helpOpen, setHelpOpen] = useState(false);
 
   const hotkeys = useMemo<HotkeyBinding[]>(() => [
@@ -56,6 +63,17 @@ export default function RavarerOversikt() {
   return (
     <div className="mx-auto w-full max-w-[1280px] space-y-6 px-page py-5">
       <InvoiceReadingAlert enabled={invoiceAccess} />
+      {invoiceAccess && (
+        <DecisionsOverviewCard
+          openQuestions={openQuestions}
+          health={healthQ.data}
+          healthError={healthQ.isError}
+          banner={readingBannerState(healthQ.data, loadKeyTestOk())}
+          movers={moversQ.data?.items ?? null}
+          moversError={moversQ.isError}
+          period={period}
+        />
+      )}
       {summaryQ.isError
         ? <QueryErrorState error={summaryQ.error} scope="ravarer:oversikt:summary" onRetry={() => summaryQ.refetch()} />
         : <WorkStartView summary={summaryQ.data ?? null} open={openCounts} firstName={firstNameFromEmail(user?.email)} />}
