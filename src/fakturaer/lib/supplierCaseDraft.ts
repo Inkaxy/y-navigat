@@ -52,6 +52,19 @@ export function inquiryBasisText(lines: readonly DraftLine[]): string {
   return "sammenligningsprisen som er oppgitt for hver linje";
 }
 
+/** «Det er en økning på x %.» fra linjenes sammenligningspris og fakturerte pris. Ukjent gir nøytral tekst. */
+export function inquiryChangeText(lines: readonly DraftLine[]): string {
+  const ps = lines
+    .filter((l) => l.expected != null && l.invoiced != null && l.expected !== 0)
+    .map((l) => Math.round(((l.invoiced as number) / (l.expected as number) - 1) * 1000) / 10);
+  if (ps.length === 0 || ps.length !== lines.length) return "Det er en prisendring.";
+  const fmt = (n: number) => `${Math.abs(n).toLocaleString("nb-NO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;
+  const lo = Math.min(...ps), hi = Math.max(...ps);
+  if (lo > 0) return lo === hi ? `Det er en økning på ${fmt(lo)}.` : `Det er en økning på ${fmt(lo)}–${fmt(hi)}.`;
+  if (hi < 0) return lo === hi ? `Det er en nedgang på ${fmt(lo)}.` : `Det er en nedgang på ${fmt(hi)}–${fmt(lo)}.`;
+  return "Det er en prisendring.";
+}
+
 export function buildSupplierCaseDraft(i: DraftInput): Draft {
   const numbers = [...new Set(i.lines.map((l) => l.invoice_number).filter((x): x is string => !!x))];
   const ref = numbers.length ? `faktura ${numbers.join(", ")}` : i.case_title;
@@ -74,10 +87,11 @@ export function buildSupplierCaseDraft(i: DraftInput): Draft {
     const obs = i.lines.every((l) => l.observed_excl_vat != null) ? Math.round(i.lines.reduce((s, l) => s + (l.observed_excl_vat ?? 0), 0) * 100) / 100 : null;
     const body = [
       hello, "",
-      `Vi ser at prisen på fakturaene under er annerledes enn ${inquiryBasisText(i.lines)}:`, "",
+      // Henrik 16.11.2026: vennlig forespørsel, ikke krav. Utkastet går til Henrik, aldri direkte til leverandøren.
+      `Vi har fått denne prisen inn i våre systemer. ${inquiryChangeText(i.lines)} Vi kan ikke se at vi har blitt varslet om prisendring. Stemmer dette?`, "",
+      `Sammenlignet med ${inquiryBasisText(i.lines)}:`,
       ...i.lines.map(head), "",
       ...(obs != null ? [`Observert prisforskjell: ${nok(obs)} kr eks. mva. Dette er ikke et krav.`, ""] : []),
-      "Kan dere bekrefte gjeldende pris og årsaken til endringen?",
       ...sign,
     ].join("\n");
     return { subject: `Spørsmål om pris – ${ref}`, body, missingBasis: false, blocked: false };

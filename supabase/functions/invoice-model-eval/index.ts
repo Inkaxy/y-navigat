@@ -205,7 +205,7 @@ Deno.serve(async (req) => {
           call: call(parts![j], pageTextBlock(pdfText, c.from, c.to), EVAL_LIMITS.chunkTimeoutMs),
         });
         warnings.push(...r.warnings);
-        return { chunk: c, data: r.best };
+        return { chunk: c, data: r.best ?? r.lastParsed };
       }));
       const merged = mergeChunkExtractions(results);
       chunked = { chunks: chunks.length, complete: merged.complete, failed: merged.failedChunks.map((c) => `side ${c.from}–${c.to}`) };

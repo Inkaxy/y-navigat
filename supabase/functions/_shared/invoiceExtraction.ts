@@ -327,7 +327,9 @@ export async function runExtractionAttempts(opts: {
   extraHint?: string | null;
   /** Tallkontroll uten AI (tusenskille/desimaltegn), se numberCheck.ts. Standard på. */
   numberCheck?: boolean;
-}): Promise<{ best: ParsedExtraction | null; attempts: number; log: AttemptLog[]; warnings: string[]; userTexts: string[]; callError: unknown; truncated: boolean }> {
+}): Promise<{ best: ParsedExtraction | null; attempts: number; log: AttemptLog[]; warnings: string[]; userTexts: string[]; callError: unknown; truncated: boolean;
+  /** Siste svar som kunne tolkes (også uten linjer). Brukes av sidelesingen: en side uten linjer er lest, ikke feilet. */
+  lastParsed: ParsedExtraction | null }> {
   const { call, parseJson, hints, examples } = opts;
   let callError: unknown = null;
   let truncated = false;
@@ -337,6 +339,7 @@ export async function runExtractionAttempts(opts: {
   const userTexts: string[] = [];
   let hint: string | null = null;
   let best: { data: ParsedExtraction; dev: number | null } | null = null;
+  let lastParsed: ParsedExtraction | null = null;
   let attempts = 0;
   for (let attempt = 1; attempt <= max; attempt++) {
     attempts = attempt;
@@ -365,6 +368,7 @@ export async function runExtractionAttempts(opts: {
     const nc = opts.numberCheck === false ? null : applyNumberCheck(raw, hints.expected_total_excl_vat, hints.is_credit);
     const lines = nc ? nc.lines : raw;
     const data: ParsedExtraction = { ...obj, lines, number_check_issue: nc?.invoiceIssue ?? null };
+    lastParsed = data;
     if (shouldRetryExtraction(lines, attempt, max)) {
       log.push({ attempt, ok: false, reason: "empty", inputTokens: res.inputTokens, outputTokens: res.outputTokens });
       warnings.push(`Ingen linjer i forsøk ${attempt}; prøver igjen`);
@@ -391,7 +395,9 @@ export async function runExtractionAttempts(opts: {
         : "Du har trolig regnet inn mva, rabattlinjer dobbelt, eller lest en «brutto»-kolonne. Bruk nettokolonnen etter rabatt.") +
       " Ikke skaler tallene for å treffe summen.";
   }
-  return { best: best?.data ?? null, attempts, log, warnings, userTexts, callError: best ? null : callError, truncated: best ? false : truncated };
+  // `truncated` beholdes også når et tidligere forsøk ga et (tomt) svar: Drammen Papir 9041438168 (16.11.2026)
+  // fikk først et tomt svar og så et kuttet svar, og kuttet ble skjult slik at lange fakturaer ikke ble oppdaget.
+  return { best: best?.data ?? null, attempts, log, warnings, userTexts, callError: best ? null : callError, truncated, lastParsed };
 }
 
 /**

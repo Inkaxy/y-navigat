@@ -50,6 +50,8 @@ export type WorkItem = {
   /** Prisvirkning. Null = ikke beregnet (gammel server eller usikker lesing) — aldri bruttobeløp. */
   impact_nok: number | null;
   last_date: string | null; last_open_line_id: string | null; reasons: string[];
+  /** Eldste åpne fakturadato (sorteringen «oldest»). Fravær = eldre svar. */
+  first_open_date?: string | null;
   /** Fravær = «unknown»: eldre servere har ikke feltet og vises konservativt. */
   effect_status: WorkEffectStatus;
   effect_label: string | null;

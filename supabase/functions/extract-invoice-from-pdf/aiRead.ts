@@ -12,7 +12,10 @@ import { extractionSchemaEnabled } from "../_shared/extractionSchemaFlag.ts";
 import { checkSum, runExtractionAttempts, type Hints, type LearningExample, type ParsedExtraction } from "../_shared/invoiceExtraction.ts";
 import { INVOICE_EXTRACTION_SYSTEM_PROMPT } from "../_shared/invoiceExtractionPrompt.ts";
 import { classifyAiFailure, type AiFailure } from "../_shared/aiFailure.ts";
-import { chunkHint, chunkReason, maxPageOf, mergeChunkExtractions, planPageChunks, type ChunkResult } from "../_shared/chunkedExtraction.ts";
+import {
+  chunkHint, chunkReason, directChunkReason, maxPageOf, mergeChunkExtractions, pagesReadNoLinesMessage, planPageChunks, resolveChunkedRead,
+  type ChunkResult, type InvoiceLevelIssue,
+} from "../_shared/chunkedExtraction.ts";
 import { applyNumberCheck } from "../_shared/numberCheck.ts";
 import type { PdfTextResult } from "../_shared/pdfText.ts";
 import { splitPdf } from "./pdfSplit.ts";
@@ -44,6 +47,10 @@ export interface ReadOutcome {
   failure: AiFailure | null;
   usage: { in: number | null; out: number | null; cost: number | null };
   chunked: { chunks: number; reason: string } | null;
+  /** Fakturavarsler fra lesingen (f.eks. sider som ikke kunne leses). */
+  issues: InvoiceLevelIssue[];
+  /** Antall sidebolker som svarte (null = ikke lest side for side). */
+  pagesRead: number | null;
 }
 
 const CHUNK_CONCURRENCY = 3;
@@ -75,7 +82,7 @@ export async function readWithConfig(ctx: ReadContext, cfg: AiConfigRow): Promis
   } catch (_e) {
     const failure = classifyAiFailure("decrypt", cfg.provider);
     await logUsage(ctx, cfg, { success: false, error_message: "Nøkkelen kunne ikke dekrypteres (AI_CONFIG_ENCRYPTION_KEY)", input_tokens: null, output_tokens: null, estimated_cost_usd: null });
-    return { best: null, attempts: 0, warnings, failure, usage, chunked: null };
+    return { best: null, attempts: 0, warnings, failure, usage, chunked: null, issues: [], pagesRead: null };
   }
   const useSchema = extractionSchemaEnabled(Deno.env.get("INVOICE_EXTRACTION_STRICT_SCHEMA"), cfg.provider);
   if (useSchema) warnings.push("Strict schema brukt i lesingen");
@@ -121,33 +128,51 @@ export async function readWithConfig(ctx: ReadContext, cfg: AiConfigRow): Promis
     }
   };
 
-  const run = await runExtractionAttempts({
-    hints: ctx.hints, examples: ctx.examples, maxAttempts: ctx.maxAttempts, parseJson: extractJson,
-    call: call(ctx.pdfBase64, ctx.textBlock),
-  });
-  await logRun(run.log);
-  warnings.push(...run.warnings);
-  let attempts = run.attempts;
-  const failure = run.callError != null ? classifyAiFailure(run.callError, cfg.provider) : null;
-
-  // Systemfeil (nøkkel/kvote/nede): ingen oppdeling — det ville bare feilet flere ganger.
-  if (failure?.systemic) return { best: null, attempts, warnings, failure, usage, chunked: null };
-
   const totalPages = ctx.pdfText?.totalPages ?? null;
-  const single = run.best;
-  const singleSum = single ? checkSum(single.lines, ctx.hints.expected_total_excl_vat, null, null, ctx.hints.is_credit) : null;
-  const reason = chunkReason({
-    truncated: run.truncated, totalPages,
-    linesSum: singleSum?.lines_sum ?? null, expectedExcl: singleSum?.expected_excl_vat ?? null,
-    maxPageSeen: single ? maxPageOf(single.lines) : null,
-  });
-  if (!reason || !ctx.pdfBytes || totalPages == null) return { best: single, attempts, warnings, failure: single ? null : failure, usage, chunked: null };
+  // Mange sider: les side for side direkte (16.11.2026: hele-faktura-kallet ble kuttet tre ganger på 6 sider).
+  const direct = ctx.pdfBytes ? directChunkReason(totalPages) : null;
+  let attempts = 0;
+  let single: ParsedExtraction | null = null;
+  let singleDev: number | null = null;
+  let failure: AiFailure | null = null;
+  let reason: string | null = direct;
+  if (!direct) {
+    const run = await runExtractionAttempts({
+      hints: ctx.hints, examples: ctx.examples, maxAttempts: ctx.maxAttempts, parseJson: extractJson,
+      call: call(ctx.pdfBase64, ctx.textBlock),
+    });
+    await logRun(run.log);
+    warnings.push(...run.warnings);
+    attempts = run.attempts;
+    failure = run.callError != null ? classifyAiFailure(run.callError, cfg.provider) : null;
+    // Systemfeil (nøkkel/kvote/nede): ingen oppdeling — det ville bare feilet flere ganger.
+    if (failure?.systemic) return { best: null, attempts, warnings, failure, usage, chunked: null, issues: [], pagesRead: null };
+    single = run.best;
+    const singleSum = single ? checkSum(single.lines, ctx.hints.expected_total_excl_vat, null, null, ctx.hints.is_credit) : null;
+    singleDev = singleSum?.deviation_pct ?? null;
+    reason = chunkReason({
+      truncated: run.truncated, totalPages,
+      linesSum: singleSum?.lines_sum ?? null, expectedExcl: singleSum?.expected_excl_vat ?? null,
+      maxPageSeen: single ? maxPageOf(single.lines) : null,
+    });
+  }
+  const plain = (): ReadOutcome => ({ best: single, attempts, warnings, failure: single ? null : failure, usage, chunked: null, issues: [], pagesRead: null });
+  if (!reason || !ctx.pdfBytes || totalPages == null) return plain();
 
   const chunks = planPageChunks(totalPages);
   const parts = await splitPdf(ctx.pdfBytes, chunks);
   if (!parts) {
     warnings.push(`Lang faktura (${reason}), men PDF-en kunne ikke deles i sider`);
-    return { best: single, attempts, warnings, failure: single ? null : failure, usage, chunked: null };
+    if (!direct) return plain();
+    // Direkte sidelesing var planlagt, men delingen feilet: les hele fakturaen som før.
+    const run = await runExtractionAttempts({
+      hints: ctx.hints, examples: ctx.examples, maxAttempts: ctx.maxAttempts, parseJson: extractJson,
+      call: call(ctx.pdfBase64, ctx.textBlock),
+    });
+    await logRun(run.log);
+    warnings.push(...run.warnings);
+    const f = run.callError != null ? classifyAiFailure(run.callError, cfg.provider) : null;
+    return { best: run.best, attempts: run.attempts, warnings, failure: run.best ? null : f, usage, chunked: null, issues: [], pagesRead: null };
   }
   warnings.push(`Leser fakturaen i ${chunks.length} sidebolker fordi ${reason}`);
   const chunkHints: Hints = { ...ctx.hints, expected_total_excl_vat: null };
@@ -162,26 +187,36 @@ export async function readWithConfig(ctx: ReadContext, cfg: AiConfigRow): Promis
       });
       await logRun(r.log);
       if (r.callError != null) chunkFailure = classifyAiFailure(r.callError, cfg.provider);
-      return { chunk: c, data: r.best } as ChunkResult;
+      // En side som svarte uten linjer (forside/oppsummering) er lest — ikke en feilet bolk.
+      return { chunk: c, data: r.best ?? r.lastParsed } as ChunkResult;
     });
     results.push(...(await Promise.all(batch)));
     attempts += batch.length;
   }
   const merged = mergeChunkExtractions(results);
-  if (!merged.complete) {
-    warnings.push(`Oppdelt lesing ufullstendig (${merged.failedChunks.map((c) => `side ${c.from}–${c.to}`).join(", ")} feilet); bruker enkeltlesingen`);
-    return { best: single, attempts, warnings, failure: single ? null : (chunkFailure ?? failure), usage, chunked: null };
-  }
   const nc = applyNumberCheck(merged.data.lines, ctx.hints.expected_total_excl_vat, ctx.hints.is_credit);
   const mergedData: ParsedExtraction = { ...merged.data, lines: nc.lines, number_check_issue: nc.invoiceIssue };
   const mergedSum = checkSum(mergedData.lines, ctx.hints.expected_total_excl_vat, null, null, ctx.hints.is_credit);
-  const better = !single || single.lines.length === 0 || mergedSum.deviation_pct == null || singleSum?.deviation_pct == null
-    || Math.abs(mergedSum.deviation_pct) < Math.abs(singleSum.deviation_pct);
-  if (!better) {
-    warnings.push("Oppdelt lesing ga ikke nærmere kontrollsum; bruker enkeltlesingen");
-    return { best: single, attempts, warnings, failure: null, usage, chunked: null };
+  const res = resolveChunkedRead({
+    single, singleDev, merged: { ...merged, data: mergedData }, mergedDev: mergedSum.deviation_pct, chunkCount: chunks.length,
+  });
+  warnings.push(...res.warnings);
+  if (res.pagesReadNoLines) {
+    // Aldri «ingen lesbare linjer» når sidene ble lest: meld ufullstendig lesing (ikke systemisk, kan prøves igjen).
+    const message = pagesReadNoLinesMessage(res.pagesRead, totalPages);
+    warnings.push(message);
+    return {
+      best: null, attempts, warnings, usage, chunked: { chunks: chunks.length, reason }, issues: res.issues, pagesRead: res.pagesRead,
+      failure: { kind: "incomplete", systemic: false, httpStatus: null, provider: cfg.provider, message },
+    };
   }
-  return { best: mergedData, attempts, warnings, failure: null, usage, chunked: { chunks: chunks.length, reason } };
+  if (!res.best) {
+    return { best: null, attempts, warnings, failure: chunkFailure ?? failure, usage, chunked: null, issues: res.issues, pagesRead: res.pagesRead };
+  }
+  return {
+    best: res.best, attempts, warnings, failure: null, usage,
+    chunked: res.usedMerged ? { chunks: chunks.length, reason } : null, issues: res.issues, pagesRead: res.pagesRead,
+  };
 }
 
 /**

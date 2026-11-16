@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/sheet";
 import { useAccessibleApps } from "@/hooks/useAccessibleApps";
 import { useWorkSummary } from "@/ravarer/hooks/useWorkData";
+import { useOpenQuestionCount } from "@/ravarer/hooks/useDecisions";
 import type { WorkSummary } from "@/ravarer/lib/workRpc";
 import { paths } from "@/ravarer/lib/paths";
 import { useInvoiceAccess } from "@/ravarer/hooks/useInvoiceAccess";
@@ -26,6 +27,7 @@ import {
 import {
   ChevronDown,
   LayoutDashboard,
+  ListChecks,
   Ticket,
   CalendarRange,
   ShoppingBag,
@@ -233,9 +235,11 @@ function RavarerNav() {
   const { data: hasInvoiceAccess = false } = useInvoiceAccess();
   const { data: accessLevel = "none" } = useRavarerAccessLevel();
   const { data: summary } = useWorkSummary({ includeApproval: false });
+  const openQuestions = useOpenQuestionCount(hasInvoiceAccess);
   return (
     <RavarerNavView
       summary={summary}
+      openQuestions={openQuestions}
       hasInvoiceAccess={hasInvoiceAccess}
       canManage={accessLevel === "admin" || accessLevel === "approve"}
     />
@@ -246,14 +250,20 @@ function RavarerNav() {
  * Råvarer 2.0: fem faste innganger + tannhjul. Alle tellere kommer fra ÉN
  * `rm_work_summary`, slik at meny, Oversikt og faner alltid viser samme tall.
  */
-export function RavarerNavView({ summary, hasInvoiceAccess, canManage }: { summary: WorkSummary | undefined; hasInvoiceAccess: boolean; canManage: boolean }) {
+export function RavarerNavView({ summary, hasInvoiceAccess, canManage, openQuestions = null }: { summary: WorkSummary | undefined; hasInvoiceAccess: boolean; canManage: boolean; openQuestions?: number | null }) {
   const items: NavItem[] = [
     { kind: "link", to: paths.oversikt(), label: "Oversikt", icon: LayoutDashboard, exact: true },
+  ];
+  if (hasInvoiceAccess) {
+    // Variant B: åpne spørsmål (samme tellere som køen), foran Varer.
+    items.push({ kind: "link", to: paths.beslutninger(), label: "Beslutninger", icon: ListChecks, matches: [paths.beslutninger()], badge: openQuestions ?? undefined, badgeTone: "warning" });
+  }
+  items.push(
     {
       kind: "link", to: paths.varer(), label: "Varer", icon: Wheat, matches: [paths.varer()],
       badge: summary?.data_quality.datasheet_changes, badgeTone: "warning",
     },
-  ];
+  );
   if (hasInvoiceAccess) {
     items.push({ kind: "link", to: paths.priskontroll(), label: "Fakturaer", icon: ScanSearch, matches: [paths.priskontroll()] });
     // Ingen merke: `todo_total` blander varegrupper og fakturaer. Eksakte fakturatellere står på arbeidsflaten.

@@ -23,7 +23,7 @@
 - [~] 5 Leverandør/Lager/Innstillinger samme rytme, ingen dobbel header
 - [ ] Skjermbilder 390/1280/1440, full testsamling
 
-# Demo C – faktura/råvare/pris (13.11.2026)
+# Demo C – faktura/råvare/pris (13.11.2026) — ERSTATTET av variant B 16.11.2026
 - [x] Oppdater plan med Henriks svar (intern godkjenning beholdes, DB 11 strykes)
 - [x] Fase 0: verifiser fase a-punkter + undersøk Tripletex EHF/strukturerte linjer (bare lesing)
 - [x] Fase a1: «Alle priser» (bare lesing) i RawMaterialPeek og råvarekortets Pris-seksjon + tester
@@ -46,3 +46,17 @@
 - [x] Nøkkelsjekk per lagret oppsett, lesing med valgt oppsetts nøkkel (OpenAI/Anthropic), sidebolker, målinger mot kontrollsum/fasit
 - [x] Fast testsett (10 fasit, 9 vanskelige, 3 uten linjer) + knapp under AI-tjenester + tester; invoice-model-eval rullet ut
 - [ ] Venter på Henrik: kjør «Start kvalitetstest» i forhåndsvisningen og send eksportert JSON, deretter tabeller og anbefaling
+
+# Variant B – beslutninger, ikke fakturaer (16.11.2026)
+- [x] Plan og roadmap oppdatert til variant B
+- [x] 0 Haster: sidelesing lagres alltid (Drammen Papir 9041438168), aldri «ingen lesbare linjer» når sider ble lest, ≥5 sider leses side for side direkte; extract-invoice-from-pdf + invoice-model-eval rullet ut
+- [ ] 0b Venter på Henrik: legg 9041438168 tilbake i køen via «Les på nytt» (ikke kjørt av meg)
+- [x] 1a Beslutninger (B1): meny med teller, kø eldste først, 12 spørsmålstyper, fakta (regnestykke, kjøp, «Det systemet vet», fakturautdrag, bruk), svar via dagens paneler, kvittering + Neste, tom kø, vennlig «Spør leverandøren»-tekst
+- [ ] 1b Tre svarknapper direkte i spørsmålet (Ja godta / Spør leverandøren / Pakningen er feil) med forhåndsvisning av pakningsretting
+- [ ] 1c «Angre» og «Angre siste» – krever PENDING-SQL (angre-RPC per svartype)
+- [ ] 1d Brutto/DG2 før og etter per vare i spørsmålet (bygges sammen med fase 5)
+- [ ] 2 Prislinje (B4): «Alle priser», «Rett pris», «Endre godkjent pakning»
+- [ ] 3 Automatikk (B7): regler, logg, nøkkelråvarer, hopp over, pant, morgen-e-post
+- [ ] 4 Handelsvarer (B5) i Varer
+- [ ] 5 Prisgrunnlag (B6) i Varer
+- [ ] 6 Fakturaer som arkiv + ny Oversikt
