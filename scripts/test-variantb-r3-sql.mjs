@@ -57,7 +57,7 @@ const before = await h4();
 check(Number(before.brutto_pct) === 70 && Number(before.dg2_pct) === 50, "før: Brutto 70 / DG2 50 uten emballasje");
 
 // Prisgrunnlag
-await db.exec(pg);
+try { await db.exec(pg); } catch (e) { fail("prisgrunnlag-filen: " + e.message); }
 const on = await h4();
 check(Number(on.brutto_pct) === 60, `null = på: Brutto 60 med emballasje (fikk ${on.brutto_pct})`);
 check(Number(on.dg2_pct) === 40, `null = på: DG2 40 med emballasje (fikk ${on.dg2_pct})`);
@@ -84,7 +84,7 @@ check(stopped, "endret h4_margin_eval stopper hele filen");
 check((await db2.query(`select count(*)::int n from information_schema.columns where table_name='entity_calc_settings' and column_name='packaging_in_margins'`)).rows[0].n === 0, "ingenting kjørt etter stopp (transaksjon)");
 
 // Handelsvarer
-await db.exec(hv);
+try { await db.exec(hv); } catch (e) { fail("handelsvarer-filen: " + e.message); }
 check((await db.query(`select varer_cap_handelsvarer_v1() c`)).rows[0].c === true, "cap handelsvarer");
 await db.exec(`insert into resale_markup_settings (legal_entity_id, price_list_id, factor) values ('${LE}', '${PL}', 1.3)`);
 await db.exec(`insert into resale_markup_settings (legal_entity_id, raw_material_id, factor) values ('${LE}', '${RM}', 1.1)`);
