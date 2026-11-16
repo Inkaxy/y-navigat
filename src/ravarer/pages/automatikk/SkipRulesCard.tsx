@@ -8,7 +8,7 @@ import { useCompany } from "@/hooks/useCompany";
 import { AUTO_KEY, useSkipRules, type SkipRule } from "./useAutomatikk";
 
 const SHOW = 50;
-const TYPE: Record<string, string> = { sku: "varenummer", name: "varetekst", description: "varetekst", contains: "tekst inneholder" };
+const TYPE: Record<string, string> = { exact_sku: "varenummer", exact_description: "varetekst", description_contains: "tekst inneholder" };
 
 /**
  * «Hopp over alltid» = selskapets utelatelsesmønstre (samme som matchmotoren leser og «Ikke vare» skriver).
