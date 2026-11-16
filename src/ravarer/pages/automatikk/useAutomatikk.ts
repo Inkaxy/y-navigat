@@ -66,7 +66,7 @@ export function useKeyLimits() {
   return { cap, ...q };
 }
 
-export interface SkipRule { id: string; supplierName: string | null; type: string; value: string; reason: string | null; createdAt: string }
+export interface SkipRule { id: string; supplierName: string | null; type: string; value: string; reason: string | null; createdAt: string | null }
 /** Hopp over alltid = selskapets utelatelsesmønstre (samme tabell som matchmotoren leser). */
 export function useSkipRules() {
   const { data: company } = useCompany();
