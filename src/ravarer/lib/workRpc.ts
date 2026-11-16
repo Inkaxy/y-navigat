@@ -78,6 +78,7 @@ function parseWorkItem(o: Obj): WorkItem | null {
     open_lines: n0(o, "open_lines"), open_invoices: n0(o, "open_invoices"), invoice_count: n0(o, "invoice_count"),
     amount: n0(o, "amount"), impact_nok: num(o, "impact_nok"), last_date: str(o, "last_date"),
     last_open_line_id: str(o, "last_open_line_id"),
+    first_open_date: str(o, "first_open_date"),
     reasons: strings(o, "reasons"),
     effect_status: pick(str(o, "effect_status"), WORK_EFFECT_STATUSES, "unknown"),
     effect_label: str(o, "effect_label"),
