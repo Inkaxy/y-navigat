@@ -1,6 +1,7 @@
 // Match invoice lines pipeline (Steg 1–6)
 // Input: { invoice_id: string, line_ids?: string[] }
 import { createClient } from "npm:@supabase/supabase-js@2.95.0";
+import { DEPOSIT_NOTE, depositParent, isDepositFollowLine, keyLimitOver, type DepositLine, type KeyLimit } from "../_shared/automationRules.ts";
 import { corsHeaders } from "npm:@supabase/supabase-js@2.95.0/cors";
 import { normalizeUnit, isPackageUnit, packageNeedsConfirmation, resolveLineCost, stripPackageTokens } from "../_shared/units.ts";
 import { normalizeMatchKey } from "../_shared/matchNormalize.ts";
@@ -209,6 +210,25 @@ Deno.serve(async (req) => {
     const catTolMap = new Map<string, number>();
     (catTols ?? []).forEach((c: AnyRec) => catTolMap.set(c.category, Number(c.price_tolerance_pct)));
 
+    // Nøkkelråvare-grenser (PENDING 20261117_automatikk). Uten tabellen finnes ingen grenser, som før.
+    // Andre lesefeil stopper kjøringen (fail closed): en grense som ikke kunne leses er ikke «ingen grense».
+    const keyLimits = new Map<string, KeyLimit>();
+    {
+      const { data: kl, error: klErr } = await svc.from("rm_key_material_limits")
+        .select("raw_material_id, max_increase_pct, min_impact_nok").eq("legal_entity_id", inv.legal_entity_id);
+      if (klErr) {
+        const code = String((klErr as AnyRec).code ?? "");
+        if (code !== "42P01" && code !== "PGRST205") throw new Error(`Kunne ikke lese nøkkelråvare-grenser: ${klErr.message}`);
+      } else {
+        for (const r of (kl ?? []) as AnyRec[]) {
+          keyLimits.set(String(r.raw_material_id), {
+            maxIncreasePct: r.max_increase_pct == null ? null : Number(r.max_increase_pct),
+            minImpactNok: r.min_impact_nok == null ? null : Number(r.min_impact_nok),
+          });
+        }
+      }
+    }
+
     /**
      * Avviksvurdering mot ETT prisgrunnlag. Startpris har sin egen toleranse og
      * en valgfri kronegrense, og godkjenner aldri en linje automatisk før
@@ -225,6 +245,8 @@ Deno.serve(async (req) => {
       /** Sant kun når motoren koblet linjen selv. En menneskelig bekreftelse
        *  skal ALDRI sendes tilbake til gjennomgang av mangel på grunnlag. */
       automatic: boolean,
+      /** Råvaren linja er koblet til (for nøkkelråvare-grense). */
+      rawMaterialId: string | null = null,
     ): string[] {
       const reasons: string[] = [];
       const isStart = String(ref.source ?? "") === "start_price";
@@ -234,6 +256,11 @@ Deno.serve(async (req) => {
       let over = Math.abs(variance) > tol;
       if (isStart && startMaxImpact != null && baseQuantity != null && Number.isFinite(baseQuantity)) {
         if (Math.abs((actual - expected) * baseQuantity) > startMaxImpact) over = true;
+      }
+      // Nøkkelråvare: egen grense kan bare legge til gjennomgang.
+      if (!over && rawMaterialId) {
+        const impact = baseQuantity != null && Number.isFinite(baseQuantity) ? (actual - expected) * baseQuantity : null;
+        if (keyLimitOver(keyLimits.get(rawMaterialId), variance, impact)) over = true;
       }
       target.variance_status = over ? "over_tolerance" : "within_tolerance";
       if (over) reasons.push("price_variance");
@@ -357,6 +384,16 @@ Deno.serve(async (req) => {
 
     const results: AnyRec[] = [];
 
+    // Varelinjene på hele fakturaen (for hvilken vare en pantlinje følger), hentet bare ved behov.
+    let invoiceLinesForDeposit: DepositLine[] | null = lineIdFilter?.length ? null : (allLines as DepositLine[]);
+    async function depositParentFor(line: DepositLine): Promise<string | null> {
+      if (!invoiceLinesForDeposit) {
+        invoiceLinesForDeposit = required("fakturalinjer for pant", await svc.from("invoice_lines")
+          .select("id, line_kind, line_number").eq("invoice_id", invoiceId)) as DepositLine[];
+      }
+      return depositParent(invoiceLinesForDeposit, line);
+    }
+
     for (const line of allLines) {
       // Skip not_applicable lines fully
       if (line.match_confidence === "not_applicable") {
@@ -407,6 +444,7 @@ Deno.serve(async (req) => {
         if (expected != null && actual != null && expected !== 0) {
           for (const reason of evaluateVariance(
             refM, expected, actual, rm?.category ?? null, manualUpdate.base_quantity ?? null, manualUpdate, false,
+            line.raw_material_id ?? null,
 
           )) {
             requiresReview = true;
@@ -472,6 +510,21 @@ Deno.serve(async (req) => {
         package_source_rms_id: null,
       };
       const suggestionsToInsert: AnyRec[] = [];
+
+      // Pant som følgevare (PENDING 20261117_automatikk; av til kolonnen finnes): følger varen,
+      // utenfor kost, mva-fri og aldri utelatt — derfor før utelatelsesmønstrene.
+      if (isDepositFollowLine(settings, line)) {
+        Object.assign(update, {
+          match_confidence: "not_applicable",
+          requires_review: false,
+          review_reason: null,
+          resolution_note: DEPOSIT_NOTE,
+          deposit_parent_line_id: await depositParentFor(line),
+        });
+        await applyUpdate(svc, line.id, update);
+        results.push({ id: line.id, status: "deposit_follow" });
+        continue;
+      }
 
       // STEG 1 — exclusions
       const matchedExclusion = (exclusions ?? []).find((p: AnyRec) => descriptionMatchesPattern(line.description, line.supplier_sku, p));
@@ -791,6 +844,7 @@ Deno.serve(async (req) => {
         if (expected != null && actual != null && expected !== 0) {
           for (const reason of evaluateVariance(
             ref, expected, actual, rm?.category ?? null, update.base_quantity ?? null, update, true,
+            rm?.id ?? null,
           )) {
             addReason(reason);
           }
