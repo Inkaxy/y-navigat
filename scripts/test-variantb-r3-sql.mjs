@@ -80,7 +80,7 @@ await db2.exec(stub);
 await db2.exec(read("scripts/fixtures/live-20261116/h4_margin_eval.sql").replace("v_raw    := nullif", "v_raw := nullif"));
 await db2.exec(read("scripts/fixtures/live-20261116/product_margins.sql"));
 let stopped = false;
-try { await db2.exec(pg); } catch (e) { stopped = /fant ikke linjen/.test(String(e.message)); }
+try { await db2.exec(pg); } catch (e) { stopped = /fant ikke linjen/.test(String(e.message)); await db2.exec("rollback"); }
 check(stopped, "endret h4_margin_eval stopper hele filen");
 check((await db2.query(`select count(*)::int n from information_schema.columns where table_name='entity_calc_settings' and column_name='packaging_in_margins'`)).rows[0].n === 0, "ingenting kjørt etter stopp (transaksjon)");
 
