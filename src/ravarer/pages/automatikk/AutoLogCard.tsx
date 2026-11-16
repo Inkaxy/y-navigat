@@ -4,11 +4,11 @@ import { paths } from "@/ravarer/lib/paths";
 import type { AutoLogCounts } from "@/ravarer/lib/automatikk";
 
 const ROWS: { key: keyof AutoLogCounts; label: string; to: string }[] = [
-  { key: "newInvoices", label: "nye fakturaer hentet", to: paths.priskontroll({ fane: "fakturaer", visning: "alle" }) },
-  { key: "linesLinked", label: "linjer koblet og kontrollert uten deg", to: paths.priskontroll({ fane: "fakturaer", visning: "alle" }) },
-  { key: "linesExcluded", label: "linjer holdt utenfor (frakt, gebyr, hopp over)", to: paths.priskontroll({ fane: "fakturaer", visning: "alle" }) },
-  { key: "invoicesReconciled", label: "fakturaer avstemt automatisk", to: paths.priskontroll({ fane: "fakturaer", visning: "avstemt" }) },
-  { key: "recalculated", label: "fakturaer beregnet på nytt i køen", to: paths.priskontroll({ fane: "fakturaer", visning: "alle" }) },
+  { key: "newInvoices", label: "nye fakturaer hentet", to: paths.fakturaer({ visning: "alle" }) },
+  { key: "linesLinked", label: "linjer koblet og kontrollert uten deg", to: paths.fakturaer({ visning: "alle" }) },
+  { key: "linesExcluded", label: "linjer holdt utenfor (frakt, gebyr, hopp over)", to: paths.fakturaer({ visning: "alle" }) },
+  { key: "invoicesReconciled", label: "fakturaer avstemt automatisk", to: paths.fakturaer({ visning: "avstemt" }) },
+  { key: "recalculated", label: "fakturaer beregnet på nytt i køen", to: paths.fakturaer({ visning: "alle" }) },
 ];
 
 /** «Gjort uten deg» (B7). Tallene er eksakte antall fra databasen; ukjent vises som «?», aldri 0. */
