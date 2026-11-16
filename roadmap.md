@@ -51,7 +51,10 @@
 - [x] Plan og roadmap oppdatert til variant B
 - [x] 0 Haster: sidelesing lagres alltid (Drammen Papir 9041438168), aldri «ingen lesbare linjer» når sider ble lest, ≥5 sider leses side for side direkte; extract-invoice-from-pdf + invoice-model-eval rullet ut
 - [ ] 0b Venter på Henrik: legg 9041438168 tilbake i køen via «Les på nytt» (ikke kjørt av meg)
-- [~] 1 Beslutninger (B1): kø + spørsmålstyper + svarpanel på dagens skriveveier
+- [x] 1a Beslutninger (B1): meny med teller, kø eldste først, 12 spørsmålstyper, fakta (regnestykke, kjøp, «Det systemet vet», fakturautdrag, bruk), svar via dagens paneler, kvittering + Neste, tom kø, vennlig «Spør leverandøren»-tekst
+- [ ] 1b Tre svarknapper direkte i spørsmålet (Ja godta / Spør leverandøren / Pakningen er feil) med forhåndsvisning av pakningsretting
+- [ ] 1c «Angre» og «Angre siste» – krever PENDING-SQL (angre-RPC per svartype)
+- [ ] 1d Brutto/DG2 før og etter per vare i spørsmålet (bygges sammen med fase 5)
 - [ ] 2 Prislinje (B4): «Alle priser», «Rett pris», «Endre godkjent pakning»
 - [ ] 3 Automatikk (B7): regler, logg, nøkkelråvarer, hopp over, pant, morgen-e-post
 - [ ] 4 Handelsvarer (B5) i Varer
