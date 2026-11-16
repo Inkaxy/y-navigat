@@ -12,6 +12,8 @@ import { osloTodayISO } from "@/lib/osloDate";
 import { formatNok } from "@/ravarer/lib/constants";
 import { paths } from "@/ravarer/lib/paths";
 import { buildAllPrices, defaultSince, MIN_PRICES_FOR_MEDIAN, registeredByLabel } from "@/ravarer/lib/allPrices";
+import { correctable, effectiveThreshold, sinceMonthsBack } from "@/ravarer/lib/prislinje";
+import type { TimelineHistoryRow } from "@/ravarer/lib/priceTimeline";
 
 const pctFmt = new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 1, minimumFractionDigits: 1, signDisplay: "exceptZero" });
 const pct1 = new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 1 });
@@ -23,18 +25,28 @@ interface Props {
   category: string | null;
   /** Kompakt visning i panelet ved siden av varelisten. */
   compact?: boolean;
+  /** Prislinje: bare én leverandørs kjøp. */
+  supplierId?: string | null;
+  /** Egen avviksgrense (innstilling); null/undefined = kategoriens toleranse. */
+  thresholdPct?: number | null;
+  /** Standard «Siden» i måneder (innstilling); undefined = 12. */
+  sinceMonths?: number | null;
+  /** «Rett pris» per kjøp (bare approve/admin når databaseendringen er kjørt). */
+  onCorrect?: (row: TimelineHistoryRow) => void;
 }
 
-/** «Alle priser» — bare lesing. Ingen retting her (kommer i fase a2). */
-export function AllPricesList({ rawMaterialId, baseUnit, category, compact }: Props) {
-  const [since, setSince] = useState(() => defaultSince(osloTodayISO()));
+/** «Alle priser». Bare lesing, unntatt valgfri «Rett pris» per kjøp (Prislinje). */
+export function AllPricesList({ rawMaterialId, baseUnit, category, compact, supplierId, thresholdPct, sinceMonths, onCorrect }: Props) {
+  const [since, setSince] = useState(() => (sinceMonths != null ? sinceMonthsBack(osloTodayISO(), sinceMonths) : defaultSince(osloTodayISO())));
   const history = useTimelineHistory(rawMaterialId);
   const { data: company } = useCompany();
   const tol = useMatchTolerances(company?.id);
-  const threshold = tol.isLoaded && !tol.isFetching ? tol.toleranceFor(category) : null;
+  const threshold = tol.isLoaded && !tol.isFetching ? effectiveThreshold(thresholdPct, tol.toleranceFor(category)) : null;
+  const own = thresholdPct != null;
+  const rowsIn = useMemo(() => (supplierId ? history.rows.filter((r) => r.supplier_id === supplierId) : history.rows), [history.rows, supplierId]);
   const result = useMemo(
-    () => buildAllPrices(history.rows, { since: since || null, currentUnit: baseUnit, thresholdPct: threshold }),
-    [history.rows, since, baseUnit, threshold],
+    () => buildAllPrices(rowsIn, { since: since || null, currentUnit: baseUnit, thresholdPct: threshold }),
+    [rowsIn, since, baseUnit, threshold],
   );
   const names = useUserNames(result.rows.map((r) => r.row.createdBy));
   const nameMap = names.data ?? null;
@@ -45,7 +57,7 @@ export function AllPricesList({ rawMaterialId, baseUnit, category, compact }: Pr
         <h3 id={`alle-priser-${rawMaterialId}`} className="text-base font-semibold">Alle priser</h3>
         <div className="flex items-end gap-2">
           <div className="space-y-1">
-            <Label htmlFor={`alle-priser-siden-${rawMaterialId}`} className="text-caption text-ink-secondary">Siden</Label>
+            <Label htmlFor={`alle-priser-siden-${rawMaterialId}`} className="text-caption text-ink-secondary">{onCorrect ? "Vis priser siden" : "Siden"}</Label>
             <Input id={`alle-priser-siden-${rawMaterialId}`} type="date" value={since} onChange={(e) => setSince(e.target.value)} className="h-11 w-[11rem]" />
           </div>
           <Button type="button" variant="ghost" size="sm" className="min-h-[44px]" onClick={() => setSince("")}>Alle</Button>
@@ -65,7 +77,7 @@ export function AllPricesList({ rawMaterialId, baseUnit, category, compact }: Pr
               ? `Avvik merkes når perioden har minst ${MIN_PRICES_FOR_MEDIAN} sammenlignbare priser.`
               : result.thresholdPct == null
                 ? `Median ${formatNok(result.median)} / ${baseUnit}. Avviksgrensen er ukjent, så ingen priser merkes.`
-                : `Median ${formatNok(result.median)} / ${baseUnit}. «Avvik» = mer enn ${pct1.format(result.thresholdPct)} % fra medianen (toleransen for kategorien).`}
+                : `Median ${formatNok(result.median)} / ${baseUnit}. «Avvik» = mer enn ${pct1.format(result.thresholdPct)} % fra medianen ${own ? "(egen avviksgrense)" : "(toleransen for kategorien)"}.`}
             {history.projectionError ? " Kontrollen av kildene feilet, så noen priser kan ikke sammenlignes." : ""}
           </p>
           <ul className="divide-y divide-line-subtle text-sm">
@@ -82,6 +94,9 @@ export function AllPricesList({ rawMaterialId, baseUnit, category, compact }: Pr
                   {registeredByLabel(r.row, nameMap)}
                   {r.row.invoice_id && (
                     <> · <Link className="underline-offset-2 hover:underline" to={paths.faktura(r.row.invoice_id)}>{r.row.invoiceNumber ? `Faktura ${r.row.invoiceNumber}` : "Faktura"}</Link></>
+                  )}
+                  {onCorrect && correctable(r.row) && (
+                    <Button type="button" variant="outline" size="sm" className="ml-2 min-h-[44px]" onClick={() => onCorrect(r.row)}>Rett pris</Button>
                   )}
                 </span>
               </li>
