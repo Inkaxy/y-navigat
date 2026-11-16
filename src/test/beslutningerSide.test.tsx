@@ -24,7 +24,10 @@ vi.mock("@/ravarer/hooks/useDecisions", () => ({
   }),
   useTodayActivity: () => ({ linesSolved: 3, invoicesReleased: 1, isError: false }),
 }));
-vi.mock("@/ravarer/pages/priskontroll/gjore/VarekortPanel", () => ({ VarekortPanel: () => <div>Svarpanel varekort</div> }));
+vi.mock("@/ravarer/pages/priskontroll/gjore/VarekortPanel", () => ({ VarekortPanel: () => <div>Svarpanel varekort</div>, lockedOpenLines: () => [] }));
+vi.mock("@/fakturaer/hooks/useInvoiceRights", () => ({ useInvoiceRights: () => ({ canWrite: true, canApprove: false, level: "write", isLoading: false }) }));
+vi.mock("@/ravarer/pages/beslutninger/QuickAnswers", () => ({ QuickAnswers: () => null }));
+vi.mock("@/lib/pendingRpc", async (orig) => ({ ...(await orig<typeof import("@/lib/pendingRpc")>()), useCapability: () => false }));
 vi.mock("@/ravarer/pages/priskontroll/gjore/FakturasakPanel", () => ({ FakturasakPanel: () => <div>Svarpanel faktura</div> }));
 vi.mock("@/fakturaer/hooks/useSupplierItems", () => ({
   useSupplierItems: () => ({ data: { items: [] } }),
