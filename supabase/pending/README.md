@@ -39,3 +39,18 @@ Edge `generate-rfq-credentials` er allerede utrullet live (v141, kilde lik b845)
 | `20261117_automatikk_cron.DATAENDRING.sql` | **DATAENDRING — TAS SEPARAT MED HENRIK.** Del A: cron-jobb hver time som kaller `rm_automation_tick()`. Del B (kommentert ut): flytte de 130 eldre auto-koblede pantlinjene ut av kost. |
 
 Lokal test av fase 1–3: `node scripts/test-variantb-sql.mjs` (PGlite med forenklet stubb av live-skjemaet, 35 kontroller). Stubben beviser logikken i de nye funksjonene, ikke at live-skjemaet er identisk.
+
+## Variant B runde 3 (18.11.2026)
+
+Ingen av filene fra 17.11 er kjørt (venter på Henriks ja). Alt som avhenger av dem er skjult/deaktivert bak `rm_cap_*`/`varer_cap_*`.
+
+| Fil | Status |
+|---|---|
+| `20261118_handelsvarer.PENDING.sql` | **VENTER PÅ ROOT.** Fase 4: `entity_calc_settings.resale_default_factor` (null = 1,2), tabellen `resale_markup_settings` (påslag per prisliste, per vare, eller vare × prisliste med sperre) med RLS og grants, `varer_cap_handelsvarer_v1`. Bare additivt, endrer ingen data. Ingen eksisterende funksjon endres. |
+| `20261118_handelsvarer.check.sql` | Bare SELECT: kolonne, tabell, RLS, policyer, rettigheter, 0 rader, cap. |
+| `20261118_prisgrunnlag.PENDING.sql` | **VENTER PÅ ROOT.** Fase 5: `entity_calc_settings.packaging_in_margins` (null = på), `calc_packaging_in_margins(product)`, tekstbytte i `h4_margin_eval` (live-md5 `da19eefa…`) og `product_margins` (live-md5 `1c4d594c…`, lest 16.11.2026) slik at emballasje teller i Brutto og DG2, og `product_margins` svarer `packaging_in_margins`. Stopper hele filen hvis en definisjon er endret. Endrer ingen data; i dag finnes 0 emballasjelinjer, så ingen margin endres ved kjøring. |
+| `20261118_prisgrunnlag.check.sql` | Bare SELECT: kolonne, begge funksjoner bruker innstillingen, cap. |
+
+Lokal test: `node scripts/test-variantb-r3-sql.mjs` (PGlite med kopier av live-definisjonene i `scripts/fixtures/live-20261116/`, 18 kontroller: Brutto/DG2 med og uten emballasje, vakten stopper ved endret definisjon, påslagstabellens regler).
+
+`supabase/functions/match-invoice-lines` + `_shared/automationRules.ts` er endret i repoet (nøkkelgrenser + pant som følgevare) men **ikke rullet ut av meg**. Begge reglene er av til `20261117_automatikk` er kjørt (manglende tabell gir PGRST205 → ingen grenser; manglende kolonne → pant av), så utrulling før SQL endrer ikke oppførselen.
