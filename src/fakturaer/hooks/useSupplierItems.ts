@@ -1,4 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { assertScopedLinkSaved, NothingSavedError } from "@/fakturaer/lib/linkSaved";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
@@ -114,6 +115,8 @@ export async function linkSupplierItem(body: LinkSupplierItemBody): Promise<Link
   if (data == null) throw new Error(FALLBACK);
   const r = parseLinkResult(data);
   if ("error" in r) throw new Error(r.error || FALLBACK);
+  // Fryst linjeutvalg + 0 endrede linjer = ingenting lagret. Gjelder alle skjermer som kobler med line_ids.
+  assertScopedLinkSaved(body, r);
   return r;
 }
 
@@ -131,5 +134,7 @@ export function useLinkSupplierItem() {
   return useMutation({
     mutationFn: linkSupplierItem,
     onSuccess: (r) => invalidateAfterLink(qc, r.raw_material_id ?? undefined),
+    // Ingenting lagret: hent linjene på nytt så skjermen viser hvorfor (låst/løst), men vis ingen kvittering.
+    onError: (e) => { if (e instanceof NothingSavedError) invalidateAfterLink(qc); },
   });
 }

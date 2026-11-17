@@ -1,12 +1,8 @@
 // Nye varer: en rad blir bare kvittering når serveren har bekreftet at minst én fakturalinje ble endret.
 // rm_link_supplier_item svarer ok:true med lines_updated=0 og skriver INGENTING når ingen av linjene kan
 // endres lenger (internt godkjent faktura, ført kostpris, avsluttet/flagget faktura). Det er ikke en suksess.
-export class NothingSavedError extends Error {
-  readonly nothingSaved = true;
-}
-
-export const NOTHING_LINKED =
-  "Ingenting ble lagret – ingen fakturalinjer ble endret. Linjene kan ikke endres herfra (fakturaen kan være godkjent internt, ha ført kostpris eller være avsluttet). Åpne fakturaen for å se hvorfor.";
+import { NOTHING_LINKED, NothingSavedError } from "@/fakturaer/lib/linkSaved";
+export { NOTHING_LINKED, NothingSavedError };
 
 /** Kaster når lagringen ikke endret noen linjer. */
 export function assertLinesSaved(r: { lines_updated: number }): void {
