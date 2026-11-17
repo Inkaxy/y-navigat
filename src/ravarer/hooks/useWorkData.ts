@@ -17,25 +17,42 @@ import type { WorkItemsCounts } from "@/ravarer/lib/workRpcTypes";
 const countSeeds = new Map<string, { counts: WorkItemsCounts; startedAt: number }>();
 export const workCountsKey = (legalEntityId: string | null) => ["ravarer", "work-items", "counts", legalEntityId] as const;
 
-/** Felles tellere for meny, Oversikt og faner. */
+const summaryKey = (legalEntityId: string | null, includeApproval: boolean) => ["ravarer", "work-summary", legalEntityId, includeApproval] as const;
+const fetchSummary = (legalEntityId: string, includeApproval: boolean, signal?: AbortSignal) =>
+  // Samme port som rm_work_items: aldri flere tunge oppslag samtidig fra samme fane.
+  workGate.run(async () => {
+    const { data, error } = await supabase.rpc("rm_work_summary", {
+      p_legal_entity_id: legalEntityId, p_include_approval: includeApproval,
+    });
+    if (error) throw error;
+    return parseWorkSummary(data);
+  }, { signal });
+
+/**
+ * Felles tellere for meny, Oversikt og faner. Menyens variant (uten godkjenning) låner sidens fulle oppsummering
+ * når siden selv viser den (Oversikt, Arbeidsbord), slik at én sidevisning gir ett rm_work_summary-kall.
+ */
 export function useWorkSummary({ includeApproval = true, enabled = true }: { includeApproval?: boolean; enabled?: boolean } = {}) {
+  const qc = useQueryClient();
   const { data: company } = useCompany();
   const legalEntityId = company?.id ?? null;
   return useQuery({
-    queryKey: ["ravarer", "work-summary", legalEntityId, includeApproval],
+    queryKey: summaryKey(legalEntityId, includeApproval),
     enabled: enabled && !!legalEntityId,
     staleTime: 30_000,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
     ...TRANSIENT_RETRY,
-    // Samme port som rm_work_items: aldri flere tunge oppslag samtidig fra samme fane.
-    queryFn: ({ signal }) => workGate.run(async () => {
-      const { data, error } = await supabase.rpc("rm_work_summary", {
-        p_legal_entity_id: legalEntityId!, p_include_approval: includeApproval,
-      });
-      if (error) throw error;
-      return parseWorkSummary(data);
-    }, { signal }),
+    queryFn: async ({ signal }) => {
+      if (!includeApproval) {
+        await new Promise((r) => setTimeout(r, 0)); // la sidens egen oppsummering registrere seg først
+        const full = qc.getQueryCache().find({ queryKey: summaryKey(legalEntityId, true), exact: true });
+        if (full && full.getObserversCount() > 0) {
+          return qc.fetchQuery({ queryKey: summaryKey(legalEntityId, true), staleTime: 30_000, queryFn: ({ signal: s }) => fetchSummary(legalEntityId!, true, s) });
+        }
+      }
+      return fetchSummary(legalEntityId!, includeApproval, signal);
+    },
   });
 }
 
