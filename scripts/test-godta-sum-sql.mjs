@@ -26,7 +26,7 @@ create schema auth;
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('test.uid', true), '')::uuid $$;
 create function public.has_ravarer_invoice_access(uuid, text) returns boolean language sql stable as $$ select $2 = 'read' or current_setting('test.write', true) is distinct from 'nei' $$;
 create function public.rm_is_finite(numeric) returns boolean language sql immutable as $$ select $1 is not null and $1 <> 'NaN'::numeric $$;
-create table invoices (id uuid primary key, legal_entity_id uuid, invoice_number text, status text, excluded_at timestamptz, flagged_at timestamptz,
+create table invoices (id uuid primary key, legal_entity_id uuid, invoice_number text, invoice_date date default '2026-10-01', status text, excluded_at timestamptz, flagged_at timestamptz,
   reconciled_at timestamptz, total_amount numeric, total_vat numeric, is_credit_note boolean default false, lines_sum_status text,
   lines_sum_excl_vat numeric, lines_sum_variance_pct numeric, notes text, extraction_issues jsonb default '[]', updated_at timestamptz default now(),
   constraint invoices_lines_sum_status_check CHECK ((lines_sum_status = ANY (ARRAY['not_checked'::text, 'ok'::text, 'mismatch'::text, 'no_lines'::text, 'no_total'::text]))));
