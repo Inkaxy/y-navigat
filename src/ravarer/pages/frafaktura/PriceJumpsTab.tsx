@@ -1,5 +1,4 @@
 import { useId, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { QueryState } from "@/components/common/QueryState";
 import { Link } from "react-router-dom";
 import { paths } from "@/ravarer/lib/paths";
@@ -17,7 +16,6 @@ export function PriceJumpsTab({ localLimit, onLocalLimit, canWrite, canApprove, 
   localLimit: number | null; onLocalLimit: (v: number | null) => void; canWrite: boolean; canApprove: boolean; retur: string;
 }) {
   const id = useId();
-  const qc = useQueryClient();
   const { data: company } = useCompany();
   const { user } = useAuth();
   const p = usePriceJumps(localLimit);
