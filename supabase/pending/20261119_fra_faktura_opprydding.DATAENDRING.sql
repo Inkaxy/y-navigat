@@ -31,6 +31,7 @@ begin
     into v_limit, v_quiet, v_pkg from public.invoice_match_settings where legal_entity_id = p_legal_entity_id;
   v_limit := coalesce(v_limit, 20);
 
+  drop table if exists _ff;
   create temp table _ff on commit drop as
   with open_lines as (
     select il.id, il.invoice_id, i.supplier_id, s.name as supplier_name, il.raw_material_id, il.price_variance_pct,
@@ -69,6 +70,7 @@ begin
   select coalesce(array_agg(distinct invoice_id), '{}') into v_invoices from _ff where reason is not null;
 
   -- A) skrivemåter som mangler som bekreftede navnealias
+  drop table if exists _ff_names;
   create temp table _ff_names on commit drop as
   select distinct rms.id as rms_id, btrim(il.description) as name, i.supplier_id
     from public.invoice_lines il
