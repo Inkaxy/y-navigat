@@ -62,10 +62,16 @@ export function useWorkItems({ group = "alle", search = null, supplierId = null,
 /** Ett rm_work_items-kall gjennom porten. Ufiltrerte svar deler tellerne sine med `useWorkCounts`. */
 export function fetchWorkItems(
   qc: QueryClient, legalEntityId: string,
-  p: { group: WorkGroup; search?: string | null; supplierId?: string | null; sort: WorkSort; limit: number; offset: number },
-  signal?: AbortSignal,
+  p: WorkItemsCall, signal?: AbortSignal,
 ) {
-  return workGate.run(async () => {
+  return workGate.run(() => rawWorkItems(qc, legalEntityId, p), { signal });
+}
+
+type WorkItemsCall = { group: WorkGroup; search?: string | null; supplierId?: string | null; sort: WorkSort; limit: number; offset: number };
+
+/** Selve kallet (uten port – kalleren holder porten). */
+async function rawWorkItems(qc: QueryClient, legalEntityId: string, p: WorkItemsCall) {
+  {
     const startedAt = Date.now();
     const { data, error } = await supabase.rpc("rm_work_items", {
       p_legal_entity_id: legalEntityId, p_group: p.group, p_search: p.search || undefined,
@@ -81,7 +87,7 @@ export function fetchWorkItems(
       }
     }
     return r;
-  }, { signal });
+  }
 }
 
 /**
@@ -102,8 +108,7 @@ export function useWorkCounts(enabled = true) {
       return workGate.run(async () => {
         const seed = countSeeds.get(legalEntityId!);
         if (seed && seed.startedAt >= requestedAt) return seed.counts;
-        const r = await fetchWorkItems(qc, legalEntityId!, { group: "alle", sort: "oldest", limit: 1, offset: 0 }).catch((e: unknown) => { throw e; });
-        return r.counts;
+        return (await rawWorkItems(qc, legalEntityId!, { group: "alle", sort: "oldest", limit: 1, offset: 0 })).counts;
       }, { low: true, signal });
     },
   });
