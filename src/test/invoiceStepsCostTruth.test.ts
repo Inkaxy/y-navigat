@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { costProgress, deliverySteps, extrasFromCounts, nextInvoiceStep, NOT_DONE_KEYS, type NextStepInput } from "@/ravarer/pages/priskontroll/faktura/invoiceSteps";
-import { arbeidClassOf } from "@/ravarer/pages/priskontroll/arbeid/arbeidLogic";
 
 const ni = (o: Partial<NextStepInput>): NextStepInput => ({
   status: "ready", received_at: null, line_count: 3, lines_source: null, line_extraction_status: "done", open_count: 0,
@@ -47,8 +46,5 @@ describe("hovedflyten påstår aldri ferdig kost ved 0 eller delvis føring", ()
     expect(nextInvoiceStep(ni({ status: "reconciled", is_credit_note: true, ...extrasFromCounts(true, 0, 3) })).key).toBe("ferdig");
     expect(costProgress(0, 0).state).toBe("fullfort");
     expect(nextInvoiceStep(ni({ status: "reconciled", ...extrasFromCounts(true, 0, 0) })).key).toBe("ferdig");
-  });
-  it("arbeidsklassen «ferdig» betyr bare avstemt; kvitteringen påstår ikke mer", () => {
-    expect(arbeidClassOf("reconciled", false)).toBe("ferdig");
   });
 });

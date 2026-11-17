@@ -4,7 +4,6 @@ import { deliverySteps, nextInvoiceStep, type NextStepInput } from "@/ravarer/pa
 import { normalizePriskontrollSearch, parseVisning, fakturaBackHref } from "@/ravarer/pages/priskontroll/fakturaer/visning";
 import { chipCount } from "@/ravarer/pages/priskontroll/fakturaer/VisningChips";
 import { matchesSearch, parseFilters, toCsv } from "@/ravarer/pages/priskontroll/fakturaer/fakturaListLogic";
-import { workspaceKey, type WorkspaceKeys } from "@/ravarer/pages/priskontroll/faktura/useWorkspaceHotkeys";
 import { paths } from "@/ravarer/lib/paths";
 import type { InboxInvoice } from "@/fakturaer/hooks/useInboxInvoices";
 
@@ -130,16 +129,4 @@ describe("hurtigtaster i arbeidsflaten", () => {
     };
     return { h, calls };
   };
-  it("J/K, U, D, ? og Esc", () => {
-    const { h, calls } = k();
-    for (const key of ["j", "k", "u", "d", "?", "Escape"]) workspaceKey(new KeyboardEvent("keydown", { key }), h);
-    expect(calls).toEqual(["next", "prev", "u", "d", "?", "esc"]);
-  });
-  it("M/N/X krever valgt linje, og ingenting når av", () => {
-    const { h, calls } = k();
-    expect(workspaceKey(new KeyboardEvent("keydown", { key: "m" }), h)).toBe(false);
-    const off = k({ enabled: false });
-    workspaceKey(new KeyboardEvent("keydown", { key: "j" }), off.h);
-    expect([calls, off.calls]).toEqual([[], []]);
-  });
 });

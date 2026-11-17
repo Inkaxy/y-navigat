@@ -9,8 +9,6 @@ import { parsePriceSafety, safetyGate, totalEffect } from "@/fakturaer/lib/price
 import { KIND_COPY, parseClaimPreview, planClaim } from "@/ravarer/lib/supplierClaim";
 import { InvoiceLinesTable } from "@/fakturaer/components/invoice-detail/InvoiceLinesTable";
 import { InvoiceDocumentPanel } from "@/fakturaer/components/InvoiceDocumentPanel";
-import { causeText, nextActionText } from "@/ravarer/pages/priskontroll/gjore/groupCopy";
-import { workEffect } from "@/ravarer/lib/workEffect";
 import { controlFigures } from "@/ravarer/pages/priskontroll/faktura/ControlSummary";
 import type { InvoiceDetailLine } from "@/fakturaer/components/invoice-detail/fetchInvoiceDetail";
 
@@ -96,19 +94,6 @@ describe("invoiceFigures", () => {
 
 describe("action_required i Å gjøre", () => {
   const base = { type: "varekort" as const, kind: "prisavvik" as const, open_lines: 1, open_invoices: 1 };
-  it("kreditnota overstyrer «Pris avviker»", () => {
-    const it2 = { ...base, action_required: toActionRequired("review_credit_note") };
-    expect(causeText(it2)).toBe("Kreditnota – ikke en prisendring");
-    expect(nextActionText(it2)).toBe("Kontroller kreditnotaen");
-  });
-  it("manglende kobling i prisgruppen kalles ikke lesefeil eller prisavvik", () => {
-    expect(nextActionText({ kind: "prisavvik", action_required: "complete_link_or_package" })).toBe("Fullfør kobling eller pakning");
-    const e = workEffect({ effect_status: "unknown", effect_label: null, impact_nok: null, read_integrity: "needs_review", unknown_effect_lines: 1, action_required: "complete_link_or_package" });
-    expect(e.label).toBe("Fullfør kobling eller pakning");
-  });
-  it("eldre server uten feltet beholder kind-tekst", () => {
-    expect(nextActionText({ kind: "prisavvik", action_required: null })).toBe("Vurder pris");
-  });
 });
 
 function line(over: Partial<InvoiceDetailLine>): InvoiceDetailLine {

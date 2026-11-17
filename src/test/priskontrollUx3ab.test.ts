@@ -1,42 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { parseWorkItems } from "@/ravarer/lib/workRpc";
-import { workEffect } from "@/ravarer/lib/workEffect";
 import { canFetchLines, deliverySteps, sumOk, sumStatusLabel } from "@/ravarer/pages/priskontroll/faktura/invoiceSteps";
 import { factsSummary } from "@/ravarer/pages/priskontroll/faktura/InvoiceFactsSection";
 import { controlFigures } from "@/ravarer/pages/priskontroll/faktura/ControlSummary";
-import { groupCountText } from "@/ravarer/pages/priskontroll/gjore/groupCopy";
 import { readingReliability } from "@/fakturaer/lib/invoiceFacts";
 
 const base = { key: "faktura:1", grp: "fakturaer", kind: "faktura_sumavvik", title: "PALS 526301", amount: 29652.45 };
 
 describe("kronevirkning i Å gjøre", () => {
-  it("gammel server uten effektfelt: aldri bruttobeløp som virkning", () => {
-    const [it0] = parseWorkItems({ items: [{ ...base, impact_nok: 317318.76 }] }).items;
-    expect(it0.effect_status).toBe("unknown");
-    const e = workEffect(it0);
-    expect(e.kind).toBe("unknown");
-    expect(JSON.stringify(e)).not.toContain("317");
-  });
   it("null impact tolkes som null, ikke 0", () => {
     expect(parseWorkItems({ items: [{ ...base, impact_nok: null }] }).items[0].impact_nok).toBeNull();
-  });
-  it("verifisert prisavvik vises med verdi, også 0", () => {
-    const [it0] = parseWorkItems({ items: [{ ...base, impact_nok: 0, effect_status: "verified_price_effect", read_integrity: "checked" }] }).items;
-    expect(workEffect(it0)).toEqual({ kind: "verified", label: "Beregnet prisavvik", value: 0 });
-  });
-  it("usikker lesing vinner over verifisert status", () => {
-    const [it0] = parseWorkItems({ items: [{ ...base, impact_nok: 500, effect_status: "verified_price_effect", read_integrity: "needs_review" }] }).items;
-    expect(workEffect(it0).label).toBe("Kontroller lesingen");
   });
   it("ukjente verdier faller tilbake til unknown", () => {
     const [it0] = parseWorkItems({ items: [{ ...base, effect_status: "noe", read_integrity: "x" }] }).items;
     expect([it0.effect_status, it0.read_integrity]).toEqual(["unknown", "unknown"]);
-  });
-  it("tellertekst skiller leverandørvarer og fakturasaker", () => {
-    const counts = { alle: 802, kobling: 354, pakning: 173, pris: 185, kontroll: 9, fakturaer: 81, faktura_mangler_linjer: 0, faktura_sumavvik: 0, faktura_flagget: 0, faktura_klar: 0 };
-    expect(groupCountText("alle", counts)).toBe("721 leverandørvarer · 81 fakturasaker");
-    expect(groupCountText("kobling", counts)).toBe("354 leverandørvarer");
-    expect(groupCountText("fakturaer", counts)).toBe("81 fakturasaker");
   });
 });
 

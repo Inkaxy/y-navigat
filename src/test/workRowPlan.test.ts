@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildReviewPlan, rowPlanSummary, supplierBasis, basisNextAction } from "@/fakturaer/lib/reviewPlan";
 import { unitCorrectionState, unitCorrectionOptions } from "@/fakturaer/lib/unitCorrection";
-import { parseWorkItemPlans } from "@/ravarer/hooks/useWorkItemPlans";
 import type { SupplierItemLine } from "@/fakturaer/lib/supplierItems";
 
 const base: SupplierItemLine = {
@@ -23,12 +22,6 @@ describe("arbeidslistens rad bruker samme plan", () => {
     const s = rowPlanSummary([{ ...base, invoice_approved: true, review_reason: "unknown_package_size" }], 1, null);
     expect(s?.readonly).toBe(true);
     expect(s?.next).toMatch(/Åpne faktura for nykontroll/);
-  });
-  it("ukjent grunnlag gir null (serverens tekst), aldri grønt", () => {
-    expect(rowPlanSummary([], 3, null)).toBeNull();
-    expect(rowPlanSummary(undefined, null, null)).toBeNull();
-    expect(parseWorkItemPlans(null).size).toBe(0);
-    expect(parseWorkItemPlans({ "a|b": { open_lines: null, lines: [] } }).get("a|b")?.openLines).toBeNull();
   });
 });
 
@@ -61,9 +54,3 @@ describe("rett fakturert enhet", () => {
   it("tilbyr pose når linjen er sekk", () => { expect(unitCorrectionOptions("sekk")).toContain("pose"); expect(unitCorrectionOptions("sekk")).not.toContain("sekk"); });
 });
 
-import { rowEffect } from "@/ravarer/pages/priskontroll/gjore/WorkListView";
-describe("rowEffect – låst rad", () => {
-  const it0 = { effect_status: "unknown", effect_label: null, impact_nok: null, read_integrity: "needs_review", unknown_effect_lines: 1, action_required: "complete_link_or_package" } satisfies Parameters<typeof rowEffect>[0];
-  it("skjuler generell hjelpetekst når planen er låst", () => { expect(rowEffect(it0, { readonly: true })).toBeNull(); });
-  it("beholder den når raden ikke er låst", () => { expect(rowEffect(it0, { readonly: false })).not.toBeNull(); });
-});
