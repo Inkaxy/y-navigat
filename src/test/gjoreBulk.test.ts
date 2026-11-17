@@ -29,7 +29,4 @@ describe("F18/F28: fryste ID-er og forslag", () => {
   });
 });
 
-describe("F28: forhåndsvalg krever forslag for alle valgte linjer", () => {
-  const s = (line: string, rm: string) => ({ invoice_line_id: line, raw_material_id: rm, rank: 1, match_reason: null, name: rm });
-});
 

@@ -6,9 +6,6 @@ function inv(id: string, number: string, tab: InboxInvoice["tab"]): InboxInvoice
   return { id, invoice_number: number, supplier_name: "ASKO", tab, status: "needs_review", line_count: 3 } as unknown as InboxInvoice;
 }
 
-describe("Oppdater matching følger søk og fane", () => {
-  const all = [inv("a", "330702353", "open"), ...Array.from({ length: 684 }, (_, i) => inv(`x${i}`, `9${i}`, "open"))];
-});
 
 describe("Frivillig startprisforslag gjør ikke linjen uavklart", () => {
   const line = {

@@ -92,9 +92,6 @@ describe("invoiceFigures", () => {
   });
 });
 
-describe("action_required i Å gjøre", () => {
-  const base = { type: "varekort" as const, kind: "prisavvik" as const, open_lines: 1, open_invoices: 1 };
-});
 
 function line(over: Partial<InvoiceDetailLine>): InvoiceDetailLine {
   return {
