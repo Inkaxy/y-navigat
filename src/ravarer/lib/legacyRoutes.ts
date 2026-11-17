@@ -84,6 +84,9 @@ const STATIC: Record<string, Entry> = {
   "/ravarer/fakturaer/import-ehf": { ...IMP, extra: [["importer", "ehf"]] },
   "/ravarer/fakturaer/import-pdf": { ...IMP, extra: [["importer", "pdf"]] },
   "/ravarer/fakturaer/reberegn-kostpriser": { to: `${R}/priskontroll/verktoy/reberegn` },
+  // Opprydding demo D: Prislinje er flyttet inn i varens prisvisning, Automatikk til Innstillinger.
+  "/ravarer/prislinje": { to: `${R}/varer`, rename: { valgt: null } },
+  "/ravarer/automatikk": { to: `${R}/innstillinger`, extra: [["seksjon", "automatikk"]] },
   "/ravarer/avtaler": { to: `${R}/leverandorer`, extra: [["fane", "avtaler"]] },
   "/ravarer/forhandlinger": { to: `${R}/leverandorer`, extra: [["fane", "forhandlinger"]] },
   "/ravarer/varemottak": { to: `${R}/lager`, extra: [["fane", "varemottak"]] },
