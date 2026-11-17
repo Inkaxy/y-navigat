@@ -17,6 +17,7 @@ import { dateNo } from "@/ravarer/lib/decisions";
 import { useRereadSuggestions, useSamletRunner, type SuggestionRow } from "@/ravarer/hooks/useSamletGjenlesing";
 import { autoInputFromRun, decideAuto, type AutoDecision } from "@/ravarer/lib/samletGjenlesing/rule";
 import { manualApplyReason } from "@/ravarer/lib/samletGjenlesing/runState";
+import { ApplyAllDialog } from "./ApplyAllDialog";
 
 const kr = (v: number | null) => (v == null ? "–" : `${Number(v).toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr`);
 const time = (iso: string) => new Date(iso).toLocaleString("nb-NO", { timeZone: "Europe/Oslo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -34,6 +35,7 @@ export function SuggestionsSection({ names, canWrite, retur }: { names: Map<stri
   const [review, setReview] = useState<Review | null>(null);
   const [discard, setDiscard] = useState<SuggestionRow | null>(null);
   const [busy, setBusy] = useState(false);
+  const [applyAll, setApplyAll] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const lock = useRef(false);
   const rows = q.data ?? [];
@@ -109,8 +111,13 @@ export function SuggestionsSection({ names, canWrite, retur }: { names: Map<stri
   return (
     <section id="ff-forslag" aria-labelledby="ff-forslag-h" className="mt-3 border-t border-line-subtle">
       <div className="px-4 py-4 md:px-5">
-        <h3 id="ff-forslag-h" className="text-body font-semibold">Forslag venter på deg <span className="tabular-nums text-ink-secondary">{rows.length.toLocaleString("nb-NO")}</span></h3>
-        <p className="text-caption text-ink-secondary">Ny lesing som ikke ble brukt automatisk. Et forslag utløper 24 timer etter at det ble lest.</p>
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <h3 id="ff-forslag-h" className="text-body font-semibold">Forslag venter på deg <span className="tabular-nums text-ink-secondary">{rows.length.toLocaleString("nb-NO")}</span></h3>
+            <p className="text-caption text-ink-secondary">Ny lesing som ikke ble brukt automatisk. Et forslag utløper 24 timer etter at det ble lest.</p>
+          </div>
+          {canWrite && rows.length > 0 && <Button className="min-h-[44px]" disabled={busy} onClick={() => { setMsg(null); setApplyAll(true); }}>Bruk alle …</Button>}
+        </div>
         {msg && <p role={msg.ok ? "status" : "alert"} className={msg.ok ? "mt-2 text-sm" : "mt-2 text-sm text-destructive"}>{msg.text}</p>}
         {q.isError && <p role="alert" className="mt-2 text-sm text-destructive">Kunne ikke hente forslagene. <button className="underline" onClick={() => void q.refetch()}>Prøv igjen</button></p>}
       </div>
@@ -153,6 +160,8 @@ export function SuggestionsSection({ names, canWrite, retur }: { names: Map<stri
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {canWrite && <ApplyAllDialog rows={rows} open={applyAll} onOpenChange={setApplyAll} onDone={setMsg} />}
 
       <AlertDialog open={!!discard} onOpenChange={(o) => !busy && !o && setDiscard(null)}>
         <AlertDialogContent>

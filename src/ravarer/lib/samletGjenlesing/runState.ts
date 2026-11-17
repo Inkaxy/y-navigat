@@ -135,3 +135,5 @@ export const autoApplyReason = (dateLabel: string) =>
   `Samlet gjenlesing ${dateLabel}: brukt automatisk – summen stemmer, og ingen manuelle koblinger, godtatte priser, «ikke vare», holdt utenfor eller rettede linjer berøres.`;
 /** Begrunnelse når Henrik selv trykker «Bruk» på et forslag. */
 export const manualApplyReason = (dateLabel: string) => `Samlet gjenlesing ${dateLabel}: forslag brukt etter gjennomgang.`;
+/** Begrunnelse når forslaget tas i bruk via «Bruk alle». */
+export const bulkApplyReason = (dateLabel: string) => `Samlet gjenlesing ${dateLabel}: forslag brukt via «Bruk alle».`;
