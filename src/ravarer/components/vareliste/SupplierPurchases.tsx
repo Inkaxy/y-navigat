@@ -131,8 +131,8 @@ export function SupplierPurchases({ rmId, baseUnit, links, nameOf, canWrite, can
           })}
         </ul>
       )}
-      {links.length > 0 && <p className="text-caption text-ink-secondary">{costRuleExplanation(r, primaryName, cheapId ? { name: nameOf.get(cheapId) ?? "ukjent leverandør" } : null)}</p>}
-      {rule.data && !rule.data.available && links.length > 1 && <p className="text-caption text-ink-secondary">Valget «Kalkylen bruker» kan endres når databaseendringen «Fra faktura» er kjørt. Til da gjelder siste gyldige kjøp.</p>}
+      {links.length > 0 && rule.data?.available && <p className="text-caption text-ink-secondary">{costRuleExplanation(r, primaryName, cheapId ? { name: nameOf.get(cheapId) ?? "ukjent leverandør" } : null)}</p>}
+      {rule.data && !rule.data.available && links.length > 0 && <p className="text-caption text-ink-secondary">Valget «Kalkylen bruker» kan endres når databaseendringen «Fra faktura» er kjørt. Til da bruker kalkylen siste gyldige kjøp uansett leverandør.</p>}
       {rule.isError && <p role="alert" className="text-caption text-destructive">Kunne ikke lese hva kalkylen bruker.</p>}
       {msg && <p role="alert" className="text-caption text-destructive">{msg}</p>}
     </section>
