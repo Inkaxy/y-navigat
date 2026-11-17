@@ -11,8 +11,8 @@ import { useMaterialPriceEvidence } from "@/ravarer/hooks/useMaterialPriceEviden
 import { costSummary } from "@/ravarer/lib/costSummary";
 import { nextFix } from "@/ravarer/lib/nextFix";
 import { AllPricesList } from "@/ravarer/components/prices/AllPricesList";
-import { useRavarer } from "@/ravarer/RavarerContext";
-import { useRavarerAccessLevel } from "@/ravarer/hooks/useRavarerAccess";
+import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { useRavarerAccessLevel } from "@/ravarer/hooks/useRavarerAccessLevel";
 import { SupplierPurchases } from "./SupplierPurchases";
 
 
