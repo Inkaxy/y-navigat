@@ -193,6 +193,8 @@ describe("Ikke lest: to grupper og ærlig melding", () => {
     const m = requeueMessage({ requeued: 0, skipped: [{ reason: "har_linjer" }, { reason: "kostpris_fort" }, { reason: "kostpris_fort" }, { reason: "godkjent" }], withLines: 0 });
     expect(m).toBe("0 lagt i lesekøen. 1 har allerede linjer og må leses på nytt med forslag – se under. 3 ble hoppet over: 2 har ført kostpris, 1 er godkjent.");
     expect(m).not.toMatch(/låst eller allerede behandlet/);
+    expect(requeueMessage({ requeued: 2, skipped: [{ reason: "har_linjer" }], withLines: 0, linesWhere: "se «Gamle sumavvik»" }))
+      .toBe("2 lagt i lesekøen. 1 har allerede linjer og må leses på nytt med forslag – se «Gamle sumavvik».");
   });
   it("differansen i kroner: linjesum mot fakturasum eks. mva", () => {
     expect(sumDifference({ ...base, lines_sum_excl_vat: 960, total_vat: 250 })).toBe(-40);

@@ -76,11 +76,11 @@ export const requeueSkipText = (r: string) => SKIP_TEXT[r] ?? "ble avvist av ser
  * Meldingen etter «Les alle på nytt»: hva som faktisk skjedde og hvorfor noe ble hoppet over.
  * `withLines` = fakturaer med linjer som ikke sendes til lesekøen (de vises i gruppen under).
  */
-export function requeueMessage(o: { requeued: number; skipped: readonly { reason: string }[]; withLines: number }): string {
+export function requeueMessage(o: { requeued: number; skipped: readonly { reason: string }[]; withLines: number; linesWhere?: string }): string {
   const n = (x: number) => x.toLocaleString("nb-NO");
   const parts = [`${n(o.requeued)} lagt i lesekøen.`];
   const lines = o.withLines + o.skipped.filter((s) => s.reason === "har_linjer").length;
-  if (lines > 0) parts.push(`${n(lines)} har allerede linjer og må leses på nytt med forslag – se under.`);
+  if (lines > 0) parts.push(`${n(lines)} har allerede linjer og må leses på nytt med forslag – ${o.linesWhere ?? "se under"}.`);
   const other = new Map<string, number>();
   for (const s of o.skipped) if (s.reason !== "har_linjer") { const t = requeueSkipText(s.reason); other.set(t, (other.get(t) ?? 0) + 1); }
   const total = [...other.values()].reduce((a, b) => a + b, 0);
