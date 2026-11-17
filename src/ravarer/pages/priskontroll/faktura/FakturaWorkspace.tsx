@@ -1,7 +1,7 @@
 import { correctionTarget } from "./correctionTarget";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useUiPreference } from "@/hooks/useUiPreference";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -240,7 +240,8 @@ export function FakturaWorkspaceView({ id, embedded }: ViewProps) {
     else if (k === "hent_linjer") doFetch();
     else if (k === "registrer_linjer") navigate(paths.registrerLinjer(data.id));
     else if (k === "rett_sum") { setFactsSignal((n) => n + 1); openCorrection(); }
-    else if (k === "avklar") focusFirstOpen();
+    // Åpne linjer avklares i Fra faktura (opprydding demo D).
+    else if (k === "avklar") navigate(paths.fraFaktura());
     else if (k === "avstem" && s.assessment) setDialog({ kind: "reconcile", inv: { id: data.id, invoice_number: data.invoice_number, assessment: s.assessment } });
     else if (k === "godkjenn") void s.approve();
     else if (k === "kostpris") void s.postCosts();
@@ -285,6 +286,28 @@ export function FakturaWorkspaceView({ id, embedded }: ViewProps) {
     else setHistoryOpen(true);
   };
 
+  // `?handling=` fra Fra faktura: rett linjen, hold utenfor eller koble kreditnota – samme dialoger og sperrer som her.
+  const handling = sp.get("handling");
+  const handledAction = useRef<string | null>(null);
+  useEffect(() => {
+    if (!handling || !data || !q.linesQuery.isSuccess) return;
+    const key = `${data.id}:${targetLine ?? ""}:${handling}`;
+    if (handledAction.current === key) return;
+    handledAction.current = key;
+    const line = targetLine ? (data.invoice_lines ?? []).find((l) => l.id === targetLine) : undefined;
+    if (handling === "rett") {
+      if (!line) s.setResult({ title: "Fant ikke linjen", items: ["Linjen fra lenken finnes ikke på denne fakturaen."], error: true });
+      else if (!lineWrite) s.setResult({ title: "Linjen kan ikke rettes her", items: [final ? "Fakturaen er avstemt eller holdt utenfor." : lineLock.locked ? lineLock.note ?? "Linjene er låst." : "Du har ikke skrivetilgang."], error: true });
+      else startCorrection(line.id);
+    } else if (handling === "hold-linje" || handling === "hold-faktura") {
+      if (!canHold) s.setResult({ title: "Kan ikke holdes utenfor her", items: ["Fakturaen er avstemt, allerede holdt utenfor, låst, eller du har ikke skrivetilgang."], error: true });
+      else openHold(line?.id ?? null, handling === "hold-linje" ? "line" : "invoice");
+    } else if (handling === "kreditnota") {
+      if (s.canWrite) setDialog({ kind: "credit", inv: data }); else s.setResult({ title: "Krever skrivetilgang", items: [], error: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handling, data, q.linesQuery.isSuccess, targetLine]);
+
   const anyDialog = !!hold || !!dialog || !!lineDialog || !!correctFor || historyOpen || helpOpen || overrideOpen || !!q.bulkLink;
   const keys = useMemo(() => ({
     enabled: !!data && !anyDialog,
@@ -305,7 +328,8 @@ export function FakturaWorkspaceView({ id, embedded }: ViewProps) {
     help: () => setHelpOpen(true),
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [data, anyDialog, q.activeLine, suppressActive, q.accept, q.undo, lineWrite, docOpen, docShown, wide, isMobile]);
-  useWorkspaceHotkeys(keys);
+  // Linjehurtigtastene (godta/ny/ikke vare) hørte til arbeidslisten og er fjernet med den (opprydding demo D).
+  void keys;
 
   if (!id) return null;
   if (detail.isLoading || detail.isError || !data || !s.next) {
@@ -313,7 +337,8 @@ export function FakturaWorkspaceView({ id, embedded }: ViewProps) {
   }
 
   const active = suppressActive ? null : q.activeLine;
-  const showTable = tableView && !forceList;
+  // Arkiv (opprydding demo D): fakturaen vises som leste linjer med koblet vare. Linjearbeidet skjer i Fra faktura.
+  const showTable = true;
   const linesById = new Map((data.invoice_lines ?? []).map((l) => [l.id, l]));
   // Kallerens EGEN radversjon/råvare binder statusen. Lånes aldri fra en annen cache; mangler den, er prisen ukjent.
   const gateFor = ownLineGate(safety.gateFor, data.id);
@@ -348,20 +373,22 @@ export function FakturaWorkspaceView({ id, embedded }: ViewProps) {
       {lockNote && <p role="note" data-testid="invoice-line-lock" className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-ink-secondary">{lockNote}{lineLock.locked && lineLock.kind === "approved" && s.canWrite && <> <a className="underline" href={paths.godkjenning()}>Gå til Godkjenning</a></>}</p>}
       {s.result && <ResultBox title={s.result.title} items={s.result.items} onUndo={s.result.undoable && q.undoEntry ? () => { s.setResult(null); void q.undo(); } : undefined} onNext={() => s.setResult(null)} nextLabel="Lukk" />}
       {lastLinked && <SimilarLinesHint rmsId={lastLinked.rmsId} name={lastLinked.name} onOpen={() => q.setBulkLink(lastLinked)} onDismiss={() => setLastLinked(null)} />}
-      <div className="flex justify-end">
-        <Button variant="ghost" size="sm" className="min-h-[44px]" aria-pressed={showTable} onClick={() => { setForceList(false); setTableView(!showTable); }}>{showTable ? "Vis arbeidsliste" : "Vis som tabell"}</Button>
-      </div>
-      {showTable ? (
+      {q.needs > 0 && !final && (
+        <p role="note" data-testid="open-in-fra-faktura" className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-sm">
+          <span>{q.needs.toLocaleString("nb-NO")} {q.needs === 1 ? "ting venter" : "ting venter"} i Fra faktura</span>
+          <Link className="font-semibold text-primary underline-offset-2 hover:underline" to={paths.fraFaktura()}>Åpne Fra faktura</Link>
+        </p>
+      )}
         <InvoiceLinesTable
           lines={data.invoice_lines ?? []}
           supplierId={data.supplier_id}
           canBulkImport={false}
-          canMatch={lineWrite}
+          canMatch={false}
           selected={{}}
           onSelect={() => undefined}
           showLedgerAccount={showLedger}
           onShowLedgerAccount={setShowLedger}
-          onMatch={(lineId) => { setTableView(false); q.setOnlyOpen(false); setPendingFocus(lineId); editMaterial(lineId); }}
+          onMatch={() => navigate(paths.fraFaktura())}
           onRegister={() => navigate(paths.registrerLinjer(data.id))}
           tolerancePct={tolerances.defaultPct}
           settings={tolerances.settings}
@@ -370,65 +397,6 @@ export function FakturaWorkspaceView({ id, embedded }: ViewProps) {
           gateOf={gateFor}
           compact={isMobile || (showDocZone && !threeZones)}
         />
-      ) : (
-        <QueueWorkspace
-          invoiceApproved={s.steps ? !!s.steps.find((x) => x.key === "godkjent")?.done : undefined}
-          lines={q.visible}
-          statusOf={q.statusOf}
-          showAll={!q.showOnlyOpen}
-          onShowAll={(v) => q.setOnlyOpen(!v)}
-          needsCount={q.needs}
-          reason={q.reason}
-          onReason={q.setReason}
-          sort={q.sort}
-          onSort={q.setSort}
-          multiSelect={multi}
-          onMultiSelect={(v) => { setMulti(v); if (!v) q.setSelected({}); }}
-          loading={q.linesQuery.isLoading}
-          error={q.linesQuery.isError ? q.linesQuery.error : null}
-          onRetry={() => void q.linesQuery.refetch()}
-          emptyTitle={q.showOnlyOpen || q.reason !== "all" ? (q.total > 0 ? "Ingen linjer passer filteret" : "Ingen linjer må avklares") : "Fakturaen har ingen linjer"}
-          activeLine={active}
-          onSelect={(l) => { setSuppressActive(false); q.dispatch({ type: "focus", id: l.id }); setInspectorOpen(true); }}
-          onPrev={() => q.dispatch({ type: "prev" })}
-          onNext={() => q.dispatch({ type: "next" })}
-          selected={q.selected}
-          onToggleSelect={(lid, v) => q.setSelected((x) => ({ ...x, [lid]: v }))}
-          bulk={{
-            count: q.selectedLines.length, acceptable: q.selectedLines.filter(isBulkAcceptable).length, busy: q.bulkBusy,
-            onAccept: () => { const n = q.selectedLines.filter(isBulkAcceptable).length; confirmMany.guard(n, "Godta forslag", () => void q.bulkAccept()); },
-            onNotApplicable: () => confirmMany.guard(notApplicableCount, "«Ikke vare»", () => void q.bulkNotApplicable()),
-            onCreate: () => setLineDialog({ kind: "bulk_create", line: null }), onClear: () => q.setSelected({}),
-            onImport: () => setLineDialog({ kind: "bulk_import", line: null }), importable: q.selectedLines.filter((l) => !l.raw_material_id).length,
-          }}
-          links={q.links}
-          toleranceFor={q.toleranceFor}
-          showInvoice={false}
-          canWrite={lineWrite}
-          reconcileReady={(s.next.key === "avstem" && s.next.enabled) || (s.next.key === "kostkontroll" && !!s.assessment?.canReconcile && s.canReconcileRight)}
-          isMobile={isMobile}
-          countsError={q.countsQuery.isError}
-          onSaved={q.handleSaved}
-          onLinked={(rmsId, name) => setLastLinked({ rmsId, name })}
-          onSecondary={(a, l, prefill) => setLineDialog({ kind: a, line: l, prefill: prefill ?? null })}
-          onShowDocument={() => { if (isMobile) setZone("dokument"); else if (!docOpen) toggleDoc(); }}
-          onReconcile={runPrimary}
-          onCorrectLine={lineWrite ? (l) => startCorrection(l.id) : undefined}
-          inspectorAsSheet={!isMobile && (!wide || (showDocZone && !threeZones))}
-          inspectorOpen={inspectorOpen}
-          onInspectorOpenChange={setInspectorOpen}
-          inspectorNote={active ? (
-            <div className="space-y-2">
-              <Button variant="outline" size="sm" className="min-h-[44px]" onClick={() => startCorrection(active.id)}>Rett fakturalinje</Button>
-              {canHold && !(data.invoice_lines ?? []).find((x) => x.id === active.id)?.excluded_at && (
-                <Button variant="outline" size="sm" className="min-h-[44px]" onClick={() => openHold(active.id, "line")}>Hold utenfor råvarebehandling …</Button>
-              )}
-              <SupplierItemScopeNote supplierId={data.supplier_id} line={active} />
-            </div>
-          ) : null}
-          editMaterialSignal={editSignal}
-        />
-      )}
     </div>
   );
 
