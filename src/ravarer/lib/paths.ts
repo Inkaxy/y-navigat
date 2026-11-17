@@ -21,21 +21,17 @@ type Id = string | null | undefined;
 const enc = (v: Id) => encodeURIComponent(v ?? "");
 export const RAVARER_ROOT = "/ravarer";
 
-export type PriskontrollFane = "arbeid" | "gjore" | "fakturaer" | "godkjenning" | "saker";
-export type LeverandorFane = "leverandorer" | "avtaler" | "forhandlinger";
+export type PriskontrollFane = "fakturaer" | "godkjenning";
+export type LeverandorFane = "leverandorer" | "avtaler" | "forhandlinger" | "saker";
 export type LagerFane = "beholdning" | "varemottak" | "telling";
-export type InnstillingSeksjon = "priskontroll" | "tripletex" | "kategorier" | "ai";
+export type InnstillingSeksjon = "priskontroll" | "automatikk" | "tripletex" | "kategorier" | "ai";
 
 export const paths = {
   oversikt: () => RAVARER_ROOT,
   /** Demo D: «Fra faktura til vare» (`?fane=nye|prishopp|ikke-lest`, `?lev=` leverandør, `?grense=`). */
   fraFaktura: (q?: Q) => withQuery(`${RAVARER_ROOT}/fra-faktura`, q),
-  /** Variant B: køen av spørsmål (`?valgt=` = valgt spørsmål). Nås fra «Øvrige spørsmål» på Fra faktura. */
+  /** Variant B: køen av spørsmål (`?valgt=`). Beholdt til kontroll/små prisendringer/klarhet er flyttet; nås fra «Øvrige spørsmål». */
   beslutninger: (q?: Q) => withQuery(`${RAVARER_ROOT}/beslutninger`, q),
-  /** Variant B: én linje per råvare og leverandør (`?valgt=` = leverandørkobling). */
-  prislinje: (q?: Q) => withQuery(`${RAVARER_ROOT}/prislinje`, q),
-  /** Variant B: regler, logg og morgen-e-post. */
-  automatikk: (q?: Q) => withQuery(`${RAVARER_ROOT}/automatikk`, q),
 
   // Varer
   varer: (q?: Q) => withQuery(`${RAVARER_ROOT}/varer`, q),
@@ -62,10 +58,10 @@ export const paths = {
   fakturaer: (q?: { visning?: "trenger" | "klar" | "avstemt" | "alle" } & Q) => withQuery(`${RAVARER_ROOT}/priskontroll`, { fane: "fakturaer", ...q }),
   varekoblinger: (q?: { leverandor?: string; status?: string; q?: string } & Q) =>
     withQuery(`${RAVARER_ROOT}/priskontroll/varekort`, q),
-  alleVarekort: (q?: Q) => withQuery(`${RAVARER_ROOT}/priskontroll/varekort`, q),
   varekort: (supplierId: Id, itemKey: Id) => `${RAVARER_ROOT}/priskontroll/varekort/${enc(supplierId)}/${enc(itemKey)}`,
   godkjenning: () => withQuery(`${RAVARER_ROOT}/priskontroll`, { fane: "godkjenning" }),
-  saker: (q?: { leverandor?: string } & Q) => withQuery(`${RAVARER_ROOT}/priskontroll`, { fane: "saker", ...q }),
+  /** Leverandørsaker ligger under Leverandører (opprydding demo D). */
+  saker: (q?: { leverandor?: string } & Q) => withQuery(`${RAVARER_ROOT}/leverandorer`, { fane: "saker", ...q }),
   faktura: (id: Id, q?: Q) => withQuery(`${RAVARER_ROOT}/priskontroll/faktura/${enc(id)}`, q),
   /** «Les originalen på nytt»; `kjoring` gjenopptar en lagret lesing. */
   lesPaNytt: (id: Id, q?: { kjoring?: string } & Q) => withQuery(`${RAVARER_ROOT}/priskontroll/faktura/${enc(id)}/les-pa-nytt`, q),
