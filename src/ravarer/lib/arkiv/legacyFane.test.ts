@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { legacyFakturaerRedirect } from "./legacyFane";
+import { PRISKONTROLL_TABS, leverandorTabs } from "@/ravarer/pages/hub/hubTabs";
 
 const U = "11111111-2222-3333-4444-555555555555";
 
@@ -22,5 +23,13 @@ describe("gamle Fakturaer-faner etter oppryddingen (demo D)", () => {
     expect(legacyFakturaerRedirect("?fane=gjore&gruppe=pris")).toBe("/ravarer/fra-faktura?fane=prishopp");
     expect(legacyFakturaerRedirect("?fane=gjore")).toBe("/ravarer/fra-faktura");
     expect(legacyFakturaerRedirect("?visning=mengde")).toBe("/ravarer/fra-faktura");
+  });
+});
+
+describe("faneradene etter oppryddingen", () => {
+  it("Fakturaer har bare Fakturaer og Godkjenning", () => expect([...PRISKONTROLL_TABS]).toEqual(["fakturaer", "godkjenning"]));
+  it("Leverandørsaker ligger under Leverandører og krever fakturatilgang", () => {
+    expect(leverandorTabs(undefined, true).find((t) => t.id === "saker")?.hidden).toBe(false);
+    expect(leverandorTabs(undefined, false).find((t) => t.id === "saker")?.hidden).toBe(true);
   });
 });

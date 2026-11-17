@@ -60,7 +60,8 @@ describe("nextInvoiceStep", () => {
 
 describe("hurtigfiltre og gamle parametre", () => {
   const v = (s: string) => parseVisning(new URLSearchParams(s));
-  it("standard er «Trenger meg»", () => expect(v("fane=fakturaer").visning).toBe("trenger"));
+  // Opprydding demo D: Fakturaer er et arkiv – uten valg vises alle fakturaer.
+  it("standard er «Alle»", () => expect(v("fane=fakturaer").visning).toBe("alle"));
   it("gamle innboksfaner mappes", () => {
     expect(v("visning=innboks").visning).toBe("trenger");
     expect(v("visning=innboks&innboks=klar").visning).toBe("klar");
