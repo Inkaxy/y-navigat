@@ -81,12 +81,14 @@ const P = {
   innSeksjon: listOf("src/ravarer/lib/paths.ts", /InnstillingSeksjon = ((?:"[^"]+"\s*\|?\s*)+)/),
   fakturaVisning: listOf("src/ravarer/pages/priskontroll/fakturaer/visning.ts", /FAKTURA_VISNINGER = \[([^\]]+)\]/),
   importer: ["ehf", "pdf", "manuelt"].filter((t) => read("src/ravarer/pages/priskontroll/import/ImportSheet.tsx").includes(t)),
-  mengde: read("src/ravarer/pages/priskontroll/gjore/mengde/MengdeDiagnostikk.tsx").includes("visning=mengde") ? ["mengde"] : [],
+  // Mengde-diagnostikken er fjernet i oppryddingen til versjon D (17.11.2026).
+  mengde: existsSync("src/ravarer/pages/priskontroll/gjore/mengde/MengdeDiagnostikk.tsx") && read("src/ravarer/pages/priskontroll/gjore/mengde/MengdeDiagnostikk.tsx").includes("visning=mengde") ? ["mengde"] : [],
 };
 const PARAMS = {
   "/ravarer/varer": { liste: P.liste, valgt: null },
   "/ravarer/varer/:id": { seksjon: P.rmSeksjon },
   "/ravarer/leverandorer": { fane: P.levFane },
+  "/ravarer/fra-faktura": { fane: ["nye", "prishopp", "ikke-lest"], lev: null },
   "/ravarer/leverandorer/:id": { seksjon: P.levSeksjon },
   "/ravarer/lager": { fane: P.lagerFane },
   "/ravarer/priskontroll": { fane: P.pkFane, importer: P.importer, visning: [...P.mengde, ...P.fakturaVisning] },

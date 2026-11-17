@@ -121,7 +121,7 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 | R76 | Bevegelseslogg med filtre for dato, type og årsak, og søk | ?fane=bevegelser | 5 | Gammel plass |
 | R77 | Fortjeneste (DB kr, DB %, solgt 30 d) | ?fane=fortjeneste | 5 | Gammel plass |
 | R78 | «Bør bestilles» + «Kopier liste» | ?fane=bestilling | 5 | Gammel plass |
-| R79 | Fakturalinjer uten mengde i baseenhet (90 d), med lenker | /priskontroll?fane=gjore › kø «Linjer uten mengde» | 5 | Gammel plass |
+| R79 | Fakturalinjer uten mengde i baseenhet (90 d), med lenker | Fjernet (opprydding D): skrivebeskyttet diagnostikk | 5 | Gammel plass |
 | R80 | Justeringsdialog: telling, svinn, åpningsbeholdning, med enheter | Felles StockAdjustDialog (?fane=beholdning og råvarekort ?seksjon=lager) | 5 | Gammel plass |
 
 ## Varemottak
@@ -312,18 +312,18 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 |---|---|---|---|---|
 | R27 | «Ny råvare» (SKU, kategori, varetype, flere kategorier, navn, basisenhet, pakning, kostpris, beskrivelse, emballasje; åpner råvaren) | RawMaterialCreateSheet fra /varer header, tasten `n` og ⌘K | 1 | Flyttet |
 | F50 | Opprett råvare fra linje (varetype, navn, foreslått SKU, lev.-SKU, kategori/ny, grunnenhet, pakning, bekreft pakning, live kostpris) | RawMaterialCreateSheet i fakturakontekst via `link-supplier-item` (regner om linjene) | 1 | Flyttet |
-| F51 | Masseopprettelse av råvarer fra valgte linjer (felles kategori) | /priskontroll?fane=gjore › avkrysning › «Opprett råvarer …» (`GjoreBulkBar`/`bulkGjore.ts`, på tvers av fakturaer/leverandører, forhåndsvisning, bekreftelse > 10 linjer, rapport per varekort, linjetall fra forhåndsvisningen og fryste linje-ID-er; test `gjoreBulk.test.ts`). Per faktura fortsatt i fakturaarbeidsflaten | 3 | Flyttet |
+| F51 | Masseopprettelse av råvarer fra valgte linjer (felles kategori) | Opprydding D: /ravarer/fra-faktura › «Opprett N sikre» | 3 | Flyttet |
 | F52 | Masseimport av umatchede linjer som nye råvarer, med AI-forslag | /priskontroll/faktura/:id › linjer › masseutvalg «Importer som nye råvarer» | 3 | Flyttet |
 
 ## Fakturaer: I dag / Beslutninger / Råvarespørsmål
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| F5 | Prioritert topp-5 over beslutninger på tvers av fakturaer | /ravarer › «Til deg» (topp 7) + /priskontroll?fane=gjore sortert etter kronevirkning | 2 | Flyttet |
+| F5 | Prioritert topp-5 over beslutninger på tvers av fakturaer | Opprydding D: /ravarer › kortet «Fra faktura til vare» (tellere for Nye varer/Prishopp/Ikke lest) | 2 | Flyttet |
 | F6 | Tellere «N åpne beslutninger på M fakturaer» og «gjentatte linjer slått sammen» | /ravarer › header-setning + Å gjøre-køtall | 2 | Flyttet |
-| F7 | Kort for varekort som venter, med lenke | /ravarer › KPI «Å gjøre i priskontroll» → ?fane=gjore | 2 | Flyttet |
-| F8 | Kort med fakturaer klare til intern godkjenning | /ravarer › KPI → /priskontroll?fane=godkjenning | 2 | Flyttet |
-| F9 | Beslutningsliste: søk, leverandørfilter, typefilter, paging, «alle» eller «bare råvarer» | /ravarer/priskontroll?fane=gjore › venstre: grupper (gamle `type`/`omfang` omdirigeres til `gruppe`), søk, leverandørfilter, paginering | 3 | Flyttet |
+| F7 | Kort for varekort som venter, med lenke | Opprydding D: /ravarer › kort «Nye varer»/«Prishopp» → /ravarer/fra-faktura | 2 | Flyttet |
+| F8 | Kort med fakturaer klare til intern godkjenning | Opprydding D: /ravarer › kort «Til godkjenning» → /priskontroll?fane=godkjenning | 2 | Flyttet |
+| F9 | Beslutningsliste: søk, leverandørfilter, typefilter, paging, «alle» eller «bare råvarer» | Opprydding D: /ravarer/fra-faktura › leverandørchips, sider à 50 («Vis flere»); øvrige typer i /ravarer/beslutninger | 3 | Flyttet |
 | F10 | Material: velg forslag, søk i hele registeret, bruk på alle like linjer og husk (alias) | Varekort-panel › Råvare-blokk | 3 | Flyttet |
 | F11 | Material: opprett ny råvare og koble resten av gruppen | Varekort-panel › «Opprett ny råvare» | 3 | Flyttet |
 | F12 | Package: bekreft pakning for alle linjer i gruppen | Varekort-panel › Pakning-blokk | 3 | Flyttet |
@@ -331,16 +331,16 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 | F14 | Price: referanse mot fakturert pris, nivådelt forklaring, samlet kronebeløp | Varekort-panel › Prisblokk | 3 | Flyttet |
 | F15 | Price: godta avviket for alle linjer, med sjekk av at linjene er uendret | Prisblokk › «Godta ny pris» (`rm_supplier_item_accept_price`) | 3 | Flyttet |
 | F16 | Price: opprett én leverandørsak for gruppen | Prisblokk › «Opprett leverandørsak» | 3 | Flyttet |
-| F17 | Gå automatisk til neste etter lagring, i samme filterrekkefølge | Resultatboks + «Neste» (auto ved tastatur) | 3 | Flyttet |
+| F17 | Gå automatisk til neste etter lagring, i samme filterrekkefølge | Fjernet (opprydding D): besvart rad forsvinner fra Fra faktura | 3 | Flyttet |
 | F18 | Frys gruppen mens den vises | `VarekortPanel` viser fryst øyeblikksbilde; nye/løste linjer gir varsel + «Oppdater». Koblingsskjema, «Ikke vare» og masseløp sender nøyaktige fryste linje-ID-er (aldri tomt). `link-supplier-item` (nå i repo) avviser tomt utvalg, hopper over linjer løst siden forhåndsvisning (`skipped_line_ids`) og regner bare om endrede linjer. Bevisst: lagret kobling/alias gjelder fremtidige linjer ved deres egen matching. Test `gjoreBulk.test.ts`. Ikke kontrollert innlogget i denne økten | 3 | Ferdig (ikke innlogget verifisert) |
 
 ## Varekoblinger / varekort
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| F53 | Liste over leverandørvarer: søk, leverandørfilter, seks statusfaner med antall | ?fane=gjore › køer (Mangler kobling, Mangler pakning, Prisendringer, Kontroll) + visning «Alle varekort» for Koblet/Ikke vare | 3 | Flyttet |
-| F54 | Kolonner (leverandør, varenr., beskrivelse, råvare, pakning, siste pris %, linjer, årsaker, sist sett, status); mobil; tastatur | ?fane=gjore › listerader (mobilkort, J/K) | 3 | Flyttet |
-| F55 | Paging og URL-synk av alle filtre | ?fane=gjore&q=&leverandor=&valgt= | 3 | Flyttet |
+| F53 | Liste over leverandørvarer: søk, leverandørfilter, seks statusfaner med antall | /ravarer/priskontroll/varekort (leverandørvarer, beholdt) | 3 | Flyttet |
+| F54 | Kolonner (leverandør, varenr., beskrivelse, råvare, pakning, siste pris %, linjer, årsaker, sist sett, status); mobil; tastatur | /ravarer/priskontroll/varekort (leverandørvarer, beholdt) | 3 | Flyttet |
+| F55 | Paging og URL-synk av alle filtre | /ravarer/priskontroll/varekort?q=&leverandor= | 3 | Flyttet |
 | F56 | «Hva mangler» i klartekst + merknader (f.eks. karantene) | Varekort-panel › topp | 3 | Flyttet |
 | F57 | Velg eksisterende råvare (forslag med «Hvorfor», søk) | Varekort-panel › Råvare-blokk | 3 | Flyttet |
 | F58 | Opprett ny råvare (navn fra beskrivelse, gjettet grunnenhet, varetype, kategori, deklarasjonsnavn) | Råvare-blokk → RawMaterialCreateSheet | 3 | Flyttet |
@@ -364,10 +364,10 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 | F23 | Radmeny (åpne detalj, kjør matching, flagg, fjern flagg) | ?fane=fakturaer › radmeny | 3 | Flyttet |
 | F24 | Fokusvisning: fremdrift, angre siste, originalfaktura, «Bekreft prismatch» | /priskontroll/faktura/:id › header (tidslinje + én hovedknapp) | 3 | Flyttet |
 | F25 | Varsel om feil på fakturanivå med «Rett registreringen» | /faktura/:id › faktasone | 3 | Flyttet |
-| F26 | Linjekø: årsaksfilter (13 grupper), tre sorteringer | ?fane=gjore (kronevirkning, hyppighet, dato) + /faktura/:id › linjefilter | 3 | Flyttet |
+| F26 | Linjekø: årsaksfilter (13 grupper), tre sorteringer | Fjernet (opprydding D): eldste først i Fra faktura; linjefilter på /faktura/:id beholdt | 3 | Flyttet |
 | F27 | «Kontroller linjer på tvers av fakturaer» (opptil 200) | ?fane=gjore (gruppert per varekort på tvers av fakturaer) | 3 | Gammel plass |
-| F28 | Masse: godta forslag, ikke aktuell, opprett råvarer | ?fane=gjore › avkrysning: «Ikke vare …», «Opprett råvarer …» og «Godta forslag …». Forhåndsvisning (bare lesing) henter åpne linjer og `invoice_line_match_suggestions` per varekort; entydig førstevalg forhåndsvelges, flere kandidater krever valg, ingen forslag hoppes over; sekvensielt med rapport per varekort (`bulkPreview.ts`, `bulkGjore.ts`). Per faktura uendret | 3 | Ferdig (ikke innlogget verifisert) |
-| F44 | Hurtigtaster ↑/↓, Enter, m, n, x, u, Esc | Å gjøre: J/K, Enter, L, P, G, X, U, `?`; linjeinspektør: m, n, x, u | 3 | Gammel plass |
+| F28 | Masse: godta forslag, ikke aktuell, opprett råvarer | Opprydding D: /ravarer/fra-faktura › «Opprett N sikre» og «Ikke vare» per rad | 3 | Ferdig (ikke innlogget verifisert) |
+| F44 | Hurtigtaster ↑/↓, Enter, m, n, x, u, Esc | Fjernet (opprydding D): køens hurtigtaster | 3 | Gammel plass |
 | F45 | Angre siste linjehandling | U / «Angre» i resultatboks og linjeinspektør | 3 | Gammel plass |
 | F46 | Dokumentpanel ved siden av køen; tilstand huskes | /faktura/:id › dokumentsone (kan skjules) | 3 | Flyttet |
 
@@ -375,24 +375,24 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| F29 | Oppgavekort med linjestatus og tre steg (råvare, pakning, pris) | Linjeinspektør | 3 | Gammel plass |
-| F30 | Forslag og søk på navn/varenr., valgfri treffprosent | Linjeinspektør › Råvare | 3 | Gammel plass |
-| F31 | Bekreft råvare (og pakning) i ett steg | Linjeinspektør › hovedknapp | 3 | Gammel plass |
-| F32 | Pakningsskjema med hint fra varenavn og varsel ved uenighet | Linjeinspektør › Pakning (PackageEditor-logikk) | 3 | Gammel plass |
-| F33 | «Husk varenummer» / «Husk varetekst» (aliaslæring, avviste forslag) | Linjeinspektør › «Dette lagres» | 3 | Gammel plass |
-| F34 | «Prisen er riktig» (godta per linje) | Linjeinspektør › Pris | 3 | Gammel plass |
-| F35 | «Rett avtalepris» og beregn på nytt | Linjeinspektør › Pris (+ Prisblokk i varekort-panel) | 3 | Gammel plass |
-| F36 | «Kontroller pakningen» og «Endre råvare» fra prissteget | Linjeinspektør › Pris | 3 | Gammel plass |
-| F37 | «Beregn prisen på nytt» / «Prøv igjen» ved feil | Linjeinspektør (via køen) | 3 | Gammel plass |
+| F29 | Oppgavekort med linjestatus og tre steg (råvare, pakning, pris) | Opprydding D: /ravarer/fra-faktura › rad per leverandørvare (vare, pakning, svar) | 3 | Gammel plass |
+| F30 | Forslag og søk på navn/varenr., valgfri treffprosent | Opprydding D: Fra faktura › «Koble til en vare jeg har» (søk, forslag øverst) | 3 | Gammel plass |
+| F31 | Bekreft råvare (og pakning) i ett steg | Opprydding D: Fra faktura › hovedknapp lagrer kobling og pakning | 3 | Gammel plass |
+| F32 | Pakningsskjema med hint fra varenavn og varsel ved uenighet | Opprydding D: Fra faktura › pakning i raden | 3 | Gammel plass |
+| F33 | «Husk varenummer» / «Husk varetekst» (aliaslæring, avviste forslag) | Leverandørvare /priskontroll/varekort/:leverandør/:vare › koblingsskjema | 3 | Gammel plass |
+| F34 | «Prisen er riktig» (godta per linje) | Opprydding D: Fra faktura › Prishopp › «Prisen stemmer» | 3 | Gammel plass |
+| F35 | «Rett avtalepris» og beregn på nytt | Leverandørvare › prisblokk «Rett avtalepris» | 3 | Gammel plass |
+| F36 | «Kontroller pakningen» og «Endre råvare» fra prissteget | Opprydding D: Fra faktura › Prishopp › «Feil pakning»; leverandørvare › «Kontroller pakningen» | 3 | Gammel plass |
+| F37 | «Beregn prisen på nytt» / «Prøv igjen» ved feil | Fakturaer › Verktøy › «Beregn alle åpne på nytt» | 3 | Gammel plass |
 | F38 | «Bekreft startpris» (vurdering + bekreftelse) | Linjeinspektør › Startpris | 3 | Gammel plass |
-| F39 | «Hent AI-forslag» | Linjeinspektør › AI | 3 | Gammel plass |
+| F39 | «Hent AI-forslag» | Leverandørvare › «Hent AI-forslag» | 3 | Gammel plass |
 | F40 | «Løs konflikt» (SKU: omdøpt vare, ny vare, e-post til leverandør) | Linjeinspektør › SKU-konflikt | 3 | Gammel plass |
 | F41 | «Ikke råvare» med grunn og eventuelt utelatelsesmønster | Linjeinspektør › «Ikke vare» (felles grunnliste) | 3 | Flyttet |
 | F42 | «Åpne varekort» | Linjeinspektør og linjerad → varekort-panel | 3 | Gammel plass |
 | F43 | «Koble N like linjer» (snapshot, årsaker til eksklusjon) | Linjeinspektør etter kobling → BulkLinkDialog / varekort-panel | 3 | Gammel plass |
-| F47 | MatchDrawer: match én linje (forslag, søk, avtalepris, pakning, husk SKU, primær, AI-hjelp) | Linjeinspektør › «Bare denne linjen» (`rm_confirm_line_match`) | 3 | Gammel plass |
-| F48 | «Godta og neste» og «Bekreft og bruk på alle like linjer» | Linjeinspektør › hovedknapp + «Bruk på like» | 3 | Gammel plass |
-| F49 | «Opprett ny vare» og «Åpne varekort» | Linjeinspektør → RawMaterialCreateSheet / varekort-panel | 3 | Gammel plass |
+| F47 | MatchDrawer: match én linje (forslag, søk, avtalepris, pakning, husk SKU, primær, AI-hjelp) | Leverandørvare › koblingsskjema; feillest linje via «Rett linjen» i Fra faktura/faktura | 3 | Gammel plass |
+| F48 | «Godta og neste» og «Bekreft og bruk på alle like linjer» | Opprydding D: Fra faktura › svaret gjelder alle linjer for leverandørvaren | 3 | Gammel plass |
+| F49 | «Opprett ny vare» og «Åpne varekort» | Opprydding D: Fra faktura › «Opprett som ny» | 3 | Gammel plass |
 
 ## Fakturaliste
 
@@ -419,7 +419,7 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 | F76 | «Rett mva-avvik» | Faktasone › handling + Fakturasak-kort | 3 | Flyttet |
 | F77 | «Beregn på nytt» (kø) | Header › omberegningsknapp | 3 | Gammel plass |
 | F78 | Kortet Detaljer (org.nr., forfall osv.) | Faktasone | 3 | Flyttet |
-| F79 | Linjetabell: forventet pris, referansekilde, avvik, matchtype, årsaker, linjetype, merknad, valgfri konto | Linjesone (midten) | 3 | Gammel plass |
+| F79 | Linjetabell: forventet pris, referansekilde, avvik, matchtype, årsaker, linjetype, merknad, valgfri konto | Arkiv: /priskontroll/faktura/:id › linjetabell | 3 | Gammel plass |
 | F80 | Per linje: «Åpne varekort», «Match/Endre match», «Se prishistorikk» | Linjesone › radhandlinger → linjeinspektør / varekort-panel / /varer/:id?seksjon=pris | 3 | Gammel plass |
 | F81 | «Registrer linjer» når fakturaen mangler linjer | Hovedknapp → /faktura/:id/registrer-linjer | 3 | Flyttet |
 
@@ -451,7 +451,7 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
-| F90 | Liste over saker med status | /priskontroll?fane=saker | 3 | Flyttet |
+| F90 | Liste over saker med status | Opprydding D: /ravarer/leverandorer?fane=saker | 3 | Flyttet |
 | F91 | Sak: linjer, kreditfordeling (kreditnota, faktura, beløp), idempotent lagring | /priskontroll/saker/:id | 3 | Flyttet |
 | F92 | Merk som løst, avbryt eller åpne igjen, med begrunnelse | /saker/:id › sticky handlingsrad | 3 | Flyttet |
 | F93 | Flagg faktura med begrunnelse og handlingstype | Flagg-dialog fra /faktura/:id, fakturaliste og Fakturasak-kort (kan opprette sak; lover ikke e-post) | 3 | Flyttet |
