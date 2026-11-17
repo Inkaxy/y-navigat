@@ -215,7 +215,7 @@ export function usePriceJumps(localLimit: number | null, enabled = true) {
   return { jumps, limit, limitFor, lines, settings, items, isLoading: lines.isLoading || items.isLoading, isError: lines.isError || items.isError };
 }
 
-type InvoiceRow = UnreadInput & { status: string | null };
+type InvoiceRow = Omit<UnreadInput, "line_count"> & { status: string | null; invoice_lines: { count: number }[] | null };
 /** Åpne fakturaer der lesingen feilet eller summen ikke stemmer. */
 export function useUnreadInvoices(enabled = true) {
   const { data: company } = useCompany();
@@ -228,12 +228,32 @@ export function useUnreadInvoices(enabled = true) {
     ...TRANSIENT_RETRY,
     queryFn: ({ signal }): Promise<UnreadInput[]> => workGate.run(async () => {
       const rows = await fetchAllRows<InvoiceRow>((from, to) => supabase.from("invoices")
-        .select("id, invoice_number, invoice_date, supplier_id, total_amount, line_extraction_status, line_extraction_error, lines_sum_status, tripletex_supplier_invoice_id, status")
+        .select("id, invoice_number, invoice_date, supplier_id, total_amount, total_vat, is_credit_note, lines_sum_excl_vat, updated_at, line_extraction_status, line_extraction_error, lines_sum_status, tripletex_supplier_invoice_id, status, invoice_lines(count)")
         .eq("legal_entity_id", le!).in("status", OPEN).is("excluded_at", null).is("flagged_at", null)
         .or("line_extraction_status.eq.failed,line_extraction_error.not.is.null,lines_sum_status.eq.mismatch")
         .order("id").range(from, to));
-      return sortUnread(rows.filter(isUnread));
+      const out: UnreadInput[] = rows.map(({ invoice_lines, status: _s, ...r }) => ({ ...r, line_count: invoice_lines?.[0]?.count ?? null }));
+      return sortUnread(out.filter(isUnread));
     }, { low: true, signal }),
+  });
+}
+
+export interface PendingRead { id: string; invoice_number: string | null; invoice_date: string | null; supplier_id: string | null; line_extraction_at: string | null; line_extraction_attempts: number | null }
+/** Åpne fakturaer som står i lesekøen (lastes først når fanen Ikke lest åpnes). */
+export function usePendingReads(enabled = true) {
+  const { data: company } = useCompany();
+  const le = company?.id ?? null;
+  return useQuery({
+    queryKey: ["ravarer", "fra-faktura", "pending-reads", le],
+    enabled: enabled && !!le,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    ...TRANSIENT_RETRY,
+    queryFn: ({ signal }): Promise<PendingRead[]> => workGate.run(() => fetchAllRows<PendingRead>((from, to) => supabase.from("invoices")
+      .select("id, invoice_number, invoice_date, supplier_id, line_extraction_at, line_extraction_attempts")
+      .eq("legal_entity_id", le!).in("status", OPEN).is("excluded_at", null).is("flagged_at", null)
+      .eq("line_extraction_status", "pending")
+      .order("invoice_date", { ascending: true }).order("id").range(from, to)), { low: true, signal }),
   });
 }
 

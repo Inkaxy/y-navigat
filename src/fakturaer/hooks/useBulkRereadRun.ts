@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { recheckInvoiceLinesSum } from "@/fakturaer/lib/linesSum";
 import { classifyStep, parseRequeueResult, runSequential, type BulkGroup, type SequentialProgress, type StepOutcome } from "@/fakturaer/lib/bulkReread";
 import type { BulkInvoice } from "@/fakturaer/hooks/useBulkRereadGroups";
+import { requeueMessage } from "@/ravarer/lib/fraFaktura/unread";
 
 export interface StepResult { invoice: BulkInvoice; outcome: StepOutcome; runId: string | null; note: string | null }
 export type RunState =
@@ -65,7 +66,8 @@ export function useBulkRereadRun(legalEntityId: string | null) {
           requeued += r.requeued; skipped.push(...r.skipped);
         }
         setState({ phase: "done", group, progress: { done: invoices.length, total: invoices.length, stopped: null },
-          message: `${requeued.toLocaleString("nb-NO")} faktura(er) lagt i lesekøen. ${skipped.length ? `${skipped.length} hoppet over (har linjer, rettelser, godkjenning eller leses nå). ` : ""}De leses av den vanlige køen de neste minuttene.` });
+          // Samme klartekst som «Fra faktura › Ikke lest»: hva som skjedde og den faktiske grunnen per faktura.
+          message: `${requeueMessage({ requeued, skipped, withLines: 0, linesWhere: "se «Gamle sumavvik» eller Fra faktura › Ikke lest" })} De leses av den vanlige køen de neste minuttene.` });
         return;
       }
       const step = async (inv: BulkInvoice): Promise<StepOutcome> => {
