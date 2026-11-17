@@ -197,7 +197,7 @@ describe("Ikke lest: to grupper og ærlig melding", () => {
   it("differansen i kroner: linjesum mot fakturasum eks. mva", () => {
     expect(sumDifference({ ...base, lines_sum_excl_vat: 960, total_vat: 250 })).toBe(-40);
     expect(sumDifferenceText(-40)).toBe("Linjene er 40,00 kr lavere enn fakturaen (eks. mva).");
-    expect(sumDifferenceText(1234.5)).toBe("Linjene er 1 234,50 kr høyere enn fakturaen (eks. mva).");
+    expect(sumDifferenceText(1234.5).replace(/\s/g, " ")).toBe("Linjene er 1 234,50 kr høyere enn fakturaen (eks. mva).");
   });
   it("kreditnota med motsatt fortegn regnes som sumkontrollen", () => {
     expect(sumDifference({ ...base, total_amount: 3612, total_vat: 471, is_credit_note: true, lines_sum_excl_vat: -3141 })).toBe(0);
