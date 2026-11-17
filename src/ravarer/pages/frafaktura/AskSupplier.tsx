@@ -19,7 +19,7 @@ type Qa = ReturnType<typeof useQuickAnswers>;
  * «Spør leverandøren» fra Prishopp-raden (leverandørsaker flyttet fra Fakturaer, opprydding demo D).
  * Samme forhåndskontroll og skrivevei som før: prisforespørsel eller dokumentert krav, alltid som utkast til Henrik.
  */
-export function AskSupplier({ item, qa, canWrite, onDone }: { item: SupplierItem; qa: Qa; canWrite: boolean; onDone: (text: string) => void }) {
+export function AskSupplier({ item, qa, canWrite, onDone }: { item: SupplierItem; qa: Qa; canWrite: boolean; onDone: (text: string, caseId: string | null) => void }) {
   const flow = useClaimFlow();
   const claim = useClaimCredit();
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +46,7 @@ export function AskSupplier({ item, qa, canWrite, onDone }: { item: SupplierItem
       const kind = r.caseKind ?? plan.kind;
       flow.close();
       setCaseId(r.caseId ?? null);
-      onDone(kind === "documented_claim" ? `Kreditnotaforslag laget (${kr(plan.amount)} eks. mva) · utkast til Henrik` : `Forespørsel til ${item.supplier_name ?? "leverandøren"} laget · utkast til Henrik`);
+      onDone(kind === "documented_claim" ? `Kreditnotaforslag laget (${kr(plan.amount)} eks. mva) · utkast til Henrik` : `Forespørsel til ${item.supplier_name ?? "leverandøren"} laget · utkast til Henrik`, r.caseId ?? null);
     } catch (e) { setError(await flow.onSubmitError(e)); }
   };
 
