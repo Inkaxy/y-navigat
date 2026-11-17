@@ -5,7 +5,7 @@
 -- Dagens «Overstyr med begrunnelse» på fakturasiden skriver direkte fra nettleseren (lines_sum_status='ok' + notat),
 -- uten revisjonslogg og uten angring. Denne veien gjør det samme på serveren, med:
 --   * kategori (avgift/pant/frakt/øreavrunding/annet) og begrunnelse, lagret i audit_log og som notat på fakturaen
---   * versjonskontroll (updated_at som rå tekst) og gjentaksnøkkel (op_id): samme op_id gir samme svar, aldri dobbelt
+--   * versjonskontroll (updated_at sendes som rå tekst og sammenlignes som tidsstempel, ingen avrunding) og gjentaksnøkkel (op_id): samme op_id gir samme svar, aldri dobbelt
 --   * angring (rm_undo_accept_invoice_sum) så lenge fakturaen ikke er endret, godkjent, avstemt eller har ført kost
 -- Status settes til 'ok' fordi invoices_lines_sum_status_check ikke tillater 'overridden' (begrensningen røres ikke).
 -- Fakturaer med lesevarselet «sumavvik_mva_forhold» avvises: å godta ville fjernet varselet (triggeren
@@ -47,7 +47,7 @@ begin
   if not public.has_ravarer_invoice_access(v.legal_entity_id, 'write') then
     raise exception 'Mangler skrivetilgang til fakturaer' using errcode = '42501';
   end if;
-  if p_expected_updated_at is null or v.updated_at::text is distinct from p_expected_updated_at then
+  if p_expected_updated_at is null or v.updated_at is distinct from p_expected_updated_at::timestamptz then
     return jsonb_build_object('ok', false, 'code', 'endret', 'updated_at', v.updated_at::text);
   end if;
   if v.lines_sum_status is distinct from 'mismatch' then return jsonb_build_object('ok', false, 'code', 'ikke_avvik'); end if;
@@ -107,7 +107,7 @@ begin
     raise exception 'Mangler skrivetilgang til fakturaer' using errcode = '42501';
   end if;
   -- Bare uendret faktura: samme versjon som godkjenningen ga, og ikke låst siden.
-  if v.updated_at::text is distinct from a.changes->'new'->>'updated_at' or v.lines_sum_status is distinct from 'ok' then
+  if v.updated_at is distinct from (a.changes->'new'->>'updated_at')::timestamptz or v.lines_sum_status is distinct from 'ok' then
     return jsonb_build_object('ok', false, 'code', 'endret_siden');
   end if;
   if v.status not in ('imported','needs_review','ready') or v.reconciled_at is not null
