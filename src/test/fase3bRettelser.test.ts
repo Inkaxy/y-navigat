@@ -44,13 +44,6 @@ describe("A2: «Endre råvare»-signalet er linjebundet", () => {
   });
 });
 
-describe("A3/småting: hurtigtaster", () => {
-  const keys = (canWrite: boolean, calls: string[]): WorkspaceKeys => ({
-    enabled: true, canWrite, activeLine: { id: "l1" } as WorkspaceKeys["activeLine"],
-    next: () => calls.push("next"), prev: () => undefined, enter: () => calls.push("enter"), editMaterial: () => calls.push("m"),
-    create: () => calls.push("n"), notItem: () => calls.push("x"), undo: () => undefined, toggleDoc: () => undefined, escape: () => undefined, help: () => undefined,
-  });
-});
 
 describe("B5: returparameter kolliderer ikke med datofilteret", () => {
   it("leser retur, og gammel fra bare når den ikke er en dato", () => {
