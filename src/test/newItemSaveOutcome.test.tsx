@@ -13,6 +13,7 @@ const line = (id: string, invoice: string) => ({
   id, invoice_id: invoice, invoice_number: `F-${invoice}`, invoice_date: "2026-11-05", requires_review: true, description: "KANEL",
   quantity: 1, unit: "kg", unit_price: 100, total_amount: 100, package_size: null, package_unit: null, count_per_package: null,
   supplier_sku: null, is_credit_note: false, review_reason: "unmatched", extraction_issues: [],
+  invoice_status: "needs_review", flagged_at: null, match_confidence: "unmatched",
 });
 let lines = [line("l1", "f1")];
 let cap: boolean | null = false;
@@ -104,6 +105,16 @@ describe("NewItemRow: feil gir ingen kvittering", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Opprett råvare" }));
     await waitFor(() => expect(onDone).toHaveBeenCalled());
     expect(linkSupplierItem.mock.calls[0][0]).toMatchObject({ line_ids: ["l2"] });
+  });
+  it("linjer på avstemt eller flagget faktura sendes aldri (samme utvalg som koblingen)", async () => {
+    cap = true;
+    lines = [line("l1", "f1"), { ...line("l2", "f2"), invoice_status: "reconciled" }, { ...line("l3", "f3"), flagged_at: "2026-11-10" }];
+    linkSupplierItem.mockResolvedValue(ok(1));
+    const onDone = vi.fn();
+    render(<Row onDone={onDone} />, { wrapper: wrap });
+    fireEvent.click(await screen.findByRole("button", { name: "Opprett råvare" }));
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    expect(linkSupplierItem.mock.calls[0][0]).toMatchObject({ line_ids: ["l1"] });
   });
   it("godkjent faktura merkes før forsøk og holdes utenfor «Opprett N sikre»", async () => {
     approved = new Set(["f1"]);

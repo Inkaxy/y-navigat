@@ -35,3 +35,28 @@ Deno.test("manglende eller ukjent status sperres uten å lese godkjenning; åpne
   for (const s of ["imported", "needs_review", "ready"]) assertEquals((await invoiceLifecycle({ ...open, status: s }, reader([]))).kind, "open");
   assertEquals((await invoiceLifecycle({ ...open, status: "ready" }, reader(null, "boom"))).kind, "error");
 });
+
+import { approvedLinesOnlyAllowed, isFreshManualLink } from "./invoiceLifecycleGuard.ts";
+const approved = { kind: "locked", reason: "internally_approved", status: "needs_review" } as const;
+Deno.test("godkjent faktura: linjeomregning bare med linjeutvalg og bekreftet markør", () => {
+  assertEquals(approvedLinesOnlyAllowed(approved, ["l1"], true), true);
+  assertEquals(approvedLinesOnlyAllowed(approved, ["l1"], null), false);
+  assertEquals(approvedLinesOnlyAllowed(approved, ["l1"], false), false);
+  assertEquals(approvedLinesOnlyAllowed(approved, [], true), false);
+  assertEquals(approvedLinesOnlyAllowed(approved, undefined, true), false);
+  assertEquals(approvedLinesOnlyAllowed(approved, "l1", true), false);
+});
+Deno.test("avstemt, utelatt, ukjent status og åpen faktura gir aldri unntaket", () => {
+  for (const reason of ["excluded", "final_status", "status_unknown"] as const) {
+    assertEquals(approvedLinesOnlyAllowed({ kind: "locked", reason, status: "reconciled" }, ["l1"], true), false);
+  }
+  assertEquals(approvedLinesOnlyAllowed({ kind: "open" }, ["l1"], true), false);
+  assertEquals(approvedLinesOnlyAllowed({ kind: "error", message: "x" }, ["l1"], true), false);
+});
+Deno.test("bare nettopp manuelt koblede linjer omregnes", () => {
+  assertEquals(isFreshManualLink({ match_confidence: "manual", review_reason: "recalculation_pending" }), true);
+  assertEquals(isFreshManualLink({ match_confidence: "manual", review_reason: "unknown_package_size, recalculation_pending" }), true);
+  assertEquals(isFreshManualLink({ match_confidence: "manual", review_reason: "price_variance" }), false);
+  assertEquals(isFreshManualLink({ match_confidence: "auto_high", review_reason: "recalculation_pending" }), false);
+  assertEquals(isFreshManualLink({ match_confidence: "manual", review_reason: null }), false);
+});

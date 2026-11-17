@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useSupplierSkuIndex } from "@/ravarer/hooks/useSupplierSkuIndex";
 import { useSupplierItemLines } from "@/fakturaer/hooks/useSupplierItems";
 import { lineLocked } from "@/fakturaer/lib/reviewPlan";
-import { lockedForLink, NOT_LINKED_APPROVED, NothingSavedError, splitLockedLines } from "@/ravarer/lib/fraFaktura/linkOutcome";
+import { isLinkableOpenLine, lockedForLink, NOT_LINKED_APPROVED, NothingSavedError, splitLockedLines } from "@/ravarer/lib/fraFaktura/linkOutcome";
 import { useCapability } from "@/lib/pendingRpc";
 import { lineMath, unitPrices } from "@/ravarer/lib/fraFaktura/lineMath";
 import { dateNo } from "@/ravarer/lib/decisions";
@@ -34,7 +34,8 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
 }) {
   const lines = useSupplierItemLines(row.supplier_id, row.item_key);
   const all = useMemo(() => lines.data ?? [], [lines.data]);
-  const open = useMemo(() => all.filter((l) => l.requires_review === true), [all]);
+  // Bare linjer koblingen godtar (åpen, ikke flagget faktura); avstemte/flaggede linjer sendes aldri og gir aldri «0 linjer».
+  const open = useMemo(() => all.filter(isLinkableOpenLine), [all]);
   const latest = open[0] ?? all[0] ?? null;
   // Kreditlinjer spør aldri om pakning; pakningsforslaget bygges bare fra en vanlig linje.
   const credit = isCreditRow(open);

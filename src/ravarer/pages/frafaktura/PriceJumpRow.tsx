@@ -11,10 +11,12 @@ import { useQuickAnswers } from "../beslutninger/useQuickAnswers";
 import { useDecisionUndo } from "../beslutninger/useDecisionUndo";
 import { PackageFix } from "../beslutninger/PackageFix";
 import { lockedOpenLines } from "../priskontroll/gjore/VarekortPanel";
+import { packageFixLocked } from "@/ravarer/lib/fraFaktura/linkOutcome";
 import { usePriceConsequence } from "./usePriceConsequence";
 import { ItemLimitSelect } from "./ItemLimitSelect";
 import { AskSupplier } from "./AskSupplier";
 import { cn } from "@/lib/utils";
+import { useCapability } from "@/lib/pendingRpc";
 
 const kr = (v: number) => v.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -35,6 +37,10 @@ export function PriceJumpRow({ j, supplierName, usage, canWrite, retur, onRound,
   // Alle åpne linjer på internt godkjente fakturaer (eller med ført kostpris): serveren nekter å endre dem, så
   // «Prisen stemmer» og «Feil pakning» tilbys ikke (samme regel som varekortet og Beslutninger).
   const locked = linesQ.data ? lockedOpenLines(linesQ.data) : null;
+  // «Feil pakning» går via koblingen, som godtar internt godkjente fakturaer når databasen sier det
+  // (20261121_kobling_godkjent_faktura). «Prisen stemmer» er fortsatt sperret der.
+  const approvedLinkable = useCapability("rm_cap_kobling_godkjent_v1");
+  const pkgLocked = locked && linesQ.data ? packageFixLocked(linesQ.data, approvedLinkable) : false;
   const undo = useDecisionUndo();
   const [fix, setFix] = useState(false);
   const [done, setDoneState] = useState<{ text: string; undo: Parameters<typeof undo.undo>[0] | null; caseId?: string | null } | null>(null);
@@ -87,7 +93,7 @@ export function PriceJumpRow({ j, supplierName, usage, canWrite, retur, onRound,
             <Button className="min-h-[44px] flex-1" disabled={!canWrite || !ready || qa.busy} onClick={() => void accept()}>
               {qa.busy && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />}Prisen stemmer
             </Button>
-            <Button variant="outline" className="min-h-[44px]" disabled={!canWrite || !item?.rm_id || !!locked} aria-expanded={fix} onClick={() => setFix((v) => !v)}>Feil pakning</Button>
+            <Button variant="outline" className="min-h-[44px]" disabled={!canWrite || !item?.rm_id || pkgLocked} aria-expanded={fix} onClick={() => setFix((v) => !v)}>Feil pakning</Button>
           </div>
           {item && <AskSupplier item={item} qa={qa} canWrite={canWrite} onDone={(text, caseId) => setDone({ text, undo: null, caseId })} />}
           {!cause.packageSuspect && (cons.falling ?? 0) > 0 && (
@@ -99,7 +105,7 @@ export function PriceJumpRow({ j, supplierName, usage, canWrite, retur, onRound,
           {item && qa.priceStatus === "error" && <p role="alert" className="text-caption text-destructive">Prisen kunne ikke kontrolleres. <button type="button" className="underline" onClick={() => qa.retrySafety()}>Prøv igjen</button></p>}
           {locked && (
             <p role="note" className="text-caption font-semibold text-warning">
-              {locked.title}. Prisen og pakningen kan ikke endres herfra. <Link className="underline" to={paths.faktura(locked.invoiceId, { linje: locked.lineId, retur })}>Åpne faktura {locked.invoiceNumber ?? "uten nummer"}</Link>
+              {locked.title}. {pkgLocked ? "Prisen og pakningen kan ikke endres herfra." : "Prisen kan ikke godtas herfra, men pakningen kan rettes."} <Link className="underline" to={paths.faktura(locked.invoiceId, { linje: locked.lineId, retur })}>Åpne faktura {locked.invoiceNumber ?? "uten nummer"}</Link>
             </p>
           )}
           {item && !locked && qa.priceStatus === "ready" && qa.rows.length === 0 && <p className="text-caption text-ink-secondary">Prisen kan ikke godtas her: {qa.blocked[0]?.label ?? "linjene må kontrolleres på fakturaen"}.</p>}
@@ -107,7 +113,7 @@ export function PriceJumpRow({ j, supplierName, usage, canWrite, retur, onRound,
         </div>
       </div>
       {itemLimit && <div className="mt-2"><ItemLimitSelect rawMaterialId={j.rawMaterialId} current={itemLimit.current} companyLimit={itemLimit.companyLimit} /></div>}
-      {fix && item && !locked && (
+      {fix && item && !pkgLocked && (
         <div className="mt-3">
           <PackageFix item={item} lines={lines} canWrite={canWrite} onCancel={() => setFix(false)}
             onSaved={(d) => { setFix(false); setDone({ text: d.result.title, undo: null }); }} />

@@ -45,3 +45,20 @@ export function svcLifecycleReader(svc: any): LifecycleReader {
       .eq("invoice_id", invoiceId).eq("status", "approved").is("revoked_at", null).limit(1),
   };
 }
+
+/**
+ * Unntak for internt godkjente fakturaer (Henrik 17.11, 20261121_kobling_godkjent_faktura): linjer en person nettopp
+ * har koblet via rm_link_supplier_item (manuell kobling + «recalculation_pending») kan beregnes på nytt linje for linje,
+ * slik at de får pris og prisobservasjon på vanlig måte. Fakturastatus endres aldri i denne modusen. Krever eksplisitt
+ * linjeutvalg og at databasen har markøren `rm_cap_kobling_godkjent_v1` (true). Alt annet, også ukjent markør, er låst.
+ */
+export function approvedLinesOnlyAllowed(decision: LifecycleDecision, lineIds: unknown, capability: boolean | null): boolean {
+  return decision.kind === "locked" && decision.reason === "internally_approved"
+    && Array.isArray(lineIds) && lineIds.length > 0 && capability === true;
+}
+
+/** Linjen er nettopp koblet manuelt og venter på omregning (rm_confirm_line_match sin tilstand). */
+export function isFreshManualLink(line: { match_confidence?: unknown; review_reason?: unknown }): boolean {
+  if (line.match_confidence !== "manual") return false;
+  return String(line.review_reason ?? "").split(",").map((s) => s.trim()).includes("recalculation_pending");
+}

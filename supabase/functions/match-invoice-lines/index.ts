@@ -10,7 +10,7 @@ import { pickPackageRow } from "../_shared/packageSignature.ts";
 import { reconcileAcceptance } from "../_shared/priceAcceptance.ts";
 import { CREDIT_NOTE_REF_PREFIX, creditNoteOriginalRef } from "../_shared/creditNote.ts";
 import { authorizeCron } from "../_shared/cron-auth.ts";
-import { invoiceLifecycle, svcLifecycleReader } from "../_shared/invoiceLifecycleGuard.ts";
+import { invoiceLifecycle, svcLifecycleReader, approvedLinesOnlyAllowed, isFreshManualLink } from "../_shared/invoiceLifecycleGuard.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -100,7 +100,14 @@ Deno.serve(async (req) => {
       console.error("invoice lifecycle guard", lifecycle.message);
       return json({ error: "lifecycle_check_failed" }, 503);
     }
-    if (lifecycle.kind === "locked") {
+    // Unntak (20261121_kobling_godkjent_faktura): på en internt godkjent faktura kan linjer en person nettopp har koblet
+    // beregnes linje for linje, uten å endre fakturastatus — bare når databasen har markøren. Ukjent markør = låst som før.
+    let approvedLinesOnly = false;
+    if (lifecycle.kind === "locked" && lifecycle.reason === "internally_approved" && Array.isArray(lineIdFilter) && lineIdFilter.length > 0) {
+      const cap = await svc.rpc("rm_cap_kobling_godkjent_v1");
+      approvedLinesOnly = approvedLinesOnlyAllowed(lifecycle, lineIdFilter, !cap.error && cap.data === true ? true : null);
+    }
+    if (lifecycle.kind === "locked" && !approvedLinesOnly) {
       return json({ ok: true, skipped: true, locked: true, reason: lifecycle.reason, invoice_status: lifecycle.status, processed: 0, results: [],
         message: lifecycle.reason === "status_unknown" ? "Fakturaens status er ukjent, så den ble ikke beregnet på nytt." : "Fakturaen er låst (internt godkjent, utelatt eller endelig) og ble ikke beregnet på nytt." });
     }
@@ -407,7 +414,8 @@ Deno.serve(async (req) => {
     let q = svc.from("invoice_lines").select("*").eq("invoice_id", invoiceId);
     if (lineIdFilter?.length) q = q.in("id", lineIdFilter);
     const lines = required("fakturalinjer", await q);
-    const allLines = lines ?? [];
+    // Godkjent faktura: bare linjene som nettopp er koblet manuelt og venter på omregning.
+    const allLines = approvedLinesOnly ? (lines ?? []).filter((l: AnyRec) => isFreshManualLink(l)) : (lines ?? []);
 
     const results: AnyRec[] = [];
 
@@ -914,6 +922,8 @@ Deno.serve(async (req) => {
         update.base_quantity = null;
       }
 
+      // Godkjent faktura: linjens trykte enhet røres ikke (bare beregnede felt og koblingsstatus skrives).
+      if (approvedLinesOnly) delete update.unit;
       await applyUpdate(svc, line.id, update);
       await insertSuggestions(svc, suggestionsToInsert);
       results.push({ id: line.id, status: update.match_confidence, requires_review: update.requires_review });
@@ -922,7 +932,8 @@ Deno.serve(async (req) => {
     // Fakturastatus etter kjøringen. Flagget eller avstemt faktura røres ALDRI —
     // et menneske har tatt et standpunkt, og motoren skal ikke overkjøre det.
     const lockedStatuses = ["flagged", "reconciled", "cancelled"];
-    if (!lockedStatuses.includes(String(inv.status))) {
+    // Internt godkjent faktura (linjemodus): fakturastatus er en del av godkjenningsgrunnlaget og endres aldri her.
+    if (!approvedLinesOnly && !lockedStatuses.includes(String(inv.status))) {
       // Feiler disse lesningene, vet vi ikke om fakturaen er ferdig. Da skal den
       // IKKE settes til «klar» — vi feiler heller kjøringen.
       const { data: stillPending, error: pendErr } = await svc.from("invoice_lines")
@@ -947,7 +958,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return json({ ok: true, processed: results.length, results });
+    return json({ ok: true, processed: results.length, results, ...(approvedLinesOnly ? { approved_lines_only: true } : {}) });
   } catch (e) {
     console.error("match-invoice-lines error", e);
     console.error("match-invoice-lines", e);

@@ -133,3 +133,4 @@
 - [x] 1b. Godkjente fakturaer: «Kunne ikke kobles: …godkjent», merke «Ligger på godkjent faktura», utenfor «Opprett N sikre»
 - [x] 1c. PENDING-forslag A (kobling på godkjente, md5-vakt) og B (køen følger sperren) – Henrik velger, ikke kjørt
 - [x] 3c. Stangeland Mølle: leseinstruks for varenummer («8400 1»)
+- [x] 1d. Henrik valgte A: PENDING `20261121_kobling_godkjent_faktura` utvidet (angre, hold utenfor, kø = kobling), lokal test, match-invoice-lines linjemodus (rullet ut, låst til markøren finnes) – ikke kjørt
