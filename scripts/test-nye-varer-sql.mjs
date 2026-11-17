@@ -134,9 +134,12 @@ check(denied, "uten lesetilgang avvises kallet");
 await db.exec(`select set_config('test.read', '', false);`);
 check(Number((await ny(null)).total) >= 0, "med tilgang virker kallet");
 
-// Annet selskap lekker ikke inn.
-const otherRows = (await ny(null)).items.filter((x) => x.title && false);
-check(otherRows.length === 0, "ingen rader fra annet selskap");
+// Annet selskap: egne tall, samme som rm_work_items for det selskapet, og ingen av dets linjer i vårt svar.
+const o1 = (await one(`select public.rm_new_items_queue('${OTHER}', null, 200, 0) r`)).r;
+const o2 = (await one(`select public.rm_work_items('${OTHER}', 'alle', null, null, 'oldest', 500, 0) r`)).r;
+check(Number(o1.counts.alle) === Number(o2.counts.kobling) + Number(o2.counts.pakning) && Number(o1.counts.alle) > 0, "annet selskap har egne, like tall");
+const ourOpen = new Set((await ny(null)).items.map((x) => x.last_open_line_id).filter(Boolean));
+check(o1.items.every((x) => !x.last_open_line_id || !ourOpen.has(x.last_open_line_id)), "ingen linjer fra annet selskap i vårt svar");
 check((await one(`select public.rm_cap_nye_varer_v1() c`)).c === true, "cap");
 
 console.log(`OK: ${ok} kontroller bestått`);
