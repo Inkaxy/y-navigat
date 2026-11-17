@@ -25,7 +25,6 @@ export function PendingRulesCard({ canEdit, canWrite }: { canEdit: boolean; canW
         <ul className="mt-1 list-disc pl-5 text-sm text-ink-secondary">
           <li>Pant følger varen den hører til (utenfor kost, mva-fri, aldri utelatt).</li>
           <li>Gamle åpne fakturaer beregnes på nytt automatisk, noen få om gangen.</li>
-          <li>Nøkkelråvarer får egen grense.</li>
         </ul>
         <p className="mt-2 text-caption text-ink-secondary">{st.cap === false ? "Venter på databaseendringen for Automatikk." : "Sjekker om databaseendringen er kjørt …"}</p>
       </section>

@@ -3,7 +3,6 @@
  * loggtallene og morgen-e-posten. Ingen skriving her.
  */
 import type { PriceDraft } from "./priceSettingsDraft";
-import { formatNorwegianNumber } from "./quickFormat";
 
 export const OUTSIDE_COST_KINDS = ["frakt", "gebyr", "avrunding"] as const;
 

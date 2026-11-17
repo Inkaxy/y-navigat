@@ -116,7 +116,7 @@ export function PrislinjePanel({ row, others, settings, onPick }: { row: Prislin
               </li>
             ))}
           </ul>
-          <p className="text-caption text-ink-secondary">Det som mangler, ligger som spørsmål under Beslutninger.</p>
+          <p className="text-caption text-ink-secondary">Det som mangler, rettes i varens egne seksjoner (pakning, næring, deklarasjon).</p>
         </Card>
         <Card title="Endre godkjent pakning" sub="Ingenting er låst etter godkjenning. Feil pakning retter du her; feil pris på ett kjøp retter du i prislisten.">
           <Button variant="outline" className="min-h-[44px]" disabled={!canFix} onClick={() => setPkgOpen(true)}>Rett pakning og regn om</Button>

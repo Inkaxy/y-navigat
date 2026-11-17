@@ -9,7 +9,7 @@ import { describePackageSpec, initialContainer, type PackageSpecInput } from "@/
 import { callPendingRpc, newOpId } from "@/lib/pendingRpc";
 import { invalidateRawMaterial, invalidateInvoice } from "@/ravarer/lib/invalidate";
 import { correctionErrorText, parsePackageChange, type PackageChangeResult, type PrislinjeRow } from "@/ravarer/lib/prislinje";
-import { PackagePreviewTable } from "../beslutninger/PackagePreviewTable";
+import { PackagePreviewTable } from "@/ravarer/pages/beslutninger/PackagePreviewTable";
 
 /**
  * «Endre godkjent pakning» (approve/admin). Endrer leverandørens godkjente pakning framover; tidligere kjøp
