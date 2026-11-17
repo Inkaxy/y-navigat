@@ -224,3 +224,27 @@ describe("Godta som den er", () => {
     expect(canSubmitAccept(null, "x")).toBe(false);
   });
 });
+
+describe("kreditnota i Nye varer (opprydding demo D)", () => {
+  it("Lantmännen Cerealia 135007588: −3 000 kg hvetemel er en kreditlinje og spør ikke om pakning", async () => {
+    const { isCreditLine, isCreditRow, packageSourceLine } = await import("./newItems");
+    const credit = { is_credit_note: true, quantity: -3000, total_amount: -21000, unit: "kg" };
+    expect(isCreditLine(credit)).toBe(true);
+    expect(isCreditRow([credit])).toBe(true);
+    expect(packageSourceLine([credit], [credit])).toBeNull();
+  });
+  it("negativ mengde eller beløp er kreditlinje selv uten kreditnota-flagg", async () => {
+    const { isCreditLine } = await import("./newItems");
+    expect(isCreditLine({ is_credit_note: false, quantity: -2, total_amount: null })).toBe(true);
+    expect(isCreditLine({ is_credit_note: false, quantity: 2, total_amount: -10 })).toBe(true);
+    expect(isCreditLine({ is_credit_note: false, quantity: 2, total_amount: 10 })).toBe(false);
+  });
+  it("blandet rad er vanlig vare, og pakningen bygges fra en vanlig linje", async () => {
+    const { isCreditRow, packageSourceLine } = await import("./newItems");
+    const credit = { id: "k", is_credit_note: true, quantity: -1, total_amount: -5 };
+    const normal = { id: "n", is_credit_note: false, quantity: 4, total_amount: 20 };
+    expect(isCreditRow([credit, normal])).toBe(false);
+    expect(isCreditRow([])).toBe(false);
+    expect(packageSourceLine([credit, normal], [credit, normal])?.id).toBe("n");
+  });
+});

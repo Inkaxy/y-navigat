@@ -252,3 +252,18 @@ export function supplierChips(rows: readonly QueueRow[]): { id: string | null; n
   }
   return [{ id: null, name: "Alle leverandører", count: rows.length }, ...[...m.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "nb"))];
 }
+
+// ---------- Kreditnota (opprydding demo D) ----------
+type CreditLine = { is_credit_note?: boolean | null; quantity?: number | null; total_amount?: number | null };
+/** Kreditlinje: på en kreditnota, eller negativ mengde/beløp. Slike linjer spør aldri om pakning. */
+export function isCreditLine(l: CreditLine): boolean {
+  return l.is_credit_note === true || (l.quantity != null && Number(l.quantity) < 0) || (l.total_amount != null && Number(l.total_amount) < 0);
+}
+/** Raden er en kreditnota-rad når alle åpne linjer er kreditlinjer (minst én). */
+export function isCreditRow(open: readonly CreditLine[]): boolean {
+  return open.length > 0 && open.every(isCreditLine);
+}
+/** Linjen pakningsforslaget bygges fra: nyeste ikke-kreditlinje, aldri en kreditlinje. */
+export function packageSourceLine<T extends CreditLine>(open: readonly T[], all: readonly T[]): T | null {
+  return open.find((l) => !isCreditLine(l)) ?? all.find((l) => !isCreditLine(l)) ?? null;
+}
