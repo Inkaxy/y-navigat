@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -20,10 +21,12 @@ interface Props {
   onPrev: () => void;
   onNext: () => void;
   onRename: () => void;
+  /** Ekstra handlinger etter «Endre navn» (f.eks. «Slå sammen med …»). */
+  extraActions?: ReactNode;
 }
 
 /** Råvarekortets hode. Felles PageHeader stabler tittel og handlinger på mobil (lange navn forblir lesbare). */
-export function RawMaterialDetailHeader({ rm, listSearch, canPrev, canNext, showRename, onBack, onPrev, onNext, onRename }: Props) {
+export function RawMaterialDetailHeader({ rm, listSearch, canPrev, canNext, showRename, onBack, onPrev, onNext, onRename, extraActions }: Props) {
   return (
     <PageHeader
       eyebrow={`Råvarer · ${ITEM_TYPE_LABEL[rm.item_type] ?? rm.item_type}${rm.is_active ? "" : " · Inaktiv"}`}
@@ -50,6 +53,7 @@ export function RawMaterialDetailHeader({ rm, listSearch, canPrev, canNext, show
               <Pencil className="mr-1.5 h-3.5 w-3.5" aria-hidden /> Endre navn
             </Button>
           )}
+          {extraActions}
         </>
       }
     />

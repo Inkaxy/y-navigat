@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { MergeWithButton } from "@/ravarer/components/merge/MergeWithButton";
 import { PeekPanel } from "@/ravarer/ui/SplitView";
 import { Button } from "@/components/ui/button";
 import { QueryState } from "@/components/common/QueryState";
@@ -71,6 +72,7 @@ function PeekBody({ id, listSearch }: { id: string; listSearch: string }) {
       <div className="flex flex-wrap gap-2">
         <Button asChild size="sm" variant="outline" className="min-h-[44px]"><Link to={href("pris")}>Pris</Link></Button>
         <Button asChild size="sm" variant="outline" className="min-h-[44px]"><Link to={href("leverandorer")}>Leverandører</Link></Button>
+        {rm.is_active && <MergeWithButton id={rm.id} name={rm.name} />}
       </div>
 
       <section className="rounded-lg border border-line-subtle p-4">

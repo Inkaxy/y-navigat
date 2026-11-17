@@ -108,3 +108,12 @@
 - [x] Regel for automatisk bruk (sum stemmer + ingen tap) ellers «Forslag venter på deg» (Bruk/Forkast)
 - [x] Kvittering med tall og lenker; revisjonslogg «Samlet gjenlesing»
 - [x] Enhetstester for regelen; rapport (ikke start kjøringen, ikke kjør SQL, ikke publiser)
+
+# Slå sammen varer (17.11.2026, Henrik)
+- [x] Undersøk eksisterende sammenslåing (kode/DB) og årsak til PALS 8009-duplikat
+- [x] PENDING-SQL (dry_run standard, godkjenner/admin, én transaksjon, angre) + .check.sql
+- [x] Ren logikk + tester (ulik enhet uten omregning avvises, alias/varenummer flyttes, oppskriftsbruk flyttes, angre gjenoppretter)
+- [x] Dialog: velg beholdt vare, side om side, omregning, forhåndsvisning, grå til SQL er kjørt
+- [x] Start fra liste (merk ≥2) og fra varens visning («Slå sammen med …»)
+- [x] «Mulige duplikater» i Varer + «Finnes kanskje fra før» i Nye varer
+- [x] Sammenslått vare: inaktiv, «Slått sammen med …», videresending, «Angre sammenslåing»

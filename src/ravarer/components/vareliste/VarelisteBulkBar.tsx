@@ -7,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Download, X } from "lucide-react";
+import { Combine, Download, X } from "lucide-react";
 import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
 import { ITEM_TYPES, type ItemType } from "@/ravarer/lib/itemTypes";
 import type { BulkPatch } from "@/ravarer/hooks/useBulkUpdateRawMaterials";
@@ -22,6 +22,8 @@ interface Props {
   onConfirmPackages: () => void;
   onExport: () => void;
   onClear: () => void;
+  /** «Slå sammen …»: vises bare for godkjenner/admin; grå med forklaring til den kan brukes. */
+  merge?: { disabled: boolean; title?: string; onClick: () => void };
 }
 
 /** Handlingslinje som vises nederst når rader er valgt. */
@@ -34,6 +36,7 @@ export function VarelisteBulkBar({
   onConfirmPackages,
   onExport,
   onClear,
+  merge,
 }: Props) {
   const [category, setCategory] = useState("");
   const [itemType, setItemType] = useState("");
@@ -117,6 +120,11 @@ export function VarelisteBulkBar({
       <Button size="sm" variant="outline" disabled={busy} onClick={onConfirmPackages}>
         Bekreft pakning
       </Button>
+      {merge && (
+        <Button size="sm" variant="outline" disabled={busy || merge.disabled} title={merge.title} onClick={merge.onClick} className="gap-1.5">
+          <Combine className="h-3.5 w-3.5" aria-hidden="true" /> Slå sammen …
+        </Button>
+      )}
       <Button size="sm" variant="outline" onClick={onExport} className="gap-1.5">
         <Download className="h-3.5 w-3.5" aria-hidden="true" /> Eksporter CSV
       </Button>

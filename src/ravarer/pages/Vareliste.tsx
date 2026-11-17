@@ -63,6 +63,11 @@ import { paths } from "@/ravarer/lib/paths";
 import { VarelistePriceDialogs } from "@/ravarer/components/vareliste/VarelistePriceDialogs";
 import { useHotkeys, type HotkeyBinding } from "@/ravarer/ui/hotkeys";
 import { ShortcutHelp } from "@/ravarer/ui/ShortcutHelp";
+import { MergeDialog } from "@/ravarer/components/merge/MergeDialog";
+import { DuplicatesPanel } from "@/ravarer/components/merge/DuplicatesPanel";
+import { useMergeAccess } from "@/ravarer/hooks/useMaterialMerge";
+import { useDuplicateGroups } from "@/ravarer/hooks/useDuplicateGroups";
+import { CAPABILITY_FILE } from "@/lib/pendingRpc";
 
 interface SavedView {
   id: string;
@@ -198,7 +203,17 @@ export default function VarelistePage({ liste, onActiveChange, activeId = null }
 
   // Samme avviksregel (kategoritoleranse + maksgrense) som detaljens forrige/neste — én kilde.
   const deviationRule = useMemo(() => deviationRuleFor(tolerances.toleranceFor, hardCap), [tolerances, hardCap]);
-  const filtered = useMemo(() => filterAndSortItems(items, listQuery, deviationRule), [items, listQuery, deviationRule]);
+  const baseFiltered = useMemo(() => filterAndSortItems(items, listQuery, deviationRule), [items, listQuery, deviationRule]);
+  // «Mulige duplikater» (`?dupl=1`) og «Slå sammen …». Forslagene virker uten databaseendringen; sammenslåingen krever den.
+  const dupl = params.get("dupl") === "1";
+  const mergeAccess = useMergeAccess();
+  const [mergeIds, setMergeIds] = useState<string[] | null>(null);
+  const supplierNameOf = useCallback((sid: string) => suppliers.find((s) => s.id === sid)?.name ?? null, [suppliers]);
+  const dupItems = useMemo(() => items.map((i) => ({ id: i.id, name: i.name, is_active: i.isActive })), [items]);
+  const dup = useDuplicateGroups(dupItems, supplierNameOf, !isLoading);
+  const dupIds = useMemo(() => new Set((dup.groups ?? []).flatMap((g) => g.ids)), [dup.groups]);
+  const filtered = useMemo(() => (dupl && dup.groups ? baseFiltered.filter((i) => dupIds.has(i.id)) : baseFiltered), [dupl, dup.groups, baseFiltered, dupIds]);
+  const nameOf = useCallback((id: string) => items.find((i) => i.id === id)?.name ?? "Ukjent vare", [items]);
   const controlCount = useMemo(() => items.filter((i) => i.comparison.state === "unknown" && i.comparison.needsControl).length, [items]);
 
   /** Filtrene følger med til detaljen, slik at «Tilbake» og «forrige/neste» beholder dem. Valgt rad er ikke listekontekst. */
@@ -587,6 +602,15 @@ export default function VarelistePage({ liste, onActiveChange, activeId = null }
             ))}
             <Button
               size="sm"
+              variant={dupl ? "default" : "outline"}
+              className="h-7 rounded-full px-3 text-xs"
+              aria-pressed={dupl}
+              onClick={() => setParam({ dupl: dupl ? null : "1", valgt: null })}
+            >
+              Mulige duplikater{dup.groups ? ` (${dup.groups.length.toLocaleString("nb-NO")})` : ""}
+            </Button>
+            <Button
+              size="sm"
               variant="ghost"
               className="h-7 px-2 text-xs"
               onClick={() => setSaveViewOpen(true)}
@@ -601,6 +625,11 @@ export default function VarelistePage({ liste, onActiveChange, activeId = null }
             åpne · <kbd>e</kbd> rediger kostpris · <kbd>n</kbd> ny vare · <kbd>Esc</kbd> tøm
           </p>
         </Card>
+
+        {dupl && (
+          <DuplicatesPanel groups={dup.groups} isLoading={dup.isLoading} isError={dup.isError} onRetry={() => void dup.refetch()} nameOf={nameOf}
+            listSearch={listSearch} merge={{ allowed: mergeAccess.allowed, ready: mergeAccess.ready, onMerge: setMergeIds }} onClose={() => setParam({ dupl: null })} />
+        )}
 
         <SplitView
           selected={!!activeId}
@@ -665,7 +694,13 @@ export default function VarelistePage({ liste, onActiveChange, activeId = null }
           onConfirmPackages={startPackageQueue}
           onExport={exportCsv}
           onClear={() => setSelected(new Set())}
+          merge={mergeAccess.allowed ? {
+            disabled: !mergeAccess.ready || selected.size < 2 || selected.size > 11,
+            title: !mergeAccess.ready ? `Venter på databaseendring («${CAPABILITY_FILE.rm_cap_slaa_sammen_v1}»)` : selected.size < 2 ? "Velg minst to varer" : selected.size > 11 ? "Høyst elleve varer om gangen" : undefined,
+            onClick: () => setMergeIds([...selected]),
+          } : undefined}
         />
+        <MergeDialog ids={mergeIds ?? []} open={!!mergeIds} onOpenChange={(o) => { if (!o) setMergeIds(null); }} onMerged={() => setSelected(new Set())} />
 
         <SaveViewDialog
           open={saveViewOpen}

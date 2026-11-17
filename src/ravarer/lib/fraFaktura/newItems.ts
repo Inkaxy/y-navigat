@@ -208,10 +208,10 @@ export type RowMode = "koble" | "opprett";
 /** Standard: «Koble» når det finnes et forslag eller en kobling, ellers «Opprett som ny». */
 export const defaultMode = (hasSuggestion: boolean): RowMode => (hasSuggestion ? "koble" : "opprett");
 
-export interface RowAnswer { mode: RowMode; type: NewItemType; name: string; pick: Candidate | null; badge: PackageBadge; state: PackageState }
-/** «Opprett N sikre»: bare «Opprett som ny» med navn, type og sikker pakning. */
+export interface RowAnswer { mode: RowMode; type: NewItemType; name: string; pick: Candidate | null; badge: PackageBadge; state: PackageState; existingMatch?: boolean }
+/** «Opprett N sikre»: bare «Opprett som ny» med navn, type og sikker pakning – og ingen vare med samme varenummer fra før. */
 export function isSafeCreate(a: RowAnswer): boolean {
-  return a.mode === "opprett" && a.name.trim().length > 0 && a.badge === "sikker" && a.state.state === "valid";
+  return a.mode === "opprett" && a.existingMatch !== true && a.name.trim().length > 0 && a.badge === "sikker" && a.state.state === "valid";
 }
 /** Primærknappen er sperret til mengden er fylt inn (og til en vare er valgt ved kobling). */
 export function canSubmit(a: RowAnswer): boolean {

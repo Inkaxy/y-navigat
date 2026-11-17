@@ -90,3 +90,12 @@ Ingen ny SQL, ingenting kjørt, ingen databasefunksjoner eller tabeller slettet.
 - `20261117_automatikk_cron.DATAENDRING.sql`: **utgår** (som før – trengs ikke).
 - `20261117_prislinje.PENDING.sql`: **trengs fortsatt.** Prishistorikk, «Rett pris» og «Endre godkjent pakning» er flyttet til varens Pris-seksjon under Varer og bruker samme funksjoner (`rm_cap_prislinje_v1`).
 
+
+## Slå sammen varer (17.11.2026)
+
+| Fil | Status |
+|---|---|
+| `20261120_slaa_sammen_varer.PENDING.sql` | **VENTER PÅ ROOT – NY TABELL TRENGER GODKJENNING.** Ny tabell `rm_material_merges` (revisjonslogg med alt som ble flyttet, for «Angre sammenslåing»), nullbare kolonner `raw_materials.merged_into_id`/`merged_at`/`merge_id` med vakt-trigger, funksjonene `rm_merge_raw_materials` (dry_run er standard, godkjenner/admin, én transaksjon, op_id), `rm_undo_material_merge`, `rm_merge_facts`, `rm_cap_slaa_sammen_v1`, og tekstbytte i ubrukte `merge_raw_materials(uuid,uuid)` bundet til live-md5 `3c2ed3cc…` (den gamle slettet duplikatet; nå delegerer den til den nye veien og sletter ingenting). Endrer ingen data ved kjøring – bare når en bruker bekrefter en sammenslåing. |
+| `20261120_slaa_sammen_varer.check.sql` | Kontroll: kolonner, RLS, rettigheter, at ingen er slått sammen, og forhåndsvisning (rulles tilbake) for KANELBOLLE SIRUP (ASKO 3507 + 305-1/1) og GLUTEN OG MELKEFRI KANELBOLLE (PALS 8009, stk → kg med 1 stk = 120 g), pluss at samme par uten omregning avvises. |
+
+Lokal test: `bunx vitest run src/test/slaaSammenVarerSql.test.ts` (PGlite med forenklede tabeller og live-kopi av pakningsvariant-triggeren: forhåndsvisning skriver ingenting, ulik enhet uten omregning avvises, alias/varenummer læres, oppskriftsbruk flyttes, angre gjenoppretter, tilgang). Forenklede stubber for prishistorikk-trigger og `rm_apply_derived_cost_price` – samspillet med de ekte triggerne er ikke prøvd mot en kopi av produksjonen.

@@ -37,6 +37,8 @@ import { lagerReturnHref } from "@/ravarer/lib/lagerReturn";
 import { paths } from "@/ravarer/lib/paths";
 import { RawMaterialPriceLines } from "@/ravarer/components/prislinje/RawMaterialPriceLines";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
+import { MergeWithButton } from "@/ravarer/components/merge/MergeWithButton";
+import { MergeNotice } from "@/ravarer/components/merge/MergeNotice";
 
 export default function RawMaterialDetail() {
   const { id } = useParams();
@@ -152,7 +154,10 @@ export default function RawMaterialDetail() {
         onPrev={() => prev && goTo(prev)}
         onNext={() => next && goTo(next)}
         onRename={startEdit}
+        extraActions={rm.is_active ? <MergeWithButton id={rm.id} name={rm.name} className="gap-1.5" /> : undefined}
       />
+
+      <MergeNotice id={rm.id} listSearch={listSearch} />
 
       {nav.missing && (
         <div role="status" className="flex flex-wrap items-center gap-2 rounded-lg border border-line-subtle bg-muted/40 px-3 py-2 text-sm">

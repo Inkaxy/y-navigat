@@ -88,6 +88,8 @@ describe("Nye varer – forslag, søk og «Opprett N sikre»", () => {
     expect(isSafeCreate({ mode: "opprett", type: "ravare", name: "Strøssel", pick: null, badge: "sikker", state: s })).toBe(true);
     expect(isSafeCreate({ mode: "koble", type: "ravare", name: "Strøssel", pick: cands[0], badge: "sikker", state: s })).toBe(false);
     expect(isSafeCreate({ mode: "opprett", type: "ravare", name: "Strøssel", pick: null, badge: "kontroller", state: s })).toBe(false);
+    // Samme varenummer finnes alt hos leverandøren: aldri «sikker» oppretting (PALS 8009).
+    expect(isSafeCreate({ mode: "opprett", type: "ravare", name: "Strøssel", pick: null, badge: "sikker", state: s, existingMatch: true })).toBe(false);
   });
   it("viser andre skrivemåter uten duplikater", () => {
     expect(otherSpellings("Sjokoladestrøssel mørk 5 kg", ["Sjokoladestrøssel mørk 5 kg", "SJOKOSTRØSSEL MØRK 5KG", "sjokostrøssel mørk 5kg", "Strøssel sjoko mørk"]))

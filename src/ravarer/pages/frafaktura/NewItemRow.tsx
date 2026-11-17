@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Loader2 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { useSupplierSkuIndex } from "@/ravarer/hooks/useSupplierSkuIndex";
 import { useSupplierItemLines } from "@/fakturaer/hooks/useSupplierItems";
 import { dateNo } from "@/ravarer/lib/decisions";
 import { paths } from "@/ravarer/lib/paths";
@@ -19,7 +18,6 @@ import { InvoiceSnippet } from "./InvoiceSnippet";
 
 export type RowEntry = { answer: RowAnswer | null; submit: () => Promise<boolean> };
 type Actions = ReturnType<typeof useNewItemActions>;
-const skuNorm = (s: string | null | undefined) => (s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
 /** Én leverandørvare: fakturateksten til venstre, «blir til denne varen» til høyre. Ett svar gjør hele jobben. */
 export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWrite, retur, onDone, register }: {
@@ -38,24 +36,20 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
   const pkgLine = packageSourceLine(open, all);
   const text = latest?.description ?? row.title;
   const collision = all.some((l) => (l.review_reason ?? "").includes("sku_collision"));
-  const coll = useQuery({
-    queryKey: ["ravarer", "fra-faktura", "collision", row.supplier_id, row.item_key],
-    enabled: collision && row.item_key.startsWith("sku:"),
-    queryFn: async () => {
-      const { data, error } = await supabase.from("raw_material_suppliers").select("raw_material_id, supplier_sku").eq("supplier_id", row.supplier_id);
-      if (error) throw error;
-      const key = row.item_key.slice(4);
-      return [...new Set((data ?? []).filter((r) => skuNorm(r.supplier_sku) === key).map((r) => r.raw_material_id))];
-    },
-  });
+  // Samme varenummer hos leverandøren sjekkes alltid (ikke bare ved «sku_collision»), så en vare som finnes fra før foreslås først.
+  const isSku = row.item_key.startsWith("sku:");
+  const skuIndex = useSupplierSkuIndex(row.supplier_id, isSku);
+  const sameSku = useMemo((): Candidate[] => {
+    if (!isSku || !skuIndex.data) return [];
+    return (skuIndex.data.get(row.item_key.slice(4)) ?? []).flatMap((id) => { const c = byId.get(id); return c ? [c] : []; });
+  }, [isSku, skuIndex.data, row.item_key, byId]);
 
   const suggestions = useMemo((): Candidate[] => {
     if (row.kind === "mangler_pakning" && row.rm_id) { const c = byId.get(row.rm_id); return c ? [c] : []; }
-    if (coll.data?.length) return coll.data.flatMap((id) => { const c = byId.get(id); return c ? [c] : []; });
     const s = suggestCandidate(text, candidates);
-    return s ? [s] : [];
-  }, [row.kind, row.rm_id, byId, coll.data, text, candidates]);
-  const suggestionLabel = row.kind === "mangler_pakning" ? "Koblet i dag" : collision ? "Samme varenummer" : "Forslag";
+    return sameSku.length ? [...sameSku, ...(s && !sameSku.some((c) => c.id === s.id) ? [s] : [])] : s ? [s] : [];
+  }, [row.kind, row.rm_id, byId, sameSku, text, candidates]);
+  const suggestionLabel = row.kind === "mangler_pakning" ? "Koblet i dag" : sameSku.length || collision ? "Samme varenummer" : "Forslag";
 
   const [mode, setMode] = useState<RowMode>("opprett");
   const [pick, setPick] = useState<Candidate | null>(null);
@@ -76,17 +70,18 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
     setDraft(packageProposal(pkgLine));
   }, [latest, pkgLine, row.title, supplierRule]);
   useEffect(() => {
-    if (init.current.sug || lines.isLoading || (collision && coll.isLoading)) return;
+    if (init.current.sug || lines.isLoading || (isSku && skuIndex.isLoading)) return;
     init.current.sug = true;
     setMode(defaultMode(suggestions.length > 0));
     setPick(suggestions[0] ?? null);
-  }, [suggestions, lines.isLoading, collision, coll.isLoading]);
+  }, [suggestions, lines.isLoading, isSku, skuIndex.isLoading]);
 
   const baseUnit = mode === "koble" ? pick?.base_unit ?? null : null;
   const state = readPackage(draft, baseUnit);
   const badge = packageBadge({ text, draft, state, mode, hasSuggestion: suggestions.length > 0 && !!pick && suggestions.some((s) => s.id === pick.id) });
   const price = pricePerBase(pkgLine, state);
-  const answer: RowAnswer = { mode, type, name, pick, badge, state };
+  // «Opprett som ny» når samme varenummer alt finnes: aldri med i «Opprett N sikre».
+  const answer: RowAnswer = { mode, type, name, pick, badge, state, existingMatch: sameSku.length > 0 };
   const lineIds = open.map((l) => l.id);
   const ready = !lines.isLoading && !lines.isError && lineIds.length > 0;
   // Kreditnota-raden svarer aldri «Opprett N sikre» (ingen pakning å godkjenne).
@@ -116,7 +111,7 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
   };
   const submitRef = useRef(submit);
   submitRef.current = submit;
-  const answerKey = `${mode}|${type}|${name}|${pick?.id ?? ""}|${badge}|${state.state}|${answerable}`;
+  const answerKey = `${mode}|${type}|${name}|${pick?.id ?? ""}|${badge}|${state.state}|${answerable}|${sameSku.length}`;
   useEffect(() => {
     register(row.key, { answer: answerable ? answer : null, submit: () => submitRef.current() });
     return () => register(row.key, null);
@@ -157,6 +152,12 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
               <>
                 <RowTarget mode={mode} onMode={setMode} pick={pick} onPick={setPick} suggestions={suggestions} suggestionLabel={suggestionLabel}
                   candidates={candidates} name={name} onName={setName} type={type} onType={setType} disabled={disabled} />
+                {mode === "opprett" && sameSku.length > 0 && (
+                  <p role="note" className="text-caption font-semibold text-warning">
+                    Finnes kanskje fra før: {sameSku.map((c) => `«${c.name}»${c.base_unit ? ` (${c.base_unit})` : ""}`).join(", ")} har samme varenummer hos leverandøren. Koble heller til den, eller slå sammen i Varer etterpå.
+                  </p>
+                )}
+                {skuIndex.isError && <p role="alert" className="text-caption text-destructive">Kunne ikke sjekke om varenummeret finnes fra før. Forslaget bygger bare på navnet.</p>}
                 <RowPackage draft={draft} onDraft={setDraft} state={state} badge={badge} price={price} baseUnit={baseUnit} disabled={disabled} />
               </>
             )}
