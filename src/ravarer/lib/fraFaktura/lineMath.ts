@@ -24,6 +24,9 @@ export interface LineMath {
 
 /** Beholdere som rommer flere stk (eske, kartong …). Flaske, boks og pose er én enhet. */
 const MULTI = new Set(["eske", "pakke", "kartong", "brett", "kolli", "bunt", "kasse", "d-pak", "dpak"]);
+// Flertall for antall-teksten («6 flasker»). units.ts holdes byte-identisk med edge-versjonen, så egen liten tabell her.
+const PLURAL: Record<string, string> = { flaske: "flasker", eske: "esker", pakke: "pakker", sekk: "sekker", pose: "poser", boks: "bokser", kanne: "kanner", tube: "tuber", beger: "begre", kartong: "kartonger" };
+const plural = (unit: string, n: number) => (n === 1 ? unit : PLURAL[unit] ?? unit);
 const fin = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 const kr = (n: number) => n.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const num = (n: number) => n.toLocaleString("nb-NO", { maximumFractionDigits: 3 });
@@ -65,7 +68,7 @@ export function lineMath(l: MathLine): LineMath {
       if (MULTI.has(unit) && Number.isInteger(q) && n % q === 0 && n / q >= 2) {
         return { clean: false, units: q, subUnits: n / q, note: `${calc}. Trolig 1 ${unit} = ${n / q} stk.` };
       }
-      if (n !== q) return { clean: false, units: n, subUnits: null, note: `${calc}. Trolig ${n} ${unit || "enheter"}, ikke ${num(q)}.` };
+      if (n !== q) return { clean: false, units: n, subUnits: null, note: `${calc}. Trolig ${n} ${unit ? plural(unit, n) : "enheter"}, ikke ${num(q)}.` };
     }
   }
   return { clean: false, units: null, subUnits: null, note: stored ?? issues[0]?.message ?? "Tallene på linjen går ikke opp." };

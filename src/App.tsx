@@ -69,6 +69,7 @@ const RecipeOverviewPreview = lazy(() => import("./dev/RecipeOverviewPreview"));
 const MerkingPreview = lazy(() => import("./dev/MerkingPreview"));
 const AiForslagPreview = lazy(() => import("./dev/AiForslagPreview"));
 const FakturaflytPreview = lazy(() => import("./dev/FakturaflytPreview"));
+const NyeVarerPreview = lazy(() => import("./dev/NyeVarerPreview"));
 const VaretellingPreviewContent = lazy(() => import("./dev/VaretellingPreviewContent"));
 const Integrasjoner = lazy(() => import("./pages/admin/Integrasjoner"));
 const IntegrasjonDetalj = lazy(() => import("./pages/admin/IntegrasjonDetalj"));
@@ -301,6 +302,7 @@ const App = () => (
               <Route path="/forhandsvisning/merking" element={<MerkingPreview />} />
               <Route path="/forhandsvisning/ai-forslag" element={<AiForslagPreview />} />
               <Route path="/forhandsvisning/fakturaflyt" element={<FakturaflytPreview />} />
+              <Route path="/forhandsvisning/nye-varer" element={<NyeVarerPreview />} />
               <Route path="/forhandsvisning/florapan-flyt" element={<Navigate to="/forhandsvisning/fakturaflyt" replace />} />
               <Route path="/forhandsvisning/varetelling" element={<VaretellingPreviewContent />} />
               <Route path="/glemt-passord" element={<ForgotPassword />} />

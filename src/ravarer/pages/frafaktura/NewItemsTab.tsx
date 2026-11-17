@@ -150,7 +150,7 @@ export function NewItemsTab({ supplier, onSupplier, canWrite, retur }: { supplie
         {undoNote && <p role="status" className="text-caption">{undoNote}</p>}
         {queue.isRefetchError && <p role="alert" className="text-caption text-destructive">Listen kunne ikke oppdateres. Radene under er fra forrige henting.</p>}
       </div>
-      <div className="mt-3 hidden grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1.6fr)_12rem] gap-3 bg-muted/60 px-5 py-2 text-caption font-semibold uppercase tracking-[0.12em] text-ink-secondary lg:grid">
+      <div className="mt-3 hidden grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1.6fr)_12rem] gap-3 bg-muted/60 px-5 py-2 text-caption font-semibold uppercase tracking-[0.12em] text-ink-secondary lg:grid xl:grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1.6fr)_15rem]">
         <span>Står på fakturaen</span><span /><span>Blir til denne varen</span><span />
       </div>
       <QueryState isLoading={queue.isLoading || rms.isLoading} isError={queue.isError || rms.isError} error={queue.error ?? rms.error} scope="ravarer:fra-faktura:nye" onRetry={queue.refetch}>

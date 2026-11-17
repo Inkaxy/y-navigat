@@ -20,6 +20,7 @@ describe("Nye varer: regnestykket på linjen", () => {
     expect(m.clean).toBe(false);
     expect(m.units).toBe(6);
     expect(m.note).toContain("615,90 + 32,42 i rabatt = 6 × 108,05");
+    expect(m.note).toContain("Trolig 6 flasker, ikke 1");
     const s = readPackage(packageProposal(chai1028, null, m), null);
     expect(s.state).toBe("valid");
     expect(pricePerBase(chai1028, s, m.units)).toBeCloseTo(615.9 / (6 * 0.7), 2); // ≈ 146,64 kr/l

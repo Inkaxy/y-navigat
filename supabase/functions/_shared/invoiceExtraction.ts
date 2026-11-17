@@ -17,6 +17,7 @@ import {
 import { resolveLineNumbers, type NumberEvidence } from "./numberTokens.ts";
 import { creditAlignedExpected } from "./lines-sum.ts";
 import { applyNumberCheck } from "./numberCheck.ts";
+import { applySupplierSkuRules, supplierSkuRule } from "./supplierSkuRules.ts";
 
 export const LINE_KINDS = ["vare", "pant", "frakt", "gebyr", "rabatt", "avrunding", "mva", "annet"] as const;
 export type LineKind = (typeof LINE_KINDS)[number];
@@ -292,6 +293,8 @@ export function buildUserText(h: Hints, attemptHint: string | null, examples: re
     );
   }
   if (facts.length) parts.push("\nKontrollfakta fra regnskapssystemet (Tripletex):\n- " + facts.join("\n- "));
+  const skuRule = supplierSkuRule(h.supplier_name);
+  if (skuRule) parts.push("\nVarenummer hos denne leverandøren:\n" + skuRule.hint);
   if (h.known_items.length) {
     const rows = h.known_items.filter((k) => k.sku || k.name).slice(0, 150).map((k) => `${k.sku ?? "(uten varenr)"} → ${k.name ?? ""}`);
     // Registeret er bare kontekst for gjenkjenning. Dokumentets varenummerkolonne er autoritet:
@@ -363,7 +366,8 @@ export async function runExtractionAttempts(opts: {
       continue;
     }
     const obj = isRecord(parsed) ? parsed : {};
-    const raw = sanitizeLines(obj.lines, hints.is_credit);
+    // Leverandørregel for varenummerkolonnen (f.eks. ASKO «305-11» er ikke varenummer); sku_raw beholdes som bevis.
+    const raw = applySupplierSkuRules(sanitizeLines(obj.lines, hints.is_credit), hints.supplier_name);
     // Tallkontroll uten AI før sumkontrollen: rett bare entydige tusenskille/desimal-feil.
     const nc = opts.numberCheck === false ? null : applyNumberCheck(raw, hints.expected_total_excl_vat, hints.is_credit);
     const lines = nc ? nc.lines : raw;

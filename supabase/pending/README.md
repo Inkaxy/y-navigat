@@ -99,3 +99,12 @@ Ingen ny SQL, ingenting kjørt, ingen databasefunksjoner eller tabeller slettet.
 | `20261120_slaa_sammen_varer.check.sql` | Kontroll: kolonner, RLS, rettigheter, at ingen er slått sammen, og forhåndsvisning (rulles tilbake) for KANELBOLLE SIRUP (ASKO 3507 + 305-1/1) og GLUTEN OG MELKEFRI KANELBOLLE (PALS 8009, stk → kg med 1 stk = 120 g), pluss at samme par uten omregning avvises. |
 
 Lokal test: `bunx vitest run src/test/slaaSammenVarerSql.test.ts` (PGlite med forenklede tabeller og live-kopi av pakningsvariant-triggeren: forhåndsvisning skriver ingenting, ulik enhet uten omregning avvises, alias/varenummer læres, oppskriftsbruk flyttes, angre gjenoppretter, tilgang). Forenklede stubber for prishistorikk-trigger og `rm_apply_derived_cost_price` – samspillet med de ekte triggerne er ikke prøvd mot en kopi av produksjonen.
+
+## Varenummer (17.11.2026)
+
+| Fil | Status |
+|---|---|
+| `20261121_varenummer_normalisering.PENDING.sql` | **VENTER PÅ ROOT.** Bare additivt: `_rm_sku_canon_plan` (bare service_role) og `rm_sku_canon_dryrun` (lesetilgang). Viser hvilke fakturalinjer som ville fått samme varenummer (ASKO «9727»/«305-11» → «299727», PALS «8009» → «80095»). Endrer ingen data og ingen eksisterende funksjon. |
+| `20261121_varenummer_normalisering.check.sql` | Bare SELECT: forutsetninger, rettigheter, oppsummering per leverandør og ISTE CHAI-eksempelet. |
+| `20261121_varenummer_normalisering.DATAENDRING.sql` | **DATAENDRING — TAS SEPARAT MED HENRIK.** Setter foreslått varenummer på åpne, ukoblede linjer (ikke godkjent/kostført/holdt utenfor) med sikkerhetskopi av gammel verdi. Slutter med ROLLBACK (dry-run). Starter ingen ny matching. |
+

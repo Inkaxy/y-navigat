@@ -4,7 +4,7 @@ import { ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSupplierSkuIndex } from "@/ravarer/hooks/useSupplierSkuIndex";
 import { useSupplierItemLines } from "@/fakturaer/hooks/useSupplierItems";
-import { useApprovedInvoiceIds } from "@/ravarer/hooks/useApprovedInvoices";
+import { lineLocked } from "@/fakturaer/lib/reviewPlan";
 import { splitLockedLines } from "@/ravarer/lib/fraFaktura/linkOutcome";
 import { lineMath, unitPrices } from "@/ravarer/lib/fraFaktura/lineMath";
 import { dateNo } from "@/ravarer/lib/decisions";
@@ -37,10 +37,10 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
   const latest = open[0] ?? all[0] ?? null;
   // Kreditlinjer spør aldri om pakning; pakningsforslaget bygges bare fra en vanlig linje.
   const credit = isCreditRow(open);
-  // Linjer på internt godkjente fakturaer kan ikke kobles (serveren hopper over dem). De sendes ikke, og en rad
-  // der alle linjene er slik, kan ikke lagres herfra.
-  const approvedQ = useApprovedInvoiceIds(useMemo(() => open.map((l) => l.invoice_id), [open]));
-  const { linkable, locked } = useMemo(() => splitLockedLines(open, approvedQ.data), [open, approvedQ.data]);
+  // Linjer på internt godkjente fakturaer eller med ført kostpris kan ikke kobles (serveren hopper over dem).
+  // De sendes ikke, og en rad der alle linjene er slik, kan ikke lagres herfra.
+  const { linkable, locked } = useMemo(() => splitLockedLines(open, (l) => lineLocked(l) != null), [open]);
+  const lockedApproved = locked.length > 0 && locked.every((l) => lineLocked(l) === "approved");
   // Pris og pakning bygges helst fra en linje som er lest rent; ellers merkes raden «Sjekk tallene».
   const pkgLine = packageSourceLine(open, all, (l) => lineMath(l).clean);
   const math = useMemo(() => (pkgLine ? lineMath(pkgLine) : null), [pkgLine]);
@@ -97,7 +97,7 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
   // «Opprett som ny» når samme varenummer alt finnes: aldri med i «Opprett N sikre».
   const answer: RowAnswer = { mode, type, name, pick, badge, state, existingMatch: sameSku.length > 0 };
   const lineIds = linkable.map((l) => l.id);
-  const ready = !lines.isLoading && !lines.isError && !approvedQ.isLoading && lineIds.length > 0;
+  const ready = !lines.isLoading && !lines.isError && lineIds.length > 0;
   const allLocked = !lines.isLoading && open.length > 0 && linkable.length === 0 && locked.length > 0;
   // Kreditnota-raden svarer aldri «Opprett N sikre» (ingen pakning å godkjenne).
   const answerable = ready && !credit;
@@ -182,12 +182,13 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
                   unitPrices={perUnit} numbersNote={math && !math.clean ? math.note : null} />
                 {allLocked ? (
                   <p role="note" className="text-caption font-semibold text-warning">
-                    {locked.length === 1 ? "Linjen står på en faktura" : `Alle ${locked.length} linjene står på fakturaer`} som er godkjent internt. De kan ikke kobles herfra før godkjenningen er opphevet på fakturaen.
+                    {lockedApproved
+                      ? `${locked.length === 1 ? "Linjen står på en faktura" : `Alle ${locked.length} linjene står på fakturaer`} som er godkjent internt. De kan ikke kobles herfra før godkjenningen er opphevet på fakturaen.`
+                      : `${locked.length === 1 ? "Linjen er" : `Alle ${locked.length} linjene er`} låst (godkjent internt eller ført kostpris) og kan ikke kobles herfra.`}
                   </p>
                 ) : locked.length > 0 && (
-                  <p role="note" className="text-caption text-ink-secondary">{locked.length} av {open.length} linjer står på internt godkjente fakturaer og kobles ikke nå.</p>
+                  <p role="note" className="text-caption text-ink-secondary">{locked.length} av {open.length} linjer er låst (godkjent internt eller ført kostpris) og kobles ikke nå.</p>
                 )}
-                {approvedQ.isError && <p role="alert" className="text-caption text-destructive">Kunne ikke sjekke om fakturaene er godkjent. Lagringen sier fra hvis linjer ikke kan kobles.</p>}
               </>
             )}
         </div>

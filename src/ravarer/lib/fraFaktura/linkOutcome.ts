@@ -13,10 +13,9 @@ export function assertLinesSaved(r: { lines_updated: number }): void {
   if (!(Number.isFinite(r.lines_updated) && r.lines_updated > 0)) throw new NothingSavedError(NOTHING_LINKED);
 }
 
-/** Åpne linjer delt i de som kan kobles og de som står på internt godkjente fakturaer (ukjent godkjenning = kan kobles; serveren vokter). */
-export function splitLockedLines<T extends { invoice_id: string }>(open: readonly T[], approved: ReadonlySet<string> | undefined): { linkable: T[]; locked: T[] } {
-  if (!approved || approved.size === 0) return { linkable: [...open], locked: [] };
+/** Åpne linjer delt i de som kan kobles og de som er låst (internt godkjent faktura eller ført kostpris – se `lineLocked`). */
+export function splitLockedLines<T>(open: readonly T[], isLocked: (l: T) => boolean): { linkable: T[]; locked: T[] } {
   const linkable: T[] = [], locked: T[] = [];
-  for (const l of open) (approved.has(l.invoice_id) ? locked : linkable).push(l);
+  for (const l of open) (isLocked(l) ? locked : linkable).push(l);
   return { linkable, locked };
 }

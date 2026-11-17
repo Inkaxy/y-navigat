@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 const linkSupplierItem = vi.fn();
 let approved = new Set<string>();
 const line = (id: string, invoice: string) => ({
+  invoice_approved: approved.has(invoice), cost_posted: false,
   id, invoice_id: invoice, invoice_number: `F-${invoice}`, invoice_date: "2026-11-05", requires_review: true, description: "KANEL",
   quantity: 1, unit: "kg", unit_price: 100, total_amount: 100, package_size: null, package_unit: null, count_per_package: null,
   supplier_sku: null, is_credit_note: false, review_reason: "unmatched", extraction_issues: [],
@@ -18,11 +19,10 @@ let lines = [line("l1", "f1")];
 vi.mock("@/hooks/useCompany", () => ({ useCompany: () => ({ data: { id: "le" } }) }));
 vi.mock("@/lib/pendingRpc", () => ({ useCapability: () => false, callPendingRpc: async () => ({ kind: "missing" }) }));
 vi.mock("@/fakturaer/hooks/useSupplierItems", () => ({
-  linkSupplierItem: (...a: unknown[]) => linkSupplierItem(...a),
+  linkSupplierItem: async (...a: unknown[]): Promise<unknown> => { const r: unknown = await linkSupplierItem(...a); return r; },
   invalidateAfterLink: () => undefined,
   useSupplierItemLines: () => ({ data: lines, isLoading: false, isError: false }),
 }));
-vi.mock("@/ravarer/hooks/useApprovedInvoices", () => ({ useApprovedInvoiceIds: () => ({ data: approved, isLoading: false, isError: false }) }));
 vi.mock("@/ravarer/hooks/useSupplierSkuIndex", () => ({ useSupplierSkuIndex: () => ({ data: new Map(), isLoading: false, isError: false }) }));
 
 import { useNewItemActions } from "@/ravarer/hooks/useNewItemActions";
@@ -42,11 +42,6 @@ describe("useNewItemActions.link", () => {
     linkSupplierItem.mockResolvedValue(ok(0));
     const { result } = renderHook(() => useNewItemActions(), { wrapper: wrap });
     await expect(result.current.link(input)).rejects.toBeInstanceOf(NothingSavedError);
-  });
-  it("lagring feiler → feil, ingen kvittering", async () => {
-    linkSupplierItem.mockImplementation(async () => { throw new Error("Nettverksfeil"); });
-    const { result } = renderHook(() => useNewItemActions(), { wrapper: wrap });
-    await expect(result.current.link(input)).rejects.toThrow("Nettverksfeil");
   });
   it("bekreftet lagring med linjer → kvittering, aldri «0 fakturalinjer»", async () => {
     linkSupplierItem.mockResolvedValue(ok(3));
@@ -82,16 +77,26 @@ describe("NewItemRow: feil gir ingen kvittering", () => {
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
     expect(linkSupplierItem).toHaveBeenCalledTimes(2);
   });
+  it("lagring feiler → feilmelding og «Prøv igjen», ingen kvittering", async () => {
+    const onDone = vi.fn();
+    linkSupplierItem.mockImplementation(() => Promise.reject(new Error("Kunne ikke nå serveren")));
+    render(<Row onDone={onDone} />, { wrapper: wrap });
+    fireEvent.click(await screen.findByRole("button", { name: "Opprett råvare" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("Kunne ikke nå serveren");
+    expect(screen.getByRole("button", { name: "Prøv igjen" })).toBeTruthy();
+    expect(onDone).not.toHaveBeenCalled();
+  });
   it("alle linjer på internt godkjente fakturaer → kan ikke lagres, ingenting sendes", async () => {
     approved = new Set(["f1"]);
+    lines = [line("l1", "f1")];
     render(<Row onDone={vi.fn()} />, { wrapper: wrap });
     expect((await screen.findByRole("note")).textContent).toContain("godkjent internt");
     expect((screen.getByRole("button", { name: "Opprett råvare" }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: "Ikke vare" }) as HTMLButtonElement).disabled).toBe(true);
   });
   it("bare linjer som kan kobles sendes", async () => {
-    lines = [line("l1", "f1"), line("l2", "f2")];
     approved = new Set(["f1"]);
+    lines = [line("l1", "f1"), line("l2", "f2")];
     linkSupplierItem.mockResolvedValue(ok(1));
     const onDone = vi.fn();
     render(<Row onDone={onDone} />, { wrapper: wrap });
