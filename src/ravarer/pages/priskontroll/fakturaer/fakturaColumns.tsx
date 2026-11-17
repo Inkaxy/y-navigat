@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+import { paths } from "@/ravarer/lib/paths";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import type { Column } from "@/ravarer/ui/DataTable";
@@ -42,6 +44,12 @@ export function LinesProgress({ inv }: { inv: InboxInvoice }) {
       <div className="mt-1 h-1 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label={`${done} av ${total} linjer avklart`} aria-valuenow={done} aria-valuemin={0} aria-valuemax={total}>
         <div className="h-full bg-primary" style={{ width: `${Math.round((done / total) * 100)}%` }} />
       </div>
+      {/* Arkiv (opprydding demo D): åpne linjer avklares i Fra faktura. */}
+      {inv.assessment.openCount > 0 && (
+        <Link to={paths.fraFaktura()} onClick={(e) => e.stopPropagation()} className="mt-1 inline-flex text-caption font-semibold text-primary hover:underline">
+          {inv.assessment.openCount.toLocaleString("nb-NO")} ting venter i Fra faktura
+        </Link>
+      )}
     </div>
   );
 }
