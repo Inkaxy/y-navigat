@@ -7,7 +7,7 @@ export type FakturaVisning = (typeof FAKTURA_VISNINGER)[number];
 export type AvstemtModus = "auto" | "manuell";
 
 export const VISNING_LABEL: Record<FakturaVisning, string> = {
-  trenger: "Trenger meg",
+  trenger: "Åpne",
   klar: "Klare til avstemming",
   etterkontroll: "Godkjent – etterkontroll",
   avstemt: "Avstemt",
@@ -27,7 +27,8 @@ export function parseVisning(sp: URLSearchParams): { visning: FakturaVisning; mo
   let visning: FakturaVisning;
   if (raw && (FAKTURA_VISNINGER as readonly string[]).includes(raw)) visning = raw as FakturaVisning;
   else if (raw === "innboks" || sp.has("innboks")) visning = fromLegacyInnboks(sp.get("innboks"));
-  else visning = "trenger";
+  // Arkiv (opprydding demo D): uten valg vises alle fakturaer.
+  else visning = "alle";
   const m = sp.get("modus");
   return { visning, modus: visning === "avstemt" && (m === "auto" || m === "manuell") ? m : null };
 }
