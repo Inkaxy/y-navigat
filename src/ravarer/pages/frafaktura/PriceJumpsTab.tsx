@@ -1,14 +1,14 @@
 import { useId, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { QueryState } from "@/components/common/QueryState";
-import { Switch } from "@/components/ui/switch";
+import { Link } from "react-router-dom";
+import { paths } from "@/ravarer/lib/paths";
 import { useCompany } from "@/hooks/useCompany";
 import { useAuth } from "@/hooks/useAuth";
-import { callPendingRpc } from "@/lib/pendingRpc";
 import { useRecipeUsage } from "@/varer/hooks/usePrisgrunnlag";
 import type { AddLineItem } from "@/varer/hooks/usePriceRounds";
 import { AddToPriceRoundDialog } from "@/varer/components/prices/AddToPriceRoundDialog";
-import { usePriceJumps, useSupplierNames } from "@/ravarer/hooks/useFraFaktura";
+import { usePriceJumps, useSaveFraFakturaSettings, useSupplierNames } from "@/ravarer/hooks/useFraFaktura";
 import { JUMP_CHOICES, belowLimitCount } from "@/ravarer/lib/fraFaktura/priceJumps";
 import { PriceJumpRow } from "./PriceJumpRow";
 
@@ -30,16 +30,11 @@ export function PriceJumpsTab({ localLimit, onLocalLimit, canWrite, canApprove, 
   const [msg, setMsg] = useState<string | null>(null);
   const lock = useRef(false);
 
-  const save = async (patch: { pct?: number; quiet?: boolean; pkg?: boolean }) => {
-    if (!company || lock.current || !s) return;
+  const saveSettings = useSaveFraFakturaSettings();
+  const save = async (patch: { pct?: number }) => {
+    if (lock.current || !s) return;
     lock.current = true; setMsg(null);
-    const r = await callPendingRpc("rm_set_fra_faktura_settings", {
-      p_legal_entity_id: company.id, p_price_jump_pct: patch.pct ?? (s.isDefault ? null : s.priceJumpPct),
-      p_quiet_prices: patch.quiet ?? null, p_invoice_package: patch.pkg ?? null,
-    });
-    lock.current = false;
-    if (r.kind !== "ok") setMsg(r.kind === "denied" ? "Bare godkjennere kan endre dette." : "Endringen ble ikke lagret. Prøv igjen.");
-    void qc.invalidateQueries({ queryKey: ["ravarer", "fra-faktura"] });
+    try { setMsg(await saveSettings(s, patch)); } finally { lock.current = false; }
   };
   const onLimit = (v: number) => { if (canSave) { onLocalLimit(null); void save({ pct: v }); } else onLocalLimit(v === (s?.priceJumpPct ?? 20) ? null : v); };
   const below = p.lines.data && p.items.data ? belowLimitCount(p.lines.data, p.limitFor) : null;
@@ -81,18 +76,10 @@ export function PriceJumpsTab({ localLimit, onLocalLimit, canWrite, canApprove, 
         {below != null && below > 0 && (s?.pending || !s?.quietPrices) && (
           <p>{below} {below === 1 ? "mindre prisendring" : "mindre prisendringer"} under grensen venter fortsatt under «Øvrige spørsmål» til regelen under er slått på.</p>
         )}
-        {s && !s.pending ? (
-          <div className="flex flex-col gap-2">
-            <label className="flex min-h-[44px] items-center gap-3 text-sm text-foreground">
-              <Switch checked={s.quietPrices} disabled={!canSave} onCheckedChange={(v) => void save({ quiet: v })} />
-              Prisendringer under grensen føres uten spørsmål
-            </label>
-            <label className="flex min-h-[44px] items-center gap-3 text-sm text-foreground">
-              <Switch checked={s.invoicePackage} disabled={!canSave} onCheckedChange={(v) => void save({ pkg: v })} />
-              Entydig pakning lest fra fakturaen gjelder uten egen godkjenning
-            </label>
-          </div>
-        ) : <p>Reglene for matchingen (stille prisendring under grensen, pakning lest fra fakturaen) kan slås på når databaseendringen «Fra faktura» er kjørt.</p>}
+        <p>
+          {s && !s.pending ? `Prisendringer under grensen ${s.quietPrices ? "føres uten spørsmål" : "spør fortsatt"}. ` : "Reglene for matchingen kan slås på når databaseendringen «Fra faktura» er kjørt. "}
+          <Link to={paths.innstillinger({ seksjon: "automatikk" })} className="font-semibold text-primary hover:underline">Regler og grense i Innstillinger</Link>
+        </p>
         {msg && <p role="alert" className="text-destructive">{msg}</p>}
       </div>
       <AddToPriceRoundDialog open={round != null} onOpenChange={(o) => !o && setRound(null)} legalEntityId={company?.id ?? null} userId={user?.id ?? null}

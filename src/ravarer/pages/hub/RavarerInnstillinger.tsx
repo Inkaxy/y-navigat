@@ -15,6 +15,7 @@ const MatchToleranser = lazy(() => import("@/ravarer/pages/innstillinger/MatchTo
 const Tripletex = lazy(() => import("@/ravarer/pages/innstillinger/TripletexSettings"));
 const Kategorier = lazy(() => import("@/ravarer/pages/innstillinger/KategorierSettings"));
 const AiTjenester = lazy(() => import("@/ravarer/pages/innstillinger/AiServicesSettings"));
+const Automatikk = lazy(() => import("@/ravarer/pages/innstillinger/AutomatikkSettings"));
 
 type Entry = { id: InnstillingSeksjon; del?: string; label: string; hint: string; adminOnly?: boolean };
 /**
@@ -23,6 +24,7 @@ type Entry = { id: InnstillingSeksjon; del?: string; label: string; hint: string
  */
 const GROUPS: { title: string; entries: Entry[] }[] = [
   { title: "Automatisk behandling", entries: [
+    { id: "automatikk", label: "Automatikk og regler", hint: "Prisgrense, pant, leverandørregler, hopp over og ny beregning" },
     { id: "priskontroll", del: "automatikk", label: "Matching og automatikk", hint: "Når linjer kobles og fakturaer avstemmes uten deg" },
     { id: "priskontroll", del: "startpris", label: "Startpris", hint: "Første dokumenterte pris fra en leverandør" },
   ] },
@@ -95,6 +97,7 @@ export default function RavarerInnstillinger() {
         <div className="min-w-0 space-y-6">
           <Suspense fallback={<QueryLoadingState rows={6} />}>
             {active === "priskontroll" && <MatchToleranser />}
+            {active === "automatikk" && <Automatikk />}
             {active === "tripletex" && <Tripletex />}
             {active === "kategorier" && <Kategorier />}
             {active === "ai" && isPlatformAdmin && <AiTjenester />}

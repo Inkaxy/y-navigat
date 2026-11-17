@@ -33,7 +33,7 @@ export default function AutomatikkSettings() {
       </div>
       <div className="space-y-4">
         <AutoLogCard days={days} setDays={setDays} data={log.data} isError={log.isError} />
-        <SkipRulesCard canEdit={isAdmin} />
+        <SkipRulesCard canWrite={canWrite} />
         <section aria-labelledby="prishistorikk-innst" className="space-y-2 rounded-2xl border border-line-subtle bg-card p-4">
           <h2 id="prishistorikk-innst" className="text-body font-semibold">Prishistorikk</h2>
           {ph.cap === true && ph.data
