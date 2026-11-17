@@ -104,6 +104,14 @@ const EXTRA: Record<string, string> = {
   ugyldig_forslag: "Ny lesing kunne ikke tolkes.",
   brukt_av_andre: "Lesingen ble tatt i bruk utenfor kjøringen.",
   pagaende: "En lesing pågår allerede.",
+  sum_stemmer_ikke: "Summen stemmer fortsatt ikke med fakturaen.",
+  manuell_kobling_ikke_gjenfunnet: "En manuelt koblet linje ble ikke gjenfunnet i ny lesing.",
+  beskyttet_linje_ikke_gjenfunnet: "En linje med godtatt pris, «ikke vare», holdt utenfor eller rettelse ble ikke gjenfunnet.",
+  beskyttet_linje_endres: "En linje med godtatt pris, «ikke vare», holdt utenfor eller rettelse ville fått nye tall.",
+  ny_linje_mangler_felt: "En ny linje mangler mengde, enhet, pris eller sum.",
+  darligere: "Summen stemte før, men ikke med ny lesing. Dagens linjer er beholdt.",
+  forslag_avvist: "Ny lesing kunne ikke brukes automatisk.",
+  finnes_ikke: "Fakturaen eller lesingen finnes ikke lenger.",
 };
 export const codeText = (code: string | null) => (code && EXTRA[code]) || rereadErrorText(code);
 

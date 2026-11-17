@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
 import { useAuthUserId } from "@/hooks/useAuth";
-import { osloTodayISO } from "@/lib/osloDate";
+import { osloDayStartIso, osloTodayISO } from "@/lib/osloDate";
 import { parseAiConfigs } from "@/ravarer/lib/aiConfig";
 import { buildPlan, estimateRunCost, type PlanInvoice, type RunCost, type RunPlan, type UsageRow } from "@/ravarer/lib/samletGjenlesing/plan";
 import { samletRunner } from "./samletGjenlesingRunner";
@@ -71,7 +71,7 @@ async function runInfo(le: string, todayIso: string) {
   const nowIso = new Date().toISOString();
   const [open, applied] = await Promise.all([
     supabase.from("invoice_reread_runs").select("invoice_id").eq("legal_entity_id", le).in("status", ["reading", "ready"]).gt("expires_at", nowIso).limit(5000),
-    supabase.from("invoice_reread_runs").select("invoice_id, applied_at").eq("legal_entity_id", le).eq("status", "applied").gte("applied_at", `${todayIso}T00:00:00+00:00`).limit(5000),
+    supabase.from("invoice_reread_runs").select("invoice_id, applied_at").eq("legal_entity_id", le).eq("status", "applied").gte("applied_at", osloDayStartIso(todayIso)).limit(5000),
   ]);
   if (open.error || applied.error) throw new Error("Kunne ikke hente pågående lesinger.");
   const appliedAt = new Map<string, string>();
