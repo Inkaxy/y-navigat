@@ -177,3 +177,48 @@ describe("Faner og tellere", () => {
     expect(parseFraFakturaTab("tull")).toBe("nye");
   });
 });
+
+import { requeueMessage, sumDifference, sumDifferenceText, unreadGroup } from "./unread";
+import { canSubmitAccept, parseSumWrite } from "./sumAccept";
+
+describe("Ikke lest: to grupper og ærlig melding", () => {
+  const base = { id: "i", invoice_number: "1", invoice_date: "2026-10-01", supplier_id: "s", total_amount: 1250, line_extraction_status: "done",
+    line_extraction_error: null, lines_sum_status: "mismatch", tripletex_supplier_invoice_id: "t" };
+  it("faktura med linjer hører til «Lest, men summen stemmer ikke»; uten linjer til «Ikke lest»", () => {
+    expect(unreadGroup({ ...base, line_count: 7 })).toBe("har_linjer");
+    expect(unreadGroup({ ...base, line_count: 0 })).toBe("uten_linjer");
+  });
+  it("meldingen sier at 38 med linjer må leses på nytt med forslag, ikke «låst eller allerede behandlet»", () => {
+    expect(requeueMessage({ requeued: 51, skipped: [], withLines: 38 })).toBe("51 lagt i lesekøen. 38 har allerede linjer og må leses på nytt med forslag – se under.");
+    const m = requeueMessage({ requeued: 0, skipped: [{ reason: "har_linjer" }, { reason: "kostpris_fort" }, { reason: "kostpris_fort" }, { reason: "godkjent" }], withLines: 0 });
+    expect(m).toBe("0 lagt i lesekøen. 1 har allerede linjer og må leses på nytt med forslag – se under. 3 ble hoppet over: 2 har ført kostpris, 1 er godkjent.");
+    expect(m).not.toMatch(/låst eller allerede behandlet/);
+  });
+  it("differansen i kroner: linjesum mot fakturasum eks. mva", () => {
+    expect(sumDifference({ ...base, lines_sum_excl_vat: 960, total_vat: 250 })).toBe(-40);
+    expect(sumDifferenceText(-40)).toBe("Linjene er 40,00 kr lavere enn fakturaen (eks. mva).");
+    expect(sumDifferenceText(1234.5)).toBe("Linjene er 1 234,50 kr høyere enn fakturaen (eks. mva).");
+  });
+  it("kreditnota med motsatt fortegn regnes som sumkontrollen", () => {
+    expect(sumDifference({ ...base, total_amount: 3612, total_vat: 471, is_credit_note: true, lines_sum_excl_vat: -3141 })).toBe(0);
+  });
+  it("uten mva er differansen ukjent, aldri 0", () => {
+    expect(sumDifference({ ...base, lines_sum_excl_vat: 960, total_vat: null })).toBeNull();
+  });
+});
+
+describe("Godta som den er", () => {
+  it("bare ok:true er utført; kjent avvisning er avvist; alt annet ukjent", () => {
+    expect(parseSumWrite({ ok: true, invoice_id: "i", audit_id: "a", replay: false })).toEqual({ kind: "ok", auditId: "a", replay: false });
+    expect(parseSumWrite({ ok: false, code: "mva_forhold" })).toEqual({ kind: "avvist", code: "mva_forhold" });
+    expect(parseSumWrite({ ok: false, code: "noe_nytt" })).toEqual({ kind: "ukjent" });
+    expect(parseSumWrite({})).toEqual({ kind: "ukjent" });
+    expect(parseSumWrite(null)).toEqual({ kind: "ukjent" });
+  });
+  it("«Annet» krever begrunnelse; de andre kategoriene gjør ikke det", () => {
+    expect(canSubmitAccept("pant", "")).toBe(true);
+    expect(canSubmitAccept("annet", " ")).toBe(false);
+    expect(canSubmitAccept("annet", "Gebyr for lite ordre")).toBe(true);
+    expect(canSubmitAccept(null, "x")).toBe(false);
+  });
+});
