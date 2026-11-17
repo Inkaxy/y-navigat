@@ -7,16 +7,12 @@ import { ShortcutHelp } from "@/ravarer/ui/ShortcutHelp";
 import { paths } from "@/ravarer/lib/paths";
 import { useWorkSummary, useActivityFeed, usePriceMovers } from "@/ravarer/hooks/useWorkData";
 import { useCompany } from "@/hooks/useCompany";
-import { useInboxInvoices } from "@/fakturaer/hooks/useInboxInvoices";
-import { NextInvoicesView } from "@/ravarer/pages/oversikt/NextInvoicesView";
-import { openWorkCounts } from "@/ravarer/pages/priskontroll/fakturaer/useFakturaListe";
-import { WorkStartView } from "@/ravarer/pages/oversikt/WorkStartView";
+import { useFraFakturaCounts } from "@/ravarer/hooks/useFraFaktura";
 import { ActivityView } from "@/ravarer/pages/oversikt/ActivityView";
 import { PriceMoversView } from "@/ravarer/pages/oversikt/PriceMoversView";
 import { DataQualityView } from "@/ravarer/pages/oversikt/DataQualityView";
+import { FraFakturaOverviewCard } from "@/ravarer/pages/oversikt/FraFakturaOverviewCard";
 import { InvoiceReadingAlert } from "@/ravarer/components/reading/InvoiceReadingAlert";
-import { DecisionsOverviewCard } from "@/ravarer/pages/oversikt/DecisionsOverviewCard";
-import { useOpenQuestionCount } from "@/ravarer/hooks/useDecisions";
 import { useInvoiceReadingHealth } from "@/ravarer/hooks/useInvoiceReadingHealth";
 import { readingBannerState } from "@/ravarer/lib/invoiceReadingHealth";
 import { loadKeyTestOk } from "@/ravarer/lib/keyTestMarker";
@@ -27,7 +23,7 @@ function firstNameFromEmail(email: string | null | undefined): string | null {
   return left ? left[0].toUpperCase() + left.slice(1) : null;
 }
 
-/** Oversikt = arbeidsstart: statusstripe, én «Start behandling», neste oppgaver (eldste først), snarveier. */
+/** Oversikt (opprydding demo D): bare Fra faktura-kortet og tall som peker til Fra faktura, Varer og Fakturaer. */
 export default function RavarerOversikt() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -36,20 +32,20 @@ export default function RavarerOversikt() {
 
   const summaryQ = useWorkSummary({ includeApproval: true });
   const invoiceAccess = summaryQ.data?.invoice_access === true;
-  // «Trenger deg»/«Klare» med nøyaktig samme filter som Fakturaer-flaten (komplett liste, uten internt godkjente).
   const { data: company } = useCompany();
-  const openQ = useInboxInvoices({ legalEntityId: company?.id ?? null, supplierId: null, enabled: invoiceAccess && !!company?.id });
-  const openCounts = invoiceAccess && company?.id && openQ.data && !openQ.isError ? openWorkCounts(openQ.data) : null;
+  // Samme tellere som menyen og Fra faktura (delt hurtigbuffer, ingen egne listekall).
+  const counts = useFraFakturaCounts(invoiceAccess);
   const [more, setMore] = useState(false);
   const activityQ = useActivityFeed({ days: 7, enabled: invoiceAccess && more });
   const moversQ = usePriceMovers({ days: period });
-  const openQuestions = useOpenQuestionCount(invoiceAccess);
   const healthQ = useInvoiceReadingHealth(company?.id ?? null, invoiceAccess);
   const [helpOpen, setHelpOpen] = useState(false);
+  const firstName = firstNameFromEmail(user?.email);
 
   const hotkeys = useMemo<HotkeyBinding[]>(() => [
-    { keys: ["g p"], sequence: ["g", "p"], description: "Gå til fakturaer", handler: () => navigate(paths.priskontroll({ fane: "gjore" })) },
+    { keys: ["g f"], sequence: ["g", "f"], description: "Gå til Fra faktura", handler: () => navigate(paths.fraFaktura()) },
     { keys: ["g v"], sequence: ["g", "v"], description: "Gå til varer", handler: () => navigate(paths.varer()) },
+    { keys: ["g p"], sequence: ["g", "p"], description: "Gå til fakturaer", handler: () => navigate(paths.alleFakturaer()) },
     { keys: ["?"], description: "Vis hurtigtaster", handler: () => setHelpOpen(true) },
   ], [navigate]);
   useHotkeys(hotkeys);
@@ -62,23 +58,23 @@ export default function RavarerOversikt() {
 
   return (
     <div className="mx-auto w-full max-w-[1280px] space-y-6 px-page py-5">
+      <h1 className="font-display text-2xl leading-tight">{firstName ? `Hei, ${firstName}` : "Råvarer"}</h1>
       <InvoiceReadingAlert enabled={invoiceAccess} />
-      {invoiceAccess && (
-        <DecisionsOverviewCard
-          openQuestions={openQuestions}
-          health={healthQ.data}
-          healthError={healthQ.isError}
-          banner={readingBannerState(healthQ.data, loadKeyTestOk())}
-          movers={moversQ.data?.items ?? null}
-          moversError={moversQ.isError}
-          period={period}
-        />
-      )}
       {summaryQ.isError
         ? <QueryErrorState error={summaryQ.error} scope="ravarer:oversikt:summary" onRetry={() => summaryQ.refetch()} />
-        : <WorkStartView summary={summaryQ.data ?? null} open={openCounts} firstName={firstNameFromEmail(user?.email)} />}
-
-      {invoiceAccess && company?.id && <NextInvoicesView all={openQ.data ?? null} loading={openQ.isLoading} error={openQ.error} onRetry={() => void openQ.refetch()} />}
+        : (
+          <FraFakturaOverviewCard
+            counts={invoiceAccess ? counts : null}
+            summary={summaryQ.data ?? null}
+            invoiceAccess={invoiceAccess}
+            health={healthQ.data}
+            healthError={healthQ.isError}
+            banner={readingBannerState(healthQ.data, loadKeyTestOk())}
+            movers={moversQ.data?.items ?? null}
+            moversError={moversQ.isError}
+            period={period}
+          />
+        )}
 
       <details className="rounded-lg border border-border bg-card" onToggle={(e) => setMore((e.currentTarget as HTMLDetailsElement).open)}>
         <summary className="flex min-h-[44px] cursor-pointer items-center px-4 text-sm font-medium">Mer: prisutvikling, aktivitet og datakvalitet</summary>
