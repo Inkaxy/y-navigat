@@ -104,7 +104,7 @@ export function SuggestionsSection({ names, canWrite, retur }: { names: Map<stri
   const ops = opsOf(d);
   const updates = ops.filter((o) => o.kind === "update").length;
   const adds = ops.length - updates;
-  const afterOk = d && (d.kind === "bruk" || d.kind === "forslag") ? d.after.status === "ok" : null;
+  const afterOk = d && (d.kind === "bruk" || d.kind === "forslag") ? d.after.lines_sum_status === "ok" : null;
 
   return (
     <section id="ff-forslag" aria-labelledby="ff-forslag-h" className="mt-3 border-t border-line-subtle">
