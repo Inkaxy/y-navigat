@@ -71,7 +71,7 @@
    "original_feature": "Meny-badger: linjer til behandling, varekort som venter (ukoblet + mangler pakning), avtaler som utløper, ukvitterte datablad-endringer",
    "original_location": "RavarerNav-badge per inngang fra `rm_work_summary` (samme tall som Oversikt og faner)",
    "current_feature": "Meny-badger: linjer til behandling, varekort som venter (ukoblet + mangler pakning), avtaler som utløper, ukvitterte datablad-endringer",
-   "current_location_or_disposition": "RavarerNav-badge per inngang fra `rm_work_summary` (samme tall som Oversikt og faner)",
+   "current_location_or_disposition": "RavarerNav-badge per inngang fra `rm_work_summary`; Fra faktura viser åpne spørsmål; Fakturaer har ingen merke (todo_total blander varegrupper og fakturaer)",
    "route_owner_path": "src/components/layout/SubAppNav.tsx",
    "action_component_paths": [
     "src/components/layout/SubAppNav.tsx"
@@ -117,7 +117,7 @@
    "original_feature": "Meny-badger: linjer til behandling, varekort som venter (ukoblet + mangler pakning), avtaler som utløper, ukvitterte datablad-endringer",
    "original_location": "RavarerNav-badge per inngang fra `rm_work_summary` (samme tall som Oversikt og faner)",
    "current_feature": "Meny-badger: linjer til behandling, varekort som venter (ukoblet + mangler pakning), avtaler som utløper, ukvitterte datablad-endringer",
-   "current_location_or_disposition": "RavarerNav-badge per inngang fra `rm_work_summary` (samme tall som Oversikt og faner)",
+   "current_location_or_disposition": "RavarerNav-badge per inngang fra `rm_work_summary`; Fra faktura viser åpne spørsmål; Fakturaer har ingen merke (todo_total blander varegrupper og fakturaer)",
    "route_owner_path": "src/components/layout/SubAppNav.tsx",
    "action_component_paths": [
     "src/components/layout/SubAppNav.tsx"
@@ -5467,7 +5467,7 @@
    "original_feature": "Meny-badger: linjer til behandling, varekort som venter (ukoblet + mangler pakning), avtaler som utløper, ukvitterte datablad-endringer",
    "original_location": "RavarerNav-badge per inngang fra `rm_work_summary` (samme tall som Oversikt og faner)",
    "current_feature": "Meny-badger: linjer til behandling, varekort som venter (ukoblet + mangler pakning), avtaler som utløper, ukvitterte datablad-endringer",
-   "current_location_or_disposition": "RavarerNav-badge per inngang fra `rm_work_summary` (samme tall som Oversikt og faner)",
+   "current_location_or_disposition": "RavarerNav-badge per inngang fra `rm_work_summary`; Fra faktura viser åpne spørsmål; Fakturaer har ingen merke (todo_total blander varegrupper og fakturaer)",
    "route_owner_path": "src/components/layout/SubAppNav.tsx",
    "action_component_paths": [
     "src/components/layout/SubAppNav.tsx"

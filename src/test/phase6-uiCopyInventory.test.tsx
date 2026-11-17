@@ -159,6 +159,7 @@ describe("eksakt 313-kartlegging", () => {
     expect(by.get("F85")?.canonical_url_templates).toEqual(["/ravarer/priskontroll?fane=godkjenning"]);
     expect(by.get("R187")?.canonical_url_templates).toEqual(["/ravarer/innstillinger?seksjon=tripletex"]);
     expect(by.get("F96")?.canonical_url_templates).toEqual(["/ravarer/priskontroll?importer=pdf"]);
-    expect(by.get("R79")?.canonical_url_templates).toEqual(["/ravarer/priskontroll?fane=gjore&visning=mengde"]);
+    // R79 (mengde-diagnostikk) er fjernet i oppryddingen til versjon D og står som bevaringsgap.
+    expect(by.get("R79")?.mapping_status).toBe("bevaringsgap");
   });
 });
