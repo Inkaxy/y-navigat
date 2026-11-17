@@ -117,3 +117,9 @@
 - [x] Start fra liste (merk ≥2) og fra varens visning («Slå sammen med …»)
 - [x] «Mulige duplikater» i Varer + «Finnes kanskje fra før» i Nye varer
 - [x] Sammenslått vare: inaktiv, «Slått sammen med …», videresending, «Angre sammenslåing»
+
+# Nye varer: rader forsvinner ikke (17.11.2026, Henrik)
+- [x] Kvittering straks + tellere ned uten nytt tungt oppslag (fane, leverandørchips, meny)
+- [x] Koblet vare med pakning og rest-årsak står ikke i Nye varer
+- [x] Kvitteringer står til omlasting; «Vis flere» henter ikke ferdige rader tilbake
+- [x] Tester: lagre → kvittering → teller ned → ny henting gir ikke raden tilbake; price_variance-rest

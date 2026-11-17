@@ -23,21 +23,28 @@ export type NewItemsPage = {
   counts: { kobling: number | null; pakning: number | null };
   /** Antall per leverandør (bare rask vei). */
   suppliers: SupplierCount[] | null;
+  /** Når oppslaget ble sendt (ms). Brukes til å trekke fra svar lagret etterpå (`newItemsDone.ts`). */
+  startedAt?: number;
 };
 
 export const firstNewItemsPage = (fast: boolean): NewItemsPageParam =>
   fast ? { source: "rask", offset: 0 } : { source: "arbeidsliste", group: "kobling", offset: 0 };
 
-/** Neste side, eller `undefined` når alt er hentet. Dagens vei går fra «kobling» til «pakning». */
-export function nextNewItemsPage(last: NewItemsPage): NewItemsPageParam | undefined {
+/**
+ * Neste side, eller `undefined` når alt er hentet. Dagens vei går fra «kobling» til «pakning».
+ * `removed` = ferdige rader i de hentede sidene av samme liste som serveren ikke lenger har: neste side starter
+ * så mange plasser tidligere, ellers ville like mange rader blitt hoppet over.
+ */
+export function nextNewItemsPage(last: NewItemsPage, removed = 0): NewItemsPageParam | undefined {
   const end = last.param.offset + last.rawCount;
   const more = last.rawCount > 0 && end < last.total;
-  if (last.param.source === "rask") return more ? { source: "rask", offset: end } : undefined;
+  const next = Math.max(0, end - removed);
+  if (last.param.source === "rask") return more ? { source: "rask", offset: next } : undefined;
   if (last.param.group === "kobling") {
-    if (more) return { source: "arbeidsliste", group: "kobling", offset: end };
+    if (more) return { source: "arbeidsliste", group: "kobling", offset: next };
     return last.counts.pakning === 0 ? undefined : { source: "arbeidsliste", group: "pakning", offset: 0 };
   }
-  return more ? { source: "arbeidsliste", group: "pakning", offset: end } : undefined;
+  return more ? { source: "arbeidsliste", group: "pakning", offset: next } : undefined;
 }
 
 const finite = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)) ? Number(v) : null);
@@ -60,11 +67,14 @@ export function parseNewItemsQueue(data: unknown, param: NewItemsPageParam): New
   return { param, items: parseWorkItemList(data.items), rawCount: data.items.length, total, counts: { kobling, pakning }, suppliers };
 }
 
-/** Radene i visningsrekkefølge (sidene etter hverandre), uten duplikater og bare varekort med leverandør og nøkkel. */
+/** Radene i visningsrekkefølge (sidene etter hverandre), uten duplikater og bare ukoblede/pakningsløse varekort med leverandør og nøkkel. */
 export function newItemsRows(pages: readonly NewItemsPage[]): (WorkItem & { supplier_id: string; item_key: string })[] {
   const seen = new Set<string>();
   const out: (WorkItem & { supplier_id: string; item_key: string })[] = [];
   for (const p of pages) for (const w of p.items) {
+    // Bare ukoblet eller koblet uten pakning hører hjemme her. En koblet vare med pakning og en rest-årsak
+    // (prisavvik → Prishopp, lesevarsel → Ikke lest/kontroll) skal aldri stå i Nye varer.
+    if (w.kind !== "ukoblet" && w.kind !== "mangler_pakning") continue;
     if (w.type !== "varekort" || !w.supplier_id || !w.item_key || seen.has(w.key)) continue;
     seen.add(w.key);
     out.push({ ...w, supplier_id: w.supplier_id, item_key: w.item_key });

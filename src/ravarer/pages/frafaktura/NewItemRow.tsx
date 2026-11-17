@@ -24,7 +24,8 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
   row: WorkItem & { supplier_id: string; item_key: string };
   candidates: readonly Candidate[]; byId: ReadonlyMap<string, Candidate>; supplierRule: NewItemType | null;
   actions: Actions; canWrite: boolean; retur: string;
-  onDone: (key: string, r: NewItemReceipt) => void;
+  /** `sentAt` = da lagringen ble sendt (for å trekke riktig fra tellere som var på vei). */
+  onDone: (key: string, r: NewItemReceipt, sentAt: number) => void;
   register: (key: string, e: RowEntry | null) => void;
 }) {
   const lines = useSupplierItemLines(row.supplier_id, row.item_key);
@@ -90,12 +91,13 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
   const submit = async (): Promise<boolean> => {
     if (lock.current || !canWrite || !answerable || !canSubmit(answer)) return false;
     lock.current = true; setBusy(true); setError(null);
+    const sentAt = Date.now();
     try {
       const r = await actions.link({
         supplierId: row.supplier_id, supplierName: row.supplier_name, itemKey: row.item_key, text: text ?? row.title, lineIds,
         target: mode === "koble" && pick ? { kind: "existing", id: pick.id, name: pick.name } : { kind: "new", name, type }, pkg: state,
       });
-      onDone(row.key, r);
+      onDone(row.key, r, sentAt);
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Kunne ikke lagre. Utfallet er ukjent – last siden på nytt før du prøver igjen.");
@@ -105,7 +107,8 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
   const notItem = async () => {
     if (lock.current || !canWrite || !ready) return;
     lock.current = true; setBusy(true); setError(null);
-    try { onDone(row.key, await actions.notItem({ supplierId: row.supplier_id, supplierName: row.supplier_name, itemKey: row.item_key, text: text ?? row.title, lineIds })); }
+    const sentAt = Date.now();
+    try { onDone(row.key, await actions.notItem({ supplierId: row.supplier_id, supplierName: row.supplier_name, itemKey: row.item_key, text: text ?? row.title, lineIds }), sentAt); }
     catch (e) { setError(e instanceof Error ? e.message : "Kunne ikke lagre."); }
     finally { lock.current = false; setBusy(false); }
   };

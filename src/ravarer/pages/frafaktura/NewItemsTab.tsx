@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Check, Loader2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,9 @@ import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
 import { NEW_ITEMS_LIST_KEY, useNewItemsCount, useNewItemsQueue, useSupplierNewItemRules } from "@/ravarer/hooks/useFraFaktura";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { useNewItemActions, type NewItemReceipt } from "@/ravarer/hooks/useNewItemActions";
+import { newItemsDoneStore, useNewItemsDone } from "@/ravarer/hooks/useNewItemsDone";
+import { useCompany } from "@/hooks/useCompany";
+import { groupOfKind } from "@/ravarer/lib/fraFaktura/newItemsDone";
 import { isSafeCreate, type Candidate } from "@/ravarer/lib/fraFaktura/newItems";
 import { newItemChips } from "@/ravarer/lib/fraFaktura/newItemChips";
 import { cn } from "@/lib/utils";
@@ -14,7 +17,10 @@ import { NewItemRow, type RowEntry } from "./NewItemRow";
 import { SupplierRuleBar } from "./SupplierRuleBar";
 
 const PAGE = 20;
-type Done = { receipt: NewItemReceipt; undo: { busy: boolean; text: string | null; error: boolean } };
+type UndoUi = { busy: boolean; text: string | null; error: boolean };
+const IDLE: UndoUi = { busy: false, text: null, error: false };
+/** Én stille oppfriskning av listen etter en serie svar (ikke én per svar). */
+const REFRESH_DELAY_MS = 2500;
 
 /** Nye varer (D1/D2): én rad per leverandørvare, leverandørchips, regler og «Opprett N sikre». */
 export function NewItemsTab({ supplier, onSupplier, canWrite, retur }: { supplier: string | null; onSupplier: (id: string | null) => void; canWrite: boolean; retur: string }) {
@@ -31,15 +37,24 @@ export function NewItemsTab({ supplier, onSupplier, canWrite, retur }: { supplie
   })), [rms.data]);
   const byId = useMemo(() => new Map(candidates.map((c) => [c.id, c])), [candidates]);
 
-  const [done, setDone] = useState<Map<string, Done>>(new Map());
-  const order = useRef<string[]>([]);
-  for (const r of queue.rows) if (!order.current.includes(r.key)) order.current.push(r.key);
+  // Ferdige svar ligger i et delt minne for fanen: kvitteringen står til siden lastes på nytt, også etter bytte av fane.
+  const { data: company } = useCompany();
+  const le = company?.id ?? null;
+  const doneList = useNewItemsDone(le);
+  const done = useMemo(() => new Map(doneList.map((e) => [e.key, e])), [doneList]);
+  const [undoUi, setUndoUi] = useState<Map<string, UndoUi>>(new Map());
+  const order = useRef<string[] | null>(null);
+  if (order.current === null) order.current = doneList.map((e) => e.key);
+  const ord = order.current;
+  for (const r of queue.rows) if (!ord.includes(r.key)) ord.push(r.key);
+  for (const e of doneList) if (!ord.includes(e.key)) ord.push(e.key);
   const rowByKey = new Map(queue.rows.map((r) => [r.key, r]));
   const supplierOf = useRef(new Map<string, string>());
   for (const r of queue.rows) supplierOf.current.set(r.key, r.supplier_id);
+  for (const e of doneList) supplierOf.current.set(e.key, e.supplierId);
 
   const chips = newItemChips({ selected: supplier, selectedTotal: queue.total, allTotal: allCount, serverCounts: queue.suppliers, rows: queue.rows, suppliers: suppliers.data ?? [] });
-  const visibleKeys = order.current.filter((k) => (rowByKey.has(k) || done.has(k)) && (!supplier || supplierOf.current.get(k) === supplier));
+  const visibleKeys = ord.filter((k) => (rowByKey.has(k) || done.has(k)) && (!supplier || supplierOf.current.get(k) === supplier));
   const [limit, setLimit] = useState(PAGE);
   const shown = visibleKeys.slice(0, limit);
   const remaining = queue.total == null ? null : Math.max(0, queue.total - shown.filter((k) => !done.has(k)).length);
@@ -70,20 +85,38 @@ export function NewItemsTab({ supplier, onSupplier, canWrite, retur }: { supplie
     setBulk(null);
   };
 
-  // Et svar gjør listen foreldet uten å hente alle sidene på nytt nå (kvitteringen vises her); neste besøk henter fersk.
-  const markStale = () => void qc.invalidateQueries({ queryKey: NEW_ITEMS_LIST_KEY, refetchType: "none" });
-  const onDone = (key: string, receipt: NewItemReceipt) => { setDone((m) => new Map(m).set(key, { receipt, undo: { busy: false, text: null, error: false } })); markStale(); };
+  // Etter svar: én stille oppfriskning i bakgrunnen. Listen venter ikke på den – svaret er alt lagt over bufferen.
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleRefresh = useCallback(() => {
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    refreshTimer.current = setTimeout(() => {
+      refreshTimer.current = null;
+      void qc.invalidateQueries({ queryKey: [...NEW_ITEMS_LIST_KEY, le] });
+    }, REFRESH_DELAY_MS);
+  }, [qc, le]);
+  useEffect(() => () => {
+    if (!refreshTimer.current) return;
+    clearTimeout(refreshTimer.current);
+    void qc.invalidateQueries({ queryKey: NEW_ITEMS_LIST_KEY, refetchType: "none" });
+  }, [qc]);
+  const onDone = (key: string, receipt: NewItemReceipt, sentAt: number) => {
+    const row = rowByKey.get(key);
+    if (!le || !row) return;
+    newItemsDoneStore.add(le, { key, supplierId: row.supplier_id, group: groupOfKind(row.kind), sentAt, receipt });
+    scheduleRefresh();
+  };
   const undo = async (key: string) => {
     const d = done.get(key);
-    if (!d?.receipt.undo || d.undo.busy) return;
-    setDone((m) => new Map(m).set(key, { ...d, undo: { busy: true, text: null, error: false } }));
+    if (!le || !d?.receipt.undo || undoUi.get(key)?.busy) return;
+    setUndoUi((m) => new Map(m).set(key, { busy: true, text: null, error: false }));
     try {
       const text = await actions.undo(d.receipt.undo);
-      setDone((m) => { const n = new Map(m); n.delete(key); return n; });
-      markStale();
+      newItemsDoneStore.remove(le, key);
+      setUndoUi((m) => { const n = new Map(m); n.delete(key); return n; });
+      scheduleRefresh();
       setUndoNote(text);
     } catch (e) {
-      setDone((m) => new Map(m).set(key, { ...d, undo: { busy: false, text: e instanceof Error ? e.message : "Kunne ikke angre.", error: true } }));
+      setUndoUi((m) => new Map(m).set(key, { busy: false, text: e instanceof Error ? e.message : "Kunne ikke angre.", error: true }));
     }
   };
   const [undoNote, setUndoNote] = useState<string | null>(null);
@@ -127,16 +160,17 @@ export function NewItemsTab({ supplier, onSupplier, canWrite, retur }: { supplie
           <ul aria-label="Nye varer">
             {shown.map((k) => {
               const d = done.get(k);
+              const u = undoUi.get(k) ?? IDLE;
               if (d) return (
                 <li key={k} className="flex flex-wrap items-center gap-2 border-t border-line-subtle bg-success/10 px-4 py-3 text-sm md:px-5" role="status">
                   <Check className="h-4 w-4 text-success" aria-hidden />
                   <span className="font-semibold">{d.receipt.title}</span><span aria-hidden>→</span><span>{d.receipt.detail}</span>
                   {actions.canUndo(d.receipt.undo) && (
-                    <Button variant="ghost" size="sm" className="ml-auto min-h-[44px] gap-1.5" disabled={d.undo.busy} onClick={() => void undo(k)}>
+                    <Button variant="ghost" size="sm" className="ml-auto min-h-[44px] gap-1.5" disabled={u.busy} onClick={() => void undo(k)}>
                       <Undo2 className="h-4 w-4" aria-hidden />Angre
                     </Button>
                   )}
-                  {d.undo.text && <span role="alert" className="w-full text-caption text-destructive">{d.undo.text}</span>}
+                  {u.text && <span role="alert" className="w-full text-caption text-destructive">{u.text}</span>}
                 </li>
               );
               const r = rowByKey.get(k);

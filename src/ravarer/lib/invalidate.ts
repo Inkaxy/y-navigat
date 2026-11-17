@@ -1,4 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
+import { NEW_ITEMS_LIST_KEY_BASE } from "@/ravarer/lib/fraFaktura/newItemsDone";
 
 /**
  * Felles invalidering for Råvarer- og Fakturaer-modulen.
@@ -208,4 +209,7 @@ export function invalidateRavarerCounts(qc: QueryClient): void {
   for (const queryKey of RAVARER_COUNT_KEYS) {
     void qc.invalidateQueries({ queryKey: [...queryKey] });
   }
+  // Listen i «Fra faktura › Nye varer» er tung: merkes bare som foreldet (hentes på nytt neste gang den vises),
+  // slik at f.eks. «Hold utenfor» på fakturaen ikke viser raden igjen fra gammel buffer.
+  void qc.invalidateQueries({ queryKey: [...NEW_ITEMS_LIST_KEY_BASE], refetchType: "none" });
 }

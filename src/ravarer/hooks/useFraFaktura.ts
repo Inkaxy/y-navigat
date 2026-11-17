@@ -8,7 +8,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
 import { fetchAllRows } from "@/lib/supabasePaging";
 import { callPendingRpc, pendingSelect, useReadCapability } from "@/lib/pendingRpc";
-import { fetchWorkItems, useWorkCounts } from "@/ravarer/hooks/useWorkData";
+import { fetchWorkItems, useWorkCounts, workCountsStartedAt } from "@/ravarer/hooks/useWorkData";
+import { newItemsDoneStore, useNewItemsDone } from "@/ravarer/hooks/useNewItemsDone";
+import { NEW_ITEMS_LIST_KEY_BASE, countWithDone, doneBefore, pageWithDone } from "@/ravarer/lib/fraFaktura/newItemsDone";
 import { TRANSIENT_RETRY, workGate } from "@/ravarer/lib/heavyGate";
 import {
   NEW_ITEMS_PAGE, firstNewItemsPage, newItemsRows, newItemsTotal, nextNewItemsPage, parseNewItemsQueue,
@@ -25,8 +27,10 @@ const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 
 const numOrNull = (v: unknown): number | null => { const n = Number(v); return v != null && Number.isFinite(n) ? n : null; };
 
 /** Nøkkelprefiks for listen over nye varer. Ligger utenfor «work-items» slik at et svar ikke henter alle sider på nytt. */
-export const NEW_ITEMS_LIST_KEY = ["ravarer-nye-varer"] as const;
+export const NEW_ITEMS_LIST_KEY = NEW_ITEMS_LIST_KEY_BASE;
 const newItemsCountKey = (le: string | null) => ["ravarer", "work-items", "nye-count", le] as const;
+/** Når oppslaget bak den raske telleren ble sendt (per selskap). */
+const fastCountStarted = new Map<string, number>();
 
 async function fetchFastPage(le: string, supplierId: string | null, limit: number, offset: number, param: NewItemsPageParam): Promise<NewItemsPage> {
   const r = await callPendingRpc("rm_new_items_queue", { p_legal_entity_id: le, p_supplier_id: supplierId, p_limit: limit, p_offset: offset });
@@ -46,28 +50,36 @@ export function useNewItemsQueue(supplierId: string | null, enabled = true) {
   const { data: company } = useCompany();
   const le = company?.id ?? null;
   const fast = useReadCapability("rm_cap_nye_varer_v1");
+  const done = useNewItemsDone(le);
   const q = useInfiniteQuery({
     queryKey: [...NEW_ITEMS_LIST_KEY, le, supplierId, fast ? "rask" : "arbeidsliste"],
     enabled: enabled && !!le && fast != null,
     initialPageParam: firstNewItemsPage(fast === true),
-    getNextPageParam: (last: NewItemsPage) => nextNewItemsPage(last),
+    // Ferdige rader som serveren har fjernet foran neste side, trekkes fra startpunktet (ingen rad hoppes over).
+    getNextPageParam: (last: NewItemsPage, all: NewItemsPage[]) => nextNewItemsPage(last, doneBefore(all, last, newItemsDoneStore.list(le))),
     staleTime: 60_000,
     refetchOnWindowFocus: false,
     ...TRANSIENT_RETRY,
     queryFn: async ({ pageParam, signal }): Promise<NewItemsPage> => {
       if (pageParam.source === "rask") {
+        const startedAt = Date.now();
         const page = await fetchFastPage(le!, supplierId, NEW_ITEMS_PAGE, pageParam.offset, pageParam);
-        if (!supplierId && pageParam.offset === 0) qc.setQueryData(newItemsCountKey(le), page.counts.kobling! + page.counts.pakning!);
-        return page;
+        if (!supplierId && pageParam.offset === 0) {
+          fastCountStarted.set(le!, startedAt);
+          qc.setQueryData(newItemsCountKey(le), page.counts.kobling! + page.counts.pakning!);
+        }
+        return { ...page, startedAt };
       }
       const r = await fetchWorkItems(qc, le!, { group: pageParam.group, supplierId, sort: "oldest", limit: NEW_ITEMS_PAGE, offset: pageParam.offset }, signal);
       return {
         param: pageParam, items: r.items, rawCount: r.items.length, total: r.total,
-        counts: { kobling: r.counts.kobling ?? null, pakning: r.counts.pakning ?? null }, suppliers: null,
+        counts: { kobling: r.counts.kobling ?? null, pakning: r.counts.pakning ?? null }, suppliers: null, startedAt: r.startedAt,
       };
     },
   });
-  const pages = q.data?.pages;
+  // Svarene gitt i denne fanen legges over bufferen straks: ferdige rader er borte og tellerne trukket ned,
+  // også når et oppslag som startet før lagringen kommer tilbake etterpå.
+  const pages = useMemo(() => q.data?.pages.map((p) => pageWithDone(p, done, supplierId)), [q.data, done, supplierId]);
   const rows = useMemo(() => newItemsRows(pages ?? []), [pages]);
   return {
     rows,
@@ -92,20 +104,24 @@ export function useNewItemsCount(enabled = true) {
   const le = company?.id ?? null;
   const fast = useReadCapability("rm_cap_nye_varer_v1");
   const work = useWorkCounts(enabled && fast === false);
+  const done = useNewItemsDone(le);
   const quick = useQuery({
     queryKey: newItemsCountKey(le),
     enabled: enabled && !!le && fast === true,
     staleTime: 120_000,
     ...TRANSIENT_RETRY,
     queryFn: async () => {
+      const startedAt = Date.now();
       const p = await fetchFastPage(le!, null, 0, 0, { source: "rask", offset: 0 });
+      fastCountStarted.set(le!, startedAt);
       return p.counts.kobling! + p.counts.pakning!;
     },
   });
-  if (fast === true) return quick.isError ? null : quick.data ?? null;
+  // Svar lagret etter at telleroppslaget startet trekkes fra straks (meny, fane og Oversikt bruker denne).
+  if (fast === true) return quick.isError ? null : countWithDone(quick.data ?? null, done, le ? fastCountStarted.get(le) : undefined);
   if (fast === false) {
     const c = work.data;
-    return !work.isError && c && typeof c.kobling === "number" && typeof c.pakning === "number" ? c.kobling + c.pakning : null;
+    return !work.isError && c && typeof c.kobling === "number" && typeof c.pakning === "number" ? countWithDone(c.kobling + c.pakning, done, workCountsStartedAt(le)) : null;
   }
   return null;
 }

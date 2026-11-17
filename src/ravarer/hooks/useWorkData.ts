@@ -16,6 +16,8 @@ import type { WorkItemsCounts } from "@/ravarer/lib/workRpcTypes";
  */
 const countSeeds = new Map<string, { counts: WorkItemsCounts; startedAt: number }>();
 export const workCountsKey = (legalEntityId: string | null) => ["ravarer", "work-items", "counts", legalEntityId] as const;
+/** Når oppslaget bak tellerne i bufferen ble sendt (for å trekke fra svar lagret etterpå). */
+export const workCountsStartedAt = (legalEntityId: string | null): number | undefined => (legalEntityId ? countSeeds.get(legalEntityId)?.startedAt : undefined);
 
 const summaryKey = (legalEntityId: string | null, includeApproval: boolean) => ["ravarer", "work-summary", legalEntityId, includeApproval] as const;
 const fetchSummary = (legalEntityId: string, includeApproval: boolean, signal?: AbortSignal) =>
@@ -102,7 +104,7 @@ async function rawWorkItems(qc: QueryClient, legalEntityId: string, p: WorkItems
       qc.setQueryData(workCountsKey(legalEntityId), r.counts);
     }
   }
-  return r;
+  return { ...r, startedAt };
 }
 
 /**
@@ -123,7 +125,9 @@ export function useWorkCounts(enabled = true) {
       return workGate.run(async () => {
         const seed = countSeeds.get(legalEntityId!);
         if (seed && seed.startedAt >= requestedAt) return seed.counts;
-        return (await rawWorkItems(qc, legalEntityId!, { group: "alle", sort: "oldest", limit: 1, offset: 0 })).counts;
+        const r = await rawWorkItems(qc, legalEntityId!, { group: "alle", sort: "oldest", limit: 1, offset: 0 });
+        // Et nyere svar kan ha kommet imens; tellerne i bufferen skal alltid være de nyeste (og stemme med starttiden).
+        return countSeeds.get(legalEntityId!)?.counts ?? r.counts;
       }, { low: true, signal });
     },
   });
