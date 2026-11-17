@@ -12,11 +12,12 @@ import { useDecisionUndo } from "../beslutninger/useDecisionUndo";
 import { PackageFix } from "../beslutninger/PackageFix";
 import { usePriceConsequence } from "./usePriceConsequence";
 import { ItemLimitSelect } from "./ItemLimitSelect";
+import { AskSupplier } from "./AskSupplier";
 import { cn } from "@/lib/utils";
 
 const kr = (v: number) => v.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** Ett prishopp (D3): gammel → ny pris, årsak, konsekvens og tre svar. Godtar bare serverkontrollerte linjer. */
+/** Ett prishopp (D3): gammel → ny pris, årsak, konsekvens og svarene (også «Spør leverandøren»). Godtar bare serverkontrollerte linjer. */
 export function PriceJumpRow({ j, supplierName, usage, canWrite, retur, onRound, inRound, itemLimit }: {
   j: PriceJump; supplierName: string | null; usage: readonly RecipeUsage[] | undefined; canWrite: boolean; retur: string;
   onRound: (key: string, items: AddLineItem[]) => void; inRound: number | null;
@@ -80,6 +81,7 @@ export function PriceJumpRow({ j, supplierName, usage, canWrite, retur, onRound,
             </Button>
             <Button variant="outline" className="min-h-[44px]" disabled={!canWrite || !item?.rm_id} aria-expanded={fix} onClick={() => setFix((v) => !v)}>Feil pakning</Button>
           </div>
+          {item && <AskSupplier item={item} qa={qa} canWrite={canWrite} onDone={(text) => setDone({ text, undo: null })} />}
           {!cause.packageSuspect && (cons.falling ?? 0) > 0 && (
             inRound != null
               ? <p className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-md border border-success/40 text-sm text-success"><Check className="h-4 w-4" aria-hidden />{inRound} {inRound === 1 ? "vare ligger" : "varer ligger"} i prisrunden</p>
