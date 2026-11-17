@@ -91,3 +91,9 @@
 - [x] «N venter på lesing» (sammenfoldet)
 - [x] Dry-run sumkontroll for gamle fakturaer + DATAENDRING-fil (ikke kjørt)
 - [ ] Kjøre 20261119_godta_sum (root); DATAENDRING sumkontroll tas med Henrik
+
+# Opprydding – kun versjon D (17.11.2026, Henrik)
+- [ ] Steg 1: docs/ravarer-opprydding-demo-d.md (flytteliste fra funksjonsmappingen)
+- [ ] Steg 2: flytt evner inn i D (kreditnota-radtype, rett feillest linje, hold utenfor, leverandørsaker, prishistorikk/rett pris/endre pakning i Varer, Automatikk-regler i Innstillinger, Beslutninger-typer)
+- [ ] Steg 3: fjern Prislinje/Automatikk/Beslutninger (videresending), Fakturaer som rent arkiv, Oversikt bare D, død kode
+- [ ] Steg 4: SQL-liste (ubrukte rm_*-funksjoner, utgåtte PENDING-filer)
