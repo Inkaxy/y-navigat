@@ -66,3 +66,13 @@
 - [x] 6 Råvarer-Oversikt: åpne beslutninger, lesestatus, største prisendringer, lenker; Fakturaer uendret
 - [x] 3b Nøkkelgrenser + pant som følgevare i matchingen bak cap
 - [x] Banner «Fakturalesingen står stille» → «Nøkkelen er testet og virker, venter på første lesing» etter vellykket nøkkeltest
+
+# Demo D – «Fra faktura til vare» (17.11.2026) — erstatter variant B som hovedflyt
+- [ ] SQL: 20261119_fra_faktura.PENDING.sql + .check.sql (grense, per vare, leverandørregel, skrivemåter, angre kobling, «Kalkylen bruker» md5-vakt) og 20261119_fra_faktura_opprydding.DATAENDRING.sql (dry-run)
+- [ ] 1 Ny side Råvarer › «Fra faktura» (D1–D4) + meny (erstatter Beslutninger i menyen, «Øvrige spørsmål (n)» nederst)
+- [ ] 1a Nye varer: koble/opprett/ikke vare, pakning i raden, utsnitt, kvittering+Angre, «Opprett N sikre», leverandørchips, regellinje
+- [ ] 1b Prishopp: grense (20 %), per vare, Prisen stemmer / Feil pakning / Legg i prisrunden
+- [ ] 1c Ikke lest: årsak i klartekst, Åpne PDF, Les alle på nytt (rm_requeue_invoice_line_extraction, bekreftelse)
+- [ ] 2 Varer: «Leverandører og innkjøpspris» i peek, hovedleverandør, «Kalkylen bruker», «Ny fra faktura»
+- [ ] 3 Matching: skrivemåter, pakning fra faktura, stille prisendring under grensen – bak innstillinger (av til SQL er kjørt)
+- [ ] Tester, typekontroll, bygg, AGENTS/README, rapport
