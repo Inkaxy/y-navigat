@@ -9,7 +9,7 @@ import { useCompany } from "@/hooks/useCompany";
 import { fetchAllRows } from "@/lib/supabasePaging";
 import { callPendingRpc, pendingSelect, useReadCapability } from "@/lib/pendingRpc";
 import { fetchWorkItems, useWorkCounts } from "@/ravarer/hooks/useWorkData";
-import { TRANSIENT_RETRY } from "@/ravarer/lib/heavyGate";
+import { TRANSIENT_RETRY, workGate } from "@/ravarer/lib/heavyGate";
 import {
   NEW_ITEMS_PAGE, firstNewItemsPage, newItemsRows, newItemsTotal, nextNewItemsPage, parseNewItemsQueue,
   type NewItemsPage, type NewItemsPageParam,
@@ -186,7 +186,9 @@ export function usePriceJumpLines(enabled = true) {
     enabled: enabled && !!le,
     staleTime: 120_000,
     refetchOnWindowFocus: false,
-    queryFn: async (): Promise<JumpLineInput[]> => {
+    ...TRANSIENT_RETRY,
+    // Menytelleren henter dette på hver Råvarer-side; lav prioritet i porten så det aldri går i tillegg til et tungt oppslag.
+    queryFn: ({ signal }): Promise<JumpLineInput[]> => workGate.run(async () => {
       const rows = await fetchAllRows<LineRow>((from, to) => supabase.from("invoice_lines")
         .select("id, invoice_id, raw_material_id, supplier_sku, description, price_per_base_unit, expected_price_per_base_unit, price_variance_pct, review_reason, invoice:invoices!invoice_lines_invoice_id_fkey!inner(invoice_number, invoice_date, supplier_id, status, flagged_at, legal_entity_id), rm:raw_materials!invoice_lines_raw_material_id_fkey(name, base_unit, item_type)")
         .eq("requires_review", true).is("excluded_at", null).not("price_variance_pct", "is", null).not("raw_material_id", "is", null)
@@ -198,7 +200,7 @@ export function usePriceJumpLines(enabled = true) {
         review_reason: r.review_reason, invoice_number: r.invoice?.invoice_number ?? null, invoice_date: r.invoice?.invoice_date ?? null,
         supplier_id: r.invoice?.supplier_id ?? null, rm_name: r.rm?.name ?? null, rm_base_unit: r.rm?.base_unit ?? null, rm_item_type: r.rm?.item_type ?? null,
       }));
-    },
+    }, { low: true, signal }),
   });
 }
 
@@ -223,14 +225,15 @@ export function useUnreadInvoices(enabled = true) {
     enabled: enabled && !!le,
     staleTime: 120_000,
     refetchOnWindowFocus: false,
-    queryFn: async (): Promise<UnreadInput[]> => {
+    ...TRANSIENT_RETRY,
+    queryFn: ({ signal }): Promise<UnreadInput[]> => workGate.run(async () => {
       const rows = await fetchAllRows<InvoiceRow>((from, to) => supabase.from("invoices")
         .select("id, invoice_number, invoice_date, supplier_id, total_amount, line_extraction_status, line_extraction_error, lines_sum_status, tripletex_supplier_invoice_id, status")
         .eq("legal_entity_id", le!).in("status", OPEN).is("excluded_at", null).is("flagged_at", null)
         .or("line_extraction_status.eq.failed,line_extraction_error.not.is.null,lines_sum_status.eq.mismatch")
         .order("id").range(from, to));
       return sortUnread(rows.filter(isUnread));
-    },
+    }, { low: true, signal }),
   });
 }
 
