@@ -20,6 +20,8 @@ export type Phase = "queued" | "begin_sent" | "reading" | "applying" | "done";
 export interface RunItem {
   invoiceId: string; label: string; phase: Phase; runId: string | null; attempts: number;
   beginAt: string | null; outcome: Outcome | null; code: string | null; ops: Operation[] | null;
+  /** Kort forklaring (f.eks. hvorfor forslaget venter). */
+  note?: string | null;
 }
 export type RunStatus = "running" | "paused" | "stopped" | "done";
 export interface BulkRunState {
@@ -45,7 +47,7 @@ function parseItem(x: unknown): RunItem | null {
   if (outcome === undefined) return null;
   const ops = x.ops == null ? null : Array.isArray(x.ops) ? (x.ops as Operation[]) : undefined;
   if (ops === undefined) return null;
-  return { invoiceId: x.invoiceId, label: x.label, phase: x.phase as Phase, runId: strOrNull(x.runId), attempts: x.attempts, beginAt: strOrNull(x.beginAt), outcome, code: strOrNull(x.code), ops };
+  return { invoiceId: x.invoiceId, label: x.label, phase: x.phase as Phase, runId: strOrNull(x.runId), attempts: x.attempts, beginAt: strOrNull(x.beginAt), outcome, code: strOrNull(x.code), ops, note: strOrNull(x.note) };
 }
 
 /** Streng lesing. Feil form, annet selskap eller annen bruker = ingen tilstand (aldri halvveis gjetning). */
