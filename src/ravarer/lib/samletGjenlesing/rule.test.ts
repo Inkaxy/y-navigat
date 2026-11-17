@@ -68,8 +68,8 @@ describe("samlet gjenlesing – automatisk bruk (punkt 4)", () => {
   });
 
   it("godtatt pris som ville fått ny verdi gir forslag, og linjen er ikke med i operasjonene", () => {
-    const lines = [line("L1", 1, { supplier_sku: "1", description: "Rug", quantity: 10, unit_price: 50, total_amount: 500 }, ["godtatt_pris"]), line("L2", 2, { supplier_sku: "2", description: "Havre", quantity: 5, unit_price: 100, total_amount: 500 })];
-    const d = decideAuto({ lines, candidates: [cand("c1", { supplier_sku: "1", description: "Rug", quantity: 10, unit_price: 55, total_amount: 550 }), cand("c2", { supplier_sku: "2", description: "Havre", quantity: 5, unit_price: 90, total_amount: 450 })], invoice: inv });
+    const lines = [line("L1", 1, { supplier_sku: "1", description: "Rug", quantity: 10, unit_price: 50, total_amount: 500 }, ["godtatt_pris"]), line("L2", 2, { supplier_sku: "2", description: "Havre", quantity: 4, unit_price: 100, total_amount: 400 })];
+    const d = decideAuto({ lines, candidates: [cand("c1", { supplier_sku: "1", description: "Rug", quantity: 10, unit_price: 55, total_amount: 550 }), cand("c2", { supplier_sku: "2", description: "Havre", quantity: 5, unit_price: 100, total_amount: 500 })], invoice: inv });
     expect(d.kind).toBe("forslag");
     if (d.kind === "forslag") {
       expect(d.reasons.map((r) => r.code)).toContain("beskyttet_linje_endres");
