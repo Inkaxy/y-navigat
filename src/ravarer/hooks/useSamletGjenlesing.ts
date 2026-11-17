@@ -2,7 +2,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useCompany } from "@/contexts/CompanyContext";
+import { useCompany } from "@/hooks/useCompany";
 import { useAuthUserId } from "@/hooks/useAuth";
 import { osloTodayISO } from "@/lib/osloDate";
 import { parseAiConfigs } from "@/ravarer/lib/aiConfig";
@@ -14,7 +14,7 @@ const PAGE = 1000;
 const CHUNK = 100;
 
 export function useSamletRunner() {
-  const { company } = useCompany();
+  const { data: company } = useCompany();
   const uid = useAuthUserId();
   const qc = useQueryClient();
   const le = company?.id ?? null;
@@ -97,7 +97,7 @@ async function costBasis(): Promise<{ rows: UsageRow[] | null; activeModel: stri
 export interface SamletPlan { plan: RunPlan; reconciled: number | null; cost: RunCost; modelSource: "aktiv" | "siste" | null; todayIso: string }
 
 export function useSamletPlan(enabled: boolean) {
-  const { company } = useCompany();
+  const { data: company } = useCompany();
   const le = company?.id ?? null;
   return useQuery({
     queryKey: ["samlet-gjenlesing", "plan", le],
@@ -136,7 +136,7 @@ export interface SuggestionRow {
 
 /** Ventende forslag (lesinger klare til gjennomgang) som denne brukeren eier. Uten snapshot/forslag – de hentes ved «Bruk». */
 export function useRereadSuggestions(enabled: boolean) {
-  const { company } = useCompany();
+  const { data: company } = useCompany();
   const uid = useAuthUserId();
   const le = company?.id ?? null;
   return useQuery({
