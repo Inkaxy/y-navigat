@@ -1,4 +1,5 @@
-import { useId, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
+import type { PriceJump } from "@/ravarer/lib/fraFaktura/priceJumps";
 import { QueryState } from "@/components/common/QueryState";
 import { Link } from "react-router-dom";
 import { paths } from "@/ravarer/lib/paths";
@@ -36,6 +37,17 @@ export function PriceJumpsTab({ localLimit, onLocalLimit, canWrite, canApprove, 
   };
   const onLimit = (v: number) => { if (canSave) { onLocalLimit(null); void save({ pct: v }); } else onLocalLimit(v === (s?.priceJumpPct ?? 20) ? null : v); };
   const below = p.lines.data && p.items.data ? belowLimitCount(p.lines.data, p.limitFor) : null;
+  // Besvarte prishopp blir stående som kvittering (med «Angre») selv om neste henting ikke lenger har dem.
+  const seen = useRef(new Map<string, PriceJump>());
+  const order = useRef<string[]>([]);
+  const [answered, setAnswered] = useState<ReadonlySet<string>>(new Set());
+  const shownJumps = useMemo((): PriceJump[] | null => {
+    if (!p.jumps) return null;
+    for (const j of p.jumps) { seen.current.set(j.key, j); if (!order.current.includes(j.key)) order.current.push(j.key); }
+    const live = new Set(p.jumps.map((j) => j.key));
+    return order.current.filter((k) => live.has(k) || answered.has(k)).flatMap((k) => { const j = seen.current.get(k); return j ? [j] : []; });
+  }, [p.jumps, answered]);
+  const onAnswered = (key: string) => setAnswered((s0) => (s0.has(key) ? s0 : new Set(s0).add(key)));
 
   return (
     <section aria-labelledby="ff-pris" className="overflow-hidden rounded-2xl border border-line-subtle bg-card">
@@ -58,13 +70,13 @@ export function PriceJumpsTab({ localLimit, onLocalLimit, canWrite, canApprove, 
         </p>
       )}
       <QueryState isLoading={p.isLoading} isError={p.isError} error={p.lines.error ?? p.items.error} scope="ravarer:fra-faktura:prishopp" onRetry={() => void p.lines.refetch()}>
-        {(p.jumps ?? []).length === 0 ? (
+        {(shownJumps ?? []).length === 0 ? (
           <p className="border-t border-line-subtle px-5 py-8 text-center text-body text-ink-secondary">Ingen priser hopper mer enn {p.limit} % akkurat nå.</p>
         ) : (
           <ul aria-label="Prishopp">
-            {(p.jumps ?? []).map((j) => (
+            {(shownJumps ?? []).map((j) => (
               <PriceJumpRow key={j.key} j={j} supplierName={names.get(j.supplierId) ?? null} usage={usage.data} canWrite={canWrite} retur={retur}
-                onRound={(key, items) => setRound({ key, items })} inRound={inRound.get(j.key) ?? null}
+                onRound={(key, items) => setRound({ key, items })} inRound={inRound.get(j.key) ?? null} onAnswered={onAnswered}
                 itemLimit={canSave && s ? { current: p.items.data?.get(j.rawMaterialId) ?? null, companyLimit: s.priceJumpPct } : null} />
             ))}
           </ul>

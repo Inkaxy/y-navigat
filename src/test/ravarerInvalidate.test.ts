@@ -59,8 +59,8 @@ describe("invalidateRawMaterial", () => {
     expect(flat).not.toContain("total-supplier-spend");
 
     expect(flat).toContain("raw_material_search_index");
-    // +1: listen i Nye varer merkes foreldet (uten ny henting).
-    expect(calls).toHaveLength(rawMaterialQueryKeys("rm-1").length + RAVARER_COUNT_KEYS.length + 1);
+    // +3: Nye varer merkes foreldet, Prishopp- og Ikke lest-listene hentes på nytt.
+    expect(calls).toHaveLength(rawMaterialQueryKeys("rm-1").length + RAVARER_COUNT_KEYS.length + 3);
   });
 
   it("uten id blir de scopede nøklene prefiks-nøkler", () => {
@@ -89,7 +89,7 @@ describe("invalidateInvoice", () => {
     // faktura-id, så den ble aldri truffet uansett.
     expect(flat).not.toContain("invoice-doc-url|inv-1");
 
-    expect(calls).toHaveLength(invoiceQueryKeys("inv-1").length + RAVARER_COUNT_KEYS.length + 1);
+    expect(calls).toHaveLength(invoiceQueryKeys("inv-1").length + RAVARER_COUNT_KEYS.length + 3);
     expect(flat).toContain("ravarer-nye-varer");
   });
 });

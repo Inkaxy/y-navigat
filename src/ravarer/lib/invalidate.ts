@@ -212,4 +212,8 @@ export function invalidateRavarerCounts(qc: QueryClient): void {
   // Listen i «Fra faktura › Nye varer» er tung: merkes bare som foreldet (hentes på nytt neste gang den vises),
   // slik at f.eks. «Hold utenfor» på fakturaen ikke viser raden igjen fra gammel buffer.
   void qc.invalidateQueries({ queryKey: [...NEW_ITEMS_LIST_KEY_BASE], refetchType: "none" });
+  // Prishopp og Ikke lest (lette oppslag, også menytelleren): hentes på nytt slik at et svar eller «Hold utenfor»
+  // ikke blir stående i listen/telleren fra gammel buffer.
+  void qc.invalidateQueries({ queryKey: ["ravarer", "fra-faktura", "price-lines"] });
+  void qc.invalidateQueries({ queryKey: ["ravarer", "fra-faktura", "unread"] });
 }

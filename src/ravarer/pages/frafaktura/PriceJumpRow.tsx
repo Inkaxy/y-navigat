@@ -18,9 +18,11 @@ import { cn } from "@/lib/utils";
 const kr = (v: number) => v.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** Ett prishopp (D3): gammel → ny pris, årsak, konsekvens og svarene (også «Spør leverandøren»). Godtar bare serverkontrollerte linjer. */
-export function PriceJumpRow({ j, supplierName, usage, canWrite, retur, onRound, inRound, itemLimit }: {
+export function PriceJumpRow({ j, supplierName, usage, canWrite, retur, onRound, inRound, itemLimit, onAnswered }: {
   j: PriceJump; supplierName: string | null; usage: readonly RecipeUsage[] | undefined; canWrite: boolean; retur: string;
   onRound: (key: string, items: AddLineItem[]) => void; inRound: number | null;
+  /** Kalles når raden er besvart, slik at listen holder kvitteringen synlig selv om prishoppet forsvinner ved neste henting. */
+  onAnswered?: (key: string) => void;
   /** Når satt: godkjenner kan sette egen grense for varen (SQL kjørt). */
   itemLimit?: { current: number | null; companyLimit: number } | null;
 }) {
@@ -31,7 +33,8 @@ export function PriceJumpRow({ j, supplierName, usage, canWrite, retur, onRound,
   const qa = useQuickAnswers(item, lines);
   const undo = useDecisionUndo();
   const [fix, setFix] = useState(false);
-  const [done, setDone] = useState<{ text: string; undo: Parameters<typeof undo.undo>[0] | null; caseId?: string | null } | null>(null);
+  const [done, setDoneState] = useState<{ text: string; undo: Parameters<typeof undo.undo>[0] | null; caseId?: string | null } | null>(null);
+  const setDone = (v: NonNullable<typeof done>) => { setDoneState(v); onAnswered?.(j.key); };
   const cause = jumpCause(j, { hasAgreement: item?.agreed_price_per_base_unit != null });
   const cons = usePriceConsequence(j, usage, `Prishopp ${j.name} ${formatPct(j.pct)} (faktura ${j.invoiceNumber ?? "uten nummer"})`);
   const c = consequenceText(cons.recipes, cons.falling, cause.packageSuspect);
