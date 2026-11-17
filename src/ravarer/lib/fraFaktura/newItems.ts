@@ -16,25 +16,18 @@ export function looksLikeNotItem(text: string | null | undefined): boolean {
 }
 
 const UPPER = /^[^a-zæøå]*$/;
+const COUNT_RE = /\b\d+\s*(?:stk|pk|pcs)\b\.?/gi;
+const SACK_RE = /\b(?:sk|sekk|krt|kart)\.?\s*\d+([.,]\d+)?\b/gi;
 /** Varenavn ryddet fra fakturateksten: uten pakningsstørrelse, «50%» → «50 %», stor forbokstav. */
 export function cleanItemName(text: string | null | undefined): string {
-  const raw = (text ?? "").trim();
+  const raw = (text ?? "").replace(/\s+/g, " ").trim();
   if (!raw) return "";
-  const allCaps = UPPER.test(raw);
-  // stripPackageTokens gir små bokstaver uten tegn; vi bygger navnet på nytt fra originalens ord.
-  const keep = new Set(stripPackageTokens(raw).split(" ").filter(Boolean));
-  const words = raw.replace(/(\d)\s*%/g, "$1 %").split(/\s+/).filter((w) => {
-    const k = w.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
-    if (w === "%") return true;
-    if (!k) return false;
-    if (/^\d+([.,]\d+)?$/.test(w) && !/%/.test(w)) return keep.has(k) && !/^\d+$/.test(k) ? true : false;
-    return keep.has(k) || /×|x/.test(w) && /\d/.test(w);
-  });
-  let s = words.join(" ").replace(/\s+%/g, " %").replace(/\s{2,}/g, " ").trim();
-  // Et frittstående tall rett før «%» er en del av navnet («18 %»).
-  s = s.replace(/ %/g, " %");
+  let s = raw.replace(/(\d)\s*%/g, "$1 %");
+  const p = parsePackageFromDescription(s);
+  if (p?.matched) s = s.replace(p.matched, " ");
+  s = s.replace(COUNT_RE, " ").replace(SACK_RE, " ").replace(/\s{2,}/g, " ").replace(/[\s,.\-–/]+$/, "").trim();
   if (!s) s = raw;
-  if (allCaps) s = s.toLowerCase();
+  if (UPPER.test(s)) s = s.toLowerCase();
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
