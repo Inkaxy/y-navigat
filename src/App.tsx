@@ -64,7 +64,6 @@ const HeaderPreviewContent = lazy(() => import("./dev/HeaderPreviewContent"));
 const DatasheetReviewPreviewContent = lazy(() => import("./dev/DatasheetReviewPreviewContent"));
 const LagerPreviewContent = lazy(() => import("./dev/LagerPreviewContent"));
 const RegnestykkePreviewContent = lazy(() => import("./dev/RegnestykkePreviewContent"));
-const ArbeidsbordPreviewContent = lazy(() => import("./dev/ArbeidsbordPreviewContent"));
 const HoldUtenforPreview = lazy(() => import("./dev/HoldUtenforPreview"));
 const RecipeOverviewPreview = lazy(() => import("./dev/RecipeOverviewPreview"));
 const MerkingPreview = lazy(() => import("./dev/MerkingPreview"));
@@ -297,7 +296,6 @@ const App = () => (
               <Route path="/forhandsvisning/datablad-gjennomgang" element={<DatasheetReviewPreviewContent />} />
               <Route path="/forhandsvisning/lager" element={<LagerPreviewContent />} />
               <Route path="/forhandsvisning/regnestykke" element={<RegnestykkePreviewContent />} />
-              <Route path="/forhandsvisning/arbeidsbord" element={<ArbeidsbordPreviewContent />} />
               <Route path="/forhandsvisning/hold-utenfor" element={<HoldUtenforPreview />} />
               <Route path="/forhandsvisning/oppskrift" element={<RecipeOverviewPreview />} />
               <Route path="/forhandsvisning/merking" element={<MerkingPreview />} />
