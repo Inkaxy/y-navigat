@@ -33,3 +33,9 @@ describe("faneradene etter oppryddingen", () => {
     expect(leverandorTabs(undefined, false).find((t) => t.id === "saker")?.hidden).toBe(true);
   });
 });
+
+import { resolveLegacyRavarerUrl } from "@/ravarer/lib/legacyRoutes";
+describe("gamle B-flater videresendes", () => {
+  it("Prislinje går til Varer uten valgt", () => expect(resolveLegacyRavarerUrl("/ravarer/prislinje", "?valgt=abc")).toBe("/ravarer/varer"));
+  it("Automatikk går til Innstillinger › Automatikk og regler", () => expect(resolveLegacyRavarerUrl("/ravarer/automatikk", "")).toBe("/ravarer/innstillinger?seksjon=automatikk"));
+});
