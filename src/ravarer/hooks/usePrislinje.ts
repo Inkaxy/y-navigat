@@ -7,20 +7,20 @@ import { parseCorrectionLog, type OpenPurchase, type PrislinjeRow } from "@/rava
 
 const n = (v: unknown): number | null => (v == null ? null : Number.isFinite(Number(v)) ? Number(v) : null);
 
-/** Alle leverandørkoblinger (råvare × leverandør) for selskapet, komplett hentet. */
-export function usePrislinjeRows() {
+/** Leverandørkoblingene (vare × leverandør) for én vare, komplett hentet. */
+export function usePrislinjeRows(rawMaterialId: string | null) {
   const { data: company } = useCompany();
   const le = company?.id ?? null;
   return useQuery({
-    queryKey: ["ravarer", "prislinje", le],
-    enabled: !!le,
+    queryKey: ["ravarer", "prislinje", le, rawMaterialId],
+    enabled: !!le && !!rawMaterialId,
     staleTime: 60_000,
     queryFn: async (): Promise<PrislinjeRow[]> => {
       const rows = await fetchAllRowsExact((from, to) => supabase
         .from("raw_material_suppliers")
         .select("id, raw_material_id, supplier_id, is_primary, package_size, package_unit, base_units_per_package, container_unit, package_confirmed_at, last_invoice_date, updated_at, raw_materials!inner(id, name, base_unit, item_type, category, current_cost_price, cost_basis_status, allergens_reviewed_at, declaration_name, is_active, legal_entity_id, updated_at), suppliers!inner(id, name)", { count: "exact" })
         .eq("raw_materials.legal_entity_id", le!)
-        .eq("raw_materials.is_active", true)
+        .eq("raw_material_id", rawMaterialId!)
         .order("id")
         .range(from, to));
       return rows.map((r) => ({

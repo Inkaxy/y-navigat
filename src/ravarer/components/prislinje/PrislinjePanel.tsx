@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { Check, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCapability } from "@/lib/pendingRpc";
@@ -9,7 +8,6 @@ import { AllPricesList } from "@/ravarer/components/prices/AllPricesList";
 import { useTimelineHistory } from "@/ravarer/hooks/useRmSuppliers";
 import { useUserNames } from "@/ravarer/hooks/useUserNames";
 import { useCorrectionLog, useHasNutrition, useOpenPurchases, type PriceHistorySettings } from "@/ravarer/hooks/usePrislinje";
-import { paths } from "@/ravarer/lib/paths";
 import { formatNorwegianNumber } from "@/ravarer/lib/quickFormat";
 import { barsFor, readiness, READY_LABEL, type PrislinjeRow } from "@/ravarer/lib/prislinje";
 import type { TimelineHistoryRow } from "@/ravarer/lib/priceTimeline";
@@ -31,7 +29,7 @@ function Card({ title, sub, children }: { title: string; sub?: string; children:
   );
 }
 
-/** Én råvare hos én leverandør (B4): søyler, alle priser, endringslogg, kost, andre leverandører, klar for bruk. */
+/** Én vare hos én leverandør (fra Prislinje, nå i varens prisvisning): søyler, alle priser, endringslogg, kost, andre leverandører, klar for bruk, rett pris og endre godkjent pakning. */
 export function PrislinjePanel({ row, others, settings, onPick }: { row: PrislinjeRow; others: PrislinjeRow[]; settings: PriceHistorySettings | null; onPick: (id: string) => void }) {
   const history = useTimelineHistory(row.rawMaterialId);
   const open = useOpenPurchases(row.rawMaterialId, row.supplierId);
@@ -89,7 +87,6 @@ export function PrislinjePanel({ row, others, settings, onPick }: { row: Prislin
             <dt className="text-ink-secondary">Pakning</dt><dd>{row.buPerPackage != null ? `${row.buPerPackage.toLocaleString("nb-NO")} ${row.baseUnit}${row.containerUnit ? ` per ${row.containerUnit}` : ""}${row.packageConfirmedAt ? ", bekreftet" : ", ikke bekreftet"}` : "ukjent"}</dd>
             <dt className="text-ink-secondary">Siste kjøp</dt><dd>{dateNo(row.lastInvoiceDate)}</dd>
           </dl>
-          <Link className="inline-flex min-h-[44px] items-center text-sm font-semibold text-primary underline-offset-2 hover:underline" to={paths.raavare(row.rawMaterialId, { seksjon: "pris" })}>Åpne råvarekortet</Link>
         </Card>
         <Card title="Andre leverandører" sub="Siste pris for samme råvare hos andre.">
           {others.length === 0 ? <p className="text-sm text-ink-secondary">Ingen andre leverandører er koblet.</p> : (
