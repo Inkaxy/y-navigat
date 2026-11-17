@@ -90,6 +90,11 @@ function parseWorkItem(o: Obj): WorkItem | null {
   };
 }
 
+/** Varekort-elementer fra et ukjent svar (samme regler som `parseWorkItems`); uleselige elementer utelates. */
+export function parseWorkItemList(v: unknown): WorkItem[] {
+  return (Array.isArray(v) ? v : []).filter(isObj).flatMap((o) => { const it = parseWorkItem(o); return it ? [it] : []; });
+}
+
 const WI_COUNT_KEYS = [...WORK_GROUPS, "faktura_mangler_linjer", "faktura_sumavvik", "faktura_flagget", "faktura_klar"] as const;
 
 export function parseWorkItems(data: Json | null | undefined): WorkItemsResult {

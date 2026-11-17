@@ -76,3 +76,10 @@
 - [x] 2 Varer: «Leverandører og innkjøpspris» i peek, hovedleverandør, «Kalkylen bruker», «Ny fra faktura»
 - [x] 3 Matching: skrivemåter, pakning fra faktura, stille prisendring under grensen – bak innstillinger (av til SQL er kjørt)
 - [x] Tester, typekontroll, bygg, AGENTS/README, rapport
+
+# Feil i «Fra faktura › Nye varer» (17.11.2026) – tidsavbrudd i rm_work_items
+- [x] Felles port: ett tungt oppslag om gangen, ett nytt forsøk ved tidsavbrudd
+- [x] Nye varer sidevis (50) med «Vis flere», leverandørfilter på serveren, feil bare for delen som mangler
+- [x] Tellere uten egne listekall (delte tellere, menyen låner sidens oppsummering); Prishopp/Ikke lest lastes først ved åpning
+- [x] PENDING 20261119_nye_varer_les (+ .check.sql, PGlite-test) – rask lesefunksjon bak cap
+- [ ] Kjøre 20261119_nye_varer_les (root)

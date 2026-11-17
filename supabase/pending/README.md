@@ -65,7 +65,10 @@ Status 17.11: `20261117_beslutninger_angre` er kjørt. Ingen av de andre filene 
 | `20261119_fra_faktura.check.sql` | Bare SELECT: kolonner, funksjoner, rettigheter, md5 etter bytte, varer med flere leverandører. |
 | `20261119_fra_faktura_opprydding.DATAENDRING.sql` | **DATAENDRING — TAS SEPARAT MED HENRIK.** `rm_fra_faktura_cleanup(le, p_dry_run default true)`: dry-run viser antall linjer per årsak og leverandør og skrivemåter som ville blitt husket. Uten dry-run (krever at reglene er slått på) legges manglende skrivemåter til og berørte fakturaer kjøres gjennom dagens `rm_rematch_invoices`. Ingen direkte linjeendring. |
 
-Lokal test: `node scripts/test-frafaktura-sql.mjs` (PGlite med live-kopi av `_rm_cost_candidates` i `scripts/fixtures/live-20261117/`).
+| `20261119_nye_varer_les.PENDING.sql` | **VENTER PÅ ROOT.** Bare tillegg: lesefunksjonen `rm_new_items_queue(le, supplier, limit, offset)` (én rad per leverandørvare, eldste først, sidevis, tellere og antall per leverandør) og `rm_cap_nye_varer_v1`. Samme gruppering/klassifisering som `rm_work_items`, men uten lesekontroll og prisvirkning per linje. `rm_work_items` røres ikke. Ingen indekser trengs. Endrer ingen data. Uavhengig av de andre filene. |
+| `20261119_nye_varer_les.check.sql` | Bare SELECT: funksjonene finnes, `rm_work_items` md5 uendret (`efe0f95e…`), samme antall kobling/pakning som `rm_work_items`, rettigheter. |
+
+Lokal test: `node scripts/test-nye-varer-sql.mjs` (PGlite med live-kopi av `rm_work_items`: samme rader, tellere og rekkefølge, sidevis, tilgang). Lokal test: `node scripts/test-frafaktura-sql.mjs` (PGlite med live-kopi av `_rm_cost_candidates` i `scripts/fixtures/live-20261117/`).
 
 `supabase/functions/match-invoice-lines` er endret i repoet (prishopp-grense, stille prisendring under grensen, entydig pakning fra fakturaen, første pris på sikker kobling) men **ikke rullet ut av meg**. Reglene leses fra kolonnene over og er av når kolonnene mangler eller står av, så utrulling før SQL endrer ikke oppførselen.
 

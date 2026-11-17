@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
-import { useActivityFeed, useWorkItems } from "@/ravarer/hooks/useWorkData";
+import { useActivityFeed, useWorkCounts, useWorkItems } from "@/ravarer/hooks/useWorkData";
 import {
   decisionsFromWork, extraDecisions, openQuestionCount, sortDecisions, type RawMaterialReadiness,
 } from "@/ravarer/lib/decisions";
@@ -120,6 +120,7 @@ export function useTodayActivity() {
 
 /** Bare telleren til menyen (samme tellere som køen, uten å hente elementene). */
 export function useOpenQuestionCount(enabled: boolean) {
-  const q = useWorkItems({ group: "alle", sort: "oldest", limit: 1, enabled });
-  return openQuestionCount(q.data?.counts);
+  // Delte tellere: ingen egne rm_work_items-kall når en liste på siden allerede har hentet dem.
+  const q = useWorkCounts(enabled);
+  return openQuestionCount(q.data);
 }

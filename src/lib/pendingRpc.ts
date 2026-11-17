@@ -72,7 +72,7 @@ export function pendingDelete(table: string, filter: string): Promise<PendingRes
 
 export type CapabilityName =
   | "rm_cap_beslutninger_v1" | "rm_cap_prislinje_v1" | "rm_cap_automatikk_v1"
-  | "varer_cap_handelsvarer_v1" | "varer_cap_prisgrunnlag_v1" | "rm_cap_fra_faktura_v1";
+  | "varer_cap_handelsvarer_v1" | "varer_cap_prisgrunnlag_v1" | "rm_cap_fra_faktura_v1" | "rm_cap_nye_varer_v1";
 /** Venter-tekster per PENDING-fil (vises i stedet for knappene). */
 export const CAPABILITY_FILE: Record<CapabilityName, string> = {
   rm_cap_beslutninger_v1: "Beslutninger – angre",
@@ -81,14 +81,15 @@ export const CAPABILITY_FILE: Record<CapabilityName, string> = {
   varer_cap_handelsvarer_v1: "Handelsvarer",
   varer_cap_prisgrunnlag_v1: "Prisgrunnlag",
   rm_cap_fra_faktura_v1: "Fra faktura",
+  rm_cap_nye_varer_v1: "Nye varer – rask lesing",
 };
 
 /**
  * Er PENDING-filen kjørt? `true` = ja, `false` = ikke kjørt ennå, `null` = ukjent (lasting/feil).
  * Ukjent viser aldri knappene.
  */
-export function useCapability(name: CapabilityName): boolean | null {
-  const q = useQuery({
+function useCapabilityQuery(name: CapabilityName) {
+  return useQuery({
     queryKey: ["pending-capability", name],
     staleTime: 5 * 60_000,
     retry: 1,
@@ -99,7 +100,21 @@ export function useCapability(name: CapabilityName): boolean | null {
       throw new Error("Kunne ikke kontrollere databaseendringen.");
     },
   });
+}
+
+export function useCapability(name: CapabilityName): boolean | null {
+  const q = useCapabilityQuery(name);
   return q.isSuccess ? q.data : null;
+}
+
+/**
+ * Bare for valg av LESEVEI: `null` mens kontrollen pågår, ellers `true`/`false`. Feilet kontroll gir `false`
+ * (dagens lesevei), aldri skriveknapper.
+ */
+export function useReadCapability(name: CapabilityName): boolean | null {
+  const q = useCapabilityQuery(name);
+  if (q.isSuccess) return q.data;
+  return q.isError ? false : null;
 }
 
 export const newOpId = (): string =>
