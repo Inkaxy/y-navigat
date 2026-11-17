@@ -108,7 +108,7 @@ const s0 = (await one(`select rm_fra_faktura_settings('${LE}') s`)).s;
 check(Number(s0.price_jump_pct) === 20 && s0.price_jump_is_default === true && s0.quiet_prices === false, "standard 20 %, regler av");
 const s1 = (await one(`select rm_set_fra_faktura_settings('${LE}', 25, true, null) s`)).s;
 check(Number(s1.price_jump_pct) === 25 && s1.quiet_prices === true && s1.invoice_package === false, "innstillinger lagret (rad opprettet)");
-await db.query(`select rm_set_fra_faktura_settings('${LE}', null, null, null)`);
+await db.query(`select rm_set_fra_faktura_settings('${LE}', null, false, false)`);
 check((await one(`select rm_fra_faktura_settings('${LE}') s`)).s.price_jump_pct == 20, "null = tilbake til 20 %");
 check((await one(`select rm_set_item_price_jump('${RM}', 40) r`)).r.ok === true, "egen grense per vare");
 check((await one(`select rm_set_supplier_new_item_type('${SB}', 'emballasje') r`)).r.new_item_type === "emballasje", "leverandørregel");
