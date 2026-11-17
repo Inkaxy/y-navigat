@@ -93,7 +93,10 @@
 - [ ] Kjøre 20261119_godta_sum (root); DATAENDRING sumkontroll tas med Henrik
 
 # Opprydding – kun versjon D (17.11.2026, Henrik)
-- [ ] Steg 1: docs/ravarer-opprydding-demo-d.md (flytteliste fra funksjonsmappingen)
-- [ ] Steg 2: flytt evner inn i D (kreditnota-radtype, rett feillest linje, hold utenfor, leverandørsaker, prishistorikk/rett pris/endre pakning i Varer, Automatikk-regler i Innstillinger, Beslutninger-typer)
-- [ ] Steg 3: fjern Prislinje/Automatikk/Beslutninger (videresending), Fakturaer som rent arkiv, Oversikt bare D, død kode
-- [ ] Steg 4: SQL-liste (ubrukte rm_*-funksjoner, utgåtte PENDING-filer)
+- [x] Steg 1: docs/ravarer-opprydding-demo-d.md (flytteliste fra funksjonsmappingen)
+- [x] Steg 2: flytt evner inn i D (kreditnota-radtype, rett feillest linje, hold utenfor, leverandørsaker, prishistorikk/rett pris/endre pakning i Varer, Automatikk-regler i Innstillinger, Beslutninger-typer)
+- [x] Steg 3: fjern Prislinje/Automatikk/Beslutninger (videresending), Fakturaer som rent arkiv, Oversikt bare D, død kode
+- [x] Steg 4: SQL-liste (ubrukte rm_*-funksjoner, utgåtte PENDING-filer)
+- [ ] Beslutninger står igjen til typene kontroll, små prisendringer og videresalg/emballasje/råvare ikke klar har radtype i D (venter på Henriks avklaring)
+- [ ] Leverandørvare-sidene (/ravarer/priskontroll/varekort[/…]) er ikke flyttet inn i D ennå (venter på Henriks avklaring)
+- [ ] Root/Henrik: stryke `rm_key_material_limits` fra `20261117_automatikk` før kjøring (venter på root)
