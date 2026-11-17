@@ -1,0 +1,164 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { useSupplierItemLines } from "@/fakturaer/hooks/useSupplierItems";
+import { dateNo } from "@/ravarer/lib/decisions";
+import {
+  CREATE_LABEL, canSubmit, cleanItemName, defaultMode, guessItemType, otherSpellings, packageBadge, packageProposal, pricePerBase, readPackage,
+  suggestCandidate, type Candidate, type NewItemType, type PackageDraft, type RowAnswer, type RowMode,
+} from "@/ravarer/lib/fraFaktura/newItems";
+import type { WorkItem } from "@/ravarer/lib/workRpcTypes";
+import type { NewItemReceipt, useNewItemActions } from "@/ravarer/hooks/useNewItemActions";
+import { RowTarget } from "./RowTarget";
+import { RowPackage } from "./RowPackage";
+import { InvoiceSnippet } from "./InvoiceSnippet";
+
+export type RowEntry = { answer: RowAnswer | null; submit: () => Promise<boolean> };
+type Actions = ReturnType<typeof useNewItemActions>;
+const skuNorm = (s: string | null | undefined) => (s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/** Én leverandørvare: fakturateksten til venstre, «blir til denne varen» til høyre. Ett svar gjør hele jobben. */
+export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWrite, retur, onDone, register }: {
+  row: WorkItem & { supplier_id: string; item_key: string };
+  candidates: readonly Candidate[]; byId: ReadonlyMap<string, Candidate>; supplierRule: NewItemType | null;
+  actions: Actions; canWrite: boolean; retur: string;
+  onDone: (key: string, r: NewItemReceipt) => void;
+  register: (key: string, e: RowEntry | null) => void;
+}) {
+  const lines = useSupplierItemLines(row.supplier_id, row.item_key);
+  const all = useMemo(() => lines.data ?? [], [lines.data]);
+  const open = useMemo(() => all.filter((l) => l.requires_review === true), [all]);
+  const latest = open[0] ?? all[0] ?? null;
+  const text = latest?.description ?? row.title;
+  const collision = all.some((l) => (l.review_reason ?? "").includes("sku_collision"));
+  const coll = useQuery({
+    queryKey: ["ravarer", "fra-faktura", "collision", row.supplier_id, row.item_key],
+    enabled: collision && row.item_key.startsWith("sku:"),
+    queryFn: async () => {
+      const { data, error } = await supabase.from("raw_material_suppliers").select("raw_material_id, supplier_sku").eq("supplier_id", row.supplier_id);
+      if (error) throw error;
+      const key = row.item_key.slice(4);
+      return [...new Set((data ?? []).filter((r) => skuNorm(r.supplier_sku) === key).map((r) => r.raw_material_id))];
+    },
+  });
+
+  const suggestions = useMemo((): Candidate[] => {
+    if (row.kind === "mangler_pakning" && row.rm_id) { const c = byId.get(row.rm_id); return c ? [c] : []; }
+    if (coll.data?.length) return coll.data.flatMap((id) => { const c = byId.get(id); return c ? [c] : []; });
+    const s = suggestCandidate(text, candidates);
+    return s ? [s] : [];
+  }, [row.kind, row.rm_id, byId, coll.data, text, candidates]);
+  const suggestionLabel = row.kind === "mangler_pakning" ? "Koblet i dag" : collision ? "Samme varenummer" : "Forslag";
+
+  const [mode, setMode] = useState<RowMode>("opprett");
+  const [pick, setPick] = useState<Candidate | null>(null);
+  const [name, setName] = useState(cleanItemName(row.title));
+  const [type, setType] = useState<NewItemType>(guessItemType(row.title, supplierRule));
+  const [draft, setDraft] = useState<PackageDraft>(packageProposal(null));
+  const [snippet, setSnippet] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const lock = useRef(false);
+  const init = useRef({ lines: false, sug: false });
+
+  useEffect(() => {
+    if (!latest || init.current.lines) return;
+    init.current.lines = true;
+    setName(cleanItemName(latest.description ?? row.title));
+    setType(guessItemType(latest.description ?? row.title, supplierRule));
+    setDraft(packageProposal(latest));
+  }, [latest, row.title, supplierRule]);
+  useEffect(() => {
+    if (init.current.sug || lines.isLoading || (collision && coll.isLoading)) return;
+    init.current.sug = true;
+    setMode(defaultMode(suggestions.length > 0));
+    setPick(suggestions[0] ?? null);
+  }, [suggestions, lines.isLoading, collision, coll.isLoading]);
+
+  const baseUnit = mode === "koble" ? pick?.base_unit ?? null : null;
+  const state = readPackage(draft, baseUnit);
+  const badge = packageBadge({ text, draft, state, mode, hasSuggestion: suggestions.length > 0 && !!pick && suggestions.some((s) => s.id === pick.id) });
+  const price = pricePerBase(latest, state);
+  const answer: RowAnswer = { mode, type, name, pick, badge, state };
+  const lineIds = open.map((l) => l.id);
+  const ready = !lines.isLoading && !lines.isError && lineIds.length > 0;
+
+  const submit = async (): Promise<boolean> => {
+    if (lock.current || !canWrite || !ready || !canSubmit(answer)) return false;
+    lock.current = true; setBusy(true); setError(null);
+    try {
+      const r = await actions.link({
+        supplierId: row.supplier_id, supplierName: row.supplier_name, itemKey: row.item_key, text: text ?? row.title, lineIds,
+        target: mode === "koble" && pick ? { kind: "existing", id: pick.id, name: pick.name } : { kind: "new", name, type }, pkg: state,
+      });
+      onDone(row.key, r);
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Kunne ikke lagre. Utfallet er ukjent – last siden på nytt før du prøver igjen.");
+      return false;
+    } finally { lock.current = false; setBusy(false); }
+  };
+  const notItem = async () => {
+    if (lock.current || !canWrite || !ready) return;
+    lock.current = true; setBusy(true); setError(null);
+    try { onDone(row.key, await actions.notItem({ supplierId: row.supplier_id, supplierName: row.supplier_name, itemKey: row.item_key, text: text ?? row.title, lineIds })); }
+    catch (e) { setError(e instanceof Error ? e.message : "Kunne ikke lagre."); }
+    finally { lock.current = false; setBusy(false); }
+  };
+  const submitRef = useRef(submit);
+  submitRef.current = submit;
+  const answerKey = `${mode}|${type}|${name}|${pick?.id ?? ""}|${badge}|${state.state}|${ready}`;
+  useEffect(() => {
+    register(row.key, { answer: ready ? answer : null, submit: () => submitRef.current() });
+    return () => register(row.key, null);
+  }, [answerKey]); // eslint-disable-line react-hooks/exhaustive-deps -- registrerer bare når svaret endres
+
+  const spellings = otherSpellings(text, all.map((l) => l.description));
+  const disabled = !canWrite || busy;
+  const primary = mode === "koble" ? (pick ? "Koble" : "Velg en vare") : CREATE_LABEL[type];
+
+  return (
+    <li className="border-t border-line-subtle px-4 py-4 md:px-5">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1.6fr)_12rem] lg:items-center">
+        <div className="min-w-0 space-y-0.5">
+          <p className="text-body font-semibold">{text}</p>
+          <p className="text-caption text-ink-secondary">{row.supplier_name ?? "Ukjent leverandør"} · {row.sku ? `varenr ${row.sku}` : "uten varenummer"}</p>
+          <p className="text-caption text-ink-secondary">På {row.invoice_count} {row.invoice_count === 1 ? "faktura" : "fakturaer"} · sist {dateNo(row.last_date)}</p>
+          {spellings.length > 0 && <p className="text-caption text-ink-secondary">Også skrevet: {spellings.map((s) => `«${s}»`).join(", ")}</p>}
+          {latest && (
+            <button type="button" className="min-h-[32px] text-caption font-semibold text-primary hover:underline" aria-expanded={snippet} onClick={() => setSnippet((v) => !v)}>
+              {snippet ? "Skjul fakturaen" : "Vis på fakturaen"}
+            </button>
+          )}
+        </div>
+        <ArrowRight className="hidden h-5 w-5 text-primary lg:block" aria-hidden />
+        <div className="min-w-0 space-y-2">
+          {lines.isLoading ? <p className="text-caption text-ink-secondary">Henter linjene …</p>
+            : lines.isError ? <p role="alert" className="text-caption text-destructive">Kunne ikke hente linjene for varen. Last siden på nytt.</p>
+            : (
+              <>
+                <RowTarget mode={mode} onMode={setMode} pick={pick} onPick={setPick} suggestions={suggestions} suggestionLabel={suggestionLabel}
+                  candidates={candidates} name={name} onName={setName} type={type} onType={setType} disabled={disabled} />
+                <RowPackage draft={draft} onDraft={setDraft} state={state} badge={badge} price={price} baseUnit={baseUnit} disabled={disabled} />
+              </>
+            )}
+        </div>
+        <div className="flex flex-col gap-2">
+          <Button className="min-h-[44px]" disabled={disabled || !ready || !canSubmit(answer)} onClick={() => void submit()}>
+            {busy && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />}{primary}
+          </Button>
+          <Button variant="outline" className="min-h-[44px]" disabled={disabled || !ready} onClick={() => void notItem()}>Ikke vare</Button>
+        </div>
+      </div>
+      {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
+      {snippet && latest && (
+        <div className="mt-3">
+          <InvoiceSnippet invoiceId={latest.invoice_id} invoiceNumber={latest.invoice_number} invoiceDate={latest.invoice_date}
+            supplierName={row.supplier_name} lineId={latest.id} retur={retur} onClose={() => setSnippet(false)} />
+        </div>
+      )}
+    </li>
+  );
+}
