@@ -8,7 +8,7 @@ import { useInvoiceRights } from "@/fakturaer/hooks/useInvoiceRights";
 import { RematchAllDialog } from "@/ravarer/components/RematchAllDialog";
 import { paths } from "@/ravarer/lib/paths";
 
-/** «Verktøy» i Priskontroll: omberegning (samme dialog som innstillingene), reberegning og alle varekort. */
+/** «Verktøy» i Fakturaer (arkiv): les på nytt, omberegning (samme dialog som innstillingene) og reberegning av kostpris. */
 export function PriskontrollToolsMenu() {
   const { data: company } = useCompany();
   const { canWrite } = useInvoiceRights();
@@ -22,14 +22,11 @@ export function PriskontrollToolsMenu() {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-[240px]">
-          <DropdownMenuItem asChild><Link to={paths.priskontroll({ fane: "fakturaer" })}>Full fakturaliste</Link></DropdownMenuItem>
-          <DropdownMenuItem asChild><Link to={paths.priskontroll({ fane: "gjore" })}>Varegrupper</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link to={paths.lesPaNyttBolk()}>Les fakturaer på nytt</Link></DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => setOpen(true)}>Beregn alle åpne på nytt …</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild><Link to={paths.reberegn()}>Reberegn kostpriser</Link></DropdownMenuItem>
-          <DropdownMenuItem asChild><Link to={paths.lesPaNyttBolk()}>Les fakturaer på nytt i bolk</Link></DropdownMenuItem>
-          <DropdownMenuItem asChild><Link to={paths.alleVarekort()}>Alle varekort</Link></DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <RematchAllDialog open={open} onOpenChange={setOpen} legalEntityId={company?.id ?? null} canWrite={canWrite} />
