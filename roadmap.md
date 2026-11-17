@@ -85,8 +85,9 @@
 - [ ] Kjøre 20261119_nye_varer_les (root)
 
 # «Ikke lest» sitter fast (17.11.2026)
-- [ ] Del fanen: «Ikke lest» (ingen linjer) og «Lest, men summen stemmer ikke» (har linjer)
-- [ ] Summen stemmer ikke: «Les på nytt» (gjenlesing med forslag), differanse i kr, «Godta som den er» (begrunnelse, kan angres), «Åpne PDF»
-- [ ] Ærlig melding etter «Les alle på nytt»
-- [ ] «N venter på lesing» (sammenfoldet)
-- [ ] Dry-run sumkontroll for gamle fakturaer + DATAENDRING-fil (ikke kjørt)
+- [x] Del fanen: «Ikke lest» (ingen linjer) og «Lest, men summen stemmer ikke» (har linjer)
+- [x] Summen stemmer ikke: «Les på nytt» (gjenlesing med forslag), differanse i kr, «Godta som den er» (begrunnelse, kan angres), «Åpne PDF»
+- [x] Ærlig melding etter «Les alle på nytt»
+- [x] «N venter på lesing» (sammenfoldet)
+- [x] Dry-run sumkontroll for gamle fakturaer + DATAENDRING-fil (ikke kjørt)
+- [ ] Kjøre 20261119_godta_sum (root); DATAENDRING sumkontroll tas med Henrik

@@ -68,6 +68,13 @@ Status 17.11: `20261117_beslutninger_angre` er kjørt. Ingen av de andre filene 
 | `20261119_nye_varer_les.PENDING.sql` | **VENTER PÅ ROOT.** Bare tillegg: lesefunksjonen `rm_new_items_queue(le, supplier, limit, offset)` (én rad per leverandørvare, eldste først, sidevis, tellere og antall per leverandør) og `rm_cap_nye_varer_v1`. Samme gruppering/klassifisering som `rm_work_items`, men uten lesekontroll og prisvirkning per linje. `rm_work_items` røres ikke. Ingen indekser trengs. Endrer ingen data. Uavhengig av de andre filene. |
 | `20261119_nye_varer_les.check.sql` | Bare SELECT: funksjonene finnes, `rm_work_items` md5 uendret (`efe0f95e…`), samme antall kobling/pakning som `rm_work_items`, rettigheter. |
 
+| `20261119_godta_sum.PENDING.sql` | **VENTER PÅ ROOT.** Bare tillegg: `rm_accept_invoice_sum` (kategori + begrunnelse, versjon, op_id, notat + audit_log, setter `lines_sum_status='ok'` som dagens overstyring), `rm_undo_accept_invoice_sum` (bare uendret, ulåst faktura) og `rm_cap_godta_sum_v1`. Avviser fakturaer med lesevarselet `sumavvik_mva_forhold`. Statusbegrensningen og eksisterende funksjoner røres ikke. Endrer ingen data. |
+| `20261119_godta_sum.check.sql` | Bare SELECT: funksjoner, rettigheter, statusbegrensningen uendret. |
+| `20261119_sumkontroll_omregning.dryrun.sql` | Bare SELECT: hvilke åpne fakturaer med sumavvik som ville fått ny status med dagens `rm_lines_sum_check`. Målt read-only 17.11: 6 av 38 blir «ok», alle kreditnotaer, ingen låst. |
+| `20261119_sumkontroll_omregning.DATAENDRING.sql` | **DATAENDRING — IKKE KJØRT, TAS SEPARAT MED HENRIK.** Regner sumkontrollen på nytt for åpne, ulåste fakturaer med avvik og endrer bare dem som får ny status; audit_log per faktura; md5-vakt `cd7ff540…` på `rm_lines_sum_check`. Ingen linjer endres. |
+
+Lokal test: `node scripts/test-godta-sum-sql.mjs` (PGlite med live-kopi av `rm_lines_sum_check`: godta, gjentak, versjon, mva-forhold, angre, dry-run, DATAENDRING og md5-vakt).
+
 Lokal test: `node scripts/test-nye-varer-sql.mjs` (PGlite med live-kopi av `rm_work_items`: samme rader, tellere og rekkefølge, sidevis, tilgang). Lokal test: `node scripts/test-frafaktura-sql.mjs` (PGlite med live-kopi av `_rm_cost_candidates` i `scripts/fixtures/live-20261117/`).
 
 `supabase/functions/match-invoice-lines` er endret i repoet (prishopp-grense, stille prisendring under grensen, entydig pakning fra fakturaen, første pris på sikker kobling) men **ikke rullet ut av meg**. Reglene leses fra kolonnene over og er av når kolonnene mangler eller står av, så utrulling før SQL endrer ikke oppførselen.
