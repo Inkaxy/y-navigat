@@ -39,7 +39,7 @@ create table audit_log (id uuid primary key default gen_random_uuid(), occurred_
   action text, entity_type text, entity_id uuid, entity_display_reference text, legal_entity_id uuid, outlet_id uuid, changes jsonb, reason text,
   source_app text, ip_address inet, user_agent text);
 `);
-await db.exec(read("scripts/fixtures/live-20261117/rm_lines_sum_check.sql").replaceAll("$function$\n", "$function$;\n"));
+await db.exec(read("scripts/fixtures/live-20261117/rm_lines_sum_check.sql").replaceAll("end $function$\n", "end $function$;\n"));
 await db.exec(read("supabase/pending/20261119_godta_sum.PENDING.sql"));
 
 // Fakturaer: 1 vanlig avvik, 2 mva-forhold, 3 avstemt, 4 kreditnota (ok med dagens regel), 5 kreditnota med kost ført, 6 «ok».
