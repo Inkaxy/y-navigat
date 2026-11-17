@@ -456,7 +456,7 @@ Deno.serve(async (req) => {
         let requiresReview = false;
         // Enhver ubrukelig kostpris — manglende beløp, mengde 0, ukjent
         // grunnenhet, ubekreftet pakning eller lav tillit — er blokkerende.
-        for (const reason of costReviewReasons(cost, actual)) {
+        for (const reason of costReviewReasons(cost, actual, invoicePackage && !pickedM.conflict)) {
           requiresReview = true;
           reviewReasons.add(reason);
         }

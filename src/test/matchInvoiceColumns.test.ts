@@ -17,6 +17,14 @@ const TABLES = [
   "raw_materials",
 ] as const;
 
+/**
+ * Kolonner fra ikke-kjørt PENDING-SQL som motoren bare leser i en EGEN spørring med toleranse for
+ * manglende kolonne (42703/PGRST204), og bare når regelen er slått på. De kan aldri velte hovedspørringene.
+ */
+const PENDING_TOLERANT: Record<string, readonly string[]> = {
+  raw_materials: ["price_jump_pct"], // 20261119_fra_faktura
+};
+
 function rowColumns(table: string): Set<string> {
   const start = TYPES.indexOf(`      ${table}: {`);
   expect(start, `fant ikke tabellen ${table} i types.ts`).toBeGreaterThan(-1);
@@ -61,6 +69,10 @@ describe("match-invoice-lines select-strenger", () => {
       for (const raw of stripped.split(",")) {
         const col = raw.trim();
         if (!col) continue;
+        if (PENDING_TOLERANT[table]?.includes(col)) {
+          expect(FN, `${table}.${col} må leses tolerant`).toContain(`.select("id, ${col}")`);
+          continue;
+        }
         expect(cols.has(col), `${table}.${col} finnes ikke i types.ts`).toBe(true);
       }
     }
