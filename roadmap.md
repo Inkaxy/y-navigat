@@ -123,3 +123,9 @@
 - [x] Koblet vare med pakning og rest-årsak står ikke i Nye varer
 - [x] Kvitteringer står til omlasting; «Vis flere» henter ikke ferdige rader tilbake
 - [x] Tester: lagre → kvittering → teller ned → ny henting gir ikke raden tilbake; price_variance-rest
+
+## Nye varer: haster 17.11 (Henrik)
+- [ ] 1. Ingen grønn kvittering uten bekreftet lagring (0 linjer = feil + «Prøv igjen»; linjer på godkjente fakturaer)
+- [ ] 2. Pris/pakning fra linje med regnestykke-avvik (ISTE CHAI 9727): utled antall, «Sjekk tallene», kr/flaske + kr/l, ren linje først
+- [ ] 3. Varenumre ASKO (29 9727 / 299727 / 9727 / 305-11): kolonneanalyse, leseinstruks + normalisering, andre leverandører, dry-run + DATAENDRING-fil
+- [ ] 4. Layout: handlingene i raden fullt synlige fra 1024 px (1280/1440)

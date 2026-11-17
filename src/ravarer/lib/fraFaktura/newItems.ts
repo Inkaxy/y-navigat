@@ -2,6 +2,7 @@
 // Én rad per leverandørvare (samme nøkkel som rm_link_supplier_item). Ingenting her skriver data.
 import { normalizeUnit, parseDecimal, parsePackageFromDescription, stripPackageTokens, toBaseFactor } from "@/fakturaer/lib/units";
 import { PANT_RE, SKIP_RE } from "@/ravarer/lib/decisions";
+import type { LineMath } from "./lineMath";
 
 export type NewItemType = "ravare" | "videresalg" | "emballasje";
 export const NEW_ITEM_TYPES: readonly NewItemType[] = ["ravare", "videresalg", "emballasje"];
@@ -92,7 +93,7 @@ const same = (a: { size: number; unit: ContentUnit }, b: { size: number; unit: C
  * trengs. Ellers lest pakning (package_size × count_per_package) og varenavnet; to kilder som ikke stemmer gir
  * `conflict`. Bekreftet pakning på koblingen vinner alltid.
  */
-export function packageProposal(line: PackageLine | null, confirmed?: { size: number; unit: string } | null): PackageDraft {
+export function packageProposal(line: PackageLine | null, confirmed?: { size: number; unit: string } | null, math?: LineMath | null): PackageDraft {
   const container = (line?.unit ?? "").trim().toLowerCase();
   if (confirmed && confirmed.size > 0 && asContent(confirmed.unit)) {
     const c = inMl(confirmed.size, confirmed.unit);
@@ -100,14 +101,18 @@ export function packageProposal(line: PackageLine | null, confirmed?: { size: nu
   }
   const direct = asContent(line?.unit);
   if (direct) return { container: direct, qty: "1", unit: direct, source: "direkte", conflict: false };
-  const read = line && line.package_size != null && line.package_size > 0 && asContent(line.package_unit)
-    ? inMl(line.package_size * (line.count_per_package != null && line.count_per_package > 0 ? line.count_per_package : 1), line.package_unit!)
-    : null;
+  // Stk per beholder: lest antall, ellers det regnestykket viser (1 eske = 6 stk).
+  const count = line?.count_per_package != null && line.count_per_package > 0 ? line.count_per_package : math?.subUnits ?? 1;
+  const hasSize = !!line && line.package_size != null && line.package_size > 0 && !!asContent(line.package_unit);
+  const read = hasSize ? inMl(line!.package_size! * count, line!.package_unit!) : null;
+  const single = hasSize ? inMl(line!.package_size!, line!.package_unit!) : null;
   const p = parsePackageFromDescription(line?.description ?? null);
   const fromName = p && asContent(p.unit) ? inMl(p.size * (p.count || 1), p.unit) : null;
-  if (read && fromName) return { container, qty: fmt(read.size), unit: read.unit, source: "lest", conflict: !same(read, fromName) };
+  // Varenavnet viser ofte størrelsen per stk («0,7L») – det er ikke strid med 6 × 0,7 l.
+  if (read && fromName) return { container, qty: fmt(read.size), unit: read.unit, source: "lest", conflict: !same(read, fromName) && !(single && same(single, fromName)) };
   if (read) return { container, qty: fmt(read.size), unit: read.unit, source: "lest", conflict: false };
   if (fromName) return { container, qty: fmt(fromName.size), unit: fromName.unit, source: "varenavn", conflict: false };
+  if (math?.subUnits != null && math.subUnits > 1) return { container, qty: String(math.subUnits), unit: "stk", source: "lest", conflict: false };
   return { container, qty: "", unit: "kg", source: "ingen", conflict: false };
 }
 
@@ -136,10 +141,13 @@ export function readPackage(d: PackageDraft, baseUnit: string | null): PackageSt
   return { state: "valid", size, unit: d.unit, baseUnit: base, baseUnitsPerPackage: size * f, direct: d.source === "direkte" };
 }
 
-/** Pris per grunnenhet for linjen: beløp ÷ (antall × innhold). Null = ukjent, aldri 0. */
-export function pricePerBase(line: Pick<PackageLine, "quantity" | "total_amount"> | null, s: PackageState): number | null {
-  if (!line || s.state !== "valid") return null;
-  const q = Number(line.quantity), t = Number(line.total_amount);
+/**
+ * Pris per grunnenhet for linjen: beløp ÷ (antall × innhold). Null = ukjent, aldri 0.
+ * `units` = antallet regnestykket viser (lineMath); null der = ukjent antall → ingen pris.
+ */
+export function pricePerBase(line: Pick<PackageLine, "quantity" | "total_amount"> | null, s: PackageState, units?: number | null): number | null {
+  if (!line || s.state !== "valid" || units === null) return null;
+  const q = units !== undefined ? units : Number(line.quantity), t = Number(line.total_amount);
   if (!Number.isFinite(q) || !Number.isFinite(t) || q <= 0 || t <= 0) return null;
   const v = t / (q * s.baseUnitsPerPackage);
   return Number.isFinite(v) && v > 0 ? v : null;
@@ -151,15 +159,19 @@ export function packagePayload(s: PackageState): { package_size: number; package
   return { package_size: s.size, package_unit: s.unit, base_units_per_package: s.baseUnitsPerPackage, confirm: true };
 }
 
-export type PackageBadge = "sikker" | "kanskje" | "fyll_inn" | "ikke_vare" | "kontroller";
+export type PackageBadge = "sikker" | "kanskje" | "fyll_inn" | "ikke_vare" | "kontroller" | "sjekk_tall";
 export const PACKAGE_BADGE_LABEL: Record<PackageBadge, string> = {
-  sikker: "Sikker", kanskje: "Finnes kanskje fra før", fyll_inn: "Fyll inn pakning", ikke_vare: "Ser ikke ut som en vare", kontroller: "Kontroller pakningen",
+  sikker: "Sikker", kanskje: "Finnes kanskje fra før", fyll_inn: "Fyll inn pakning", ikke_vare: "Ser ikke ut som en vare", kontroller: "Kontroller pakningen", sjekk_tall: "Sjekk tallene",
 };
 
-/** Merket i pakningsraden. Rekkefølge: ikke vare → mangler → kilder i strid → forslag finnes → sikker. */
-export function packageBadge(o: { text: string | null; draft: PackageDraft; state: PackageState; mode: RowMode; hasSuggestion: boolean }): PackageBadge {
+/**
+ * Merket i pakningsraden. Rekkefølge: ikke vare → mangler → tallene går ikke opp → kilder i strid → forslag finnes → sikker.
+ * `numbersOk=false`: linjen prisen bygger på har merknad i lesekontrollen – aldri «Sikker».
+ */
+export function packageBadge(o: { text: string | null; draft: PackageDraft; state: PackageState; mode: RowMode; hasSuggestion: boolean; numbersOk?: boolean }): PackageBadge {
   if (looksLikeNotItem(o.text)) return "ikke_vare";
   if (o.state.state !== "valid") return "fyll_inn";
+  if (o.numbersOk === false) return "sjekk_tall";
   if (o.draft.conflict) return "kontroller";
   if (o.mode === "koble" && o.hasSuggestion) return "kanskje";
   return "sikker";
@@ -263,7 +275,14 @@ export function isCreditLine(l: CreditLine): boolean {
 export function isCreditRow(open: readonly CreditLine[]): boolean {
   return open.length > 0 && open.every(isCreditLine);
 }
-/** Linjen pakningsforslaget bygges fra: nyeste ikke-kreditlinje, aldri en kreditlinje. */
-export function packageSourceLine<T extends CreditLine>(open: readonly T[], all: readonly T[]): T | null {
+/**
+ * Linjen pakningsforslaget og prisen bygges fra: aldri en kreditlinje. Med `clean`: en linje som er lest rent
+ * (åpen først, så eldre) foran en med merknad i lesekontrollen.
+ */
+export function packageSourceLine<T extends CreditLine>(open: readonly T[], all: readonly T[], clean?: (l: T) => boolean): T | null {
+  if (clean) {
+    const c = open.find((l) => !isCreditLine(l) && clean(l)) ?? all.find((l) => !isCreditLine(l) && clean(l));
+    if (c) return c;
+  }
   return open.find((l) => !isCreditLine(l)) ?? all.find((l) => !isCreditLine(l)) ?? null;
 }

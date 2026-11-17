@@ -8,6 +8,7 @@ import { invalidateAfterLink, linkSupplierItem } from "@/fakturaer/hooks/useSupp
 import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
 import { parseUndoResult, undoSummary } from "@/ravarer/lib/quickAnswers";
 import { NEW_ITEM_TYPE_LABEL, packagePayload, type NewItemType, type PackageState } from "@/ravarer/lib/fraFaktura/newItems";
+import { assertLinesSaved } from "@/ravarer/lib/fraFaktura/linkOutcome";
 
 export type NewItemUndo =
   | { kind: "kobling"; supplierId: string; itemKey: string; lineIds: string[]; rawMaterialId: string; created: boolean }
@@ -41,6 +42,8 @@ export function useNewItemActions() {
   const link = async (i: LinkInput): Promise<NewItemReceipt> => {
     if (!company) throw new Error("Selskapet er ikke lastet ennå.");
     if (i.pkg.state !== "valid") throw new Error("Fyll inn pakningen først.");
+    // Alltid et fryst linjeutvalg: uten det ville lagringen gjelde «alle åpne linjer» for varen.
+    if (i.lineIds.length === 0) throw new Error("Ingen linjer kan kobles. Last siden på nytt.");
     const pkg = packagePayload(i.pkg);
     const r = await linkSupplierItem({
       legal_entity_id: company.id, supplier_id: i.supplierId, item_key: i.itemKey,
@@ -48,8 +51,10 @@ export function useNewItemActions() {
         ? { raw_material_id: i.target.id }
         : { new_raw_material: { name: i.target.name.trim(), base_unit: i.pkg.baseUnit, item_type: i.target.type } }),
       ...(pkg ? { package: pkg } : {}),
-      ...(i.lineIds.length ? { line_ids: i.lineIds } : {}),
+      line_ids: i.lineIds,
     }).finally(() => refresh());
+    // 0 endrede linjer = ingenting lagret (serveren svarer ok uten å skrive). Aldri kvittering.
+    assertLinesSaved(r);
     const rmId = r.raw_material_id;
     if (capFra === true && r.raw_material_supplier_id) {
       // Skrivemåtene huskes etter koblingen. Feil her gjør ikke koblingen ugyldig.
@@ -61,7 +66,7 @@ export function useNewItemActions() {
     const open = r.still_open_lines > 0 ? ` ${r.still_open_lines} står fortsatt til kontroll.` : "";
     return {
       title: i.text, detail: `${what}. ${lines(r.lines_updated)} koblet.${open}`,
-      undo: rmId && r.lines_updated > 0 && i.lineIds.length ? { kind: "kobling", supplierId: i.supplierId, itemKey: i.itemKey, lineIds: i.lineIds, rawMaterialId: rmId, created: r.created_raw_material } : null,
+      undo: rmId ? { kind: "kobling", supplierId: i.supplierId, itemKey: i.itemKey, lineIds: i.lineIds, rawMaterialId: rmId, created: r.created_raw_material } : null,
     };
   };
 
@@ -69,8 +74,9 @@ export function useNewItemActions() {
   const notItem = async (i: { supplierId: string; supplierName: string | null; itemKey: string; text: string; lineIds: string[] }): Promise<NewItemReceipt> => {
     if (!company) throw new Error("Selskapet er ikke lastet ennå.");
     if (i.lineIds.length === 0) throw new Error("Ingen åpne linjer. Last siden på nytt.");
-    await linkSupplierItem({ legal_entity_id: company.id, supplier_id: i.supplierId, item_key: i.itemKey, not_raw_material: true, reason: "Ikke vare (Fra faktura)", line_ids: i.lineIds })
+    const r = await linkSupplierItem({ legal_entity_id: company.id, supplier_id: i.supplierId, item_key: i.itemKey, not_raw_material: true, reason: "Ikke vare (Fra faktura)", line_ids: i.lineIds })
       .finally(() => refresh());
+    assertLinesSaved(r);
     return { title: i.text, detail: `ikke en vare. Hoppes over på alle fakturaer fra ${i.supplierName ?? "leverandøren"}.`, undo: { kind: "ikke_vare", supplierId: i.supplierId, itemKey: i.itemKey, lineIds: i.lineIds } };
   };
 

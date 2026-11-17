@@ -4,6 +4,9 @@ import { ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSupplierSkuIndex } from "@/ravarer/hooks/useSupplierSkuIndex";
 import { useSupplierItemLines } from "@/fakturaer/hooks/useSupplierItems";
+import { useApprovedInvoiceIds } from "@/ravarer/hooks/useApprovedInvoices";
+import { splitLockedLines } from "@/ravarer/lib/fraFaktura/linkOutcome";
+import { lineMath, unitPrices } from "@/ravarer/lib/fraFaktura/lineMath";
 import { dateNo } from "@/ravarer/lib/decisions";
 import { paths } from "@/ravarer/lib/paths";
 import {
@@ -34,7 +37,13 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
   const latest = open[0] ?? all[0] ?? null;
   // Kreditlinjer spør aldri om pakning; pakningsforslaget bygges bare fra en vanlig linje.
   const credit = isCreditRow(open);
-  const pkgLine = packageSourceLine(open, all);
+  // Linjer på internt godkjente fakturaer kan ikke kobles (serveren hopper over dem). De sendes ikke, og en rad
+  // der alle linjene er slik, kan ikke lagres herfra.
+  const approvedQ = useApprovedInvoiceIds(useMemo(() => open.map((l) => l.invoice_id), [open]));
+  const { linkable, locked } = useMemo(() => splitLockedLines(open, approvedQ.data), [open, approvedQ.data]);
+  // Pris og pakning bygges helst fra en linje som er lest rent; ellers merkes raden «Sjekk tallene».
+  const pkgLine = packageSourceLine(open, all, (l) => lineMath(l).clean);
+  const math = useMemo(() => (pkgLine ? lineMath(pkgLine) : null), [pkgLine]);
   const text = latest?.description ?? row.title;
   const collision = all.some((l) => (l.review_reason ?? "").includes("sku_collision"));
   // Samme varenummer hos leverandøren sjekkes alltid (ikke bare ved «sku_collision»), så en vare som finnes fra før foreslås først.
@@ -61,6 +70,9 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
+  // «Prøv igjen» gjentar siste svar. Ingenting er lagret når feilen vises (0 linjer eller avvist), og en gjentatt
+  // kobling av linjer som alt er koblet endrer ingenting.
+  const [retry, setRetry] = useState<(() => void) | null>(null);
   const init = useRef({ lines: false, sug: false });
 
   useEffect(() => {
@@ -68,8 +80,8 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
     init.current.lines = true;
     setName(cleanItemName(latest.description ?? row.title));
     setType(guessItemType(latest.description ?? row.title, supplierRule));
-    setDraft(packageProposal(pkgLine));
-  }, [latest, pkgLine, row.title, supplierRule]);
+    setDraft(packageProposal(pkgLine, null, math));
+  }, [latest, pkgLine, math, row.title, supplierRule]);
   useEffect(() => {
     if (init.current.sug || lines.isLoading || (isSku && skuIndex.isLoading)) return;
     init.current.sug = true;
@@ -79,18 +91,20 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
 
   const baseUnit = mode === "koble" ? pick?.base_unit ?? null : null;
   const state = readPackage(draft, baseUnit);
-  const badge = packageBadge({ text, draft, state, mode, hasSuggestion: suggestions.length > 0 && !!pick && suggestions.some((s) => s.id === pick.id) });
-  const price = pricePerBase(pkgLine, state);
+  const badge = packageBadge({ text, draft, state, mode, hasSuggestion: suggestions.length > 0 && !!pick && suggestions.some((s) => s.id === pick.id), numbersOk: math?.clean !== false });
+  const price = pricePerBase(pkgLine, state, math ? math.units : undefined);
+  const perUnit = pkgLine ? unitPrices(pkgLine, math) : [];
   // «Opprett som ny» når samme varenummer alt finnes: aldri med i «Opprett N sikre».
   const answer: RowAnswer = { mode, type, name, pick, badge, state, existingMatch: sameSku.length > 0 };
-  const lineIds = open.map((l) => l.id);
-  const ready = !lines.isLoading && !lines.isError && lineIds.length > 0;
+  const lineIds = linkable.map((l) => l.id);
+  const ready = !lines.isLoading && !lines.isError && !approvedQ.isLoading && lineIds.length > 0;
+  const allLocked = !lines.isLoading && open.length > 0 && linkable.length === 0 && locked.length > 0;
   // Kreditnota-raden svarer aldri «Opprett N sikre» (ingen pakning å godkjenne).
   const answerable = ready && !credit;
 
   const submit = async (): Promise<boolean> => {
     if (lock.current || !canWrite || !answerable || !canSubmit(answer)) return false;
-    lock.current = true; setBusy(true); setError(null);
+    lock.current = true; setBusy(true); setError(null); setRetry(null);
     const sentAt = Date.now();
     try {
       const r = await actions.link({
@@ -101,19 +115,22 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Kunne ikke lagre. Utfallet er ukjent – last siden på nytt før du prøver igjen.");
+      setRetry(() => () => void submitRef.current());
       return false;
     } finally { lock.current = false; setBusy(false); }
   };
   const notItem = async () => {
     if (lock.current || !canWrite || !ready) return;
-    lock.current = true; setBusy(true); setError(null);
+    lock.current = true; setBusy(true); setError(null); setRetry(null);
     const sentAt = Date.now();
     try { onDone(row.key, await actions.notItem({ supplierId: row.supplier_id, supplierName: row.supplier_name, itemKey: row.item_key, text: text ?? row.title, lineIds }), sentAt); }
-    catch (e) { setError(e instanceof Error ? e.message : "Kunne ikke lagre."); }
+    catch (e) { setError(e instanceof Error ? e.message : "Kunne ikke lagre."); setRetry(() => () => void notItemRef.current()); }
     finally { lock.current = false; setBusy(false); }
   };
   const submitRef = useRef(submit);
   submitRef.current = submit;
+  const notItemRef = useRef(notItem);
+  notItemRef.current = notItem;
   const answerKey = `${mode}|${type}|${name}|${pick?.id ?? ""}|${badge}|${state.state}|${answerable}|${sameSku.length}`;
   useEffect(() => {
     register(row.key, { answer: answerable ? answer : null, submit: () => submitRef.current() });
@@ -130,7 +147,7 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
 
   return (
     <li className="border-t border-line-subtle px-4 py-4 md:px-5">
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1.6fr)_12rem] lg:items-center">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1.6fr)_12rem] lg:items-center xl:grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1.6fr)_15rem]">
         <div className="min-w-0 space-y-0.5">
           <p className="text-body font-semibold">{text}</p>
           <p className="text-caption text-ink-secondary">{row.supplier_name ?? "Ukjent leverandør"} · {row.sku ? `varenr ${row.sku}` : "uten varenummer"}</p>
@@ -161,11 +178,21 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
                   </p>
                 )}
                 {skuIndex.isError && <p role="alert" className="text-caption text-destructive">Kunne ikke sjekke om varenummeret finnes fra før. Forslaget bygger bare på navnet.</p>}
-                <RowPackage draft={draft} onDraft={setDraft} state={state} badge={badge} price={price} baseUnit={baseUnit} disabled={disabled} />
+                <RowPackage draft={draft} onDraft={setDraft} state={state} badge={badge} price={price} baseUnit={baseUnit} disabled={disabled}
+                  unitPrices={perUnit} numbersNote={math && !math.clean ? math.note : null} />
+                {allLocked ? (
+                  <p role="note" className="text-caption font-semibold text-warning">
+                    {locked.length === 1 ? "Linjen står på en faktura" : `Alle ${locked.length} linjene står på fakturaer`} som er godkjent internt. De kan ikke kobles herfra før godkjenningen er opphevet på fakturaen.
+                  </p>
+                ) : locked.length > 0 && (
+                  <p role="note" className="text-caption text-ink-secondary">{locked.length} av {open.length} linjer står på internt godkjente fakturaer og kobles ikke nå.</p>
+                )}
+                {approvedQ.isError && <p role="alert" className="text-caption text-destructive">Kunne ikke sjekke om fakturaene er godkjent. Lagringen sier fra hvis linjer ikke kan kobles.</p>}
               </>
             )}
         </div>
-        <div className="flex flex-col gap-2">
+        {/* Handlingene bryter til ny linje i stedet for å gå utenfor kanten (smal kolonne ved ca. 1024–1280 px). */}
+        <div className="flex min-w-0 flex-col gap-2">
           {credit ? (
             creditHref && canWrite
               ? <Button asChild className="min-h-[44px]"><Link to={creditHref}>Koble til opprinnelig faktura</Link></Button>
@@ -175,15 +202,20 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
               {busy && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />}{primary}
             </Button>
           )}
-          <div className="flex gap-2">
-            <Button variant="outline" className="min-h-[44px] flex-1" disabled={disabled || !ready} onClick={() => void notItem()}>Ikke vare</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className="min-h-[44px] min-w-[5.5rem] flex-1" disabled={disabled || !ready} onClick={() => void notItem()}>Ikke vare</Button>
             {holdHref && canWrite
-              ? <Button asChild variant="outline" className="min-h-[44px] flex-1"><Link to={holdHref} title={credit ? "Hold hele kreditnotaen utenfor råvarebehandling" : "Hold den nyeste linjen (eller hele fakturaen) utenfor råvarebehandling"}>Hold utenfor …</Link></Button>
-              : <Button variant="outline" className="min-h-[44px] flex-1" disabled>Hold utenfor …</Button>}
+              ? <Button asChild variant="outline" className="min-h-[44px] min-w-[7.5rem] flex-1"><Link to={holdHref} title={credit ? "Hold hele kreditnotaen utenfor råvarebehandling" : "Hold den nyeste linjen (eller hele fakturaen) utenfor råvarebehandling"}>Hold utenfor …</Link></Button>
+              : <Button variant="outline" className="min-h-[44px] min-w-[7.5rem] flex-1" disabled>Hold utenfor …</Button>}
           </div>
         </div>
       </div>
-      {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
+      {error && (
+        <div role="alert" className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          <span className="min-w-0 flex-1">{error}</span>
+          {retry && <Button variant="outline" className="min-h-[44px]" disabled={busy} onClick={retry}>Prøv igjen</Button>}
+        </div>
+      )}
       {snippet && latest && (
         <div className="mt-3">
           <InvoiceSnippet invoiceId={latest.invoice_id} invoiceNumber={latest.invoice_number} invoiceDate={latest.invoice_date}
