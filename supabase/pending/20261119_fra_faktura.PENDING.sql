@@ -185,7 +185,7 @@ begin
 end $$;
 
 -- «Angre» på koble/opprett fra «Fra faktura». Gjenåpner bare linjer i utvalget som fortsatt er koblet til
--- råvaren, på åpen, ulåst, ikke godkjent faktura uten ført kost. Prisobservasjoner fra linjene får
+-- råvaren, på åpen (ikke avstemt/flagget) faktura uten ført kost; intern godkjenning sperrer ikke (Henrik 17.11). Prisobservasjoner fra linjene får
 -- superseded_at (beholdes). En råvare opprettet i samme svar settes inaktiv (aldri slettet) når den ikke er
 -- brukt noe annet sted. Samme svarform som rm_undo_not_item.
 create or replace function public.rm_undo_supplier_item_link(p_legal_entity_id uuid, p_supplier_id uuid, p_item_key text,
@@ -233,9 +233,6 @@ begin
     end if;
     if r.inv_status is null or r.inv_status not in ('imported','needs_review','ready') or r.flagged_at is not null or r.reconciled_at is not null then
       v_skipped := v_skipped || jsonb_build_object('id', r.id, 'reason', 'faktura_last'); continue;
-    end if;
-    if exists (select 1 from public.invoice_internal_approvals a where a.invoice_id = r.invoice_id and a.status = 'approved' and a.revoked_at is null) then
-      v_skipped := v_skipped || jsonb_build_object('id', r.id, 'reason', 'faktura_godkjent'); continue;
     end if;
     if exists (select 1 from public.invoice_line_cost_postings p where p.invoice_line_id = r.id and p.revoked_at is null) then
       v_skipped := v_skipped || jsonb_build_object('id', r.id, 'reason', 'kostpris_fort'); continue;

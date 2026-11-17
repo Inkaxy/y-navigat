@@ -6,8 +6,9 @@ with le as (select '751709bc-04b3-4449-867d-b97faa9ab373'::uuid id),
 select 'funksjonene finnes' as kontroll,
        (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
          where n.nspname = 'public' and p.proname in ('rm_new_items_queue','rm_cap_nye_varer_v1')) = 2 as ok
-union all select 'rm_work_items er uendret (md5)',
-       md5(pg_get_functiondef('public.rm_work_items(uuid,text,text,uuid,text,integer,integer)'::regprocedure)) = 'efe0f95ef98471bbfca5713d05960e27'
+union all select 'rm_work_items er dagens (17.11) eller etter 20261121_kobling_godkjent_faktura (md5)',
+       md5(pg_get_functiondef('public.rm_work_items(uuid,text,text,uuid,text,integer,integer)'::regprocedure))
+         in ('efe0f95ef98471bbfca5713d05960e27', '27451573d8696e4d95c3253798923a45')
 union all select 'samme antall ukoblede som rm_work_items',
        ((select r from ny)->'counts'->>'kobling')::int = ((select r from wi)->'counts'->>'kobling')::int
 union all select 'samme antall uten pakning som rm_work_items',

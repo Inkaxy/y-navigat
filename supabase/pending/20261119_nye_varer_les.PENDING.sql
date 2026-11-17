@@ -66,9 +66,10 @@ begin
       left join suppliers s on s.id = a.supplier_id
       left join raw_materials rm on rm.id = a.linked_rm_id
      where a.last_conf is distinct from 'not_applicable'
+       -- Bare varer med minst én linje koblingen godtar (samme regel som rm_link_supplier_item; 20261121_kobling_godkjent_faktura).
+       and a.open_lines > 0
        and (a.linked_rm_id is null
-            or (a.open_lines > 0
-                and coalesce(a.reasons_raw,'') ~ '(unknown_package_size|package_conflict|missing_base_unit|uncertain_cost)'))
+            or coalesce(a.reasons_raw,'') ~ '(unknown_package_size|package_conflict|missing_base_unit|uncertain_cost)')
   ), f as (
     select q.*, row_number() over (order by q.oldest_open asc nulls last, q.last_seen desc nulls last, q.key) rn
       from q where p_supplier_id is null or q.supplier_id = p_supplier_id

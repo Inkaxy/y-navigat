@@ -1,5 +1,5 @@
 // «Fra faktura › Nye varer»: kjører 20261119_nye_varer_les.PENDING.sql mot innebygd PostgreSQL (PGlite) sammen med
-// live-definisjonen av rm_work_items fra 17.11 (byte-identisk kopi), og kontrollerer at den nye funksjonen gir
+// live-definisjonen av rm_work_items fra 17.11 (byte-identisk kopi) etter 20261121_kobling_godkjent_faktura, og kontrollerer at den nye funksjonen gir
 // nøyaktig samme rader, tellere og rekkefølge som rm_work_items (gruppene kobling + pakning). Rører aldri live.
 // Bruk: node scripts/test-nye-varer-sql.mjs
 import { readFileSync } from "node:fs";
@@ -11,6 +11,10 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (p) => readFileSync(join(root, p), "utf8");
 const pending = read("supabase/pending/20261119_nye_varer_les.PENDING.sql");
 const live = read("scripts/fixtures/live-20261117/rm_work_items.sql");
+// Samme regel som koblingen (20261121_kobling_godkjent_faktura) gjelder begge køfunksjonene; filen kjøres derfor her også.
+const kobling = read("supabase/pending/20261121_kobling_godkjent_faktura.PENDING.sql");
+const koblingFx = ["rm_confirm_line_match", "rm_link_supplier_item", "rm_undo_not_item", "rm_set_invoice_exclusion"]
+  .map((n) => read(`scripts/fixtures/live-20261117b/${n}.sql`)).join(";\n");
 
 const stub = `
 create role anon; create role authenticated; create role service_role;
@@ -30,6 +34,7 @@ create table invoices (id uuid primary key, legal_entity_id uuid, supplier_id uu
 create table invoice_lines (id uuid primary key, invoice_id uuid, created_at timestamptz, supplier_sku text, description text, raw_material_id uuid,
   match_confidence text, requires_review boolean, review_reason text, total_amount numeric, base_quantity numeric,
   price_per_base_unit numeric, expected_price_per_base_unit numeric, excluded_at timestamptz);
+create table invoice_line_cost_postings (invoice_line_id uuid, revoked_at timestamptz);
 `;
 
 const LE = "00000000-0000-0000-0000-0000000000a1";
@@ -49,6 +54,8 @@ const one = async (sql) => (await db.query(sql)).rows[0];
 await step("stubb", () => db.exec(stub));
 await step("live rm_work_items", () => db.exec(live));
 await step("PENDING", () => db.exec(pending));
+await step("dagens koblingsfunksjoner", () => db.exec(koblingFx));
+await step("20261121_kobling_godkjent_faktura", () => db.exec(kobling));
 
 // Testdata: 4 leverandører, 12 råvarer, 120 fakturaer, ca. 600 linjer med blandet status/kobling/årsak.
 const sups = [1, 2, 3, 4].map((n) => id("0001", n));
@@ -86,6 +93,9 @@ for (const inv of invs) {
       ${conf ? `'${conf}'` : "null"}, ${rr}, ${reason ? `'${reason}'` : "null"}, ${Math.round(rnd() * 900)}, 1, 1, null, ${rnd() < 0.03 ? "now()" : "null"});\n`;
   }
 }
+// Annet selskap har alltid minst én åpen, ukoblet linje (ellers er sammenligningen nedenfor tom).
+sql += `update invoices set status = 'needs_review', flagged_at = null, excluded_at = null where id = '${invs[119]}';
+insert into invoice_lines values ('${id("0004", ln + 1)}','${invs[119]}', timestamptz '2026-11-02', null, 'ANNET SELSKAP VARE', null, 'unmatched', true, 'unmatched', 10, 1, 1, null, null);\n`;
 await step("data", () => db.exec(sql));
 
 const wi = async (sup) => (await one(`select public.rm_work_items('${LE}', 'alle', null, ${sup ? `'${sup}'` : "null"}, 'oldest', 500, 0) r`)).r;
