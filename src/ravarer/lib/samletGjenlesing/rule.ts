@@ -13,7 +13,7 @@
 // Alt annet blir «Forslag venter på deg».
 import { computeLinesSum, type LinesSumCheck } from "../../../../supabase/functions/_shared/lines-sum.ts";
 import { normalizeMatchKey } from "@/fakturaer/lib/matchNormalize";
-import { REREAD_FIELDS, differingFields, type Operation, type RereadField, type Value, type Values } from "@/fakturaer/lib/reread";
+import { REREAD_FIELDS, sameValue, type Operation, type RereadField, type Value, type Values } from "@/fakturaer/lib/reread";
 
 export type Protection = "manuell_kobling" | "godtatt_pris" | "ikke_vare" | "holdt_utenfor" | "rettet";
 export const PROTECTION_LABEL: Record<Protection, string> = {
@@ -112,7 +112,7 @@ export function decideAuto(input: AutoInput): AutoDecision {
       else unmatchedOld++;
       continue;
     }
-    const diff = differingFields({ candidate_id: p.candidate.candidate_id, values: p.candidate.values, issues: [], evidence: { confidence: null, number_evidence: [], ean: null, vat_rate: null, discount_pct: null, model_price_basis: null } }, { ...l, issues: [], manuallyLinked: manual, corrected: l.protections.includes("rettet") });
+    const diff = REREAD_FIELDS.filter((f) => !sameValue(p.candidate.values[f], l[f]));
     if (manual && !SAME_ITEM.includes(p.method)) {
       reasons.push({ code: "manuell_kobling_ikke_gjenfunnet", text: `${describe(l)} er manuelt koblet, men ny lesing har verken samme varenummer eller samme tekst og beløp.` });
       continue;
