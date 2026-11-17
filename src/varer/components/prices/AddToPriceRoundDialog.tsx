@@ -37,6 +37,8 @@ interface Props {
   items: AddLineItem[];
   /** Antall valgte varer som mangler ny pris og derfor hoppes over. */
   skipped?: number;
+  /** Kalles etter vellykket lagring. Når satt, blir brukeren stående på siden (ingen navigering). */
+  onAdded?: (count: number, roundId: string) => void;
 }
 
 export function AddToPriceRoundDialog({
@@ -46,6 +48,7 @@ export function AddToPriceRoundDialog({
   userId,
   items,
   skipped = 0,
+  onAdded,
 }: Props) {
   const navigate = useNavigate();
   const roundsQuery = usePriceRounds(legalEntityId);
@@ -92,9 +95,11 @@ export function AddToPriceRoundDialog({
         roundId = round.id;
       }
       const res = await addLines.mutateAsync({ roundId, items });
-      toast.success(`${nNum(res?.lines_upserted ?? items.length, 0)} varer lagt i prisrunden`);
+      const count = res?.lines_upserted ?? items.length;
+      toast.success(`${nNum(count, 0)} varer lagt i prisrunden`);
       onOpenChange(false);
-      navigate(`/varer/prisrunder/${roundId}`);
+      if (onAdded) onAdded(count, roundId);
+      else navigate(`/varer/prisrunder/${roundId}`);
     } catch (e) {
       toast.error(rpcFeilmelding(e, "Kunne ikke legge varene i prisrunden"));
     }

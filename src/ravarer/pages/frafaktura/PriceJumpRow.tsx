@@ -84,7 +84,7 @@ export function PriceJumpRow({ j, supplierName, usage, canWrite, retur, onRound,
           )}
           {item && qa.priceStatus === "loading" && <p className="text-caption text-ink-secondary">Kontrollerer prisen …</p>}
           {item && qa.priceStatus === "error" && <p role="alert" className="text-caption text-destructive">Prisen kunne ikke kontrolleres. <button type="button" className="underline" onClick={() => qa.retrySafety()}>Prøv igjen</button></p>}
-          {item && qa.priceStatus === "ready" && qa.rows.length === 0 && <p className="text-caption text-ink-secondary">Prisen kan ikke godtas her: {qa.blocked[0]?.why ?? "linjene må kontrolleres på fakturaen"}.</p>}
+          {item && qa.priceStatus === "ready" && qa.rows.length === 0 && <p className="text-caption text-ink-secondary">Prisen kan ikke godtas her: {qa.blocked[0]?.label ?? "linjene må kontrolleres på fakturaen"}.</p>}
           {qa.error && <p role="alert" className="text-caption text-destructive">{qa.error}</p>}
         </div>
       </div>
