@@ -120,6 +120,7 @@ export function useTodayActivity() {
 
 /** Bare telleren til menyen (samme tellere som køen, uten å hente elementene). */
 export function useOpenQuestionCount(enabled: boolean) {
-  const q = useWorkItems({ group: "alle", sort: "oldest", limit: 1, enabled });
-  return openQuestionCount(q.data?.counts);
+  // Delte tellere: ingen egne rm_work_items-kall når en liste på siden allerede har hentet dem.
+  const q = useWorkCounts(enabled);
+  return openQuestionCount(q.data);
 }

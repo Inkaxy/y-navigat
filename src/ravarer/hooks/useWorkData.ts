@@ -71,23 +71,21 @@ type WorkItemsCall = { group: WorkGroup; search?: string | null; supplierId?: st
 
 /** Selve kallet (uten port – kalleren holder porten). */
 async function rawWorkItems(qc: QueryClient, legalEntityId: string, p: WorkItemsCall) {
-  {
-    const startedAt = Date.now();
-    const { data, error } = await supabase.rpc("rm_work_items", {
-      p_legal_entity_id: legalEntityId, p_group: p.group, p_search: p.search || undefined,
-      p_supplier_id: p.supplierId || undefined, p_sort: p.sort, p_limit: p.limit, p_offset: p.offset,
-    });
-    if (error) throw error;
-    const r = parseWorkItems(data);
-    if (!p.search && !p.supplierId) {
-      const prev = countSeeds.get(legalEntityId);
-      if (!prev || prev.startedAt <= startedAt) {
-        countSeeds.set(legalEntityId, { counts: r.counts, startedAt });
-        qc.setQueryData(workCountsKey(legalEntityId), r.counts);
-      }
+  const startedAt = Date.now();
+  const { data, error } = await supabase.rpc("rm_work_items", {
+    p_legal_entity_id: legalEntityId, p_group: p.group, p_search: p.search || undefined,
+    p_supplier_id: p.supplierId || undefined, p_sort: p.sort, p_limit: p.limit, p_offset: p.offset,
+  });
+  if (error) throw error;
+  const r = parseWorkItems(data);
+  if (!p.search && !p.supplierId) {
+    const prev = countSeeds.get(legalEntityId);
+    if (!prev || prev.startedAt <= startedAt) {
+      countSeeds.set(legalEntityId, { counts: r.counts, startedAt });
+      qc.setQueryData(workCountsKey(legalEntityId), r.counts);
     }
-    return r;
   }
+  return r;
 }
 
 /**
