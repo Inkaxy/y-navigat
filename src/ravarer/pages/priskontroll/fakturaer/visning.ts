@@ -79,7 +79,7 @@ export function sanitizeReturnSearch(raw: string | null | undefined): string {
 }
 
 /** Tillatte opprinnelser for returstier i appen (leverandørkort, lager). Aldri ekstern. */
-const SAFE_RETURN_PATH = /^\/ravarer\/(leverandorer(\/[A-Za-z0-9-]+)?|lager|beslutninger|priskontroll\/varekort\/[A-Za-z0-9%._~-]+\/[A-Za-z0-9%._~-]+)(\?[^#\\]*)?$/;
+const SAFE_RETURN_PATH = /^\/ravarer\/(leverandorer(\/[A-Za-z0-9-]+)?|lager|beslutninger|fra-faktura|priskontroll\/varekort\/[A-Za-z0-9%._~-]+\/[A-Za-z0-9%._~-]+)(\?[^#\\]*)?$/;
 
 /** Trygg returstien innen appen, eller null. Avviser protokoll, `//`, backslash og fragment. */
 export function safeReturnPath(raw: string | null | undefined): string | null {
@@ -91,9 +91,9 @@ export function safeReturnPath(raw: string | null | undefined): string | null {
 /** Retur med lesbar etikett: leverandør/lager-sti, ellers listens spørrestreng. */
 export function fakturaReturn(fra: string | null | undefined): { href: string; label: string } {
   const path = safeReturnPath(fra);
-  if (path) return { href: path, label: path.startsWith("/ravarer/priskontroll/varekort/") ? "Varekort" : path.startsWith("/ravarer/lager") ? "Lager" : path.startsWith("/ravarer/beslutninger") ? "Beslutninger" : path.startsWith("/ravarer/leverandorer/") ? "Leverandør" : "Leverandører" };
+  if (path) return { href: path, label: path.startsWith("/ravarer/priskontroll/varekort/") ? "Varekort" : path.startsWith("/ravarer/lager") ? "Lager" : path.startsWith("/ravarer/beslutninger") ? "Beslutninger" : path.startsWith("/ravarer/fra-faktura") ? "Fra faktura" : path.startsWith("/ravarer/leverandorer/") ? "Leverandør" : "Leverandører" };
   const href = fakturaBackHref(fra);
-  return { href, label: new URLSearchParams(sanitizeReturnSearch(fra)).get("fane") === "gjore" ? "Å gjøre" : "Fakturaer" };
+  return { href, label: "Fakturaer" };
 }
 
 /** Tilbake til Fakturaer-listen med bevarte filtre. */
