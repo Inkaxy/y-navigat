@@ -109,6 +109,8 @@ export interface RawMaterialListItem {
   allergensReviewed: boolean | null;
   searchText: string;
   aliases: string[];
+  /** Opprettet fra en fakturalinje («Fra faktura») og ikke tatt i bruk i oppskrift, kalkyle eller handelsvare ennå. */
+  newFromInvoice?: boolean;
 }
 
 export const DEFAULT_DEVIATION_TOLERANCE = 5;

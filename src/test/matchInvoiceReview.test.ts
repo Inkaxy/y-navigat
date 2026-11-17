@@ -69,7 +69,8 @@ describe("matchemotoren ruter usikre linjer til gjennomgang", () => {
   it("begge grenene bruker samme vurdering av ubrukelig kostpris", () => {
     // Pakningskravet ligger nå i én delt hjelper som begge grenene kaller.
     expect(FN).toContain("packageNeedsConfirmation(cost)");
-    expect((FN.match(/costReviewReasons\(cost, actual\)/g) ?? []).length).toBe(2);
+    // Begge grenene sender samme pakningsregel (Fra faktura, av som standard).
+    expect((FN.match(/costReviewReasons\(cost, actual, invoicePackage && !picked(M)?\.conflict\)/g) ?? []).length).toBe(2);
     expect((FN.match(/costIsUsable\(cost\)/g) ?? []).length).toBe(2);
   });
 

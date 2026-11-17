@@ -54,3 +54,19 @@ Ingen av filene fra 17.11 er kjørt (venter på Henriks ja). Alt som avhenger av
 Lokal test: `node scripts/test-variantb-r3-sql.mjs` (PGlite med kopier av live-definisjonene i `scripts/fixtures/live-20261116/`, 18 kontroller: Brutto/DG2 med og uten emballasje, vakten stopper ved endret definisjon, påslagstabellens regler).
 
 `supabase/functions/match-invoice-lines` + `_shared/automationRules.ts` er endret i repoet (nøkkelgrenser + pant som følgevare) men **ikke rullet ut av meg**. Begge reglene er av til `20261117_automatikk` er kjørt (manglende tabell gir PGRST205 → ingen grenser; manglende kolonne → pant av), så utrulling før SQL endrer ikke oppførselen.
+
+## Demo D «Fra faktura til vare» (19.11.2026)
+
+Status 17.11: `20261117_beslutninger_angre` er kjørt. Ingen av de andre filene fra 17.–18.11 er kjørt, og «Fra faktura» trenger ingen av dem.
+
+| Fil | Status |
+|---|---|
+| `20261119_fra_faktura.PENDING.sql` | **VENTER PÅ ROOT.** Nullbare kolonner (`invoice_match_settings.price_jump_pct`/`fra_faktura_quiet_prices`/`fra_faktura_invoice_package`, `raw_materials.price_jump_pct`/`cost_basis_rule`, `suppliers.new_item_type`), funksjonene `rm_fra_faktura_settings`, `rm_set_fra_faktura_settings`, `rm_set_item_price_jump`, `rm_set_supplier_new_item_type`, `rm_remember_supplier_item_names`, `rm_undo_supplier_item_link`, `rm_set_cost_basis_rule`, `_rm_cost_rule_ok`, `rm_cap_fra_faktura_v1`, og tekstbytte i `_rm_cost_candidates` bundet til live-md5 `5a28cc1e…` (17.11.2026). Begge matchingreglene er av etter kjøring; `cost_basis_rule` er null for alle varer (= dagens oppførsel for varer med én leverandør). Endrer ingen data. |
+| `20261119_fra_faktura.check.sql` | Bare SELECT: kolonner, funksjoner, rettigheter, md5 etter bytte, varer med flere leverandører. |
+| `20261119_fra_faktura_opprydding.DATAENDRING.sql` | **DATAENDRING — TAS SEPARAT MED HENRIK.** `rm_fra_faktura_cleanup(le, p_dry_run default true)`: dry-run viser antall linjer per årsak og leverandør og skrivemåter som ville blitt husket. Uten dry-run (krever at reglene er slått på) legges manglende skrivemåter til og berørte fakturaer kjøres gjennom dagens `rm_rematch_invoices`. Ingen direkte linjeendring. |
+
+Lokal test: `node scripts/test-frafaktura-sql.mjs` (PGlite med live-kopi av `_rm_cost_candidates` i `scripts/fixtures/live-20261117/`).
+
+`supabase/functions/match-invoice-lines` er endret i repoet (prishopp-grense, stille prisendring under grensen, entydig pakning fra fakturaen, første pris på sikker kobling) men **ikke rullet ut av meg**. Reglene leses fra kolonnene over og er av når kolonnene mangler eller står av, så utrulling før SQL endrer ikke oppførselen.
+
+Kan utgå/slås sammen: `rm_key_material_limits` i `20261117_automatikk` overlapper med egen grense per vare (`raw_materials.price_jump_pct`). `20261117_prislinje`, `20261118_handelsvarer` og `20261118_prisgrunnlag` er uavhengige av «Fra faktura» (Prishopp regner marginkonsekvens med dagens `product_margins`). `20261117_automatikk_cron.DATAENDRING` trengs ikke.

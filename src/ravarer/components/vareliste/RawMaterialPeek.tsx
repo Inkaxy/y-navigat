@@ -4,15 +4,16 @@ import { Button } from "@/components/ui/button";
 import { QueryState } from "@/components/common/QueryState";
 import { useRawMaterialPage } from "@/ravarer/hooks/useRawMaterialPage";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
-import { formatNok } from "@/ravarer/lib/constants";
 import { paths } from "@/ravarer/lib/paths";
 import { completenessChecklist, sectionSearch, type SectionId } from "@/ravarer/lib/rawMaterialSections";
-import { agreementStatusLabel, derivedPackagePrice, packageLabel } from "@/ravarer/lib/supplierPackagePrice";
 import { ChecklistCard } from "@/ravarer/components/detail/Completeness";
 import { useMaterialPriceEvidence } from "@/ravarer/hooks/useMaterialPriceEvidence";
 import { costSummary } from "@/ravarer/lib/costSummary";
 import { nextFix } from "@/ravarer/lib/nextFix";
 import { AllPricesList } from "@/ravarer/components/prices/AllPricesList";
+import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { useRavarerAccessLevel } from "@/ravarer/hooks/useRavarerAccessLevel";
+import { SupplierPurchases } from "./SupplierPurchases";
 
 
 /**
@@ -37,6 +38,9 @@ function PeekTitle({ id }: { id: string }) {
 function PeekBody({ id, listSearch }: { id: string; listSearch: string }) {
   const page = useRawMaterialPage(id);
   const { data: suppliers = [] } = useSuppliers();
+  const { canWrite } = useRavarer();
+  const { data: level = "none" } = useRavarerAccessLevel();
+  const canApprove = level === "admin" || level === "approve";
   const rm = page.rm;
   const sp = new URLSearchParams(listSearch);
   const href = (s: SectionId) => `${paths.raavare(id)}${sectionSearch(sp, s)}`;
@@ -80,30 +84,7 @@ function PeekBody({ id, listSearch }: { id: string; listSearch: string }) {
 
       <ChecklistCard items={checklist} hrefFor={href} />
 
-      <section className="space-y-2">
-        <h3 className="text-base font-semibold">Leverandører</h3>
-        {page.links.length === 0 ? <p className="text-sm text-ink-secondary">Ingen leverandør koblet.</p> : (
-          <ul className="divide-y divide-line-subtle text-sm">
-            {page.links.map((l) => {
-              const d = derivedPackagePrice(l);
-              const status = agreementStatusLabel(l);
-              return (
-                <li key={l.id} className="py-2">
-                  <div className="font-medium">{nameOf.get(l.supplier_id) ?? "Ukjent leverandør"}{l.is_primary ? " · Primær" : ""}</div>
-                  <div className="text-caption text-ink-secondary">{packageLabel(l, rm.base_unit).label ?? "Pakning ukjent"}</div>
-                  {l.agreed_price_per_base_unit != null && (
-                    <div className="text-caption tabular-nums">
-                      Avtale {formatNok(l.agreed_price_per_base_unit)} / {rm.base_unit}
-                      {d.kind === "known" ? ` · ${formatNok(d.price)} per pakning (avledet)` : d.kind === "needs_confirmation" ? " · pakningsgrunnlag må bekreftes" : ""}
-                      {status && <span className="block text-warning">{status}</span>}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+      <SupplierPurchases rmId={rm.id} baseUnit={rm.base_unit} links={page.links} nameOf={nameOf} canWrite={canWrite} canApprove={canApprove} />
 
       <AllPricesList rawMaterialId={rm.id} baseUnit={rm.base_unit} category={rm.category} compact />
     </div>

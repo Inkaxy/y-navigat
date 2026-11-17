@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/sheet";
 import { useAccessibleApps } from "@/hooks/useAccessibleApps";
 import { useWorkSummary } from "@/ravarer/hooks/useWorkData";
-import { useOpenQuestionCount } from "@/ravarer/hooks/useDecisions";
+import { useFraFakturaCounts } from "@/ravarer/hooks/useFraFaktura";
 import type { WorkSummary } from "@/ravarer/lib/workRpc";
 import { paths } from "@/ravarer/lib/paths";
 import { useInvoiceAccess } from "@/ravarer/hooks/useInvoiceAccess";
@@ -27,7 +27,7 @@ import {
 import {
   ChevronDown,
   LayoutDashboard,
-  ListChecks, ChartColumn, Workflow,
+  FileInput, ChartColumn, Workflow,
   Ticket,
   CalendarRange,
   ShoppingBag,
@@ -235,11 +235,11 @@ function RavarerNav() {
   const { data: hasInvoiceAccess = false } = useInvoiceAccess();
   const { data: accessLevel = "none" } = useRavarerAccessLevel();
   const { data: summary } = useWorkSummary({ includeApproval: false });
-  const openQuestions = useOpenQuestionCount(hasInvoiceAccess);
+  const fraFaktura = useFraFakturaCounts(hasInvoiceAccess);
   return (
     <RavarerNavView
       summary={summary}
-      openQuestions={openQuestions}
+      openQuestions={fraFaktura.total}
       hasInvoiceAccess={hasInvoiceAccess}
       canManage={accessLevel === "admin" || accessLevel === "approve"}
     />
@@ -255,8 +255,9 @@ export function RavarerNavView({ summary, hasInvoiceAccess, canManage, openQuest
     { kind: "link", to: paths.oversikt(), label: "Oversikt", icon: LayoutDashboard, exact: true },
   ];
   if (hasInvoiceAccess) {
-    // Variant B: åpne spørsmål (samme tellere som køen), foran Varer.
-    items.push({ kind: "link", to: paths.beslutninger(), label: "Beslutninger", icon: ListChecks, matches: [paths.beslutninger()], badge: openQuestions ?? undefined, badgeTone: "warning" });
+    // Demo D: «Fra faktura» rett etter Oversikt; teller = sum av de tre fanene. Beslutninger nås fra siden
+    // («Øvrige spørsmål») og markerer samme menypunkt.
+    items.push({ kind: "link", to: paths.fraFaktura(), label: "Fra faktura", icon: FileInput, matches: [paths.fraFaktura(), paths.beslutninger()], badge: openQuestions ?? undefined, badgeTone: "warning" });
   }
   items.push(
     {

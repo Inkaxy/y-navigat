@@ -139,11 +139,14 @@ describe("Retur fra fakturasiden", () => {
 });
 
 describe("Plassering", () => {
-  it("Beslutninger står foran Varer i Råvarer-menyen, og Topbar er ikke endret", () => {
+  it("Fra faktura har tatt Beslutningers plass foran Varer (demo D); Beslutninger nås fortsatt", () => {
     const nav = readFileSync("src/components/layout/SubAppNav.tsx", "utf8");
     const view = nav.slice(nav.indexOf("export function RavarerNavView"));
-    expect(view.indexOf('label: "Beslutninger"')).toBeGreaterThan(0);
-    expect(view.indexOf('label: "Beslutninger"')).toBeLessThan(view.indexOf('label: "Varer"'));
+    expect(view.indexOf('label: "Fra faktura"')).toBeGreaterThan(view.indexOf('label: "Oversikt"'));
+    expect(view.indexOf('label: "Fra faktura"')).toBeLessThan(view.indexOf('label: "Varer"'));
+    expect(view).not.toContain('label: "Beslutninger"');
+    expect(readFileSync("src/ravarer/routes.tsx", "utf8")).toContain('path="/ravarer/beslutninger"');
+    expect(readFileSync("src/ravarer/pages/frafaktura/FraFaktura.tsx", "utf8")).toContain("paths.beslutninger()");
     for (const l of ["Oversikt", "Fakturaer", "Leverandører", "Lager", "Innstillinger"]) expect(view).toContain(`label: "${l}"`);
   });
 });

@@ -208,6 +208,7 @@ function cellFor(id: string, ctx: VarelisteCellContext): (item: RawMaterialListI
           <Link to={detailUrl(item)} title={item.name} className="block truncate font-medium text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{item.name}</Link>
           {item.declarationName && <span className="block truncate text-xs text-muted-foreground" title={item.declarationName}>{item.declarationName}</span>}
           {item.matchedAlias && <Badge variant="outline" className="text-[11px] font-normal">lev.nr {item.matchedAlias}</Badge>}
+          {item.newFromInvoice && <Badge variant="outline" className="border-primary/40 bg-primary/10 text-[11px] font-semibold text-primary">Ny fra faktura</Badge>}
         </div>
       );
     case "category":

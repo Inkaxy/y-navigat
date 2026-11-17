@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { reviewedFrom } from "@/ravarer/lib/allergenState";
 import { useRawMaterials, type RawMaterialRow } from "@/ravarer/hooks/useRawMaterials";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
@@ -20,6 +22,37 @@ export function categoriesOf(r: Pick<RawMaterialRow, "categories" | "category">)
   return r.category ? [r.category] : [];
 }
 
+/** Kategorien `rm_link_supplier_item` gir en ny vare opprettet fra en fakturalinje. */
+export const NEW_FROM_INVOICE_CATEGORY = "Importert – ikke kategorisert";
+export function isNewFromInvoiceCandidate(r: Pick<RawMaterialRow, "category" | "categories" | "price_source">): boolean {
+  return r.price_source === "invoice" && categoriesOf(r).length === 1 && categoriesOf(r)[0] === NEW_FROM_INVOICE_CATEGORY;
+}
+
+/** Hvilke av kandidatene som er i bruk (oppskrift, emballasje i kalkyle, handelsvare). Ukjent = ingen merking. */
+function useUsedIds(candidates: string[]) {
+  return useQuery({
+    queryKey: ["ravarer", "vareliste", "new-from-invoice-used", candidates.join(",")],
+    enabled: candidates.length > 0,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const used = new Set<string>();
+      for (let i = 0; i < candidates.length; i += 100) {
+        const chunk = candidates.slice(i, i + 100);
+        const [a, b, c] = await Promise.all([
+          supabase.from("recipe_lines").select("raw_material_id").in("raw_material_id", chunk).limit(1000),
+          supabase.from("recipe_packaging_lines").select("raw_material_id").in("raw_material_id", chunk).limit(1000),
+          supabase.from("raw_material_products").select("raw_material_id").in("raw_material_id", chunk).limit(1000),
+        ]);
+        for (const r of [a, b, c]) {
+          if (r.error) throw r.error;
+          for (const x of r.data ?? []) if (x.raw_material_id) used.add(x.raw_material_id);
+        }
+      }
+      return used;
+    },
+  });
+}
+
 function packageStateOf(r: RawMaterialRow): PackageState {
   if (r.base_units_per_package == null) return "missing";
   return r.package_confirmed_at ? "confirmed" : "unconfirmed";
@@ -38,6 +71,9 @@ export function useVarelisteItems(options?: { enabled?: boolean }) {
   const { legalEntityId } = useRavarerScope();
   const ids = useMemo(() => (rawMaterials.data ?? []).map((r) => r.id), [rawMaterials.data]);
   const evidence = useListPriceEvidence(legalEntityId, ids, enabled);
+  const newCandidates = useMemo(() => (rawMaterials.data ?? []).filter(isNewFromInvoiceCandidate).map((r) => r.id), [rawMaterials.data]);
+  const usedQ = useUsedIds(newCandidates);
+  const used = usedQ.data;
 
   const supplierMap = useMemo(
     () => new Map((suppliers.data ?? []).map((s) => [s.id, s.name])),
@@ -112,6 +148,7 @@ export function useVarelisteItems(options?: { enabled?: boolean }) {
         hasAllergens: index.data?.allergenIds.has(r.id) ?? false,
         allergensReviewed: reviewedFrom(r.allergens_reviewed_at),
         aliases,
+        newFromInvoice: used ? isNewFromInvoiceCandidate(r) && !used.has(r.id) : false,
         searchText: buildSearchText([
           r.name,
           r.sku,
@@ -124,7 +161,7 @@ export function useVarelisteItems(options?: { enabled?: boolean }) {
         ]),
       } satisfies RawMaterialListItem;
     });
-  }, [rawMaterials.data, index.data, stats.data, supplierMap, evidence.certified, evidence.loading]);
+  }, [rawMaterials.data, index.data, stats.data, supplierMap, evidence.certified, evidence.loading, used]);
 
   // Feil i søke-/statusindeksen eller kjøpsstatistikken må vises, ikke
   // svelges — ellers ser listen komplett ut med tomme kolonner.

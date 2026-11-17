@@ -18771,6 +18771,7 @@ export type Database = {
       rm_can_read: { Args: { _rm_id: string }; Returns: boolean }
       rm_can_write: { Args: { _rm_id: string }; Returns: boolean }
       rm_cancel_invoice_reread: { Args: { p_run_id: string }; Returns: Json }
+      rm_cap_beslutninger_v1: { Args: never; Returns: boolean }
       rm_change_supplier_link: {
         Args: {
           p_line_ids?: string[]
@@ -19381,6 +19382,25 @@ export type Database = {
         }[]
       }
       rm_supplier_link_snapshot: { Args: { p_rms_id: string }; Returns: string }
+      rm_undo_not_item: {
+        Args: {
+          p_item_key: string
+          p_legal_entity_id: string
+          p_line_ids: string[]
+          p_reason?: string
+          p_remove_rule?: boolean
+          p_supplier_id: string
+        }
+        Returns: Json
+      }
+      rm_undo_price_acceptance: {
+        Args: {
+          p_legal_entity_id: string
+          p_line_ids: string[]
+          p_reason?: string
+        }
+        Returns: Json
+      }
       rm_unit_change_at: {
         Args: { p_raw_material_id: string }
         Returns: string
