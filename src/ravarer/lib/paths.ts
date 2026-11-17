@@ -28,7 +28,9 @@ export type InnstillingSeksjon = "priskontroll" | "tripletex" | "kategorier" | "
 
 export const paths = {
   oversikt: () => RAVARER_ROOT,
-  /** Variant B: køen av spørsmål (`?valgt=` = valgt spørsmål). */
+  /** Demo D: «Fra faktura til vare» (`?fane=nye|prishopp|ikke-lest`, `?lev=` leverandør, `?grense=`). */
+  fraFaktura: (q?: Q) => withQuery(`${RAVARER_ROOT}/fra-faktura`, q),
+  /** Variant B: køen av spørsmål (`?valgt=` = valgt spørsmål). Nås fra «Øvrige spørsmål» på Fra faktura. */
   beslutninger: (q?: Q) => withQuery(`${RAVARER_ROOT}/beslutninger`, q),
   /** Variant B: én linje per råvare og leverandør (`?valgt=` = leverandørkobling). */
   prislinje: (q?: Q) => withQuery(`${RAVARER_ROOT}/prislinje`, q),

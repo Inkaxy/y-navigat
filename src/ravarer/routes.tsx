@@ -11,6 +11,7 @@ import { LEGACY_RAVARER_PATHS } from "@/ravarer/lib/legacyRoutes";
 import { VarerShell } from "@/ravarer/pages/hub/VarerShell";
 
 const Oversikt = lazy(() => import("@/ravarer/pages/hub/RavarerOversikt"));
+const FraFaktura = lazy(() => import("@/ravarer/pages/frafaktura/FraFaktura"));
 const Beslutninger = lazy(() => import("@/ravarer/pages/beslutninger/Beslutninger"));
 const Prislinje = lazy(() => import("@/ravarer/pages/prislinje/Prislinje"));
 const Automatikk = lazy(() => import("@/ravarer/pages/automatikk/Automatikk"));
@@ -54,6 +55,8 @@ export function ravarerRoutes(Shell: ShellType) {
 
   return [
     <Route key="oversikt" path="/ravarer" element={rv(<Oversikt />)} />,
+    // Demo D: «Fra faktura til vare» (krever fakturatilgang). Beslutninger består som «Øvrige spørsmål».
+    <Route key="fra-faktura" path="/ravarer/fra-faktura" element={inv(<FraFaktura />)} />,
     // Variant B: beslutningskøen (krever fakturatilgang, som køen den bygger på).
     <Route key="beslutninger" path="/ravarer/beslutninger" element={inv(<Beslutninger />)} />,
     <Route key="prislinje" path="/ravarer/prislinje" element={inv(<Prislinje />)} />,
