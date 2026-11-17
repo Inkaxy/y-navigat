@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from "vitest";
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
 import { approvalBucket, approveMany, summarizeResults, amountExclVat } from "@/fakturaer/lib/approval";
 import { remainingByInvoice, maxAllocatable } from "@/fakturaer/lib/supplierCases";
-import { runPerLine, packagePreview } from "@/fakturaer/lib/groupActions";
 import { buildDecisionGroups } from "@/fakturaer/lib/decisionGroups";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 
@@ -48,15 +47,6 @@ describe("B: delkreditering per faktura", () => {
 });
 
 describe("gruppelagring og pakning", () => {
-  it("per-linje-lagring teller feil ærlig", async () => {
-    const r = await runPerLine([L("1", "F1"), L("2", "F2")], async (l) => { if (l.id === "2") throw new Error("avvist"); });
-    expect(r.text).toBe("1 av 2 lagret, 1 feilet");
-    expect(r.outcomes[1].message).toBe("avvist");
-  });
-  it("C: 8×1L til 184 kr gir 23 kr/l — mengde fra dokumentert innhold, ikke linjesum/pris", () => {
-    expect(packagePreview({ quantity: 1, total_amount: 184 }, 8)).toEqual({ baseQuantity: 8, pricePerBase: 23 });
-    expect(packagePreview({ quantity: null, total_amount: 184 }, 8)).toBeNull();
-  });
   it("manglende avtalepris alene blir første kostpris, ikke prisavvik", () => {
     const g = buildDecisionGroups([L("1", "F1"), L("2", "F2")]);
     expect(g).toHaveLength(1);

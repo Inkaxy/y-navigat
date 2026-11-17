@@ -12,11 +12,12 @@ import { useDecisionUndo } from "../beslutninger/useDecisionUndo";
 import { PackageFix } from "../beslutninger/PackageFix";
 import { usePriceConsequence } from "./usePriceConsequence";
 import { ItemLimitSelect } from "./ItemLimitSelect";
+import { AskSupplier } from "./AskSupplier";
 import { cn } from "@/lib/utils";
 
 const kr = (v: number) => v.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** Ett prishopp (D3): gammel → ny pris, årsak, konsekvens og tre svar. Godtar bare serverkontrollerte linjer. */
+/** Ett prishopp (D3): gammel → ny pris, årsak, konsekvens og svarene (også «Spør leverandøren»). Godtar bare serverkontrollerte linjer. */
 export function PriceJumpRow({ j, supplierName, usage, canWrite, retur, onRound, inRound, itemLimit }: {
   j: PriceJump; supplierName: string | null; usage: readonly RecipeUsage[] | undefined; canWrite: boolean; retur: string;
   onRound: (key: string, items: AddLineItem[]) => void; inRound: number | null;
@@ -30,7 +31,7 @@ export function PriceJumpRow({ j, supplierName, usage, canWrite, retur, onRound,
   const qa = useQuickAnswers(item, lines);
   const undo = useDecisionUndo();
   const [fix, setFix] = useState(false);
-  const [done, setDone] = useState<{ text: string; undo: Parameters<typeof undo.undo>[0] | null } | null>(null);
+  const [done, setDone] = useState<{ text: string; undo: Parameters<typeof undo.undo>[0] | null; caseId?: string | null } | null>(null);
   const cause = jumpCause(j, { hasAgreement: item?.agreed_price_per_base_unit != null });
   const cons = usePriceConsequence(j, usage, `Prishopp ${j.name} ${formatPct(j.pct)} (faktura ${j.invoiceNumber ?? "uten nummer"})`);
   const c = consequenceText(cons.recipes, cons.falling, cause.packageSuspect);
@@ -45,6 +46,7 @@ export function PriceJumpRow({ j, supplierName, usage, canWrite, retur, onRound,
     return (
       <li role="status" className="flex flex-wrap items-center gap-2 border-t border-line-subtle bg-success/10 px-4 py-3 text-sm md:px-5">
         <Check className="h-4 w-4 text-success" aria-hidden /><span className="font-semibold">{j.name}</span><span aria-hidden>→</span><span>{done.text}</span>
+        {done.caseId && <Link className="font-semibold text-primary hover:underline" to={paths.sak(done.caseId)}>Åpne leverandørsaken</Link>}
         {done.undo && undo.canUndo(done.undo) && undo.state.kind !== "done" && (
           <Button variant="ghost" size="sm" className="ml-auto min-h-[44px] gap-1.5" disabled={undo.state.kind === "busy"} onClick={() => done.undo && void undo.undo(done.undo)}>
             <Undo2 className="h-4 w-4" aria-hidden />Angre
@@ -80,6 +82,7 @@ export function PriceJumpRow({ j, supplierName, usage, canWrite, retur, onRound,
             </Button>
             <Button variant="outline" className="min-h-[44px]" disabled={!canWrite || !item?.rm_id} aria-expanded={fix} onClick={() => setFix((v) => !v)}>Feil pakning</Button>
           </div>
+          {item && <AskSupplier item={item} qa={qa} canWrite={canWrite} onDone={(text, caseId) => setDone({ text, undo: null, caseId })} />}
           {!cause.packageSuspect && (cons.falling ?? 0) > 0 && (
             inRound != null
               ? <p className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-md border border-success/40 text-sm text-success"><Check className="h-4 w-4" aria-hidden />{inRound} {inRound === 1 ? "vare ligger" : "varer ligger"} i prisrunden</p>

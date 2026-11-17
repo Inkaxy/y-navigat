@@ -130,7 +130,9 @@ describe("retur fra faktura", () => {
     expect(fakturaReturn("/ravarer/lager?fane=varemottak").label).toBe("Lager");
     expect(fakturaReturn("//evil.com/x").href).toBe("/ravarer/priskontroll?fane=fakturaer");
     expect(fakturaReturn("https://evil.com").href).toBe("/ravarer/priskontroll?fane=fakturaer");
-    expect(fakturaReturn("?fane=gjore&visning=mengde")).toEqual({ href: "/ravarer/priskontroll?fane=gjore&visning=mengde", label: "Å gjøre" });
+    expect(fakturaReturn("?fane=gjore&visning=mengde")).toEqual({ href: "/ravarer/priskontroll?fane=gjore&visning=mengde", label: "Fakturaer" });
+    // Opprydding demo D: retur til Fra faktura beholder fane og leverandør.
+    expect(fakturaReturn("/ravarer/fra-faktura?fane=prishopp")).toEqual({ href: "/ravarer/fra-faktura?fane=prishopp", label: "Fra faktura" });
     expect(readReturnParam(new URLSearchParams({ fra: "2026-01-01" }))).toBeNull();
   });
 });

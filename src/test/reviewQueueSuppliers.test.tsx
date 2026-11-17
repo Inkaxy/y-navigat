@@ -45,45 +45,18 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import { useSuppliersFor } from "@/fakturaer/hooks/useSuppliersFor";
-import { resolveQueueEntityId } from "@/fakturaer/lib/queueEntity";
 
 function wrapper({ children }: { children: ReactNode }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
 }
 
-describe("resolveQueueEntityId", () => {
-  it("bruker firmaet fra useCompany", () => {
-    expect(resolveQueueEntityId(COMPANY_ID, [COMPANY_ID])).toBe(COMPANY_ID);
-  });
-
-  it("faller tilbake på det eneste selskapet brukeren har tilgang til", () => {
-    expect(resolveQueueEntityId(null, ["e1"])).toBe("e1");
-    expect(resolveQueueEntityId(undefined, ["e1"])).toBe("e1");
-  });
-
-  it("returnerer aldri «alle» når firmaet er kjent", () => {
-    expect(resolveQueueEntityId(COMPANY_ID, [])).toBe(COMPANY_ID);
-  });
-
-  it("gir null bare når tilgangen faktisk spenner over flere selskaper", () => {
-    expect(resolveQueueEntityId(null, ["e1", "e2"])).toBeNull();
-    expect(resolveQueueEntityId("ukjent", ["e1", "e2"])).toBeNull();
-  });
-});
 
 describe("leverandørvalget i fakturainnboksen", () => {
   beforeEach(() => {
     supplierFilters.length = 0;
   });
 
-  it("henter leverandører for det ene firmaet", async () => {
-    const entityId = resolveQueueEntityId(COMPANY_ID, [COMPANY_ID]);
-    const { result } = renderHook(() => useSuppliersFor(entityId), { wrapper });
-    await waitFor(() => expect(result.current.data).toHaveLength(1));
-    expect(result.current.data?.[0].name).toBe("Bakermel AS");
-    expect(supplierFilters).toEqual([COMPANY_ID]);
-  });
 
   it("henter ingenting uten selskap — derav regresjonen", async () => {
     const { result } = renderHook(() => useSuppliersFor(null), { wrapper });

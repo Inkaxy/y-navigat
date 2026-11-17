@@ -2,12 +2,12 @@
  * Hurtigfiltrene på Fakturaer-fanen (`?visning=`) og mappingen fra gamle
  * innboks-/listeparametre. Rene funksjoner — testes uten React.
  */
-export const FAKTURA_VISNINGER = ["trenger", "klar", "etterkontroll", "avstemt", "utenfor", "alle"] as const;
+export const FAKTURA_VISNINGER = ["alle", "trenger", "klar", "etterkontroll", "avstemt", "utenfor"] as const;
 export type FakturaVisning = (typeof FAKTURA_VISNINGER)[number];
 export type AvstemtModus = "auto" | "manuell";
 
 export const VISNING_LABEL: Record<FakturaVisning, string> = {
-  trenger: "Trenger meg",
+  trenger: "Åpne",
   klar: "Klare til avstemming",
   etterkontroll: "Godkjent – etterkontroll",
   avstemt: "Avstemt",
@@ -27,7 +27,8 @@ export function parseVisning(sp: URLSearchParams): { visning: FakturaVisning; mo
   let visning: FakturaVisning;
   if (raw && (FAKTURA_VISNINGER as readonly string[]).includes(raw)) visning = raw as FakturaVisning;
   else if (raw === "innboks" || sp.has("innboks")) visning = fromLegacyInnboks(sp.get("innboks"));
-  else visning = "trenger";
+  // Arkiv (opprydding demo D): uten valg vises alle fakturaer.
+  else visning = "alle";
   const m = sp.get("modus");
   return { visning, modus: visning === "avstemt" && (m === "auto" || m === "manuell") ? m : null };
 }
@@ -79,7 +80,7 @@ export function sanitizeReturnSearch(raw: string | null | undefined): string {
 }
 
 /** Tillatte opprinnelser for returstier i appen (leverandørkort, lager). Aldri ekstern. */
-const SAFE_RETURN_PATH = /^\/ravarer\/(leverandorer(\/[A-Za-z0-9-]+)?|lager|beslutninger|priskontroll\/varekort\/[A-Za-z0-9%._~-]+\/[A-Za-z0-9%._~-]+)(\?[^#\\]*)?$/;
+const SAFE_RETURN_PATH = /^\/ravarer\/(leverandorer(\/[A-Za-z0-9-]+)?|lager|beslutninger|fra-faktura|priskontroll\/varekort\/[A-Za-z0-9%._~-]+\/[A-Za-z0-9%._~-]+)(\?[^#\\]*)?$/;
 
 /** Trygg returstien innen appen, eller null. Avviser protokoll, `//`, backslash og fragment. */
 export function safeReturnPath(raw: string | null | undefined): string | null {
@@ -91,9 +92,9 @@ export function safeReturnPath(raw: string | null | undefined): string | null {
 /** Retur med lesbar etikett: leverandør/lager-sti, ellers listens spørrestreng. */
 export function fakturaReturn(fra: string | null | undefined): { href: string; label: string } {
   const path = safeReturnPath(fra);
-  if (path) return { href: path, label: path.startsWith("/ravarer/priskontroll/varekort/") ? "Varekort" : path.startsWith("/ravarer/lager") ? "Lager" : path.startsWith("/ravarer/beslutninger") ? "Beslutninger" : path.startsWith("/ravarer/leverandorer/") ? "Leverandør" : "Leverandører" };
+  if (path) return { href: path, label: path.startsWith("/ravarer/priskontroll/varekort/") ? "Varekort" : path.startsWith("/ravarer/lager") ? "Lager" : path.startsWith("/ravarer/beslutninger") ? "Beslutninger" : path.startsWith("/ravarer/fra-faktura") ? "Fra faktura" : path.startsWith("/ravarer/leverandorer/") ? "Leverandør" : "Leverandører" };
   const href = fakturaBackHref(fra);
-  return { href, label: new URLSearchParams(sanitizeReturnSearch(fra)).get("fane") === "gjore" ? "Å gjøre" : "Fakturaer" };
+  return { href, label: "Fakturaer" };
 }
 
 /** Tilbake til Fakturaer-listen med bevarte filtre. */

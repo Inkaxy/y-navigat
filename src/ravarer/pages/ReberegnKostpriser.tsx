@@ -62,7 +62,7 @@ export default function ReberegnKostpriser() {
       title="Reberegn kostpriser"
       subtitle="Serverens kostprisregler kjørt på nytt over fakturalinjene som allerede ligger i basen"
       embedsPage={false}
-      actions={<Button asChild variant="ghost" size="sm" className="gap-1"><Link to={paths.priskontroll({ fane: "gjore" })}><ArrowLeft className="h-3.5 w-3.5" aria-hidden />Priskontroll</Link></Button>}
+      actions={<Button asChild variant="ghost" size="sm" className="gap-1"><Link to={paths.priskontroll()}><ArrowLeft className="h-3.5 w-3.5" aria-hidden />Fakturaer</Link></Button>}
     >
       <div className="space-y-5 px-page pb-6">
         <Card className="p-4">

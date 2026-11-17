@@ -5,7 +5,6 @@ import { flagSummary, isFlaggable } from "@/fakturaer/lib/flagging";
 import { bulkActionGate } from "@/ravarer/pages/priskontroll/godkjenning/approvalLogic";
 import { canFetchLines, nextInvoiceStep, deliverySteps, type NextStepInput } from "@/ravarer/pages/priskontroll/faktura/invoiceSteps";
 import { fakturaBackHref, readReturnParam } from "@/ravarer/pages/priskontroll/fakturaer/visning";
-import { workspaceKey, type WorkspaceKeys } from "@/ravarer/pages/priskontroll/faktura/useWorkspaceHotkeys";
 import { chipCount } from "@/ravarer/pages/priskontroll/fakturaer/VisningChips";
 import { invoiceQueryKeys } from "@/ravarer/lib/invalidate";
 
@@ -45,30 +44,6 @@ describe("A2: «Endre råvare»-signalet er linjebundet", () => {
   });
 });
 
-describe("A3/småting: hurtigtaster", () => {
-  const keys = (canWrite: boolean, calls: string[]): WorkspaceKeys => ({
-    enabled: true, canWrite, activeLine: { id: "l1" } as WorkspaceKeys["activeLine"],
-    next: () => calls.push("next"), prev: () => undefined, enter: () => calls.push("enter"), editMaterial: () => calls.push("m"),
-    create: () => calls.push("n"), notItem: () => calls.push("x"), undo: () => undefined, toggleDoc: () => undefined, escape: () => undefined, help: () => undefined,
-  });
-  it("N/X/M/Enter gjør ingenting uten skrivetilgang (låst faktura)", () => {
-    const calls: string[] = [];
-    for (const k of ["n", "x", "m", "Enter"]) workspaceKey(new KeyboardEvent("keydown", { key: k }), keys(false, calls));
-    expect(calls).toEqual([]);
-  });
-  it("virker inne i inspektørens Sheet, men ikke i felt", () => {
-    const calls: string[] = [];
-    const sheet = document.createElement("div");
-    sheet.setAttribute("role", "dialog"); sheet.setAttribute("data-inspector-sheet", "");
-    const btn = document.createElement("div"); sheet.appendChild(btn);
-    const input = document.createElement("input"); sheet.appendChild(input);
-    document.body.appendChild(sheet);
-    const ev = (t: HTMLElement) => { const e = new KeyboardEvent("keydown", { key: "j" }); Object.defineProperty(e, "target", { value: t }); return e; };
-    workspaceKey(ev(btn), keys(true, calls));
-    workspaceKey(ev(input), keys(true, calls));
-    expect(calls).toEqual(["next"]);
-  });
-});
 
 describe("B5: returparameter kolliderer ikke med datofilteret", () => {
   it("leser retur, og gammel fra bare når den ikke er en dato", () => {

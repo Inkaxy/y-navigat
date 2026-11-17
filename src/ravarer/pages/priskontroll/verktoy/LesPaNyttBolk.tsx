@@ -94,7 +94,7 @@ export default function LesPaNyttBolk() {
       title="Les fakturaer på nytt i bolk"
       subtitle="Rydding etter at fakturalesingen stod stille. Ingenting starter før du trykker Start."
       embedsPage={false}
-      actions={<Button asChild variant="ghost" size="sm" className="gap-1"><Link to={paths.priskontroll({ fane: "gjore" })}><ArrowLeft className="h-3.5 w-3.5" aria-hidden />Priskontroll</Link></Button>}
+      actions={<Button asChild variant="ghost" size="sm" className="gap-1"><Link to={paths.priskontroll()}><ArrowLeft className="h-3.5 w-3.5" aria-hidden />Fakturaer</Link></Button>}
     >
       <div className="space-y-5 px-page pb-6">
         <InvoiceReadingAlert />

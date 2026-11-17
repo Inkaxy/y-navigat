@@ -27,7 +27,7 @@ import {
 import {
   ChevronDown,
   LayoutDashboard,
-  FileInput, ChartColumn, Workflow,
+  FileInput,
   Ticket,
   CalendarRange,
   ShoppingBag,
@@ -247,7 +247,7 @@ function RavarerNav() {
 }
 
 /**
- * Råvarer 2.0: fem faste innganger + tannhjul. Alle tellere kommer fra ÉN
+ * Råvarer (demo D): seks faste innganger + tannhjul. Alle tellere kommer fra ÉN
  * `rm_work_summary`, slik at meny, Oversikt og faner alltid viser samme tall.
  */
 export function RavarerNavView({ summary, hasInvoiceAccess, canManage, openQuestions = null }: { summary: WorkSummary | undefined; hasInvoiceAccess: boolean; canManage: boolean; openQuestions?: number | null }) {
@@ -266,9 +266,7 @@ export function RavarerNavView({ summary, hasInvoiceAccess, canManage, openQuest
     },
   );
   if (hasInvoiceAccess) {
-    // Variant B: prislinje og automatikk som egne innganger i dagens liste.
-    items.push({ kind: "link", to: paths.prislinje(), label: "Prislinje", icon: ChartColumn, matches: [paths.prislinje()] });
-    items.push({ kind: "link", to: paths.automatikk(), label: "Automatikk", icon: Workflow, matches: [paths.automatikk()] });
+    // Opprydding demo D: Oversikt · Fra faktura · Varer · Fakturaer · Leverandører · Lager (+ tannhjul).
     items.push({ kind: "link", to: paths.priskontroll(), label: "Fakturaer", icon: ScanSearch, matches: [paths.priskontroll()] });
     // Ingen merke: `todo_total` blander varegrupper og fakturaer. Eksakte fakturatellere står på arbeidsflaten.
   }

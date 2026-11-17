@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { morningEmail, outsideCostOn, parseAutoSettings, parseKeyLimits, parseStale, ruleSentences, setOutsideCost, toggleRule } from "@/ravarer/lib/automatikk";
+import { outsideCostOn, parseAutoSettings, parseStale, ruleSentences, setOutsideCost, toggleRule } from "@/ravarer/lib/automatikk";
 import { draftFrom } from "@/ravarer/lib/priceSettingsDraft";
 
 const draft = draftFrom({
@@ -34,22 +34,8 @@ describe("Automatikk: nye innstillinger", () => {
     expect(parseAutoSettings([{ deposit_as_follow_item: null, auto_requeue_stale_enabled: true, auto_requeue_batch_size: 10 }])).toEqual({ depositFollows: true, requeueOn: true, batch: 10, minAgeDays: 3 });
     expect(parseAutoSettings({})).toBeNull();
   });
-  it("kø-svar og nøkkelgrenser leses strengt", () => {
+  it("kø-svar leses strengt", () => {
     expect(parseStale({ ok: true, dry_run: true, invoices: [{ id: "a", invoice_number: "1" }], limit: 25, min_age_days: 3 }).kind).toBe("ok");
     expect(parseStale({ ok: true, invoices: [] }).kind).toBe("unknown");
-    expect(parseKeyLimits([{ id: "k", raw_material_id: "r", max_increase_pct: 2, raw_materials: { name: "Hvetemel" } }])?.[0]).toMatchObject({ name: "Hvetemel", maxPct: 2 });
-    expect(parseKeyLimits([{ id: 1 }])).toBeNull();
-  });
-});
-
-describe("morgen-e-post", () => {
-  it("bygges fra køen nå; ukjent tall vises som «?», aldri 0", () => {
-    const t = morningEmail({ name: "Henrik", log: { newInvoices: 6, linesLinked: null, linesExcluded: 2, invoicesReconciled: 4, recalculated: null }, openQuestions: 12,
-      oldest: { question: "Hører «Pant flaske» til Coca-Cola?", date: "2026-11-01" }, biggest: { text: "smør hos TINE, +5,1 %", impactNok: 2100 } });
-    expect(t[0]).toBe("God morgen, Henrik.");
-    expect(t[1]).toContain("? linjer koblet");
-    expect(t[2]).toContain("12 spørsmål venter på deg. Det eldste (01.11.2026)");
-    expect(t[3]).toContain("rundt 2");
-    expect(t.at(-1)).toBe("Åpne Beslutninger i NBhub for å svare.");
   });
 });

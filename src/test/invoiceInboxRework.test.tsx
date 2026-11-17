@@ -137,37 +137,3 @@ describe("bekreftet leverandørpakning gjenbrukes", () => {
   });
 });
 
-describe("Oppdater matching med delvis feil", () => {
-  it("viser hvilke som feilet og prøver bare dem igjen", async () => {
-    const { InvoiceInbox } = await import("@/fakturaer/components/inbox/InvoiceInbox");
-    const mk = (id: string, num: string): InboxInvoice => {
-      const assessment = assessInboxInvoice({ ...base, lines: [L({ requires_review: true, review_reason: "unmatched", raw_material_id: null })] });
-      return {
-        internally_approved: false, id, invoice_number: num, invoice_date: "2026-09-01", received_at: null, due_date: null, status: "needs_review", legal_entity_id: "le", supplier_id: "s",
-        supplier_name: "ASKO", is_credit_note: false, total_amount: 100, total_vat: 0, lines_sum_status: "ok",
-        lines_sum_variance_pct: null, source_document_url: null, line_extraction_status: "done", source: "ehf", notes: null,
-        paid_at: null, tripletex_is_paid: null, line_extraction_attempts: 0, line_extraction_error: null, extraction_confidence: null, reconciled_mode: null, lines_source: null, tripletex_voucher_number: null, line_count: 1, assessment, tab: inboxTabOf({ status: "needs_review", assessment }),
-      };
-    };
-    const batch = vi.fn()
-      .mockResolvedValueOnce([{ id: "b", label: "ASKO 2" }])
-      .mockResolvedValueOnce([]);
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <InvoiceInbox
-          tab="open" onTabChange={() => {}} invoices={[mk("a", "1"), mk("b", "2")]} isLoading={false} isError={false}
-          error={null} onRetry={() => {}} legalEntityId="le" supplierId={null} supplierFilter={null} canWrite canReconcile
-          busyId={null} onPrimary={() => {}} onRematch={() => {}} onOpenDetail={() => {}} onFlag={() => {}} onUnflag={() => {}} onBatchMatch={batch}
-        />
-      </QueryClientProvider>,
-    );
-    expect(screen.getByText("Viser 2 av 2")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /Oppdater matching/ }));
-    const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toMatch(/ASKO 2/);
-    expect(alert.textContent).toMatch(/Ingenting er godkjent/);
-    fireEvent.click(screen.getByRole("button", { name: "Prøv igjen" }));
-    await waitFor(() => expect(batch).toHaveBeenCalledTimes(2));
-    expect((batch.mock.calls[1][0] as InboxInvoice[]).map((i) => i.id)).toEqual(["b"]);
-  });
-});

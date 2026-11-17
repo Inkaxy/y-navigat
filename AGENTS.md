@@ -1,4 +1,4 @@
-- Fakturalinje-kobling og pakningsbekreftelse går gjennom `useLineMatchForm` (brukes av både kontrollflaten i køen og MatchDrawer) — én skjema- og lagringslogikk mot `acceptMatch`.
+- Fakturalinje-kobling og pakningsbekreftelse går per leverandørvare via `link-supplier-item`/`rm_link_supplier_item` (Fra faktura › Nye varer og leverandørvarens `SupplierItemLinkForm`); køens linjeskjema og MatchDrawer er fjernet. Why: én skrivevei for kobling og pakning.
 - Bekreftede leverandørpakninger lagres som varianter i `raw_material_supplier_packages` (trigger på `raw_material_suppliers`); matchemotoren gjenbruker en variant bare ved entydig lik dokumentert pakning. Why: én rad per råvare/leverandør overskrev tidligere bekreftelser.
 - Intern fakturagodkjenning krever approve/admin (`has_ravarer_invoice_approve`); skrive-RPC-er bruker `has_ravarer_invoice_access(...,'write')`. Why: attestasjon skal ikke følge av vanlig skrivetilgang.
 - Linjer med aktiv `invoice_line_cost_postings` er låst for ny matching og koblingsendring. Why: ført kostpris/historikk skal ikke endres stille.

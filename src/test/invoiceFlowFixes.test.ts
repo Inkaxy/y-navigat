@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from "vitest";
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
 import { groupKeyFor, buildDecisionGroups, hasKnownPackage } from "@/fakturaer/lib/decisionGroups";
 import { creditNetExclVat } from "@/fakturaer/lib/supplierCases";
-import { frozenSignature, outcomeNotes, summarize } from "@/fakturaer/lib/groupActions";
 import { blockerLabel } from "@/fakturaer/lib/approval";
 import type { ReviewLineRow } from "@/fakturaer/hooks/useReviewLines";
 
@@ -55,16 +54,6 @@ describe("kreditnota — punkt 3", () => {
 });
 
 describe("ærlig lagring — punkt 6 og 8", () => {
-  it("fryst signatur endres når pakning eller råvare endres", () => {
-    const a = L("1");
-    expect(frozenSignature(a)).toBe(frozenSignature(L("1")));
-    expect(frozenSignature(a)).not.toBe(frozenSignature(L("1", { package_size: 15 })));
-  });
-  it("viser beregning og læring som gjenstår", () => {
-    const r = summarize([{ lineId: "1", invoiceNumber: "F", ok: true, message: null }], { learningFailed: 1, recalcPending: 1, changedSinceViewed: 1 });
-    expect(r.text).toBe("1 av 1 lagret");
-    expect(outcomeNotes(r)).toHaveLength(3);
-  });
   it("nye sperrer har norsk forklaring", () => {
     for (const c of ["sum_ukontrollert", "mva_ukjent", "lavt_uttrekk", "leverandor_mangler", "valuta_mangler", "belop_mangler"]) {
       expect(blockerLabel(c)).not.toBe("Kan ikke godkjennes ennå");

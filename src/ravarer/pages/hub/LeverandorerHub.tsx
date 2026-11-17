@@ -7,16 +7,20 @@ import { useWorkSummary } from "@/ravarer/hooks/useWorkData";
 import { ModulePage } from "@/ravarer/ui/ModulePage";
 import { SectionTabs } from "@/ravarer/ui/SectionTabs";
 import { activeTabFrom } from "@/ravarer/ui/sectionTabsLogic";
+import { InvoiceAccessGuard } from "@/ravarer/components/InvoiceAccessGuard";
+import { FakturaerProvider } from "@/fakturaer/context/FakturaerContext";
 import { leverandorTabs, RAVARER_EYEBROW } from "./hubTabs";
 
 const Leverandorer = lazy(() => import("@/ravarer/pages/Leverandorer"));
 const Avtaler = lazy(() => import("@/ravarer/pages/Avtaler"));
 const Forhandlinger = lazy(() => import("@/ravarer/pages/forhandlinger/ForhandlingerList"));
+const Saker = lazy(() => import("@/ravarer/pages/priskontroll/saker/SakerTab").then((m) => ({ default: m.SakerTab })));
 
 export default function LeverandorerHub() {
   const [sp] = useSearchParams();
   const { data: hasInvoiceAccess = false } = useInvoiceAccess();
   const { data: summary } = useWorkSummary({ includeApproval: false });
+  // Leverandørsaker (flyttet fra Fakturaer) åpnes også fra Prishopp-raden og saksiden.
   const tabs = leverandorTabs(summary, hasInvoiceAccess);
   const tab = activeTabFrom(sp, "fane", tabs.filter((t) => !t.hidden).map((t) => t.id), "leverandorer");
   return (
@@ -25,6 +29,7 @@ export default function LeverandorerHub() {
         {tab === "leverandorer" && <Leverandorer />}
         {tab === "avtaler" && <Avtaler />}
         {tab === "forhandlinger" && hasInvoiceAccess && <Forhandlinger />}
+        {tab === "saker" && hasInvoiceAccess && <InvoiceAccessGuard><FakturaerProvider><Saker /></FakturaerProvider></InvoiceAccessGuard>}
       </Suspense>
     </ModulePage>
   );

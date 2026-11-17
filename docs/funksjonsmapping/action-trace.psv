@@ -24,7 +24,6 @@ F13|src/ravarer/pages/priskontroll/gjore/PriceBlock.tsx|Før første kostpris p�
 F14|src/ravarer/pages/priskontroll/gjore/PriceBlock.tsx|expected_price_per_base_unit|Referanse
 F15|src/ravarer/hooks/useWorkData.ts|rm_supplier_item_accept_price|Godta
 F16|src/ravarer/pages/priskontroll/gjore/PriceBlock.tsx|onCase|Leverandørsak
-F17|src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx|AUTO_NEXT_MS|Auto-neste
 F18|src/ravarer/pages/priskontroll/gjore/VarekortPanel.tsx|Varekortet er endret siden du åpnet det|Frys
 F19|src/ravarer/pages/priskontroll/fakturaer/visning.ts|FAKTURA_VISNINGER|Hurtigfiltre
 F2|src/components/layout/SubAppNav.tsx|rm_work_summary|Badgekilde
@@ -35,26 +34,14 @@ F22|src/ravarer/pages/priskontroll/fakturaer/FakturaRowActions.tsx|Koble kreditn
 F23|src/ravarer/pages/priskontroll/fakturaer/FakturaRowActions.tsx|Kjør matching på nytt|Radmeny
 F24|src/ravarer/pages/priskontroll/faktura/WorkspaceHeader.tsx|lineProgress|Fremdrift
 F25|src/ravarer/pages/priskontroll/faktura/WorkspaceHeader.tsx|Rett linjer mot originalen|Rett
-F26|src/ravarer/pages/priskontroll/gjore/logic.ts|GJORE_SORTS|Sorteringer
-F28|src/ravarer/pages/priskontroll/gjore/GjoreBulkBar.tsx|Opprett råvarer …|Masse
-F29|src/fakturaer/components/inbox/task/LineTask.tsx|LineTask|Oppgavekort
 F3|src/components/layout/SubAppNav.tsx|badge: summary?.data_quality.datasheet_changes|Badge
-F30|src/fakturaer/components/inbox/task/MaterialPicker.tsx|MaterialPicker|Forslag/søk
-F32|src/fakturaer/components/inbox/task/PackageForm.tsx|PackageForm|Pakningsskjema
 F38|src/ravarer/pages/priskontroll/gjore/PriceBlock.tsx|Bekreft startpris|Startpris
 F4|src/ravarer/routes.tsx|InvoiceAccessGuard|Fakturavakt på ruter
 F40|src/fakturaer/components/SkuConflictDialog.tsx|SkuConflictDialog|SKU-konflikt
 F41|src/fakturaer/components/NotARawMaterialDialog.tsx|NotARawMaterialDialog|Ikke råvare
 F42|src/fakturaer/components/supplier-item/OpenSupplierItemButton.tsx|OpenSupplierItemButton|Åpne varekort
-F44|src/ravarer/pages/priskontroll/faktura/useWorkspaceHotkeys.ts|useWorkspaceHotkeys|Hurtigtaster
 F45|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|q.undo()|Angre
-F47|src/fakturaer/components/inbox/task/LineTask.tsx|MatchDrawer|Delt skjema
-F48|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|Godta forslag|Godta
-F5|src/ravarer/pages/hub/RavarerOversikt.tsx|NextInvoicesView|Topp 5 eldste handlingsbare fakturaer (samme kø som Trenger deg); kronevirkning i ?fane=gjore
-F51|src/ravarer/pages/priskontroll/gjore/GjoreBulkBar.tsx|Opprett råvarer fra valgte varekort|Masseopprett
 F52|src/fakturaer/components/BulkImportRawMaterialsDrawer.tsx|BulkImportRawMaterialsDrawer|Masseimport
-F53|src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx|Alle leverandører|Leverandørfilter
-F55|src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx|setSp(|URL-synk
 F56|src/ravarer/pages/priskontroll/gjore/VarekortPanel.tsx|Varekortet er endret siden du åpnet det|Varsel
 F57|src/fakturaer/components/supplier-item/SupplierItemLinkForm.tsx|suggestions.data|Forslag
 F58|src/fakturaer/components/supplier-item/SupplierItemLinkForm.tsx|Opprett råvare og koble|Opprett
@@ -80,7 +67,6 @@ F68|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|Vis/skjul dokume
 F68|src/ravarer/pages/priskontroll/faktura/WorkspaceHeader.tsx|Vis dokument|Dokument
 F69|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|doFetch|Hent linjer
 F69|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|Linjene er hentet|Hent linjer
-F7|src/ravarer/pages/oversikt/KpiRowView.tsx|Å gjøre i priskontroll|KPI
 F70|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|doRematch|Kjør matching på nytt
 F70|src/ravarer/pages/priskontroll/faktura/WorkspaceHeader.tsx|Beregn på nytt|Matching på nytt
 F71|src/ravarer/pages/priskontroll/fakturaer/FakturaerDialogs.tsx|kind: "flag"; ids: string[]|Flagg
@@ -94,9 +80,6 @@ F76|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|rm_repair_invoic
 F77|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|useRematchWait|Omberegning
 F77|src/ravarer/pages/priskontroll/faktura/WorkspaceHeader.tsx|Kontroller summen på nytt|Sum på nytt
 F78|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|ControlSummary|Detaljer i faktasone
-F79|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|InvoiceLinesTable|Linjetabell
-F79|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|QueueWorkspace|Arbeidsliste
-F8|src/ravarer/pages/oversikt/KpiRowView.tsx|Klare til godkjenning|KPI
 F80|src/fakturaer/components/supplier-item/OpenSupplierItemButton.tsx|OpenSupplierItemButton|Åpne varekort
 F80|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|editMaterial|Endre råvare
 F80|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|Rett fakturalinje|Radhandling
@@ -108,7 +91,6 @@ F87|src/ravarer/pages/priskontroll/godkjenning/GodkjenningTab.tsx|Utløser ikke 
 F88|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|void s.postCosts()|Før kostpris
 F88|src/ravarer/pages/priskontroll/godkjenning/GodkjenningTab.tsx|Før kostpris for trygge linjer|Før kostpris
 F89|src/ravarer/pages/priskontroll/godkjenning/ApprovalHistorySheet.tsx|ApprovalHistorySheet|Historikk/tilbaketrekking
-F9|src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx|Søk vare, leverandør eller faktura|Søk/filter
 F90|src/ravarer/pages/priskontroll/saker/SakerTab.tsx|SUPPLIER_CASE_STATUS_LABELS|Saksliste med status
 F93|src/ravarer/pages/priskontroll/fakturaer/FakturaerDialogs.tsx|FlagInvoiceDialog|Flagg med begrunnelse
 F94|src/ravarer/pages/priskontroll/fakturaer/FakturaerDialogs.tsx|kind: "credit"; inv:|Kreditnota-dialog
@@ -189,7 +171,7 @@ R190|src/ravarer/pages/ReberegnKostpriser.tsx|Hent forslag|Skann
 R193|src/ravarer/pages/ReberegnKostpriser.tsx|Reberegn valgte|Kjør
 R194|src/ravarer/pages/ReberegnKostpriser.tsx|Angre|Angre
 R196|src/varer/components/products/RawMaterialAutocomplete.tsx|RawMaterialOption|Velg råvare
-R2|src/components/layout/SubAppNav.tsx|badge: summary?.todo_total|Badge
+R2|src/components/layout/SubAppNav.tsx|badge: summary?.data_quality.datasheet_changes|Badge
 R200|src/varer/components/products/StockLinkNote.tsx|Trekker fra lager|Lagertrekk
 R201|src/ravarer/pages/RawMaterialDetail.tsx|section === "leverandorer"|Leverandørseksjon
 R202|src/ravarer/editors/createSheetLogic.ts|link-supplier-item|Kobling
@@ -260,7 +242,6 @@ R67|src/ravarer/components/tabs/StockTab.tsx|Avanserte enheter|Enheter
 R68|src/ravarer/components/PriceComparisonCard.tsx|rawMaterialId|Prissammenligning
 R68|src/ravarer/components/tabs/HistoryTab.tsx|PriceComparisonCard|Prissammenligning
 R69|src/ravarer/components/tabs/HistoryTab.tsx|KIND_LABEL|Historikk
-R79|src/ravarer/pages/priskontroll/gjore/mengde/MengdeDiagnostikk.tsx|Mengde i baseenhet|Diagnostikk
 R81|src/ravarer/pages/Varemottak.tsx|Fakturaer i perioden|Liste
 R82|src/ravarer/pages/Varemottak.tsx|Fra dato|Periode
 R83|src/ravarer/pages/Varemottak.tsx|Mottaksstatus|Status
@@ -269,16 +250,8 @@ R85|src/ravarer/pages/varemottak/InvoiceReceiptPanel.tsx|rm_receive_invoice_line
 R86|src/ravarer/pages/varemottak/InvoiceReceiptPanel.tsx|Avvik|Avvik
 R87|src/ravarer/pages/varemottak/InvoiceReceiptPanel.tsx|Sett pakning|Pakning
 R88|src/ravarer/pages/Varemottak.tsx|Manuelt mottak|Manuelt mottak
-F31|src/fakturaer/components/inbox/task/LineTask.tsx|Bekreft råvare|Bekreft råvare (og pakning) i ett steg
-F34|src/fakturaer/components/inbox/task/LineTask.tsx|Prisen er riktig|Godta pris per linje
-F35|src/fakturaer/components/inbox/task/LineTask.tsx|Rett avtalepris|Rett avtalepris
-F36|src/fakturaer/components/inbox/task/LineTask.tsx|Kontroller pakningen|Fra prissteget
-F37|src/fakturaer/components/inbox/task/LineTask.tsx|Beregn prisen på nytt|Beregn på nytt
-F39|src/fakturaer/components/inbox/task/LineTask.tsx|Hent AI-forslag|AI-forslag
 F43|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|SimilarLinesHint|Like linjer etter kobling
 F46|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|nbhub.faktura.docpanel.v2|Dokumentpanelets tilstand huskes
-F49|src/fakturaer/components/inbox/task/LineTask.tsx|Ny råvare …|Opprett ny vare
-F54|src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx|WorkListView|Listerader/mobilkort (kolonnene er listerader)
 F84|src/ravarer/pages/priskontroll/fakturaer/FakturaerTab.tsx|TripletexStatusCard|Tripletex-statuskort
 R192|src/ravarer/pages/reberegn/SingleRecalcDetail.tsx|Serverens regnestykke nå|Eksplisitt skrivebeskyttet enkeltforslag (recalc_raw_material_cost, p_dry_run true) per vare fra forslag/kvittering/feil; dagens forslag, ikke frosset kvitteringsspor
 R192|src/ravarer/hooks/useSingleRecalcPreview.ts|p_dry_run: true|Én forespørsel om gangen, frosset selskap+vare+generasjon
@@ -286,8 +259,6 @@ R195|src/ravarer/pages/reberegn/reberegnColumns.tsx|paths.pakninger|Pakningslenk
 F27|src/fakturaer/hooks/useSupplierItems.ts|p_limit: 200|Grouped cross-invoice item inspection retains up-to-200 request
 F27|src/ravarer/pages/priskontroll/gjore/VarekortPanel.tsx|<SupplierItemHistory lines={lines}|All returned grouped invoice lines shown; current replacement for former flat queue
 F27|src/fakturaer/components/supplier-item/SupplierItemHistory.tsx|to={paths.faktura(l.invoice_id)}|Each history line links to its own invoice
-F33|src/fakturaer/components/inbox/task/LineTask.tsx|Husk leverandørens varetekst|Separate varetekst choice exists; delete false not-found note
-F33|src/fakturaer/hooks/useLineMatchForm.ts|rejectedRawMaterialIds: suggestions|acceptMatch receives rememberSku/rememberName plus rejected alternatives
 F73|src/fakturaer/components/invoice-detail/InvoiceFactsCard.tsx|readingReliability({ confidence: conf|Rendered reading status, not merely ControlSummary import
 F75|src/fakturaer/components/invoice-detail/InvoiceFactsCard.tsx|<Row k="Bilagsnr">|InvoiceFactsView renders amount/VAT/net/voucher/paid/line sum/variance/reliability/attempts/source
 F75|src/ravarer/pages/priskontroll/faktura/ControlSummary.tsx|<InvoiceFactsView invoice={data} details={headerFacts(data)}|Actual current workspace consumer
@@ -301,3 +272,31 @@ F91|src/ravarer/pages/priskontroll/saker/CaseCreditForm.tsx|clientRef: ref|Credi
 F91|src/fakturaer/lib/supplierCases.ts|p_client_ref: args.clientRef|Existing allocation RPC idempotency parameter; not a new DB test
 F92|src/ravarer/pages/priskontroll/saker/CaseRecovery.tsx|mutationFn: (v: { id: string; status: Status; note: string })|Actual status callback for resolve/cancel/reopen with required reason
 F92|src/fakturaer/lib/supplierCases.ts|p_status: status, p_note: note|Existing set_supplier_deviation_case_status RPC arguments
+F5|src/ravarer/pages/oversikt/FraFakturaOverviewCard.tsx|overviewTiles|Opprydding D: tellere per fane i Fra faktura erstatter topp-5
+F7|src/ravarer/pages/oversikt/FraFakturaOverviewCard.tsx|label: "Nye varer"|Opprydding D: kort med lenke til Fra faktura
+F8|src/ravarer/pages/oversikt/FraFakturaOverviewCard.tsx|label: "Til godkjenning"|Opprydding D: kort med lenke til Godkjenning
+F9|src/ravarer/pages/frafaktura/NewItemsTab.tsx|newItemChips|Opprydding D: leverandørchips
+F9|src/ravarer/pages/frafaktura/NewItemsTab.tsx|"Vis flere"|Sider à 50
+F17|GAP|Fjernet etter Henriks beslutning 17.11.2026 (kun versjon D): besvart rad forsvinner fra listen, ingen automatisk hopp
+F26|GAP|Fjernet etter Henriks beslutning 17.11.2026 (kun versjon D): Fra faktura sorterer eldste først; linjefilter på fakturasiden beholdt
+F28|src/ravarer/pages/frafaktura/NewItemsTab.tsx|sikre`|Opprydding D: «Opprett N sikre»
+F51|src/ravarer/pages/frafaktura/NewItemsTab.tsx|sikre`|Opprydding D: «Opprett N sikre»
+F29|src/ravarer/pages/frafaktura/NewItemsTab.tsx|Blir til denne varen|Opprydding D: én rad per leverandørvare (vare, pakning, svar)
+F30|src/ravarer/pages/frafaktura/RowTarget.tsx|Koble til en vare jeg har|Forslag og søk
+F31|src/ravarer/pages/frafaktura/NewItemRow.tsx|onClick={() => void submit()}|Kobling og pakning lagres i ett svar
+F32|src/ravarer/pages/frafaktura/RowPackage.tsx|Mangler mengde|Pakning i raden
+F33|src/fakturaer/components/supplier-item/SupplierItemLinkForm.tsx|useMaterialChoices|Leverandørvarens koblingsskjema (læring per leverandør)
+F34|src/ravarer/pages/frafaktura/PriceJumpRow.tsx|Prisen stemmer|Opprydding D: Prishopp
+F35|src/ravarer/pages/priskontroll/gjore/PriceBlockView.tsx|Rett avtalepris|Leverandørvarens prisblokk
+F36|src/ravarer/pages/frafaktura/PriceJumpRow.tsx|Feil pakning|Opprydding D: Prishopp
+F37|src/ravarer/pages/hub/PriskontrollToolsMenu.tsx|Beregn alle åpne på nytt|Verktøymenyen i Fakturaer
+F39|src/fakturaer/components/supplier-item/AiSuggestion.tsx|Hent AI-forslag|Leverandørvarens visning
+F44|GAP|Fjernet etter Henriks beslutning 17.11.2026 (kun versjon D): linje-for-linje-hurtigtastene fulgte køen som er fjernet; Oversikt har g f / g v / g p
+F47|src/fakturaer/components/supplier-item/SupplierItemLinkForm.tsx|useMaterialChoices|Kobling skjer per leverandørvare; enkeltlinje rettes via «Rett linjen»
+F48|src/ravarer/pages/frafaktura/NewItemRow.tsx|onClick={() => void submit()}|Svaret gjelder alle linjer for leverandørvaren
+F49|src/ravarer/pages/frafaktura/RowTarget.tsx|Opprett som ny|Opprett ny vare
+F53|src/fakturaer/pages/Varekoblinger.tsx|Alle leverandører|Leverandørvarer (beholdt)
+F54|src/fakturaer/pages/Varekoblinger.tsx|Søk på vare eller varenummer|Leverandørvarer (beholdt)
+F55|src/fakturaer/pages/Varekoblinger.tsx|useSearchParams|URL-synk
+F79|src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx|InvoiceLinesTable|Arkiv: linjetabell vises alltid
+R79|GAP|Fjernet etter Henriks beslutning 17.11.2026 (kun versjon D): skrivebeskyttet diagnostikk uten handling

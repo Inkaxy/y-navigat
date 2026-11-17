@@ -80,3 +80,13 @@ Lokal test: `node scripts/test-nye-varer-sql.mjs` (PGlite med live-kopi av `rm_w
 `supabase/functions/match-invoice-lines` er endret i repoet (prishopp-grense, stille prisendring under grensen, entydig pakning fra fakturaen, første pris på sikker kobling) men **ikke rullet ut av meg**. Reglene leses fra kolonnene over og er av når kolonnene mangler eller står av, så utrulling før SQL endrer ikke oppførselen.
 
 Kan utgå/slås sammen: `rm_key_material_limits` i `20261117_automatikk` overlapper med egen grense per vare (`raw_materials.price_jump_pct`). `20261117_prislinje`, `20261118_handelsvarer` og `20261118_prisgrunnlag` er uavhengige av «Fra faktura» (Prishopp regner marginkonsekvens med dagens `product_margins`). `20261117_automatikk_cron.DATAENDRING` trengs ikke.
+
+## Opprydding – kun versjon D (17.11.2026)
+
+Ingen ny SQL, ingenting kjørt, ingen databasefunksjoner eller tabeller slettet.
+
+- Ikke lenger kalt fra frontend: `rm_work_item_plan_lines` (bare den fjernede gamle arbeidslisten brukte den) og `rm_key_material_limits` (nøkkelråvaregrenser utgår; «egen grense per vare» erstatter dem).
+- `20261117_automatikk.PENDING.sql`: **utgår delvis.** Tabellen `rm_key_material_limits` trengs ikke lenger. Resten (pant som følgevare, automatisk ny lesing, `rm_cap_automatikk_v1`) brukes fortsatt av Innstillinger › «Automatikk og regler» og svarknappene. Root/Henrik avgjør om tabelldelen strykes før kjøring. `match-invoice-lines`/`_shared/automationRules.ts` i repoet leser fortsatt nøkkelgrenser (manglende tabell = ingen grenser).
+- `20261117_automatikk_cron.DATAENDRING.sql`: **utgår** (som før – trengs ikke).
+- `20261117_prislinje.PENDING.sql`: **trengs fortsatt.** Prishistorikk, «Rett pris» og «Endre godkjent pakning» er flyttet til varens Pris-seksjon under Varer og bruker samme funksjoner (`rm_cap_prislinje_v1`).
+

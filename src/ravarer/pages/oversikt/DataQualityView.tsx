@@ -54,7 +54,6 @@ export function DataQualityView({ dq, stockBelowMin, loading, error, onRetry }: 
     { label: "Deklarasjonsnavn", ok: active - dq.missing_declaration, total: active, to: paths.deklarasjonsnavn() },
     { label: "Næringsdata", ok: active - dq.missing_nutrition, total: active, to: paths.naering() },
     { label: "Stabil pris", ok: active - dq.unstable_price, total: active, to: paths.pakninger({ filter: "ustabil_pris" }) },
-    { label: "Lager over minimum", ok: Math.max(0, active - stockBelowMin), total: active, to: paths.lager() },
   ];
 
   return (

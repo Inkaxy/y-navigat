@@ -23,32 +23,32 @@ export function varerTabs(s: WorkSummary | undefined, sp: URLSearchParams = new 
   ];
 }
 
-export const PRISKONTROLL_TABS = ["arbeid", "fakturaer", "gjore", "godkjenning", "saker"] as const;
+export const PRISKONTROLL_TABS = ["fakturaer", "godkjenning"] as const;
 export type PriskontrollTabId = (typeof PRISKONTROLL_TABS)[number];
 
-/** Parametre som tilhører en enkelt Priskontroll-fane og fjernes ved fanebytte. */
+/** Parametre som tilhører en enkelt Fakturaer-fane og fjernes ved fanebytte. */
 export const PRISKONTROLL_TAB_PARAMS = [
   "visning", "modus", "innboks", "faktura", "filter", "kilde", "kreditnota", "lav", "status", "leverandor", "q", "selskap", "fra", "til", "avvik", "betalt", "sort", "dir", "side", "sak", "vis", "valgt", "rekkefolge", "linje", "fokus",
 ];
 
-/** Godkjenning: `rm_work_summary.approval.ready_to_approve` har samme regel som listens «Klare» (ikke kansellert, ikke godkjent, ingen blokkere). */
-export function priskontrollTabs(s: WorkSummary | undefined, active: string = "arbeid"): SectionTab[] {
+/**
+ * Fakturaer er et arkiv (opprydding demo D): alle fakturaer, og Godkjenning (uendret).
+ * `rm_work_summary.approval.ready_to_approve` har samme regel som listens «Klare» (ikke kansellert, ikke godkjent, ingen blokkere).
+ */
+export function priskontrollTabs(s: WorkSummary | undefined): SectionTab[] {
   return [
-    // Primærinngang: én faktura om gangen. Tellerne står i arbeidsflatens egen filterrad (med enhet).
-    { id: "arbeid", label: "Fakturaer" },
-    // Sekundære flater: åpnes fra «Verktøy»; fanen vises bare mens den er åpen, og gamle lenker virker uendret.
-    { id: "fakturaer", label: "Fakturaliste", hidden: active !== "fakturaer" },
-    { id: "gjore", label: "Varegrupper", hidden: active !== "gjore" },
+    { id: "fakturaer", label: "Fakturaer" },
     { id: "godkjenning", label: "Godkjenning", count: s?.approval?.ready_to_approve },
-    { id: "saker", label: "Leverandørsaker", count: s?.other.cases_open },
   ];
 }
 
+/** Leverandørsaker flyttet hit fra Fakturaer (krever fakturatilgang, som før). */
 export function leverandorTabs(s: WorkSummary | undefined, hasInvoiceAccess: boolean): SectionTab[] {
   return [
     { id: "leverandorer", label: "Leverandører" },
     { id: "avtaler", label: "Avtaler", count: s?.other.agreements_expiring_30d, tone: "warning" },
     { id: "forhandlinger", label: "Forhandlinger", hidden: !hasInvoiceAccess },
+    { id: "saker", label: "Leverandørsaker", count: s?.other.cases_open, hidden: !hasInvoiceAccess },
   ];
 }
 

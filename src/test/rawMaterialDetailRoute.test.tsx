@@ -39,6 +39,7 @@ const NaeringStub = stubRegistering("naering");
 const DeklStub = stubRegistering("deklarasjon");
 vi.mock("@/ravarer/components/tabs/OverviewTab", () => ({ OverviewTab: stubRegistering("grunndata") }));
 vi.mock("@/ravarer/components/tabs/SuppliersTab", () => ({ SuppliersTab: () => <div data-testid="stub-pris" /> }));
+vi.mock("@/ravarer/components/prislinje/RawMaterialPriceLines", () => ({ RawMaterialPriceLines: () => null }));
 vi.mock("@/ravarer/components/tabs/RecipesTab", () => ({ RecipesTab: () => null }));
 vi.mock("@/ravarer/components/tabs/StockTab", () => ({ StockTab: () => null }));
 vi.mock("@/ravarer/components/tabs/HistoryTab", () => ({ HistoryTab: () => <div data-testid="stub-historikk" /> }));

@@ -8,7 +8,6 @@ import { splitByGate } from "@/ravarer/pages/priskontroll/gjore/PriceBlock";
 import { reasonGate } from "@/fakturaer/lib/priceSafety";
 import { UNCHECKED } from "@/fakturaer/lib/priceSafety";
 import { clarifyHref, clarifyReturn, startTarget, parseFocus } from "@/ravarer/pages/priskontroll/gjore/clarifyTarget";
-import { detailCause } from "@/ravarer/pages/priskontroll/gjore/groupCopy";
 import { FocusNotice } from "@/ravarer/pages/priskontroll/faktura/FocusNotice";
 import { fakturaReturn } from "@/ravarer/pages/priskontroll/fakturaer/visning";
 import { whatIsMissing, type SupplierItem } from "@/fakturaer/lib/supplierItems";
@@ -125,21 +124,14 @@ describe("blandet, lasting og feil", () => {
 });
 
 describe("overskrift og retur", () => {
-  it("gammel kreditnota merker ikke hele varekortet", () => {
-    const d = detailCause({ type: "varekort", kind: "prisavvik", action_required: "review_credit_note", open_lines: 7, open_invoices: 7 });
-    expect(d.cause).not.toMatch(/Kreditnota/);
-    expect(d.cause).toMatch(/7 åpne linjer på 7 fakturaer/);
-    expect(d.next).not.toMatch(/kreditnota/i);
-    expect(detailCause({ type: "faktura", kind: "faktura_flagget", action_required: "review_credit_note", open_lines: 1, open_invoices: 1 }).cause).toBe("Kreditnota – ikke en prisendring");
-  });
   it("«Hva mangler» påstår ikke bekreftede prisavvik", () => {
     const t = whatIsMissing({ status: "prisavvik", open_lines: 7, rm_name: "Combisur" } as SupplierItem);
     expect(t).not.toMatch(/avviker fra prisgrunnlaget/);
     expect(t).toMatch(/mulig prisavvik/);
   });
-  it("retur går tilbake til eksakt varekort i arbeidsbordet eller på egen side", () => {
+  it("retur går tilbake til eksakt varekort (gammel arbeidsbord-adresse videresendes) eller på egen side", () => {
     expect(fakturaReturn(RET).href).toBe(`/ravarer/priskontroll${RET}`);
-    expect(fakturaReturn(RET).label).toBe("Å gjøre");
+    expect(fakturaReturn(RET).label).toBe("Fakturaer");
     const own = clarifyReturn("/ravarer/priskontroll/varekort/s1/sku%3A12113", "")!;
     expect(fakturaReturn(own)).toEqual({ href: "/ravarer/priskontroll/varekort/s1/sku%3A12113", label: "Varekort" });
     expect(fakturaReturn("//evil.com").href).toBe("/ravarer/priskontroll?fane=fakturaer");

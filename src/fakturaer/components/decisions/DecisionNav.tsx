@@ -4,13 +4,12 @@ import { useIsEmbedded } from "@/ravarer/ui/EmbeddedContext";
 import { paths } from "@/ravarer/lib/paths";
 
 const ITEMS = [
-  { to: paths.priskontroll({ fane: "gjore" }), label: "Å gjøre" },
   { to: paths.alleFakturaer(), label: "Fakturaer" },
   { to: paths.godkjenning(), label: "Godkjenning" },
   { to: paths.saker(), label: "Leverandørsaker" },
 ];
 
-/** Snarveier til Priskontroll-fanene (samme navn som fanene), for frittstående beslutningssider. */
+/** Snarveier til Fakturaer (arkiv), Godkjenning og Leverandørsaker for frittstående sider (alle leverandørvarer). */
 export function DecisionNav() {
   if (useIsEmbedded()) return null;
   return (

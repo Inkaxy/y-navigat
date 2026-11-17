@@ -272,3 +272,18 @@ export function useFraFakturaCounts(enabled: boolean, localLimit: number | null 
   const unreadCount = unread.isError ? null : unread.data?.length ?? null;
   return { newItems, priceJumps: priceJumpCount, unread: unreadCount, total: fraFakturaTotal([newItems, priceJumpCount, unreadCount]), limit: jumps.limit };
 }
+
+/** Lagrer selskapets grense og regler for Fra faktura (godkjenner). Brukt i Prishopp og Innstillinger › Automatikk og regler. */
+export function useSaveFraFakturaSettings() {
+  const qc = useQueryClient();
+  const { data: company } = useCompany();
+  return async (s: FraFakturaSettings, patch: { pct?: number; quiet?: boolean; pkg?: boolean }): Promise<string | null> => {
+    if (!company) return "Selskapet er ikke lastet.";
+    const r = await callPendingRpc("rm_set_fra_faktura_settings", {
+      p_legal_entity_id: company.id, p_price_jump_pct: patch.pct ?? (s.isDefault ? null : s.priceJumpPct),
+      p_quiet_prices: patch.quiet ?? null, p_invoice_package: patch.pkg ?? null,
+    });
+    void qc.invalidateQueries({ queryKey: ["ravarer", "fra-faktura"] });
+    return r.kind === "ok" ? null : r.kind === "denied" ? "Bare godkjennere kan endre dette." : "Endringen ble ikke lagret. Prøv igjen.";
+  };
+}

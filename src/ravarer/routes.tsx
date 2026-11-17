@@ -13,8 +13,6 @@ import { VarerShell } from "@/ravarer/pages/hub/VarerShell";
 const Oversikt = lazy(() => import("@/ravarer/pages/hub/RavarerOversikt"));
 const FraFaktura = lazy(() => import("@/ravarer/pages/frafaktura/FraFaktura"));
 const Beslutninger = lazy(() => import("@/ravarer/pages/beslutninger/Beslutninger"));
-const Prislinje = lazy(() => import("@/ravarer/pages/prislinje/Prislinje"));
-const Automatikk = lazy(() => import("@/ravarer/pages/automatikk/Automatikk"));
 const Priskontroll = lazy(() => import("@/ravarer/pages/hub/PriskontrollPage"));
 const LeverandorerHub = lazy(() => import("@/ravarer/pages/hub/LeverandorerHub"));
 const LagerHub = lazy(() => import("@/ravarer/pages/hub/LagerHub"));
@@ -57,10 +55,9 @@ export function ravarerRoutes(Shell: ShellType) {
     <Route key="oversikt" path="/ravarer" element={rv(<Oversikt />)} />,
     // Demo D: «Fra faktura til vare» (krever fakturatilgang). Beslutninger består som «Øvrige spørsmål».
     <Route key="fra-faktura" path="/ravarer/fra-faktura" element={inv(<FraFaktura />)} />,
-    // Variant B: beslutningskøen (krever fakturatilgang, som køen den bygger på).
+    // Variant B: beslutningskøen, beholdt som «Øvrige spørsmål» til kontroll/små prisendringer/klarhet er flyttet inn i Fra faktura.
+    // Prislinje og Automatikk er fjernet (opprydding demo D); gamle adresser videresendes i legacyRoutes.
     <Route key="beslutninger" path="/ravarer/beslutninger" element={inv(<Beslutninger />)} />,
-    <Route key="prislinje" path="/ravarer/prislinje" element={inv(<Prislinje />)} />,
-    <Route key="automatikk" path="/ravarer/automatikk" element={inv(<Automatikk />)} />,
 
     // Varer
     // Én varearbeidsflate (fase 4A); gamle /varer/pakninger|deklarasjonsnavn|naering|datablad-endringer videresendes (legacyRoutes).
@@ -69,7 +66,7 @@ export function ravarerRoutes(Shell: ShellType) {
     <Route key="dbbulk" path="/ravarer/varer/datablad-opplasting" element={rv(<VarerShell title="Last opp datablad"><DatabladBulk /></VarerShell>)} />,
     <Route key="raavare" path="/ravarer/varer/:id" element={rv(<RawMaterialDetail />)} />,
 
-    // Priskontroll
+    // Fakturaer (arkiv). Leverandørvarer (varekort) nås fra varer, leverandørkort og «Øvrige spørsmål».
     <Route key="pk" path="/ravarer/priskontroll" element={inv(<Priskontroll />)} />,
     <Route key="pk-vk" path="/ravarer/priskontroll/varekort" element={inv(<AlleVarekort />)} />,
     <Route key="pk-vk-d" path="/ravarer/priskontroll/varekort/:supplierId/:itemKey" element={inv(<VarekortPage />)} />,
