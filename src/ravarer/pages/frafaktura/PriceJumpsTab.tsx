@@ -71,7 +71,8 @@ export function PriceJumpsTab({ localLimit, onLocalLimit, canWrite, canApprove, 
           <ul aria-label="Prishopp">
             {(p.jumps ?? []).map((j) => (
               <PriceJumpRow key={j.key} j={j} supplierName={names.get(j.supplierId) ?? null} usage={usage.data} canWrite={canWrite} retur={retur}
-                onRound={(key, items) => setRound({ key, items })} inRound={inRound.get(j.key) ?? null} />
+                onRound={(key, items) => setRound({ key, items })} inRound={inRound.get(j.key) ?? null}
+                itemLimit={canSave && s ? { current: p.items.data?.get(j.rawMaterialId) ?? null, companyLimit: s.priceJumpPct } : null} />
             ))}
           </ul>
         )}

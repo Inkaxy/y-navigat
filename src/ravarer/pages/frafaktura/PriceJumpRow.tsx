@@ -11,14 +11,17 @@ import { useQuickAnswers } from "../beslutninger/useQuickAnswers";
 import { useDecisionUndo } from "../beslutninger/useDecisionUndo";
 import { PackageFix } from "../beslutninger/PackageFix";
 import { usePriceConsequence } from "./usePriceConsequence";
+import { ItemLimitSelect } from "./ItemLimitSelect";
 import { cn } from "@/lib/utils";
 
 const kr = (v: number) => v.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** Ett prishopp (D3): gammel → ny pris, årsak, konsekvens og tre svar. Godtar bare serverkontrollerte linjer. */
-export function PriceJumpRow({ j, supplierName, usage, canWrite, retur, onRound, inRound }: {
+export function PriceJumpRow({ j, supplierName, usage, canWrite, retur, onRound, inRound, itemLimit }: {
   j: PriceJump; supplierName: string | null; usage: readonly RecipeUsage[] | undefined; canWrite: boolean; retur: string;
   onRound: (key: string, items: AddLineItem[]) => void; inRound: number | null;
+  /** Når satt: godkjenner kan sette egen grense for varen (SQL kjørt). */
+  itemLimit?: { current: number | null; companyLimit: number } | null;
 }) {
   const itemQ = useSupplierItems({ supplierId: j.supplierId, itemKey: j.itemKey, pageSize: 1 });
   const item = itemQ.data?.items[0] ?? null;
@@ -88,6 +91,7 @@ export function PriceJumpRow({ j, supplierName, usage, canWrite, retur, onRound,
           {qa.error && <p role="alert" className="text-caption text-destructive">{qa.error}</p>}
         </div>
       </div>
+      {itemLimit && <div className="mt-2"><ItemLimitSelect rawMaterialId={j.rawMaterialId} current={itemLimit.current} companyLimit={itemLimit.companyLimit} /></div>}
       {fix && item && (
         <div className="mt-3">
           <PackageFix item={item} lines={lines} canWrite={canWrite} onCancel={() => setFix(false)}
