@@ -203,6 +203,29 @@ Deno.serve(async (req) => {
       AUTOMATIC_CHECK_BASIS.add("last_purchase");
     }
 
+    // Demo D «Fra faktura» (PENDING 20261119_fra_faktura). Kolonnene finnes ikke før SQL-en er kjørt,
+    // og begge reglene er av som standard: uten dem oppfører motoren seg nøyaktig som før.
+    const quietPrices = settings?.fra_faktura_quiet_prices === true;
+    const invoicePackage = settings?.fra_faktura_invoice_package === true;
+    const jumpPctDefault = Number.isFinite(Number(settings?.price_jump_pct)) && Number(settings?.price_jump_pct) > 0
+      ? Number(settings?.price_jump_pct) : 20;
+    // Egen grense per vare (raw_materials.price_jump_pct) leses bare når regelen er på. Manglende kolonne
+    // = ingen overstyring; andre lesefeil stopper kjøringen (fail closed).
+    const jumpPctByRm = new Map<string, number>();
+    if (quietPrices) {
+      const { data: jp, error: jpErr } = await svc.from("raw_materials")
+        .select("id, price_jump_pct").eq("legal_entity_id", inv.legal_entity_id).not("price_jump_pct", "is", null);
+      if (jpErr) {
+        const code = String((jpErr as AnyRec).code ?? "");
+        if (code !== "42703" && code !== "PGRST204") throw new Error(`Kunne ikke lese prisgrenser per vare: ${jpErr.message}`);
+      } else {
+        for (const r of (jp ?? []) as AnyRec[]) {
+          const v = Number(r.price_jump_pct);
+          if (Number.isFinite(v) && v > 0) jumpPctByRm.set(String(r.id), v);
+        }
+      }
+    }
+
 
 
     const catTols = required("kategoritoleranser", await svc.from("invoice_match_category_tolerances")
@@ -253,7 +276,10 @@ Deno.serve(async (req) => {
       const tol = isStart ? startTolPct : (catTolMap.get(category ?? "") ?? tolDefault);
       const variance = ((actual - expected) / expected) * 100;
       target.price_variance_pct = Number(variance.toFixed(3));
-      let over = Math.abs(variance) > tol;
+      // Fra faktura: utenom startpris er det bare prishopp over grensen (vare- eller selskapsgrense) som spør.
+      const quiet = quietPrices && !isStart;
+      const jumpLimit = quiet ? (rawMaterialId ? jumpPctByRm.get(rawMaterialId) : undefined) ?? jumpPctDefault : null;
+      let over = jumpLimit != null ? Math.abs(variance) > jumpLimit : Math.abs(variance) > tol;
       if (isStart && startMaxImpact != null && baseQuantity != null && Number.isFinite(baseQuantity)) {
         if (Math.abs((actual - expected) * baseQuantity) > startMaxImpact) over = true;
       }
@@ -268,7 +294,8 @@ Deno.serve(async (req) => {
       // Forrige kjøp er KUN sammenligning. Uten gyldig avtale eller bekreftet
       // startpris kan en automatisk match aldri avsluttes av motoren — heller
       // ikke når prisen ligger innenfor toleransen mot forrige faktura.
-      if (automatic && !AUTOMATIC_CHECK_BASIS.has(String(ref.source ?? ""))) {
+      // Fra faktura: en prisendring innenfor grensen føres uten spørsmål (vises i historikken).
+      if (automatic && !AUTOMATIC_CHECK_BASIS.has(String(ref.source ?? "")) && !(quiet && !over)) {
         reasons.push("no_automatic_basis");
       }
       return reasons;
@@ -837,7 +864,7 @@ Deno.serve(async (req) => {
         };
 
         // Aldri gjett: enhver ubrukelig kostpris skal ha en blokkerende årsak.
-        for (const reason of costReviewReasons(cost, actual)) addReason(reason);
+        for (const reason of costReviewReasons(cost, actual, invoicePackage && !picked.conflict)) addReason(reason);
         if (actual == null && isPackageUnit(normalizedUnit) && rm?.base_unit) addReason("unknown_package_size");
         if (picked.conflict) addReason("package_conflict");
 
@@ -854,7 +881,11 @@ Deno.serve(async (req) => {
           update.price_variance_pct = null;
           // Uten gyldig avtale eller bekreftet startpris finnes det ikke noe
           // grunnlag en maskin kan godkjenne mot — unntatt kjent identitet.
-          if (!knownIdentity) addReason("no_automatic_basis");
+          // Fra faktura: første pris på en sikker leverandørkobling føres uten spørsmål når pakningen er
+          // bekreftet, eller (med pakningsregelen på) entydig lest fra fakturaen.
+          const quietFirst = quietPrices && confidenceLabel === "auto_high" && !!rmsRow && usable && !picked.conflict
+            && (!!rmsRow.package_confirmed_at || (invoicePackage && cost!.confidence >= 0.85));
+          if (!knownIdentity && !quietFirst) addReason("no_automatic_basis");
 
           if (ref.source === "conflict") addReason("agreement_conflict");
         }
@@ -1007,7 +1038,12 @@ function costIsUsable(cost: AnyRec | null | undefined): boolean {
  * manglende/nullbeløp, mengde 0, ukjent grunnenhet, ubekreftet pakning,
  * lav tillit — eller et tall som ikke er endelig.
  */
-function costReviewReasons(cost: AnyRec | null | undefined, actual: number | null): string[] {
+function costReviewReasons(
+  cost: AnyRec | null | undefined,
+  actual: number | null,
+  /** Fra faktura (av som standard): entydig pakning lest av fakturalinjen gjelder uten egen godkjenning. */
+  acceptInvoicePackage = false,
+): string[] {
   const reasons: string[] = [];
   // costForLine gir null nettopp når varen mangler grunnenhet.
   if (!cost) return ["missing_base_unit"];
@@ -1016,7 +1052,7 @@ function costReviewReasons(cost: AnyRec | null | undefined, actual: number | nul
   else if (cost.needsInput === "base_unit") reasons.push("missing_base_unit");
   else {
     // Pakning som bare er tolket ut av varenavnet er ikke bekreftet.
-    if (packageNeedsConfirmation(cost)) reasons.push("unknown_package_size");
+    if (packageNeedsConfirmation(cost) && !(acceptInvoicePackage && Number(cost.confidence) >= 0.85)) reasons.push("unknown_package_size");
     if (cost.confidenceLevel === "low") reasons.push("uncertain_cost");
   }
   if ((actual == null || !Number.isFinite(actual)) && reasons.length === 0) reasons.push("uncertain_cost");
