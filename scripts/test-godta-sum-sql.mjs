@@ -13,6 +13,7 @@ const U = "00000000-0000-0000-0000-0000000000e1";
 const id = (p, n) => `00000000-0000-0000-${p}-${String(n).padStart(12, "0")}`;
 
 let ok = 0;
+process.on("uncaughtException", (e) => { console.error("FEIL:", e.message, e.position ?? ""); process.exit(1); });
 const fail = (m) => { console.error("FEIL:", m); process.exit(1); };
 const check = (c, m) => { if (!c) fail(m); ok++; };
 const db = new PGlite();
