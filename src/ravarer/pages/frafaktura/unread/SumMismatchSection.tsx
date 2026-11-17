@@ -10,12 +10,16 @@ import { dateNo } from "@/ravarer/lib/decisions";
 import { useBulkRereadRun } from "@/fakturaer/hooks/useBulkRereadRun";
 import { useExtractionCostRows } from "@/fakturaer/hooks/useBulkRereadGroups";
 import { estimateCost, fmtUsd } from "@/fakturaer/lib/bulkReread";
+import { rereadErrorText } from "@/fakturaer/lib/reread";
 import { useSumAccept } from "@/ravarer/hooks/useSumAccept";
 import { ACCEPT_CATEGORIES, sumRejectText } from "@/ravarer/lib/fraFaktura/sumAccept";
 import { sumDifference, sumDifferenceText, unreadReason, type UnreadInput } from "@/ravarer/lib/fraFaktura/unread";
 import { AcceptSumDialog, type AcceptReceipt, type AcceptTarget } from "./AcceptSumDialog";
 
 const kr = (v: number | null) => (v == null ? "–" : `${Number(v).toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr`);
+// Hvorfor en faktura ble hoppet over ved gjenlesing i bolk – den faktiske grunnen, ikke en samlet tekst.
+const SKIP_EXTRA: Record<string, string> = { dokument_mangler: "Originalen (PDF) mangler.", ikke_pdf: "Originalen er ikke en PDF.", pagaende: "En lesing pågår allerede." };
+const skipText = (code: string | null) => (code && SKIP_EXTRA[code]) || rereadErrorText(code);
 type Receipt = AcceptReceipt & { undo: { busy: boolean; text: string | null; opId: string | null } };
 
 /**
@@ -98,7 +102,7 @@ export function SumMismatchSection({ list, names, canWrite, retur }: { list: Unr
                 <div className="text-sm">
                   <p className="text-ink-secondary">{i.lines_sum_status === "mismatch" ? sumDifferenceText(d) : unreadReason(i)}</p>
                   {run?.outcome === "forslag" && run.runId && <Link className="font-semibold text-primary hover:underline" to={paths.lesPaNytt(i.id, { kjoring: run.runId })}>Forslaget er klart – gå gjennom</Link>}
-                  {run && run.outcome !== "forslag" && <p className="text-caption text-ink-secondary">{run.outcome === "hoppet_over" ? "Kan ikke leses på nytt (låst, godkjent, ført kost eller mangler PDF)." : "Lesingen feilet. Prøv igjen senere."}</p>}
+                  {run && run.outcome !== "forslag" && <p className="text-caption text-ink-secondary">{run.outcome === "hoppet_over" ? `Ikke lest på nytt: ${skipText(run.note)}` : run.outcome === "ai_feil" ? rereadErrorText(run.note) : "Lesingen feilet eller utfallet er ukjent. Prøv igjen senere."}</p>}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {canWrite && <Button asChild variant="outline" className="min-h-[44px]"><Link to={paths.lesPaNytt(i.id)}>Les på nytt</Link></Button>}
