@@ -30,9 +30,9 @@ export function RowPackage({ draft, onDraft, state, badge, price, baseUnit, disa
             className={cn("h-11 w-24 rounded-md border bg-background px-3 tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               missing || state.state === "invalid" ? "border-destructive" : "border-input")} />
           <label htmlFor={`${id}-u`} className="sr-only">Enhet</label>
-          <select id={`${id}-u`} value={draft.unit} disabled={disabled} onChange={(e) => onDraft({ ...draft, unit: e.target.value as ContentUnit, conflict: false })}
+          <select id={`${id}-u`} value={draft.unit} disabled={disabled} onChange={(e) => { const u = CONTENT_UNITS.find((x) => x === e.target.value); if (u) onDraft({ ...draft, unit: u, conflict: false }); }}
             className="h-11 rounded-md border border-input bg-background px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            {allowed(baseUnit).map((u) => <option key={u} value={u}>{u}</option>)}
+            {[...new Set([...allowed(baseUnit), draft.unit])].map((u) => <option key={u} value={u}>{u}</option>)}
           </select>
         </>
       )}
