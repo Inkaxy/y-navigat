@@ -96,7 +96,8 @@ check((await undo(r1.audit_id, u1)).replay === true, "samme angring på nytt er 
 check((await undo(r1.audit_id, "00000000-0000-0000-0000-00000000b002")).code === "allerede_angret", "kan ikke angres to ganger");
 const r3 = await accept(1, "avrunding", null, await upd(1), "00000000-0000-0000-0000-00000000a011");
 await db.exec(`update invoices set notes = notes || ' x' where id = '${id("0001", 1)}'`);
-check((await undo(r3.audit_id, "00000000-0000-0000-0000-00000000b003")).code === "endret_siden", "angre avvises når fakturaen er endret siden");
+const r3u = await undo(r3.audit_id, "00000000-0000-0000-0000-00000000b003");
+check(r3u.code === "endret_siden", `angre avvises når fakturaen er endret siden (${JSON.stringify(r3u)} ${JSON.stringify(r3)})`);
 check((await one(`select lines_sum_status s from invoices where id = $1`, [id("0001", 1)])).s === "ok", "avvist angring endrer ingenting");
 
 // Dry-run og DATAENDRING (som root: auth.uid() er null).
