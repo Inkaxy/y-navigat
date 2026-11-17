@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { legacyFakturaerRedirect } from "./legacyFane";
+import { resolveLegacyRavarerUrl } from "@/ravarer/lib/legacyRoutes";
 import { PRISKONTROLL_TABS, leverandorTabs } from "@/ravarer/pages/hub/hubTabs";
 
 const U = "11111111-2222-3333-4444-555555555555";
@@ -34,7 +35,6 @@ describe("faneradene etter oppryddingen", () => {
   });
 });
 
-import { resolveLegacyRavarerUrl } from "@/ravarer/lib/legacyRoutes";
 describe("gamle B-flater videresendes", () => {
   it("Prislinje går til Varer uten valgt", () => expect(resolveLegacyRavarerUrl("/ravarer/prislinje", "?valgt=abc")).toBe("/ravarer/varer"));
   it("Automatikk går til Innstillinger › Automatikk og regler", () => expect(resolveLegacyRavarerUrl("/ravarer/automatikk", "")).toBe("/ravarer/innstillinger?seksjon=automatikk"));
