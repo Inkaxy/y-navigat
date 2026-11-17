@@ -143,3 +143,10 @@ check(o1.items.every((x) => !x.last_open_line_id || !ourOpen.has(x.last_open_lin
 check((await one(`select public.rm_cap_nye_varer_v1() c`)).c === true, "cap");
 
 console.log(`OK: ${ok} kontroller bestått`);
+
+// Kontrollfilen kjører og gir bare «ok» på testkopien (selskaps-ID byttet til testselskapet).
+await db.exec(`select set_config('test.uid', '', false);`);
+const checkSql = read("supabase/pending/20261119_nye_varer_les.check.sql").replaceAll("751709bc-04b3-4449-867d-b97faa9ab373", LE);
+const checkRows = (await step("check.sql", () => db.query(checkSql))).rows;
+check(checkRows.length === 8 && checkRows.every((r) => r.ok === true), `check.sql: ${JSON.stringify(checkRows.filter((r) => r.ok !== true))}`);
+console.log(`OK: ${ok} kontroller bestått (med check.sql)`);
