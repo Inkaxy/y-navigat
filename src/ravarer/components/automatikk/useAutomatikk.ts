@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
 import { pendingSelect, useCapability } from "@/lib/pendingRpc";
-import { parseAutoSettings, parseKeyLimits, type AutoLogCounts } from "@/ravarer/lib/automatikk";
+import { parseAutoSettings, type AutoLogCounts } from "@/ravarer/lib/automatikk";
 
 export const AUTO_KEY = ["ravarer", "automatikk"] as const;
 
@@ -43,23 +43,6 @@ export function useAutoSettings() {
       const r = await pendingSelect("invoice_match_settings", `select=deposit_as_follow_item,auto_requeue_stale_enabled,auto_requeue_batch_size,auto_requeue_min_age_days&legal_entity_id=eq.${le}`, signal);
       const p = r.kind === "ok" ? parseAutoSettings(r.data) : null;
       if (!p) throw new Error("Innstillingene kunne ikke leses.");
-      return p;
-    },
-  });
-  return { cap, ...q };
-}
-
-export function useKeyLimits() {
-  const { data: company } = useCompany();
-  const le = company?.id ?? null;
-  const cap = useCapability("rm_cap_automatikk_v1");
-  const q = useQuery({
-    queryKey: [...AUTO_KEY, "nokkelravarer", le],
-    enabled: !!le && cap === true,
-    queryFn: async ({ signal }) => {
-      const r = await pendingSelect("rm_key_material_limits", `select=id,raw_material_id,max_increase_pct,min_impact_nok,note,raw_materials(name)&legal_entity_id=eq.${le}`, signal);
-      const p = r.kind === "ok" ? parseKeyLimits(r.data) : null;
-      if (!p) throw new Error("Nøkkelråvarene kunne ikke leses.");
       return p;
     },
   });

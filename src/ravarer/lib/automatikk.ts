@@ -72,25 +72,9 @@ export function parseAutoSettings(v: unknown): AutoSettings | null {
   };
 }
 
-// ---------- Logg og morgen-e-post ----------
+// ---------- Logg ----------
 export interface AutoLogCounts { newInvoices: number | null; linesLinked: number | null; linesExcluded: number | null; invoicesReconciled: number | null; recalculated: number | null }
 const c = (v: number | null) => (v == null ? "?" : v.toLocaleString("nb-NO"));
-
-export function morningEmail(o: {
-  name: string | null; log: AutoLogCounts; openQuestions: number | null;
-  oldest: { question: string; date: string | null } | null;
-  biggest: { text: string; impactNok: number } | null;
-}): string[] {
-  const lines = [`God morgen${o.name ? `, ${o.name}` : ""}.`];
-  lines.push(`Siste døgn: ${c(o.log.newInvoices)} nye fakturaer hentet, ${c(o.log.linesLinked)} linjer koblet uten deg, ${c(o.log.linesExcluded)} linjer holdt utenfor og ${c(o.log.invoicesReconciled)} fakturaer avstemt.`);
-  if (o.openQuestions === 0) lines.push("Ingen spørsmål venter på deg.");
-  else if (o.openQuestions != null) {
-    lines.push(`${o.openQuestions.toLocaleString("nb-NO")} spørsmål venter på deg.${o.oldest ? ` Det eldste${o.oldest.date ? ` (${o.oldest.date.split("-").reverse().join(".")})` : ""}: ${o.oldest.question}` : ""}`);
-  }
-  if (o.biggest) lines.push(`Størst kronevirkning: ${o.biggest.text}, rundt ${formatNorwegianNumber(Math.round(o.biggest.impactNok), 0)} kr.`);
-  lines.push("Åpne Beslutninger i NBhub for å svare.");
-  return lines;
-}
 
 export interface StaleCandidate { id: string; invoiceNumber: string | null; invoiceDate: string | null; lastRun: string | null }
 export type StaleResult = { kind: "ok"; dryRun: boolean; candidates: StaleCandidate[]; queued: number; limit: number; minAgeDays: number } | { kind: "unknown" };
@@ -108,17 +92,3 @@ export function parseStale(v: unknown): StaleResult {
   return { kind: "ok", dryRun: o.dry_run, candidates, queued: num(o.queued) ?? 0, limit: num(o.limit) ?? 0, minAgeDays: num(o.min_age_days) ?? 0 };
 }
 
-export interface KeyLimit { id: string; rawMaterialId: string; name: string; maxPct: number | null; minNok: number | null; note: string | null }
-export function parseKeyLimits(v: unknown): KeyLimit[] | null {
-  if (!Array.isArray(v)) return null;
-  const out: KeyLimit[] = [];
-  for (const x of v) {
-    if (!x || typeof x !== "object") return null;
-    const r = x as Record<string, unknown>;
-    if (typeof r.id !== "string" || typeof r.raw_material_id !== "string") return null;
-    const rm = r.raw_materials && typeof r.raw_materials === "object" ? (r.raw_materials as Record<string, unknown>) : null;
-    out.push({ id: r.id, rawMaterialId: r.raw_material_id, name: typeof rm?.name === "string" ? rm.name : "Ukjent råvare",
-      maxPct: num(r.max_increase_pct) ?? (typeof r.max_increase_pct === "string" ? Number(r.max_increase_pct) : null), minNok: num(r.min_impact_nok), note: typeof r.note === "string" ? r.note : null });
-  }
-  return out.sort((a, b) => a.name.localeCompare(b.name, "nb"));
-}
