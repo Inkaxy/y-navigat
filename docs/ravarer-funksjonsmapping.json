@@ -69,9 +69,9 @@
    "id": "F2",
    "section": "Navigasjon, tilgang og felles",
    "original_feature": "Meny-badger: linjer til behandling, varekort som venter (ukoblet + mangler pakning), avtaler som utløper, ukvitterte datablad-endringer",
-   "original_location": "RavarerNav-badge per inngang fra `rm_work_summary`; Fakturaer har ingen merke (todo_total blander varegrupper og fakturaer)",
+   "original_location": "RavarerNav-badge per inngang fra `rm_work_summary` (samme tall som Oversikt og faner)",
    "current_feature": "Meny-badger: linjer til behandling, varekort som venter (ukoblet + mangler pakning), avtaler som utløper, ukvitterte datablad-endringer",
-   "current_location_or_disposition": "RavarerNav-badge per inngang fra `rm_work_summary`; Fakturaer har ingen merke (todo_total blander varegrupper og fakturaer)",
+   "current_location_or_disposition": "RavarerNav-badge per inngang fra `rm_work_summary` (samme tall som Oversikt og faner)",
    "route_owner_path": "src/components/layout/SubAppNav.tsx",
    "action_component_paths": [
     "src/components/layout/SubAppNav.tsx"
@@ -115,9 +115,9 @@
    "id": "F3",
    "section": "Navigasjon, tilgang og felles",
    "original_feature": "Meny-badger: linjer til behandling, varekort som venter (ukoblet + mangler pakning), avtaler som utløper, ukvitterte datablad-endringer",
-   "original_location": "RavarerNav-badge per inngang fra `rm_work_summary`; Fakturaer har ingen merke (todo_total blander varegrupper og fakturaer)",
+   "original_location": "RavarerNav-badge per inngang fra `rm_work_summary` (samme tall som Oversikt og faner)",
    "current_feature": "Meny-badger: linjer til behandling, varekort som venter (ukoblet + mangler pakning), avtaler som utløper, ukvitterte datablad-endringer",
-   "current_location_or_disposition": "RavarerNav-badge per inngang fra `rm_work_summary`; Fakturaer har ingen merke (todo_total blander varegrupper og fakturaer)",
+   "current_location_or_disposition": "RavarerNav-badge per inngang fra `rm_work_summary` (samme tall som Oversikt og faner)",
    "route_owner_path": "src/components/layout/SubAppNav.tsx",
    "action_component_paths": [
     "src/components/layout/SubAppNav.tsx"
@@ -211,16 +211,17 @@
    "original_feature": "Prioritert topp-5 over beslutninger på tvers av fakturaer",
    "original_location": "/ravarer › «Til deg» (topp 7) + /priskontroll?fane=gjore sortert etter kronevirkning",
    "current_feature": "Prioritert topp-5 over beslutninger på tvers av fakturaer",
-   "current_location_or_disposition": "/ravarer › «Neste fakturaer» (5 eldste handlingsbare, samme kø som «Trenger deg») + /priskontroll?fane=gjore sortert etter kronevirkning",
+   "current_location_or_disposition": "Opprydding D: /ravarer › kortet «Fra faktura til vare» (tellere for Nye varer/Prishopp/Ikke lest)",
    "route_owner_path": "src/ravarer/pages/hub/RavarerOversikt.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/hub/RavarerOversikt.tsx"
+    "src/ravarer/pages/hub/RavarerOversikt.tsx",
+    "src/ravarer/pages/oversikt/FraFakturaOverviewCard.tsx"
    ],
    "handler_or_render_evidence": [
     {
-     "file": "src/ravarer/pages/hub/RavarerOversikt.tsx",
-     "evidence": "NextInvoicesView",
-     "note": "Topp etter kronevirkning",
+     "file": "src/ravarer/pages/oversikt/FraFakturaOverviewCard.tsx",
+     "evidence": "overviewTiles",
+     "note": "Opprydding D: tellere per fane i Fra faktura erstatter topp-5",
      "reached_from_owner": true
     }
    ],
@@ -303,17 +304,17 @@
    "original_feature": "Kort for varekort som venter, med lenke",
    "original_location": "/ravarer › KPI «Å gjøre i priskontroll» → ?fane=gjore",
    "current_feature": "Kort for varekort som venter, med lenke",
-   "current_location_or_disposition": "/ravarer › KPI «Å gjøre i priskontroll» → ?fane=gjore",
+   "current_location_or_disposition": "Opprydding D: /ravarer › kort «Nye varer»/«Prishopp» → /ravarer/fra-faktura",
    "route_owner_path": "src/ravarer/pages/hub/RavarerOversikt.tsx",
    "action_component_paths": [
     "src/ravarer/pages/hub/RavarerOversikt.tsx",
-    "src/ravarer/pages/oversikt/KpiRowView.tsx"
+    "src/ravarer/pages/oversikt/FraFakturaOverviewCard.tsx"
    ],
    "handler_or_render_evidence": [
     {
-     "file": "src/ravarer/pages/oversikt/KpiRowView.tsx",
-     "evidence": "Å gjøre i priskontroll",
-     "note": "KPI",
+     "file": "src/ravarer/pages/oversikt/FraFakturaOverviewCard.tsx",
+     "evidence": "label: \"Nye varer\"",
+     "note": "Opprydding D: kort med lenke til Fra faktura",
      "reached_from_owner": true
     }
    ],
@@ -350,17 +351,17 @@
    "original_feature": "Kort med fakturaer klare til intern godkjenning",
    "original_location": "/ravarer › KPI → /priskontroll?fane=godkjenning",
    "current_feature": "Kort med fakturaer klare til intern godkjenning",
-   "current_location_or_disposition": "/ravarer › KPI → /priskontroll?fane=godkjenning",
+   "current_location_or_disposition": "Opprydding D: /ravarer › kort «Til godkjenning» → /priskontroll?fane=godkjenning",
    "route_owner_path": "src/ravarer/pages/hub/RavarerOversikt.tsx",
    "action_component_paths": [
     "src/ravarer/pages/hub/RavarerOversikt.tsx",
-    "src/ravarer/pages/oversikt/KpiRowView.tsx"
+    "src/ravarer/pages/oversikt/FraFakturaOverviewCard.tsx"
    ],
    "handler_or_render_evidence": [
     {
-     "file": "src/ravarer/pages/oversikt/KpiRowView.tsx",
-     "evidence": "Klare til godkjenning",
-     "note": "KPI",
+     "file": "src/ravarer/pages/oversikt/FraFakturaOverviewCard.tsx",
+     "evidence": "label: \"Til godkjenning\"",
+     "note": "Opprydding D: kort med lenke til Godkjenning",
      "reached_from_owner": true
     }
    ],
@@ -397,23 +398,29 @@
    "original_feature": "Beslutningsliste: søk, leverandørfilter, typefilter, paging, «alle» eller «bare råvarer»",
    "original_location": "?fane=gjore › venstre: køer, søk, leverandørfilter",
    "current_feature": "Beslutningsliste: søk, leverandørfilter, typefilter, paging, «alle» eller «bare råvarer»",
-   "current_location_or_disposition": "/ravarer/priskontroll?fane=gjore › venstre: grupper (gamle `type`/`omfang` omdirigeres til `gruppe`), søk, leverandørfilter, paginering",
-   "route_owner_path": "src/ravarer/pages/hub/PriskontrollPage.tsx",
+   "current_location_or_disposition": "Opprydding D: /ravarer/fra-faktura › leverandørchips, sider à 50 («Vis flere»); øvrige typer i /ravarer/beslutninger",
+   "route_owner_path": "src/ravarer/pages/frafaktura/FraFaktura.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/hub/PriskontrollPage.tsx",
-    "src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx"
+    "src/ravarer/pages/frafaktura/FraFaktura.tsx",
+    "src/ravarer/pages/frafaktura/NewItemsTab.tsx"
    ],
    "handler_or_render_evidence": [
     {
-     "file": "src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx",
-     "evidence": "Søk vare, leverandør eller faktura",
-     "note": "Søk/filter",
+     "file": "src/ravarer/pages/frafaktura/NewItemsTab.tsx",
+     "evidence": "newItemChips",
+     "note": "Opprydding D: leverandørchips",
+     "reached_from_owner": true
+    },
+    {
+     "file": "src/ravarer/pages/frafaktura/NewItemsTab.tsx",
+     "evidence": "\"Vis flere\"",
+     "note": "Sider à 50",
      "reached_from_owner": true
     }
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll?fane=gjore"
+    "/ravarer/fra-faktura"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -445,9 +452,9 @@
    "original_location": "Varekort-panel › Råvare-blokk",
    "current_feature": "Material: velg forslag, søk i hele registeret, bruk på alle like linjer og husk (alias)",
    "current_location_or_disposition": "Varekort-panel › Råvare-blokk",
-   "route_owner_path": "src/ravarer/pages/hub/PriskontrollPage.tsx",
+   "route_owner_path": "src/ravarer/pages/priskontroll/VarekortPage.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/hub/PriskontrollPage.tsx",
+    "src/ravarer/pages/priskontroll/VarekortPage.tsx",
     "src/fakturaer/components/supplier-item/SupplierItemLinkForm.tsx"
    ],
    "handler_or_render_evidence": [
@@ -460,7 +467,7 @@
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll?fane=gjore"
+    "/ravarer/priskontroll/varekort/:supplierId/:itemKey"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -492,9 +499,9 @@
    "original_location": "Varekort-panel › «Opprett ny råvare»",
    "current_feature": "Material: opprett ny råvare og koble resten av gruppen",
    "current_location_or_disposition": "Varekort-panel › «Opprett ny råvare»",
-   "route_owner_path": "src/ravarer/pages/hub/PriskontrollPage.tsx",
+   "route_owner_path": "src/ravarer/pages/priskontroll/VarekortPage.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/hub/PriskontrollPage.tsx",
+    "src/ravarer/pages/priskontroll/VarekortPage.tsx",
     "src/fakturaer/components/supplier-item/SupplierItemLinkForm.tsx"
    ],
    "handler_or_render_evidence": [
@@ -507,7 +514,7 @@
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll?fane=gjore"
+    "/ravarer/priskontroll/varekort/:supplierId/:itemKey"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -539,9 +546,9 @@
    "original_location": "Varekort-panel › Pakning-blokk",
    "current_feature": "Package: bekreft pakning for alle linjer i gruppen",
    "current_location_or_disposition": "Varekort-panel › Pakning-blokk",
-   "route_owner_path": "src/ravarer/pages/hub/PriskontrollPage.tsx",
+   "route_owner_path": "src/ravarer/pages/priskontroll/VarekortPage.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/hub/PriskontrollPage.tsx",
+    "src/ravarer/pages/priskontroll/VarekortPage.tsx",
     "src/ravarer/pages/priskontroll/gjore/VarekortPanel.tsx"
    ],
    "handler_or_render_evidence": [
@@ -554,7 +561,7 @@
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll?fane=gjore"
+    "/ravarer/priskontroll/varekort/:supplierId/:itemKey"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -586,9 +593,9 @@
    "original_location": "Varekort-panel › «Første kostpris»",
    "current_feature": "First cost: sett manglende pakning og før første kostpris",
    "current_location_or_disposition": "Varekort-panel › Prisblokk «Bekreft startpris» (én linje) og «Før første kostpris på N fakturaer» (`rm_post_safe_line_costs` per faktura)",
-   "route_owner_path": "src/ravarer/pages/hub/PriskontrollPage.tsx",
+   "route_owner_path": "src/ravarer/pages/priskontroll/VarekortPage.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/hub/PriskontrollPage.tsx",
+    "src/ravarer/pages/priskontroll/VarekortPage.tsx",
     "src/ravarer/pages/priskontroll/gjore/PriceBlock.tsx"
    ],
    "handler_or_render_evidence": [
@@ -601,7 +608,7 @@
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll?fane=gjore"
+    "/ravarer/priskontroll/varekort/:supplierId/:itemKey"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -633,9 +640,9 @@
    "original_location": "Varekort-panel › Prisblokk",
    "current_feature": "Price: referanse mot fakturert pris, nivådelt forklaring, samlet kronebeløp",
    "current_location_or_disposition": "Varekort-panel › Prisblokk",
-   "route_owner_path": "src/ravarer/pages/hub/PriskontrollPage.tsx",
+   "route_owner_path": "src/ravarer/pages/priskontroll/VarekortPage.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/hub/PriskontrollPage.tsx",
+    "src/ravarer/pages/priskontroll/VarekortPage.tsx",
     "src/ravarer/pages/priskontroll/gjore/PriceBlock.tsx"
    ],
    "handler_or_render_evidence": [
@@ -648,7 +655,7 @@
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll?fane=gjore"
+    "/ravarer/priskontroll/varekort/:supplierId/:itemKey"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -680,9 +687,9 @@
    "original_location": "Prisblokk › «Godta ny pris» (`rm_supplier_item_accept_price`)",
    "current_feature": "Price: godta avviket for alle linjer, med sjekk av at linjene er uendret",
    "current_location_or_disposition": "Prisblokk › «Godta ny pris» (`rm_supplier_item_accept_price`)",
-   "route_owner_path": "src/ravarer/pages/hub/PriskontrollPage.tsx",
+   "route_owner_path": "src/ravarer/pages/priskontroll/VarekortPage.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/hub/PriskontrollPage.tsx",
+    "src/ravarer/pages/priskontroll/VarekortPage.tsx",
     "src/ravarer/hooks/useWorkData.ts"
    ],
    "handler_or_render_evidence": [
@@ -695,7 +702,7 @@
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll?fane=gjore"
+    "/ravarer/priskontroll/varekort/:supplierId/:itemKey"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -727,9 +734,9 @@
    "original_location": "Prisblokk › «Opprett leverandørsak»",
    "current_feature": "Price: opprett én leverandørsak for gruppen",
    "current_location_or_disposition": "Prisblokk › «Opprett leverandørsak»",
-   "route_owner_path": "src/ravarer/pages/hub/PriskontrollPage.tsx",
+   "route_owner_path": "src/ravarer/pages/priskontroll/VarekortPage.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/hub/PriskontrollPage.tsx",
+    "src/ravarer/pages/priskontroll/VarekortPage.tsx",
     "src/ravarer/pages/priskontroll/gjore/PriceBlock.tsx"
    ],
    "handler_or_render_evidence": [
@@ -742,7 +749,7 @@
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll?fane=gjore"
+    "/ravarer/priskontroll/varekort/:supplierId/:itemKey"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -773,25 +780,17 @@
    "original_feature": "Gå automatisk til neste etter lagring, i samme filterrekkefølge",
    "original_location": "Resultatboks + «Neste» (auto ved tastatur)",
    "current_feature": "Gå automatisk til neste etter lagring, i samme filterrekkefølge",
-   "current_location_or_disposition": "Resultatboks + «Neste» (auto ved tastatur)",
-   "route_owner_path": "src/ravarer/pages/hub/PriskontrollPage.tsx",
+   "current_location_or_disposition": "Fjernet (opprydding D): besvart rad forsvinner fra Fra faktura",
+   "route_owner_path": "src/ravarer/pages/frafaktura/FraFaktura.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/hub/PriskontrollPage.tsx",
-    "src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx"
+    "src/ravarer/pages/frafaktura/FraFaktura.tsx"
    ],
-   "handler_or_render_evidence": [
-    {
-     "file": "src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx",
-     "evidence": "AUTO_NEXT_MS",
-     "note": "Auto-neste",
-     "reached_from_owner": true
-    }
-   ],
-   "preservation_gap": null,
+   "handler_or_render_evidence": [],
+   "preservation_gap": "Fjernet etter Henriks beslutning 17.11.2026 (kun versjon D): besvart rad forsvinner fra listen, ingen automatisk hopp",
    "canonical_url_templates": [
-    "/ravarer/priskontroll?fane=gjore"
+    "/ravarer/fra-faktura"
    ],
-   "mapping_status": "handling_sporet_i_kilde",
+   "mapping_status": "bevaringsgap",
    "child_import_check": "ikke_oppgitt",
    "source_review": "ukjent",
    "mocked_test": "ukjent",
@@ -821,9 +820,9 @@
    "original_location": "Varekort-panel fryser valgt element (`?valgt=`)",
    "current_feature": "Frys gruppen mens den vises",
    "current_location_or_disposition": "`VarekortPanel` viser fryst øyeblikksbilde; nye/løste linjer gir varsel + «Oppdater». Koblingsskjema, «Ikke vare» og masseløp sender nøyaktige fryste linje-ID-er (aldri tomt). `link-supplier-item` (nå i repo) avviser tomt utvalg, hopper over linjer løst siden forhåndsvisning (`skipped_line_ids`) og regner bare om endrede linjer. Bevisst: lagret kobling/alias gjelder fremtidige linjer ved deres egen matching. Test `gjoreBulk.test.ts`. Ikke kontrollert innlogget i denne økten",
-   "route_owner_path": "src/ravarer/pages/hub/PriskontrollPage.tsx",
+   "route_owner_path": "src/ravarer/pages/priskontroll/VarekortPage.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/hub/PriskontrollPage.tsx",
+    "src/ravarer/pages/priskontroll/VarekortPage.tsx",
     "src/ravarer/pages/priskontroll/gjore/VarekortPanel.tsx"
    ],
    "handler_or_render_evidence": [
@@ -836,7 +835,7 @@
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll?fane=gjore"
+    "/ravarer/priskontroll/varekort/:supplierId/:itemKey"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -1214,25 +1213,17 @@
    "original_feature": "Linjekø: årsaksfilter (13 grupper), tre sorteringer",
    "original_location": "?fane=gjore (kronevirkning, hyppighet, dato) + /faktura/:id › linjefilter",
    "current_feature": "Linjekø: årsaksfilter (13 grupper), tre sorteringer",
-   "current_location_or_disposition": "?fane=gjore (kronevirkning, hyppighet, dato) + /faktura/:id › linjefilter",
-   "route_owner_path": "src/ravarer/pages/hub/PriskontrollPage.tsx",
+   "current_location_or_disposition": "Fjernet (opprydding D): eldste først i Fra faktura; linjefilter på /faktura/:id beholdt",
+   "route_owner_path": "src/ravarer/pages/frafaktura/FraFaktura.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/hub/PriskontrollPage.tsx",
-    "src/ravarer/pages/priskontroll/gjore/logic.ts"
+    "src/ravarer/pages/frafaktura/FraFaktura.tsx"
    ],
-   "handler_or_render_evidence": [
-    {
-     "file": "src/ravarer/pages/priskontroll/gjore/logic.ts",
-     "evidence": "GJORE_SORTS",
-     "note": "Sorteringer",
-     "reached_from_owner": true
-    }
-   ],
-   "preservation_gap": null,
+   "handler_or_render_evidence": [],
+   "preservation_gap": "Fjernet etter Henriks beslutning 17.11.2026 (kun versjon D): Fra faktura sorterer eldste først; linjefilter på fakturasiden beholdt",
    "canonical_url_templates": [
-    "/ravarer/priskontroll?fane=gjore"
+    "/ravarer/fra-faktura"
    ],
-   "mapping_status": "handling_sporet_i_kilde",
+   "mapping_status": "bevaringsgap",
    "child_import_check": "ikke_oppgitt",
    "source_review": "ukjent",
    "mocked_test": "ukjent",
@@ -1262,9 +1253,9 @@
    "original_location": "?fane=gjore (gruppert per varekort på tvers av fakturaer)",
    "current_feature": "«Kontroller linjer på tvers av fakturaer» (opptil 200)",
    "current_location_or_disposition": "?fane=gjore (gruppert per varekort på tvers av fakturaer)",
-   "route_owner_path": "src/ravarer/pages/hub/PriskontrollPage.tsx",
+   "route_owner_path": "src/ravarer/pages/priskontroll/VarekortPage.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/hub/PriskontrollPage.tsx",
+    "src/ravarer/pages/priskontroll/VarekortPage.tsx",
     "src/fakturaer/hooks/useSupplierItems.ts",
     "src/ravarer/pages/priskontroll/gjore/VarekortPanel.tsx",
     "src/fakturaer/components/supplier-item/SupplierItemHistory.tsx"
@@ -1291,7 +1282,7 @@
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll?fane=gjore"
+    "/ravarer/priskontroll/varekort/:supplierId/:itemKey"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -1322,23 +1313,23 @@
    "original_feature": "Masse: godta forslag, ikke aktuell, opprett råvarer",
    "original_location": "?fane=gjore › masseutvalg",
    "current_feature": "Masse: godta forslag, ikke aktuell, opprett råvarer",
-   "current_location_or_disposition": "?fane=gjore › avkrysning: «Ikke vare …», «Opprett råvarer …» og «Godta forslag …». Forhåndsvisning (bare lesing) henter åpne linjer og `invoice_line_match_suggestions` per varekort; entydig førstevalg forhåndsvelges, flere kandidater krever valg, ingen forslag hoppes over; sekvensielt med rapport per varekort (`bulkPreview.ts`, `bulkGjore.ts`). Per faktura uendret",
-   "route_owner_path": "src/ravarer/pages/hub/PriskontrollPage.tsx",
+   "current_location_or_disposition": "Opprydding D: /ravarer/fra-faktura › «Opprett N sikre» og «Ikke vare» per rad",
+   "route_owner_path": "src/ravarer/pages/frafaktura/FraFaktura.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/hub/PriskontrollPage.tsx",
-    "src/ravarer/pages/priskontroll/gjore/GjoreBulkBar.tsx"
+    "src/ravarer/pages/frafaktura/FraFaktura.tsx",
+    "src/ravarer/pages/frafaktura/NewItemsTab.tsx"
    ],
    "handler_or_render_evidence": [
     {
-     "file": "src/ravarer/pages/priskontroll/gjore/GjoreBulkBar.tsx",
-     "evidence": "Opprett råvarer …",
-     "note": "Masse",
+     "file": "src/ravarer/pages/frafaktura/NewItemsTab.tsx",
+     "evidence": "sikre`",
+     "note": "Opprydding D: «Opprett N sikre»",
      "reached_from_owner": true
     }
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll?fane=gjore"
+    "/ravarer/fra-faktura"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -1375,23 +1366,23 @@
    "original_feature": "Oppgavekort med linjestatus og tre steg (råvare, pakning, pris)",
    "original_location": "Linjeinspektør",
    "current_feature": "Oppgavekort med linjestatus og tre steg (råvare, pakning, pris)",
-   "current_location_or_disposition": "Linjeinspektør",
-   "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+   "current_location_or_disposition": "Opprydding D: /ravarer/fra-faktura › rad per leverandørvare (vare, pakning, svar)",
+   "route_owner_path": "src/ravarer/pages/frafaktura/FraFaktura.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
-    "src/fakturaer/components/inbox/task/LineTask.tsx"
+    "src/ravarer/pages/frafaktura/FraFaktura.tsx",
+    "src/ravarer/pages/frafaktura/NewItemsTab.tsx"
    ],
    "handler_or_render_evidence": [
     {
-     "file": "src/fakturaer/components/inbox/task/LineTask.tsx",
-     "evidence": "LineTask",
-     "note": "Oppgavekort",
+     "file": "src/ravarer/pages/frafaktura/NewItemsTab.tsx",
+     "evidence": "Blir til denne varen",
+     "note": "Opprydding D: én rad per leverandørvare (vare, pakning, svar)",
      "reached_from_owner": true
     }
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll/faktura/:id?linje=:linje"
+    "/ravarer/fra-faktura"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -1422,23 +1413,23 @@
    "original_feature": "Forslag og søk på navn/varenr., valgfri treffprosent",
    "original_location": "Linjeinspektør › Råvare",
    "current_feature": "Forslag og søk på navn/varenr., valgfri treffprosent",
-   "current_location_or_disposition": "Linjeinspektør › Råvare",
-   "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+   "current_location_or_disposition": "Opprydding D: Fra faktura › «Koble til en vare jeg har» (søk, forslag øverst)",
+   "route_owner_path": "src/ravarer/pages/frafaktura/FraFaktura.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
-    "src/fakturaer/components/inbox/task/MaterialPicker.tsx"
+    "src/ravarer/pages/frafaktura/FraFaktura.tsx",
+    "src/ravarer/pages/frafaktura/RowTarget.tsx"
    ],
    "handler_or_render_evidence": [
     {
-     "file": "src/fakturaer/components/inbox/task/MaterialPicker.tsx",
-     "evidence": "MaterialPicker",
-     "note": "Forslag/søk",
+     "file": "src/ravarer/pages/frafaktura/RowTarget.tsx",
+     "evidence": "Koble til en vare jeg har",
+     "note": "Forslag og søk",
      "reached_from_owner": true
     }
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll/faktura/:id?linje=:linje"
+    "/ravarer/fra-faktura"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -1469,23 +1460,23 @@
    "original_feature": "Bekreft råvare (og pakning) i ett steg",
    "original_location": "Linjeinspektør › hovedknapp",
    "current_feature": "Bekreft råvare (og pakning) i ett steg",
-   "current_location_or_disposition": "Linjeinspektør › hovedknapp",
-   "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+   "current_location_or_disposition": "Opprydding D: Fra faktura › hovedknapp lagrer kobling og pakning",
+   "route_owner_path": "src/ravarer/pages/frafaktura/FraFaktura.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
-    "src/fakturaer/components/inbox/task/LineTask.tsx"
+    "src/ravarer/pages/frafaktura/FraFaktura.tsx",
+    "src/ravarer/pages/frafaktura/NewItemRow.tsx"
    ],
    "handler_or_render_evidence": [
     {
-     "file": "src/fakturaer/components/inbox/task/LineTask.tsx",
-     "evidence": "Bekreft råvare",
-     "note": "Bekreft råvare (og pakning) i ett steg",
+     "file": "src/ravarer/pages/frafaktura/NewItemRow.tsx",
+     "evidence": "onClick={() => void submit()}",
+     "note": "Kobling og pakning lagres i ett svar",
      "reached_from_owner": true
     }
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll/faktura/:id?linje=:linje"
+    "/ravarer/fra-faktura"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -1516,23 +1507,23 @@
    "original_feature": "Pakningsskjema med hint fra varenavn og varsel ved uenighet",
    "original_location": "Linjeinspektør › Pakning (PackageEditor-logikk)",
    "current_feature": "Pakningsskjema med hint fra varenavn og varsel ved uenighet",
-   "current_location_or_disposition": "Linjeinspektør › Pakning (PackageEditor-logikk)",
-   "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+   "current_location_or_disposition": "Opprydding D: Fra faktura › pakning i raden",
+   "route_owner_path": "src/ravarer/pages/frafaktura/FraFaktura.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
-    "src/fakturaer/components/inbox/task/PackageForm.tsx"
+    "src/ravarer/pages/frafaktura/FraFaktura.tsx",
+    "src/ravarer/pages/frafaktura/RowPackage.tsx"
    ],
    "handler_or_render_evidence": [
     {
-     "file": "src/fakturaer/components/inbox/task/PackageForm.tsx",
-     "evidence": "PackageForm",
-     "note": "Pakningsskjema",
+     "file": "src/ravarer/pages/frafaktura/RowPackage.tsx",
+     "evidence": "Mangler mengde",
+     "note": "Pakning i raden",
      "reached_from_owner": true
     }
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll/faktura/:id?linje=:linje"
+    "/ravarer/fra-faktura"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -1563,30 +1554,23 @@
    "original_feature": "«Husk varenummer» / «Husk varetekst» (aliaslæring, avviste forslag)",
    "original_location": "Linjeinspektør › «Dette lagres»",
    "current_feature": "«Husk varenummer» / «Husk varetekst» (aliaslæring, avviste forslag)",
-   "current_location_or_disposition": "Linjeinspektør › «Dette lagres»",
-   "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+   "current_location_or_disposition": "Leverandørvare /priskontroll/varekort/:leverandør/:vare › koblingsskjema",
+   "route_owner_path": "src/ravarer/pages/priskontroll/VarekortPage.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
-    "src/fakturaer/components/inbox/task/LineTask.tsx",
-    "src/fakturaer/hooks/useLineMatchForm.ts"
+    "src/ravarer/pages/priskontroll/VarekortPage.tsx",
+    "src/fakturaer/components/supplier-item/SupplierItemLinkForm.tsx"
    ],
    "handler_or_render_evidence": [
     {
-     "file": "src/fakturaer/components/inbox/task/LineTask.tsx",
-     "evidence": "Husk leverandørens varetekst",
-     "note": "Separate varetekst choice exists; delete false not-found note",
-     "reached_from_owner": true
-    },
-    {
-     "file": "src/fakturaer/hooks/useLineMatchForm.ts",
-     "evidence": "rejectedRawMaterialIds: suggestions",
-     "note": "acceptMatch receives rememberSku/rememberName plus rejected alternatives",
+     "file": "src/fakturaer/components/supplier-item/SupplierItemLinkForm.tsx",
+     "evidence": "useMaterialChoices",
+     "note": "Leverandørvarens koblingsskjema (læring per leverandør)",
      "reached_from_owner": true
     }
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll/faktura/:id?linje=:linje"
+    "/ravarer/priskontroll/varekort/:supplierId/:itemKey"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -1617,23 +1601,23 @@
    "original_feature": "«Prisen er riktig» (godta per linje)",
    "original_location": "Linjeinspektør › Pris",
    "current_feature": "«Prisen er riktig» (godta per linje)",
-   "current_location_or_disposition": "Linjeinspektør › Pris",
-   "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+   "current_location_or_disposition": "Opprydding D: Fra faktura › Prishopp › «Prisen stemmer»",
+   "route_owner_path": "src/ravarer/pages/frafaktura/FraFaktura.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
-    "src/fakturaer/components/inbox/task/LineTask.tsx"
+    "src/ravarer/pages/frafaktura/FraFaktura.tsx",
+    "src/ravarer/pages/frafaktura/PriceJumpRow.tsx"
    ],
    "handler_or_render_evidence": [
     {
-     "file": "src/fakturaer/components/inbox/task/LineTask.tsx",
-     "evidence": "Prisen er riktig",
-     "note": "Godta pris per linje",
+     "file": "src/ravarer/pages/frafaktura/PriceJumpRow.tsx",
+     "evidence": "Prisen stemmer",
+     "note": "Opprydding D: Prishopp",
      "reached_from_owner": true
     }
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll/faktura/:id?linje=:linje"
+    "/ravarer/fra-faktura?fane=prishopp"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -1664,23 +1648,23 @@
    "original_feature": "«Rett avtalepris» og beregn på nytt",
    "original_location": "Linjeinspektør › Pris (+ Prisblokk i varekort-panel)",
    "current_feature": "«Rett avtalepris» og beregn på nytt",
-   "current_location_or_disposition": "Linjeinspektør › Pris (+ Prisblokk i varekort-panel)",
-   "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+   "current_location_or_disposition": "Leverandørvare › prisblokk «Rett avtalepris»",
+   "route_owner_path": "src/ravarer/pages/priskontroll/VarekortPage.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
-    "src/fakturaer/components/inbox/task/LineTask.tsx"
+    "src/ravarer/pages/priskontroll/VarekortPage.tsx",
+    "src/ravarer/pages/priskontroll/gjore/PriceBlockView.tsx"
    ],
    "handler_or_render_evidence": [
     {
-     "file": "src/fakturaer/components/inbox/task/LineTask.tsx",
+     "file": "src/ravarer/pages/priskontroll/gjore/PriceBlockView.tsx",
      "evidence": "Rett avtalepris",
-     "note": "Rett avtalepris",
+     "note": "Leverandørvarens prisblokk",
      "reached_from_owner": true
     }
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll/faktura/:id?linje=:linje"
+    "/ravarer/priskontroll/varekort/:supplierId/:itemKey"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -1711,23 +1695,23 @@
    "original_feature": "«Kontroller pakningen» og «Endre råvare» fra prissteget",
    "original_location": "Linjeinspektør › Pris",
    "current_feature": "«Kontroller pakningen» og «Endre råvare» fra prissteget",
-   "current_location_or_disposition": "Linjeinspektør › Pris",
-   "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+   "current_location_or_disposition": "Opprydding D: Fra faktura › Prishopp › «Feil pakning»; leverandørvare › «Kontroller pakningen»",
+   "route_owner_path": "src/ravarer/pages/frafaktura/FraFaktura.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
-    "src/fakturaer/components/inbox/task/LineTask.tsx"
+    "src/ravarer/pages/frafaktura/FraFaktura.tsx",
+    "src/ravarer/pages/frafaktura/PriceJumpRow.tsx"
    ],
    "handler_or_render_evidence": [
     {
-     "file": "src/fakturaer/components/inbox/task/LineTask.tsx",
-     "evidence": "Kontroller pakningen",
-     "note": "Fra prissteget",
+     "file": "src/ravarer/pages/frafaktura/PriceJumpRow.tsx",
+     "evidence": "Feil pakning",
+     "note": "Opprydding D: Prishopp",
      "reached_from_owner": true
     }
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll/faktura/:id?linje=:linje"
+    "/ravarer/fra-faktura?fane=prishopp"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -1758,23 +1742,23 @@
    "original_feature": "«Beregn prisen på nytt» / «Prøv igjen» ved feil",
    "original_location": "Linjeinspektør (via køen)",
    "current_feature": "«Beregn prisen på nytt» / «Prøv igjen» ved feil",
-   "current_location_or_disposition": "Linjeinspektør (via køen)",
-   "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+   "current_location_or_disposition": "Fakturaer › Verktøy › «Beregn alle åpne på nytt»",
+   "route_owner_path": "src/ravarer/pages/hub/PriskontrollPage.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
-    "src/fakturaer/components/inbox/task/LineTask.tsx"
+    "src/ravarer/pages/hub/PriskontrollPage.tsx",
+    "src/ravarer/pages/hub/PriskontrollToolsMenu.tsx"
    ],
    "handler_or_render_evidence": [
     {
-     "file": "src/fakturaer/components/inbox/task/LineTask.tsx",
-     "evidence": "Beregn prisen på nytt",
-     "note": "Beregn på nytt",
+     "file": "src/ravarer/pages/hub/PriskontrollToolsMenu.tsx",
+     "evidence": "Beregn alle åpne på nytt",
+     "note": "Verktøymenyen i Fakturaer",
      "reached_from_owner": true
     }
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll/faktura/:id?linje=:linje"
+    "/ravarer/priskontroll"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -1852,23 +1836,23 @@
    "original_feature": "«Hent AI-forslag»",
    "original_location": "Linjeinspektør › AI",
    "current_feature": "«Hent AI-forslag»",
-   "current_location_or_disposition": "Linjeinspektør › AI",
-   "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+   "current_location_or_disposition": "Leverandørvare › «Hent AI-forslag»",
+   "route_owner_path": "src/ravarer/pages/priskontroll/VarekortPage.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
-    "src/fakturaer/components/inbox/task/LineTask.tsx"
+    "src/ravarer/pages/priskontroll/VarekortPage.tsx",
+    "src/fakturaer/components/supplier-item/AiSuggestion.tsx"
    ],
    "handler_or_render_evidence": [
     {
-     "file": "src/fakturaer/components/inbox/task/LineTask.tsx",
+     "file": "src/fakturaer/components/supplier-item/AiSuggestion.tsx",
      "evidence": "Hent AI-forslag",
-     "note": "AI-forslag",
+     "note": "Leverandørvarens visning",
      "reached_from_owner": true
     }
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll/faktura/:id?linje=:linje"
+    "/ravarer/priskontroll/varekort/:supplierId/:itemKey"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -2086,25 +2070,17 @@
    "original_feature": "Hurtigtaster ↑/↓, Enter, m, n, x, u, Esc",
    "original_location": "Å gjøre: J/K, Enter, L, P, G, X, U, `?`; linjeinspektør: m, n, x, u",
    "current_feature": "Hurtigtaster ↑/↓, Enter, m, n, x, u, Esc",
-   "current_location_or_disposition": "Å gjøre: J/K, Enter, L, P, G, X, U, `?`; linjeinspektør: m, n, x, u",
-   "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+   "current_location_or_disposition": "Fjernet (opprydding D): køens hurtigtaster",
+   "route_owner_path": "src/ravarer/pages/frafaktura/FraFaktura.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
-    "src/ravarer/pages/priskontroll/faktura/useWorkspaceHotkeys.ts"
+    "src/ravarer/pages/frafaktura/FraFaktura.tsx"
    ],
-   "handler_or_render_evidence": [
-    {
-     "file": "src/ravarer/pages/priskontroll/faktura/useWorkspaceHotkeys.ts",
-     "evidence": "useWorkspaceHotkeys",
-     "note": "Hurtigtaster",
-     "reached_from_owner": true
-    }
-   ],
-   "preservation_gap": null,
+   "handler_or_render_evidence": [],
+   "preservation_gap": "Fjernet etter Henriks beslutning 17.11.2026 (kun versjon D): linje-for-linje-hurtigtastene fulgte køen som er fjernet; Oversikt har g f / g v / g p",
    "canonical_url_templates": [
-    "/ravarer/priskontroll/faktura/:id"
+    "/ravarer/fra-faktura"
    ],
-   "mapping_status": "handling_sporet_i_kilde",
+   "mapping_status": "bevaringsgap",
    "child_import_check": "ikke_oppgitt",
    "source_review": "ukjent",
    "mocked_test": "ukjent",
@@ -2225,23 +2201,23 @@
    "original_feature": "MatchDrawer: match én linje (forslag, søk, avtalepris, pakning, husk SKU, primær, AI-hjelp)",
    "original_location": "Linjeinspektør › «Bare denne linjen» (`rm_confirm_line_match`)",
    "current_feature": "MatchDrawer: match én linje (forslag, søk, avtalepris, pakning, husk SKU, primær, AI-hjelp)",
-   "current_location_or_disposition": "Linjeinspektør › «Bare denne linjen» (`rm_confirm_line_match`)",
-   "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+   "current_location_or_disposition": "Leverandørvare › koblingsskjema; feillest linje via «Rett linjen» i Fra faktura/faktura",
+   "route_owner_path": "src/ravarer/pages/priskontroll/VarekortPage.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
-    "src/fakturaer/components/inbox/task/LineTask.tsx"
+    "src/ravarer/pages/priskontroll/VarekortPage.tsx",
+    "src/fakturaer/components/supplier-item/SupplierItemLinkForm.tsx"
    ],
    "handler_or_render_evidence": [
     {
-     "file": "src/fakturaer/components/inbox/task/LineTask.tsx",
-     "evidence": "MatchDrawer",
-     "note": "Delt skjema",
+     "file": "src/fakturaer/components/supplier-item/SupplierItemLinkForm.tsx",
+     "evidence": "useMaterialChoices",
+     "note": "Kobling skjer per leverandørvare; enkeltlinje rettes via «Rett linjen»",
      "reached_from_owner": true
     }
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll/faktura/:id?linje=:linje"
+    "/ravarer/priskontroll/varekort/:supplierId/:itemKey"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -2272,22 +2248,23 @@
    "original_feature": "«Godta og neste» og «Bekreft og bruk på alle like linjer»",
    "original_location": "Linjeinspektør › hovedknapp + «Bruk på like»",
    "current_feature": "«Godta og neste» og «Bekreft og bruk på alle like linjer»",
-   "current_location_or_disposition": "Linjeinspektør › hovedknapp + «Bruk på like»",
-   "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+   "current_location_or_disposition": "Opprydding D: Fra faktura › svaret gjelder alle linjer for leverandørvaren",
+   "route_owner_path": "src/ravarer/pages/frafaktura/FraFaktura.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx"
+    "src/ravarer/pages/frafaktura/FraFaktura.tsx",
+    "src/ravarer/pages/frafaktura/NewItemRow.tsx"
    ],
    "handler_or_render_evidence": [
     {
-     "file": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
-     "evidence": "Godta forslag",
-     "note": "Godta",
+     "file": "src/ravarer/pages/frafaktura/NewItemRow.tsx",
+     "evidence": "onClick={() => void submit()}",
+     "note": "Svaret gjelder alle linjer for leverandørvaren",
      "reached_from_owner": true
     }
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll/faktura/:id?linje=:linje"
+    "/ravarer/fra-faktura"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -2318,23 +2295,23 @@
    "original_feature": "«Opprett ny vare» og «Åpne varekort»",
    "original_location": "Linjeinspektør → RawMaterialCreateSheet / varekort-panel",
    "current_feature": "«Opprett ny vare» og «Åpne varekort»",
-   "current_location_or_disposition": "Linjeinspektør → RawMaterialCreateSheet / varekort-panel",
-   "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
+   "current_location_or_disposition": "Opprydding D: Fra faktura › «Opprett som ny»",
+   "route_owner_path": "src/ravarer/pages/frafaktura/FraFaktura.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
-    "src/fakturaer/components/inbox/task/LineTask.tsx"
+    "src/ravarer/pages/frafaktura/FraFaktura.tsx",
+    "src/ravarer/pages/frafaktura/RowTarget.tsx"
    ],
    "handler_or_render_evidence": [
     {
-     "file": "src/fakturaer/components/inbox/task/LineTask.tsx",
-     "evidence": "Ny råvare …",
+     "file": "src/ravarer/pages/frafaktura/RowTarget.tsx",
+     "evidence": "Opprett som ny",
      "note": "Opprett ny vare",
      "reached_from_owner": true
     }
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll/faktura/:id?linje=:linje"
+    "/ravarer/fra-faktura"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -2405,23 +2382,23 @@
    "original_feature": "Masseopprettelse av råvarer fra valgte linjer (felles kategori)",
    "original_location": "/priskontroll?fane=gjore › masseutvalg › «Opprett råvarer»",
    "current_feature": "Masseopprettelse av råvarer fra valgte linjer (felles kategori)",
-   "current_location_or_disposition": "/priskontroll?fane=gjore › avkrysning › «Opprett råvarer …» (`GjoreBulkBar`/`bulkGjore.ts`, på tvers av fakturaer/leverandører, forhåndsvisning, bekreftelse > 10 linjer, rapport per varekort, linjetall fra forhåndsvisningen og fryste linje-ID-er; test `gjoreBulk.test.ts`). Per faktura fortsatt i fakturaarbeidsflaten",
-   "route_owner_path": "src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx",
+   "current_location_or_disposition": "Opprydding D: /ravarer/fra-faktura › «Opprett N sikre»",
+   "route_owner_path": "src/ravarer/pages/frafaktura/FraFaktura.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx",
-    "src/ravarer/pages/priskontroll/gjore/GjoreBulkBar.tsx"
+    "src/ravarer/pages/frafaktura/FraFaktura.tsx",
+    "src/ravarer/pages/frafaktura/NewItemsTab.tsx"
    ],
    "handler_or_render_evidence": [
     {
-     "file": "src/ravarer/pages/priskontroll/gjore/GjoreBulkBar.tsx",
-     "evidence": "Opprett råvarer fra valgte varekort",
-     "note": "Masseopprett",
+     "file": "src/ravarer/pages/frafaktura/NewItemsTab.tsx",
+     "evidence": "sikre`",
+     "note": "Opprydding D: «Opprett N sikre»",
      "reached_from_owner": true
     }
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll?fane=gjore"
+    "/ravarer/fra-faktura"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -2505,22 +2482,23 @@
    "original_feature": "Liste over leverandørvarer: søk, leverandørfilter, seks statusfaner med antall",
    "original_location": "?fane=gjore › køer (Mangler kobling, Mangler pakning, Prisendringer, Kontroll) + visning «Alle varekort» for Koblet/Ikke vare",
    "current_feature": "Liste over leverandørvarer: søk, leverandørfilter, seks statusfaner med antall",
-   "current_location_or_disposition": "?fane=gjore › køer (Mangler kobling, Mangler pakning, Prisendringer, Kontroll) + visning «Alle varekort» for Koblet/Ikke vare",
-   "route_owner_path": "src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx",
+   "current_location_or_disposition": "/ravarer/priskontroll/varekort (leverandørvarer, beholdt)",
+   "route_owner_path": "src/ravarer/pages/priskontroll/AlleVarekort.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx"
+    "src/ravarer/pages/priskontroll/AlleVarekort.tsx",
+    "src/fakturaer/pages/Varekoblinger.tsx"
    ],
    "handler_or_render_evidence": [
     {
-     "file": "src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx",
+     "file": "src/fakturaer/pages/Varekoblinger.tsx",
      "evidence": "Alle leverandører",
-     "note": "Leverandørfilter",
+     "note": "Leverandørvarer (beholdt)",
      "reached_from_owner": true
     }
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll?fane=gjore"
+    "/ravarer/priskontroll/varekort"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -2551,22 +2529,23 @@
    "original_feature": "Kolonner (leverandør, varenr., beskrivelse, råvare, pakning, siste pris %, linjer, årsaker, sist sett, status); mobil; tastatur",
    "original_location": "?fane=gjore › listerader (mobilkort, J/K)",
    "current_feature": "Kolonner (leverandør, varenr., beskrivelse, råvare, pakning, siste pris %, linjer, årsaker, sist sett, status); mobil; tastatur",
-   "current_location_or_disposition": "?fane=gjore › listerader (mobilkort, J/K)",
-   "route_owner_path": "src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx",
+   "current_location_or_disposition": "/ravarer/priskontroll/varekort (leverandørvarer, beholdt)",
+   "route_owner_path": "src/ravarer/pages/priskontroll/AlleVarekort.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx"
+    "src/ravarer/pages/priskontroll/AlleVarekort.tsx",
+    "src/fakturaer/pages/Varekoblinger.tsx"
    ],
    "handler_or_render_evidence": [
     {
-     "file": "src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx",
-     "evidence": "WorkListView",
-     "note": "Listerader/mobilkort (kolonnene er listerader)",
+     "file": "src/fakturaer/pages/Varekoblinger.tsx",
+     "evidence": "Søk på vare eller varenummer",
+     "note": "Leverandørvarer (beholdt)",
      "reached_from_owner": true
     }
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll?fane=gjore"
+    "/ravarer/priskontroll/varekort"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -2597,22 +2576,23 @@
    "original_feature": "Paging og URL-synk av alle filtre",
    "original_location": "?fane=gjore&q=&leverandor=&valgt=",
    "current_feature": "Paging og URL-synk av alle filtre",
-   "current_location_or_disposition": "?fane=gjore&q=&leverandor=&valgt=",
-   "route_owner_path": "src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx",
+   "current_location_or_disposition": "/ravarer/priskontroll/varekort?q=&leverandor=",
+   "route_owner_path": "src/ravarer/pages/priskontroll/AlleVarekort.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx"
+    "src/ravarer/pages/priskontroll/AlleVarekort.tsx",
+    "src/fakturaer/pages/Varekoblinger.tsx"
    ],
    "handler_or_render_evidence": [
     {
-     "file": "src/ravarer/pages/priskontroll/gjore/GjoreWorkspace.tsx",
-     "evidence": "setSp(",
+     "file": "src/fakturaer/pages/Varekoblinger.tsx",
+     "evidence": "useSearchParams",
      "note": "URL-synk",
      "reached_from_owner": true
     }
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll?fane=gjore"
+    "/ravarer/priskontroll/varekort"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -3823,7 +3803,7 @@
    "original_feature": "Linjetabell: forventet pris, referansekilde, avvik, matchtype, årsaker, linjetype, merknad, valgfri konto",
    "original_location": "Linjesone (midten)",
    "current_feature": "Linjetabell: forventet pris, referansekilde, avvik, matchtype, årsaker, linjetype, merknad, valgfri konto",
-   "current_location_or_disposition": "Linjesone (midten)",
+   "current_location_or_disposition": "Arkiv: /priskontroll/faktura/:id › linjetabell",
    "route_owner_path": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
    "action_component_paths": [
     "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx"
@@ -3832,13 +3812,7 @@
     {
      "file": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
      "evidence": "InvoiceLinesTable",
-     "note": "Linjetabell",
-     "reached_from_owner": true
-    },
-    {
-     "file": "src/ravarer/pages/priskontroll/faktura/FakturaWorkspace.tsx",
-     "evidence": "QueueWorkspace",
-     "note": "Arbeidsliste",
+     "note": "Arkiv: linjetabell vises alltid",
      "reached_from_owner": true
     }
    ],
@@ -4385,9 +4359,10 @@
    "original_feature": "Liste over saker med status",
    "original_location": "/priskontroll?fane=saker",
    "current_feature": "Liste over saker med status",
-   "current_location_or_disposition": "/priskontroll?fane=saker",
-   "route_owner_path": "src/ravarer/pages/priskontroll/saker/SakerTab.tsx",
+   "current_location_or_disposition": "Opprydding D: /ravarer/leverandorer?fane=saker",
+   "route_owner_path": "src/ravarer/pages/hub/LeverandorerHub.tsx",
    "action_component_paths": [
+    "src/ravarer/pages/hub/LeverandorerHub.tsx",
     "src/ravarer/pages/priskontroll/saker/SakerTab.tsx"
    ],
    "handler_or_render_evidence": [
@@ -4400,7 +4375,7 @@
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll?fane=saker"
+    "/ravarer/leverandorer?fane=saker"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -5295,8 +5270,9 @@
    "original_location": "Felles PriceDeviationNote: varekort-panel › Prisblokk, linjeinspektør, råvarekort ?seksjon=pris",
    "current_feature": "Nivådelt forklaring av prisavvik (speiler `rm_price_deviation_eval`) i alle prisvisninger",
    "current_location_or_disposition": "Felles PriceDeviationNote: varekort-panel › Prisblokk, linjeinspektør, råvarekort ?seksjon=pris",
-   "route_owner_path": "src/ravarer/pages/priskontroll/gjore/PriceBlockView.tsx",
+   "route_owner_path": "src/ravarer/pages/priskontroll/VarekortPage.tsx",
    "action_component_paths": [
+    "src/ravarer/pages/priskontroll/VarekortPage.tsx",
     "src/ravarer/pages/priskontroll/gjore/PriceBlockView.tsx"
    ],
    "handler_or_render_evidence": [
@@ -5309,7 +5285,7 @@
    ],
    "preservation_gap": null,
    "canonical_url_templates": [
-    "/ravarer/priskontroll?fane=gjore"
+    "/ravarer/priskontroll/varekort/:supplierId/:itemKey"
    ],
    "mapping_status": "handling_sporet_i_kilde",
    "child_import_check": "ikke_oppgitt",
@@ -5489,9 +5465,9 @@
    "id": "R2",
    "section": "Navigasjon, tilgang og felles",
    "original_feature": "Meny-badger: linjer til behandling, varekort som venter (ukoblet + mangler pakning), avtaler som utløper, ukvitterte datablad-endringer",
-   "original_location": "RavarerNav-badge per inngang fra `rm_work_summary`; Fakturaer har ingen merke (todo_total blander varegrupper og fakturaer)",
+   "original_location": "RavarerNav-badge per inngang fra `rm_work_summary` (samme tall som Oversikt og faner)",
    "current_feature": "Meny-badger: linjer til behandling, varekort som venter (ukoblet + mangler pakning), avtaler som utløper, ukvitterte datablad-endringer",
-   "current_location_or_disposition": "RavarerNav-badge per inngang fra `rm_work_summary`; Fakturaer har ingen merke (todo_total blander varegrupper og fakturaer)",
+   "current_location_or_disposition": "RavarerNav-badge per inngang fra `rm_work_summary` (samme tall som Oversikt og faner)",
    "route_owner_path": "src/components/layout/SubAppNav.tsx",
    "action_component_paths": [
     "src/components/layout/SubAppNav.tsx"
@@ -8963,24 +8939,17 @@
    "original_feature": "Fakturalinjer uten mengde i baseenhet (90 d), med lenker",
    "original_location": "/priskontroll?fane=gjore › kø «Linjer uten mengde»",
    "current_feature": "Fakturalinjer uten mengde i baseenhet (90 d), med lenker",
-   "current_location_or_disposition": "/priskontroll?fane=gjore › kø «Linjer uten mengde»",
-   "route_owner_path": "src/ravarer/pages/priskontroll/gjore/mengde/MengdeDiagnostikk.tsx",
+   "current_location_or_disposition": "Fjernet (opprydding D): skrivebeskyttet diagnostikk",
+   "route_owner_path": "src/ravarer/pages/hub/PriskontrollPage.tsx",
    "action_component_paths": [
-    "src/ravarer/pages/priskontroll/gjore/mengde/MengdeDiagnostikk.tsx"
+    "src/ravarer/pages/hub/PriskontrollPage.tsx"
    ],
-   "handler_or_render_evidence": [
-    {
-     "file": "src/ravarer/pages/priskontroll/gjore/mengde/MengdeDiagnostikk.tsx",
-     "evidence": "Mengde i baseenhet",
-     "note": "Diagnostikk",
-     "reached_from_owner": true
-    }
-   ],
-   "preservation_gap": null,
+   "handler_or_render_evidence": [],
+   "preservation_gap": "Fjernet etter Henriks beslutning 17.11.2026 (kun versjon D): skrivebeskyttet diagnostikk uten handling",
    "canonical_url_templates": [
-    "/ravarer/priskontroll?fane=gjore&visning=mengde"
+    "/ravarer/priskontroll"
    ],
-   "mapping_status": "handling_sporet_i_kilde",
+   "mapping_status": "bevaringsgap",
    "child_import_check": "ikke_oppgitt",
    "source_review": "phase5_targeted_source_review_not_exhaustive",
    "mocked_test": "phase5_actual_component_or_hook_bounded",

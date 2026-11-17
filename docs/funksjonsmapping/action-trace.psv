@@ -171,7 +171,7 @@ R190|src/ravarer/pages/ReberegnKostpriser.tsx|Hent forslag|Skann
 R193|src/ravarer/pages/ReberegnKostpriser.tsx|Reberegn valgte|Kjør
 R194|src/ravarer/pages/ReberegnKostpriser.tsx|Angre|Angre
 R196|src/varer/components/products/RawMaterialAutocomplete.tsx|RawMaterialOption|Velg råvare
-R2|src/components/layout/SubAppNav.tsx|badge: summary?.todo_total|Badge
+R2|src/components/layout/SubAppNav.tsx|badge: summary?.data_quality.datasheet_changes|Badge
 R200|src/varer/components/products/StockLinkNote.tsx|Trekker fra lager|Lagertrekk
 R201|src/ravarer/pages/RawMaterialDetail.tsx|section === "leverandorer"|Leverandørseksjon
 R202|src/ravarer/editors/createSheetLogic.ts|link-supplier-item|Kobling
