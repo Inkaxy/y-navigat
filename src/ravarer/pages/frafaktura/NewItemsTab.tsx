@@ -1,11 +1,14 @@
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Check, Loader2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QueryState } from "@/components/common/QueryState";
 import { useRawMaterials } from "@/ravarer/hooks/useRawMaterials";
-import { useNewItemsQueue, useSupplierNewItemRules, NEW_ITEMS_LIMIT } from "@/ravarer/hooks/useFraFaktura";
+import { NEW_ITEMS_LIST_KEY, useNewItemsCount, useNewItemsQueue, useSupplierNewItemRules } from "@/ravarer/hooks/useFraFaktura";
+import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { useNewItemActions, type NewItemReceipt } from "@/ravarer/hooks/useNewItemActions";
-import { isSafeCreate, supplierChips, type Candidate } from "@/ravarer/lib/fraFaktura/newItems";
+import { isSafeCreate, type Candidate } from "@/ravarer/lib/fraFaktura/newItems";
+import { newItemChips } from "@/ravarer/lib/fraFaktura/newItemChips";
 import { cn } from "@/lib/utils";
 import { NewItemRow, type RowEntry } from "./NewItemRow";
 import { SupplierRuleBar } from "./SupplierRuleBar";
@@ -15,7 +18,10 @@ type Done = { receipt: NewItemReceipt; undo: { busy: boolean; text: string | nul
 
 /** Nye varer (D1/D2): én rad per leverandørvare, leverandørchips, regler og «Opprett N sikre». */
 export function NewItemsTab({ supplier, onSupplier, canWrite, retur }: { supplier: string | null; onSupplier: (id: string | null) => void; canWrite: boolean; retur: string }) {
-  const queue = useNewItemsQueue();
+  const qc = useQueryClient();
+  const queue = useNewItemsQueue(supplier);
+  const allCount = useNewItemsCount();
+  const suppliers = useSuppliers();
   const rules = useSupplierNewItemRules();
   const rms = useRawMaterials();
   const actions = useNewItemActions();
@@ -32,10 +38,17 @@ export function NewItemsTab({ supplier, onSupplier, canWrite, retur }: { supplie
   const supplierOf = useRef(new Map<string, string>());
   for (const r of queue.rows) supplierOf.current.set(r.key, r.supplier_id);
 
-  const chips = supplierChips(queue.rows);
+  const chips = newItemChips({ selected: supplier, selectedTotal: queue.total, allTotal: allCount, serverCounts: queue.suppliers, rows: queue.rows, suppliers: suppliers.data ?? [] });
   const visibleKeys = order.current.filter((k) => (rowByKey.has(k) || done.has(k)) && (!supplier || supplierOf.current.get(k) === supplier));
   const [limit, setLimit] = useState(PAGE);
   const shown = visibleKeys.slice(0, limit);
+  const remaining = queue.total == null ? null : Math.max(0, queue.total - shown.filter((k) => !done.has(k)).length);
+  // Viser flere av de hentede radene; henter neste side fra serveren når de hentede er brukt opp.
+  const showMore = () => {
+    const next = limit + PAGE;
+    setLimit(next);
+    if (next >= visibleKeys.length && queue.hasNextPage) queue.fetchNextPage();
+  };
 
   const registry = useRef(new Map<string, RowEntry>());
   const [, setTick] = useState(0);
@@ -57,7 +70,9 @@ export function NewItemsTab({ supplier, onSupplier, canWrite, retur }: { supplie
     setBulk(null);
   };
 
-  const onDone = (key: string, receipt: NewItemReceipt) => setDone((m) => new Map(m).set(key, { receipt, undo: { busy: false, text: null, error: false } }));
+  // Et svar gjør listen foreldet uten å hente alle sidene på nytt nå (kvitteringen vises her); neste besøk henter fersk.
+  const markStale = () => void qc.invalidateQueries({ queryKey: NEW_ITEMS_LIST_KEY, refetchType: "none" });
+  const onDone = (key: string, receipt: NewItemReceipt) => { setDone((m) => new Map(m).set(key, { receipt, undo: { busy: false, text: null, error: false } })); markStale(); };
   const undo = async (key: string) => {
     const d = done.get(key);
     if (!d?.receipt.undo || d.undo.busy) return;
@@ -65,6 +80,7 @@ export function NewItemsTab({ supplier, onSupplier, canWrite, retur }: { supplie
     try {
       const text = await actions.undo(d.receipt.undo);
       setDone((m) => { const n = new Map(m); n.delete(key); return n; });
+      markStale();
       setUndoNote(text);
     } catch (e) {
       setDone((m) => new Map(m).set(key, { ...d, undo: { busy: false, text: e instanceof Error ? e.message : "Kunne ikke angre.", error: true } }));
@@ -91,7 +107,7 @@ export function NewItemsTab({ supplier, onSupplier, canWrite, retur }: { supplie
           {chips.map((c) => (
             <button key={c.id ?? "alle"} type="button" aria-pressed={supplier === c.id} onClick={() => { onSupplier(c.id); setLimit(PAGE); }}
               className={cn("min-h-[44px] rounded-lg border px-3 text-sm", supplier === c.id ? "border-foreground bg-muted font-semibold" : "border-line-subtle bg-card hover:bg-muted")}>
-              {c.name} <span className="tabular-nums text-ink-secondary">{c.count}</span>
+              {c.name}{c.count != null && <> <span className="tabular-nums text-ink-secondary">{c.count.toLocaleString("nb-NO")}</span></>}
             </button>
           ))}
         </div>
@@ -99,7 +115,7 @@ export function NewItemsTab({ supplier, onSupplier, canWrite, retur }: { supplie
           <SupplierRuleBar supplierId={supplier} supplierName={selName} rule={rules.data?.rules.get(supplier) ?? null} rulesAvailable={rules.data?.available === true} canWrite={canWrite} />
         ) : <p className="text-caption text-ink-secondary">Velg en leverandør for å sette regler som gjelder alle varene derfra.</p>}
         {undoNote && <p role="status" className="text-caption">{undoNote}</p>}
-        {queue.truncated && <p className="text-caption text-ink-secondary">Viser de {NEW_ITEMS_LIMIT} eldste per gruppe. Resten kommer når disse er besvart.</p>}
+        {queue.isRefetchError && <p role="alert" className="text-caption text-destructive">Listen kunne ikke oppdateres. Radene under er fra forrige henting.</p>}
       </div>
       <div className="mt-3 hidden grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1.6fr)_12rem] gap-3 bg-muted/60 px-5 py-2 text-caption font-semibold uppercase tracking-[0.12em] text-ink-secondary lg:grid">
         <span>Står på fakturaen</span><span /><span>Blir til denne varen</span><span />
@@ -129,8 +145,19 @@ export function NewItemsTab({ supplier, onSupplier, canWrite, retur }: { supplie
             })}
           </ul>
         )}
-        {visibleKeys.length > shown.length && (
-          <div className="border-t border-line-subtle px-5 py-3"><Button variant="outline" className="min-h-[44px]" onClick={() => setLimit((n) => n + PAGE)}>Vis {Math.min(PAGE, visibleKeys.length - shown.length)} til ({visibleKeys.length - shown.length} igjen)</Button></div>
+        {(visibleKeys.length > shown.length || queue.hasNextPage) && (
+          <div className="flex flex-wrap items-center gap-3 border-t border-line-subtle px-5 py-3">
+            <Button variant="outline" className="min-h-[44px]" disabled={queue.isFetchingNextPage} onClick={showMore}>
+              {queue.isFetchingNextPage ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />Henter flere</> : "Vis flere"}
+            </Button>
+            {remaining != null && remaining > 0 && <span className="text-caption text-ink-secondary">{remaining.toLocaleString("nb-NO")} igjen</span>}
+          </div>
+        )}
+        {queue.isFetchNextPageError && (
+          <div role="alert" className="flex flex-wrap items-center gap-3 border-t border-line-subtle px-5 py-3 text-caption text-destructive">
+            Resten av listen kunne ikke hentes. Radene over er riktige.
+            <Button variant="outline" size="sm" className="min-h-[44px]" onClick={queue.fetchNextPage}>Prøv igjen</Button>
+          </div>
         )}
       </QueryState>
       <p className="border-t border-line-subtle px-5 py-3 text-caption text-ink-secondary">En ny vare samler pris fra første faktura. Den kan brukes i oppskrifter og kalkyler når du har koblet eller opprettet den.</p>
