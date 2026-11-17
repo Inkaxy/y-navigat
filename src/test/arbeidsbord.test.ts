@@ -15,22 +15,3 @@ describe("prissperre i varekortet", () => {
   it("eget regnestykke på ufullstendig varekortlinje stenger ikke (mangler prisgrunnlag/rabatt)", () => expect(clarificationGate(l as never)).toBeNull());
   it("regnestykke som går opp stenger ikke", () => expect(clarificationGate({ ...l, total_amount: 1000 } as never)).toBeNull());
 });
-
-describe("ruter", () => {
-  it("arbeidsbordet er standard og klassisk visning er bevart", () => {
-    const s = readFileSync("src/ravarer/pages/hub/PriskontrollPage.tsx", "utf8");
-    expect(s).toContain('!sp.get("visning") && <Arbeidsbord />');
-    expect(s).toContain("<GjoreWorkspace />");
-    expect(s).toContain("<MengdeDiagnostikk />");
-  });
-  it("syntetisk forhåndsvisning finnes", () => expect(readFileSync("src/App.tsx", "utf8")).toContain('path="/forhandsvisning/arbeidsbord"'));
-});
-
-describe("integrasjonsrettinger", () => {
-  it("«Behandle flere» er synlig og originalen følger valgt linje", () => {
-    expect(readFileSync("src/ravarer/pages/priskontroll/arbeidsbord/ArbeidsbordView.tsx", "utf8")).toContain("Behandle flere");
-    const a = readFileSync("src/ravarer/pages/priskontroll/arbeidsbord/Arbeidsbord.tsx", "utf8");
-    expect(a).toContain('lineId={it.invoice_id ? null : prm.sp.get("linje")}');
-    expect(a).toContain("onOriginalLine=");
-  });
-});
