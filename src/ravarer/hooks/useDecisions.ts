@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
-import { useActivityFeed, useWorkItems } from "@/ravarer/hooks/useWorkData";
+import { useActivityFeed, useWorkCounts, useWorkItems } from "@/ravarer/hooks/useWorkData";
 import {
   decisionsFromWork, extraDecisions, openQuestionCount, sortDecisions, type RawMaterialReadiness,
 } from "@/ravarer/lib/decisions";
