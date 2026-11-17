@@ -129,9 +129,9 @@ describe("overskrift og retur", () => {
     expect(t).not.toMatch(/avviker fra prisgrunnlaget/);
     expect(t).toMatch(/mulig prisavvik/);
   });
-  it("retur går tilbake til eksakt varekort i arbeidsbordet eller på egen side", () => {
+  it("retur går tilbake til eksakt varekort (gammel arbeidsbord-adresse videresendes) eller på egen side", () => {
     expect(fakturaReturn(RET).href).toBe(`/ravarer/priskontroll${RET}`);
-    expect(fakturaReturn(RET).label).toBe("Å gjøre");
+    expect(fakturaReturn(RET).label).toBe("Fakturaer");
     const own = clarifyReturn("/ravarer/priskontroll/varekort/s1/sku%3A12113", "")!;
     expect(fakturaReturn(own)).toEqual({ href: "/ravarer/priskontroll/varekort/s1/sku%3A12113", label: "Varekort" });
     expect(fakturaReturn("//evil.com").href).toBe("/ravarer/priskontroll?fane=fakturaer");
