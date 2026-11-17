@@ -1,13 +1,11 @@
-import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ModulePage } from "@/ravarer/ui/ModulePage";
 import { RAVARER_EYEBROW } from "@/ravarer/pages/hub/hubTabs";
 import { paths } from "@/ravarer/lib/paths";
 import { useInvoiceRights } from "@/fakturaer/hooks/useInvoiceRights";
-import { useWorkItems } from "@/ravarer/hooks/useWorkData";
 import { useOpenQuestionCount } from "@/ravarer/hooks/useDecisions";
-import { useFraFakturaCounts, usePriceJumps } from "@/ravarer/hooks/useFraFaktura";
-import { otherQuestions, parseFraFakturaTab, type FraFakturaTab } from "@/ravarer/lib/fraFaktura/tabs";
+import { useFraFakturaCounts } from "@/ravarer/hooks/useFraFaktura";
+import { parseFraFakturaTab, type FraFakturaTab } from "@/ravarer/lib/fraFaktura/tabs";
 import { cn } from "@/lib/utils";
 import { NewItemsTab } from "./NewItemsTab";
 import { PriceJumpsTab } from "./PriceJumpsTab";
@@ -22,16 +20,8 @@ export default function FraFaktura() {
   const set = (k: string, v: string | null) => setSp((prev) => { const n = new URLSearchParams(prev); if (v == null) n.delete(k); else n.set(k, v); return n; }, { replace: true });
   const rights = useInvoiceRights();
   const counts = useFraFakturaCounts(true, localLimit);
+  // Delte tellere (ingen egen prisliste lenger): antall åpne spørsmål i Beslutninger, også dem fanene viser.
   const open = useOpenQuestionCount(true);
-  const pris = useWorkItems({ group: "pris", sort: "oldest", limit: 500 });
-  const jumps = usePriceJumps(localLimit);
-  const covered = useMemo(() => {
-    if (!pris.data || !jumps.jumps) return null;
-    const keys = new Set(jumps.jumps.map((j) => j.key));
-    return pris.data.items.filter((w) => w.supplier_id && w.item_key && keys.has(`${w.supplier_id}|${w.item_key}`)).length;
-  }, [pris.data, jumps.jumps]);
-  const c = counts.work.data?.counts;
-  const other = otherQuestions({ open, newItems: counts.newItems, coveredPrices: covered, unreadInvoiceItems: c ? (c.faktura_mangler_linjer ?? 0) + (c.faktura_sumavvik ?? 0) : null });
   const retur = `${paths.fraFaktura()}${sp.toString() ? `?${sp.toString()}` : ""}`;
 
   const cards: { id: FraFakturaTab; n: number | null; label: string; sub: string }[] = [
@@ -60,8 +50,9 @@ export default function FraFaktura() {
           {tab === "ikke-lest" && <UnreadTab canWrite={rights.canWrite} retur={retur} />}
         </div>
         <p className="text-caption text-ink-secondary">
-          <Link to={paths.beslutninger()} className="font-semibold text-primary hover:underline">Øvrige spørsmål{other != null ? ` (${other.toLocaleString("nb-NO")})` : ""}</Link>
+          <Link to={paths.beslutninger()} className="font-semibold text-primary hover:underline">Øvrige spørsmål</Link>
           {" "}– spørsmål som ikke hører til de tre fanene ennå (kontroll, mindre prisendringer, pant og lignende).
+          {open != null && <> Beslutninger har {open.toLocaleString("nb-NO")} åpne spørsmål i alt, også dem som vises her.</>}
         </p>
       </div>
     </ModulePage>
