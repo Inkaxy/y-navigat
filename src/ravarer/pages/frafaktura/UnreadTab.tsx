@@ -14,6 +14,8 @@ import { useSupplierNames, useUnreadInvoices } from "@/ravarer/hooks/useFraFaktu
 import { canRequeue, requeueMessage, unreadGroup, unreadReason } from "@/ravarer/lib/fraFaktura/unread";
 import { SumMismatchSection } from "./unread/SumMismatchSection";
 import { PendingReads } from "./unread/PendingReads";
+import { BulkRereadCard } from "./unread/BulkRereadCard";
+import { SuggestionsSection } from "./unread/SuggestionsSection";
 
 const kr = (v: number | null) => (v == null ? "–" : `${Number(v).toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr`);
 
@@ -68,6 +70,8 @@ export function UnreadTab({ canWrite, retur }: { canWrite: boolean; retur: strin
         <p className="text-body text-ink-secondary">Systemet prøver selv på nytt. Du trenger bare å se her hvis en faktura blir liggende.</p>
       </div>
       {result && <p role={result.ok ? "status" : "alert"} className={result.ok ? "px-5 pt-3 text-sm" : "px-5 pt-3 text-sm text-destructive"}>{result.text}</p>}
+      <BulkRereadCard canWrite={canWrite} retur={retur} />
+      <SuggestionsSection names={names} canWrite={canWrite} retur={retur} />
       <QueryState isLoading={q.isLoading} isError={q.isError} error={q.error} scope="ravarer:fra-faktura:ikke-lest" onRetry={() => void q.refetch()}>
         <section aria-labelledby="ff-ul-ny" className="mt-3 border-t border-line-subtle">
           <div className="flex flex-wrap items-start gap-3 px-4 py-4 md:px-5">

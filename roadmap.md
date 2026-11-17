@@ -100,3 +100,11 @@
 - [ ] Beslutninger står igjen til typene kontroll, små prisendringer og videresalg/emballasje/råvare ikke klar har radtype i D (venter på Henriks avklaring)
 - [ ] Leverandørvare-sidene (/ravarer/priskontroll/varekort[/…]) er ikke flyttet inn i D ennå (venter på Henriks avklaring)
 - [ ] Root/Henrik: stryke `rm_key_material_limits` fra `20261117_automatikk` før kjøring (venter på root)
+
+# Samlet gjenlesing av alle åpne fakturaer (17.11.2026, Henrik)
+- [x] Knapp «Les alle åpne på nytt …» i Fra faktura › Ikke lest (godkjenner/admin)
+- [x] Oppsummering før start (leses / hoppes over per årsak / kostnadsanslag), én «Start»
+- [x] Kjøring i bolker à 3, N av M, pause/stopp, tåler omlasting, ett nytt forsøk, vent ved 429/5xx
+- [x] Regel for automatisk bruk (sum stemmer + ingen tap) ellers «Forslag venter på deg» (Bruk/Forkast)
+- [x] Kvittering med tall og lenker; revisjonslogg «Samlet gjenlesing»
+- [x] Enhetstester for regelen; rapport (ikke start kjøringen, ikke kjør SQL, ikke publiser)
