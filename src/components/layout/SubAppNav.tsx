@@ -27,7 +27,7 @@ import {
 import {
   ChevronDown,
   LayoutDashboard,
-  FileInput, ChartColumn, Workflow,
+  FileInput,
   Ticket,
   CalendarRange,
   ShoppingBag,
