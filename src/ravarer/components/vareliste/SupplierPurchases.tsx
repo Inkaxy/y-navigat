@@ -1,6 +1,8 @@
 import { useId, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link as RouterLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { paths } from "@/ravarer/lib/paths";
 import { supabase } from "@/integrations/supabase/client";
 import { callPendingRpc, pendingSelect } from "@/lib/pendingRpc";
 import { formatNok } from "@/ravarer/lib/constants";
@@ -120,6 +122,9 @@ export function SupplierPurchases({ rmId, baseUnit, links, nameOf, canWrite, can
                     {status && <span className="block text-warning">{status}</span>}
                   </div>
                 )}
+                <RouterLink to={paths.raavare(rmId, { seksjon: "pris", prislinje: l.id })} className="inline-flex min-h-[44px] items-center text-caption font-semibold text-primary hover:underline">
+                  Prishistorikk, rett pris eller pakning
+                </RouterLink>
                 {l.is_primary
                   ? <span className="inline-block rounded-full bg-success/15 px-2 py-0.5 text-caption font-semibold text-success">Hovedleverandør</span>
                   : canWrite && links.length > 1 && (

@@ -35,6 +35,7 @@ import { StockTab } from "@/ravarer/components/tabs/StockTab";
 import { HistoryTab } from "@/ravarer/components/tabs/HistoryTab";
 import { lagerReturnHref } from "@/ravarer/lib/lagerReturn";
 import { paths } from "@/ravarer/lib/paths";
+import { RawMaterialPriceLines } from "@/ravarer/components/prislinje/RawMaterialPriceLines";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 
 export default function RawMaterialDetail() {
@@ -247,7 +248,13 @@ export default function RawMaterialDetail() {
               <RawMaterialKpiStrip rm={rm} evidence={priceEvidence} links={page.links} recipeCount={page.recipeCount} spend12m={stats?.cost_12m ?? null} />
             </>
           )}
-          {section === "pris" && <SuppliersTab rm={rm} part="pris" />}
+          {section === "pris" && (
+            <>
+              <SuppliersTab rm={rm} part="pris" />
+              {/* Fra Prislinje (opprydding demo D): prishistorikk per leverandør, «Rett pris» og «Endre godkjent pakning». */}
+              <RawMaterialPriceLines rawMaterialId={rm.id} />
+            </>
+          )}
           {section === "leverandorer" && <SuppliersTab rm={rm} part="leverandorer" />}
           {section === "naering" && !rm.is_packaging && (
             <NutritionTab rawMaterialId={rm.id} part="naering" registerSave={owner.register} />
