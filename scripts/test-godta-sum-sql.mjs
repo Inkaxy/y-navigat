@@ -30,7 +30,7 @@ create table invoices (id uuid primary key, legal_entity_id uuid, invoice_number
   reconciled_at timestamptz, total_amount numeric, total_vat numeric, is_credit_note boolean default false, lines_sum_status text,
   lines_sum_excl_vat numeric, lines_sum_variance_pct numeric, notes text, extraction_issues jsonb default '[]', updated_at timestamptz default now(),
   constraint invoices_lines_sum_status_check CHECK ((lines_sum_status = ANY (ARRAY['not_checked'::text, 'ok'::text, 'mismatch'::text, 'no_lines'::text, 'no_total'::text]))));
-create function set_updated_at() returns trigger language plpgsql as $$ begin new.updated_at := clock_timestamp(); return new; end $$;
+create function set_updated_at() returns trigger language plpgsql as $$ begin new.updated_at := greatest(clock_timestamp(), old.updated_at + interval '1 millisecond'); return new; end $$;
 create trigger trg_invoices_updated_at before update on invoices for each row execute function set_updated_at();
 create table invoice_lines (id uuid primary key, invoice_id uuid, total_amount numeric);
 create table invoice_internal_approvals (id uuid primary key default gen_random_uuid(), invoice_id uuid, status text, revoked_at timestamptz);
