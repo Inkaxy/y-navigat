@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useSupplierItemLines } from "@/fakturaer/hooks/useSupplierItems";
 import { dateNo } from "@/ravarer/lib/decisions";
+import { paths } from "@/ravarer/lib/paths";
 import {
-  CREATE_LABEL, canSubmit, cleanItemName, defaultMode, guessItemType, otherSpellings, packageBadge, packageProposal, pricePerBase, readPackage,
+  CREATE_LABEL, canSubmit, cleanItemName, defaultMode, guessItemType, isCreditRow, otherSpellings, packageBadge, packageProposal, packageSourceLine, pricePerBase, readPackage,
   suggestCandidate, type Candidate, type NewItemType, type PackageDraft, type RowAnswer, type RowMode,
 } from "@/ravarer/lib/fraFaktura/newItems";
 import type { WorkItem } from "@/ravarer/lib/workRpcTypes";
@@ -31,6 +33,9 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
   const all = useMemo(() => lines.data ?? [], [lines.data]);
   const open = useMemo(() => all.filter((l) => l.requires_review === true), [all]);
   const latest = open[0] ?? all[0] ?? null;
+  // Kreditlinjer spør aldri om pakning; pakningsforslaget bygges bare fra en vanlig linje.
+  const credit = isCreditRow(open);
+  const pkgLine = packageSourceLine(open, all);
   const text = latest?.description ?? row.title;
   const collision = all.some((l) => (l.review_reason ?? "").includes("sku_collision"));
   const coll = useQuery({
@@ -68,8 +73,8 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
     init.current.lines = true;
     setName(cleanItemName(latest.description ?? row.title));
     setType(guessItemType(latest.description ?? row.title, supplierRule));
-    setDraft(packageProposal(latest));
-  }, [latest, row.title, supplierRule]);
+    setDraft(packageProposal(pkgLine));
+  }, [latest, pkgLine, row.title, supplierRule]);
   useEffect(() => {
     if (init.current.sug || lines.isLoading || (collision && coll.isLoading)) return;
     init.current.sug = true;
@@ -80,13 +85,15 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
   const baseUnit = mode === "koble" ? pick?.base_unit ?? null : null;
   const state = readPackage(draft, baseUnit);
   const badge = packageBadge({ text, draft, state, mode, hasSuggestion: suggestions.length > 0 && !!pick && suggestions.some((s) => s.id === pick.id) });
-  const price = pricePerBase(latest, state);
+  const price = pricePerBase(pkgLine, state);
   const answer: RowAnswer = { mode, type, name, pick, badge, state };
   const lineIds = open.map((l) => l.id);
   const ready = !lines.isLoading && !lines.isError && lineIds.length > 0;
+  // Kreditnota-raden svarer aldri «Opprett N sikre» (ingen pakning å godkjenne).
+  const answerable = ready && !credit;
 
   const submit = async (): Promise<boolean> => {
-    if (lock.current || !canWrite || !ready || !canSubmit(answer)) return false;
+    if (lock.current || !canWrite || !answerable || !canSubmit(answer)) return false;
     lock.current = true; setBusy(true); setError(null);
     try {
       const r = await actions.link({
@@ -109,15 +116,19 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
   };
   const submitRef = useRef(submit);
   submitRef.current = submit;
-  const answerKey = `${mode}|${type}|${name}|${pick?.id ?? ""}|${badge}|${state.state}|${ready}`;
+  const answerKey = `${mode}|${type}|${name}|${pick?.id ?? ""}|${badge}|${state.state}|${answerable}`;
   useEffect(() => {
-    register(row.key, { answer: ready ? answer : null, submit: () => submitRef.current() });
+    register(row.key, { answer: answerable ? answer : null, submit: () => submitRef.current() });
     return () => register(row.key, null);
   }, [answerKey]); // eslint-disable-line react-hooks/exhaustive-deps -- registrerer bare når svaret endres
 
   const spellings = otherSpellings(text, all.map((l) => l.description));
   const disabled = !canWrite || busy;
   const primary = mode === "koble" ? (pick ? "Koble" : "Velg en vare") : CREATE_LABEL[type];
+  const atInvoice = (handling: "kreditnota" | "hold-linje" | "hold-faktura") =>
+    latest ? paths.faktura(latest.invoice_id, { linje: latest.id, handling, retur }) : null;
+  const holdHref = atInvoice(credit ? "hold-faktura" : "hold-linje");
+  const creditHref = atInvoice("kreditnota");
 
   return (
     <li className="border-t border-line-subtle px-4 py-4 md:px-5">
@@ -137,7 +148,12 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
         <div className="min-w-0 space-y-2">
           {lines.isLoading ? <p className="text-caption text-ink-secondary">Henter linjene …</p>
             : lines.isError ? <p role="alert" className="text-caption text-destructive">Kunne ikke hente linjene for varen. Last siden på nytt.</p>
-            : (
+            : credit ? (
+              <div className="space-y-1 rounded-xl border border-line-subtle bg-muted/30 px-3 py-2 text-sm">
+                <p className="font-semibold">Kreditnota – koble til opprinnelig faktura</p>
+                <p className="text-caption text-ink-secondary">Kreditlinjer trenger ingen pakning. Koble kreditnotaen til fakturaen den gjelder, eller hold den utenfor råvarebehandling.</p>
+              </div>
+            ) : (
               <>
                 <RowTarget mode={mode} onMode={setMode} pick={pick} onPick={setPick} suggestions={suggestions} suggestionLabel={suggestionLabel}
                   candidates={candidates} name={name} onName={setName} type={type} onType={setType} disabled={disabled} />
@@ -146,10 +162,21 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
             )}
         </div>
         <div className="flex flex-col gap-2">
-          <Button className="min-h-[44px]" disabled={disabled || !ready || !canSubmit(answer)} onClick={() => void submit()}>
-            {busy && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />}{primary}
-          </Button>
-          <Button variant="outline" className="min-h-[44px]" disabled={disabled || !ready} onClick={() => void notItem()}>Ikke vare</Button>
+          {credit ? (
+            creditHref && canWrite
+              ? <Button asChild className="min-h-[44px]"><Link to={creditHref}>Koble til opprinnelig faktura</Link></Button>
+              : <Button className="min-h-[44px]" disabled>Koble til opprinnelig faktura</Button>
+          ) : (
+            <Button className="min-h-[44px]" disabled={disabled || !answerable || !canSubmit(answer)} onClick={() => void submit()}>
+              {busy && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />}{primary}
+            </Button>
+          )}
+          <div className="flex gap-2">
+            <Button variant="outline" className="min-h-[44px] flex-1" disabled={disabled || !ready} onClick={() => void notItem()}>Ikke vare</Button>
+            {holdHref && canWrite
+              ? <Button asChild variant="outline" className="min-h-[44px] flex-1"><Link to={holdHref} title={credit ? "Hold hele kreditnotaen utenfor råvarebehandling" : "Hold den nyeste linjen (eller hele fakturaen) utenfor råvarebehandling"}>Hold utenfor …</Link></Button>
+              : <Button variant="outline" className="min-h-[44px] flex-1" disabled>Hold utenfor …</Button>}
+          </div>
         </div>
       </div>
       {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}

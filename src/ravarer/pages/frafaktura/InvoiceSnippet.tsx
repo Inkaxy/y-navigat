@@ -30,7 +30,9 @@ export function InvoiceSnippet({ invoiceId, invoiceNumber, invoiceDate, supplier
     <div className="overflow-hidden rounded-xl border border-line-subtle bg-background" role="region" aria-label={`Utsnitt av faktura ${invoiceNumber ?? ""}`}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line-subtle px-4 py-2 text-caption">
         <span><strong>{supplierName ?? "Leverandør"}</strong> · faktura {invoiceNumber ?? "uten nummer"} · {dateNo(invoiceDate)} · utsnitt av linjene slik de er lest, linjen er markert</span>
-        <span className="ml-auto flex gap-3">
+        <span className="ml-auto flex flex-wrap gap-3">
+          {/* Feillest antall, pris, enhet eller tekst rettes via «Rett fakturalinje» (samme dialog, sperrer og revisjon som på fakturaen). */}
+          <Link className="font-semibold text-primary hover:underline" to={paths.faktura(invoiceId, { linje: lineId, handling: "rett", retur })}>Rett linjen …</Link>
           <Link className="font-semibold text-primary hover:underline" to={paths.faktura(invoiceId, { linje: lineId, retur })}>Åpne hele fakturaen</Link>
           <button type="button" className="font-semibold text-primary hover:underline" onClick={onClose}>Lukk</button>
         </span>
