@@ -32,7 +32,9 @@ async function fetchFastPage(le: string, supplierId: string | null, limit: numbe
   const r = await callPendingRpc("rm_new_items_queue", { p_legal_entity_id: le, p_supplier_id: supplierId, p_limit: limit, p_offset: offset });
   if (r.kind === "ok") return parseNewItemsQueue(r.data, param);
   if (r.kind === "denied") throw Object.assign(new Error("Du har ikke tilgang til fakturaene."), { code: "42501" });
-  throw new Error("Kunne ikke hente listen over nye varer.");
+  if (r.kind === "missing") throw new Error("Den raske listen over nye varer finnes ikke ennå.");
+  // Kode og status følger med, slik at tidsavbrudd og nettverksbrudd prøves én gang til.
+  throw Object.assign(new Error("Kunne ikke hente listen over nye varer."), { code: r.code ?? undefined, status: r.status ?? 503 });
 }
 
 /**
