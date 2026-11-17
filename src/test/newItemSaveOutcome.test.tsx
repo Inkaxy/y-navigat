@@ -13,7 +13,7 @@ const line = (id: string, invoice: string) => ({
   id, invoice_id: invoice, invoice_number: `F-${invoice}`, invoice_date: "2026-11-05", requires_review: true, description: "KANEL",
   quantity: 1, unit: "kg", unit_price: 100, total_amount: 100, package_size: null, package_unit: null, count_per_package: null,
   supplier_sku: null, is_credit_note: false, review_reason: "unmatched", extraction_issues: [],
-  invoice_status: "needs_review", flagged_at: null, match_confidence: "unmatched",
+  invoice_status: "needs_review", flagged_at: null as string | null, match_confidence: "unmatched",
 });
 let lines = [line("l1", "f1")];
 let cap: boolean | null = false;
