@@ -130,3 +130,6 @@
 - [x] 3. Varenumre: leseinstruks + regel (rullet ut), dry-run PENDING + DATAENDRING-fil (ikke kjørt)
 - [ ] 3b. Åpne ASKO-PDF-ene for å fastslå kolonnene (venter: krever innlogget tilgang til fakturadokumentene)
 - [x] 4. Layout: handlingene i raden fullt synlige fra 1024 px (1280/1440)
+- [x] 1b. Godkjente fakturaer: «Kunne ikke kobles: …godkjent», merke «Ligger på godkjent faktura», utenfor «Opprett N sikre»
+- [x] 1c. PENDING-forslag A (kobling på godkjente, md5-vakt) og B (køen følger sperren) – Henrik velger, ikke kjørt
+- [x] 3c. Stangeland Mølle: leseinstruks for varenummer («8400 1»)

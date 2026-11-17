@@ -15,3 +15,16 @@ export function splitLockedLines<T>(open: readonly T[], isLocked: (l: T) => bool
   for (const l of open) (isLocked(l) ? locked : linkable).push(l);
   return { linkable, locked };
 }
+
+/** Feilteksten når lagringen ikke endret noen linjer og alle linjene viser seg å ligge på godkjente fakturaer. */
+export const NOT_LINKED_APPROVED = "Kunne ikke kobles: linjene ligger på fakturaer som allerede er godkjent. Ingenting ble lagret.";
+
+/**
+ * Er linjen låst for kobling fra Nye varer? Ført kostpris låser alltid. Intern godkjenning låser til databasen
+ * bekrefter at koblingen godtar godkjente, åpne fakturaer (`rm_cap_kobling_godkjent_v1` = true); ukjent = låst.
+ */
+export function lockedForLink(lock: "approved" | "cost" | null, approvedLinkable: boolean | null): boolean {
+  if (lock === "cost") return true;
+  if (lock === "approved") return approvedLinkable !== true;
+  return false;
+}

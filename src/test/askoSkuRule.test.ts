@@ -22,3 +22,14 @@ describe("ASKO: varenummerkolonnen", () => {
     expect(buildUserText(hints("A/S PALS"), null, [])).not.toContain("ASKO-fakturaer");
   });
 });
+
+describe("Stangeland Mølle: varenummerkolonnen", () => {
+  it("instruksen ber om alle sifrene («8400 1»), og ingen trykt verdi fjernes", () => {
+    expect(buildUserText(hints("Stangeland Mølle Handel AS"), null, [])).toContain("«8400 1»");
+    const out = applySupplierSkuRules([{ sku: "8400 1" }, { sku: "9939" }, { sku: "1011 0-1" }], "Stangeland Mølle Handel AS");
+    expect(out.map((l) => l.sku)).toEqual(["8400 1", "9939", "1011 0-1"]);
+  });
+  it("ASKO-instruksen gis ikke til Stangeland", () => {
+    expect(buildUserText(hints("Stangeland Mølle Handel AS"), null, [])).not.toContain("ASKO-fakturaer");
+  });
+});

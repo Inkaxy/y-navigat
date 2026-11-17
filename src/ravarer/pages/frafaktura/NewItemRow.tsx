@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { useSupplierSkuIndex } from "@/ravarer/hooks/useSupplierSkuIndex";
 import { useSupplierItemLines } from "@/fakturaer/hooks/useSupplierItems";
 import { lineLocked } from "@/fakturaer/lib/reviewPlan";
-import { splitLockedLines } from "@/ravarer/lib/fraFaktura/linkOutcome";
+import { lockedForLink, NOT_LINKED_APPROVED, NothingSavedError, splitLockedLines } from "@/ravarer/lib/fraFaktura/linkOutcome";
+import { useCapability } from "@/lib/pendingRpc";
 import { lineMath, unitPrices } from "@/ravarer/lib/fraFaktura/lineMath";
 import { dateNo } from "@/ravarer/lib/decisions";
 import { paths } from "@/ravarer/lib/paths";
@@ -39,7 +40,9 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
   const credit = isCreditRow(open);
   // Linjer på internt godkjente fakturaer eller med ført kostpris kan ikke kobles (serveren hopper over dem).
   // De sendes ikke, og en rad der alle linjene er slik, kan ikke lagres herfra.
-  const { linkable, locked } = useMemo(() => splitLockedLines(open, (l) => lineLocked(l) != null), [open]);
+  // Godkjente fakturaer kan kobles først når databasen sier det (forslag A); til da er de låst.
+  const approvedLinkable = useCapability("rm_cap_kobling_godkjent_v1");
+  const { linkable, locked } = useMemo(() => splitLockedLines(open, (l) => lockedForLink(lineLocked(l), approvedLinkable)), [open, approvedLinkable]);
   const lockedApproved = locked.length > 0 && locked.every((l) => lineLocked(l) === "approved");
   // Pris og pakning bygges helst fra en linje som er lest rent; ellers merkes raden «Sjekk tallene».
   const pkgLine = packageSourceLine(open, all, (l) => lineMath(l).clean);
@@ -73,6 +76,8 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
   // «Prøv igjen» gjentar siste svar. Ingenting er lagret når feilen vises (0 linjer eller avvist), og en gjentatt
   // kobling av linjer som alt er koblet endrer ingenting.
   const [retry, setRetry] = useState<(() => void) | null>(null);
+  // «Ingenting ble lagret»: teksten avgjøres når linjene er hentet på nytt (godkjent faktura eller annen grunn).
+  const [nothingSaved, setNothingSaved] = useState(false);
   const init = useRef({ lines: false, sug: false });
 
   useEffect(() => {
@@ -104,7 +109,7 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
 
   const submit = async (): Promise<boolean> => {
     if (lock.current || !canWrite || !answerable || !canSubmit(answer)) return false;
-    lock.current = true; setBusy(true); setError(null); setRetry(null);
+    lock.current = true; setBusy(true); setError(null); setRetry(null); setNothingSaved(false);
     const sentAt = Date.now();
     try {
       const r = await actions.link({
@@ -115,16 +120,17 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Kunne ikke lagre. Utfallet er ukjent – last siden på nytt før du prøver igjen.");
+      setNothingSaved(e instanceof NothingSavedError);
       setRetry(() => () => void submitRef.current());
       return false;
     } finally { lock.current = false; setBusy(false); }
   };
   const notItem = async () => {
     if (lock.current || !canWrite || !ready) return;
-    lock.current = true; setBusy(true); setError(null); setRetry(null);
+    lock.current = true; setBusy(true); setError(null); setRetry(null); setNothingSaved(false);
     const sentAt = Date.now();
     try { onDone(row.key, await actions.notItem({ supplierId: row.supplier_id, supplierName: row.supplier_name, itemKey: row.item_key, text: text ?? row.title, lineIds }), sentAt); }
-    catch (e) { setError(e instanceof Error ? e.message : "Kunne ikke lagre."); setRetry(() => () => void notItemRef.current()); }
+    catch (e) { setError(e instanceof Error ? e.message : "Kunne ikke lagre."); setNothingSaved(e instanceof NothingSavedError); setRetry(() => () => void notItemRef.current()); }
     finally { lock.current = false; setBusy(false); }
   };
   const submitRef = useRef(submit);
@@ -151,6 +157,7 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
         <div className="min-w-0 space-y-0.5">
           <p className="text-body font-semibold">{text}</p>
           <p className="text-caption text-ink-secondary">{row.supplier_name ?? "Ukjent leverandør"} · {row.sku ? `varenr ${row.sku}` : "uten varenummer"}</p>
+          {allLocked && lockedApproved && <p className="inline-flex rounded-md bg-warning/15 px-2 py-0.5 text-caption font-semibold text-warning">Ligger på godkjent faktura</p>}
           <p className="text-caption text-ink-secondary">På {row.invoice_count} {row.invoice_count === 1 ? "faktura" : "fakturaer"} · sist {dateNo(row.last_date)}</p>
           {spellings.length > 0 && <p className="text-caption text-ink-secondary">Også skrevet: {spellings.map((s) => `«${s}»`).join(", ")}</p>}
           {latest && (
@@ -213,8 +220,8 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
       </div>
       {error && (
         <div role="alert" className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-          <span className="min-w-0 flex-1">{error}</span>
-          {retry && <Button variant="outline" className="min-h-[44px]" disabled={busy} onClick={retry}>Prøv igjen</Button>}
+          <span className="min-w-0 flex-1">{nothingSaved && allLocked && lockedApproved ? NOT_LINKED_APPROVED : error}</span>
+          {retry && !allLocked && <Button variant="outline" className="min-h-[44px]" disabled={busy} onClick={retry}>Prøv igjen</Button>}
         </div>
       )}
       {snippet && latest && (

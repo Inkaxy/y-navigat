@@ -108,3 +108,13 @@ Lokal test: `bunx vitest run src/test/slaaSammenVarerSql.test.ts` (PGlite med fo
 | `20261121_varenummer_normalisering.check.sql` | Bare SELECT: forutsetninger, rettigheter, oppsummering per leverandør og ISTE CHAI-eksempelet. |
 | `20261121_varenummer_normalisering.DATAENDRING.sql` | **DATAENDRING — TAS SEPARAT MED HENRIK.** Setter foreslått varenummer på åpne, ukoblede linjer (ikke godkjent/kostført/holdt utenfor) med sikkerhetskopi av gammel verdi. Slutter med ROLLBACK (dry-run). Starter ingen ny matching. |
 
+## Kobling på godkjente fakturaer (17.11.2026) — Henrik velger HØYST ÉN
+
+| Fil | Status |
+|---|---|
+| `20261121_kobling_godkjent_faktura.PENDING.sql` | **FORSLAG A, VENTER PÅ HENRIK/ROOT.** Kobling/oppretting/«Ikke vare» via `rm_link_supplier_item` gjelder også linjer på internt godkjente, åpne fakturaer (ikke avstemt/flagget/not_applicable/ført kost). Tekstbytter med md5-vakt: `rm_confirm_line_match` `e2958f26…` (godkjent-sperren hoppes over bare fra `rm_link_supplier_item` via transaksjonslokal `rm.link_approved`), `rm_link_supplier_item` `acc4fdb1…`, `rm_work_items` `efe0f95e…` (ført kost er ikke åpen). Markør `rm_cap_kobling_godkjent_v1`. Stopper hvis B er kjørt. Endrer ingen data. Etter kjøring feiler linjen «rm_work_items er uendret» i `20261119_nye_varer_les.check.sql` – forventet. |
+| `20261121_kobling_godkjent_faktura.check.sql` | Bare SELECT: md5, omfang (207 åpne linjer 17.11), godkjenningsgrunnlag uendret (samme tall før/etter), åpne linjer med ført kost (0). |
+| `20261121_ko_uten_godkjent.PENDING.sql` | **FORSLAG B, VENTER PÅ HENRIK/ROOT.** Koblingen beholder sperren; køen (`rm_work_items` md5 `efe0f95e…` og `rm_new_items_queue` når den finnes) teller ikke linjer på godkjente fakturaer eller med ført kost som åpne. Kjøres etter 20261119 hvis begge skal kjøres. Markør `rm_cap_ko_uten_godkjent_v1`. Stopper hvis A er kjørt. Endrer ingen data. |
+| `20261121_ko_uten_godkjent.check.sql` | Bare SELECT: md5, markører, antall leverandørvarer med bare/delvis godkjente linjer (47/14 17.11). |
+
+`20261119_nye_varer_les.PENDING.sql` (ikke kjørt) er oppdatert 17.11: en linje med aktiv ført kostpris telles ikke som åpen, samme regel som koblingen.

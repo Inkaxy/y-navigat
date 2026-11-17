@@ -6,8 +6,8 @@ export interface SupplierSkuRule {
   supplier: RegExp;
   /** Instruks til leseren (legges i brukerteksten sammen med kontrollfakta). */
   hint: string;
-  /** Råverdier i varenummerfeltet som ikke er varenummer. */
-  notSku: RegExp;
+  /** Råverdier i varenummerfeltet som ikke er varenummer (utelatt = bare instruks). */
+  notSku?: RegExp;
 }
 
 export const SUPPLIER_SKU_RULES: readonly SupplierSkuRule[] = [
@@ -22,6 +22,17 @@ export const SUPPLIER_SKU_RULES: readonly SupplierSkuRule[] = [
       "Finnes ikke noe annet varenummer på linjen, sett sku=null.",
     notSku: /^\d{3}\s*-\s*\d{1,2}(\s*\/\s*\d{1,2})?$/,
   },
+  {
+    // Stangeland Mølle: samme vare er lest som «8400 1» og uten varenummer, «9939 7», «9939» og uten. Varenummeret er
+    // trykt som fire + ett siffer; det siste sifferet falt bort eller hele nummeret ble utelatt. Tall i varenavnet
+    // («PISTAGEREMONS PALMEFRI 571111», «ARO 2000 266711») er en del av navnet, ikke varenummer. Bare instruks:
+    // ingen trykt verdi fjernes.
+    supplier: /\bstangeland\b/i,
+    hint:
+      "Stangeland Mølle-fakturaer: varenummeret står i egen kolonne og er trykt som fire sifre, mellomrom og ett siffer («8400 1», «9939 7», «8191 5»). " +
+      "Ta alltid med ALLE sifrene i sku_raw og sku – også det siste sifferet etter mellomrommet. Les varenummeret på hver linje; utelat det aldri når det står trykt. " +
+      "Tall som står i varenavnet (for eksempel «571111» i «PISTAGEREMONS PALMEFRI 571111») er en del av navnet, ikke varenummer.",
+  },
 ];
 
 export function supplierSkuRule(supplierName: string | null | undefined): SupplierSkuRule | null {
@@ -34,5 +45,7 @@ export function supplierSkuRule(supplierName: string | null | undefined): Suppli
 export function applySupplierSkuRules<T extends { sku: string | null; sku_raw?: string | null }>(lines: readonly T[], supplierName: string | null | undefined): T[] {
   const rule = supplierSkuRule(supplierName);
   if (!rule) return [...lines];
-  return lines.map((l) => (l.sku != null && rule.notSku.test(l.sku.trim()) ? { ...l, sku: null } : l));
+  const notSku = rule.notSku;
+  if (!notSku) return [...lines];
+  return lines.map((l) => (l.sku != null && notSku.test(l.sku.trim()) ? { ...l, sku: null } : l));
 }

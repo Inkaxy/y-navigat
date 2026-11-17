@@ -35,7 +35,9 @@ begin
      where i.excluded_at is null and i.status is distinct from 'excluded' and i.legal_entity_id = p_legal_entity_id
   ), lines as materialized (
     select il.id, il.invoice_id, i.supplier_id, i.invoice_date, il.created_at, il.supplier_sku, il.description,
-           il.raw_material_id, il.match_confidence, il.requires_review, il.review_reason, il.total_amount, i.is_open,
+           il.raw_material_id, il.match_confidence, il.requires_review, il.review_reason, il.total_amount,
+           -- Samme regel som rm_link_supplier_item: linje med aktiv ført kostpris kan ikke kobles og er ikke åpen.
+           (i.is_open and not exists (select 1 from public.invoice_line_cost_postings cp where cp.invoice_line_id = il.id and cp.revoked_at is null)) is_open,
            case when public.rm_sku_norm(il.supplier_sku) <> '' then 'sku:' || public.rm_sku_norm(il.supplier_sku)
                 else 'name:' || public.rm_match_key(il.description) end item_key
       from invoice_lines il join inv i on i.id = il.invoice_id
