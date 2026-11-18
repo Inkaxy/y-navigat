@@ -80,7 +80,7 @@ const fasitUnread = (await as(U_OK, directUnread)).map((x) => x.id);
 ok(fasitJump.length === 2 && fasitUnread.length === 2, "testdata gir 2 prishopp-linjer og 2 uleste");
 
 // DEL 1
-await db.exec(read("1-kjor-na/02_raske_oppslag_del1.sql"));
+await db.exec(read("kjort/02_raske_oppslag_del1.sql"));
 const j = (await as(U_OK, `select public.rm_price_jump_lines('${LE}') r`))[0].r;
 ok(j.ok === true && j.rows.map((x) => x.id).join() === fasitJump.join(), "rm_price_jump_lines = dagens Prishopp-rader");
 ok(j.rows[0].rm_name === "Mel" && "invoice_number" in j.rows[0] && "expected_price_per_base_unit" in j.rows[0], "prishopp har varenavn og fakturafelt");
@@ -94,10 +94,10 @@ const nav = (await as(U_NO, `select public.rm_nav_counts('${LE}') r`))[0].r;
 ok(nav.datasheet_changes === 1 && nav.agreements_expiring_30d === 1 && nav.stock_below_min === 1, "menyens tre merker");
 ok(await fails(U_OK, `select public.rm_nav_counts('${LE2}')`, /Ingen tilgang/), "meny: annet selskap avvist");
 const rerun = async (f) => { try { await db.exec(read(f)); return ""; } catch (e) { await db.exec("rollback"); return String(e.message); } };
-ok(/allerede kjørt/.test(await rerun("1-kjor-na/02_raske_oppslag_del1.sql")), "del 1 kan ikke kjøres to ganger");
+ok(/allerede kjørt/.test(await rerun("kjort/02_raske_oppslag_del1.sql")), "del 1 kan ikke kjøres to ganger");
 
 // DEL 2 – samme synlige rader for alle brukere, også via nestede spørringer.
-await db.exec(read("1-kjor-na/03_raske_oppslag_del2_rls.sql"));
+await db.exec(read("kjort/03_raske_oppslag_del2_rls.sql"));
 const after = { ok: await visible(U_OK), owner: await visible(U_OWNER), no: await visible(U_NO) };
 ok(JSON.stringify(after) === JSON.stringify(before), "radsikkerhet: nøyaktig samme synlige fakturaer og linjer før og etter");
 ok(before.no.inv === "" && before.no.lines === "", "uten tilgang ser ingenting (før og etter)");
@@ -112,11 +112,11 @@ console.log(`  tilgangskall: før ${callsBefore} (8 linjer) · etter ${callsAfte
 await db.exec(`delete from invoice_lines where invoice_id = '${iOpen}' and requires_review = false and price_variance_pct is null`);
 const pol = (await db.query("select qual from pg_policies where tablename = 'invoice_lines' and policyname = 'invoice_lines_select'")).rows[0].qual;
 ok(/rm_invoice_read_entity_ids/.test(pol), "ny policy på invoice_lines");
-ok(/allerede kjørt/.test(await rerun("1-kjor-na/03_raske_oppslag_del2_rls.sql")), "del 2 kan ikke kjøres to ganger");
+ok(/allerede kjørt/.test(await rerun("kjort/03_raske_oppslag_del2_rls.sql")), "del 2 kan ikke kjøres to ganger");
 // Vakt: endret policy før kjøring stopper filen.
 const db2 = new PGlite(); await db2.exec(stub);
 await db2.exec("drop policy invoices_select on invoices; create policy invoices_select on invoices for select using (true);");
-try { await db2.exec(read("1-kjor-na/03_raske_oppslag_del2_rls.sql")); ok(false, "vakt"); } catch (e) { ok(/endret siden 18.11/.test(e.message), "vakt stopper ved endret policy"); }
+try { await db2.exec(read("kjort/03_raske_oppslag_del2_rls.sql")); ok(false, "vakt"); } catch (e) { ok(/endret siden 18.11/.test(e.message), "vakt stopper ved endret policy"); }
 
 await printFingerprint(db);
 console.log(`OK – ${n} kontroller`);

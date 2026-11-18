@@ -168,5 +168,5 @@
 - [x] 7 Sammenslåingsfilen delt i 7 deler + verktøy/test
 
 # Rydding av supabase/pending (18.11.2026, Henrik)
-- [x] Mapper 1-kjor-na (01–07) / 2-endrer-data / 3-valgfritt / kjort / kontroll / delfiler / utgaatt; SQL-innhold uendret (md5)
+- [x] Mapper 1-kjor-na (01–07, kjørt av Henrik 18.11 og flyttet til kjort/) / 2-endrer-data / 3-valgfritt / kjort / kontroll / delfiler / utgaatt; SQL-innhold uendret (md5)
 - [x] LES-MEG.md + docs/ravarer-drift.md + skript/tester oppdatert

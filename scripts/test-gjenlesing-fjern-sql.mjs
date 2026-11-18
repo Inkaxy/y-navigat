@@ -10,7 +10,7 @@ import { EOL, readSql, printFingerprint } from "./lib/pastedSql.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const fx = (f) => readFileSync(join(root, "scripts/fixtures/live-20261118", f), "utf8");
-const pending = readSql(join(root, "supabase/pending/1-kjor-na/01_gjenlesing_fjern_linjer.sql"));
+const pending = readSql(join(root, "supabase/pending/kjort/01_gjenlesing_fjern_linjer.sql"));
 const check = readSql(join(root, "supabase/pending/kontroll/20261123_gjenlesing_fjern_linjer.check.sql"));
 
 const stub = `

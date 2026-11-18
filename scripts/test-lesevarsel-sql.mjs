@@ -5,7 +5,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { readSql, printFingerprint } from "./lib/pastedSql.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const sql = readSql(join(root, "supabase/pending/1-kjor-na/07_lesevarsel_stillstand.sql"));
+const sql = readSql(join(root, "supabase/pending/kjort/07_lesevarsel_stillstand.sql"));
 const db = new PGlite();
 let checks = 0;
 const ok = (c, m) => { if (!c) throw new Error("FEIL: " + m); checks++; };

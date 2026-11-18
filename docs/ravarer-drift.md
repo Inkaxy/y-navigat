@@ -6,13 +6,13 @@ begrensninger. Root kjører databasefiler; ingenting her kjøres automatisk. «K
 ## A. Databasefiler (`supabase/pending/`)
 
 Startpunkt for den som kjører filene: `supabase/pending/LES-MEG.md` (tabell, framgangsmåte i SQL Editor).
-Mappene: `1-kjor-na/` (nummerert, kjøres nå), `2-endrer-data/` (eget ja + dry-run), `3-valgfritt/`, `kjort/`,
+Mappene: `1-kjor-na/` (nummerert, kjøres nå; tom etter 18.11), `2-endrer-data/` (eget ja + dry-run), `3-valgfritt/`, `kjort/`,
 `kontroll/` (alle `.check.sql`, bare SELECT), `delfiler/`, `utgaatt/`, `functions/` (serverkode). Filer som endrer
 en eksisterende funksjon/policy stopper selv hvis live-definisjonen avviker fra den som ble lest (md5-vakt).
 Innholdet i SQL-filene ble ikke endret ved ryddingen 18.11; kontrollfilene beholder gamle navn.
-Etter innlimingsfeilen 18.11 (01 stoppet på «anker a» fordi innlimingen ga CR+LF) tåler filene i `1-kjor-na/` og
+Etter innlimingsfeilen 18.11 (01 stoppet på «anker a» fordi innlimingen ga CR+LF) tåler filene 00–07 og
 `2-endrer-data/` Windows-linjeskift: ankre renses for CR/hardt mellomrom/tabulator, et sluttsteg skriver opprettede
-funksjoner på nytt uten CR, og md5-vakter/kontrollfiler regner md5 uten CR. `1-kjor-na/00_test_innliming.sql` (ren SELECT)
+funksjoner på nytt uten CR, og md5-vakter/kontrollfiler regner md5 uten CR. `kjort/00_test_innliming.sql` (ren SELECT)
 viser hva utklippstavlen gjør. Test: `node scripts/test-innliming-crlf.mjs` (hver fil LF mot CR+LF).
 
 ### Kjørt – `kjort/`, kjør aldri på nytt
@@ -28,18 +28,23 @@ viser hva utklippstavlen gjør. Test: `node scripts/test-innliming-crlf.mjs` (hv
 | `20261119_fra_faktura` | Prishopp-grense, egen grense per vare, leverandørvaretype, innstillinger for Fra faktura. |
 | `20261119_godta_sum` | «Godta sum» med begrunnelse og angre. |
 | `20261122_fakturalesing_opplaering` | Tabeller og funksjoner for opplæring av fakturaleseren. Alle brytere står av. |
+| `00_test_innliming` (18.11) | Ren SELECT som viste hva utklippstavlen gjør. |
+| `01_gjenlesing_fjern_linjer` (`20261123_gjenlesing_fjern_linjer`, 18.11) | Gjenlesing kan erstatte hele linjesettet når ingen beskyttet linje går tapt (`rm_cap_gjenlesing_fjern_v1`). Første innliming stoppet på anker a (CR+LF) uten endring; rettet fil gikk gjennom. |
+| `02_raske_oppslag_del1` (`20261124_raske_oppslag_del1`, 18.11) | Raske tellere i menyen, Prishopp og Ikke lest (`rm_cap_raske_oppslag_v1`). |
+| `03_raske_oppslag_del2_rls` (`20261124_raske_oppslag_del2_rls`, 18.11) | Fakturatilgang sjekkes én gang per spørring. Tilbakerulling i `kontroll/20261124_raske_oppslag_del2_rls.check.sql`. Ekte før/etter-tid er ikke målt. |
+| `04_prislinje` (`20261117_prislinje`, 18.11) | «Rett pris» på ett kjøp og «Endre godkjent pakning» (`rm_cap_prislinje_v1`, `rm_purchase_corrections`). |
+| `05_slaa_sammen_varer` (`20261120_slaa_sammen_varer`, 18.11) | «Slå sammen varer» med angre (`rm_cap_slaa_sammen_v1`, `rm_material_merges`). Delfilene i `delfiler/` skal ikke kjøres. |
+| `06_varselmal_lesing_stopper` (`20261113_invoice_reading_alert_template`, 18.11) | E-postmalen for «lesingen står stille». |
+| `07_lesevarsel_stillstand` (`20261125_lesevarsel_stillstand`, 18.11) | `rm_reading_stall_check`. Tidsplanen (cron) nederst i filen er ikke lagt inn; krever eget ja. |
 
-### Venter – `1-kjor-na/`, i nummerrekkefølge
-| Nr | Fil (opprinnelig navn) | Hva den slår på | Merknad |
-|---|---|---|---|
-| 00 | `00_test_innliming` (ny 18.11) | Ingenting – ren SELECT som viser om innlimingen gir CR, hardt mellomrom eller endret tabulator. | Kjøres først. |
-| 01 | `01_gjenlesing_fjern_linjer` (`20261123_gjenlesing_fjern_linjer`) | Gjenlesing kan erstatte hele linjesettet når ingen beskyttet linje går tapt (`rm_cap_gjenlesing_fjern_v1`). | md5-vakt mot `rm_apply_invoice_reread` (`c9c68ddd…`); stemte mot live 18.11. Første innliming 18.11 stoppet på anker a (CR+LF), ingenting endret; rettet. |
-| 02 | `02_raske_oppslag_del1` (`20261124_raske_oppslag_del1`) | Raske tellere i menyen, Prishopp og Ikke lest (`rm_cap_raske_oppslag_v1`). | Bare nye lesefunksjoner. Appen bytter selv når filen er kjørt. |
-| 03 | `03_raske_oppslag_del2_rls` (`20261124_raske_oppslag_del2_rls`) | Fakturatilgang sjekkes én gang per spørring i stedet for per linje. | Endrer bare lesepolicyene på `invoices`/`invoice_lines`; vakt stemte mot live 18.11; tilbakerulling i `kontroll/20261124_raske_oppslag_del2_rls.check.sql`. Mål tiden før/etter. |
-| 04 | `04_prislinje` (`20261117_prislinje`) | «Rett pris» på ett kjøp og «Endre godkjent pakning» (`rm_cap_prislinje_v1`). | Uavhengig av resten. |
-| 05 | `05_slaa_sammen_varer` (`20261120_slaa_sammen_varer`, hele filen) | «Slå sammen varer» med angre (`rm_cap_slaa_sammen_v1`). Ny tabell `rm_material_merges`. | md5-vakt mot `merge_raw_materials` (`3c2ed3cc…`) stemte mot live 18.11. Delfilene i `delfiler/` trengs ikke når hele filen limes inn. |
-| 06 | `06_varselmal_lesing_stopper` (`20261113_invoice_reading_alert_template`) | E-postmalen for «lesingen står stille». | Flyttet hit fra valgfritt: nr. 07 trenger malen, og den utrullede leseren bruker den også. |
-| 07 | `07_lesevarsel_stillstand` (`20261125_lesevarsel_stillstand`) | Servertjek: e-post ved stillstand ≥ 24 t med kø, eller feilrate ≥ 30 % (min. 5 lesinger) siste døgn. | Kjøres etter 06. Tidsplanen (cron) står kommentert nederst og legges inn bare etter ja. |
+### Venter – `1-kjor-na/`
+Ingenting. Mappen er tom til neste fil får Henriks ja.
+
+**Kontrollert av root i produksjon 18.11 etter 00–07:** `rm_cap_gjenlesing_fjern_v1`, `rm_cap_raske_oppslag_v1`,
+`rm_cap_prislinje_v1` og `rm_cap_slaa_sammen_v1` finnes; tabellene `rm_material_merges` (0 rader) og
+`rm_purchase_corrections` finnes; de nye lesepolicyene ligger på `invoices`/`invoice_lines`; `rm_reading_stall_check`
+finnes; ingen ny cron-jobb; ingen funksjoner fra filene har CR; 793 fakturaer og 5 561 linjer uendret; ingen
+tilgangsfeil eller tidsavbrudd i loggene etterpå.
 
 ### Valgfritt – `3-valgfritt/`
 | Fil | Hva den slår på | Merknad |
@@ -49,7 +54,7 @@ viser hva utklippstavlen gjør. Test: `node scripts/test-innliming-crlf.mjs` (hv
 | `20261112_push_breadscale_floor` | Brødskala sendes som helt tall rundet ned. | Venter på ja. |
 | `20261117_automatikk` | Pant som følgevare, automatisk ny lesing. **Delvis utgått:** tabellen `rm_key_material_limits` er erstattet av egen prisgrense per vare. | Bør strykes for tabelldelen før kjøring; avgjøres av Henrik/root. |
 
-### Dataendringer – `2-endrer-data/`, tas separat med Henrik (alle har dry-run)
+### Dataendringer – `2-endrer-data/`, venter på Henriks ja per fil (alle har dry-run)
 `20261119_fra_faktura_opprydding` (funksjon med dry-run som standard), `20261119_sumkontroll_omregning` (+ `.dryrun.sql`),
 `20261121_varenummer_normalisering` (`.PENDING.sql` = forhåndsvisning uten dataendring, kjøres før `.DATAENDRING.sql`),
 `20261122_like_linjer` (+ `.dryrun.sql`, 41 mulige like linjegrupper).
@@ -58,7 +63,7 @@ viser hva utklippstavlen gjør. Test: `node scripts/test-innliming-crlf.mjs` (hv
 `20261117_automatikk_cron.DATAENDRING` (cron trengs ikke), `20261012_negotiation_item_preservation` (erstattet, gjennomgått versjon kjørt 12.10).
 
 ### Store filer
-Root/Henrik limer inn hele filen i SQL Editor (tåler 77 kB). Delfiler fra `node scripts/splitPendingSql.mjs <fil>`
+Root/Henrik limer inn hele filen i SQL Editor (tåler 77 kB; 05 gikk gjennom 18.11, så delfilene for den skal ikke kjøres). Delfiler fra `node scripts/splitPendingSql.mjs <fil>`
 ligger i `delfiler/` som reserve ved innskriving for hånd: delene legger teksten i en mellomlagring med md5-kontroll
 per del, og siste del kjører hele den gjennomgåtte teksten i én transaksjon. Test: `src/test/splitPendingSql.test.ts`.
 
@@ -94,9 +99,9 @@ Lagring under `supabase/functions/` ruller ut automatisk. Ny serverkode legges d
 ## D. Kjente begrensninger
 
 - Oversikt og Varer-fanene bruker fortsatt den tunge oppsummeringen (`rm_work_summary`, opptil 6–8 s). Menyen,
-  Prishopp og Ikke lest blir raske etter fil nr. 02–03. Målet «under 1 s på alle sider» er ikke nådd for disse to.
-- Tidene for de nye lesefunksjonene er målt lokalt og med tilgangskontroll omgått mot live; ekte før/etter-tid må
-  måles etter kjøring.
+  Prishopp og Ikke lest skal være raske etter fil nr. 02–03 (kjørt 18.11). Målet «under 1 s på alle sider» er ikke nådd for disse to.
+- Tidene for de nye lesefunksjonene er målt lokalt og med tilgangskontroll omgått mot live; ekte før/etter-tid etter
+  kjøringen 18.11 er ikke målt ennå.
 - md5-verdiene for nye funksjonskropper i check-filene er regnet lokalt; root bør sammenligne med live etter kjøring.
 - Gjentatte oppslag mot databaseobjekter som ikke finnes, huskes i én time per fane; årsaken til hundrevis av
   404/400 i døgnet i produksjon er ikke bevist (loggene var ikke tilgjengelige), og nbhub.no får endringen først ved publisering.

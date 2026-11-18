@@ -8,7 +8,7 @@ import { STUB } from "./fixtures/slaaSammenStub";
 
 type Out = { files: { name: string; sql: string }[]; parts: string[]; body: string; fnBodies: { name: string; md5: string }[] };
 const FILE = "20261120_slaa_sammen_varer";
-const SRC = path.join(process.cwd(), "supabase/pending/1-kjor-na/05_slaa_sammen_varer.sql");
+const SRC = path.join(process.cwd(), "supabase/pending/kjort/05_slaa_sammen_varer.sql");
 const original = readFileSync(SRC, "utf8");
 const split = (): Out => splitSql(original, FILE) as Out;
 const pend = (o: Out) => o.files.filter((f) => f.name.endsWith(".PENDING.sql"));

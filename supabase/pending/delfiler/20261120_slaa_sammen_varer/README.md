@@ -1,7 +1,9 @@
 # 20261120_slaa_sammen_varer i åtte deler
 
+**Kjør ikke.** Hele filen (05) ble kjørt av Henrik 18.11.2026. Delene er beholdt fordi testene leser dem.
+
 Reserve for innskriving for hånd. Når filen limes inn i SQL Editor, brukes heller hele originalen
-`../../1-kjor-na/05_slaa_sammen_varer.sql` (78 kB), og disse delene trengs ikke. Delene inneholder originalen ordrett
+`../../kjort/05_slaa_sammen_varer.sql` (78 kB), og disse delene trengs ikke. Delene inneholder originalen ordrett
 (laget på nytt 18.11 etter at originalen fikk sluttsteget for linjeskift). Hver del renser innlimt tekst for CR, hardt
 mellomrom og tabulator før md5 sjekkes, så Windows-linjeskift gir ikke «skrevet inn feil».
 

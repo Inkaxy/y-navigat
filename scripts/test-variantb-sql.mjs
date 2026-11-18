@@ -9,7 +9,7 @@ const dir = join(dirname(fileURLToPath(import.meta.url)), "..", "supabase", "pen
 const read = (f) => readSql(join(dir, f));
 // Stubben har ikke live-teksten byte for byte: md5-vakten byttes mot en innholdskontroll.
 const phase1 = read("kjort/20261117_beslutninger_angre.PENDING.sql").replace("if md5(v_def) <> '35d0e2bd23aff1c85459c4299db189d9' then", "if false then");
-const phase2 = read("1-kjor-na/04_prislinje.sql");
+const phase2 = read("kjort/04_prislinje.sql");
 const phase3 = read("3-valgfritt/20261117_automatikk.PENDING.sql");
 
 const stub = `
