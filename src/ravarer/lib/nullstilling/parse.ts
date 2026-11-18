@@ -11,7 +11,8 @@ const strArr = (v: unknown): string[] | null => (Array.isArray(v) && v.every((x)
 export function parseSnapLine(v: unknown): SnapLine | null {
   if (!isObj(v)) return null;
   const line_id = str(v, "line_id"), invoice_id = str(v, "invoice_id"), line_updated_at = str(v, "line_updated_at");
-  if (!line_id || !invoice_id || !line_updated_at) return null;
+  const invoice_read_codes = strArr(v.invoice_read_codes);
+  if (!line_id || !invoice_id || !line_updated_at || !invoice_read_codes || !Array.isArray(v.extraction_issues)) return null;
   return {
     line_id, invoice_id, line_updated_at,
     invoice_number: str(v, "invoice_number"), invoice_date: str(v, "invoice_date"), supplier_id: str(v, "supplier_id"), supplier_name: str(v, "supplier_name"),
@@ -19,11 +20,11 @@ export function parseSnapLine(v: unknown): SnapLine | null {
     cost_posted: bool(v, "cost_posted") === true, item_key: str(v, "item_key"), supplier_sku: str(v, "supplier_sku"), description: str(v, "description"),
     quantity: num(v, "quantity"), unit: str(v, "unit"), unit_price: num(v, "unit_price"), total_amount: num(v, "total_amount"),
     discount_amount: num(v, "discount_amount"), unit_price_basis: str(v, "unit_price_basis"), line_kind: str(v, "line_kind"),
-    extraction_issues: Array.isArray(v.extraction_issues) ? v.extraction_issues : [],
+    extraction_issues: v.extraction_issues,
     package_size: num(v, "package_size"), package_unit: str(v, "package_unit"), count_per_package: num(v, "count_per_package"),
     raw_material_id: str(v, "raw_material_id"), match_confidence: str(v, "match_confidence"), review_reason: str(v, "review_reason"),
     price_per_base_unit: num(v, "price_per_base_unit"), expected_price_per_base_unit: num(v, "expected_price_per_base_unit"),
-    price_variance_pct: num(v, "price_variance_pct"), read_issue: str(v, "read_issue"), exclusion_blocker: str(v, "exclusion_blocker"),
+    price_variance_pct: num(v, "price_variance_pct"), invoice_read_codes, exclusion_blocker: str(v, "exclusion_blocker"),
     rm_name: str(v, "rm_name"), rm_base_unit: str(v, "rm_base_unit"), rm_cost: num(v, "rm_cost"), rm_active: bool(v, "rm_active") !== false,
   };
 }

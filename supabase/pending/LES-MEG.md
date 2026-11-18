@@ -14,7 +14,7 @@ Det som gjenstår, ligger i `2-endrer-data/` (eget ja per fil) og `3-valgfritt/`
 
 | Nr | Fil | Hva den slår på | Endrer data ved kjøring? | Hva Henrik ser i appen etterpå |
 |---|---|---|---|---|
-| 01 | `01_nullstill_koen.sql` | «Nullstill køen»: egen kategori «Avsluttet ved nullstilling» for «Hold utenfor» (bare én linje), fire tabeller for kjøringen og funksjonene som styrer den (start, bolker, pause/stopp, kontroll av uavklarte steg, avslutning, angre-merking, status). | Nei. Ingen kjøring startes, ingen linjer, kostpriser eller innstillinger endres. Grensen 1 % settes først når en kjøring Henrik starter er ferdig uten feil. | «Nullstill køen …» øverst i Råvarer › Fra faktura (godkjenner/admin): forhåndsvisning, eksport, start, fremdrift, kvittering, angre. Helsesiden viser grensen og siste nullstilling. |
+| 01 | `01_nullstill_koen.sql` | «Nullstill køen»: egen kategori «Avsluttet ved nullstilling» for «Hold utenfor» (bare én linje), fire tabeller for kjøringen og funksjonene som styrer den (start, bolker, pause/stopp, kontroll av uavklarte steg, avslutning, angre-merking, status). Oppdatert 18.11 med Henriks romsligere regler: forhåndsvisningen leser lesevarslene på faktura og linje, og revisjonsloggen får hvilken forklaring/pakningskilde som ble brukt. | Nei. Ingen kjøring startes, ingen linjer, kostpriser eller innstillinger endres. Grensen 1 % settes først når en kjøring Henrik starter er ferdig uten feil. | «Nullstill køen …» øverst i Råvarer › Fra faktura (godkjenner/admin): forhåndsvisning, eksport, start, fremdrift, kvittering, angre. Helsesiden viser grensen og siste nullstilling. |
 
 Kontroll før og etter: `kontroll/20261124_nullstill_koen.check.sql` (alle rader `ok = true`). Tåler Windows-linjeskift.
 

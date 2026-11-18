@@ -1,14 +1,14 @@
 // «Nullstill køen» – regelmotoren (bestilling 18.11.2026). Ren logikk: samme hjelpere som Nye varer bruker for navn, varetype,
 // pakning og regnestykke, så resultatet blir som ved manuell behandling. Ingenting her skriver data.
-import { lineMath } from "@/ravarer/lib/fraFaktura/lineMath";
 import {
-  baseUnitForNew, cleanItemName, guessItemType, isCreditLine, isNewItemType, nameSimilarity, packagePayload, packageProposal,
-  pricePerBase, readPackage, SUGGEST_MIN, type PackageDraft, type PackageState,
+  baseUnitForNew, cleanItemName, guessItemType, isCreditLine, isNewItemType, nameSimilarity, packagePayload,
+  pricePerBase, readPackage, SUGGEST_MIN, type PackageState,
 } from "@/ravarer/lib/fraFaktura/newItems";
+import { linePackage, priceSpread, readVerdict, type LinePackage, type PkgSource } from "./readBasis";
 import {
   CLOSE_REASON_LABEL, CLOSE_TEXT, MAX_PRICE_PCT, NEW_ITEM_CATEGORY, NOT_ITEM_KINDS, PACKAGE_GUARD, PACKAGE_REASONS, PRICE_REASONS, RULES,
-  type Catalog, type CatalogLink, type CloseReason, type CostChange, type Creation, type LeftOpen, type Plan, type PlanItem, type Rule, type RuleTotals,
-  type SnapLine, type SupplierTotals,
+  type Catalog, type CatalogLink, type CloseReason, type CostChange, type Creation, type LeftOpen, type LineBasis, type Plan, type PlanItem, type Rule,
+  type RuleTotals, type SnapLine, type SupplierTotals,
 } from "./types";
 
 type Valid = Extract<PackageState, { state: "valid" }>;
@@ -17,33 +17,41 @@ const fin = (v: number | null | undefined): v is number => typeof v === "number"
 const byOldest = (a: SnapLine, b: SnapLine) => (a.invoice_date ?? "9999").localeCompare(b.invoice_date ?? "9999") || a.line_id.localeCompare(b.line_id);
 const fmtKr = (n: number) => n.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** Ren lesing: lesekontrollen (delt `lineReadIssues` via lineMath), lagret lesevarsel, serverens lesekontroll og uavklart beløp. */
-export function readClean(l: SnapLine): boolean {
-  if (l.read_issue) return false;
-  if (reasonsOf(l).includes("extraction_unresolved")) return false;
-  return lineMath({ ...l, is_credit_note: l.is_credit_note }).clean;
-}
-
 /**
- * Pakning lest entydig av linjen: lest pakning (package_size/count_per_package) eller fakturert i grunnenhet (kg/l/stk …).
- * For en koblet vare: er linjen fakturert per stk mens varen har grunnenhet kg/l, brukes den trykte pakningen (4 l per stk)
- * når den passer grunnenheten – aldri varenavnet.
+ * Ren lesing uten forklaring (regel 2): ingen lesevarsel på faktura eller linje, grønn lesekontroll, beløpet avklart.
+ * Regel 3 og 4 bruker `evalLine` (A + B). Serverens prissikkerhetsstatus brukes ikke her – den er satt for alle åpne linjer.
  */
-export function readablePackage(l: SnapLine, baseUnit: string | null = null): PackageDraft | null {
-  const d = packageProposal(l, null, lineMath(l));
-  if (d.source === "direkte" && baseUnit && readPackage(d, baseUnit).state !== "valid") {
-    const printed = packageProposal({ ...l, unit: null }, null, null);
-    if (printed.source === "lest" && !printed.conflict && readPackage(printed, baseUnit).state === "valid") return { ...printed, container: d.container };
-  }
-  return (d.source === "lest" || d.source === "direkte") && !d.conflict ? d : null;
+export function readClean(l: SnapLine): boolean {
+  const v = readVerdict(l, null, false);
+  return v.ok && v.forklaring === 0;
 }
 
 const samePackage = (a: Valid, b: Valid) => a.direct === b.direct && Math.abs(a.baseUnitsPerPackage - b.baseUnitsPerPackage) <= Math.max(1e-6, 0.001 * b.baseUnitsPerPackage);
 
-export function linePricePerBase(l: SnapLine, s: Valid): number | null {
-  const m = lineMath(l);
-  return pricePerBase(l, s, m.units);
+/** Regel 3/4 for én linje: pakning (A) og lesing (B). Prisen per grunnenhet = sum ÷ (antall × pakning), som serveren regner. */
+type Eval = { l: SnapLine; s: Valid; ppb: number; basis: LineBasis };
+function evalLine(l: SnapLine, baseUnit: string | null): Eval | { l: SnapLine; why: CloseReason; detail?: string } {
+  if (isCreditLine(l)) return { l, why: "kreditlinje" };
+  const pkg: LinePackage = linePackage(l, baseUnit);
+  const v = readVerdict(l, pkg);
+  // Uten lesbar pakning kan (1) og (3) ikke prøves – da er pakningen den egentlige årsaken.
+  if (!v.ok) return !pkg.ok && v.why === "regnestykke_uforklart" ? { l, why: pkg.why } : { l, why: v.why, detail: v.detail };
+  if (!pkg.ok) return { l, why: pkg.why };
+  const st = readPackage(pkg.draft, baseUnit);
+  if (st.state !== "valid") return { l, why: "pakning_passer_ikke" };
+  const ppb = pricePerBase(l, st, l.quantity);
+  if (ppb == null) return { l, why: "pakning_uleselig" };
+  return { l, s: st, ppb, basis: { f: v.forklaring, pakning: pkg.source as PkgSource } };
 }
+const isEval = (e: Eval | { why: CloseReason }): e is Eval => "s" in e;
+/** Lagres i steget (og revisjonsloggen): bare linjer der B eller A ble brukt. */
+function basisMap(es: readonly Eval[]): Record<string, LineBasis> | undefined {
+  const m: Record<string, LineBasis> = {};
+  for (const e of es) if (e.basis.f !== 0 || e.basis.pakning === "varenavn") m[e.l.line_id] = e.basis;
+  return Object.keys(m).length ? m : undefined;
+}
+const priceRows = (es: readonly Eval[]) => es.map((e) => ({ line_id: e.l.line_id, ppb: e.ppb, date: e.l.invoice_date, obs: e.basis.f === 0 }));
+const spreadText = (lo: number, hi: number, unit: string | null) => `${fmtKr(lo)}–${fmtKr(hi)} kr/${unit ?? "enhet"} (+${((hi / lo - 1) * 100).toLocaleString("nb-NO", { maximumFractionDigits: 1 })} %)`;
 
 /** Regel 3-vakten: innenfor ±20 % av gjeldende kostpris, eller varen har ingen kostpris. */
 export function withinPackageGuard(ppb: number, cost: number | null): boolean {
@@ -88,7 +96,7 @@ function rule2Eligible(l: SnapLine): CloseReason | null {
 
 function planLinked(c: Ctx, linked: SnapLine[]) {
   const r2 = new Map<string, SnapLine[]>();
-  const r3 = new Map<string, { l: SnapLine; s: Valid | null; ppb: number | null; why: CloseReason | null }[]>();
+  const r3 = new Map<string, ReturnType<typeof evalLine>[]>();
   for (const l of linked) {
     const rs = reasonsOf(l);
     if (rs.length > 0 && rs.every((r) => PRICE_REASONS.includes(r))) {
@@ -97,18 +105,9 @@ function planLinked(c: Ctx, linked: SnapLine[]) {
       else r2.set(l.raw_material_id!, [...(r2.get(l.raw_material_id!) ?? []), l]);
       continue;
     }
-    if (rs.length > 0 && rs.every((r) => PACKAGE_REASONS.includes(r))) {
-      let why: CloseReason | null = null; let s: Valid | null = null; let ppb: number | null = null;
-      if (isCreditLine(l)) why = "kreditlinje";
-      else if (!readClean(l)) why = "lesevarsel";
-      else {
-        const d = readablePackage(l, l.rm_base_unit);
-        const st = d ? readPackage(d, l.rm_base_unit) : null;
-        if (!d) why = "pakning_uleselig";
-        else if (!st || st.state !== "valid") why = "pakning_passer_ikke";
-        else { s = st; ppb = linePricePerBase(l, st); if (ppb == null) why = "pakning_uleselig"; }
-      }
-      r3.set(l.raw_material_id!, [...(r3.get(l.raw_material_id!) ?? []), { l, s, ppb, why }]);
+    // Regel 3: bare pakningsårsaker – «extraction_issue» (lagret lesevarsel) er med når B forklarer regnestykket.
+    if (rs.some((r) => PACKAGE_REASONS.includes(r)) && rs.every((r) => PACKAGE_REASONS.includes(r) || r === "extraction_issue")) {
+      r3.set(l.raw_material_id!, [...(r3.get(l.raw_material_id!) ?? []), evalLine(l, l.rm_base_unit)]);
       continue;
     }
     close(c, l, otherReason(rs));
@@ -117,30 +116,32 @@ function planLinked(c: Ctx, linked: SnapLine[]) {
     const f = ls[0];
     c.items.push(base(2, "godta_pris", ls, {
       raw_material_id: rm, raw_material_name: f.rm_name,
-      prices: ls.map((l) => ({ line_id: l.line_id, ppb: l.price_per_base_unit, date: l.invoice_date })),
+      prices: ls.map((l) => ({ line_id: l.line_id, ppb: l.price_per_base_unit, date: l.invoice_date, obs: true })),
       payload: { title: f.description ?? "", supplier_name: f.supplier_name, cost_before: f.rm_cost, lines: ls.map((l) => ({ id: l.line_id, price_per_base_unit: l.price_per_base_unit })) },
     }));
   }
   for (const [rm, evals] of r3) {
-    const readable = evals.filter((e) => e.s != null);
-    const consistent = readable.every((e) => samePackage(e.s!, readable[0].s!));
-    const ok: typeof evals = [];
+    const readable = evals.filter(isEval);
+    const consistent = readable.every((e) => samePackage(e.s, readable[0].s));
+    let ok: Eval[] = [];
     for (const e of evals) {
-      if (e.why) { close(c, e.l, e.why); continue; }
+      if (!isEval(e)) { close(c, e.l, e.why, e.detail ?? null); continue; }
       if (!consistent) { close(c, e.l, "pakning_ulik"); continue; }
-      if (!withinPackageGuard(e.ppb!, e.l.rm_cost)) {
-        const pct = ((e.ppb! / e.l.rm_cost!) - 1) * 100;
-        close(c, e.l, "pris_utenfor_20", `${fmtKr(e.ppb!)} kr/${e.l.rm_base_unit ?? "enhet"} mot kostpris ${fmtKr(e.l.rm_cost!)} (${pct > 0 ? "+" : ""}${pct.toLocaleString("nb-NO", { maximumFractionDigits: 1 })} %)`);
+      if (!withinPackageGuard(e.ppb, e.l.rm_cost)) {
+        const pct = ((e.ppb / e.l.rm_cost!) - 1) * 100;
+        close(c, e.l, "pris_utenfor_20", `${fmtKr(e.ppb)} kr/${e.l.rm_base_unit ?? "enhet"} mot kostpris ${fmtKr(e.l.rm_cost!)} (${pct > 0 ? "+" : ""}${pct.toLocaleString("nb-NO", { maximumFractionDigits: 1 })} %)`);
         continue;
       }
       ok.push(e);
     }
     if (ok.length === 0) continue;
     const f = ok[0];
+    // C: varen har ingen kostpris – prisen må være lik (±20 %) på tvers av linjene.
+    const sp = !fin(f.l.rm_cost) || f.l.rm_cost <= 0 ? priceSpread(ok.map((e) => e.ppb)) : null;
+    if (sp?.spread) { ok.forEach((e) => close(c, e.l, "pris_sprik", spreadText(sp.min, sp.max, f.l.rm_base_unit))); ok = []; continue; }
     c.items.push(base(3, "bekreft_pakning", ok.map((e) => e.l), {
-      raw_material_id: rm, raw_material_name: f.l.rm_name,
-      prices: ok.map((e) => ({ line_id: e.l.line_id, ppb: e.ppb, date: e.l.invoice_date })),
-      payload: { title: f.l.description ?? "", supplier_name: f.l.supplier_name, cost_before: f.l.rm_cost, package: packagePayload(f.s!) },
+      raw_material_id: rm, raw_material_name: f.l.rm_name, prices: priceRows(ok),
+      payload: { title: f.l.description ?? "", supplier_name: f.l.supplier_name, cost_before: f.l.rm_cost, package: packagePayload(f.s), lesegrunnlag: basisMap(ok) },
     }));
   }
 }
@@ -148,13 +149,15 @@ function planLinked(c: Ctx, linked: SnapLine[]) {
 function planUnlinkedItems(c: Ctx, g: SnapLine[], linked: SnapLine[], supplierRule: string | null) {
   const key = g[0].item_key ?? "";
   if (!key.startsWith("sku:")) { g.forEach((l) => close(c, l, "uten_varenummer")); return; }
-  const eligible: { l: SnapLine; d: PackageDraft }[] = [];
+  // Pakning og lesing først uten grunnenhet (ny vare får grunnenhet fra pakningen); målvarens grunnenhet sjekkes under.
+  const eligible: { l: SnapLine; pkg: Extract<LinePackage, { ok: true }>; f: LineBasis["f"] }[] = [];
   for (const l of g) {
     if (isCreditLine(l)) { close(c, l, "kreditlinje"); continue; }
-    if (!readClean(l)) { close(c, l, "lesevarsel"); continue; }
-    const d = readablePackage(l);
-    if (!d) { close(c, l, "pakning_uleselig"); continue; }
-    eligible.push({ l, d });
+    const pkg = linePackage(l);
+    const v = readVerdict(l, pkg);
+    if (!v.ok) { if (!pkg.ok && v.why === "regnestykke_uforklart") close(c, l, pkg.why); else close(c, l, v.why, v.detail ?? null); continue; }
+    if (!pkg.ok) { close(c, l, pkg.why); continue; }
+    eligible.push({ l, pkg, f: v.forklaring });
   }
   if (eligible.length === 0) return;
   const supplierId = g[0].supplier_id!;
@@ -175,22 +178,31 @@ function planUnlinkedItems(c: Ctx, g: SnapLine[], linked: SnapLine[], supplierRu
     if (active.length === 0 && hits.length > 0) { eligible.forEach((e) => close(c, e.l, "inaktiv_vare", `«${hits[0].name}»`)); return; }
     target = active[0] ?? null;
   }
-  // Grunnlag: linjen med renest lesing – lest pakning foran fakturert i grunnenhet, så nyeste faktura.
-  const basis = [...eligible].sort((a, b) => Number(b.d.source === "lest") - Number(a.d.source === "lest") || (b.l.invoice_date ?? "").localeCompare(a.l.invoice_date ?? "") || a.l.line_id.localeCompare(b.l.line_id))[0];
-  const baseUnit = target ? target.base_unit : baseUnitForNew(basis.d.unit);
-  const bs = readPackage(basis.d, baseUnit);
+  // Grunnlag: linjen med renest lesing – grønn lesekontroll foran forklart (B), lest pakning foran grunnenhet foran varenavn, så nyeste.
+  const rank = { lest: 0, direkte: 1, varenavn: 2 } as const;
+  const basis = [...eligible].sort((a, b) => Number(a.f !== 0) - Number(b.f !== 0) || rank[a.pkg.source] - rank[b.pkg.source]
+    || (b.l.invoice_date ?? "").localeCompare(a.l.invoice_date ?? "") || a.l.line_id.localeCompare(b.l.line_id))[0];
+  const baseUnit = target ? target.base_unit : baseUnitForNew(basis.pkg.draft.unit);
+  const bs = readPackage(basis.pkg.draft, baseUnit);
   if (bs.state !== "valid") { eligible.forEach((e) => close(c, e.l, "pakning_passer_ikke")); return; }
-  const members: { l: SnapLine; s: Valid }[] = [];
+  const members: Eval[] = [];
   for (const e of eligible) {
-    const s = readPackage(e.d, baseUnit);
-    if (s.state === "valid" && samePackage(s, bs)) members.push({ l: e.l, s }); else close(c, e.l, "pakning_ulik");
+    const s = readPackage(e.pkg.draft, baseUnit);
+    const ppb = s.state === "valid" ? pricePerBase(e.l, s, e.l.quantity) : null;
+    if (s.state === "valid" && samePackage(s, bs) && ppb != null) members.push({ l: e.l, s, ppb, basis: { f: e.f, pakning: e.pkg.source } });
+    else close(c, e.l, s.state === "valid" && samePackage(s, bs) ? "pakning_uleselig" : "pakning_ulik");
   }
-  const prices = members.map((m) => ({ line_id: m.l.line_id, ppb: linePricePerBase(m.l, m.s), date: m.l.invoice_date }));
+  if (members.length === 0) return;
+  // C: ny vare, eller målvaren har ingen kostpris – prisen må være lik (±20 %) på tvers av linjene.
+  const sp = !target || !fin(target.cost) || target.cost <= 0 ? priceSpread(members.map((m) => m.ppb)) : null;
+  if (sp?.spread) { members.forEach((m) => close(c, m.l, "pris_sprik", spreadText(sp.min, sp.max, bs.baseUnit))); return; }
+  const prices = priceRows(members);
   const pkg = packagePayload(bs);
+  const lesegrunnlag = basisMap(members);
   if (target) {
     c.items.push(base(4, "koble", members.map((m) => m.l), {
       raw_material_id: target.raw_material_id, raw_material_name: target.name, prices,
-      payload: { title: basis.l.description ?? "", supplier_name: basis.l.supplier_name, cost_before: target.cost, package: pkg },
+      payload: { title: basis.l.description ?? "", supplier_name: basis.l.supplier_name, cost_before: target.cost, package: pkg, lesegrunnlag },
     }));
     return;
   }
@@ -206,7 +218,7 @@ function planUnlinkedItems(c: Ctx, g: SnapLine[], linked: SnapLine[], supplierRu
   c.planned.set(supplierId, [...(c.planned.get(supplierId) ?? []), name]);
   c.items.push(base(4, "opprett", members.map((m) => m.l), {
     raw_material_name: name, prices,
-    payload: { title: basis.l.description ?? "", supplier_name: basis.l.supplier_name, cost_before: null, package: pkg,
+    payload: { title: basis.l.description ?? "", supplier_name: basis.l.supplier_name, cost_before: null, package: pkg, lesegrunnlag,
       new_raw_material: { name, base_unit: bs.baseUnit, item_type: type, category: NEW_ITEM_CATEGORY } },
   }));
 }
@@ -284,7 +296,7 @@ export function costChanges(items: readonly PlanItem[]): CostChange[] {
   for (const i of items) {
     if (!i.raw_material_id || !["godta_pris", "bekreft_pakning", "koble"].includes(i.action)) continue;
     for (const p of i.prices) {
-      if (p.ppb == null) continue;
+      if (p.ppb == null || !p.obs) continue;
       const cur = best.get(i.raw_material_id);
       if (cur && (cur.date ?? "") > (p.date ?? "")) continue;
       const before = i.payload.cost_before ?? null;
@@ -298,7 +310,7 @@ export function costChanges(items: readonly PlanItem[]): CostChange[] {
 export function creations(items: readonly PlanItem[]): Creation[] {
   return items.filter((i) => i.action === "opprett" && i.payload.new_raw_material).map((i) => {
     const n = i.payload.new_raw_material!;
-    const newest = [...i.prices].filter((p) => p.ppb != null).sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""))[0];
+    const newest = [...i.prices].filter((p) => p.ppb != null && p.obs).sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""))[0];
     return { supplier_name: i.supplier_name, name: n.name, item_type: n.item_type, base_unit: n.base_unit, package: i.payload.package ?? null, lines: i.line_ids.length, price: newest?.ppb ?? null, item_key: i.item_key ?? "" };
   });
 }
@@ -309,7 +321,9 @@ export function planPhase1(lines: readonly SnapLine[], cat: Catalog): Plan {
   const all = [...items, ...closes];
   const snapshotIds = lines.map((l) => l.line_id).sort();
   const fp = hash(`${[...lines].sort((a, b) => a.line_id.localeCompare(b.line_id)).map((l) => `${l.line_id}@${l.line_updated_at}`).join(",")}|${items.map((i) => `${i.rule}:${i.action}:${i.line_ids.join("+")}`).join(";")}`);
-  return { snapshotIds, items, closes, totals: totals(all), bySupplier: supplierTotals(all), costChanges: costChanges(items), creations: creations(items), leftOpen, fingerprint: `nq1-${snapshotIds.length}-${fp}` };
+  const bases = items.flatMap((i) => Object.values(i.payload.lesegrunnlag ?? {}));
+  const readStats = { name: bases.filter((b) => b.pakning === "varenavn").length, b1: bases.filter((b) => b.f === 1).length, b2: bases.filter((b) => b.f === 2).length, b3: bases.filter((b) => b.f === 3).length };
+  return { snapshotIds, items, closes, totals: totals(all), bySupplier: supplierTotals(all), costChanges: costChanges(items), creations: creations(items), leftOpen, readStats, fingerprint: `nq1-${snapshotIds.length}-${fp}` };
 }
 
 /**

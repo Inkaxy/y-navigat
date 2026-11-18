@@ -41,7 +41,7 @@ export function PreviewPanel({ canApprove, onStarted }: { canApprove: boolean; o
     startLock.current = true; setBusy(true); setStartErr(null);
     try {
       const plan = st.plan;
-      const summary = { totals: plan.totals, cost_changes: plan.costChanges.length, creations: plan.creations.length, closes: plan.closes.length };
+      const summary = { totals: plan.totals, read_stats: plan.readStats, cost_changes: plan.costChanges.length, creations: plan.creations.length, closes: plan.closes.length };
       const r = await startRun(company.id, plan.fingerprint, summary, plan.snapshotIds, plan.items);
       if (r.ok) { setConfirm(false); onStarted(); return; }
       setConfirm(false);
@@ -87,6 +87,11 @@ export function PreviewPanel({ canApprove, onStarted }: { canApprove: boolean; o
           rows={([1, 2, 3, 4, 6] as const).map((r) => [`${r}. ${RULE_LABEL[r]}`, fmtInt(plan.totals[r].lines), fmtInt(plan.totals[r].supplierItems), fmtInt(plan.totals[r].rawMaterials), r === 4 ? fmtInt(plan.totals[4].newItems) : ""])} />
         <p className="mt-2 text-caption text-ink-secondary">
           Regel 5 (sumavvik) er med i regel 6. Tallene for regel 2–6 er et anslag: etter regel 1–4 regnes fakturaene om, og det som fortsatt er åpent avsluttes (regel 6) eller godtas (prisavvik ≤ 20 %).
+        </p>
+        <p className="mt-1 text-caption text-ink-secondary">
+          I regel 3 og 4 er {fmtInt(plan.readStats.name)} linjer med pakning fra varenavnet og {fmtInt(plan.readStats.b1 + plan.readStats.b2 + plan.readStats.b3)} med forklart regnestykke
+          (forklaring 1: {fmtInt(plan.readStats.b1)}, 2: {fmtInt(plan.readStats.b2)}, 3: {fmtInt(plan.readStats.b3)}). Linjer med forklart regnestykke beholder lesevarselet:
+          varen kobles og pakningen bekreftes, men linjen gir ingen pris og avsluttes etter regel 1–4.
         </p>
       </Section>
 

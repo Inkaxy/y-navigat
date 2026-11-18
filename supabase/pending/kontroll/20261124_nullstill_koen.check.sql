@@ -19,6 +19,9 @@ union all select 'ingen direkte skriving fra klient', not has_table_privilege('a
 union all select 'hjelpere ikke kallbare fra klient', not has_function_privilege('authenticated', 'public._rm_qr_insert_items(uuid,uuid,smallint,jsonb)', 'execute')
     and not has_function_privilege('authenticated', 'public._rm_qr_guard(uuid)', 'execute')
 union all select 'anon kan ikke starte', not has_function_privilege('anon', 'public.rm_queue_reset_start(uuid,text,jsonb,uuid[],jsonb)', 'execute')
+union all select 'forhåndsvisningen leser lesevarsler, ikke prissikkerhetsstatus', strpos(pg_get_functiondef('public.rm_queue_reset_snapshot_lines(uuid,uuid,integer)'::regprocedure), '_rm_queue_line_read_issue') = 0
+    and strpos(pg_get_functiondef('public.rm_queue_reset_snapshot_lines(uuid,uuid,integer)'::regprocedure), 'invoice_read_codes') > 0
+union all select 'revisjonsloggen får lesegrunnlag per steg', strpos(pg_get_functiondef('public.rm_queue_reset_finish(uuid,uuid,text,jsonb,text)'::regprocedure), $$'lesegrunnlag', v_it.payload->'lesegrunnlag'$$) > 0
 union all select 'ingen kjøring er startet av filen', not exists (select 1 from public.rm_queue_reset_runs)
 union all select 'ingen funksjon med CR', not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'
     and strpos(p.prosrc, chr(13)) > 0 and (p.proname like 'rm\_queue\_reset\_%' or p.proname like '\_rm\_qr\_%' or p.proname in ('rm_cap_nullstill_koen_v1','rm_set_invoice_exclusion')));

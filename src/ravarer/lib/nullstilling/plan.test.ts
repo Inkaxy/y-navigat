@@ -13,7 +13,7 @@ function line(o: Partial<SnapLine> = {}): SnapLine {
     item_key: "sku:9727", supplier_sku: "9727", description: "Hvetemel 25 kg", quantity: 2, unit: "sekk", unit_price: 250, total_amount: 500,
     discount_amount: null, unit_price_basis: null, line_kind: "vare", extraction_issues: [], package_size: 25, package_unit: "kg", count_per_package: null,
     raw_material_id: null, match_confidence: "unmatched", review_reason: "unmatched", price_per_base_unit: null, expected_price_per_base_unit: null,
-    price_variance_pct: null, line_updated_at: "2026-11-18 10:00:00.123456+00", read_issue: null, exclusion_blocker: null, rm_name: null, rm_base_unit: null, rm_cost: null, rm_active: true,
+    price_variance_pct: null, line_updated_at: "2026-11-18 10:00:00.123456+00", invoice_read_codes: [], exclusion_blocker: null, rm_name: null, rm_base_unit: null, rm_cost: null, rm_active: true,
     ...o,
   };
 }
@@ -87,11 +87,15 @@ describe("Regel 3 – koblet, mangler pakning/grunnlag", () => {
     expect(r.items[0].payload.package).toMatchObject({ base_units_per_package: 4 });
     expect(r.items[0].prices[0].ppb).toBeCloseTo(97.12);
   });
-  it("linje uten noe i regnestykket (pris per kg på eske-linje) er regnefeil → regel 6", () => {
-    expect(only([pk({ quantity: 20, unit: "eske", unit_price: 31.68, total_amount: 6336, package_size: 5, package_unit: "kg", count_per_package: 2 })]).closes[0].reason_code).toBe("lesevarsel");
+  it("pris per kg på eske-linje: 20-%-vakten gjelder fortsatt (31,68 kr/kg mot kostpris 10 → regel 6)", () => {
+    expect(only([pk({ quantity: 20, unit: "eske", unit_price: 31.68, total_amount: 6336, package_size: 5, package_unit: "kg", count_per_package: 2, description: "Hvetemel eske" })]).closes[0].reason_code).toBe("pris_utenfor_20");
   });
-  it("pakning som bare står i varenavnet er ikke entydig → regel 6", () => {
-    expect(only([pk({ package_size: null, package_unit: null })]).closes[0].reason_code).toBe("pakning_uleselig");
+  it("A: pakningen står bare i varenavnet («Hvetemel 25 kg») → bekreftes, kilden lagres", () => {
+    const l = pk({ package_size: null, package_unit: null });
+    const r = only([l]);
+    expect(r.items[0]).toMatchObject({ rule: 3, action: "bekreft_pakning" });
+    expect(r.items[0].payload.package).toMatchObject({ package_size: 25, package_unit: "kg", base_units_per_package: 25 });
+    expect(r.items[0].payload.lesegrunnlag?.[l.line_id]).toEqual({ f: 0, pakning: "varenavn" });
   });
 });
 
@@ -127,7 +131,7 @@ describe("Regel 4 – ukoblet varelinje med ren lesing, varenummer og pakning", 
   it("uten varenummer, med lesevarsel eller uten lesbar pakning → regel 6", () => {
     expect(only([rug({ item_key: "name:rugmel", supplier_sku: null })]).closes[0].reason_code).toBe("uten_varenummer");
     expect(only([rug({ extraction_issues: [{ message: "Tallene går ikke opp" }] })]).closes[0].reason_code).toBe("lesevarsel");
-    expect(only([rug({ total_amount: 260 })]).closes[0].reason_code).toBe("lesevarsel");
+    expect(only([rug({ total_amount: 260 })]).closes[0].reason_code).toBe("regnestykke_uforklart");
     expect(only([rug({ package_size: null, package_unit: null, description: "Rugmel" })]).closes[0].reason_code).toBe("pakning_uleselig");
   });
   it("flere aktive varer med samme varenummer → regel 6", () => {

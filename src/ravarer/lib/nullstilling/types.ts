@@ -17,7 +17,8 @@ export type CloseReason =
   | "sumavvik" | "prishopp_over_20" | "mangler_prisgrunnlag" | "lesevarsel" | "pakning_uleselig" | "pakning_passer_ikke"
   | "pakning_ulik" | "pris_utenfor_20" | "uten_varenummer" | "mulig_duplikat" | "flere_varer" | "inaktiv_vare"
   | "godkjent_faktura" | "kreditlinje" | "blandet_varenokkel" | "annen_linjetype" | "ukjent_kobling" | "beregnes_pa_nytt"
-  | "uavklart_belop" | "mangler_leverandor" | "apen_etter_fase_1" | "annen_arsak";
+  | "uavklart_belop" | "mangler_leverandor" | "apen_etter_fase_1" | "annen_arsak"
+  | "lesevarsel_faktura" | "pakning_flertydig" | "pakning_motsagt" | "regnestykke_uforklart" | "regnestykke_flertydig" | "pris_sprik";
 
 export const CLOSE_REASON_LABEL: Record<CloseReason, string> = {
   sumavvik: "Sumavvik på fakturaen",
@@ -42,6 +43,12 @@ export const CLOSE_REASON_LABEL: Record<CloseReason, string> = {
   mangler_leverandor: "Mangler leverandør eller varenøkkel",
   apen_etter_fase_1: "Fortsatt åpen etter regel 1–4",
   annen_arsak: "Annen årsak",
+  lesevarsel_faktura: "Lesevarsel på fakturaen (sumavvik etter gjenlesing, side som ikke kunne leses o.l.)",
+  pakning_flertydig: "Varenavnet har flere ulike mengder",
+  pakning_motsagt: "Pakningen i varenavnet stemmer ikke med lest pakning",
+  regnestykke_uforklart: "Regnestykket går ikke opp med noen av de tre forklaringene",
+  regnestykke_flertydig: "Regnestykket passer med flere forklaringer som gir ulik pris",
+  pris_sprik: "Prisen per enhet spriker mer enn 20 % mellom linjene",
 };
 export const isCloseReason = (v: unknown): v is CloseReason => typeof v === "string" && v in CLOSE_REASON_LABEL;
 
@@ -68,7 +75,9 @@ export interface SnapLine {
   package_size: number | null; package_unit: string | null; count_per_package: number | null;
   raw_material_id: string | null; match_confidence: string | null; review_reason: string | null;
   price_per_base_unit: number | null; expected_price_per_base_unit: number | null; price_variance_pct: number | null;
-  line_updated_at: string; read_issue: string | null;
+  line_updated_at: string;
+  /** Lesevarsler på fakturaen (koder fra invoices.extraction_issues). Alt unntatt «reread_warning» gjør linjene urene. */
+  invoice_read_codes: string[];
   /** Serverens sperre for «hold utenfor» (`_rm_line_exclusion_blocker`): kostpris ført, lager, varemottak, prisobservasjon. */
   exclusion_blocker: string | null;
   rm_name: string | null; rm_base_unit: string | null; rm_cost: number | null; rm_active: boolean;
@@ -87,7 +96,8 @@ export interface PlanItem {
   line_ids: string[]; invoice_ids: string[];
   reason_code: CloseReason | null; detail: string | null;
   /** Pris per grunnenhet per linje (for kostanslag). */
-  prices: { line_id: string; ppb: number | null; date: string | null }[];
+  /** `obs` = linjen gir prisobservasjon etter handlingen. Linjer med lagret lesevarsel (B) gjør det ikke – serveren holder dem til gjennomgang. */
+  prices: { line_id: string; ppb: number | null; date: string | null; obs: boolean }[];
   payload: ItemPayload;
 }
 
@@ -100,7 +110,11 @@ export interface ItemPayload {
   lines?: { id: string; price_per_base_unit: number | null }[];
   /** Regel 6. */
   invoice_id?: string; line_updated_at?: string; reason_text?: string; detail?: string | null;
+  /** Regel 3/4: hvilken forklaring (B) og pakningskilde (A) som ble brukt per linje. Lagres i revisjonsloggen for steget. */
+  lesegrunnlag?: Record<string, LineBasis>;
 }
+/** f: 0 = lesekontrollen grønn, 1–3 = forklaring i regel B. pakning: lest/direkte/varenavn (A). */
+export interface LineBasis { f: 0 | 1 | 2 | 3; pakning: "lest" | "direkte" | "varenavn" }
 
 export interface RuleTotals { lines: number; supplierItems: number; rawMaterials: number; newItems: number }
 export interface SupplierTotals { supplier_id: string | null; name: string; byRule: Record<Rule, number>; lines: number }
@@ -119,6 +133,8 @@ export interface Plan {
   creations: Creation[];
   /** Regel 6-linjer som «hold utenfor» ikke tillater (serverens sperre). Ingen handling; de blir stående åpne. */
   leftOpen: LeftOpen[];
+  /** Linjer i regel 3/4 hentet inn med pakning fra varenavnet (A) og med forklart regnestykke (B, per forklaring). */
+  readStats: { name: number; b1: number; b2: number; b3: number };
   fingerprint: string;
 }
 export interface LeftOpen { line_id: string; invoice_id: string; invoice_number: string | null; description: string | null; supplier_name: string | null; blocker: string; reason_code: CloseReason }

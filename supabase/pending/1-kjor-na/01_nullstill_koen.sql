@@ -20,6 +20,10 @@
 --     (rm_rematch_invoices) slik at de får status etter dagens regler. Ingen avstemming, ingen godkjenning.
 --     Bryteren «prisendringer under grensen føres uten spørsmål» endres ALDRI av filen eller kjøringen.
 --
+--  5. Romsligere regler (Henriks valg 18.11, før kjøring): forhåndsvisningen leser lesevarsler fra fakturaen og ALLE lesevarsler på
+--     linjen (ikke prissikkerhetsstatusen _rm_queue_line_read_issue, som er satt for alle åpne linjer), og hvert steg kan bære
+--     «lesegrunnlag» (forklaring 1–3 for pris per kg/l på kolli-linje, pakning fra varenavnet) som skrives i revisjonsloggen.
+--
 -- Kontroll: kontroll/20261124_nullstill_koen.check.sql (før/etter + md5). Lokal test: node scripts/test-nullstilling-sql.mjs
 -- Innliming: tåler Windows-linjeskift – ankeret renses for CR/hardt mellomrom/tabulator før det sammenlignes med uendret
 -- live-tekst, md5 regnes uten CR, og sluttsteget nederst skriver funksjonene på nytt uten CR.
@@ -42,8 +46,6 @@ begin
      or to_regprocedure('public.rm_undo_price_acceptance(uuid,uuid[],text)') is null
      or to_regprocedure('public.rm_reopen_invoice_exclusion(uuid,text,uuid,text,text)') is null
      or to_regprocedure('public.rm_rematch_invoices(uuid,integer,uuid[],boolean)') is null
-     or to_regprocedure('public._rm_queue_line_read_issue(uuid,boolean)') is null
-     or to_regprocedure('public.rm_invoice_has_read_issues(uuid)') is null
      or to_regprocedure('public._rm_line_exclusion_blocker(uuid)') is null then
     raise exception 'En funksjon nullstillingen bygger på mangler i databasen.';
   end if;
@@ -194,7 +196,10 @@ begin
     if cardinality(v_lines) = 0 or cardinality(v_lines) > 2000 or (v_action = 'hold_utenfor' and cardinality(v_lines) <> 1) then
       raise exception 'ugyldig_linjeutvalg (steg %)', v_ord using errcode = '22023';
     end if;
-    if length(coalesce(v_it->'payload', '{}'::jsonb)::text) > 20000 then raise exception 'for_stort_steg (steg %)', v_ord using errcode = '22023'; end if;
+    if length(coalesce(v_it->'payload', '{}'::jsonb)::text) > 60000 then raise exception 'for_stort_steg (steg %)', v_ord using errcode = '22023'; end if;
+    if v_it->'payload' ? 'lesegrunnlag' and jsonb_typeof(v_it->'payload'->'lesegrunnlag') is distinct from 'object' then
+      raise exception 'ugyldig_lesegrunnlag (steg %)', v_ord using errcode = '22023';
+    end if;
     select count(*) into v_bad from unnest(v_lines) x where not exists (select 1 from rm_queue_reset_snapshot s where s.run_id = p_run and s.line_id = x);
     if v_bad > 0 then raise exception 'linje_utenfor_utvalget (steg %)', v_ord using errcode = '22023'; end if;
     v_sup := nullif(v_it->>'supplier_id', '')::uuid; v_key := nullif(v_it->>'item_key', ''); v_rm := nullif(v_it->>'raw_material_id', '')::uuid;
@@ -229,7 +234,9 @@ grant execute on function public._rm_qr_guard(uuid), public._rm_qr_item_key(text
   public._rm_qr_insert_items(uuid, uuid, smallint, jsonb) to service_role;
 
 -- 4 Forhåndsvisning (bare lesing) ---------------------------------------------------------------------------------------
--- Åpne linjer på åpne, ikke-flaggede fakturaer (requires_review), i sider på id. Varenøkkel og lesekontroll regnes av databasen.
+-- Åpne linjer på åpne, ikke-flaggede fakturaer (requires_review), i sider på id. Varenøkkel regnes av databasen. Lesing: alle
+-- lesevarsler på linjen (kode + melding, høyst 20) og kodene for lesevarsler på fakturaen; regnestykket kontrolleres i appen med
+-- den delte lesekontrollen. Prissikkerhetsstatusen (_rm_queue_line_read_issue) brukes ikke: den er satt for alle åpne linjer.
 create or replace function public.rm_queue_reset_snapshot_lines(p_legal_entity_id uuid, p_after uuid default null, p_limit integer default 500)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare v_rows jsonb; v_n int; v_lim int := greatest(1, least(coalesce(p_limit, 500), 1000));
@@ -243,12 +250,14 @@ begin
            public._rm_qr_item_key(il.supplier_sku, il.description) as item_key,
            il.supplier_sku, il.description, il.quantity, il.unit, il.unit_price, il.total_amount, il.discount_amount, il.unit_price_basis,
            il.line_kind,
-           case when jsonb_typeof(il.extraction_issues) = 'array' and jsonb_array_length(il.extraction_issues) > 0
-                then jsonb_build_array(il.extraction_issues->0) else '[]'::jsonb end as extraction_issues,
+           (select coalesce(jsonb_agg(jsonb_build_object('code', e.v->>'code', 'message', left(e.v->>'message', 300)) order by e.o), '[]'::jsonb)
+              from jsonb_array_elements(case when jsonb_typeof(il.extraction_issues) = 'array' then il.extraction_issues else '[]'::jsonb end)
+                   with ordinality as e(v, o) where e.o <= 20) as extraction_issues,
+           (select coalesce(jsonb_agg(distinct coalesce(e->>'code', 'ukjent')), '[]'::jsonb)
+              from jsonb_array_elements(case when jsonb_typeof(i.extraction_issues) = 'array' then i.extraction_issues else '[]'::jsonb end) e) as invoice_read_codes,
            il.package_size, il.package_unit, il.count_per_package, il.raw_material_id, il.match_confidence::text as match_confidence,
            il.review_reason, il.price_per_base_unit, il.expected_price_per_base_unit, il.price_variance_pct,
            il.updated_at::text as line_updated_at,
-           public._rm_queue_line_read_issue(il.id, public.rm_invoice_has_read_issues(i.id)) as read_issue,
            public._rm_line_exclusion_blocker(il.id) as exclusion_blocker,
            rm.name as rm_name, rm.base_unit as rm_base_unit, rm.current_cost_price as rm_cost, coalesce(rm.is_active, true) as rm_active
       from invoice_lines il
@@ -385,7 +394,8 @@ begin
   values (v_uid, 'queue_reset.step', 'rm_queue_reset_item', v_it.id, v_it.legal_entity_id,
           jsonb_build_object('run_id', v_it.run_id, 'phase', v_it.phase, 'rule', v_it.rule, 'action', v_it.action, 'status', p_status,
                              'supplier_id', v_it.supplier_id, 'item_key', v_it.item_key, 'lines', cardinality(v_it.line_ids),
-                             'raw_material_id', coalesce(v_created, v_it.raw_material_id), 'error', left(p_error, 300)),
+                             'raw_material_id', coalesce(v_created, v_it.raw_material_id), 'error', left(p_error, 300),
+                             'lesegrunnlag', v_it.payload->'lesegrunnlag'),
           'Nullstilling 18.11.2026 – regel ' || v_it.rule, 'ravarer');
   return jsonb_build_object('ok', true, 'status', p_status);
 end $$;

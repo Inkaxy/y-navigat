@@ -51,7 +51,7 @@ create table suppliers (id uuid primary key, legal_entity_id uuid, name text, ne
 create table raw_materials (id uuid primary key, legal_entity_id uuid, name text, base_unit text, current_cost_price numeric, is_active boolean default true);
 create table raw_material_suppliers (id uuid primary key default gen_random_uuid(), raw_material_id uuid, supplier_id uuid, supplier_sku text, base_units_per_package numeric);
 create table raw_material_supplier_aliases (id serial, raw_material_supplier_id uuid, alias_type alias_type, alias_value text, status alias_status);
-create table invoices (id uuid primary key, legal_entity_id uuid, supplier_id uuid, invoice_number text, invoice_date date, status text default 'needs_review',
+create table invoices (id uuid primary key, legal_entity_id uuid, supplier_id uuid, invoice_number text, invoice_date date, status text default 'needs_review', extraction_issues jsonb default '[]',
   flagged_at timestamptz, reconciled_at timestamptz, is_credit_note boolean default false, currency text default 'NOK', lines_sum_status text,
   excluded_at timestamptz, excluded_by uuid, exclusion_category text, exclusion_reason text, exclusion_prev jsonb, updated_at timestamptz default now());
 create function public.rm_invoice_lines_trusted(invoices) returns boolean language sql stable as $$ select true $$;
@@ -127,6 +127,16 @@ check1(/allerede kjørt/.test(again), `filen kan ikke kjøres to ganger (${again
 const kontroll = (await db.query(check.split("-- ETTER")[1])).rows;
 check1(kontroll.length > 0 && kontroll.every((r) => r.ok === true), `kontrollfil ETTER: ${JSON.stringify(kontroll.filter((r) => !r.ok))}`);
 
+// --- Forhåndsvisningen: alle lesevarsler på linjen og kodene på fakturaen, ikke prissikkerhetsstatusen ---
+await db.exec(`update invoice_lines set extraction_issues = '[{"code":"regnestykke","message":"a"},{"code":"ugyldig_tall","message":"b"}]' where id = '${L(2)}';
+  update invoices set extraction_issues = '[{"code":"reread_sum_mismatch","message":"x"},{"code":"reread_warning","message":"y"}]' where id = '${INV1}'`);
+const sn = (await one(`select rm_queue_reset_snapshot_lines('${LE}') r`)).r;
+const sl2 = sn.rows.find((r) => r.line_id === L(2)), sl3 = sn.rows.find((r) => r.line_id === L(3));
+check1(sn.ok === true && sl2 && !("read_issue" in sl2), "forhåndsvisningen bruker ikke prissikkerhetsstatusen");
+check1(JSON.stringify(sl2.extraction_issues.map((e) => e.code)) === '["regnestykke","ugyldig_tall"]', `alle lesevarsler på linjen (${JSON.stringify(sl2.extraction_issues)})`);
+check1(JSON.stringify([...sl2.invoice_read_codes].sort()) === '["reread_sum_mismatch","reread_warning"]' && JSON.stringify(sl3.invoice_read_codes) === "[]", "kodene for lesevarsler på fakturaen");
+await db.exec(`update invoice_lines set extraction_issues = '[]' where id = '${L(2)}'; update invoices set extraction_issues = '[]' where id = '${INV1}'`);
+
 // --- Regel 6: hold utenfor med egen kategori, ingen prisobservasjon, ingen kostendring ---
 const costBefore = (await one(`select current_cost_price c from raw_materials where id = '${RM}'`)).c;
 const v4 = (await one(`select updated_at::text u from invoice_lines where id = '${L(4)}'`)).u;
@@ -152,7 +162,7 @@ const snap = `array['${L(1)}','${L(2)}','${L(3)}','${L(4)}','${L(5)}']::uuid[]`;
 const items1 = [
   { rule: 1, action: "ikke_vare", supplier_id: SA, item_key: "sku:p1", line_ids: [L(1)], payload: { title: "Pant flaske" } },
   { rule: 3, action: "bekreft_pakning", supplier_id: SA, item_key: "sku:9727", raw_material_id: RM, line_ids: [L(2)], payload: { cost_before: 10, title: "Hvetemel" } },
-  { rule: 4, action: "opprett", supplier_id: SA, item_key: "sku:5555", line_ids: [L(3)], payload: { new_raw_material: { name: "Rugmel", base_unit: "kg" }, title: "Rugmel" } },
+  { rule: 4, action: "opprett", supplier_id: SA, item_key: "sku:5555", line_ids: [L(3)], payload: { new_raw_material: { name: "Rugmel", base_unit: "kg" }, title: "Rugmel", lesegrunnlag: { [L(3)]: { f: 1, pakning: "varenavn" } } } },
 ];
 const start = (items, snapshot = snap) => `select rm_queue_reset_start('${LE}', 'fp1', '{"n":5}'::jsonb, ${snapshot}, ${j(items)}) r`;
 await db.exec(`select set_config('test.approve', 'nei', false)`);
@@ -165,6 +175,7 @@ check1(await rejects(start([items1[0], { ...items1[0] }]), /duplicate key|unique
 check1(await rejects(start([{ ...items1[0], item_key: "sku:feil" }]), /linje_feil_leverandorvare/), "linjen må høre til leverandørvaren");
 check1(await rejects(start([{ ...items1[1], line_ids: [L(3)], item_key: "sku:5555" }]), /linje_ikke_koblet_til_varen/), "regel 3 bare for linjer koblet til varen");
 check1(await rejects(start([{ ...items1[2], payload: {} }]), /ny_vare_mangler_navn/), "ny vare må ha navn");
+check1(await rejects(start([{ ...items1[2], payload: { ...items1[2].payload, lesegrunnlag: "1" } }]), /ugyldig_lesegrunnlag/), "lesegrunnlag må være et objekt");
 const closed = await one(start(items1, `array['${L(1)}','${L(6)}']::uuid[]`));
 check1(closed.r.ok === false && closed.r.error === "koen_endret" && closed.r.changed === 1, "lukket linje i utvalget: be om ny forhåndsvisning");
 const s1 = (await one(start(items1))).r;
@@ -201,6 +212,8 @@ await db.exec(`insert into raw_materials values ('${NEW}', '${LE}', 'Rugmel', 'k
 const c3 = (await one(`select rm_queue_reset_claim('${RUN}', 5) r`)).r;
 check1(c3.items.length === 1 && c3.items[0].id === i4.id, "steg 4 hentes igjen");
 check1((await one(`select rm_queue_reset_finish('${i4.id}', '${c3.items[0].claim_token}', 'ferdig', '{"raw_material_id":"${NEW}","created":true}'::jsonb, null) r`)).r.ok, "steg 4 ferdig");
+const st4 = await one(`select changes from audit_log where action = 'queue_reset.step' and entity_id = '${i4.id}' order by occurred_at desc limit 1`);
+check1(st4?.changes?.lesegrunnlag?.[L(3)]?.f === 1 && st4.changes.lesegrunnlag[L(3)].pakning === "varenavn", `revisjonsloggen har forklaringen som ble brukt (${JSON.stringify(st4?.changes)})`);
 check1((await one(`select created_raw_material_id c from rm_queue_reset_items where id = '${i4.id}'`)).c === NEW, "ny vare registrert på steget");
 
 // --- Pause/fortsett ---
