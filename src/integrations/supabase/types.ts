@@ -3538,11 +3538,14 @@ export type Database = {
           auto_exclude_line_kinds: string[]
           auto_reconcile_clean_imports: boolean
           default_price_tolerance_pct: number | null
+          fra_faktura_invoice_package: boolean | null
+          fra_faktura_quiet_prices: boolean | null
           fuzzy_auto_match_dominance_threshold: number | null
           fuzzy_auto_match_threshold: number | null
           fuzzy_match_threshold: number | null
           legal_entity_id: string
           price_hard_cap_pct: number
+          price_jump_pct: number | null
           price_min_impact_nok: number
           start_price_max_impact_nok: number | null
           start_price_tolerance_pct: number
@@ -3559,11 +3562,14 @@ export type Database = {
           auto_exclude_line_kinds?: string[]
           auto_reconcile_clean_imports?: boolean
           default_price_tolerance_pct?: number | null
+          fra_faktura_invoice_package?: boolean | null
+          fra_faktura_quiet_prices?: boolean | null
           fuzzy_auto_match_dominance_threshold?: number | null
           fuzzy_auto_match_threshold?: number | null
           fuzzy_match_threshold?: number | null
           legal_entity_id: string
           price_hard_cap_pct?: number
+          price_jump_pct?: number | null
           price_min_impact_nok?: number
           start_price_max_impact_nok?: number | null
           start_price_tolerance_pct?: number
@@ -3580,11 +3586,14 @@ export type Database = {
           auto_exclude_line_kinds?: string[]
           auto_reconcile_clean_imports?: boolean
           default_price_tolerance_pct?: number | null
+          fra_faktura_invoice_package?: boolean | null
+          fra_faktura_quiet_prices?: boolean | null
           fuzzy_auto_match_dominance_threshold?: number | null
           fuzzy_auto_match_threshold?: number | null
           fuzzy_match_threshold?: number | null
           legal_entity_id?: string
           price_hard_cap_pct?: number
+          price_jump_pct?: number | null
           price_min_impact_nok?: number
           start_price_max_impact_nok?: number | null
           start_price_tolerance_pct?: number
@@ -11472,6 +11481,7 @@ export type Database = {
           category: string | null
           cereal_type: string | null
           components_reviewed_at: string | null
+          cost_basis_rule: string | null
           cost_basis_status: string | null
           cost_source_history_id: string | null
           created_at: string
@@ -11496,6 +11506,7 @@ export type Database = {
           package_confirmed_by: string | null
           package_size: number | null
           package_unit: string | null
+          price_jump_pct: number | null
           price_source: string | null
           price_updated_at: string | null
           primary_supplier_id: string | null
@@ -11515,6 +11526,7 @@ export type Database = {
           category?: string | null
           cereal_type?: string | null
           components_reviewed_at?: string | null
+          cost_basis_rule?: string | null
           cost_basis_status?: string | null
           cost_source_history_id?: string | null
           created_at?: string
@@ -11539,6 +11551,7 @@ export type Database = {
           package_confirmed_by?: string | null
           package_size?: number | null
           package_unit?: string | null
+          price_jump_pct?: number | null
           price_source?: string | null
           price_updated_at?: string | null
           primary_supplier_id?: string | null
@@ -11558,6 +11571,7 @@ export type Database = {
           category?: string | null
           cereal_type?: string | null
           components_reviewed_at?: string | null
+          cost_basis_rule?: string | null
           cost_basis_status?: string | null
           cost_source_history_id?: string | null
           created_at?: string
@@ -11582,6 +11596,7 @@ export type Database = {
           package_confirmed_by?: string | null
           package_size?: number | null
           package_unit?: string | null
+          price_jump_pct?: number | null
           price_source?: string | null
           price_updated_at?: string | null
           primary_supplier_id?: string | null
@@ -14035,6 +14050,7 @@ export type Database = {
           line_tracking_changed_at: string | null
           line_tracking_changed_by: string | null
           name: string
+          new_item_type: string | null
           notes: string | null
           org_number: string | null
           track_invoice_lines: boolean
@@ -14056,6 +14072,7 @@ export type Database = {
           line_tracking_changed_at?: string | null
           line_tracking_changed_by?: string | null
           name: string
+          new_item_type?: string | null
           notes?: string | null
           org_number?: string | null
           track_invoice_lines?: boolean
@@ -14077,6 +14094,7 @@ export type Database = {
           line_tracking_changed_at?: string | null
           line_tracking_changed_by?: string | null
           name?: string
+          new_item_type?: string | null
           notes?: string | null
           org_number?: string | null
           track_invoice_lines?: boolean
@@ -16787,6 +16805,17 @@ export type Database = {
           supplier_id: string
         }[]
       }
+      _rm_cost_rule_ok: {
+        Args: {
+          p_date: string
+          p_primary: string
+          p_rm: string
+          p_rule: string
+          p_source: string
+          p_supplier: string
+        }
+        Returns: boolean
+      }
       _rm_invoice_extraction_blocker: {
         Args: { p_invoice_id: string }
         Returns: string
@@ -18593,6 +18622,7 @@ export type Database = {
           category: string | null
           cereal_type: string | null
           components_reviewed_at: string | null
+          cost_basis_rule: string | null
           cost_basis_status: string | null
           cost_source_history_id: string | null
           created_at: string
@@ -18617,6 +18647,7 @@ export type Database = {
           package_confirmed_by: string | null
           package_size: number | null
           package_unit: string | null
+          price_jump_pct: number | null
           price_source: string | null
           price_updated_at: string | null
           primary_supplier_id: string | null
@@ -18700,6 +18731,16 @@ export type Database = {
         Args: { p_invoice_id: string; p_reason: string }
         Returns: Json
       }
+      rm_accept_invoice_sum: {
+        Args: {
+          p_category: string
+          p_expected_updated_at: string
+          p_invoice_id: string
+          p_op_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       rm_activate_due_cost_prices: { Args: never; Returns: number }
       rm_activity_feed: {
         Args: { p_legal_entity_id: string; p_limit?: number; p_since?: string }
@@ -18772,6 +18813,10 @@ export type Database = {
       rm_can_write: { Args: { _rm_id: string }; Returns: boolean }
       rm_cancel_invoice_reread: { Args: { p_run_id: string }; Returns: Json }
       rm_cap_beslutninger_v1: { Args: never; Returns: boolean }
+      rm_cap_fra_faktura_v1: { Args: never; Returns: boolean }
+      rm_cap_godta_sum_v1: { Args: never; Returns: boolean }
+      rm_cap_kobling_godkjent_v1: { Args: never; Returns: boolean }
+      rm_cap_nye_varer_v1: { Args: never; Returns: boolean }
       rm_change_supplier_link: {
         Args: {
           p_line_ids?: string[]
@@ -18948,6 +18993,10 @@ export type Database = {
         }
         Returns: Json
       }
+      rm_fra_faktura_settings: {
+        Args: { p_legal_entity_id: string }
+        Returns: Json
+      }
       rm_infer_package: {
         Args: { p_base_unit?: string; p_line_id: string }
         Returns: Json
@@ -19075,6 +19124,15 @@ export type Database = {
         }
         Returns: Json
       }
+      rm_new_items_queue: {
+        Args: {
+          p_legal_entity_id: string
+          p_limit?: number
+          p_offset?: number
+          p_supplier_id?: string
+        }
+        Returns: Json
+      }
       rm_oslo_today: { Args: never; Returns: string }
       rm_package_factor: {
         Args: { p_raw_material_id: string; p_supplier_id: string }
@@ -19187,6 +19245,15 @@ export type Database = {
       rm_rematch_queue_cleanup: { Args: never; Returns: number }
       rm_rematch_status: { Args: { p_legal_entity_id: string }; Returns: Json }
       rm_rematch_tick: { Args: { p_slots?: number }; Returns: Json }
+      rm_remember_supplier_item_names: {
+        Args: {
+          p_item_key: string
+          p_legal_entity_id: string
+          p_raw_material_supplier_id: string
+          p_supplier_id: string
+        }
+        Returns: Json
+      }
       rm_reopen_invoice_exclusion: {
         Args: {
           p_expected_updated_at?: string
@@ -19226,6 +19293,10 @@ export type Database = {
         }
         Returns: Json
       }
+      rm_set_cost_basis_rule: {
+        Args: { p_raw_material_id: string; p_rule: string }
+        Returns: Json
+      }
       rm_set_documented_cost_price: {
         Args: {
           p_effective_date: string
@@ -19241,6 +19312,15 @@ export type Database = {
         Args: { p_active: boolean; p_example_id: string; p_reason?: string }
         Returns: Json
       }
+      rm_set_fra_faktura_settings: {
+        Args: {
+          p_invoice_package?: boolean
+          p_legal_entity_id: string
+          p_price_jump_pct: number
+          p_quiet_prices?: boolean
+        }
+        Returns: Json
+      }
       rm_set_invoice_exclusion: {
         Args: {
           p_category?: string
@@ -19253,8 +19333,16 @@ export type Database = {
         }
         Returns: Json
       }
+      rm_set_item_price_jump: {
+        Args: { p_pct: number; p_raw_material_id: string }
+        Returns: Json
+      }
       rm_set_primary_supplier: {
         Args: { p_raw_material_id: string; p_supplier_id: string }
+        Returns: Json
+      }
+      rm_set_supplier_new_item_type: {
+        Args: { p_supplier_id: string; p_type: string }
         Returns: Json
       }
       rm_sku_norm: { Args: { p: string }; Returns: string }
@@ -19382,6 +19470,10 @@ export type Database = {
         }[]
       }
       rm_supplier_link_snapshot: { Args: { p_rms_id: string }; Returns: string }
+      rm_undo_accept_invoice_sum: {
+        Args: { p_audit_id: string; p_op_id: string }
+        Returns: Json
+      }
       rm_undo_not_item: {
         Args: {
           p_item_key: string
@@ -19398,6 +19490,18 @@ export type Database = {
           p_legal_entity_id: string
           p_line_ids: string[]
           p_reason?: string
+        }
+        Returns: Json
+      }
+      rm_undo_supplier_item_link: {
+        Args: {
+          p_created?: boolean
+          p_item_key: string
+          p_legal_entity_id: string
+          p_line_ids: string[]
+          p_raw_material_id: string
+          p_reason?: string
+          p_supplier_id: string
         }
         Returns: Json
       }

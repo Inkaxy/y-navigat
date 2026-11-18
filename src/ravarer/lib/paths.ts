@@ -24,7 +24,7 @@ export const RAVARER_ROOT = "/ravarer";
 export type PriskontrollFane = "fakturaer" | "godkjenning";
 export type LeverandorFane = "leverandorer" | "avtaler" | "forhandlinger" | "saker";
 export type LagerFane = "beholdning" | "varemottak" | "telling";
-export type InnstillingSeksjon = "priskontroll" | "automatikk" | "tripletex" | "kategorier" | "ai";
+export type InnstillingSeksjon = "priskontroll" | "automatikk" | "tripletex" | "kategorier" | "ai" | "fakturalesing";
 
 export const paths = {
   oversikt: () => RAVARER_ROOT,

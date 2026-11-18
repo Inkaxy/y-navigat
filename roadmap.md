@@ -134,3 +134,14 @@
 - [x] 1c. PENDING-forslag A (kobling på godkjente, md5-vakt) og B (køen følger sperren) – Henrik velger, ikke kjørt
 - [x] 3c. Stangeland Mølle: leseinstruks for varenummer («8400 1»)
 - [x] 1d. Henrik valgte A: PENDING `20261121_kobling_godkjent_faktura` utvidet (angre, hold utenfor, kø = kobling), lokal test, match-invoice-lines linjemodus (rullet ut, låst til markøren finnes) – ikke kjørt
+
+# Opplæring av fakturaleseren (18.11.2026) – alt bak innstillinger som er AV
+- [x] A Serverkode i supabase/pending/functions + patch – klar for utrulling, venter på ja
+- [x] C1 Varekatalog som fasit (bygget; venter på SQL + utrulling)
+- [x] C2 Leverandørprofil (bygget; venter på SQL)
+- [x] C3 Læring av rettinger (bygget; venter på SQL)
+- [x] C4 Selvkontroll + sterkere modell (bygget; venter på SQL + utrulling)
+- [x] C5 Fasit og måling (merking venter på SQL; måling venter på utrulling)
+- [x] C6 Like linjer: dry-run + DATAENDRING (ikke kjørt)
+- [x] D EHF: rapport i docs/fakturalesing-opplaering.md
+- [ ] Venter: Henriks ja til SQL 20261122_fakturalesing_opplaering, utrulling av patchen, og DATAENDRING like linjer

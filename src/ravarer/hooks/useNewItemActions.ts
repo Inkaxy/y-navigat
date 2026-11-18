@@ -9,6 +9,7 @@ import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
 import { parseUndoResult, undoSummary } from "@/ravarer/lib/quickAnswers";
 import { NEW_ITEM_TYPE_LABEL, packagePayload, type NewItemType, type PackageState } from "@/ravarer/lib/fraFaktura/newItems";
 import { assertLinesSaved } from "@/ravarer/lib/fraFaktura/linkOutcome";
+import { linkLearning, notItemLearning, type LearningExample } from "@/ravarer/lib/fakturalesing/learningExample";
 
 export type NewItemUndo =
   | { kind: "kobling"; supplierId: string; itemKey: string; lineIds: string[]; rawMaterialId: string; created: boolean }
@@ -29,6 +30,17 @@ export function useNewItemActions() {
   const { data: company } = useCompany();
   const capFra = useCapability("rm_cap_fra_faktura_v1");
   const capUndoNotItem = useCapability("rm_cap_beslutninger_v1");
+  const capLearning = useCapability("rm_cap_fakturalesing_v1");
+
+  /**
+   * Læring (bestilling 18.11, C3): etter BEKREFTET lagring lagres avgjørelsen som eksempel for leverandør + vare.
+   * Serveren lagrer bare når «Læring av rettinger» er slått på. Feil her endrer aldri koblingen eller kvitteringen.
+   */
+  const learn = async (lineId: string | undefined, ex: LearningExample | null) => {
+    if (capLearning !== true || !lineId || !ex) return;
+    const r = await callPendingRpc("rm_record_extraction_example", { p_line_id: lineId, p_kind: ex.kind, p_corrected: ex.corrected, p_note: "Fra faktura" });
+    if (r.kind !== "ok") console.warn("[fakturalesing] læringseksempel ble ikke lagret", r.kind);
+  };
 
   const refresh = (rmId?: string) => {
     invalidateAfterLink(qc, rmId);
@@ -62,6 +74,7 @@ export function useNewItemActions() {
       if (m.kind !== "ok") console.warn("[fra-faktura] skrivemåter ble ikke lagret", m.kind);
     }
     refresh(rmId ?? undefined);
+    void learn(i.lineIds[0], linkLearning(i.target.name, i.pkg));
     const what = i.target.kind === "existing" ? `«${i.target.name}»` : `ny ${NEW_ITEM_TYPE_LABEL[i.target.type].toLowerCase()} «${i.target.name.trim()}»`;
     const open = r.still_open_lines > 0 ? ` ${r.still_open_lines} står fortsatt til kontroll.` : "";
     return {
@@ -77,6 +90,7 @@ export function useNewItemActions() {
     const r = await linkSupplierItem({ legal_entity_id: company.id, supplier_id: i.supplierId, item_key: i.itemKey, not_raw_material: true, reason: "Ikke vare (Fra faktura)", line_ids: i.lineIds })
       .finally(() => refresh());
     assertLinesSaved(r);
+    void learn(i.lineIds[0], notItemLearning());
     return { title: i.text, detail: `ikke en vare. Hoppes over på alle fakturaer fra ${i.supplierName ?? "leverandøren"}.`, undo: { kind: "ikke_vare", supplierId: i.supplierId, itemKey: i.itemKey, lineIds: i.lineIds } };
   };
 

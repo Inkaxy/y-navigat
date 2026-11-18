@@ -16,6 +16,7 @@ const Tripletex = lazy(() => import("@/ravarer/pages/innstillinger/TripletexSett
 const Kategorier = lazy(() => import("@/ravarer/pages/innstillinger/KategorierSettings"));
 const AiTjenester = lazy(() => import("@/ravarer/pages/innstillinger/AiServicesSettings"));
 const Automatikk = lazy(() => import("@/ravarer/pages/innstillinger/AutomatikkSettings"));
+const Fakturalesing = lazy(() => import("@/ravarer/pages/innstillinger/FakturalesingSettings"));
 
 type Entry = { id: InnstillingSeksjon; del?: string; label: string; hint: string; adminOnly?: boolean };
 /**
@@ -35,6 +36,7 @@ const GROUPS: { title: string; entries: Entry[] }[] = [
   ] },
   { title: "Integrasjoner", entries: [
     { id: "tripletex", label: "Tripletex", hint: "Import av fakturaer" },
+    { id: "fakturalesing", label: "Fakturalesing", hint: "Opplæring av fakturaleseren: varekatalog, leverandørprofiler, læring og fasit" },
     { id: "ai", label: "AI-tjenester", hint: "Modell og tilkobling (plattformadministrator)", adminOnly: true },
   ] },
 ];
@@ -100,6 +102,7 @@ export default function RavarerInnstillinger() {
             {active === "automatikk" && <Automatikk />}
             {active === "tripletex" && <Tripletex />}
             {active === "kategorier" && <Kategorier />}
+            {active === "fakturalesing" && <Fakturalesing />}
             {active === "ai" && isPlatformAdmin && <AiTjenester />}
           </Suspense>
         </div>
