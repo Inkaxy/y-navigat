@@ -3638,6 +3638,8 @@ export type Database = {
           fuzzy_match_threshold: number | null
           legal_entity_id: string
           price_hard_cap_pct: number
+          price_history_deviation_pct: number | null
+          price_history_since_months: number | null
           price_jump_pct: number | null
           price_min_impact_nok: number
           start_price_max_impact_nok: number | null
@@ -3662,6 +3664,8 @@ export type Database = {
           fuzzy_match_threshold?: number | null
           legal_entity_id: string
           price_hard_cap_pct?: number
+          price_history_deviation_pct?: number | null
+          price_history_since_months?: number | null
           price_jump_pct?: number | null
           price_min_impact_nok?: number
           start_price_max_impact_nok?: number | null
@@ -3686,6 +3690,8 @@ export type Database = {
           fuzzy_match_threshold?: number | null
           legal_entity_id?: string
           price_hard_cap_pct?: number
+          price_history_deviation_pct?: number | null
+          price_history_since_months?: number | null
           price_jump_pct?: number | null
           price_min_impact_nok?: number
           start_price_max_impact_nok?: number | null
@@ -11777,6 +11783,9 @@ export type Database = {
           is_water: boolean | null
           item_type: string
           legal_entity_id: string
+          merge_id: string | null
+          merged_at: string | null
+          merged_into_id: string | null
           min_stock: number | null
           name: string
           package_confirmed_at: string | null
@@ -11822,6 +11831,9 @@ export type Database = {
           is_water?: boolean | null
           item_type?: string
           legal_entity_id: string
+          merge_id?: string | null
+          merged_at?: string | null
+          merged_into_id?: string | null
           min_stock?: number | null
           name: string
           package_confirmed_at?: string | null
@@ -11867,6 +11879,9 @@ export type Database = {
           is_water?: boolean | null
           item_type?: string
           legal_entity_id?: string
+          merge_id?: string | null
+          merged_at?: string | null
+          merged_into_id?: string | null
           min_stock?: number | null
           name?: string
           package_confirmed_at?: string | null
@@ -11891,6 +11906,55 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "legal_entities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_materials_merge_id_fkey"
+            columns: ["merge_id"]
+            isOneToOne: false
+            referencedRelation: "rm_material_merges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_materials_merged_into_id_fkey"
+            columns: ["merged_into_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_declaration_worklist"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_materials_merged_into_id_fkey"
+            columns: ["merged_into_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_materials_merged_into_id_fkey"
+            columns: ["merged_into_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_package_worklist"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_materials_merged_into_id_fkey"
+            columns: ["merged_into_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "raw_materials_merged_into_id_fkey"
+            columns: ["merged_into_id"]
+            isOneToOne: false
+            referencedRelation: "raw_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_materials_merged_into_id_fkey"
+            columns: ["merged_into_id"]
+            isOneToOne: false
+            referencedRelation: "resale_stock_status"
+            referencedColumns: ["raw_material_id"]
           },
           {
             foreignKeyName: "raw_materials_primary_supplier_id_fkey"
@@ -13354,6 +13418,164 @@ export type Database = {
             referencedColumns: ["raw_material_id"]
           },
         ]
+      }
+      rm_material_merges: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          keep_id: string
+          legal_entity_id: string
+          merged_ids: string[]
+          op_id: string
+          request: Json
+          result: Json
+          undo_log: Json
+          undo_op_id: string | null
+          undo_result: Json | null
+          undone_at: string | null
+          undone_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          keep_id: string
+          legal_entity_id: string
+          merged_ids: string[]
+          op_id: string
+          request: Json
+          result: Json
+          undo_log: Json
+          undo_op_id?: string | null
+          undo_result?: Json | null
+          undone_at?: string | null
+          undone_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          keep_id?: string
+          legal_entity_id?: string
+          merged_ids?: string[]
+          op_id?: string
+          request?: Json
+          result?: Json
+          undo_log?: Json
+          undo_op_id?: string | null
+          undo_result?: Json | null
+          undone_at?: string | null
+          undone_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rm_material_merges_keep_id_fkey"
+            columns: ["keep_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_declaration_worklist"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "rm_material_merges_keep_id_fkey"
+            columns: ["keep_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_nutrition_coverage"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "rm_material_merges_keep_id_fkey"
+            columns: ["keep_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_package_worklist"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rm_material_merges_keep_id_fkey"
+            columns: ["keep_id"]
+            isOneToOne: false
+            referencedRelation: "raw_material_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "rm_material_merges_keep_id_fkey"
+            columns: ["keep_id"]
+            isOneToOne: false
+            referencedRelation: "raw_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rm_material_merges_keep_id_fkey"
+            columns: ["keep_id"]
+            isOneToOne: false
+            referencedRelation: "resale_stock_status"
+            referencedColumns: ["raw_material_id"]
+          },
+          {
+            foreignKeyName: "rm_material_merges_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rm_purchase_corrections: {
+        Row: {
+          after: Json
+          before: Json
+          corrected_at: string
+          corrected_by: string
+          history_id: string | null
+          id: string
+          kind: string
+          legal_entity_id: string
+          new_history_id: string | null
+          raw_material_id: string
+          reason: string
+          revert_reason: string | null
+          reverted_at: string | null
+          reverted_by: string | null
+          rms_id: string | null
+          supplier_id: string | null
+        }
+        Insert: {
+          after?: Json
+          before?: Json
+          corrected_at?: string
+          corrected_by: string
+          history_id?: string | null
+          id: string
+          kind: string
+          legal_entity_id: string
+          new_history_id?: string | null
+          raw_material_id: string
+          reason: string
+          revert_reason?: string | null
+          reverted_at?: string | null
+          reverted_by?: string | null
+          rms_id?: string | null
+          supplier_id?: string | null
+        }
+        Update: {
+          after?: Json
+          before?: Json
+          corrected_at?: string
+          corrected_by?: string
+          history_id?: string | null
+          id?: string
+          kind?: string
+          legal_entity_id?: string
+          new_history_id?: string | null
+          raw_material_id?: string
+          reason?: string
+          revert_reason?: string | null
+          reverted_at?: string | null
+          reverted_by?: string | null
+          rms_id?: string | null
+          supplier_id?: string | null
+        }
+        Relationships: []
       }
       rm_rematch_queue: {
         Row: {
@@ -17105,6 +17327,52 @@ export type Database = {
         Args: { p_invoice_id: string; p_replay: boolean }
         Returns: boolean
       }
+      _rm_merge_add: {
+        Args: { p_counts: Json; p_key: string; p_n: number }
+        Returns: Json
+      }
+      _rm_merge_back: {
+        Args: { p_cur: number; p_f: number; p_kind: string; p_old: number }
+        Returns: number
+      }
+      _rm_merge_conf: {
+        Args: { p_blocking: boolean; p_code: string; p_text: string }
+        Returns: Json
+      }
+      _rm_merge_core: {
+        Args: {
+          p_dry_run: boolean
+          p_dups: string[]
+          p_fields: Json
+          p_grams_per_piece: Json
+          p_keep: string
+          p_op_id: string
+          p_reason: string
+          p_uid: string
+        }
+        Returns: Json
+      }
+      _rm_merge_needs_weight: {
+        Args: { p_dup: string; p_keep: string }
+        Returns: boolean
+      }
+      _rm_merge_push: {
+        Args: { p_items: Json; p_key: string; p_log: Json }
+        Returns: Json
+      }
+      _rm_merge_undo_core: {
+        Args: {
+          p_dry_run: boolean
+          p_merge_id: string
+          p_op_id: string
+          p_uid: string
+        }
+        Returns: Json
+      }
+      _rm_merge_unit_factor: {
+        Args: { p_dup: string; p_gpp: number; p_keep: string }
+        Returns: number
+      }
       _rm_queue_line_effect: {
         Args: { p_line_id: string; p_read_valid?: boolean }
         Returns: number
@@ -17126,6 +17394,10 @@ export type Database = {
         Returns: Json
       }
       _rm_reread_blocker: { Args: { p_invoice_id: string }; Returns: string }
+      _rm_reread_line_protection: {
+        Args: { p_line_id: string }
+        Returns: string
+      }
       _rm_reread_snapshot: { Args: { p_invoice_id: string }; Returns: Json }
       _rm_reread_values: { Args: { p: Json }; Returns: Json }
       _rm_validate_case_claim: {
@@ -18926,6 +19198,9 @@ export type Database = {
           is_water: boolean | null
           item_type: string
           legal_entity_id: string
+          merge_id: string | null
+          merged_at: string | null
+          merged_into_id: string | null
           min_stock: number | null
           name: string
           package_confirmed_at: string | null
@@ -19100,9 +19375,27 @@ export type Database = {
       rm_cap_beslutninger_v1: { Args: never; Returns: boolean }
       rm_cap_fakturalesing_v1: { Args: never; Returns: boolean }
       rm_cap_fra_faktura_v1: { Args: never; Returns: boolean }
+      rm_cap_gjenlesing_fjern_v1: { Args: never; Returns: boolean }
       rm_cap_godta_sum_v1: { Args: never; Returns: boolean }
       rm_cap_kobling_godkjent_v1: { Args: never; Returns: boolean }
       rm_cap_nye_varer_v1: { Args: never; Returns: boolean }
+      rm_cap_prislinje_v1: { Args: never; Returns: boolean }
+      rm_cap_raske_oppslag_v1: { Args: never; Returns: boolean }
+      rm_cap_slaa_sammen_v1: { Args: never; Returns: boolean }
+      rm_change_approved_package: {
+        Args: {
+          p_base_units_per_package: number
+          p_container_unit: string
+          p_dry_run?: boolean
+          p_expected_updated_at: string
+          p_op_id: string
+          p_package_size: number
+          p_package_unit: string
+          p_reason: string
+          p_rms_id: string
+        }
+        Returns: Json
+      }
       rm_change_supplier_link: {
         Args: {
           p_line_ids?: string[]
@@ -19170,6 +19463,16 @@ export type Database = {
           p_expected_updated_at: string
           p_learn?: boolean
           p_line_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
+      rm_correct_purchase_price: {
+        Args: {
+          p_dry_run?: boolean
+          p_history_id: string
+          p_new_price: number
+          p_op_id: string
           p_reason: string
         }
         Returns: Json
@@ -19320,6 +19623,7 @@ export type Database = {
         Args: { p_invoice: Database["public"]["Tables"]["invoices"]["Row"] }
         Returns: boolean
       }
+      rm_invoice_read_entity_ids: { Args: never; Returns: string[] }
       rm_is_finite: { Args: { p: number }; Returns: boolean }
       rm_line_base: {
         Args: {
@@ -19412,6 +19716,19 @@ export type Database = {
         Args: { p_raw_material_id: string }
         Returns: Json
       }
+      rm_merge_facts: { Args: { p_ids: string[] }; Returns: Json }
+      rm_merge_raw_materials: {
+        Args: {
+          p_dry_run?: boolean
+          p_dups: string[]
+          p_fields?: Json
+          p_grams_per_piece?: Json
+          p_keep: string
+          p_op_id?: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
       rm_model_eval_reserve: {
         Args: {
           p_dedup_seconds: number
@@ -19431,6 +19748,7 @@ export type Database = {
         }
         Returns: Json
       }
+      rm_nav_counts: { Args: { p_legal_entity_id: string }; Returns: Json }
       rm_new_items_queue: {
         Args: {
           p_legal_entity_id: string
@@ -19463,6 +19781,10 @@ export type Database = {
           p_min_impact_nok: number
           p_tol_pct: number
         }
+        Returns: Json
+      }
+      rm_price_jump_lines: {
+        Args: { p_legal_entity_id: string }
         Returns: Json
       }
       rm_price_line_validation_reason: {
@@ -19525,6 +19847,7 @@ export type Database = {
         Args: { p_legal_entity_id: string }
         Returns: Json
       }
+      rm_reading_stall_check: { Args: { p_dry_run?: boolean }; Returns: Json }
       rm_receive_invoice_line: {
         Args: {
           p_best_before?: string
@@ -19606,6 +19929,10 @@ export type Database = {
       }
       rm_requeue_invoice_line_extraction: {
         Args: { p_invoice_ids: string[]; p_legal_entity_id: string }
+        Returns: Json
+      }
+      rm_revert_purchase_price_correction: {
+        Args: { p_correction_id: string; p_reason: string }
         Returns: Json
       }
       rm_save_manual_pdf_invoice: {
@@ -19837,6 +20164,10 @@ export type Database = {
         Args: { p_audit_id: string; p_op_id: string }
         Returns: Json
       }
+      rm_undo_material_merge: {
+        Args: { p_dry_run?: boolean; p_merge_id: string; p_op_id?: string }
+        Returns: Json
+      }
       rm_undo_not_item: {
         Args: {
           p_item_key: string
@@ -19886,6 +20217,7 @@ export type Database = {
         Returns: undefined
       }
       rm_unmark_gold_invoice: { Args: { p_invoice_id: string }; Returns: Json }
+      rm_unread_invoices: { Args: { p_legal_entity_id: string }; Returns: Json }
       rm_usable_cost: { Args: { p_raw_material_id: string }; Returns: number }
       rm_user_names: {
         Args: { p_legal_entity_id: string; p_user_ids: string[] }
