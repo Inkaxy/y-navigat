@@ -122,7 +122,7 @@ export function parseRun(row: RunRowInput): RereadRun {
     },
     result: res ? {
       ok: res.ok === true, applied_count: numOrNull(res.applied_count) ?? 0, lines_sum_status: strOrNull(res.lines_sum_status), replayed: res.replayed === true,
-      operations: recs(res.operations).map((o) => ({ kind: String(o.kind), candidate_id: String(o.candidate_id), line_id: strOrNull(o.line_id) })),
+      operations: recs(res.operations).map((o) => ({ kind: String(o.kind), candidate_id: o.candidate_id == null ? "" : String(o.candidate_id), line_id: strOrNull(o.line_id) })),
     } : null,
     appliedOperations: row.applied_operations, applyReason: row.apply_reason,
   };
@@ -194,7 +194,11 @@ export const identityChange = (c: Candidate, s: Selection, l: OldLine | undefine
 
 export type Operation =
   | { kind: "update"; candidate_id: string; line_id: string; changes: Partial<Values>; confirmed_mapping: true; learn: false; override_manual?: true; manual_reason?: string; confirm_identity_change?: true }
-  | { kind: "add"; candidate_id: string; changes: Values; confirmed_addition: true };
+  | { kind: "add"; candidate_id: string; changes: Values; confirmed_addition: true }
+  /** Bare når 20261123_gjenlesing_fjern_linjer er kjørt: fjerner en ubeskyttet linje uten motstykke (erstatning). */
+  | { kind: "remove"; line_id: string; confirmed_removal: true }
+  /** Bare ved erstatning: kandidaten tilsvarer linjen uendret (samme linjesum). */
+  | { kind: "keep"; candidate_id: string; line_id: string; confirmed_keep: true };
 
 /** Valg → nøyaktig operasjonsliste. Verdiene er alltid forslagets egne (ingen brukerredigering i denne versjonen). */
 export function buildOperations(cands: Candidate[], sel: Record<string, Selection>, lines: OldLine[]): Operation[] {
@@ -247,6 +251,12 @@ const ERR: Record<string, string> = {
   forslag_avvist: "Lesingen ble avvist av kontrollen i databasen. Ingenting er endret.",
   begrunnelse_mangler: "Skriv en begrunnelse (minst 3 tegn).",
   omberegning_kunne_ikke_koes: "Ny beregning kunne ikke legges i kø; ingenting ble lagret.",
+  beskyttet_linje_kan_ikke_fjernes: "En linje som skulle fjernes er beskyttet (koblet, godtatt, rettet, holdt utenfor eller ført). Ingenting er endret.",
+  erstatning_ufullstendig: "Ny lesing kunne ikke erstatte hele linjesettet. Ingenting er endret – se forslaget.",
+  erstatning_sum_avviker: "Linjesummen ville ikke blitt lik ny lesing. Ingenting er endret.",
+  sumavvik_ville_oke: "De nye linjene ville gjort sumavviket større (trolig dobbeltlinjer). Ingenting er endret.",
+  beholdt_linje_har_annen_sum: "En linje som skulle beholdes har annen sum i ny lesing. Ingenting er endret.",
+  fjerning_ma_bekreftes: "Fjerning av linjer må bekreftes.",
 };
 /** Kode → norsk forklaring. Ukjent kode gir generell tekst, aldri rå backendtekst. */
 export function rereadErrorText(codeOrMessage: string | null | undefined): string {
@@ -273,7 +283,10 @@ export function loadPending(runId: string, store: Pick<Storage, "getItem"> = ses
   }
 }
 function isOperation(x: unknown): x is Operation {
-  return isRec(x) && typeof x.candidate_id === "string" && isRec(x.changes) && (x.kind === "add" ? x.confirmed_addition === true : x.kind === "update" && typeof x.line_id === "string" && x.confirmed_mapping === true);
+  if (!isRec(x)) return false;
+  if (x.kind === "remove") return typeof x.line_id === "string" && x.confirmed_removal === true && !("candidate_id" in x);
+  if (x.kind === "keep") return typeof x.candidate_id === "string" && typeof x.line_id === "string" && x.confirmed_keep === true;
+  return typeof x.candidate_id === "string" && isRec(x.changes) && (x.kind === "add" ? x.confirmed_addition === true : x.kind === "update" && typeof x.line_id === "string" && x.confirmed_mapping === true);
 }
 export function clearPending(runId: string, store: Pick<Storage, "removeItem"> = sessionStorage) { store.removeItem(pendingKey(runId)); }
 
@@ -345,7 +358,7 @@ export function applyResponseValid(data: unknown, req: PendingApply, invoiceId: 
   if (!isRec(data) || data.ok !== true || data.run_id !== req.runId || data.invoice_id !== invoiceId) return false;
   if (typeof data.applied_count !== "number" || !Number.isInteger(data.applied_count) || data.applied_count !== req.operations.length) return false;
   if (!Array.isArray(data.operations) || data.operations.length !== req.operations.length) return false;
-  return data.operations.every((o: unknown) => isRec(o) && typeof o.kind === "string" && typeof o.candidate_id === "string");
+  return data.operations.every((o: unknown) => isRec(o) && typeof o.kind === "string" && (o.kind === "remove" ? o.candidate_id == null && typeof o.line_id === "string" : typeof o.candidate_id === "string"));
 }
 
 /** Lagret kjøring mot innsendt forespørsel. */

@@ -21,7 +21,7 @@ const CHUNK = 20;
 
 
 /** Henter alle ventende forslag, vurderer dem med samme regel som «Bruk», og sender dem ett og ett. */
-async function loadItems(rows: SuggestionRow[]): Promise<ApplyAllItem[]> {
+async function loadItems(rows: SuggestionRow[], replace: boolean): Promise<ApplyAllItem[]> {
   const byId = new Map<string, { status: string; snapshot: unknown; proposal: unknown }>();
   for (let i = 0; i < rows.length; i += CHUNK) {
     const ids = rows.slice(i, i + CHUNK).map((r) => r.runId);
@@ -32,21 +32,21 @@ async function loadItems(rows: SuggestionRow[]): Promise<ApplyAllItem[]> {
   return rows.map((row) => {
     const run = byId.get(row.runId);
     const input = run && run.status === "ready" ? autoInputFromRun(run.snapshot, run.proposal) : null;
-    return { runId: row.runId, invoiceId: row.invoiceId, ...classifyForApplyAll(input ? decideAuto(input) : null) };
+    return { runId: row.runId, invoiceId: row.invoiceId, ...classifyForApplyAll(input ? decideAuto(input, { replace }) : null) };
   });
 }
 
-export function ApplyAllDialog({ rows, open, onOpenChange, onDone }: {
-  rows: SuggestionRow[]; open: boolean; onOpenChange: (o: boolean) => void; onDone: (m: { ok: boolean; text: string }) => void;
+export function ApplyAllDialog({ rows, open, onOpenChange, onDone, replace = false }: {
+  replace?: boolean; rows: SuggestionRow[]; open: boolean; onOpenChange: (o: boolean) => void; onDone: (m: { ok: boolean; text: string }) => void;
 }) {
   const qc = useQueryClient();
   const { data: company } = useCompany();
   // Ferskt grunnlag hver gang vinduet åpnes; ingenting skrives før et valg trykkes.
   const q = useQuery({
-    queryKey: ["samlet-gjenlesing", "bruk-alle", company?.id ?? null, rows.map((r) => r.runId).join(",")],
+    queryKey: ["samlet-gjenlesing", "bruk-alle", company?.id ?? null, replace, rows.map((r) => r.runId).join(",")],
     enabled: open && rows.length > 0,
     staleTime: 0, gcTime: 0, retry: false, refetchOnWindowFocus: false,
-    queryFn: () => loadItems(rows),
+    queryFn: () => loadItems(rows, replace),
   });
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const lock = useRef(false);

@@ -153,8 +153,8 @@
 - [ ] Kjøre testen med ekte data – venter på Henriks ja til utrulling av `tripletex-ehf-test`
 
 # Ferdigstilling Råvarer/Fra faktura (18.11.2026, Henrik)
-- [ ] 1 Utrulling: EHF-testfunksjon + ny fakturaleser (alle brytere av) etter at 20261122 er bekreftet kjørt; test lik prompt med alt av; tilbakerulling
-- [ ] 2 Gjenlesing kan fjerne linjer (rm_apply_invoice_reread, PENDING md5), test at linjesum ikke øker av rester
+- [x] 1 Utrulling: EHF-testfunksjon + ny fakturaleser (alle brytere av) etter at 20261122 er bekreftet kjørt; test lik prompt med alt av; tilbakerulling
+- [x] 2 Gjenlesing kan fjerne linjer (rm_apply_invoice_reread, PENDING md5), test at linjesum ikke øker av rester
 - [ ] 3 Raske lesefunksjoner for tellere/Prishopp/Ikke lest (<1 s), PENDING + check, målt før/etter
 - [ ] 4a Flytt siste Beslutninger-typer (Sjekk tallene under Ikke lest; merker på varen), fjern Beslutninger/Øvrige spørsmål
 - [ ] 4b Leverandørvare-visning beholdes som detaljside

@@ -45,6 +45,8 @@ export function RereadApplyPanel({ sums, currency, operations, candidates, lines
       {operations.length > 0 && (
         <ul className="max-h-40 space-y-1 overflow-y-auto text-caption tabular-nums">
           {operations.map((o) => {
+            // Manuell gjennomgang bygger bare update/add; remove/keep kommer bare fra erstatningsregelen.
+            if (o.kind === "remove" || o.kind === "keep") return null;
             const c = candidates.find((x) => x.candidate_id === o.candidate_id);
             if (o.kind === "add") return <li key={o.candidate_id}>Ny linje: {c?.values.description ?? "–"} · {showValue(o.changes.total_amount)}</li>;
             const l = lines.find((x) => x.id === o.line_id);

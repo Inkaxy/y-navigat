@@ -11,6 +11,11 @@
 //        rabatt og linjesum; de røres aldri (en retting ville nullstilt godtatt pris og krevd overstyring).
 // Lik lesing (ingen endring) gjør ingenting. En lesing som gjør en stemmende sum til avvik brukes aldri.
 // Alt annet blir «Forslag venter på deg».
+//
+// ERSTATNING (når 20261123_gjenlesing_fjern_linjer er kjørt, `replace: true`): ny lesing erstatter hele linjesettet.
+// Gamle linjer uten motstykke fjernes (remove) når de ikke er beskyttet; parede linjer uten endring beholdes (keep).
+// Linjesummen etter bruk er da nøyaktig summen av ny lesing – rester kan ikke bli stående. En beskyttet linje uten
+// motstykke, eller en ny linje som mangler felt, gjør erstatning umulig; da brukes dagens vanlige forslag (uten fjerning).
 import { computeLinesSum, type LinesSumCheck } from "../../../../supabase/functions/_shared/lines-sum.ts";
 import { normalizeMatchKey } from "@/fakturaer/lib/matchNormalize";
 import { REREAD_FIELDS, sameValue, type Operation, type RereadField, type Value, type Values } from "@/fakturaer/lib/reread";
@@ -31,9 +36,9 @@ export type ReasonCode =
 export type AutoReason = { code: ReasonCode; text: string };
 
 export type AutoDecision =
-  | { kind: "bruk"; operations: Operation[]; before: LinesSumCheck; after: LinesSumCheck; unmatchedOld: number }
+  | { kind: "bruk"; operations: Operation[]; before: LinesSumCheck; after: LinesSumCheck; unmatchedOld: number; replace?: boolean }
   | { kind: "uendret"; before: LinesSumCheck }
-  | { kind: "forslag"; operations: Operation[]; reasons: AutoReason[]; before: LinesSumCheck; after: LinesSumCheck; unmatchedOld: number }
+  | { kind: "forslag"; operations: Operation[]; reasons: AutoReason[]; before: LinesSumCheck; after: LinesSumCheck; unmatchedOld: number; replace?: boolean }
   | { kind: "darligere"; before: LinesSumCheck; after: LinesSumCheck };
 
 const IDENTITY: RereadField[] = ["supplier_sku", "description", "line_kind"];
@@ -90,7 +95,76 @@ export function sumCheckOf(totals: Value[], inv: AutoInvoice): LinesSumCheck {
 }
 
 /** Regelen. Operasjonene rører aldri en beskyttet linje utover det som beholder beskyttelsen. */
-export function decideAuto(input: AutoInput): AutoDecision {
+export function decideAuto(input: AutoInput, opts: { replace?: boolean } = {}): AutoDecision {
+  if (opts.replace) { const r = decideReplace(input); if (r) return r; }
+  return decideLegacy(input);
+}
+
+/**
+ * Erstatning: hver kandidat brukes (update/add/keep), hver gammel linje velges (update/keep/remove). null = ikke mulig
+ * (beskyttet linje uten motstykke, beskyttet linje som ville endret verdi, eller ny linje som mangler felt).
+ */
+export function decideReplace(input: AutoInput): AutoDecision | null {
+  const { lines, candidates, invoice } = input;
+  const pairs = pairLines(candidates, lines);
+  const pairedLine = new Map<string, { candidate: AutoCandidate; method: PairMethod }>();
+  for (const c of candidates) { const p = pairs.get(c.candidate_id); if (p) pairedLine.set(p.lineId, { candidate: c, method: p.method }); }
+  const operations: Operation[] = [];
+  const finalTotals: Value[] = [];
+  let changes = 0;
+  let removed = 0;
+  for (const l of lines) {
+    const p = pairedLine.get(l.id);
+    const untouched = l.protections.filter((x) => KEEP_UNTOUCHED.includes(x));
+    const manual = l.protections.includes("manuell_kobling");
+    if (!p) {
+      if (l.protections.length > 0) return null; // beskyttet linje kan aldri fjernes
+      operations.push({ kind: "remove", line_id: l.id, confirmed_removal: true });
+      removed++; changes++;
+      continue;
+    }
+    if (manual && !SAME_ITEM.includes(p.method)) return null;
+    const diff = REREAD_FIELDS.filter((f) => !sameValue(p.candidate.values[f], l[f]));
+    if (untouched.length > 0) {
+      if (diff.some((f) => VALUE_FIELDS.includes(f))) return null;
+      operations.push({ kind: "keep", candidate_id: p.candidate.candidate_id, line_id: l.id, confirmed_keep: true });
+      finalTotals.push(l.total_amount);
+      continue;
+    }
+    const fields = manual ? diff.filter((f) => !IDENTITY.includes(f)) : diff;
+    if (fields.length === 0) {
+      operations.push({ kind: "keep", candidate_id: p.candidate.candidate_id, line_id: l.id, confirmed_keep: true });
+      finalTotals.push(l.total_amount);
+      continue;
+    }
+    const ch: Partial<Values> = {};
+    for (const f of REREAD_FIELDS) if (fields.includes(f)) ch[f] = p.candidate.values[f];
+    operations.push({ kind: "update", candidate_id: p.candidate.candidate_id, line_id: l.id, changes: ch, confirmed_mapping: true, learn: false });
+    finalTotals.push(fields.includes("total_amount") ? p.candidate.values.total_amount : l.total_amount);
+    changes++;
+  }
+  for (const c of candidates) {
+    if (pairs.has(c.candidate_id)) continue;
+    if (ADD_REQUIRED.some((f) => c.values[f] == null)) return null;
+    operations.push({ kind: "add", candidate_id: c.candidate_id, changes: { ...c.values }, confirmed_addition: true });
+    finalTotals.push(c.values.total_amount);
+    changes++;
+  }
+  // Serveren krever at linjesummen etterpå er nøyaktig ny lesing; avviker den (f.eks. manglende beløp), ingen erstatning.
+  const cand = candidates.reduce<number | null>((s, c) => (s == null || typeof c.values.total_amount !== "number" ? null : s + c.values.total_amount), 0);
+  const fin = finalTotals.reduce<number | null>((s, t) => (s == null || typeof t !== "number" ? null : s + t), 0);
+  if (cand == null || fin == null || Math.abs(cand - fin) > 0.005) return null;
+  const before = sumCheckOf(lines.map((l) => l.total_amount), invoice);
+  if (changes === 0) return { kind: "uendret", before };
+  const after = sumCheckOf(finalTotals, invoice);
+  if (before.lines_sum_status === "ok" && after.lines_sum_status !== "ok") return { kind: "darligere", before, after };
+  if (after.lines_sum_status !== "ok") {
+    return { kind: "forslag", operations, reasons: [{ code: "sum_stemmer_ikke", text: "Summen stemmer fortsatt ikke med fakturaen etter ny lesing." }], before, after, unmatchedOld: removed, replace: true };
+  }
+  return { kind: "bruk", operations, before, after, unmatchedOld: removed, replace: true };
+}
+
+function decideLegacy(input: AutoInput): AutoDecision {
   const { lines, candidates, invoice } = input;
   const pairs = pairLines(candidates, lines);
   const pairedLine = new Map<string, { candidate: AutoCandidate; method: PairMethod }>();

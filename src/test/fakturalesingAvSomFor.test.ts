@@ -16,7 +16,7 @@ async function capture(extraHint: string | null | undefined, ex: readonly Learni
   const texts: string[] = [];
   const opts = {
     hints, examples: ex, maxAttempts: 2, parseJson: (s: string) => JSON.parse(s),
-    call: async (t: string) => { texts.push(t); return { text: reply }; },
+    call: async (t: string) => { texts.push(t); return { rawText: reply }; },
   };
   const run = await runExtractionAttempts(extraHint === undefined ? opts : { ...opts, extraHint });
   return { texts, lines: run.best?.lines ?? [] };
@@ -48,6 +48,7 @@ describe("Ny leser med alt av = samme lesing som før", () => {
       const after = await capture(rp.extraHint, rp.examples ?? examples); // slik den patchede leseren kaller
       expect(after.texts).toEqual(before.texts);
       expect(after.lines).toEqual(before.lines);
+      expect(after.lines.length).toBe(1);
     }
   });
 
@@ -59,7 +60,7 @@ describe("Ny leser med alt av = samme lesing som før", () => {
   });
 
   it("varenummer-etterkontrollen endrer ingen linjer når «Varekatalog» er av", () => {
-    const lines = [{ sku: "29 9727", description: "ISTE CHAI", quantity: 2, unit_price: 500, total_amount: 1000 }];
+    const lines = [{ sku: "29 9727", description: "ISTE CHAI", line_kind: "vare", read_issues: [] }];
     const out = catalogCheck({ ...OFF_CONTEXT, available: true, catalog: [{ sku_norm: "299727", sku_printed: ["29 9727"], name: "ISTE", aliases: [], package: null, base_unit: "l" }] }, lines);
     expect(out).toEqual(lines);
   });

@@ -10,6 +10,7 @@ import { decideApply, fetchRereadRun } from "@/fakturaer/hooks/useInvoiceReread"
 import type { Operation } from "@/fakturaer/lib/reread";
 import { invalidateRavarerCounts } from "@/ravarer/lib/invalidate";
 import { autoInputFromRun, decideAuto } from "@/ravarer/lib/samletGjenlesing/rule";
+import { callPendingRpc } from "@/lib/pendingRpc";
 import type { SkipReason } from "@/ravarer/lib/samletGjenlesing/plan";
 import {
   CONCURRENCY, MAX_ATTEMPTS, afterReload, autoApplyReason, backoffMs, classifyFailure, leaseKey, otherTabOwns, parseLease,
@@ -49,6 +50,12 @@ class SamletRunner {
   private listeners = new Set<() => void>();
   private snap: RunnerSnapshot = { state: null, otherTab: false, active: false, cooldownUntil: 0, ctx: null };
   private lastInvalidate = 0;
+  /** Erstatning (fjerner rester) bare når 20261123_gjenlesing_fjern_linjer er kjørt. Feil/ukjent = dagens regel. */
+  private replaceMode: Promise<boolean> | null = null;
+  private replaceAllowed(): Promise<boolean> {
+    this.replaceMode ??= callPendingRpc("rm_cap_gjenlesing_fjern_v1", {}).then((r) => r.kind === "ok" && r.data === true).catch(() => false);
+    return this.replaceMode;
+  }
 
   subscribe = (l: () => void) => { this.listeners.add(l); return () => { this.listeners.delete(l); }; };
   getSnapshot = () => this.snap;
@@ -264,7 +271,7 @@ class SamletRunner {
         this.consecutive = 0;
         const input = autoInputFromRun(run.snapshot, run.proposal);
         if (!input) return this.finalize(id, "forslag", "ugyldig_forslag");
-        const d = decideAuto(input);
+        const d = decideAuto(input, { replace: await this.replaceAllowed() });
         if (d.kind === "uendret") { await this.cancel(run.id); return this.finalize(id, "uendret", null); }
         if (d.kind === "darligere") { await this.cancel(run.id); return this.finalize(id, "darligere", "darligere"); }
         if (d.kind === "forslag") return this.finalize(id, "forslag", d.reasons[0]?.code ?? null, d.reasons.map((r) => r.text).join(" "));

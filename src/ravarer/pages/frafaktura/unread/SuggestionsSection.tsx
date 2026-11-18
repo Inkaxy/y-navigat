@@ -17,6 +17,7 @@ import { dateNo } from "@/ravarer/lib/decisions";
 import { useRereadSuggestions, useSamletRunner, type SuggestionRow } from "@/ravarer/hooks/useSamletGjenlesing";
 import { autoInputFromRun, decideAuto, type AutoDecision } from "@/ravarer/lib/samletGjenlesing/rule";
 import { manualApplyReason } from "@/ravarer/lib/samletGjenlesing/runState";
+import { useCapability } from "@/lib/pendingRpc";
 import { ApplyAllDialog } from "./ApplyAllDialog";
 
 const kr = (v: number | null) => (v == null ? "–" : `${Number(v).toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr`);
@@ -38,6 +39,8 @@ export function SuggestionsSection({ names, canWrite, retur }: { names: Map<stri
   const [applyAll, setApplyAll] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const lock = useRef(false);
+  // Erstatning (fjerner rester) bare når 20261123_gjenlesing_fjern_linjer er kjørt; ukjent = dagens regel.
+  const replace = useCapability("rm_cap_gjenlesing_fjern_v1") === true;
   const rows = q.data ?? [];
   if (q.isLoading || (!q.isError && rows.length === 0)) return null;
 
@@ -56,7 +59,7 @@ export function SuggestionsSection({ names, canWrite, retur }: { names: Map<stri
     if (error || !data) return setReview({ row, decision: null, error: "Kunne ikke hente forslaget. Prøv igjen.", loading: false });
     if (data.status !== "ready") return setReview({ row, decision: null, error: "Forslaget er ikke lenger klart (brukt, forkastet eller utløpt).", loading: false });
     const input = autoInputFromRun(data.snapshot, data.proposal);
-    setReview({ row, decision: input ? decideAuto(input) : null, error: input ? null : "Forslaget kunne ikke tolkes. Åpne det for å se detaljene.", loading: false });
+    setReview({ row, decision: input ? decideAuto(input, { replace }) : null, error: input ? null : "Forslaget kunne ikke tolkes. Åpne det for å se detaljene.", loading: false });
   };
 
   const opsOf = (d: AutoDecision | null): Operation[] => (d && (d.kind === "bruk" || d.kind === "forslag") ? d.operations : []);
@@ -150,7 +153,7 @@ export function SuggestionsSection({ names, canWrite, retur }: { names: Map<stri
                 <p>{updates > 0 && `${updates} ${updates === 1 ? "linje rettes" : "linjer rettes"}`}{updates > 0 && adds > 0 && " og "}{adds > 0 && `${adds} ${adds === 1 ? "ny linje legges til" : "nye linjer legges til"}`}. Summen {afterOk ? "stemmer" : "stemmer fortsatt ikke"} etterpå.</p>
               )}
               {d.kind === "forslag" && d.reasons.length > 0 && <ul className="list-disc pl-4 text-caption text-ink-secondary">{d.reasons.map((x, i) => <li key={i}>{x.text}</li>)}</ul>}
-              {(d.kind === "bruk" || d.kind === "forslag") && d.unmatchedOld > 0 && <p className="text-caption text-ink-secondary">{d.unmatchedOld} eksisterende {d.unmatchedOld === 1 ? "linje" : "linjer"} uten motstykke blir stående.</p>}
+              {(d.kind === "bruk" || d.kind === "forslag") && d.unmatchedOld > 0 && <p className="text-caption text-ink-secondary">{d.unmatchedOld} eksisterende {d.unmatchedOld === 1 ? "linje" : "linjer"} uten motstykke {d.replace ? "fjernes (ingen av dem er koblet, godtatt, rettet eller ført)." : "blir stående."}</p>}
             </div>
           )}
           <AlertDialogFooter>
@@ -161,7 +164,7 @@ export function SuggestionsSection({ names, canWrite, retur }: { names: Map<stri
         </AlertDialogContent>
       </AlertDialog>
 
-      {canWrite && <ApplyAllDialog rows={rows} open={applyAll} onOpenChange={setApplyAll} onDone={setMsg} />}
+      {canWrite && <ApplyAllDialog replace={replace} rows={rows} open={applyAll} onOpenChange={setApplyAll} onDone={setMsg} />}
 
       <AlertDialog open={!!discard} onOpenChange={(o) => !busy && !o && setDiscard(null)}>
         <AlertDialogContent>
