@@ -24,6 +24,7 @@ const SCRIPTS = [
   ["test-nye-varer-sql.mjs", "kontroll: nye_varer_les"],
   ["test-kobling-godkjent-sql.mjs", "kontroll: kobling_godkjent_faktura"],
   ["test-fakturalesing-sql.mjs", "kontroll: fakturalesing_opplaering"],
+  ["test-nullstilling-sql.mjs", "1-kjor-na: 01_nullstill_koen + kontroll"],
 ];
 
 for (const [script, what] of SCRIPTS) {

@@ -1,7 +1,7 @@
 # Databasefiler – les meg først
 
-Oppdatert 18.11.2026. **Ingenting står i kø nå.** Henrik kjørte 00–07 i SQL Editor 18.11, alle med «Success», og root
-har kontrollert dem i produksjon. Filene er flyttet uendret til `kjort/`. Mappen `1-kjor-na/` er tom til neste fil får ja.
+Oppdatert 18.11.2026. **Én fil venter på Henriks ja:** `1-kjor-na/01_nullstill_koen.sql` («Nullstill køen», se under).
+Henrik kjørte 00–07 i SQL Editor 18.11, alle med «Success», og root har kontrollert dem i produksjon. De er flyttet uendret til `kjort/`.
 Det som gjenstår, ligger i `2-endrer-data/` (eget ja per fil) og `3-valgfritt/`. Ingen fil kjøres automatisk.
 
 **Slik kjører du én fil (når en fil har fått ja)**
@@ -9,6 +9,14 @@ Det som gjenstår, ligger i `2-endrer-data/` (eget ja per fil) og `3-valgfritt/`
    eller rå visning (f.eks. «Raw» på GitHub) hvis den finnes, framfor å merke tekst i kodevisningen.
 2. Lim inn i Supabase › SQL Editor (nytt, tomt vindu) og trykk **Run**. Én fil om gangen; dry-run først der den finnes.
 3. Feiler noe: stopp, ikke kjør neste fil, og send hele feilmeldingen. Filen ruller da tilbake av seg selv.
+
+## Venter på ja – `1-kjor-na/`
+
+| Nr | Fil | Hva den slår på | Endrer data ved kjøring? | Hva Henrik ser i appen etterpå |
+|---|---|---|---|---|
+| 01 | `01_nullstill_koen.sql` | «Nullstill køen»: egen kategori «Avsluttet ved nullstilling» for «Hold utenfor» (bare én linje), fire tabeller for kjøringen og funksjonene som styrer den (start, bolker, pause/stopp, kontroll av uavklarte steg, avslutning, angre-merking, status). | Nei. Ingen kjøring startes, ingen linjer, kostpriser eller innstillinger endres. Grensen 1 % settes først når en kjøring Henrik starter er ferdig uten feil. | «Nullstill køen …» øverst i Råvarer › Fra faktura (godkjenner/admin): forhåndsvisning, eksport, start, fremdrift, kvittering, angre. Helsesiden viser grensen og siste nullstilling. |
+
+Kontroll før og etter: `kontroll/20261124_nullstill_koen.check.sql` (alle rader `ok = true`). Tåler Windows-linjeskift.
 
 ## Kjørt 18.11 – nå i `kjort/`, kjør aldri på nytt
 
@@ -39,9 +47,9 @@ funksjonene har Windows-linjeskift (CR); 793 fakturaer og 5 561 linjer uendret; 
 
 | Mappe | Innhold |
 |---|---|
-| `1-kjor-na/` | Tom. Neste fil legges her, nummerert, når den har fått ja. |
+| `1-kjor-na/` | `01_nullstill_koen.sql` – venter på Henriks ja. |
 | `kjort/` | Kjørt i produksjon – kjør aldri på nytt. Beholdt fordi tester og historikk leser dem. |
-| `kontroll/` | Alle `.check.sql` (bare lesing). For 01–07 heter de: 01 = `20261123_gjenlesing_fjern_linjer`, 02 = `20261124_raske_oppslag_del1`, 03 = `20261124_raske_oppslag_del2_rls`, 04 = `20261117_prislinje`, 05 = `20261120_slaa_sammen_varer`, 06 = `20261113_invoice_reading_alert_template`, 07 = `20261125_lesevarsel_stillstand`. |
+| `kontroll/` | Alle `.check.sql` (bare lesing). «Nullstill køen» = `20261124_nullstill_koen`. For de kjørte 01–07 heter de: 01 = `20261123_gjenlesing_fjern_linjer`, 02 = `20261124_raske_oppslag_del1`, 03 = `20261124_raske_oppslag_del2_rls`, 04 = `20261117_prislinje`, 05 = `20261120_slaa_sammen_varer`, 06 = `20261113_invoice_reading_alert_template`, 07 = `20261125_lesevarsel_stillstand`. |
 | `delfiler/` | «Slå sammen varer» delt i åtte deler. **Kjør ikke** – hele filen (05) er kjørt. Beholdt fordi testene leser dem. |
 | `utgaatt/` | Erstattet eller unødvendig – kjør aldri. |
 | `functions/` | Serverkode som venter på utrulling (ikke SQL). |

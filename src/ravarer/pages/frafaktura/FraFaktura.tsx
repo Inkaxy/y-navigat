@@ -1,4 +1,5 @@
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { RotateCcw } from "lucide-react";
 import { ReadingStallAlert } from "@/ravarer/components/drift/ReadingStallAlert";
 import { ModulePage } from "@/ravarer/ui/ModulePage";
 import { RAVARER_EYEBROW } from "@/ravarer/pages/hub/hubTabs";
@@ -10,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { NewItemsTab } from "./NewItemsTab";
 import { PriceJumpsTab } from "./PriceJumpsTab";
 import { UnreadTab } from "./UnreadTab";
+import { QueueResetPage } from "./nullstilling/QueueResetPage";
 
 /** Råvarer › Fra faktura (demo D): systemet gjør jobben, du ser bare det som er nytt eller ser feil ut. */
 export default function FraFaktura() {
@@ -19,7 +21,8 @@ export default function FraFaktura() {
   const localLimit = Number.isFinite(grense) && grense >= 1 && grense <= 1000 ? grense : null;
   const set = (k: string, v: string | null) => setSp((prev) => { const n = new URLSearchParams(prev); if (v == null) n.delete(k); else n.set(k, v); return n; }, { replace: true });
   const rights = useInvoiceRights();
-  const counts = useFraFakturaCounts(true, localLimit);
+  const reset = sp.get("nullstilling") === "1";
+  const counts = useFraFakturaCounts(!reset, localLimit);
   const retur = `${paths.fraFaktura()}${sp.toString() ? `?${sp.toString()}` : ""}`;
 
   const cards: { id: FraFakturaTab; n: number | null; label: string; sub: string }[] = [
@@ -30,7 +33,13 @@ export default function FraFaktura() {
 
   return (
     <ModulePage eyebrow={RAVARER_EYEBROW} title="Fra faktura til vare" compact
-      subtitle="Systemet leser fakturaen, lager varen og fører prisen. Du ser bare på det som er nytt eller ser feil ut.">
+      subtitle="Systemet leser fakturaen, lager varen og fører prisen. Du ser bare på det som er nytt eller ser feil ut."
+      actions={rights.canApprove && !reset ? (
+        <Link to={paths.fraFaktura({ nullstilling: 1 })} className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[10px] px-3 text-body text-ink-secondary hover:bg-muted hover:text-foreground">
+          <RotateCcw className="h-4 w-4" aria-hidden />Nullstill køen …
+        </Link>
+      ) : undefined}>
+      {reset ? <div className="px-page pb-8"><QueueResetPage canApprove={rights.canApprove} view={sp.get("vis")} /></div> : (
       <div className="space-y-4 px-page pb-8">
         <ReadingStallAlert />
         <div role="tablist" aria-label="Fra faktura" className="grid gap-2 sm:grid-cols-3">
@@ -49,6 +58,7 @@ export default function FraFaktura() {
           {tab === "ikke-lest" && <UnreadTab canWrite={rights.canWrite} retur={retur} />}
         </div>
       </div>
+      )}
     </ModulePage>
   );
 }

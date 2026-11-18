@@ -1,4 +1,4 @@
-// Simulerer innliming i Supabase SQL Editor. Med SQL_EOL=crlf får filene som limes inn (2-endrer-data, kontroll og de
+// Simulerer innliming i Supabase SQL Editor. Med SQL_EOL=crlf får filene som limes inn (1-kjor-na, 2-endrer-data, kontroll og de
 // innlimte 00–07 som nå ligger i kjort/) Windows-linjeskift (CR+LF), slik Henriks utklippstavle ga 18.11. Andre filer
 // (øvrige kjort/, fixtures) leses uendret.
 // fingerprint() gir et sammenlignbart avtrykk av databasen: alle funksjonsdefinisjoner og policyer i public, og antall
@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 
 export const EOL = process.env.SQL_EOL === "crlf" ? "crlf" : "lf";
-const PASTED = /[\\/]supabase[\\/]pending[\\/](2-endrer-data[\\/]|kontroll[\\/]|kjort[\\/]0\d_)/;
+const PASTED = /[\\/]supabase[\\/]pending[\\/](1-kjor-na[\\/]|2-endrer-data[\\/]|kontroll[\\/]|kjort[\\/]0\d_)/;
 
 export function asPasted(text, path) {
   if (EOL !== "crlf" || !PASTED.test(path)) return text;

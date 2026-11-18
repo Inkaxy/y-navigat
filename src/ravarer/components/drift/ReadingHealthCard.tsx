@@ -9,6 +9,7 @@ import { useFraFakturaSettings } from "@/ravarer/hooks/useFraFaktura";
 import { useReadingSettings } from "@/ravarer/lib/fakturalesing/readingApi";
 import { fmtOsloDateTime } from "@/ravarer/lib/invoiceReadingHealth";
 import { loadKeyTestOk } from "@/ravarer/lib/keyTestMarker";
+import { useResetStatus } from "@/ravarer/hooks/useQueueReset";
 
 const n = (v: number | null | undefined) => (v == null ? "ukjent" : v.toLocaleString("nb-NO"));
 const Row = ({ label, value }: { label: string; value: string }) => (
@@ -26,6 +27,10 @@ export function ReadingHealthCard() {
   const health = useInvoiceReadingHealth(company?.id ?? null);
   const reading = useReadingSettings(company?.id);
   const ff = useFraFakturaSettings();
+  const reset = useResetStatus();
+  const lastRun = reset.data?.run ?? null;
+  const resetText = reset.cap === false ? "ikke tilgjengelig" : !reset.data ? "ukjent" : !lastRun ? "aldri kjørt"
+    : `${lastRun.status === "ferdig" ? "ferdig" : lastRun.status === "stoppet" ? "stoppet" : lastRun.status === "pause" ? "på pause" : "pågår"} ${fmtOsloDateTime(lastRun.finishedAt ?? lastRun.createdAt)}`;
   const d = drift.data;
   const keyOk = loadKeyTestOk();
   const keyText = health.data?.state === "failing" ? `feiler: ${health.data.failure.message}` : health.data?.state === "ok" ? "virker (siste lesinger lyktes)" : "ukjent";
@@ -64,6 +69,9 @@ export function ReadingHealthCard() {
             <Row label="Leverandørprofil" value={sw(s?.profile)} />
             <Row label="Læring av rettinger" value={sw(s?.learning)} />
             <Row label="Selvkontroll" value={sw(s?.self_check)} />
+            <Row label="Grense for prishopp" value={!ff.data || ff.data.pending ? "ukjent" : `${ff.data.priceJumpPct.toLocaleString("nb-NO")} %${ff.data.isDefault ? " (standard)" : ""}`} />
+            <Row label="Siste nullstilling av køen" value={resetText} />
+            {lastRun?.priceJumpSetAt && <Row label="Grensen satt til 1 % av nullstillingen" value={fmtOsloDateTime(lastRun.priceJumpSetAt)} />}
             <Row label="Prisendringer under grensen føres uten spørsmål" value={ff.data?.pending ? "ikke tilgjengelig" : sw(ff.data?.quietPrices)} />
             <Row label="Pakning fra faktura" value={ff.data?.pending ? "ikke tilgjengelig" : sw(ff.data?.invoicePackage)} />
           </dl>

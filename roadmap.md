@@ -170,3 +170,9 @@
 # Rydding av supabase/pending (18.11.2026, Henrik)
 - [x] Mapper 1-kjor-na (01–07, kjørt av Henrik 18.11 og flyttet til kjort/) / 2-endrer-data / 3-valgfritt / kjort / kontroll / delfiler / utgaatt; SQL-innhold uendret (md5)
 - [x] LES-MEG.md + docs/ravarer-drift.md + skript/tester oppdatert
+
+# Nullstill køen (18.11.2026, Henrik)
+- [x] Regelmotor regel 1–6 + tester (20 %-vakt regel 3, duplikatvakt regel 4, regel 6 uten prisobservasjon)
+- [x] Forhåndsvisning med CSV/JSON, start med én bekreftelse, bolker/pause/stopp/omlasting, kvittering, angre, helseside
+- [x] PENDING `1-kjor-na/01_nullstill_koen.sql` + kontrollfil, testet LF/CRLF
+- [ ] Kjøre SQL-filen (venter på Henriks ja) og prøve kjøringen innlogget i appen
