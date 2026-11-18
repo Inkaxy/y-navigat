@@ -145,3 +145,9 @@
 - [x] C6 Like linjer: dry-run + DATAENDRING (ikke kjørt)
 - [x] D EHF: rapport i docs/fakturalesing-opplaering.md
 - [ ] Venter: Henriks ja til SQL 20261122_fakturalesing_opplaering, utrulling av patchen, og DATAENDRING like linjer
+
+# EHF-test (18.11.2026)
+- [x] Kort «EHF-test» (godkjenner/admin), utvalg 1–3 per leverandør, «Kjør test», stopp, JSON-eksport
+- [x] Lesende funksjon `tripletex-ehf-test` i supabase/pending/functions (klar for utrulling – venter på ja)
+- [x] Tolking av EHF/Tripletex-linjer, side om side mot PDF, sammendrag per leverandør, råd ved 401/403
+- [ ] Kjøre testen med ekte data – venter på Henriks ja til utrulling av `tripletex-ehf-test`

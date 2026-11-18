@@ -24,3 +24,29 @@ Steg 2–4 i samme endring; lagring under `supabase/functions/` ruller ut automa
 Ingenting endres før en bryter slås på under Råvarer › Innstillinger › Fakturalesing. Uten SQL eller ved feil i
 oppslag leser leseren som i dag. Kontrollert lokalt: patchen gjelder rent mot dagens kode, og `deno check` gir
 ingen nye feil (de tre feilene som vises finnes også i dagens kode med lokal Deno-versjon).
+
+---
+
+# EHF-test (18.11.2026) – `tripletex-ehf-test/`
+
+**Status: klar for utrulling – venter på ja.** Ny, rent lesende funksjon. Ingen SQL trengs.
+
+## Hva den gjør
+Ett kall = én faktura, valgt fra kortet «EHF-test» under Råvarer › Innstillinger › Fakturalesing.
+1. Krever innlogget bruker med godkjenner/admin (`has_ravarer_invoice_approve`). Ingen cron- eller tjenestevei.
+2. Leser `invoices` (id, selskap, fakturanr, Tripletex-ID-er) – bare SELECT.
+3. Sender bare **GET** til Tripletex med dagens tilkobling (`_shared/tripletex.ts`):
+   - `GET /v2/supplierInvoice/{id}?fields=…` – fakturahode, bilag og `orderLines` (enklere felt-utvalg prøves ved 400)
+   - `GET /v2/ledger/voucher/{voucherId}?fields=…` – `ediDocument`, `attachment`, `document`
+   - `GET /v2/document/{docId}` og `GET /v2/document/{docId}/content` – for hvert dokument som ble funnet (høyst 4)
+   - `GET /v2/incomingInvoice/{voucherId}?fields=*` – beta; kan gi strukturerte linjer
+4. Svarer med logg per kall (endepunkt, HTTP-status, innholdstype, størrelse, Tripletex' feiltekst), EHF-XML
+   (innebygde PDF-vedlegg fjernet) og eventuelle `orderLines`. PDF-innhold sendes ikke videre.
+
+Skriver aldri til fakturaer, linjer, varer eller storage. Eneste skriving er den samme som alle Tripletex-funksjoner
+gjør: `getSessionToken` kan fornye og bufre sesjonsnøkkelen i `tripletex_credentials`.
+
+## Utrulling (etter ja)
+`git mv supabase/pending/functions/tripletex-ehf-test supabase/functions/tripletex-ehf-test` – lagringen ruller ut
+funksjonen automatisk. Ingen andre endringer trengs: kortet oppdager selv om funksjonen finnes.
+Kontrollert lokalt: `deno check` gir ingen nye feil (bare den kjente feilen i `_shared/tripletex-crypto.ts`).

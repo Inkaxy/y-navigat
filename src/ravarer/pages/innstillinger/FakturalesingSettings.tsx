@@ -8,6 +8,7 @@ import { ReadingSwitchesCard } from "./fakturalesing/ReadingSwitchesCard";
 import { SupplierProfilesCard } from "./fakturalesing/SupplierProfilesCard";
 import { LearningExamplesCard } from "./fakturalesing/LearningExamplesCard";
 import { GoldInvoicesCard } from "./fakturalesing/GoldInvoicesCard";
+import { EhfTestCard } from "./fakturalesing/EhfTestCard";
 
 export default function FakturalesingSettings() {
   const { data: company } = useCompany();
@@ -46,6 +47,8 @@ export default function FakturalesingSettings() {
           <GoldInvoicesCard legalEntityId={company.id} />
         </>
       )}
+      {/* EHF-test trenger ingen databaseendring; vises for godkjenner/admin uansett. */}
+      <EhfTestCard key={company.id} legalEntityId={company.id} />
     </div>
   );
 }

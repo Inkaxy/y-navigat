@@ -42,6 +42,14 @@ summen stemmer etterpå), sikkerhetskopi og revisjonslogg. Prisobservasjonen mar
   og sammenlign med `orderLines`. Finnes XML: bruk EHF-linjer først og AI-lesing bare som reserve. Usikkerhet: høy
   sikkerhet for at API-et beskriver veien, middels/lav for at våre data og rettigheter faktisk gir XML-en.
 
+## EHF-test (bygget 18.11.2026, venter på utrulling)
+- Kort «EHF-test» under Råvarer › Innstillinger › Fakturalesing (bare godkjenner/admin). Velg leverandør eller «Én per
+  leverandør» og 1–3 fakturaer per leverandør; verktøyet tar de nyeste som er hentet fra Tripletex og lest fra PDF.
+- Lesende funksjon `tripletex-ehf-test` (i `supabase/pending/functions/`, se README der) prøver
+  supplierInvoice → voucher → ediDocument/attachment → document/content og incomingInvoice (beta).
+- Nettleseren tolker EHF (UBL) og Tripletex-linjer, viser dem side om side med PDF-linjene (forskjeller per felt) og
+  et sammendrag per leverandør. Eksport som JSON. Ingenting lagres i NBhub.
+
 ## Ikke verifisert
 - Ingenting er prøvd innlogget mot ekte data; innstillingssiden er bare typekontrollert og enhetstestet.
 - Leserens kvalitetsgevinst er ikke målt (krever utrulling + fasitfakturaer).
