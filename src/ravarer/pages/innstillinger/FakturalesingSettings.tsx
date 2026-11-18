@@ -9,6 +9,8 @@ import { SupplierProfilesCard } from "./fakturalesing/SupplierProfilesCard";
 import { LearningExamplesCard } from "./fakturalesing/LearningExamplesCard";
 import { GoldInvoicesCard } from "./fakturalesing/GoldInvoicesCard";
 import { EhfTestCard } from "./fakturalesing/EhfTestCard";
+import { ReadingHealthCard } from "@/ravarer/components/drift/ReadingHealthCard";
+import { ReadingStallAlert } from "@/ravarer/components/drift/ReadingStallAlert";
 
 export default function FakturalesingSettings() {
   const { data: company } = useCompany();
@@ -16,6 +18,8 @@ export default function FakturalesingSettings() {
   if (!company || cap === null) return <QueryLoadingState rows={4} />;
   return (
     <div className="space-y-6">
+      <ReadingStallAlert />
+      <ReadingHealthCard />
       {!READER_CODE_DEPLOYED && (
         <div role="status" className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
           Fakturaleseren bruker ikke disse innstillingene ennå: den nye leserkoden er klar, men ikke rullet ut. Den venter på ja fra Henrik.

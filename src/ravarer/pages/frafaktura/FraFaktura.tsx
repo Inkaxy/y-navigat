@@ -1,4 +1,5 @@
 import { useSearchParams } from "react-router-dom";
+import { ReadingStallAlert } from "@/ravarer/components/drift/ReadingStallAlert";
 import { ModulePage } from "@/ravarer/ui/ModulePage";
 import { RAVARER_EYEBROW } from "@/ravarer/pages/hub/hubTabs";
 import { paths } from "@/ravarer/lib/paths";
@@ -31,6 +32,7 @@ export default function FraFaktura() {
     <ModulePage eyebrow={RAVARER_EYEBROW} title="Fra faktura til vare" compact
       subtitle="Systemet leser fakturaen, lager varen og fører prisen. Du ser bare på det som er nytt eller ser feil ut.">
       <div className="space-y-4 px-page pb-8">
+        <ReadingStallAlert />
         <div role="tablist" aria-label="Fra faktura" className="grid gap-2 sm:grid-cols-3">
           {cards.map((x) => (
             <button key={x.id} type="button" role="tab" aria-selected={tab === x.id} aria-controls={`ff-panel-${x.id}`} onClick={() => set("fane", x.id === "nye" ? null : x.id)}
