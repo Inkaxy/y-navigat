@@ -9,7 +9,7 @@ import { STUB } from "./fixtures/slaaSammenStub";
  * Rører aldri live. Live-triggerne for prishistorikk og pakningsvarianter er forenklet gjengitt (samme
  * unike indeks og samme «gammel variant»-oppførsel), så angring testes mot de samme fellene.
  */
-const FILE = path.join(process.cwd(), "supabase/pending/20261120_slaa_sammen_varer.PENDING.sql");
+const FILE = path.join(process.cwd(), "supabase/pending/1-kjor-na/05_slaa_sammen_varer.sql");
 const LE = "11111111-1111-1111-1111-111111111111";
 const USER = "99999999-9999-9999-9999-999999999999";
 const ASKO = "a0000000-0000-0000-0000-000000000001";

@@ -9,10 +9,10 @@ import { PGlite } from "@electric-sql/pglite";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (p) => readFileSync(join(root, p), "utf8");
-const pending = read("supabase/pending/20261119_nye_varer_les.PENDING.sql");
+const pending = read("supabase/pending/kjort/20261119_nye_varer_les.PENDING.sql");
 const live = read("scripts/fixtures/live-20261117/rm_work_items.sql");
 // Samme regel som koblingen (20261121_kobling_godkjent_faktura) gjelder begge køfunksjonene; filen kjøres derfor her også.
-const kobling = read("supabase/pending/20261121_kobling_godkjent_faktura.PENDING.sql");
+const kobling = read("supabase/pending/kjort/20261121_kobling_godkjent_faktura.PENDING.sql");
 const koblingFx = ["rm_confirm_line_match", "rm_link_supplier_item", "rm_undo_not_item", "rm_set_invoice_exclusion"]
   .map((n) => read(`scripts/fixtures/live-20261117b/${n}.sql`)).join(";\n");
 
@@ -156,7 +156,7 @@ console.log(`OK: ${ok} kontroller bestått`);
 
 // Kontrollfilen kjører og gir bare «ok» på testkopien (selskaps-ID byttet til testselskapet).
 await db.exec(`select set_config('test.uid', '', false);`);
-const checkSql = read("supabase/pending/20261119_nye_varer_les.check.sql").replaceAll("751709bc-04b3-4449-867d-b97faa9ab373", LE);
+const checkSql = read("supabase/pending/kontroll/20261119_nye_varer_les.check.sql").replaceAll("751709bc-04b3-4449-867d-b97faa9ab373", LE);
 const checkRows = (await step("check.sql", () => db.query(checkSql))).rows;
 check(checkRows.length === 8 && checkRows.every((r) => r.ok === true), `check.sql: ${JSON.stringify(checkRows.filter((r) => r.ok !== true))}`);
 console.log(`OK: ${ok} kontroller bestått (med check.sql)`);

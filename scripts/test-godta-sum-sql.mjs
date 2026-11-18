@@ -40,7 +40,7 @@ create table audit_log (id uuid primary key default gen_random_uuid(), occurred_
   source_app text, ip_address inet, user_agent text);
 `);
 await db.exec(read("scripts/fixtures/live-20261117/rm_lines_sum_check.sql").replaceAll("end $function$\n", "end $function$;\n"));
-await db.exec(read("supabase/pending/20261119_godta_sum.PENDING.sql"));
+await db.exec(read("supabase/pending/kjort/20261119_godta_sum.PENDING.sql"));
 
 // Fakturaer: 1 vanlig avvik, 2 mva-forhold, 3 avstemt, 4 kreditnota (ok med dagens regel), 5 kreditnota med kost ført, 6 «ok».
 const inv = (n, o) => `insert into invoices (id, legal_entity_id, invoice_number, status, total_amount, total_vat, is_credit_note, lines_sum_status, lines_sum_excl_vat, extraction_issues, reconciled_at)
@@ -103,21 +103,21 @@ check((await one(`select lines_sum_status s from invoices where id = $1`, [id("0
 // Dry-run og DATAENDRING (som root: auth.uid() er null).
 await as(null);
 const before = (await db.query(`select id, lines_sum_status from invoices order by id`)).rows;
-const dry = (await db.query(read("supabase/pending/20261119_sumkontroll_omregning.dryrun.sql"))).rows;
+const dry = (await db.query(read("supabase/pending/2-endrer-data/20261119_sumkontroll_omregning.dryrun.sql"))).rows;
 check(JSON.stringify((await db.query(`select id, lines_sum_status from invoices order by id`)).rows) === JSON.stringify(before), "dry-run endrer ingenting");
 const dryOk = dry.filter((r) => r.new_status === "ok").map((r) => r.invoice_number).sort();
 check(JSON.stringify(dryOk) === JSON.stringify(["F4", "F5"]), `dry-run viser kreditnotaene som blir ok (${dryOk})`);
 // DATAENDRING forventer live-md5; testkopien er byte-identisk.
-await db.exec(read("supabase/pending/20261119_sumkontroll_omregning.DATAENDRING.sql"));
+await db.exec(read("supabase/pending/2-endrer-data/20261119_sumkontroll_omregning.DATAENDRING.sql"));
 const st = Object.fromEntries((await db.query(`select invoice_number n, lines_sum_status s from invoices`)).rows.map((r) => [r.n, r.s]));
 check(st.F4 === "ok", "kreditnota uten låser blir ok");
 check(st.F5 === "mismatch", "kreditnota med ført kost røres ikke");
 check(st.F2 === "mismatch" && st.F3 === "mismatch" && st.F6 === "ok", "andre fakturaer røres ikke");
 const logs = (await db.query(`select * from audit_log where action = 'invoice.sum_rechecked'`)).rows;
 check(logs.length === 1 && logs[0].changes.old.lines_sum_status === "mismatch" && logs[0].changes.new.lines_sum_status === "ok", "omregningen loggføres med gammel og ny verdi");
-await db.exec(read("supabase/pending/20261119_sumkontroll_omregning.DATAENDRING.sql"));
+await db.exec(read("supabase/pending/2-endrer-data/20261119_sumkontroll_omregning.DATAENDRING.sql"));
 check((await db.query(`select * from audit_log where action = 'invoice.sum_rechecked'`)).rows.length === 1, "ny kjøring endrer ikke mer");
 await db.exec(`create or replace function public.rm_lines_sum_check(p_sum numeric, p_count integer, p_total numeric, p_vat numeric, p_is_credit boolean) returns jsonb language sql immutable as $$ select '{}'::jsonb $$;`);
-check(/endret siden 17.11.2026/.test(await err(() => db.exec(read("supabase/pending/20261119_sumkontroll_omregning.DATAENDRING.sql"))) ?? ""), "md5-vakten stopper ved endret sumkontroll");
+check(/endret siden 17.11.2026/.test(await err(() => db.exec(read("supabase/pending/2-endrer-data/20261119_sumkontroll_omregning.DATAENDRING.sql"))) ?? ""), "md5-vakten stopper ved endret sumkontroll");
 
 console.log(`OK: ${ok} kontroller bestått`);

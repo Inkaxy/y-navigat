@@ -9,8 +9,8 @@ import { PGlite } from "@electric-sql/pglite";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (p) => readFileSync(join(root, p), "utf8");
 // PGlite lager egen funksjonstekst: md5-vakten byttes mot innholdskontrollen (replace må treffe).
-const hv = read("supabase/pending/20261118_handelsvarer.PENDING.sql");
-const pg = read("supabase/pending/20261118_prisgrunnlag.PENDING.sql")
+const hv = read("supabase/pending/3-valgfritt/20261118_handelsvarer.PENDING.sql");
+const pg = read("supabase/pending/3-valgfritt/20261118_prisgrunnlag.PENDING.sql")
   .replace("if md5(v_def) <> 'da19eefad08a54909ed6b87149b37845' then", "if false then")
   .replace("if md5(v_def) <> '1c4d594c42078a473b825d69a2624b3d' then", "if false then");
 

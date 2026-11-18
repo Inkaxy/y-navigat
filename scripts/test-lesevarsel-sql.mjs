@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const sql = readFileSync(join(root, "supabase/pending/20261125_lesevarsel_stillstand.PENDING.sql"), "utf8");
+const sql = readFileSync(join(root, "supabase/pending/1-kjor-na/07_lesevarsel_stillstand.sql"), "utf8");
 const db = new PGlite();
 let checks = 0;
 const ok = (c, m) => { if (!c) throw new Error("FEIL: " + m); checks++; };

@@ -1,3 +1,5 @@
+> Historisk oversikt fra før ryddingen 18.11.2026 – stiene her er utdaterte. Gjeldende: `../LES-MEG.md` og `docs/ravarer-drift.md`.
+
 # Ventende forslag
 
 Filer her er forslag til uavhengig gjennomgang og ligger utenfor `supabase/migrations`

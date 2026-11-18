@@ -9,8 +9,8 @@ import { PGlite } from "@electric-sql/pglite";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const fx = (f) => readFileSync(join(root, "scripts/fixtures/live-20261118", f), "utf8");
-const pending = readFileSync(join(root, "supabase/pending/20261123_gjenlesing_fjern_linjer.PENDING.sql"), "utf8");
-const check = readFileSync(join(root, "supabase/pending/20261123_gjenlesing_fjern_linjer.check.sql"), "utf8");
+const pending = readFileSync(join(root, "supabase/pending/1-kjor-na/01_gjenlesing_fjern_linjer.sql"), "utf8");
+const check = readFileSync(join(root, "supabase/pending/kontroll/20261123_gjenlesing_fjern_linjer.check.sql"), "utf8");
 
 const stub = `
 create role anon; create role authenticated; create role service_role;

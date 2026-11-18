@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 
-const dir = join(dirname(fileURLToPath(import.meta.url)), "..", "supabase", "pending");
+const dir = join(dirname(fileURLToPath(import.meta.url)), "..", "supabase", "pending", "kjort");
 const pending = readFileSync(join(dir, "20261012_varetelling_foundation.PENDING.sql"), "utf8");
 const test = readFileSync(join(dir, "20261012_varetelling_foundation.test.sql"), "utf8")
   .replace(/^\\set .*$/m, "")

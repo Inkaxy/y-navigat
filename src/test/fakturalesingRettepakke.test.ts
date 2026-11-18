@@ -207,8 +207,8 @@ describe("F – avgifter i oppsummeringen leses som egne linjer", () => {
 });
 
 describe("PENDING-SQL – forutsetninger og minimale tekstbytter", () => {
-  const credit = readFileSync("supabase/pending/20261113_lines_sum_credit_vat.PENDING.sql", "utf8");
-  const release = readFileSync("supabase/pending/20261113_line_extraction_release_requeue.PENDING.sql", "utf8");
+  const credit = readFileSync("supabase/pending/kjort/20261113_lines_sum_credit_vat.PENDING.sql", "utf8");
+  const release = readFileSync("supabase/pending/kjort/20261113_line_extraction_release_requeue.PENDING.sql", "utf8");
   it("binder til live-md5 lest 13.11.2026 og stopper ved avvik", () => {
     for (const m of ["2309db2c778a0db23c2f6bee2852cf86", "dc58b00ca0774c576f7fa8c8c044df4d", "e2d12782ccbe9b5cd7a3211fa4e9724c"]) expect(credit).toContain(m);
     expect(release).toContain("cb553c3def46e26a75e50ddd7d7758eb");

@@ -9,8 +9,8 @@ import { PGlite } from "@electric-sql/pglite";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (p) => readFileSync(join(root, p), "utf8");
-const pending = read("supabase/pending/20261121_kobling_godkjent_faktura.PENDING.sql");
-const checkSql = read("supabase/pending/20261121_kobling_godkjent_faktura.check.sql");
+const pending = read("supabase/pending/kjort/20261121_kobling_godkjent_faktura.PENDING.sql");
+const checkSql = read("supabase/pending/kontroll/20261121_kobling_godkjent_faktura.check.sql");
 const fx = (n, dir = "live-20261117b") => read(`scripts/fixtures/${dir}/${n}.sql`);
 
 const stub = `
@@ -81,9 +81,9 @@ for (const n of ["rm_confirm_line_match", "rm_link_supplier_item", "rm_undo_not_
 await step("rm_work_items", () => db.exec(fx("rm_work_items", "live-20261117")));
 // Eldre utgaver (git HEAD) av de to 20261119-funksjonene, som om de var kjørt før denne filen.
 const head = (p) => execSync(`git show HEAD:${p}`, { cwd: root, encoding: "utf8" });
-const oldQueue = head("supabase/pending/20261119_nye_varer_les.PENDING.sql");
+const oldQueue = head("supabase/pending/kjort/20261119_nye_varer_les.PENDING.sql");
 await step("gammel rm_new_items_queue", () => db.exec(oldQueue.slice(oldQueue.indexOf("create or replace function public.rm_new_items_queue"), oldQueue.indexOf("revoke all on function public.rm_new_items_queue"))));
-const fra = head("supabase/pending/20261119_fra_faktura.PENDING.sql");
+const fra = head("supabase/pending/kjort/20261119_fra_faktura.PENDING.sql");
 const us = fra.indexOf("create or replace function public.rm_undo_supplier_item_link");
 await step("gammel rm_undo_supplier_item_link", () => db.exec(fra.slice(us, fra.indexOf("end $$;", us) + 7)));
 

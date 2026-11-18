@@ -8,8 +8,8 @@ import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const pending = readFileSync(join(root, "supabase/pending/20261122_fakturalesing_opplaering.PENDING.sql"), "utf8");
-const check = readFileSync(join(root, "supabase/pending/20261122_fakturalesing_opplaering.check.sql"), "utf8");
+const pending = readFileSync(join(root, "supabase/pending/kjort/20261122_fakturalesing_opplaering.PENDING.sql"), "utf8");
+const check = readFileSync(join(root, "supabase/pending/kontroll/20261122_fakturalesing_opplaering.check.sql"), "utf8");
 
 const stub = `
 create role anon; create role authenticated; create role service_role;

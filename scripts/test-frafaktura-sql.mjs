@@ -8,9 +8,9 @@ import { PGlite } from "@electric-sql/pglite";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (p) => readFileSync(join(root, p), "utf8");
-const main = read("supabase/pending/20261119_fra_faktura.PENDING.sql")
+const main = read("supabase/pending/kjort/20261119_fra_faktura.PENDING.sql")
   .replace("if md5(v_def) <> '5a28cc1e868271452552b30ad1d8ea57' then", "if false then");
-const cleanup = read("supabase/pending/20261119_fra_faktura_opprydding.DATAENDRING.sql");
+const cleanup = read("supabase/pending/2-endrer-data/20261119_fra_faktura_opprydding.DATAENDRING.sql");
 const fixture = read("scripts/fixtures/live-20261117/_rm_cost_candidates.sql");
 
 const stub = `

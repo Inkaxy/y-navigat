@@ -10,7 +10,7 @@ Alt er AV til Henrik slår det på. Ingen SQL er kjørt, ingen edge-funksjon er 
 | 3 Læring av rettinger | `rm_record_extraction_example` (krever innlogget person) kalt etter bekreftet kobling/«ikke vare» i Fra faktura; liste med av/på | Venter på SQL; lagrer bare når «Læring» er på |
 | 4 Selvkontroll | `readingContext.runWithSelfCheck`: feil tilbake + ett nytt forsøk, deretter sterkere modell, beste etter sumkontroll; `invoice_reading_log` | Venter på SQL + utrulling, bryter av |
 | 5 Fasit og måling | `invoice_gold_invoices` (linjer fryses), merking på innstillingssiden; `invoice-model-eval` får `setup: gjeldende/kandidat` og treff per felt | Merking venter på SQL; måling venter på utrulling |
-| 6 Like linjer | `supabase/pending/20261122_like_linjer.dryrun.sql` + `.DATAENDRING.sql` (ROLLBACK som standard) | Ikke kjørt |
+| 6 Like linjer | `supabase/pending/2-endrer-data/20261122_like_linjer.dryrun.sql` + `.DATAENDRING.sql` (ROLLBACK som standard) | Ikke kjørt |
 
 Rettede fakturalinjer (`rm_correct_invoice_line` med læring) ble eksempler fra før og gjør det fortsatt.
 

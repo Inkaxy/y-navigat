@@ -1,5 +1,5 @@
 // «Slå sammen varer»: enhetsomregning. Speiler `_rm_merge_unit_factor` / `_rm_merge_needs_weight` i
-// supabase/pending/20261120_slaa_sammen_varer.PENDING.sql. Ren logikk (testes).
+// supabase/pending/1-kjor-na/05_slaa_sammen_varer.sql. Ren logikk (testes).
 import { parseDecimal } from "@/fakturaer/lib/units";
 
 const MASS: Record<string, number> = { kg: 1000, g: 1 };

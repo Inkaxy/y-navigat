@@ -7,8 +7,8 @@ Baseline: `e29ad95e8e372578ffa8f205c2560633f0e8ef9b`. Revisjon 2 bygget på `755
 Forklaring: **[x]** bygget og testet i kode/lokal database · **[~]** delvis · **[ ]** ikke bygget. Ingenting er i drift før SQL-en er godkjent og kjørt. Grunnlaget er **ikke akseptert** av root ennå.
 
 ### Databasegrunnlag – foreslått, IKKE kjørt mot live (revisjon 2)
-- [x] `supabase/pending/20261012_varetelling_foundation.PENDING.sql` (additivt, kun `vt_*`/`_vt_*`; erstatter aldri-kjørt revisjon 1)
-- [x] Atferdstest `supabase/pending/20261012_varetelling_foundation.test.sql` via `node scripts/test-varetelling-sql.mjs` (PGlite i minnet, 111 kontroller, seriell). Kanonisk prisvelger og tilgangsfunksjoner er stubbet.
+- [x] `supabase/pending/kjort/20261012_varetelling_foundation.PENDING.sql` (additivt, kun `vt_*`/`_vt_*`; erstatter aldri-kjørt revisjon 1)
+- [x] Atferdstest `supabase/pending/kjort/20261012_varetelling_foundation.test.sql` via `node scripts/test-varetelling-sql.mjs` (PGlite i minnet, 111 kontroller, seriell). Kanonisk prisvelger og tilgangsfunksjoner er stubbet.
 - [x] Pris: `_vt_price_evidence` brukes av både dekning og start. «Ved start» = nyeste `_rm_cost_candidates(id, dagens Oslo-dato)` OG råvaren bundet til nøyaktig den kandidaten (verifisert, samme history_id, samme pris). `verifisert` alene gir ikke pris. Uten fakturalesetilgang: ingen pris. Ukjent baseenhet: ingen enhet (aldri «stk») og ingen pris. Kilde, virkningsdato, registreringstidspunkt, as-of og årsakskode lagres.
 - [x] Historisk verdsettelse må velges eksplisitt med dato før i dag; nyeste kandidat med virkningsdato ≤ datoen; «registrert etter verdsettelsesdato» merkes. Fremtidig dato avvises. (Kandidatvelgerens gyldighetsregler vurderes slik de står i dag — dokumentert begrensning.)
 - [x] Alle aktive varer kan telles uavhengig av `stock_tracking`; lagerføring endres aldri.

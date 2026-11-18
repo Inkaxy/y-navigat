@@ -5,13 +5,17 @@ begrensninger. Root kjører databasefiler; ingenting her kjøres automatisk. «K
 
 ## A. Databasefiler (`supabase/pending/`)
 
-Alle filer har en `.check.sql` (bare SELECT) som kjøres etterpå. Filer som endrer en eksisterende funksjon
-stopper selv hvis live-definisjonen avviker fra den som ble lest (md5-vakt).
+Startpunkt for den som kjører filene: `supabase/pending/LES-MEG.md` (tabell, framgangsmåte i SQL Editor).
+Mappene: `1-kjor-na/` (nummerert, kjøres nå), `2-endrer-data/` (eget ja + dry-run), `3-valgfritt/`, `kjort/`,
+`kontroll/` (alle `.check.sql`, bare SELECT), `delfiler/`, `utgaatt/`, `functions/` (serverkode). Filer som endrer
+en eksisterende funksjon/policy stopper selv hvis live-definisjonen avviker fra den som ble lest (md5-vakt).
+Innholdet i SQL-filene ble ikke endret ved ryddingen 18.11; kontrollfilene beholder gamle navn.
 
-### Kjørt – kjør aldri på nytt
+### Kjørt – `kjort/`, kjør aldri på nytt
 | Fil | Hva den slo på |
 |---|---|
 | `20261012_varetelling_foundation`, `_stage3`, `_stage3_storage` | Varetelling (12.10). Speil i `supabase/live-mirror/`. |
+| `20261020_label_approved_version_claims` | Etikett/nettside fra godkjent deklarasjonsversjon (20.10, som `preserve_approved_declarations_during_review`; speil i `supabase/live-mirror/`). |
 | `20261113_lines_sum_credit_vat` | Sumkontroll med kreditnota og mva (15.11). |
 | `20261113_line_extraction_release_requeue` | AI-feil teller ikke forsøk; «Les på nytt i bolk» (15.11). |
 | `20261117_beslutninger_angre` | Angre «godta pris» og «ikke vare». |
@@ -21,34 +25,37 @@ stopper selv hvis live-definisjonen avviker fra den som ble lest (md5-vakt).
 | `20261119_godta_sum` | «Godta sum» med begrunnelse og angre. |
 | `20261122_fakturalesing_opplaering` | Tabeller og funksjoner for opplæring av fakturaleseren. Alle brytere står av. |
 
-### Venter – anbefalt rekkefølge
-| # | Fil | Hva den slår på | Merknad |
+### Venter – `1-kjor-na/`, i nummerrekkefølge
+| Nr | Fil (opprinnelig navn) | Hva den slår på | Merknad |
 |---|---|---|---|
-| 1 | `20261124_raske_oppslag_del1` | Raske tellere i menyen, Prishopp og Ikke lest (`rm_cap_raske_oppslag_v1`). | Bare nye lesefunksjoner. Appen bytter selv når filen er kjørt. |
-| 2 | `20261124_raske_oppslag_del2_rls` | Fakturatilgang sjekkes én gang per spørring i stedet for per linje. | Endrer bare lesepolicyene på `invoices`/`invoice_lines`; tilbakerulling står i check-filen. Mål tiden før/etter. |
-| 3 | `20261123_gjenlesing_fjern_linjer` | Gjenlesing kan erstatte hele linjesettet (fjerner rester som ekstra pantlinjer) når ingen beskyttet linje går tapt (`rm_cap_gjenlesing_fjern_v1`). | md5-vakt mot `rm_apply_invoice_reread` (`c9c68ddd…`) og `_rm_reread_values` (`a520e0cb…`). |
-| 4 | `20261120_slaa_sammen_varer/` del 01–07 | «Slå sammen varer» med angre (`rm_cap_slaa_sammen_v1`). Ny tabell `rm_material_merges`. | Skriv inn delene i stedet for den store filen; se README i mappen. Originalen er den gjennomgåtte teksten. |
-| 5 | `20261113_invoice_reading_alert_template` | E-postmalen for «lesingen står stille». | Trengs fortsatt: både den utrullede leseren og nr. 6 bruker den. |
-| 6 | `20261125_lesevarsel_stillstand` | Servertjek: e-post til Henrik ved stillstand ≥ 24 t med kø, eller feilrate ≥ 30 % (min. 5 lesinger) siste døgn. | Tidsplanen (cron) står kommentert nederst og legges inn bare etter ja. |
-| 7 | `20261113_ai_fallback_provider` | Reserveleverandør når hoved-AI-tjenesten er nede/avviser nøkkelen. | Fortsatt nyttig: selvkontrollen hjelper mot dårlig lesing, ikke mot at tjenesten er nede. Endrer ingen rader; aktivering er egen linje. |
-| 8 | `20261117_prislinje` | «Rett pris» på ett kjøp og «Endre godkjent pakning» (`rm_cap_prislinje_v1`). | Uavhengig av resten. |
-| 9 | `20261118_handelsvarer`, `20261118_prisgrunnlag` | Påslag per prisgruppe; emballasje i Brutto/DG2. | Uavhengige av Fra faktura. |
-| 10 | `20261121_varenummer_normalisering` | Bare forhåndsvisning av samme varenummer skrevet ulikt. | Endrer ingen data. |
-| – | `20261112_push_breadscale_floor` | Brødskala sendes som helt tall rundet ned. | Venter på ja. |
-| – | `20261020_label_approved_version_claims` | Etikettpåstander fra godkjent versjon. | Se egen test; status ikke bekreftet av root i denne runden. |
-| – | `20261117_automatikk` | Pant som følgevare, automatisk ny lesing. **Delvis utgått:** tabellen `rm_key_material_limits` (nøkkelråvaregrenser) erstattes av egen prisgrense per vare. | Bør strykes for tabelldelen før kjøring; avgjøres av Henrik/root. |
+| 01 | `01_gjenlesing_fjern_linjer` (`20261123_gjenlesing_fjern_linjer`) | Gjenlesing kan erstatte hele linjesettet når ingen beskyttet linje går tapt (`rm_cap_gjenlesing_fjern_v1`). | md5-vakt mot `rm_apply_invoice_reread` (`c9c68ddd…`); stemte mot live 18.11. |
+| 02 | `02_raske_oppslag_del1` (`20261124_raske_oppslag_del1`) | Raske tellere i menyen, Prishopp og Ikke lest (`rm_cap_raske_oppslag_v1`). | Bare nye lesefunksjoner. Appen bytter selv når filen er kjørt. |
+| 03 | `03_raske_oppslag_del2_rls` (`20261124_raske_oppslag_del2_rls`) | Fakturatilgang sjekkes én gang per spørring i stedet for per linje. | Endrer bare lesepolicyene på `invoices`/`invoice_lines`; vakt stemte mot live 18.11; tilbakerulling i `kontroll/20261124_raske_oppslag_del2_rls.check.sql`. Mål tiden før/etter. |
+| 04 | `04_prislinje` (`20261117_prislinje`) | «Rett pris» på ett kjøp og «Endre godkjent pakning» (`rm_cap_prislinje_v1`). | Uavhengig av resten. |
+| 05 | `05_slaa_sammen_varer` (`20261120_slaa_sammen_varer`, hele filen) | «Slå sammen varer» med angre (`rm_cap_slaa_sammen_v1`). Ny tabell `rm_material_merges`. | md5-vakt mot `merge_raw_materials` (`3c2ed3cc…`) stemte mot live 18.11. Delfilene i `delfiler/` trengs ikke når hele filen limes inn. |
+| 06 | `06_varselmal_lesing_stopper` (`20261113_invoice_reading_alert_template`) | E-postmalen for «lesingen står stille». | Flyttet hit fra valgfritt: nr. 07 trenger malen, og den utrullede leseren bruker den også. |
+| 07 | `07_lesevarsel_stillstand` (`20261125_lesevarsel_stillstand`) | Servertjek: e-post ved stillstand ≥ 24 t med kø, eller feilrate ≥ 30 % (min. 5 lesinger) siste døgn. | Kjøres etter 06. Tidsplanen (cron) står kommentert nederst og legges inn bare etter ja. |
 
-### Dataendringer – tas separat med Henrik (alle har dry-run)
-`20261119_fra_faktura_opprydding`, `20261119_sumkontroll_omregning` (+ `.dryrun.sql`), `20261121_varenummer_normalisering.DATAENDRING`,
+### Valgfritt – `3-valgfritt/`
+| Fil | Hva den slår på | Merknad |
+|---|---|---|
+| `20261113_ai_fallback_provider` | Reserveleverandør når hoved-AI-tjenesten er nede/avviser nøkkelen. | Fortsatt nyttig: selvkontrollen hjelper mot dårlig lesing, ikke mot at tjenesten er nede. Aktivering er egen linje. |
+| `20261118_handelsvarer`, `20261118_prisgrunnlag` | Påslag per prisgruppe; emballasje i Brutto/DG2. | Uavhengige av Fra faktura. |
+| `20261112_push_breadscale_floor` | Brødskala sendes som helt tall rundet ned. | Venter på ja. |
+| `20261117_automatikk` | Pant som følgevare, automatisk ny lesing. **Delvis utgått:** tabellen `rm_key_material_limits` er erstattet av egen prisgrense per vare. | Bør strykes for tabelldelen før kjøring; avgjøres av Henrik/root. |
+
+### Dataendringer – `2-endrer-data/`, tas separat med Henrik (alle har dry-run)
+`20261119_fra_faktura_opprydding` (funksjon med dry-run som standard), `20261119_sumkontroll_omregning` (+ `.dryrun.sql`),
+`20261121_varenummer_normalisering` (`.PENDING.sql` = forhåndsvisning uten dataendring, kjøres før `.DATAENDRING.sql`),
 `20261122_like_linjer` (+ `.dryrun.sql`, 41 mulige like linjegrupper).
 
-### Utgått – flyttet til `supabase/pending/utgaatt/`, kjør aldri
+### Utgått – `utgaatt/`, kjør aldri
 `20261117_automatikk_cron.DATAENDRING` (cron trengs ikke), `20261012_negotiation_item_preservation` (erstattet, gjennomgått versjon kjørt 12.10).
 
 ### Store filer
-Filer over ca. 15 kB deles med `node scripts/splitPendingSql.mjs <fil>`: delene legger teksten i en mellomlagring
-med md5-kontroll per del, og siste del kjører hele den gjennomgåtte teksten i én transaksjon. Test:
-`src/test/splitPendingSql.test.ts`. Gjelder alle nye filer framover.
+Root/Henrik limer inn hele filen i SQL Editor (tåler 77 kB). Delfiler fra `node scripts/splitPendingSql.mjs <fil>`
+ligger i `delfiler/` som reserve ved innskriving for hånd: delene legger teksten i en mellomlagring med md5-kontroll
+per del, og siste del kjører hele den gjennomgåtte teksten i én transaksjon. Test: `src/test/splitPendingSql.test.ts`.
 
 ## B. Brytere – anbefalt rekkefølge
 
@@ -82,7 +89,7 @@ Lagring under `supabase/functions/` ruller ut automatisk. Ny serverkode legges d
 ## D. Kjente begrensninger
 
 - Oversikt og Varer-fanene bruker fortsatt den tunge oppsummeringen (`rm_work_summary`, opptil 6–8 s). Menyen,
-  Prishopp og Ikke lest blir raske etter fil nr. 1–2. Målet «under 1 s på alle sider» er ikke nådd for disse to.
+  Prishopp og Ikke lest blir raske etter fil nr. 02–03. Målet «under 1 s på alle sider» er ikke nådd for disse to.
 - Tidene for de nye lesefunksjonene er målt lokalt og med tilgangskontroll omgått mot live; ekte før/etter-tid må
   måles etter kjøring.
 - md5-verdiene for nye funksjonskropper i check-filene er regnet lokalt; root bør sammenligne med live etter kjøring.

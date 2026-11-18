@@ -8,7 +8,7 @@ import { STUB } from "./fixtures/slaaSammenStub";
 
 type Out = { files: { name: string; sql: string }[]; parts: string[]; body: string; fnBodies: { name: string; md5: string }[] };
 const FILE = "20261120_slaa_sammen_varer";
-const SRC = path.join(process.cwd(), `supabase/pending/${FILE}.PENDING.sql`);
+const SRC = path.join(process.cwd(), "supabase/pending/1-kjor-na/05_slaa_sammen_varer.sql");
 const original = readFileSync(SRC, "utf8");
 const split = (): Out => splitSql(original, FILE) as Out;
 const pend = (o: Out) => o.files.filter((f) => f.name.endsWith(".PENDING.sql"));
@@ -19,7 +19,7 @@ describe("store SQL-filer deles i delfiler (punkt 7)", () => {
     expect(o.files.length).toBeGreaterThanOrEqual(4);
     for (const f of o.files) {
       expect(Buffer.byteLength(f.sql, "utf8"), f.name).toBeLessThanOrEqual(15 * 1024);
-      expect(readFileSync(path.join(process.cwd(), `supabase/pending/${FILE}`, f.name), "utf8"), f.name).toBe(f.sql);
+      expect(readFileSync(path.join(process.cwd(), `supabase/pending/delfiler/${FILE}`, f.name), "utf8"), f.name).toBe(f.sql);
     }
   });
   it("delene satt sammen er ordrett originalfilen uten egen begin/commit", () => {

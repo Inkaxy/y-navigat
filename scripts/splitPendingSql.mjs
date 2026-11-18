@@ -2,7 +2,7 @@
 // Delene 01..N legger bare teksten i en mellomlagringstabell og kontrollerer md5 for akkurat den delen
 // (ingen virkning på appen). Siste del («kjør») kontrollerer alle deler og md5 for hele teksten og kjører
 // så den gjennomgåtte filen ordrett i ÉN transaksjon – samme SQL som originalen, samme alt-eller-ingenting.
-// Bruk: node scripts/splitPendingSql.mjs supabase/pending/<fil>.PENDING.sql [maks byte per del, standard 13000]
+// Bruk: node scripts/splitPendingSql.mjs <sti>/<fil>.PENDING.sql [maks byte per del, standard 13000]; flytt utdatamappen til supabase/pending/delfiler/
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
