@@ -5,6 +5,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { forgetMissing, isKnownMissing, missingKey, rememberMissing } from "@/lib/missingMemory";
 
 export type PendingResult<T = unknown> =
   | { kind: "ok"; data: T }
@@ -33,6 +34,15 @@ async function headers(extra?: Record<string, string>): Promise<Record<string, s
 }
 
 async function send(path: string, init: RequestInit & { extraHeaders?: Record<string, string> }): Promise<PendingResult> {
+  // Lesing av et objekt som nylig manglet: svar «ikke kjørt ennå» uten nytt kall (se missingMemory).
+  const mKey = missingKey(path, init.method ?? "GET");
+  if (mKey && isKnownMissing(mKey)) return { kind: "missing" };
+  const r = await sendRaw(path, init);
+  if (mKey) { if (r.kind === "missing") rememberMissing(mKey); else if (r.kind === "ok") forgetMissing(mKey); }
+  return r;
+}
+
+async function sendRaw(path: string, init: RequestInit & { extraHeaders?: Record<string, string> }): Promise<PendingResult> {
   const h = await headers(init.extraHeaders);
   if (!h) return { kind: "denied" };
   try {

@@ -18,6 +18,17 @@ import { paths } from "@/ravarer/lib/paths";
 
 export type InlineField = "cost" | "agreed" | "category";
 
+/** «Ny fra faktura» og varens merker (handelsvare uten salgsvare, emballasje uten kalkyle, allergener ikke kontrollert). Samme på mobil og bred skjerm. */
+export function ItemFlags({ item, flags = [] }: { item: RawMaterialListItem; flags?: readonly string[] }) {
+  if (!item.newFromInvoice && flags.length === 0) return null;
+  return (
+    <span className="mt-0.5 flex flex-wrap gap-1">
+      {item.newFromInvoice && <Badge variant="outline" className="border-primary/40 bg-primary/10 text-[11px] font-semibold text-primary">Ny fra faktura</Badge>}
+      {flags.map((f) => <Badge key={f} variant="outline" className="border-warning/40 bg-warning/10 text-[11px] font-normal text-foreground">{f}</Badge>)}
+    </span>
+  );
+}
+
 export function StatusChips({ item }: { item: RawMaterialListItem }) {
   const aState = allergenState(item.allergensReviewed, item.hasAllergens);
   const chips: { label: string; ok: boolean; title?: string }[] = [
@@ -191,6 +202,8 @@ export interface VarelisteCellContext {
   onCommitCategory: (item: RawMaterialListItem, value: string) => void;
   /** URL-parametrene fra listen, slik at detaljen kan gå videre/tilbake i samme rekkefølge. */
   listSearch: string;
+  /** Varens merker (fra Beslutninger, punkt 4a). Ukjent = ingen merker. */
+  flagsFor?: (id: string) => readonly string[];
 }
 
 const editingField = (ctx: VarelisteCellContext, id: string): InlineField | null => (ctx.editing?.id === id ? ctx.editing.field : null);
@@ -208,7 +221,7 @@ function cellFor(id: string, ctx: VarelisteCellContext): (item: RawMaterialListI
           <Link to={detailUrl(item)} title={item.name} className="block truncate font-medium text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{item.name}</Link>
           {item.declarationName && <span className="block truncate text-xs text-muted-foreground" title={item.declarationName}>{item.declarationName}</span>}
           {item.matchedAlias && <Badge variant="outline" className="text-[11px] font-normal">lev.nr {item.matchedAlias}</Badge>}
-          {item.newFromInvoice && <Badge variant="outline" className="border-primary/40 bg-primary/10 text-[11px] font-semibold text-primary">Ny fra faktura</Badge>}
+          <ItemFlags item={item} flags={ctx.flagsFor?.(item.id)} />
         </div>
       );
     case "category":

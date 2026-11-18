@@ -1,9 +1,8 @@
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { ModulePage } from "@/ravarer/ui/ModulePage";
 import { RAVARER_EYEBROW } from "@/ravarer/pages/hub/hubTabs";
 import { paths } from "@/ravarer/lib/paths";
 import { useInvoiceRights } from "@/fakturaer/hooks/useInvoiceRights";
-import { useOpenQuestionCount } from "@/ravarer/hooks/useDecisions";
 import { useFraFakturaCounts } from "@/ravarer/hooks/useFraFaktura";
 import { parseFraFakturaTab, type FraFakturaTab } from "@/ravarer/lib/fraFaktura/tabs";
 import { cn } from "@/lib/utils";
@@ -20,8 +19,6 @@ export default function FraFaktura() {
   const set = (k: string, v: string | null) => setSp((prev) => { const n = new URLSearchParams(prev); if (v == null) n.delete(k); else n.set(k, v); return n; }, { replace: true });
   const rights = useInvoiceRights();
   const counts = useFraFakturaCounts(true, localLimit);
-  // Delte tellere (ingen egen prisliste lenger): antall åpne spørsmål i Beslutninger, også dem fanene viser.
-  const open = useOpenQuestionCount(true);
   const retur = `${paths.fraFaktura()}${sp.toString() ? `?${sp.toString()}` : ""}`;
 
   const cards: { id: FraFakturaTab; n: number | null; label: string; sub: string }[] = [
@@ -49,11 +46,6 @@ export default function FraFaktura() {
           {tab === "prishopp" && <PriceJumpsTab localLimit={localLimit} onLocalLimit={(v) => set("grense", v == null ? null : String(v))} canWrite={rights.canWrite} canApprove={rights.canApprove} retur={retur} />}
           {tab === "ikke-lest" && <UnreadTab canWrite={rights.canWrite} retur={retur} />}
         </div>
-        <p className="text-caption text-ink-secondary">
-          <Link to={paths.beslutninger()} className="font-semibold text-primary hover:underline">Øvrige spørsmål</Link>
-          {" "}– spørsmål som ikke hører til de tre fanene ennå (kontroll, mindre prisendringer, pant og lignende).
-          {open != null && <> Beslutninger har {open.toLocaleString("nb-NO")} åpne spørsmål i alt, også dem som vises her.</>}
-        </p>
       </div>
     </ModulePage>
   );

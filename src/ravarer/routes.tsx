@@ -12,7 +12,6 @@ import { VarerShell } from "@/ravarer/pages/hub/VarerShell";
 
 const Oversikt = lazy(() => import("@/ravarer/pages/hub/RavarerOversikt"));
 const FraFaktura = lazy(() => import("@/ravarer/pages/frafaktura/FraFaktura"));
-const Beslutninger = lazy(() => import("@/ravarer/pages/beslutninger/Beslutninger"));
 const Priskontroll = lazy(() => import("@/ravarer/pages/hub/PriskontrollPage"));
 const LeverandorerHub = lazy(() => import("@/ravarer/pages/hub/LeverandorerHub"));
 const LagerHub = lazy(() => import("@/ravarer/pages/hub/LagerHub"));
@@ -53,11 +52,12 @@ export function ravarerRoutes(Shell: ShellType) {
 
   return [
     <Route key="oversikt" path="/ravarer" element={rv(<Oversikt />)} />,
-    // Demo D: «Fra faktura til vare» (krever fakturatilgang). Beslutninger består som «Øvrige spørsmål».
+    // Demo D: «Fra faktura til vare» (krever fakturatilgang).
     <Route key="fra-faktura" path="/ravarer/fra-faktura" element={inv(<FraFaktura />)} />,
-    // Variant B: beslutningskøen, beholdt som «Øvrige spørsmål» til kontroll/små prisendringer/klarhet er flyttet inn i Fra faktura.
+    // Beslutninger er fjernet (punkt 4a): lesekontroll/koblingskontroll står under Ikke lest («Sjekk tallene»), mindre
+    // prisendringer under Prishopp, videresalg/emballasje/råvare ikke klar som merker på varen. Gamle lenker går til Fra faktura.
     // Prislinje og Automatikk er fjernet (opprydding demo D); gamle adresser videresendes i legacyRoutes.
-    <Route key="beslutninger" path="/ravarer/beslutninger" element={inv(<Beslutninger />)} />,
+    <Route key="beslutninger" path="/ravarer/beslutninger" element={<Navigate to={paths.fraFaktura()} replace />} />,
 
     // Varer
     // Én varearbeidsflate (fase 4A); gamle /varer/pakninger|deklarasjonsnavn|naering|datablad-endringer videresendes (legacyRoutes).

@@ -9,7 +9,7 @@ import { useRecipeUsage } from "@/varer/hooks/usePrisgrunnlag";
 import type { AddLineItem } from "@/varer/hooks/usePriceRounds";
 import { AddToPriceRoundDialog } from "@/varer/components/prices/AddToPriceRoundDialog";
 import { usePriceJumps, useSaveFraFakturaSettings, useSupplierNames } from "@/ravarer/hooks/useFraFaktura";
-import { JUMP_CHOICES, belowLimitCount } from "@/ravarer/lib/fraFaktura/priceJumps";
+import { JUMP_CHOICES, belowLimitCount, belowLimitJumps } from "@/ravarer/lib/fraFaktura/priceJumps";
 import { PriceJumpRow } from "./PriceJumpRow";
 
 /** Prishopp (D3): bare priser som hopper mer enn grensen. Vanlige prisendringer føres rett på varen. */
@@ -48,6 +48,8 @@ export function PriceJumpsTab({ localLimit, onLocalLimit, canWrite, canApprove, 
     return order.current.filter((k) => live.has(k) || answered.has(k)).flatMap((k) => { const j = seen.current.get(k); return j ? [j] : []; });
   }, [p.jumps, answered]);
   const onAnswered = (key: string) => setAnswered((s0) => (s0.has(key) ? s0 : new Set(s0).add(key)));
+  // Mindre prisendringer under grensen (tidligere under «Øvrige spørsmål»). Tas med så lenge de fortsatt spør.
+  const belowJumps = useMemo(() => (p.lines.data && p.items.data ? belowLimitJumps(p.lines.data, p.limitFor) : null), [p.lines.data, p.items.data, p.limitFor]);
 
   return (
     <section aria-labelledby="ff-pris" className="overflow-hidden rounded-2xl border border-line-subtle bg-card">
@@ -82,9 +84,23 @@ export function PriceJumpsTab({ localLimit, onLocalLimit, canWrite, canApprove, 
           </ul>
         )}
       </QueryState>
+      {belowJumps && belowJumps.length > 0 && (
+        <details className="border-t border-line-subtle">
+          <summary className="flex min-h-[44px] cursor-pointer items-center px-5 text-sm font-medium">
+            Mindre prisendringer under grensen <span className="ml-1.5 tabular-nums text-ink-secondary">{belowJumps.length.toLocaleString("nb-NO")}</span>
+          </summary>
+          <ul aria-label="Mindre prisendringer under grensen">
+            {belowJumps.map((j) => (
+              <PriceJumpRow key={j.key} j={j} supplierName={names.get(j.supplierId) ?? null} usage={usage.data} canWrite={canWrite} retur={retur}
+                onRound={(key, items) => setRound({ key, items })} inRound={inRound.get(j.key) ?? null} onAnswered={onAnswered}
+                itemLimit={canSave && s ? { current: p.items.data?.get(j.rawMaterialId) ?? null, companyLimit: s.priceJumpPct } : null} />
+            ))}
+          </ul>
+        </details>
+      )}
       <div className="space-y-2 border-t border-line-subtle px-5 py-3 text-caption text-ink-secondary">
         {below != null && below > 0 && (s?.pending || !s?.quietPrices) && (
-          <p>{below} {below === 1 ? "mindre prisendring" : "mindre prisendringer"} under grensen venter fortsatt under «Øvrige spørsmål» til regelen under er slått på.</p>
+          <p>{below} {below === 1 ? "linje har" : "linjer har"} en mindre prisendring under grensen. De står i gruppen under til regelen nedenfor er slått på.</p>
         )}
         <p>
           {s && !s.pending ? `Prisendringer under grensen ${s.quietPrices ? "føres uten spørsmål" : "spør fortsatt"}. ` : "Reglene for matchingen kan slås på når databaseendringen «Fra faktura» er kjørt. "}

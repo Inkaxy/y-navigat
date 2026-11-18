@@ -57,6 +57,16 @@ export function priceJumps(lines: readonly JumpLineInput[], limitFor: (rawMateri
   return out.sort((a, b) => (a.invoiceDate ?? "9999").localeCompare(b.invoiceDate ?? "9999") || Math.abs(b.pct) - Math.abs(a.pct));
 }
 
+/**
+ * Prisendringer UNDER grensen (flyttet fra «Øvrige spørsmål»): samme gruppering som prishopp, men bare der |avvik| er
+ * innenfor grensen for varen. Vises sammenslått under Prishopp så de fortsatt kan besvares.
+ */
+export function belowLimitJumps(lines: readonly JumpLineInput[], limitFor: (rawMaterialId: string) => number): PriceJump[] {
+  return priceJumps(lines, () => -1)
+    .filter((j) => Math.abs(j.pct) <= limitFor(j.rawMaterialId))
+    .map((j) => ({ ...j, limit: limitFor(j.rawMaterialId) }));
+}
+
 /** Hvor mange linjer som ligger under grensen (føres rett på varen når de nye reglene er på). */
 export function belowLimitCount(lines: readonly JumpLineInput[], limitFor: (rawMaterialId: string) => number): number {
   return lines.filter((l) => l.raw_material_id && isPriceLine(l.review_reason) && num(l.price_variance_pct) != null

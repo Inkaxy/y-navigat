@@ -160,6 +160,19 @@ export function extraDecisions(work: readonly Decision[], rms: readonly RawMater
   return out;
 }
 
+/**
+ * Merker på varen (flyttet fra Beslutninger, punkt 4a): samme regler som tilleggsspørsmålene, men vist på varen i
+ * Varer i stedet for som spørsmål. Ukjent (null) gir aldri merke.
+ */
+export function readinessFlags(rm: RawMaterialReadiness): string[] {
+  const out: string[] = [];
+  if (rm.item_type === "videresalg" && rm.sold_as_product === false) out.push("Handelsvare uten salgsvare");
+  if (rm.item_type === "emballasje" && rm.used_as_packaging === false) out.push("Emballasje uten kalkyle");
+  if (rm.item_type === "ravare" && rm.allergens_reviewed_at == null && rm.recipes != null && rm.recipes > 0)
+    out.push(`Allergener ikke kontrollert (${rm.recipes} ${rm.recipes === 1 ? "oppskrift" : "oppskrifter"})`);
+  return out;
+}
+
 /** Eldste fakturadato først (ren sortering). Tilleggsspørsmål kommer rett etter spørsmålet de hører til. */
 export function sortDecisions(ds: readonly Decision[]): Decision[] {
   const anchor = (d: Decision) => (d.source.kind === "extra" ? d.source.parentKey : d.key);

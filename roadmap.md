@@ -156,11 +156,11 @@
 - [x] 1 Utrulling: EHF-testfunksjon + ny fakturaleser (alle brytere av) etter at 20261122 er bekreftet kjørt; test lik prompt med alt av; tilbakerulling
 - [x] 2 Gjenlesing kan fjerne linjer (rm_apply_invoice_reread, PENDING md5), test at linjesum ikke øker av rester
 - [x] 3 Raske lesefunksjoner: meny, Prishopp, Ikke lest + raskere fakturatilgang (20261124 del 1–2, ikke kjørt). Gjenstår: Oversikt og Varer-fanene bruker fortsatt rm_work_summary (pakkelisten er treg)
-- [ ] 4a Flytt siste Beslutninger-typer (Sjekk tallene under Ikke lest; merker på varen), fjern Beslutninger/Øvrige spørsmål
-- [ ] 4b Leverandørvare-visning beholdes som detaljside
-- [ ] 4c «Ny fra faktura»-merket på mobil
-- [ ] 4d Egen prisgrense per vare fra varen
-- [ ] 4e Stopp mislykkede oppslag (rm_key_material_limits m.fl.)
+- [x] 4a «Sjekk tallene»/«Sjekk koblingen» under Ikke lest, mindre prisendringer under Prishopp, merker på varen; Beslutninger fjernet (gamle lenker → Fra faktura)
+- [x] 4b Leverandørvare-visning beholdt som detaljside
+- [x] 4c «Ny fra faktura»-merket på mobil
+- [x] 4d Egen prisgrense på varens prisfane
+- [x] 4e Manglende databaseobjekter huskes i én time (nbhub.no får det først ved publisering)
 - [ ] 5a Helseside under Innstillinger
 - [ ] 5b Varsel stillstand/feilrate; vurder 20261113-filene
 - [ ] 5c Røyktester uten innlogging + sjekkliste innlogget

@@ -139,14 +139,16 @@ describe("Retur fra fakturasiden", () => {
 });
 
 describe("Plassering", () => {
-  it("Fra faktura har tatt Beslutningers plass foran Varer (demo D); Beslutninger nås fortsatt", () => {
+  it("Fra faktura har tatt Beslutningers plass foran Varer (demo D); gamle Beslutninger-lenker går til Fra faktura", () => {
     const nav = readFileSync("src/components/layout/SubAppNav.tsx", "utf8");
     const view = nav.slice(nav.indexOf("export function RavarerNavView"));
     expect(view.indexOf('label: "Fra faktura"')).toBeGreaterThan(view.indexOf('label: "Oversikt"'));
     expect(view.indexOf('label: "Fra faktura"')).toBeLessThan(view.indexOf('label: "Varer"'));
     expect(view).not.toContain('label: "Beslutninger"');
-    expect(readFileSync("src/ravarer/routes.tsx", "utf8")).toContain('path="/ravarer/beslutninger"');
-    expect(readFileSync("src/ravarer/pages/frafaktura/FraFaktura.tsx", "utf8")).toContain("paths.beslutninger()");
+    const routes = readFileSync("src/ravarer/routes.tsx", "utf8");
+    expect(routes).toContain('path="/ravarer/beslutninger" element={<Navigate to={paths.fraFaktura()} replace />}');
+    expect(readFileSync("src/ravarer/pages/frafaktura/FraFaktura.tsx", "utf8")).not.toContain("Øvrige spørsmål");
+    expect(readFileSync("src/ravarer/pages/frafaktura/UnreadTab.tsx", "utf8")).toContain("<CheckNumbersSection");
     for (const l of ["Oversikt", "Fakturaer", "Leverandører", "Lager", "Innstillinger"]) expect(view).toContain(`label: "${l}"`);
   });
 });

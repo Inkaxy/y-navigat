@@ -9,7 +9,7 @@ export default function VarekortPage() {
   const { supplierId = "", itemKey = "" } = useParams();
   const navigate = useNavigate();
   const [sp] = useSearchParams();
-  // Leverandørvaren nås fra varen, leverandørkortet og «Øvrige spørsmål»; trygg retur, ellers Fra faktura.
+  // Leverandørvaren (detaljside) nås fra varen, leverandørkortet og Fra faktura; trygg retur, ellers Fra faktura.
   const back = safeReturnPath(sp.get("retur")) ?? paths.fraFaktura();
   return (
     <div className="mx-auto max-w-3xl space-y-4 px-page py-4">

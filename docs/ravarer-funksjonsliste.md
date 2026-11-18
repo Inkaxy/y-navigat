@@ -8,7 +8,7 @@ Stier i tabellene er relative til `/ravarer` (f.eks. `/varer/:id` = `/ravarer/va
 | ID | Funksjon | Ny plassering | Fase | Status |
 |---|---|---|---|---|
 | R1 | Råvarer-meny med grupper, nedtrekk og aktiv-markering | RavarerNav: Oversikt · Varer · Priskontroll · Leverandører · Lager + tannhjul | 1 | Flyttet |
-| R2, F2, F3 | Meny-badger: linjer til behandling, varekort som venter (ukoblet + mangler pakning), avtaler som utløper, ukvitterte datablad-endringer | RavarerNav-badge per inngang fra `rm_work_summary`; Fra faktura viser åpne spørsmål; Fakturaer har ingen merke (todo_total blander varegrupper og fakturaer) | 1 | Flyttet |
+| R2, F2, F3 | Meny-badger: linjer til behandling, varekort som venter (ukoblet + mangler pakning), avtaler som utløper, ukvitterte datablad-endringer | RavarerNav-badge per inngang fra `rm_nav_counts` (før SQL: `rm_work_summary`); Fra faktura viser åpne spørsmål; Fakturaer har ingen merke (todo_total blander varegrupper og fakturaer) | 1 | Flyttet |
 | R3, F4 | Tilgang: fakturadel og forhandlinger krever fakturatilgang (`user_has_invoice_access`, roller read/write/approve/admin); Innstillinger krever approve/admin; AI-tjenester krever plattformadmin | Rutevakter på /priskontroll/*, /leverandorer/forhandlinger/* og /innstillinger (vakt på ruten, ikke bare i menyen) | 1 | Flyttet |
 | R4 | Mobilmeny som bunnark | RavarerNav mobil-bunnark (5 innganger + Innstillinger) | 1 | Flyttet |
 | R5 | Sidetitler i nettleserfanen | `pageLabels.ts` komplett for alle nye ruter | 1 | Flyttet |

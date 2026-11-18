@@ -1,15 +1,8 @@
-import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
-import { useActivityFeed, useWorkCounts, useWorkItems } from "@/ravarer/hooks/useWorkData";
-import {
-  decisionsFromWork, extraDecisions, openQuestionCount, sortDecisions, type RawMaterialReadiness,
-} from "@/ravarer/lib/decisions";
-import { osloTodayISO, osloDateISO } from "@/lib/osloDate";
+import type { RawMaterialReadiness } from "@/ravarer/lib/decisions";
 
-/** rm_work_items gir høyst 500 per side. */
-export const DECISION_LIMIT = 500;
 const CHUNK = 100;
 const PAGE = 1000;
 
@@ -85,42 +78,4 @@ export function useRawMaterialReadiness(ids: readonly string[]) {
       }));
     },
   });
-}
-
-/** Beslutningskøen: køens spørsmål (eldste fakturadato først) + tilleggsspørsmål om råvarene. */
-export function useDecisions() {
-  const work = useWorkItems({ group: "alle", sort: "oldest", limit: DECISION_LIMIT });
-  const base = useMemo(() => decisionsFromWork(work.data?.items ?? []), [work.data]);
-  const rmIds = useMemo(() => [...new Set(base.flatMap((d) => (d.source.kind === "work" && d.source.item.rm_id ? [d.source.item.rm_id] : [])))], [base]);
-  const readiness = useRawMaterialReadiness(rmIds);
-  const decisions = useMemo(() => sortDecisions([...base, ...extraDecisions(base, readiness.data ?? [])]), [base, readiness.data]);
-  return {
-    work, readiness, decisions,
-    openCount: openQuestionCount(work.data?.counts),
-    extraCount: decisions.length - base.length,
-    truncated: (work.data?.total ?? 0) > (work.data?.items.length ?? 0),
-  };
-}
-
-/** Nøkkeltall for i dag fra aktivitetsloggen (Oslo-dato). Null = ukjent. */
-export function useTodayActivity() {
-  const feed = useActivityFeed({ days: 1, limit: 200 });
-  return useMemo(() => {
-    if (!feed.data) return { linesSolved: null as number | null, invoicesReleased: null as number | null, isError: feed.isError };
-    const today = osloTodayISO();
-    const items = feed.data.items.filter((i) => osloDateISO(i.at) === today);
-    const sum = (pred: (k: string) => boolean) => items.filter((i) => pred(i.kind)).reduce((s, i) => s + Math.max(1, i.count), 0);
-    return {
-      linesSolved: sum((k) => ["pris_godtatt", "kobling_bekreftet", "ikke_vare", "pakning_bekreftet_auto", "forste_pris", "gjentatt_pris"].includes(k)),
-      invoicesReleased: sum((k) => k === "faktura_avstemt" || k === "faktura_avstemt_auto"),
-      isError: false,
-    };
-  }, [feed.data, feed.isError]);
-}
-
-/** Bare telleren til menyen (samme tellere som køen, uten å hente elementene). */
-export function useOpenQuestionCount(enabled: boolean) {
-  // Delte tellere: ingen egne rm_work_items-kall når en liste på siden allerede har hentet dem.
-  const q = useWorkCounts(enabled);
-  return openQuestionCount(q.data);
 }

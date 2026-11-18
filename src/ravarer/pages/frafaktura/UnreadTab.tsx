@@ -15,6 +15,7 @@ import { canRequeue, requeueMessage, unreadGroup, unreadReason } from "@/ravarer
 import { SumMismatchSection } from "./unread/SumMismatchSection";
 import { PendingReads } from "./unread/PendingReads";
 import { BulkRereadCard } from "./unread/BulkRereadCard";
+import { CheckNumbersSection } from "./unread/CheckNumbersSection";
 import { SuggestionsSection } from "./unread/SuggestionsSection";
 
 const kr = (v: number | null) => (v == null ? "–" : `${Number(v).toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr`);
@@ -100,6 +101,7 @@ export function UnreadTab({ canWrite, retur }: { canWrite: boolean; retur: strin
         </section>
         <SumMismatchSection list={withLines} names={names} canWrite={canWrite} retur={retur} />
       </QueryState>
+      <CheckNumbersSection retur={retur} />
       <PendingReads names={names} />
       <AlertDialog open={confirm} onOpenChange={(o) => !busy && setConfirm(o)}>
         <AlertDialogContent>

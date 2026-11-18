@@ -29,7 +29,9 @@ import { toast } from "sonner";
 import { RavarerHeaderBanner, NewRawMaterialButton } from "@/ravarer/components/RavarerHeaderBanner";
 import { RawMaterialCreateSheet } from "@/ravarer/editors/RawMaterialCreateSheet";
 import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
-import { buildVarelisteColumns, type InlineField } from "@/ravarer/components/vareliste/VarelisteCells";
+import { ItemFlags, buildVarelisteColumns, type InlineField } from "@/ravarer/components/vareliste/VarelisteCells";
+import { useRawMaterialReadiness } from "@/ravarer/hooks/useDecisions";
+import { readinessFlags } from "@/ravarer/lib/decisions";
 import { DataTable } from "@/ravarer/ui/DataTable";
 import { SplitView } from "@/ravarer/ui/SplitView";
 import { tableCsv, visibleColumns as visibleOf } from "@/ravarer/ui/dataTableLogic";
@@ -374,12 +376,17 @@ export default function VarelistePage({ liste, onActiveChange, activeId = null }
   );
   const cancelEdit = useCallback(() => setEditing(null), []);
 
+  // Varens merker (flyttet fra Beslutninger): handelsvare uten salgsvare, emballasje uten kalkyle, allergener ikke kontrollert.
+  const readinessIds = useMemo(() => (filtered ?? []).map((i) => i.id), [filtered]);
+  const readiness = useRawMaterialReadiness(readinessIds);
+  const flagsById = useMemo(() => new Map((readiness.data ?? []).map((r) => [r.id, readinessFlags(r)])), [readiness.data]);
+  const flagsFor = useCallback((id: string) => flagsById.get(id) ?? [], [flagsById]);
   const columns = useMemo(
     () => buildVarelisteColumns({
       canWrite, categoryOptions: allCategoryOptions, toleranceFor: tolerances.toleranceFor, hardCap,
-      editing, onStartEdit: startEdit, onCancelEdit: cancelEdit, onCommitPrice: commitPrice, onCommitCategory: commitCategory, listSearch,
+      editing, onStartEdit: startEdit, onCancelEdit: cancelEdit, onCommitPrice: commitPrice, onCommitCategory: commitCategory, listSearch, flagsFor,
     }),
-    [canWrite, allCategoryOptions, tolerances, hardCap, editing, startEdit, cancelEdit, commitPrice, commitCategory, listSearch],
+    [canWrite, allCategoryOptions, tolerances, hardCap, editing, startEdit, cancelEdit, commitPrice, commitCategory, listSearch, flagsFor],
   );
   const columnsRef = useRef(columns);
   columnsRef.current = columns;
@@ -662,6 +669,7 @@ export default function VarelistePage({ liste, onActiveChange, activeId = null }
               renderMobileCard={(item) => (
                 <div className="rounded-lg border border-border p-3">
                   <p className="font-medium">{item.name}</p>
+                  <ItemFlags item={item} flags={flagsFor(item.id)} />
                   <p className="text-xs text-muted-foreground">
                     {item.supplierName ?? "Uten leverandør"} · {formatNok(item.costPrice)} / {item.baseUnit}
                     <CostStatusMark status={item.costStatus} />

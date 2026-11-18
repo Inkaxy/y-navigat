@@ -36,6 +36,7 @@ import { HistoryTab } from "@/ravarer/components/tabs/HistoryTab";
 import { lagerReturnHref } from "@/ravarer/lib/lagerReturn";
 import { paths } from "@/ravarer/lib/paths";
 import { RawMaterialPriceLines } from "@/ravarer/components/prislinje/RawMaterialPriceLines";
+import { ItemPriceJumpCard } from "@/ravarer/components/prislinje/ItemPriceJumpCard";
 import { useSuppliers } from "@/ravarer/hooks/useSuppliers";
 import { MergeWithButton } from "@/ravarer/components/merge/MergeWithButton";
 import { MergeNotice } from "@/ravarer/components/merge/MergeNotice";
@@ -256,6 +257,7 @@ export default function RawMaterialDetail() {
           {section === "pris" && (
             <>
               <SuppliersTab rm={rm} part="pris" />
+              <ItemPriceJumpCard rawMaterialId={rm.id} />
               {/* Fra Prislinje (opprydding demo D): prishistorikk per leverandør, «Rett pris» og «Endre godkjent pakning». */}
               <RawMaterialPriceLines rawMaterialId={rm.id} />
             </>

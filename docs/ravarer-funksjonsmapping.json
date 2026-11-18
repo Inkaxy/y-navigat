@@ -71,7 +71,7 @@
    "original_feature": "Meny-badger: linjer til behandling, varekort som venter (ukoblet + mangler pakning), avtaler som utløper, ukvitterte datablad-endringer",
    "original_location": "RavarerNav-badge per inngang fra `rm_work_summary` (samme tall som Oversikt og faner)",
    "current_feature": "Meny-badger: linjer til behandling, varekort som venter (ukoblet + mangler pakning), avtaler som utløper, ukvitterte datablad-endringer",
-   "current_location_or_disposition": "RavarerNav-badge per inngang fra `rm_work_summary`; Fra faktura viser åpne spørsmål; Fakturaer har ingen merke (todo_total blander varegrupper og fakturaer)",
+   "current_location_or_disposition": "RavarerNav-badge per inngang fra `rm_nav_counts` (før SQL: `rm_work_summary`); Fra faktura viser åpne spørsmål; Fakturaer har ingen merke (todo_total blander varegrupper og fakturaer)",
    "route_owner_path": "src/components/layout/SubAppNav.tsx",
    "action_component_paths": [
     "src/components/layout/SubAppNav.tsx"
@@ -125,7 +125,7 @@
    "handler_or_render_evidence": [
     {
      "file": "src/components/layout/SubAppNav.tsx",
-     "evidence": "badge: summary?.data_quality.datasheet_changes",
+     "evidence": "badge: counts?.datasheet_changes",
      "note": "Badge",
      "reached_from_owner": true
     }
@@ -5475,7 +5475,7 @@
    "handler_or_render_evidence": [
     {
      "file": "src/components/layout/SubAppNav.tsx",
-     "evidence": "badge: summary?.data_quality.datasheet_changes",
+     "evidence": "badge: counts?.datasheet_changes",
      "note": "Badge",
      "reached_from_owner": true
     }
