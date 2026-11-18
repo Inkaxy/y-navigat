@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatDate } from "@/ravarer/lib/constants";
 import { useExampleList, type ExampleListRow } from "@/ravarer/lib/fakturalesing/readingApi";
 import { exampleChanges, exampleTitle } from "@/ravarer/lib/fakturalesing/exampleSummary";
-import { EXAMPLE_KIND_LABEL } from "../../../../../supabase/pending/functions/_shared/exampleRanking";
+import { EXAMPLE_KIND_LABEL } from "../../../../../supabase/functions/_shared/exampleRanking";
 
 const ALL = "__alle__";
 

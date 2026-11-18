@@ -6,8 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { callPendingRpc } from "@/lib/pendingRpc";
 import { requireSaved, unwrapPending, type ProfileRow } from "@/ravarer/lib/fakturalesing/readingApi";
-import { draftFromStats, emptyProfile, mergeDraft, parseProfile, parseProfileStats, type ProfileStatus, type SupplierProfile } from "../../../../../supabase/pending/functions/_shared/supplierProfile";
-import { skuShape } from "../../../../../supabase/pending/functions/_shared/readingCatalog";
+import { draftFromStats, emptyProfile, mergeDraft, parseProfile, parseProfileStats, type ProfileStatus, type SupplierProfile } from "../../../../../supabase/functions/_shared/supplierProfile";
+import { skuShape } from "../../../../../supabase/functions/_shared/readingCatalog";
 
 type Path = "sku.position" | "sku.missing_note" | "quantity.note" | "quantity.d_pak" | "quantity.f_pak" | "package.note" | "discount.note"
   | "fees.pant" | "fees.avgifter" | "fees.gebyr" | "fees.frakt" | "credit.note" | "other";

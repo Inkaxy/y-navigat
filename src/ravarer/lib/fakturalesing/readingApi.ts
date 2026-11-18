@@ -3,14 +3,14 @@
 // serverkoden bruker (supabase/pending/functions/_shared, flyttes til supabase/functions/_shared ved utrulling).
 import { useQuery } from "@tanstack/react-query";
 import { callPendingRpc, type PendingResult } from "@/lib/pendingRpc";
-import { parseReadingSettings, type ReadingSettings } from "../../../../supabase/pending/functions/_shared/readingSettings";
-import { parseProfile, type ProfileStatus, type SupplierProfile } from "../../../../supabase/pending/functions/_shared/supplierProfile";
+import { parseReadingSettings, type ReadingSettings } from "../../../../supabase/functions/_shared/readingSettings";
+import { parseProfile, type ProfileStatus, type SupplierProfile } from "../../../../supabase/functions/_shared/supplierProfile";
 
 /**
  * Er den nye leserkoden rullet ut? Settes til true i samme endring som flytter serverkoden fra
  * supabase/pending/functions til supabase/functions (etter Henriks ja). Styrer bare forklaringstekster.
  */
-export const READER_CODE_DEPLOYED = false;
+export const READER_CODE_DEPLOYED = true;
 
 export const READING_WAITING = "Venter på databaseendringen «Fakturalesing – opplæring» (20261122).";
 

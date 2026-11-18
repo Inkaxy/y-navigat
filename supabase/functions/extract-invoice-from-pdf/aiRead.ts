@@ -38,6 +38,8 @@ export interface ReadContext {
   pdfBytes: Uint8Array | null;
   pdfText: PdfTextResult | null;
   textBlock: string | null;
+  /** Opplæring (20261122): varekatalog/leverandørprofil/selvkontroll-tilbakemelding. null = som før. */
+  extraHint?: string | null;
 }
 
 export interface ReadOutcome {
@@ -138,7 +140,7 @@ export async function readWithConfig(ctx: ReadContext, cfg: AiConfigRow): Promis
   let reason: string | null = direct;
   if (!direct) {
     const run = await runExtractionAttempts({
-      hints: ctx.hints, examples: ctx.examples, maxAttempts: ctx.maxAttempts, parseJson: extractJson,
+      hints: ctx.hints, examples: ctx.examples, maxAttempts: ctx.maxAttempts, parseJson: extractJson, extraHint: ctx.extraHint ?? null,
       call: call(ctx.pdfBase64, ctx.textBlock),
     });
     await logRun(run.log);
@@ -166,7 +168,7 @@ export async function readWithConfig(ctx: ReadContext, cfg: AiConfigRow): Promis
     if (!direct) return plain();
     // Direkte sidelesing var planlagt, men delingen feilet: les hele fakturaen som før.
     const run = await runExtractionAttempts({
-      hints: ctx.hints, examples: ctx.examples, maxAttempts: ctx.maxAttempts, parseJson: extractJson,
+      hints: ctx.hints, examples: ctx.examples, maxAttempts: ctx.maxAttempts, parseJson: extractJson, extraHint: ctx.extraHint ?? null,
       call: call(ctx.pdfBase64, ctx.textBlock),
     });
     await logRun(run.log);
@@ -182,7 +184,7 @@ export async function readWithConfig(ctx: ReadContext, cfg: AiConfigRow): Promis
     const batch = chunks.slice(i, i + CHUNK_CONCURRENCY).map(async (c, j) => {
       const r = await runExtractionAttempts({
         hints: chunkHints, examples: ctx.examples, maxAttempts: 1, parseJson: extractJson, numberCheck: false,
-        extraHint: chunkHint(c, totalPages),
+        extraHint: [ctx.extraHint ?? null, chunkHint(c, totalPages)].filter((x): x is string => !!x).join("\n\n"),
         call: call(parts[i + j], pageTextBlock(ctx.pdfText, c.from, c.to), CHUNK_TIMEOUT_MS),
       });
       await logRun(r.log);

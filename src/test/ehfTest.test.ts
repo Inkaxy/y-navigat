@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   containsUbl, documentIdsFrom, sniffContent, stripEmbeddedBinaries, tripletexMessage, xmlRootName,
-} from "../../supabase/pending/functions/tripletex-ehf-test/probe";
+} from "../../supabase/functions/tripletex-ehf-test/probe";
 import { parseUbl } from "@/ravarer/lib/ehfTest/ehfUbl";
 import { parseOrderLines } from "@/ravarer/lib/ehfTest/orderLines";
 import { compareInvoice, normSku, type PdfLine } from "@/ravarer/lib/ehfTest/compare";

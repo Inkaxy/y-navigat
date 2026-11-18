@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parseReadingSettings, READING_SETTINGS_OFF, settingsKey, withCandidate } from "../../supabase/pending/functions/_shared/readingSettings";
-import { applyCatalogCheck, formatCatalogForPrompt, parseCatalog, selectRelevantCatalog, skuNorm, skuShape, supplierSkuShapes, type CatalogItem, type CatalogCheck } from "../../supabase/pending/functions/_shared/readingCatalog";
-import { draftFromStats, formatProfileForPrompt, mergeDraft, parseProfile, parseProfileStats, emptyProfile } from "../../supabase/pending/functions/_shared/supplierProfile";
-import { parseExampleRows, rankExamples } from "../../supabase/pending/functions/_shared/exampleRanking";
-import { buildSelfCheckFeedback, compareQuality, nextPath, pickBest, qualityOf, type SelfCheckLine } from "../../supabase/pending/functions/_shared/selfCheck";
-import { aggregate, scoreGold, toGoldLines, verdict, withMissingAsErrors } from "../../supabase/pending/functions/_shared/goldCompare";
+import { parseReadingSettings, READING_SETTINGS_OFF, settingsKey, withCandidate } from "../../supabase/functions/_shared/readingSettings";
+import { applyCatalogCheck, formatCatalogForPrompt, parseCatalog, selectRelevantCatalog, skuNorm, skuShape, supplierSkuShapes, type CatalogItem, type CatalogCheck } from "../../supabase/functions/_shared/readingCatalog";
+import { draftFromStats, formatProfileForPrompt, mergeDraft, parseProfile, parseProfileStats, emptyProfile } from "../../supabase/functions/_shared/supplierProfile";
+import { parseExampleRows, rankExamples } from "../../supabase/functions/_shared/exampleRanking";
+import { buildSelfCheckFeedback, compareQuality, nextPath, pickBest, qualityOf, type SelfCheckLine } from "../../supabase/functions/_shared/selfCheck";
+import { aggregate, scoreGold, toGoldLines, verdict, withMissingAsErrors } from "../../supabase/functions/_shared/goldCompare";
 
 const item = (sku: string | null, name: string, extra: Partial<CatalogItem> = {}): CatalogItem => ({ sku_norm: skuNorm(sku), sku_printed: sku ? [sku] : [], name, aliases: [], package: null, base_unit: "l", ...extra });
 const line = (sku: string | null, description: string, extra: Partial<SelfCheckLine & { sku_raw: string | null }> = {}) => {

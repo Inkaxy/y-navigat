@@ -11,7 +11,7 @@ import { QueryErrorState, QueryLoadingState } from "@/components/common/QuerySta
 import { callPendingRpc } from "@/lib/pendingRpc";
 import { formatDate } from "@/ravarer/lib/constants";
 import { readingKeys, requireSaved, unwrapPending, useModelOptions, useReadingSettings } from "@/ravarer/lib/fakturalesing/readingApi";
-import { READING_FEATURE_LABEL, READING_FEATURES, type ReadingFeature, type ReadingSettings } from "../../../../../supabase/pending/functions/_shared/readingSettings";
+import { READING_FEATURE_LABEL, READING_FEATURES, type ReadingFeature, type ReadingSettings } from "../../../../../supabase/functions/_shared/readingSettings";
 
 const HINT: Record<ReadingFeature, string> = {
   catalog: "Leseren får leverandørens kjente varer (varenummer, navn, skrivemåter, pakning) og velger kjent varenummer når teksten passer. Ukjente varenummer som ikke følger leverandørens mønster merkes.",

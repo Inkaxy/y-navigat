@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { loadReadingContext, readingPrompt, runWithSelfCheck, type ReadingDb, type RpcResult } from "../../supabase/pending/functions/_shared/readingContext";
-import { READING_SETTINGS_OFF } from "../../supabase/pending/functions/_shared/readingSettings";
-import type { SelfCheckLine } from "../../supabase/pending/functions/_shared/selfCheck";
+import { loadReadingContext, readingPrompt, runWithSelfCheck, type ReadingDb, type RpcResult } from "../../supabase/functions/_shared/readingContext";
+import { READING_SETTINGS_OFF } from "../../supabase/functions/_shared/readingSettings";
+import type { SelfCheckLine } from "../../supabase/functions/_shared/selfCheck";
 
 const db = (answers: Record<string, RpcResult>): ReadingDb & { calls: string[] } => {
   const calls: string[] = [];

@@ -298,6 +298,8 @@ Deno.serve(async (req) => {
               expected_vat: totalVat,
               supplier_name: supplierName,
               invoice_number: (head as any)?.invoice_number ?? inv.invoice_number ?? null,
+              // Leseloggen (20261122) skiller import fra manuell lesing. Ignoreres av dagens leser.
+              source: "import",
               known_items: known,
               supplier_id: supplierId,
               is_credit: isCredit,

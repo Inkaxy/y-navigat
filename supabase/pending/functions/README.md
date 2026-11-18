@@ -3,9 +3,10 @@
 Plattformen ruller ut edge-funksjoner automatisk når filer under `supabase/functions/` lagres. Derfor ligger
 denne koden her, utenfor `supabase/functions/`, til Henrik har sagt ja til akkurat denne utrullingen.
 
-**Status: klar for utrulling – venter på ja.**
+**Status: RULLET UT 18.11.2026 (Henriks ja).** Modulene er flyttet til `supabase/functions/_shared/`, patchen er brukt,
+og `READER_CODE_DEPLOYED = true`. Alle brytere er av. Tilbakerulling: se `docs/ravarer-drift.md`.
 
-## Innhold
+## Innhold (historikk)
 - `_shared/readingSettings.ts`, `readingCatalog.ts`, `supplierProfile.ts`, `exampleRanking.ts`, `selfCheck.ts`,
   `goldCompare.ts`, `readingContext.ts` – ren kode (testet med vitest i `src/test/fakturalesing*.test.ts`).
   Innstillingssiden importerer de samme filene.
@@ -29,7 +30,7 @@ ingen nye feil (de tre feilene som vises finnes også i dagens kode med lokal De
 
 # EHF-test (18.11.2026) – `tripletex-ehf-test/`
 
-**Status: klar for utrulling – venter på ja.** Ny, rent lesende funksjon. Ingen SQL trengs.
+**Status: RULLET UT 18.11.2026 (Henriks ja)** – ligger nå i `supabase/functions/tripletex-ehf-test/`. Ny, rent lesende funksjon. Ingen SQL trengs.
 
 ## Hva den gjør
 Ett kall = én faktura, valgt fra kortet «EHF-test» under Råvarer › Innstillinger › Fakturalesing.

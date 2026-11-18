@@ -151,3 +151,18 @@
 - [x] Lesende funksjon `tripletex-ehf-test` i supabase/pending/functions (klar for utrulling – venter på ja)
 - [x] Tolking av EHF/Tripletex-linjer, side om side mot PDF, sammendrag per leverandør, råd ved 401/403
 - [ ] Kjøre testen med ekte data – venter på Henriks ja til utrulling av `tripletex-ehf-test`
+
+# Ferdigstilling Råvarer/Fra faktura (18.11.2026, Henrik)
+- [ ] 1 Utrulling: EHF-testfunksjon + ny fakturaleser (alle brytere av) etter at 20261122 er bekreftet kjørt; test lik prompt med alt av; tilbakerulling
+- [ ] 2 Gjenlesing kan fjerne linjer (rm_apply_invoice_reread, PENDING md5), test at linjesum ikke øker av rester
+- [ ] 3 Raske lesefunksjoner for tellere/Prishopp/Ikke lest (<1 s), PENDING + check, målt før/etter
+- [ ] 4a Flytt siste Beslutninger-typer (Sjekk tallene under Ikke lest; merker på varen), fjern Beslutninger/Øvrige spørsmål
+- [ ] 4b Leverandørvare-visning beholdes som detaljside
+- [ ] 4c «Ny fra faktura»-merket på mobil
+- [ ] 4d Egen prisgrense per vare fra varen
+- [ ] 4e Stopp mislykkede oppslag (rm_key_material_limits m.fl.)
+- [ ] 5a Helseside under Innstillinger
+- [ ] 5b Varsel stillstand/feilrate; vurder 20261113-filene
+- [ ] 5c Røyktester uten innlogging + sjekkliste innlogget
+- [ ] 6 docs/ravarer-drift.md + flytt utgåtte filer til supabase/pending/utgaatt/
+- [ ] 7 Del 20261120_slaa_sammen_varer i delfiler ≤15 kB med vakt + check (md5)

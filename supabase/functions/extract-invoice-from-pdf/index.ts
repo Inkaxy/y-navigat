@@ -35,6 +35,9 @@ import { decodeBase64 } from "jsr:@std/encoding@1/base64";
 import { formatPdfTextForModel, PDF_TEXT_LIMITS, pdfTextProfile, type PdfTextResult } from "../_shared/pdfText.ts";
 import { readOriginalPdfText } from "../_shared/pdfTextRuntime.ts";
 import { annotateSkuTextCheck } from "../_shared/invoiceExtraction.ts";
+import { catalogCheck, loadReadingContext, logReading, readingPrompt, runWithSelfCheck } from "../_shared/readingContext.ts";
+import { settingsKey } from "../_shared/readingSettings.ts";
+import type { ReadingPath } from "../_shared/selfCheck.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -167,6 +170,10 @@ Deno.serve(async (req) => {
       examples = (Array.isArray(ex) ? ex : []).map((e: any) => ({ original: e.original, corrected: e.corrected, note: e.note ?? null }));
     }
 
+    // Opplæring av fakturaleseren (20261122): bare det Henrik har slått på under Råvarer › Innstillinger › Fakturalesing.
+    // Uten SQL, ved feil eller når alt er av: dagens lesing uendret.
+    const reading = await loadReadingContext(admin, legal_entity_id, supplierId);
+
     // Hovedleverandør (aktiv) og ev. reserve. Kolonnen use_as_fallback finnes først etter PENDING-SQL
     // 20261113_ai_fallback_provider; uten den gir spørringen feil og ingen reserve brukes (som før).
     const CFG_COLS = "id, provider, model, encrypted_api_key, max_tokens, temperature, azure_endpoint, azure_deployment";
@@ -218,11 +225,52 @@ Deno.serve(async (req) => {
       if (pdfText && pdfText.status !== "ok") warnings.push("PDF-en har ikke brukbart tekstlag – lest bare visuelt");
     }
     const textBlock = pdfText ? formatPdfTextForModel(pdfText) : null;
+    const pageText = pdfText?.status === "ok" ? pdfText.pages.join("\n") : null;
+    const rp = readingPrompt(reading, hints.supplier_name, pageText);
+    const readExamples = rp.examples ?? examples;
+    let readingPath: ReadingPath[] = [];
+    let readingChosen: ReadingPath | null = null;
+    let readingAttempts: unknown[] = [];
 
     if (pdf_base64) {
-      const ctx: ReadContext = { admin, legalEntityId: legal_entity_id, usageInvoiceId, hints, examples, maxAttempts, pdfBase64: pdf_base64, pdfBytes, pdfText, textBlock };
+      const ctx: ReadContext = { admin, legalEntityId: legal_entity_id, usageInvoiceId, hints, examples: readExamples, maxAttempts, pdfBase64: pdf_base64, pdfBytes, pdfText, textBlock, extraHint: rp.extraHint };
       let out = cfg ? await readWithConfig(ctx, cfg) : null;
       if (cfg) providerUsed = "primary";
+      // Selvkontroll (av som standard): konkret feil tilbake + ett nytt forsøk, deretter sterkere modell. Beste lesing
+      // etter sumkontroll beholdes; en senere lesing erstatter aldri en bedre. Forbruket fra alle forsøk summeres.
+      if (cfg && out?.best && reading.settings.self_check) {
+        const first = out;
+        const extra: typeof out[] = [];
+        let strong: AiConfigRow | null = null;
+        if (reading.settings.strong_config_id) {
+          const { data: sc } = await admin.from("ai_provider_config").select(CFG_COLS)
+            .eq("id", reading.settings.strong_config_id).eq("purpose", "invoice_extraction").maybeSingle();
+          strong = (sc ?? null) as AiConfigRow | null;
+        }
+        const run = await runWithSelfCheck({
+          settings: reading.settings, strongAvailable: !!strong,
+          read: async (p, fb) => {
+            const o = p === "første" ? first
+              : await readWithConfig({ ...ctx, maxAttempts: 1, extraHint: [rp.extraHint, fb].filter((x): x is string => !!x).join("\n\n") || null }, p === "sterkere_modell" && strong ? strong : cfg);
+            if (p !== "første") extra.push(o);
+            if (!o.best) return null;
+            const s = checkSum(o.best.lines, hints.expected_total_excl_vat, hints.expected_total_incl_vat, hints.expected_vat, hints.is_credit);
+            return { data: o, lines: o.best.lines, sum: { lines_sum: s.lines_sum, expected_excl_vat: s.expected_excl_vat, deviation_pct: s.deviation_pct, missing_amount: s.missing_amount } };
+          },
+        });
+        readingPath = run.path;
+        readingAttempts = run.attempts;
+        if (run.best) {
+          readingChosen = run.best.path;
+          const add = (a: number | null, b: number | null) => (a == null && b == null ? null : (a ?? 0) + (b ?? 0));
+          const usage = extra.reduce((u, o) => ({ in: add(u.in, o.usage.in), out: add(u.out, o.usage.out), cost: add(u.cost, o.usage.cost) }), first.usage);
+          out = { ...run.best.data, usage, attempts: first.attempts + extra.reduce((n, o) => n + o.attempts, 0) };
+          if (run.path.length > 1) out.warnings = [...out.warnings, `Selvkontroll: ${run.path.join(" → ")}; valgt: ${run.best.path}`];
+        }
+      } else if (out?.best) {
+        readingPath = ["første"];
+        readingChosen = "første";
+      }
       // Reserve bare når hovedleverandøren feiler på tjenesten (nøkkel/kvote/nede/nettverk/oppsett) eller mangler.
       if (!out || (out.failure?.systemic && !out.best)) {
         const fb = await loadFallback();
@@ -288,6 +336,16 @@ Deno.serve(async (req) => {
     }
 
     if (Array.isArray(extracted.lines) && pdfText?.status === "ok") extracted.lines = annotateSkuTextCheck(extracted.lines, pdfText.pages);
+    // Varekatalog som fasit (av som standard): kjent varenummer for tydelig avkortede/manglende numre, ukjent mønster merkes.
+    if (Array.isArray(extracted.lines)) extracted.lines = catalogCheck(reading, extracted.lines);
+    if (reading.available) {
+      await logReading(admin, {
+        legal_entity_id, invoice_id: usageInvoiceId, supplier_id: supplierId,
+        source: body.source === "import" ? "import" : body.source === "gjenlesing" ? "gjenlesing" : "manuell",
+        settings_key: settingsKey(reading.settings), path: readingPath, chosen: readingChosen, attempts: readingAttempts,
+        catalog_items: rp.catalogItems, examples_used: readExamples.length, profile_used: rp.profileUsed,
+      });
+    }
     const lines = (extracted.lines ?? []) as any[];
     const expected = hints.expected_total_excl_vat;
     const sum = checkSum(lines, expected, hints.expected_total_incl_vat, hints.expected_vat, hints.is_credit);
@@ -351,8 +409,9 @@ Deno.serve(async (req) => {
         issues: sum.issues,
         vat_scale_factor_applied: null,
         arithmetic_issue_lines: arithmeticIssues,
-        examples_used: examples.length,
+        examples_used: readExamples.length,
       },
+      reading: { path: readingPath, chosen: readingChosen, catalog_items: rp.catalogItems, profile_used: rp.profileUsed, settings_key: settingsKey(reading.settings) },
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     console.error("extract-invoice-from-pdf error", e);
