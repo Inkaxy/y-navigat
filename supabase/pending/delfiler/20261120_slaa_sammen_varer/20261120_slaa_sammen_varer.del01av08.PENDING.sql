@@ -1,12 +1,12 @@
--- VENTER PÅ ROOT. 20261120_slaa_sammen_varer.del01av07.PENDING.sql – del 1 av 7 av 20261120_slaa_sammen_varer.PENDING.sql (12971 byte tekst).
--- Legger bare teksten i mellomlagringen og kontrollerer md5. Ingen virkning på appen før del 7 («kjør»).
--- Kan kjøres på nytt (overskriver samme del). md5 for delen: e243c19959b8b8d712d377d9b4ed2e98
+-- VENTER PÅ ROOT. 20261120_slaa_sammen_varer.del01av08.PENDING.sql – del 1 av 8 av 20261120_slaa_sammen_varer.PENDING.sql (12993 byte tekst).
+-- Legger bare teksten i mellomlagringen og kontrollerer md5. Ingen virkning på appen før del 8 («kjør»).
+-- Kan kjøres på nytt (overskriver samme del). md5 for delen: f5b405ab367102afc884e30cbb631c1e
 
 create table if not exists public._rm_sql_stage (file text not null, part int not null, body text not null,
   created_at timestamptz not null default now(), primary key (file, part));
 alter table public._rm_sql_stage enable row level security;
 revoke all on public._rm_sql_stage from public, anon, authenticated;
-insert into public._rm_sql_stage (file, part, body) values ('20261120_slaa_sammen_varer', 1, $stage$-- =====================================================================================================
+insert into public._rm_sql_stage (file, part, body) values ('20261120_slaa_sammen_varer', 1, replace(replace(replace($stage$-- =====================================================================================================
 -- 20261120_slaa_sammen_varer.PENDING.sql — «Slå sammen varer» (Råvarer › Varer). Henrik Næss 17.11.2026.
 -- VENTER PÅ ROOT. Kjøres som én transaksjon (begin/commit i filen). Kjør .check.sql etterpå.
 --
@@ -26,7 +26,7 @@ insert into public._rm_sql_stage (file, part, body) values ('20261120_slaa_samme
 
 do $$
 begin
-  if md5(pg_get_functiondef('public.merge_raw_materials(uuid,uuid)'::regprocedure)) <> '3c2ed3ccedddc6c117e3ca2899f916e4' then
+  if md5(replace(pg_get_functiondef('public.merge_raw_materials(uuid,uuid)'::regprocedure), chr(13), '')) <> '3c2ed3ccedddc6c117e3ca2899f916e4' then
     raise exception 'merge_raw_materials er endret etter 17.11.2026 – les live-definisjonen før denne filen kjøres';
   end if;
   if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'raw_materials' and column_name = 'merged_into_id') then
@@ -219,10 +219,10 @@ begin
           format('Stykkvekten på «%s» endres fra %s g til %s g.', v_keep.name, v_keep.unit_weight_grams, v_gpp), false);
       end if;
     end if;
-$stage$)
+$stage$, chr(13), ''), chr(160), ' '), chr(9), ' '))
   on conflict (file, part) do update set body = excluded.body, created_at = now();
 do $g$ begin
-  if (select md5(body) from public._rm_sql_stage where file = '20261120_slaa_sammen_varer' and part = 1) <> 'e243c19959b8b8d712d377d9b4ed2e98' then
+  if (select md5(body) from public._rm_sql_stage where file = '20261120_slaa_sammen_varer' and part = 1) <> 'f5b405ab367102afc884e30cbb631c1e' then
     raise exception 'Del 01 er ikke skrevet inn riktig (md5 avviker) – skriv den inn på nytt';
   end if;
 end $g$;

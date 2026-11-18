@@ -1,6 +1,6 @@
--- Kontroll for 20261120_slaa_sammen_varer.del07av07 (bare SELECT). Viser md5 av funksjonskroppene slik de ligger i databasen,
+-- Kontroll for 20261120_slaa_sammen_varer.del08av08 (bare SELECT). Viser md5 av funksjonskroppene slik de ligger i databasen,
 -- mot verdiene i den gjennomgåtte filen. Alle «riktig» skal være true. Kjør også 20261120_slaa_sammen_varer.check.sql.
-select e.navn, md5(p.prosrc) as md5_live, e.md5 as md5_fil, md5(p.prosrc) = e.md5 as riktig
+select e.navn, md5(replace(p.prosrc, chr(13), '')) as md5_live, e.md5 as md5_fil, md5(replace(p.prosrc, chr(13), '')) = e.md5 as riktig
 from (values
   ('public._rm_merge_fields_guard', 'a48397c5b5b6fb18d159c42c4ee53f15'),
   ('public._rm_merge_push', '4602348b16a93fe3eac35b23e73cc632'),

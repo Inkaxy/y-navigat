@@ -1,6 +1,6 @@
 -- Bare SELECT. Kjøres før og etter 20261121_varenummer_normalisering.PENDING.sql.
 -- Forutsetninger: hjelpefunksjonene finnes med dagens navn (definisjonene endres ikke av filen).
-select proname, md5(pg_get_functiondef(oid)) as md5
+select proname, md5(replace(pg_get_functiondef(oid), chr(13), '')) as md5
 from pg_proc where proname in ('rm_sku_norm', 'rm_match_key', 'has_ravarer_invoice_access') order by proname;
 
 -- Etter kjøring: funksjonene finnes og rettighetene er stramme (forventet: _rm_sku_canon_plan bare service_role).

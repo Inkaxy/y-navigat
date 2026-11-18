@@ -19,7 +19,7 @@ begin;
 
 do $$
 begin
-  if md5(pg_get_functiondef('public.merge_raw_materials(uuid,uuid)'::regprocedure)) <> '3c2ed3ccedddc6c117e3ca2899f916e4' then
+  if md5(replace(pg_get_functiondef('public.merge_raw_materials(uuid,uuid)'::regprocedure), chr(13), '')) <> '3c2ed3ccedddc6c117e3ca2899f916e4' then
     raise exception 'merge_raw_materials er endret etter 17.11.2026 – les live-definisjonen før denne filen kjøres';
   end if;
   if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'raw_materials' and column_name = 'merged_into_id') then
@@ -990,4 +990,17 @@ grant execute on function public.rm_cap_slaa_sammen_v1() to authenticated, servi
 revoke all on function public._rm_merge_fields_guard() from public, anon, authenticated;
 
 notify pgrst, 'reload schema';
+-- Linjeskift: limes filen inn med Windows-linjeskift (CR+LF), får funksjonene over et usynlig CR-tegn i kroppen.
+-- Denne blokken skriver dem på nytt med bare LF, slik at kontrollsummene blir de samme uansett innliming.
+-- Gjør ingenting når alt allerede er LF. Rører bare funksjonene denne filen oppretter.
+do $lf$
+declare r record;
+begin
+  for r in select p.oid from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname = any (array['_rm_merge_add', '_rm_merge_back', '_rm_merge_conf', '_rm_merge_core', '_rm_merge_fields_guard', '_rm_merge_needs_weight', '_rm_merge_push', '_rm_merge_undo_core', '_rm_merge_unit_factor', 'merge_raw_materials', 'rm_cap_slaa_sammen_v1', 'rm_merge_facts', 'rm_merge_raw_materials', 'rm_undo_material_merge'])
+              and p.prokind = 'f' and strpos(p.prosrc, chr(13)) > 0 loop
+    execute replace(pg_get_functiondef(r.oid), chr(13), '');
+  end loop;
+end $lf$;
+
 commit;

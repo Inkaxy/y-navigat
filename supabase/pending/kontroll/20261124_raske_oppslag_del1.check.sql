@@ -11,10 +11,10 @@ union all select 'tilgangsfunksjonene finnes', to_regprocedure('public.has_ravar
 explain (analyze, timing off, summary on) select public.rm_work_summary('751709bc-04b3-4449-867d-b97faa9ab373', false);
 
 -- ETTER
-select 'rm_nav_counts (md5)' kontroll, md5(pg_get_functiondef('public.rm_nav_counts(uuid)'::regprocedure)) = '7f112925ed2d04787180c48bda0f5550' ok
-union all select 'rm_price_jump_lines (md5)', md5(pg_get_functiondef('public.rm_price_jump_lines(uuid)'::regprocedure)) = 'e8c86e45c54bb9f0aad00c7619321007'
-union all select 'rm_unread_invoices (md5)', md5(pg_get_functiondef('public.rm_unread_invoices(uuid)'::regprocedure)) = 'dcf11116beefbeb51c9019a7ede4d997'
-union all select 'markør (md5)', md5(pg_get_functiondef('public.rm_cap_raske_oppslag_v1()'::regprocedure)) = 'd9c2e60a840209400d5e8ccfdd296ab3'
+select 'rm_nav_counts (md5)' kontroll, md5(replace(pg_get_functiondef('public.rm_nav_counts(uuid)'::regprocedure), chr(13), '')) = '7f112925ed2d04787180c48bda0f5550' ok
+union all select 'rm_price_jump_lines (md5)', md5(replace(pg_get_functiondef('public.rm_price_jump_lines(uuid)'::regprocedure), chr(13), '')) = 'e8c86e45c54bb9f0aad00c7619321007'
+union all select 'rm_unread_invoices (md5)', md5(replace(pg_get_functiondef('public.rm_unread_invoices(uuid)'::regprocedure), chr(13), '')) = 'dcf11116beefbeb51c9019a7ede4d997'
+union all select 'markør (md5)', md5(replace(pg_get_functiondef('public.rm_cap_raske_oppslag_v1()'::regprocedure), chr(13), '')) = 'd9c2e60a840209400d5e8ccfdd296ab3'
 union all select 'anon kan ikke kalle noen av dem', not has_function_privilege('anon', 'public.rm_nav_counts(uuid)', 'execute')
    and not has_function_privilege('anon', 'public.rm_price_jump_lines(uuid)', 'execute') and not has_function_privilege('anon', 'public.rm_unread_invoices(uuid)', 'execute')
    and not has_function_privilege('anon', 'public.rm_cap_raske_oppslag_v1()', 'execute')

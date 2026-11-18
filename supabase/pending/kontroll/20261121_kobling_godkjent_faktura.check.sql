@@ -2,11 +2,11 @@
 -- Første spørring: hver kontroll har forventet verdi før (for_ok) og etter (etter_ok). Alle i riktig kolonne skal være true.
 -- Selskaps-ID er Nøtterø Bakeri.
 with d as (
-  select pg_get_functiondef('public.rm_confirm_line_match(uuid,uuid,numeric,text,numeric,boolean,numeric,boolean,uuid[],boolean)'::regprocedure) confirm,
-         pg_get_functiondef('public.rm_link_supplier_item(uuid,uuid,text,uuid,jsonb,jsonb,boolean,boolean,text,uuid[])'::regprocedure) link,
-         pg_get_functiondef('public.rm_undo_not_item(uuid,uuid,text,uuid[],boolean,text)'::regprocedure) undo_not,
-         pg_get_functiondef('public.rm_set_invoice_exclusion(uuid,text,uuid,text,text,text,uuid)'::regprocedure) excl,
-         pg_get_functiondef('public.rm_work_items(uuid,text,text,uuid,text,integer,integer)'::regprocedure) wi,
+  select replace(pg_get_functiondef('public.rm_confirm_line_match(uuid,uuid,numeric,text,numeric,boolean,numeric,boolean,uuid[],boolean)'::regprocedure), chr(13), '') confirm,
+         replace(pg_get_functiondef('public.rm_link_supplier_item(uuid,uuid,text,uuid,jsonb,jsonb,boolean,boolean,text,uuid[])'::regprocedure), chr(13), '') link,
+         replace(pg_get_functiondef('public.rm_undo_not_item(uuid,uuid,text,uuid[],boolean,text)'::regprocedure), chr(13), '') undo_not,
+         replace(pg_get_functiondef('public.rm_set_invoice_exclusion(uuid,text,uuid,text,text,text,uuid)'::regprocedure), chr(13), '') excl,
+         replace(pg_get_functiondef('public.rm_work_items(uuid,text,text,uuid,text,integer,integer)'::regprocedure), chr(13), '') wi,
          to_regprocedure('public.rm_cap_kobling_godkjent_v1()') is not null cap
 ), q as (
   select (public.rm_work_items('751709bc-04b3-4449-867d-b97faa9ab373'::uuid, 'kobling', null, null, 'oldest', 500, 0)) r

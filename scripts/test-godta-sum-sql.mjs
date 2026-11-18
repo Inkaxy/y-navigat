@@ -1,13 +1,13 @@
 // «Fra faktura › Ikke lest»: kjører 20261119_godta_sum.PENDING.sql og 20261119_sumkontroll_omregning (dry-run og
 // DATAENDRING) mot innebygd PostgreSQL (PGlite) med byte-identisk kopi av live rm_lines_sum_check. Rører aldri live.
 // Bruk: node scripts/test-godta-sum-sql.mjs
-import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
+import { readSql, printFingerprint } from "./lib/pastedSql.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const read = (p) => readFileSync(join(root, p), "utf8");
+const read = (p) => readSql(join(root, p));
 const LE = "751709bc-04b3-4449-867d-b97faa9ab373";
 const U = "00000000-0000-0000-0000-0000000000e1";
 const id = (p, n) => `00000000-0000-0000-${p}-${String(n).padStart(12, "0")}`;
@@ -120,4 +120,5 @@ check((await db.query(`select * from audit_log where action = 'invoice.sum_reche
 await db.exec(`create or replace function public.rm_lines_sum_check(p_sum numeric, p_count integer, p_total numeric, p_vat numeric, p_is_credit boolean) returns jsonb language sql immutable as $$ select '{}'::jsonb $$;`);
 check(/endret siden 17.11.2026/.test(await err(() => db.exec(read("supabase/pending/2-endrer-data/20261119_sumkontroll_omregning.DATAENDRING.sql"))) ?? ""), "md5-vakten stopper ved endret sumkontroll");
 
+await printFingerprint(db);
 console.log(`OK: ${ok} kontroller bestått`);

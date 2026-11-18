@@ -1,16 +1,16 @@
 -- KONTROLL – bare SELECT, skriver ingenting. Hører til 20261113_lines_sum_credit_vat.PENDING.sql.
 
 -- 1) Forutsetning før kjøring (alle skal være true). Etter kjøring er de tre første false (endret).
-select md5(pg_get_functiondef('public.rm_correct_invoice_line(uuid,timestamp with time zone,jsonb,text,boolean,boolean)'::regprocedure)) = '2309db2c778a0db23c2f6bee2852cf86' as correct_uendret,
-       md5(pg_get_functiondef('public.rm_apply_invoice_reread(uuid,jsonb,text)'::regprocedure)) = 'dc58b00ca0774c576f7fa8c8c044df4d' as apply_uendret,
-       md5(pg_get_functiondef('public.rm_finalize_invoice_line_extraction(uuid,uuid,jsonb,jsonb)'::regprocedure)) = 'e2d12782ccbe9b5cd7a3211fa4e9724c' as finalize_uendret,
-       md5(pg_get_functiondef('public.rm_lines_sum_check(numeric,integer,numeric,numeric)'::regprocedure)) = '531e59387ca1103d33d6095ab6ca0a08' as sumcheck4_uendret,
+select md5(replace(pg_get_functiondef('public.rm_correct_invoice_line(uuid,timestamp with time zone,jsonb,text,boolean,boolean)'::regprocedure), chr(13), '')) = '2309db2c778a0db23c2f6bee2852cf86' as correct_uendret,
+       md5(replace(pg_get_functiondef('public.rm_apply_invoice_reread(uuid,jsonb,text)'::regprocedure), chr(13), '')) = 'dc58b00ca0774c576f7fa8c8c044df4d' as apply_uendret,
+       md5(replace(pg_get_functiondef('public.rm_finalize_invoice_line_extraction(uuid,uuid,jsonb,jsonb)'::regprocedure), chr(13), '')) = 'e2d12782ccbe9b5cd7a3211fa4e9724c' as finalize_uendret,
+       md5(replace(pg_get_functiondef('public.rm_lines_sum_check(numeric,integer,numeric,numeric)'::regprocedure), chr(13), '')) = '531e59387ca1103d33d6095ab6ca0a08' as sumcheck4_uendret,
        to_regprocedure('public.rm_lines_sum_check(numeric,integer,numeric,numeric,boolean)') is not null as sumcheck5_finnes;
 
 -- 2) Etter kjøring: kallerne bruker 5-argumentsversjonen, finalize kjenner total_vat_zero_replaced.
-select position('coalesce(v.is_credit_note, false))' in pg_get_functiondef('public.rm_correct_invoice_line(uuid,timestamp with time zone,jsonb,text,boolean,boolean)'::regprocedure)) > 0 as correct_kreditt,
-       position('coalesce(v.is_credit_note,false))' in pg_get_functiondef('public.rm_apply_invoice_reread(uuid,jsonb,text)'::regprocedure)) > 0 as apply_kreditt,
-       (length(pg_get_functiondef('public.rm_finalize_invoice_line_extraction(uuid,uuid,jsonb,jsonb)'::regprocedure))
+select position('coalesce(v.is_credit_note, false))' in replace(pg_get_functiondef('public.rm_correct_invoice_line(uuid,timestamp with time zone,jsonb,text,boolean,boolean)'::regprocedure), chr(13), '')) > 0 as correct_kreditt,
+       position('coalesce(v.is_credit_note,false))' in replace(pg_get_functiondef('public.rm_apply_invoice_reread(uuid,jsonb,text)'::regprocedure), chr(13), '')) > 0 as apply_kreditt,
+       (length(replace(pg_get_functiondef('public.rm_finalize_invoice_line_extraction(uuid,uuid,jsonb,jsonb)'::regprocedure), chr(13), ''))
         - length(replace(pg_get_functiondef('public.rm_finalize_invoice_line_extraction(uuid,uuid,jsonb,jsonb)'::regprocedure), 'total_vat_zero_replaced', '')))
         / length('total_vat_zero_replaced') = 2 as finalize_mva0;
 

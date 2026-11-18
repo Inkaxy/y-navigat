@@ -1,6 +1,6 @@
--- VENTER PÅ ROOT. 20261120_slaa_sammen_varer.del06av07.PENDING.sql – del 6 av 7 av 20261120_slaa_sammen_varer.PENDING.sql (12849 byte tekst).
--- Legger bare teksten i mellomlagringen og kontrollerer md5. Ingen virkning på appen før del 7 («kjør»).
--- Kan kjøres på nytt (overskriver samme del). md5 for delen: 49c0baceda8f751d9d4b3cdd4bbbdbf3
+-- VENTER PÅ ROOT. 20261120_slaa_sammen_varer.del06av08.PENDING.sql – del 6 av 8 av 20261120_slaa_sammen_varer.PENDING.sql (12964 byte tekst).
+-- Legger bare teksten i mellomlagringen og kontrollerer md5. Ingen virkning på appen før del 8 («kjør»).
+-- Kan kjøres på nytt (overskriver samme del). md5 for delen: 56a916303d903ef2cc3b2bead10ca7c7
 
 do $g$ begin
   if to_regclass('public._rm_sql_stage') is null then raise exception 'Kjør del 01 først'; end if;
@@ -8,7 +8,7 @@ do $g$ begin
     raise exception 'Kjør del 05 først';
   end if;
 end $g$;
-insert into public._rm_sql_stage (file, part, body) values ('20261120_slaa_sammen_varer', 6, $stage$      from jsonb_array_elements(coalesce(v_log -> 'lots', '[]')) j where l.id = (j ->> 'id')::uuid and l.raw_material_id = v_keep;
+insert into public._rm_sql_stage (file, part, body) values ('20261120_slaa_sammen_varer', 6, replace(replace(replace($stage$      from jsonb_array_elements(coalesce(v_log -> 'lots', '[]')) j where l.id = (j ->> 'id')::uuid and l.raw_material_id = v_keep;
     update public.rm_goods_receipts g set raw_material_id = (j ->> 'd')::uuid,
            quantity_base = public._rm_merge_back(g.quantity_base, (j ->> 'q')::numeric, (v_f ->> (j ->> 'd'))::numeric, 'qty')
       from jsonb_array_elements(coalesce(v_log -> 'receipts', '[]')) j where g.id = (j ->> 'id')::uuid and g.raw_material_id = v_keep;
@@ -178,10 +178,11 @@ grant execute on function public.rm_cap_slaa_sammen_v1() to authenticated, servi
 revoke all on function public._rm_merge_fields_guard() from public, anon, authenticated;
 
 notify pgrst, 'reload schema';
-$stage$)
+-- Linjeskift: limes filen inn med Windows-linjeskift (CR+LF), får funksjonene over et usynlig CR-tegn i kroppen.
+$stage$, chr(13), ''), chr(160), ' '), chr(9), ' '))
   on conflict (file, part) do update set body = excluded.body, created_at = now();
 do $g$ begin
-  if (select md5(body) from public._rm_sql_stage where file = '20261120_slaa_sammen_varer' and part = 6) <> '49c0baceda8f751d9d4b3cdd4bbbdbf3' then
+  if (select md5(body) from public._rm_sql_stage where file = '20261120_slaa_sammen_varer' and part = 6) <> '56a916303d903ef2cc3b2bead10ca7c7' then
     raise exception 'Del 06 er ikke skrevet inn riktig (md5 avviker) – skriv den inn på nytt';
   end if;
 end $g$;

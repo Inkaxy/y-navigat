@@ -20,7 +20,7 @@ union all select 'innloggede kan kalle sammenslåing/angre/fakta',
 union all select 'anon kan ikke kalle sammenslåing',
        not has_function_privilege('anon', 'public.rm_merge_raw_materials(uuid,uuid[],jsonb,jsonb,text,boolean,uuid)', 'execute')
 union all select 'merge_raw_materials delegerer til ny vei',
-       pg_get_functiondef('public.merge_raw_materials(uuid,uuid)'::regprocedure) like '%rm_merge_raw_materials%'
+       replace(pg_get_functiondef('public.merge_raw_materials(uuid,uuid)'::regprocedure), chr(13), '') like '%rm_merge_raw_materials%'
 union all select 'ingen varer er slått sammen ennå', (select count(*) from public.raw_materials where merged_into_id is not null) = 0
 union all select 'cap', public.rm_cap_slaa_sammen_v1();
 

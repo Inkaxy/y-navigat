@@ -1,14 +1,14 @@
 // 20261121_kobling_godkjent_faktura: kjører PENDING-filen i innebygd PostgreSQL (PGlite) mot byte-identiske kopier av dagens
 // live-funksjoner (md5 kontrollert av filen selv) og prøver reglene med ekte kall. Rører aldri live.
 // Bruk: node scripts/test-kobling-godkjent-sql.mjs
-import { readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
+import { readSql, printFingerprint } from "./lib/pastedSql.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const read = (p) => readFileSync(join(root, p), "utf8");
+const read = (p) => readSql(join(root, p));
 const pending = read("supabase/pending/kjort/20261121_kobling_godkjent_faktura.PENDING.sql");
 const checkSql = read("supabase/pending/kontroll/20261121_kobling_godkjent_faktura.check.sql");
 const fx = (n, dir = "live-20261117b") => read(`scripts/fixtures/${dir}/${n}.sql`);
@@ -206,4 +206,5 @@ console.log(`OK: ${ok} kontroller bestått`);
 // Fingeravtrykk etter kjøring: 20261119_nye_varer_les.check.sql godtar dagens eller dette.
 const wiAfter = await val(`select md5(pg_get_functiondef('public.rm_work_items(uuid,text,text,uuid,text,integer,integer)'::regprocedure))`);
 check(wiAfter === "27451573d8696e4d95c3253798923a45", `rm_work_items md5 etter kjøring: ${wiAfter}`);
+await printFingerprint(db);
 console.log(`OK: ${ok} kontroller bestått (med md5 etter kjøring)`);

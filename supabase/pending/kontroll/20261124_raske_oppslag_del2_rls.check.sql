@@ -8,7 +8,7 @@ union all select 'hjelper finnes ikke', to_regprocedure('public.rm_invoice_read_
 union all select 'ingen fakturaer uten selskap', not exists (select 1 from invoices where legal_entity_id is null);
 
 -- ETTER
-select 'rm_invoice_read_entity_ids (md5)' kontroll, md5(pg_get_functiondef('public.rm_invoice_read_entity_ids()'::regprocedure)) = '9a0fc472cc331c60eb09a0b69c3aecdd' ok
+select 'rm_invoice_read_entity_ids (md5)' kontroll, md5(replace(pg_get_functiondef('public.rm_invoice_read_entity_ids()'::regprocedure), chr(13), '')) = '9a0fc472cc331c60eb09a0b69c3aecdd' ok
 union all select 'invoices_select ny tekst', md5(qual) = 'ae52672e5625d1e2b14c15784afb310d'
   from pg_policies where schemaname = 'public' and tablename = 'invoices' and policyname = 'invoices_select'
 union all select 'invoice_lines_select ny tekst', md5(qual) = '0a7b2d5e20af33ed2b5a94ab39c8e21c'

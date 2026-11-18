@@ -6,11 +6,12 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
+import { EOL, readSql, printFingerprint } from "./lib/pastedSql.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const fx = (f) => readFileSync(join(root, "scripts/fixtures/live-20261118", f), "utf8");
-const pending = readFileSync(join(root, "supabase/pending/1-kjor-na/01_gjenlesing_fjern_linjer.sql"), "utf8");
-const check = readFileSync(join(root, "supabase/pending/kontroll/20261123_gjenlesing_fjern_linjer.check.sql"), "utf8");
+const pending = readSql(join(root, "supabase/pending/1-kjor-na/01_gjenlesing_fjern_linjer.sql"));
+const check = readSql(join(root, "supabase/pending/kontroll/20261123_gjenlesing_fjern_linjer.check.sql"));
 
 const stub = `
 create role anon; create role authenticated; create role service_role;
@@ -100,6 +101,12 @@ expect((await err(apply(run, [{ kind: "remove", line_id: A, confirmed_removal: t
 const before = (await db.query(check.split("-- ETTER")[0])).rows;
 expect(before.every((r) => r.ok === true), `kontroll før: ${JSON.stringify(before)}`);
 
+if (EOL === "crlf") {
+  // Gjenskaper feilen fra 18.11: uten rensingen av ankrene stopper filen på anker a når den er limt inn med CR+LF.
+  const unclean = pending.replace(/^  s_old := replace\(replace\(replace\(s_old, chr\(13\).*\r?\n/gm, "");
+  expect(unclean !== pending && (await err(unclean))?.includes("anker a finnes ikke nøyaktig én gang"), "uten rensing: samme feil som ved innlimingen 18.11");
+  await db.exec("rollback");
+}
 await db.exec(pending);
 const after = (await db.query(check.split("-- ETTER")[1])).rows;
 expect(after.every((r) => r.ok === true), `kontroll etter: ${JSON.stringify(after)}`);
@@ -179,4 +186,5 @@ run = await setup([[A, 900], [P1, 48]], [cand("cA", 952)]);
 expect((await one(apply(run, [{ kind: "update", candidate_id: "cA", line_id: A, changes: { total_amount: 952 }, confirmed_mapping: true, learn: false }]))).r.replace === false, "vanlig retting som før");
 expect((await sumNow()) === 1000, "retting gir 1000");
 
+await printFingerprint(db);
 console.log(`OK – ${ok} kontroller`);

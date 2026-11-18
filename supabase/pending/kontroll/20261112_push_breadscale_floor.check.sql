@@ -4,9 +4,9 @@
 -- 1) Forutsetning: live-definisjonen er den som ble lest 12.11.2026.
 --    Før kjøring: md5 = 0fc4425e0c29df93842dd57a4743059e.
 --    Etter kjøring skal round(rec.breadscale_pct) være borte og floor(...) finnes én gang.
-select md5(pg_get_functiondef('public.push_products_to_nettside()'::regprocedure)) as md5,
-       position('round(rec.breadscale_pct)' in pg_get_functiondef('public.push_products_to_nettside()'::regprocedure)) > 0 as har_round,
-       position('floor(rec.breadscale_pct)' in pg_get_functiondef('public.push_products_to_nettside()'::regprocedure)) > 0 as har_floor;
+select md5(replace(pg_get_functiondef('public.push_products_to_nettside()'::regprocedure), chr(13), '')) as md5,
+       position('round(rec.breadscale_pct)' in replace(pg_get_functiondef('public.push_products_to_nettside()'::regprocedure), chr(13), '')) > 0 as har_round,
+       position('floor(rec.breadscale_pct)' in replace(pg_get_functiondef('public.push_products_to_nettside()'::regprocedure), chr(13), '')) > 0 as har_floor;
 
 -- 2) Varer som får et annet tall i push enn i dag. Samme utvalg og samme
 --    prosentkilde som funksjonen (versjonert → godkjent versjon, legacy → varen),

@@ -11,7 +11,7 @@ begin;
 
 do $$
 begin
-  if md5(pg_get_functiondef('public.rm_lines_sum_check(numeric,integer,numeric,numeric,boolean)'::regprocedure)) <> 'cd7ff540627265d66f719614c77beaab' then
+  if md5(replace(pg_get_functiondef('public.rm_lines_sum_check(numeric,integer,numeric,numeric,boolean)'::regprocedure), chr(13), '')) <> 'cd7ff540627265d66f719614c77beaab' then
     raise exception 'rm_lines_sum_check er endret siden 17.11.2026 – kjør dry-run på nytt og oppdater filen';
   end if;
 end $$;

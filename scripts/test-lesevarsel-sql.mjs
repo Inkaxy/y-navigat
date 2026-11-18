@@ -1,11 +1,11 @@
 // 20261125_lesevarsel_stillstand i PGlite. Bruk: node scripts/test-lesevarsel-sql.mjs
-import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
+import { readSql, printFingerprint } from "./lib/pastedSql.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const sql = readFileSync(join(root, "supabase/pending/1-kjor-na/07_lesevarsel_stillstand.sql"), "utf8");
+const sql = readSql(join(root, "supabase/pending/1-kjor-na/07_lesevarsel_stillstand.sql"));
 const db = new PGlite();
 let checks = 0;
 const ok = (c, m) => { if (!c) throw new Error("FEIL: " + m); checks++; };
@@ -51,4 +51,5 @@ ok((await run()).reason === "ok", "20 % er under grensen");
 const priv = (await db.query(`select has_function_privilege('authenticated', 'public.rm_reading_stall_check(boolean)', 'execute') a,
   has_function_privilege('service_role', 'public.rm_reading_stall_check(boolean)', 'execute') s`)).rows[0];
 ok(priv.a === false && priv.s === true, "bare service_role kan kjøre");
+await printFingerprint(db);
 console.log(`OK – ${checks} kontroller`);

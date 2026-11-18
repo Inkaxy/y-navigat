@@ -1,5 +1,5 @@
--- VENTER PÅ ROOT. 20261120_slaa_sammen_varer.del03av07.PENDING.sql – del 3 av 7 av 20261120_slaa_sammen_varer.PENDING.sql (12976 byte tekst).
--- Legger bare teksten i mellomlagringen og kontrollerer md5. Ingen virkning på appen før del 7 («kjør»).
+-- VENTER PÅ ROOT. 20261120_slaa_sammen_varer.del03av08.PENDING.sql – del 3 av 8 av 20261120_slaa_sammen_varer.PENDING.sql (12976 byte tekst).
+-- Legger bare teksten i mellomlagringen og kontrollerer md5. Ingen virkning på appen før del 8 («kjør»).
 -- Kan kjøres på nytt (overskriver samme del). md5 for delen: 024e58e5d9b7ba5cc92484f04182bb22
 
 do $g$ begin
@@ -8,7 +8,7 @@ do $g$ begin
     raise exception 'Kjør del 02 først';
   end if;
 end $g$;
-insert into public._rm_sql_stage (file, part, body) values ('20261120_slaa_sammen_varer', 3, $stage$                format('%s «%s» er avvist på «%s» hos denne leverandøren og læres ikke.', case when x.t = 'supplier_sku' then 'Varenummeret' else 'Varenavnet' end, x.v, v_keep.name), false);
+insert into public._rm_sql_stage (file, part, body) values ('20261120_slaa_sammen_varer', 3, replace(replace(replace($stage$                format('%s «%s» er avvist på «%s» hos denne leverandøren og læres ikke.', case when x.t = 'supplier_sku' then 'Varenummeret' else 'Varenavnet' end, x.v, v_keep.name), false);
             elsif v_st in ('pending', 'superseded') then
               update public.raw_material_supplier_aliases set status = 'confirmed', confirmed_by = p_uid, confirmed_at = v_now where id = v_src;
               v_log := public._rm_merge_push(v_log, 'aliases_status', jsonb_build_array(jsonb_build_object('id', v_src, 's', v_st, 'cb', v_cb, 'ca', v_ca)));
@@ -156,7 +156,7 @@ insert into public._rm_sql_stage (file, part, body) values ('20261120_slaa_samme
         v_conf := v_conf || public._rm_merge_conf('tellinger_blir_staende', format('%s linjer i avsluttede tellinger har låst grunnlag og blir stående på «%s».', v_n, v_dup.name), false);
       end if;
 
-$stage$)
+$stage$, chr(13), ''), chr(160), ' '), chr(9), ' '))
   on conflict (file, part) do update set body = excluded.body, created_at = now();
 do $g$ begin
   if (select md5(body) from public._rm_sql_stage where file = '20261120_slaa_sammen_varer' and part = 3) <> '024e58e5d9b7ba5cc92484f04182bb22' then

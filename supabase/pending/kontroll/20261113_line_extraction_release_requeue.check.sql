@@ -1,8 +1,8 @@
 -- KONTROLL – bare SELECT, skriver ingenting. Hører til 20261113_line_extraction_release_requeue.PENDING.sql.
 
 -- 1) Før: md5 = cb553c3def46e26a75e50ddd7d7758eb og requeue finnes ikke. Etter: release_attempt finnes, requeue finnes.
-select md5(pg_get_functiondef('public.rm_fail_invoice_line_extraction(uuid,uuid,jsonb)'::regprocedure)) as fail_md5,
-       position('release_attempt' in pg_get_functiondef('public.rm_fail_invoice_line_extraction(uuid,uuid,jsonb)'::regprocedure)) > 0 as har_release,
+select md5(replace(pg_get_functiondef('public.rm_fail_invoice_line_extraction(uuid,uuid,jsonb)'::regprocedure), chr(13), '')) as fail_md5,
+       position('release_attempt' in replace(pg_get_functiondef('public.rm_fail_invoice_line_extraction(uuid,uuid,jsonb)'::regprocedure), chr(13), '')) > 0 as har_release,
        to_regprocedure('public.rm_requeue_invoice_line_extraction(uuid,uuid[])') is not null as requeue_finnes;
 
 -- 2) Gruppe 1 i «Les på nytt i bolk»: ferdig lest uten linjer, «PDF-en ga ingen lesbare linjer», siden 19.10.2026.

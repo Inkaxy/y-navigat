@@ -1,5 +1,5 @@
--- VENTER PÅ ROOT. 20261120_slaa_sammen_varer.del05av07.PENDING.sql – del 5 av 7 av 20261120_slaa_sammen_varer.PENDING.sql (12949 byte tekst).
--- Legger bare teksten i mellomlagringen og kontrollerer md5. Ingen virkning på appen før del 7 («kjør»).
+-- VENTER PÅ ROOT. 20261120_slaa_sammen_varer.del05av08.PENDING.sql – del 5 av 8 av 20261120_slaa_sammen_varer.PENDING.sql (12949 byte tekst).
+-- Legger bare teksten i mellomlagringen og kontrollerer md5. Ingen virkning på appen før del 8 («kjør»).
 -- Kan kjøres på nytt (overskriver samme del). md5 for delen: 328e40ac1258fd3ed04b6079aca0a4ae
 
 do $g$ begin
@@ -8,7 +8,7 @@ do $g$ begin
     raise exception 'Kjør del 04 først';
   end if;
 end $g$;
-insert into public._rm_sql_stage (file, part, body) values ('20261120_slaa_sammen_varer', 5, $stage$      'merged_ids', to_jsonb(m.merged_ids), 'counts', '{}'::jsonb, 'conflicts', v_conf);
+insert into public._rm_sql_stage (file, part, body) values ('20261120_slaa_sammen_varer', 5, replace(replace(replace($stage$      'merged_ids', to_jsonb(m.merged_ids), 'counts', '{}'::jsonb, 'conflicts', v_conf);
   end if;
   select coalesce(array_agg((j ->> 'id')::uuid), '{}') into v_hist from jsonb_array_elements(coalesce(v_log -> 'history', '[]')) j;
 
@@ -159,7 +159,7 @@ insert into public._rm_sql_stage (file, part, body) values ('20261120_slaa_samme
     update public.rm_stock_lots l set raw_material_id = (j ->> 'd')::uuid,
            quantity_base = public._rm_merge_back(l.quantity_base, (j ->> 'q')::numeric, (v_f ->> (j ->> 'd'))::numeric, 'qty'),
            remaining_base = public._rm_merge_back(l.remaining_base, (j ->> 'rb')::numeric, (v_f ->> (j ->> 'd'))::numeric, 'qty')
-$stage$)
+$stage$, chr(13), ''), chr(160), ' '), chr(9), ' '))
   on conflict (file, part) do update set body = excluded.body, created_at = now();
 do $g$ begin
   if (select md5(body) from public._rm_sql_stage where file = '20261120_slaa_sammen_varer' and part = 5) <> '328e40ac1258fd3ed04b6079aca0a4ae' then

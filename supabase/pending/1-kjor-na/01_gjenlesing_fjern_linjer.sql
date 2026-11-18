@@ -26,6 +26,8 @@
 -- kostprisen regnes ut på nytt, innkjøpsspeil og lagerbevegelse for linjen fjernes (lagerbevegelse er beskyttet, se 1).
 --
 -- Kontroll: 20261123_gjenlesing_fjern_linjer.check.sql (før/etter + md5). Lokal test: node scripts/test-gjenlesing-fjern-sql.mjs
+-- Innliming: tåler Windows-linjeskift (18.11) – ankrene renses for CR/hardt mellomrom/tabulator før de sammenlignes med
+-- uendret live-tekst, og sluttsteget nederst skriver funksjonene på nytt uten CR. Test: node scripts/test-innliming-crlf.mjs
 begin;
 
 create or replace function public._rm_reread_line_protection(p_line_id uuid)
@@ -54,7 +56,7 @@ declare d text; s_old text; s_new text;
   procedure_sig constant text := 'public.rm_apply_invoice_reread(uuid,jsonb,text)';
 begin
   if to_regprocedure('public.rm_cap_gjenlesing_fjern_v1()') is not null then raise exception 'Filen er allerede kjørt (rm_cap_gjenlesing_fjern_v1 finnes).'; end if;
-  d := pg_get_functiondef(procedure_sig::regprocedure);
+  d := replace(pg_get_functiondef(procedure_sig::regprocedure), chr(13), '');
   if md5(d) <> 'c9c68ddd556312ec0b03d5d3365d4e6a' then raise exception 'rm_apply_invoice_reread er endret siden 18.11 (md5 %)', md5(d); end if;
 
   -- a) variabler
@@ -62,6 +64,7 @@ begin
 $x$;
   s_new := s_old || $x$ old_ids uuid[]:='{}'; replace_mode boolean:=false; prot text; before_check jsonb; cand_sum numeric; final_sum numeric;
 $x$;
+  s_old := replace(replace(replace(s_old, chr(13), ''), chr(160), ' '), chr(9), ' '); s_new := replace(replace(replace(s_new, chr(13), ''), chr(160), ' '), chr(9), ' ');
   if (length(d) - length(replace(d, s_old, ''))) <> length(s_old) then raise exception 'anker a finnes ikke nøyaktig én gang'; end if;
   d := replace(d, s_old, s_new);
 
@@ -82,6 +85,7 @@ $x$ || s_old || $x$ IF NOT replace_mode AND EXISTS(SELECT 1 FROM jsonb_array_ele
   RAISE EXCEPTION 'sumavvik_ville_oke';
  END IF;
 $x$;
+  s_old := replace(replace(replace(s_old, chr(13), ''), chr(160), ' '), chr(9), ' '); s_new := replace(replace(replace(s_new, chr(13), ''), chr(160), ' '), chr(9), ' ');
   if (length(d) - length(replace(d, s_old, ''))) <> length(s_old) then raise exception 'anker b finnes ikke nøyaktig én gang'; end if;
   d := replace(d, s_old, s_new);
 
@@ -92,12 +96,14 @@ $x$;
  SELECT rm_lines_sum_check(sum(total_amount),count(*)::int,v.total_amount,v.total_vat,coalesce(v.is_credit_note,false)) INTO before_check FROM invoice_lines WHERE invoice_id=v.id;
  replace_mode:=EXISTS(SELECT 1 FROM jsonb_array_elements(p_operations) o WHERE jsonb_typeof(o)='object' AND o->>'kind' IN ('remove','keep'));
 $x$;
+  s_old := replace(replace(replace(s_old, chr(13), ''), chr(160), ' '), chr(9), ' '); s_new := replace(replace(replace(s_new, chr(13), ''), chr(160), ' '), chr(9), ' ');
   if (length(d) - length(replace(d, s_old, ''))) <> length(s_old) then raise exception 'anker c finnes ikke nøyaktig én gang'; end if;
   d := replace(d, s_old, s_new);
 
   -- d) nye bekreftelsesfelt
   s_old := $x$'confirm_identity_change','confirmed_addition'] LOOP$x$;
   s_new := $x$'confirm_identity_change','confirmed_addition','confirmed_removal','confirmed_keep'] LOOP$x$;
+  s_old := replace(replace(replace(s_old, chr(13), ''), chr(160), ' '), chr(9), ' '); s_new := replace(replace(replace(s_new, chr(13), ''), chr(160), ' '), chr(9), ' ');
   if (length(d) - length(replace(d, s_old, ''))) <> length(s_old) then raise exception 'anker d finnes ikke nøyaktig én gang'; end if;
   d := replace(d, s_old, s_new);
 
@@ -133,16 +139,19 @@ $x$;
    CONTINUE;
   END IF;
 $x$;
+  s_old := replace(replace(replace(s_old, chr(13), ''), chr(160), ' '), chr(9), ' '); s_new := replace(replace(replace(s_new, chr(13), ''), chr(160), ' '), chr(9), ' ');
   if (length(d) - length(replace(d, s_old, ''))) <> length(s_old) then raise exception 'anker e finnes ikke nøyaktig én gang'; end if;
   d := replace(d, s_old, s_new);
 
   -- f) modus i svar og revisjonslogg
   s_old := $x$'lines_sum_status',sumcheck->>'lines_sum_status','replayed',false);$x$;
   s_new := $x$'lines_sum_status',sumcheck->>'lines_sum_status','replayed',false,'replace',replace_mode);$x$;
+  s_old := replace(replace(replace(s_old, chr(13), ''), chr(160), ' '), chr(9), ' '); s_new := replace(replace(replace(s_new, chr(13), ''), chr(160), ' '), chr(9), ' ');
   if (length(d) - length(replace(d, s_old, ''))) <> length(s_old) then raise exception 'anker f finnes ikke nøyaktig én gang'; end if;
   d := replace(d, s_old, s_new);
   s_old := $x$jsonb_build_object('run_id',rr.id,'operations',results,'document_sha256',rr.document_sha256)$x$;
   s_new := $x$jsonb_build_object('run_id',rr.id,'operations',results,'document_sha256',rr.document_sha256,'replace',replace_mode)$x$;
+  s_old := replace(replace(replace(s_old, chr(13), ''), chr(160), ' '), chr(9), ' '); s_new := replace(replace(replace(s_new, chr(13), ''), chr(160), ' '), chr(9), ' ');
   if (length(d) - length(replace(d, s_old, ''))) <> length(s_old) then raise exception 'anker g finnes ikke nøyaktig én gang'; end if;
   d := replace(d, s_old, s_new);
 
@@ -153,5 +162,18 @@ create or replace function public.rm_cap_gjenlesing_fjern_v1()
 returns boolean language sql stable security invoker set search_path = public as $$ select true $$;
 revoke all on function public.rm_cap_gjenlesing_fjern_v1() from public, anon;
 grant execute on function public.rm_cap_gjenlesing_fjern_v1() to authenticated, service_role;
+
+-- Linjeskift: limes filen inn med Windows-linjeskift (CR+LF), får funksjonene over et usynlig CR-tegn i kroppen.
+-- Denne blokken skriver dem på nytt med bare LF, slik at kontrollsummene blir de samme uansett innliming.
+-- Gjør ingenting når alt allerede er LF. Rører bare funksjonene denne filen oppretter.
+do $lf$
+declare r record;
+begin
+  for r in select p.oid from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname = any (array['_rm_reread_line_protection', 'rm_apply_invoice_reread', 'rm_cap_gjenlesing_fjern_v1'])
+              and p.prokind = 'f' and strpos(p.prosrc, chr(13)) > 0 loop
+    execute replace(pg_get_functiondef(r.oid), chr(13), '');
+  end loop;
+end $lf$;
 
 commit;

@@ -72,6 +72,19 @@ $$;
 revoke all on function public.rm_reading_stall_check(boolean) from public, anon, authenticated;
 grant execute on function public.rm_reading_stall_check(boolean) to service_role;
 
+-- Linjeskift: limes filen inn med Windows-linjeskift (CR+LF), får funksjonene over et usynlig CR-tegn i kroppen.
+-- Denne blokken skriver dem på nytt med bare LF, slik at kontrollsummene blir de samme uansett innliming.
+-- Gjør ingenting når alt allerede er LF. Rører bare funksjonene denne filen oppretter.
+do $lf$
+declare r record;
+begin
+  for r in select p.oid from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname = any (array['rm_reading_stall_check'])
+              and p.prokind = 'f' and strpos(p.prosrc, chr(13)) > 0 loop
+    execute replace(pg_get_functiondef(r.oid), chr(13), '');
+  end loop;
+end $lf$;
+
 commit;
 
 -- TIDSPLAN – bare etter Henriks ja (én gang i timen, kvarter over):

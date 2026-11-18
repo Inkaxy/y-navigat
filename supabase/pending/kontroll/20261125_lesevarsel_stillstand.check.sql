@@ -3,7 +3,7 @@
 select p.proname, p.prosecdef as security_definer,
        has_function_privilege('authenticated', p.oid, 'execute') as authenticated_kan_kjore,
        has_function_privilege('service_role', p.oid, 'execute') as service_kan_kjore,
-       md5(p.prosrc) as md5_kropp
+       md5(replace(p.prosrc, chr(13), '')) as md5_kropp
 from pg_proc p where p.oid = 'public.rm_reading_stall_check(boolean)'::regprocedure;
 -- Forventet: security_definer=t, authenticated_kan_kjore=f, service_kan_kjore=t.
 -- 2) Malen fra 20261113 finnes og er aktiv (ellers sendes ingenting).

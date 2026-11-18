@@ -58,6 +58,31 @@ describe("store SQL-filer deles i delfiler (punkt 7)", () => {
     await a.close(); await b.close();
   }, 60_000);
 
+  it("limt inn med Windows-linjeskift (CR+LF) gir hele filen og delfilene samme funksjoner, uten CR", async () => {
+    const o = split();
+    const crlf = (s: string) => s.replace(/\r?\n/g, "\r\n");
+    const fake = `set search_path = public, pg_catalog;
+      create function public.pg_get_functiondef(regprocedure) returns text language sql as $$ select 'LIVE-17.11'::text $$;
+      create function public.md5(text) returns text language sql immutable as $$ select case when $1 = 'LIVE-17.11' then '3c2ed3ccedddc6c117e3ca2899f916e4' else pg_catalog.md5($1) end $$;`;
+    const fns = async (db: PGlite) => (await db.query<{ n: string; m: string; cr: boolean }>(
+      `select p.proname n, pg_catalog.md5(p.prosrc) m, pg_catalog.strpos(p.prosrc, chr(13)) > 0 cr from pg_proc p join pg_namespace s on s.oid = p.pronamespace
+       where s.nspname = 'public' and (p.proname like '%merge%' or p.proname like 'rm_cap_slaa%') order by 1, 2`)).rows;
+    const lf = new PGlite(); await lf.exec(STUB); await lf.exec(fake); await lf.exec(original);
+    const whole = new PGlite(); await whole.exec(STUB); await whole.exec(fake); await whole.exec(crlf(original));
+    const parts = new PGlite(); await parts.exec(STUB); await parts.exec(fake);
+    for (const f of pend(o)) await parts.exec(crlf(f.sql));
+    const expected = await fns(lf);
+    expect(expected.length).toBeGreaterThan(10);
+    expect(expected.some((r) => r.cr)).toBe(false);
+    expect(await fns(whole)).toEqual(expected);
+    expect(await fns(parts)).toEqual(expected);
+    // Uten sluttsteget ville CR blitt liggende i funksjonskroppene (det er dette steget hindrer).
+    const noFix = new PGlite(); await noFix.exec(STUB); await noFix.exec(fake);
+    await noFix.exec(crlf(original.replace(/-- Linjeskift: limes filen inn[\s\S]*?end \$lf\$;\n/, "")));
+    expect((await fns(noFix)).some((r) => r.cr)).toBe(true);
+    await lf.close(); await whole.close(); await parts.close(); await noFix.close();
+  }, 120_000);
+
   it("feiler kjøringen, rulles alt tilbake og mellomlagringen står igjen", async () => {
     const o = splitSql("-- test\nbegin;\ncreate table public.t1 (i int);\nselect 1/0;\ncommit;\n", "synt", 20) as Out;
     const db = new PGlite();

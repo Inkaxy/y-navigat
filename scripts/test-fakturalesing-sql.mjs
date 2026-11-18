@@ -6,10 +6,11 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
+import { readSql, printFingerprint } from "./lib/pastedSql.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const pending = readFileSync(join(root, "supabase/pending/kjort/20261122_fakturalesing_opplaering.PENDING.sql"), "utf8");
-const check = readFileSync(join(root, "supabase/pending/kontroll/20261122_fakturalesing_opplaering.check.sql"), "utf8");
+const check = readSql(join(root, "supabase/pending/kontroll/20261122_fakturalesing_opplaering.check.sql"));
 
 const stub = `
 create role anon; create role authenticated; create role service_role;
@@ -177,4 +178,5 @@ gold = (await one(`select public.rm_gold_invoices('${LE}') as g`)).g;
 expect(gold.length === 0, "avmerket fasit vises ikke");
 
 
+await printFingerprint(db);
 console.log(`OK – ${ok} kontroller grønne`);

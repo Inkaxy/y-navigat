@@ -17,4 +17,4 @@ select count(*) as apne_fakturaer_med_apne_linjer from invoices i
  where i.status in ('imported','needs_review','ready') and i.flagged_at is null
    and exists (select 1 from invoice_lines l where l.invoice_id = i.id and l.requires_review);
 -- Uendret avhengighet (lest 16.11.2026): rm_rematch_invoices md5 6bc2d41f8fb1e555176537651d3837cd
-select md5(pg_get_functiondef('public.rm_rematch_invoices'::regproc)) as rematch_md5;
+select md5(replace(pg_get_functiondef('public.rm_rematch_invoices'::regproc), chr(13), '')) as rematch_md5;

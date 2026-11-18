@@ -2,13 +2,13 @@
 // live-definisjonen av rm_work_items fra 17.11 (byte-identisk kopi) etter 20261121_kobling_godkjent_faktura, og kontrollerer at den nye funksjonen gir
 // nøyaktig samme rader, tellere og rekkefølge som rm_work_items (gruppene kobling + pakning). Rører aldri live.
 // Bruk: node scripts/test-nye-varer-sql.mjs
-import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
+import { readSql, printFingerprint } from "./lib/pastedSql.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const read = (p) => readFileSync(join(root, p), "utf8");
+const read = (p) => readSql(join(root, p));
 const pending = read("supabase/pending/kjort/20261119_nye_varer_les.PENDING.sql");
 const live = read("scripts/fixtures/live-20261117/rm_work_items.sql");
 // Samme regel som koblingen (20261121_kobling_godkjent_faktura) gjelder begge køfunksjonene; filen kjøres derfor her også.
@@ -159,4 +159,5 @@ await db.exec(`select set_config('test.uid', '', false);`);
 const checkSql = read("supabase/pending/kontroll/20261119_nye_varer_les.check.sql").replaceAll("751709bc-04b3-4449-867d-b97faa9ab373", LE);
 const checkRows = (await step("check.sql", () => db.query(checkSql))).rows;
 check(checkRows.length === 8 && checkRows.every((r) => r.ok === true), `check.sql: ${JSON.stringify(checkRows.filter((r) => r.ok !== true))}`);
+await printFingerprint(db);
 console.log(`OK: ${ok} kontroller bestått (med check.sql)`);

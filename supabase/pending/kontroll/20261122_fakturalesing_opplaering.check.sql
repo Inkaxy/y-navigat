@@ -39,9 +39,9 @@ select kontroll, for_ok, etter_ok from (
          case when (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'invoice_extraction_examples' and column_name = 'source_kind') = 0
            then false else (xpath('/row/n/text()', query_to_xml('select count(*) as n from public.invoice_extraction_examples where source_kind is not null and created_at < ''2026-11-18''', false, true, '')))[1]::text = '0' end
   union all select 10, 'rm_extraction_examples_for (v1) er uendret',
-         md5(pg_get_functiondef('public.rm_extraction_examples_for(uuid,uuid,integer)'::regprocedure)) = 'f7d5e490a436da2aef661cbcbda31f38'
+         md5(replace(pg_get_functiondef('public.rm_extraction_examples_for(uuid,uuid,integer)'::regprocedure), chr(13), '')) = 'f7d5e490a436da2aef661cbcbda31f38'
            or to_regclass('public.audit_log') is null,
-         md5(pg_get_functiondef('public.rm_extraction_examples_for(uuid,uuid,integer)'::regprocedure)) = 'f7d5e490a436da2aef661cbcbda31f38'
+         md5(replace(pg_get_functiondef('public.rm_extraction_examples_for(uuid,uuid,integer)'::regprocedure), chr(13), '')) = 'f7d5e490a436da2aef661cbcbda31f38'
            or to_regclass('public.audit_log') is null
 ) k order by n;
 -- STOPP (resten er bare informasjon fra live)

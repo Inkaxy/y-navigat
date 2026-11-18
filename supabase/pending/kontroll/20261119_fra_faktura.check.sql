@@ -12,7 +12,7 @@ union all select 'ingen data endret: alle nye felt er null',
        and not exists (select 1 from public.raw_materials where price_jump_pct is not null or cost_basis_rule is not null)
        and not exists (select 1 from public.suppliers where new_item_type is not null)
 union all select '_rm_cost_candidates bruker regelen',
-       position('_rm_cost_rule_ok' in pg_get_functiondef('public._rm_cost_candidates(uuid,date)'::regprocedure)) > 0
+       position('_rm_cost_rule_ok' in replace(pg_get_functiondef('public._rm_cost_candidates(uuid,date)'::regprocedure), chr(13), '')) > 0
 union all select 'nye funksjoner finnes',
        (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname in
          ('rm_fra_faktura_settings','rm_set_fra_faktura_settings','rm_set_item_price_jump','rm_set_supplier_new_item_type',

@@ -1,5 +1,5 @@
--- VENTER PÅ ROOT. 20261120_slaa_sammen_varer.del02av07.PENDING.sql – del 2 av 7 av 20261120_slaa_sammen_varer.PENDING.sql (12833 byte tekst).
--- Legger bare teksten i mellomlagringen og kontrollerer md5. Ingen virkning på appen før del 7 («kjør»).
+-- VENTER PÅ ROOT. 20261120_slaa_sammen_varer.del02av08.PENDING.sql – del 2 av 8 av 20261120_slaa_sammen_varer.PENDING.sql (12833 byte tekst).
+-- Legger bare teksten i mellomlagringen og kontrollerer md5. Ingen virkning på appen før del 8 («kjør»).
 -- Kan kjøres på nytt (overskriver samme del). md5 for delen: e2feb7079dc710126bc2d9d0180f35d9
 
 do $g$ begin
@@ -8,7 +8,7 @@ do $g$ begin
     raise exception 'Kjør del 01 først';
   end if;
 end $g$;
-insert into public._rm_sql_stage (file, part, body) values ('20261120_slaa_sammen_varer', 2, $stage$    v_factor := v_factor || jsonb_build_object(v_d::text, v_f);
+insert into public._rm_sql_stage (file, part, body) values ('20261120_slaa_sammen_varer', 2, replace(replace(replace($stage$    v_factor := v_factor || jsonb_build_object(v_d::text, v_f);
 
     select count(*) into v_n from public.invoice_lines il where il.raw_material_id = v_d
        and exists (select 1 from public.invoice_line_cost_postings p where p.invoice_line_id = il.id and p.revoked_at is null);
@@ -170,7 +170,7 @@ insert into public._rm_sql_stage (file, part, body) values ('20261120_slaa_samme
               v_counts := public._rm_merge_add(v_counts, case when x.t = 'supplier_sku' then 'varenumre_laert' else 'skrivemater' end, 1);
             elsif v_st = 'rejected' then
               v_conf := v_conf || public._rm_merge_conf('avvist_pa_beholdt',
-$stage$)
+$stage$, chr(13), ''), chr(160), ' '), chr(9), ' '))
   on conflict (file, part) do update set body = excluded.body, created_at = now();
 do $g$ begin
   if (select md5(body) from public._rm_sql_stage where file = '20261120_slaa_sammen_varer' and part = 2) <> 'e2feb7079dc710126bc2d9d0180f35d9' then

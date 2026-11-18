@@ -9,6 +9,6 @@ select p.proname, has_function_privilege('authenticated', p.oid, 'execute') as a
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
  where n.nspname = 'public' and p.proname in ('rm_correct_purchase_price','rm_revert_purchase_price_correction','rm_change_approved_package','rm_cap_prislinje_v1');
 -- Uendrede avhengigheter (lest 16.11.2026):
-select md5(pg_get_functiondef('public._rm_cost_candidates'::regproc)) as cost_candidates_md5,
-       md5(pg_get_functiondef('public._rmph_snapshot'::regproc)) as snapshot_md5,
-       md5(pg_get_functiondef('public._rms_record_package_variant'::regproc)) as package_variant_md5;
+select md5(replace(pg_get_functiondef('public._rm_cost_candidates'::regproc), chr(13), '')) as cost_candidates_md5,
+       md5(replace(pg_get_functiondef('public._rmph_snapshot'::regproc), chr(13), '')) as snapshot_md5,
+       md5(replace(pg_get_functiondef('public._rms_record_package_variant'::regproc), chr(13), '')) as package_variant_md5;

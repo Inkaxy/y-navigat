@@ -76,7 +76,7 @@ beforeAll(async () => {
   db = new PGlite();
   await db.exec(STUB);
   const sql = readFileSync(FILE, "utf8")
-    .replace("if md5(pg_get_functiondef('public.merge_raw_materials(uuid,uuid)'::regprocedure)) <> '3c2ed3ccedddc6c117e3ca2899f916e4' then", "if false then")
+    .replace("if md5(replace(pg_get_functiondef('public.merge_raw_materials(uuid,uuid)'::regprocedure), chr(13), '')) <> '3c2ed3ccedddc6c117e3ca2899f916e4' then", "if false then")
     .replace("notify pgrst, 'reload schema';", "");
   await db.exec(sql);
   await db.exec("create table public._seed_done(x int);");

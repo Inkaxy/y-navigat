@@ -1,12 +1,12 @@
 // Raske oppslag (20261124 del 1 + del 2) i PGlite: tilgang kontrolleres én gang, samme rader som dagens direkte lesing,
 // og radsikkerheten gir nøyaktig samme synlige rader før og etter del 2. Bruk: node scripts/test-raske-oppslag-sql.mjs
-import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
+import { readSql, printFingerprint } from "./lib/pastedSql.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const read = (f) => readFileSync(join(root, "supabase/pending", f), "utf8");
+const read = (f) => readSql(join(root, "supabase/pending", f));
 const LE = "11111111-1111-1111-1111-111111111111", LE2 = "22222222-2222-2222-2222-222222222222";
 const U_OK = "aaaaaaaa-0000-0000-0000-000000000001", U_NO = "aaaaaaaa-0000-0000-0000-000000000002", U_OWNER = "aaaaaaaa-0000-0000-0000-000000000003";
 
@@ -118,4 +118,5 @@ const db2 = new PGlite(); await db2.exec(stub);
 await db2.exec("drop policy invoices_select on invoices; create policy invoices_select on invoices for select using (true);");
 try { await db2.exec(read("1-kjor-na/03_raske_oppslag_del2_rls.sql")); ok(false, "vakt"); } catch (e) { ok(/endret siden 18.11/.test(e.message), "vakt stopper ved endret policy"); }
 
+await printFingerprint(db);
 console.log(`OK – ${n} kontroller`);

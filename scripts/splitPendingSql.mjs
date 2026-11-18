@@ -8,6 +8,10 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 
 export const TAG = "$stage$";
+// Innliming fra kodevisning/utklippstavle kan gi CR+LF, hardt mellomrom eller tabulator. Originalen har ingen av dem
+// (kontrolleres i splitSql), så teksten renses før lagring og md5 blir den samme uansett hvordan den ble limt inn.
+const CLEAN_OPEN = "replace(replace(replace(";
+const CLEAN_CLOSE = ", chr(13), ''), chr(160), ' '), chr(9), ' ')";
 const md5 = (s) => createHash("md5").update(s, "utf8").digest("hex");
 const pad = (n) => String(n).padStart(2, "0");
 
@@ -43,6 +47,7 @@ export function functionBodies(text) {
 export function splitSql(text, file, maxBytes = 13000) {
   const body = bodyOf(text);
   if (body.includes(TAG)) throw new Error(`Filen inneholder ${TAG}; velg annet merke`);
+  if (/[\r\t\u00a0]/.test(body)) throw new Error("Filen inneholder CR, tabulator eller hardt mellomrom; rens den først");
   const parts = chunk(body, maxBytes);
   const n = parts.length + 1;
   const name = (i) => `${file}.del${pad(i)}av${pad(n)}`;
@@ -59,7 +64,7 @@ export function splitSql(text, file, maxBytes = 13000) {
         + `  if not exists (select 1 from public._rm_sql_stage where file = '${file}' and part = ${i - 1}) then\n`
         + `    raise exception 'Kjør del ${pad(i - 1)} først';\n  end if;\nend $g$;\n`;
     const sql = head + "\n" + setup
-      + `insert into public._rm_sql_stage (file, part, body) values ('${file}', ${i}, ${TAG}${p}${TAG})\n  on conflict (file, part) do update set body = excluded.body, created_at = now();\n`
+      + `insert into public._rm_sql_stage (file, part, body) values ('${file}', ${i}, ${CLEAN_OPEN}${TAG}${p}${TAG}${CLEAN_CLOSE})\n  on conflict (file, part) do update set body = excluded.body, created_at = now();\n`
       + `do $g$ begin\n  if (select md5(body) from public._rm_sql_stage where file = '${file}' and part = ${i}) <> '${md5(p)}' then\n`
       + `    raise exception 'Del ${pad(i)} er ikke skrevet inn riktig (md5 avviker) – skriv den inn på nytt';\n  end if;\nend $g$;\n`;
     const check = `-- Kontroll for ${name(i)} (bare SELECT). Forventet: lengde ${p.length} tegn, md5 ${md5(p)}.\n`
@@ -82,7 +87,7 @@ export function splitSql(text, file, maxBytes = 13000) {
     + `do $g$ begin if not exists (select 1 from public._rm_sql_stage) then drop table public._rm_sql_stage; end if; end $g$;\n\ncommit;\n`;
   const runCheck = `-- Kontroll for ${name(n)} (bare SELECT). Viser md5 av funksjonskroppene slik de ligger i databasen,\n`
     + `-- mot verdiene i den gjennomgåtte filen. Alle «riktig» skal være true. Kjør også ${file}.check.sql.\n`
-    + `select e.navn, md5(p.prosrc) as md5_live, e.md5 as md5_fil, md5(p.prosrc) = e.md5 as riktig\nfrom (values\n`
+    + `select e.navn, md5(replace(p.prosrc, chr(13), '')) as md5_live, e.md5 as md5_fil, md5(replace(p.prosrc, chr(13), '')) = e.md5 as riktig\nfrom (values\n`
     + fnBodies.map((f) => `  ('${f.name}', '${f.md5}')`).join(",\n")
     + `\n) e(navn, md5)\nleft join pg_proc p on p.oid = (select max(x.oid) from pg_proc x join pg_namespace ns on ns.oid = x.pronamespace\n  where ns.nspname || '.' || x.proname = e.navn)\norder by e.navn;\n`
     + `-- Mellomlagringen er borte når alt er kjørt: select to_regclass('public._rm_sql_stage'); -- forventet null\n`;

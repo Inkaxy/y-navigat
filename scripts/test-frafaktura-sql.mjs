@@ -1,13 +1,13 @@
 // Demo D «Fra faktura»: kjører 20261119_fra_faktura.PENDING.sql og 20261119_fra_faktura_opprydding.DATAENDRING.sql
 // mot innebygd PostgreSQL (PGlite) med live-definisjonen av _rm_cost_candidates fra 17.11. Rører aldri live.
 // Bruk: node scripts/test-frafaktura-sql.mjs
-import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
+import { readSql, printFingerprint } from "./lib/pastedSql.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const read = (p) => readFileSync(join(root, p), "utf8");
+const read = (p) => readSql(join(root, p));
 const main = read("supabase/pending/kjort/20261119_fra_faktura.PENDING.sql")
   .replace("if md5(v_def) <> '5a28cc1e868271452552b30ad1d8ea57' then", "if false then");
 const cleanup = read("supabase/pending/2-endrer-data/20261119_fra_faktura_opprydding.DATAENDRING.sql");
@@ -174,4 +174,5 @@ check(stopped, "vakten stopper ved endret definisjon");
 await db2.exec("rollback");
 check((await db2.query(`select count(*)::int n from information_schema.columns where table_name='raw_materials' and column_name='cost_basis_rule'`)).rows[0].n === 0, "ingenting kjørt når vakten stopper");
 
+await printFingerprint(db);
 console.log(`OK: ${ok} kontroller bestått`);

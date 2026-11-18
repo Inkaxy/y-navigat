@@ -1,5 +1,5 @@
--- VENTER PÅ ROOT. 20261120_slaa_sammen_varer.del04av07.PENDING.sql – del 4 av 7 av 20261120_slaa_sammen_varer.PENDING.sql (12914 byte tekst).
--- Legger bare teksten i mellomlagringen og kontrollerer md5. Ingen virkning på appen før del 7 («kjør»).
+-- VENTER PÅ ROOT. 20261120_slaa_sammen_varer.del04av08.PENDING.sql – del 4 av 8 av 20261120_slaa_sammen_varer.PENDING.sql (12914 byte tekst).
+-- Legger bare teksten i mellomlagringen og kontrollerer md5. Ingen virkning på appen før del 8 («kjør»).
 -- Kan kjøres på nytt (overskriver samme del). md5 for delen: 8ab670c0bf53f07efdcf50acbe773489
 
 do $g$ begin
@@ -8,7 +8,7 @@ do $g$ begin
     raise exception 'Kjør del 03 først';
   end if;
 end $g$;
-insert into public._rm_sql_stage (file, part, body) values ('20261120_slaa_sammen_varer', 4, $stage$      -- Næring, allergener, datablad: bare der beholdt vare mangler det
+insert into public._rm_sql_stage (file, part, body) values ('20261120_slaa_sammen_varer', 4, replace(replace(replace($stage$      -- Næring, allergener, datablad: bare der beholdt vare mangler det
       if exists (select 1 from public.raw_material_nutrition where raw_material_id = v_d) then
         if not exists (select 1 from public.raw_material_nutrition where raw_material_id = p_keep) then
           update public.raw_material_nutrition set raw_material_id = p_keep where raw_material_id = v_d;
@@ -155,7 +155,7 @@ begin
   if v_blocking then
     if not p_dry_run then return jsonb_build_object('ok', false, 'code', 'konflikt', 'conflicts', v_conf); end if;
     return jsonb_build_object('ok', true, 'dry_run', true, 'can_apply', false, 'merge_id', m.id, 'keep_id', m.keep_id,
-$stage$)
+$stage$, chr(13), ''), chr(160), ' '), chr(9), ' '))
   on conflict (file, part) do update set body = excluded.body, created_at = now();
 do $g$ begin
   if (select md5(body) from public._rm_sql_stage where file = '20261120_slaa_sammen_varer' and part = 4) <> '8ab670c0bf53f07efdcf50acbe773489' then

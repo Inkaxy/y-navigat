@@ -1,12 +1,12 @@
 // Kjører variant B-forslagene (fase 1–3) mot innebygd PostgreSQL (PGlite) med en minimal stubb av
 // live-skjemaet. Rører aldri live. Bruk: node scripts/test-variantb-sql.mjs
-import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
+import { readSql, printFingerprint } from "./lib/pastedSql.mjs";
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), "..", "supabase", "pending");
-const read = (f) => readFileSync(join(dir, f), "utf8");
+const read = (f) => readSql(join(dir, f));
 // Stubben har ikke live-teksten byte for byte: md5-vakten byttes mot en innholdskontroll.
 const phase1 = read("kjort/20261117_beslutninger_angre.PENDING.sql").replace("if md5(v_def) <> '35d0e2bd23aff1c85459c4299db189d9' then", "if false then");
 const phase2 = read("1-kjor-na/04_prislinje.sql");
@@ -218,6 +218,7 @@ try {
   await as(U1);
   try { await db.query(`select public.rm_automation_tick()`); fail("innlogget bruker skulle ikke kunne kjøre tick"); } catch { ok(true, "tick bare for planlagt kjøring"); }
 
+await printFingerprint(db);
   console.log(`OK-kontroller: ${pass}`);
   console.log("ALLE VARIANT B-SQL-TESTER BESTÅTT");
 } catch (e) {
