@@ -73,7 +73,7 @@ export function pendingDelete(table: string, filter: string): Promise<PendingRes
 export type CapabilityName =
   | "rm_cap_beslutninger_v1" | "rm_cap_prislinje_v1" | "rm_cap_automatikk_v1"
   | "varer_cap_handelsvarer_v1" | "varer_cap_prisgrunnlag_v1" | "rm_cap_fra_faktura_v1" | "rm_cap_nye_varer_v1" | "rm_cap_godta_sum_v1"
-  | "rm_cap_slaa_sammen_v1" | "rm_cap_kobling_godkjent_v1" | "rm_cap_fakturalesing_v1" | "rm_cap_gjenlesing_fjern_v1";
+  | "rm_cap_slaa_sammen_v1" | "rm_cap_kobling_godkjent_v1" | "rm_cap_fakturalesing_v1" | "rm_cap_gjenlesing_fjern_v1" | "rm_cap_raske_oppslag_v1";
 /** Venter-tekster per PENDING-fil (vises i stedet for knappene). */
 export const CAPABILITY_FILE: Record<CapabilityName, string> = {
   rm_cap_beslutninger_v1: "Beslutninger – angre",
@@ -88,6 +88,7 @@ export const CAPABILITY_FILE: Record<CapabilityName, string> = {
   rm_cap_kobling_godkjent_v1: "Kobling på godkjente fakturaer",
   rm_cap_fakturalesing_v1: "Fakturalesing – opplæring",
   rm_cap_gjenlesing_fjern_v1: "Gjenlesing – fjern rester",
+  rm_cap_raske_oppslag_v1: "Raske oppslag",
 };
 
 /**

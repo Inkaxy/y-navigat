@@ -21,6 +21,15 @@ import { isNewItemType, type NewItemType } from "@/ravarer/lib/fraFaktura/newIte
 import { DEFAULT_JUMP_PCT, priceJumps, type JumpLineInput } from "@/ravarer/lib/fraFaktura/priceJumps";
 import { isUnread, sortUnread, type UnreadInput } from "@/ravarer/lib/fraFaktura/unread";
 import { fraFakturaTotal } from "@/ravarer/lib/fraFaktura/tabs";
+import { parsePriceJumpRows, parseUnreadRows } from "@/ravarer/lib/fastReads";
+
+/** Rask lesevei (20261124_raske_oppslag_del1): én tilgangskontroll per kall. Før SQL-en er kjørt: dagens direkte lesing. */
+async function fastRows<T>(name: string, le: string, parse: (d: unknown) => T, signal?: AbortSignal): Promise<T> {
+  const r = await callPendingRpc(name, { p_legal_entity_id: le }, signal);
+  if (r.kind === "ok") return parse(r.data);
+  if (r.kind === "denied") throw new Error("Du har ikke tilgang til fakturaene for dette selskapet.");
+  throw new Error("Kunne ikke hente listen. Prøv igjen.");
+}
 
 const OPEN = ["imported", "needs_review", "ready"];
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
@@ -197,14 +206,15 @@ type LineRow = {
 export function usePriceJumpLines(enabled = true) {
   const { data: company } = useCompany();
   const le = company?.id ?? null;
+  const fast = useReadCapability("rm_cap_raske_oppslag_v1");
   return useQuery({
     queryKey: ["ravarer", "fra-faktura", "price-lines", le],
-    enabled: enabled && !!le,
+    enabled: enabled && !!le && fast !== null,
     staleTime: 120_000,
     refetchOnWindowFocus: false,
     ...TRANSIENT_RETRY,
     // Menytelleren henter dette på hver Råvarer-side; lav prioritet i porten så det aldri går i tillegg til et tungt oppslag.
-    queryFn: ({ signal }): Promise<JumpLineInput[]> => workGate.run(async () => {
+    queryFn: ({ signal }): Promise<JumpLineInput[]> => fast ? fastRows("rm_price_jump_lines", le!, parsePriceJumpRows, signal) : workGate.run(async () => {
       const rows = await fetchAllRows<LineRow>((from, to) => supabase.from("invoice_lines")
         .select("id, invoice_id, raw_material_id, supplier_sku, description, price_per_base_unit, expected_price_per_base_unit, price_variance_pct, review_reason, invoice:invoices!invoice_lines_invoice_id_fkey!inner(invoice_number, invoice_date, supplier_id, status, flagged_at, legal_entity_id), rm:raw_materials!invoice_lines_raw_material_id_fkey(name, base_unit, item_type)")
         .eq("requires_review", true).is("excluded_at", null).not("price_variance_pct", "is", null).not("raw_material_id", "is", null)
@@ -236,13 +246,16 @@ type InvoiceRow = Omit<UnreadInput, "line_count"> & { status: string | null; inv
 export function useUnreadInvoices(enabled = true) {
   const { data: company } = useCompany();
   const le = company?.id ?? null;
+  const fast = useReadCapability("rm_cap_raske_oppslag_v1");
   return useQuery({
     queryKey: ["ravarer", "fra-faktura", "unread", le],
-    enabled: enabled && !!le,
+    enabled: enabled && !!le && fast !== null,
     staleTime: 120_000,
     refetchOnWindowFocus: false,
     ...TRANSIENT_RETRY,
-    queryFn: ({ signal }): Promise<UnreadInput[]> => workGate.run(async () => {
+    queryFn: ({ signal }): Promise<UnreadInput[]> => fast
+      ? fastRows("rm_unread_invoices", le!, parseUnreadRows, signal).then((out) => sortUnread(out.filter(isUnread)))
+      : workGate.run(async () => {
       const rows = await fetchAllRows<InvoiceRow>((from, to) => supabase.from("invoices")
         .select("id, invoice_number, invoice_date, supplier_id, total_amount, total_vat, is_credit_note, lines_sum_excl_vat, updated_at, line_extraction_status, line_extraction_error, lines_sum_status, tripletex_supplier_invoice_id, status, invoice_lines(count)")
         .eq("legal_entity_id", le!).in("status", OPEN).is("excluded_at", null).is("flagged_at", null)

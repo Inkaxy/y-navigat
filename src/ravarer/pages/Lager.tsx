@@ -10,7 +10,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ClipboardCheck, Search, Trash } from "lucide-react";
 import { RavarerHeaderBanner } from "@/ravarer/components/RavarerHeaderBanner";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
-import { useWorkSummary } from "@/ravarer/hooks/useWorkData";
+import { useNavCounts } from "@/ravarer/hooks/useNavCounts";
 import { availabilityRank, useResaleStockStatus, type ResaleStockRow } from "@/ravarer/hooks/useResaleStock";
 import { StockAdjustDialog, type AdjustMode } from "@/ravarer/components/stock/StockAdjustDialog";
 import { StockPeek } from "@/ravarer/components/stock/StockPeek";
@@ -29,8 +29,7 @@ const kr = (n: number | null) =>
 export default function LagerPage() {
   const { canWrite } = useRavarer();
   // Samme tall som Lager-merket i menyen og Beholdning-fanen (alle lagerførte, beholdning < min).
-  const { data: summary } = useWorkSummary({ includeApproval: false });
-  const belowMinAll = summary?.other.stock_below_min ?? null;
+  const belowMinAll = useNavCounts()?.stock_below_min ?? null;
   const stockQuery = useResaleStockStatus();
   const { data: items = [], isLoading } = stockQuery;
   const [sp, setSp] = useSearchParams();

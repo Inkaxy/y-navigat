@@ -8,7 +8,8 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useAccessibleApps } from "@/hooks/useAccessibleApps";
-import { useWorkSummary } from "@/ravarer/hooks/useWorkData";
+import { useNavCounts } from "@/ravarer/hooks/useNavCounts";
+import type { NavCounts } from "@/ravarer/lib/fastReads";
 import { useFraFakturaCounts } from "@/ravarer/hooks/useFraFaktura";
 import type { WorkSummary } from "@/ravarer/lib/workRpc";
 import { paths } from "@/ravarer/lib/paths";
@@ -234,11 +235,12 @@ export function SubAppNav() {
 function RavarerNav() {
   const { data: hasInvoiceAccess = false } = useInvoiceAccess();
   const { data: accessLevel = "none" } = useRavarerAccessLevel();
-  const { data: summary } = useWorkSummary({ includeApproval: false });
+  // Menyens merker: rask rm_nav_counts når 20261124_raske_oppslag_del1 er kjørt (ellers dagens oppsummering).
+  const nav = useNavCounts();
   const fraFaktura = useFraFakturaCounts(hasInvoiceAccess);
   return (
     <RavarerNavView
-      summary={summary}
+      nav={nav}
       openQuestions={fraFaktura.total}
       hasInvoiceAccess={hasInvoiceAccess}
       canManage={accessLevel === "admin" || accessLevel === "approve"}
@@ -247,10 +249,11 @@ function RavarerNav() {
 }
 
 /**
- * Råvarer (demo D): seks faste innganger + tannhjul. Alle tellere kommer fra ÉN
- * `rm_work_summary`, slik at meny, Oversikt og faner alltid viser samme tall.
+ * Råvarer (demo D): seks faste innganger + tannhjul. Merkene kommer fra rm_nav_counts (eller, før den finnes, fra
+ * `rm_work_summary`); samme regler som Oversikt og faner.
  */
-export function RavarerNavView({ summary, hasInvoiceAccess, canManage, openQuestions = null }: { summary: WorkSummary | undefined; hasInvoiceAccess: boolean; canManage: boolean; openQuestions?: number | null }) {
+export function RavarerNavView({ summary, nav = null, hasInvoiceAccess, canManage, openQuestions = null }: { summary?: WorkSummary | undefined; nav?: NavCounts | null; hasInvoiceAccess: boolean; canManage: boolean; openQuestions?: number | null }) {
+  const counts: NavCounts | null = nav ?? (summary ? { datasheet_changes: summary.data_quality.datasheet_changes, agreements_expiring_30d: summary.other.agreements_expiring_30d, stock_below_min: summary.other.stock_below_min } : null);
   const items: NavItem[] = [
     { kind: "link", to: paths.oversikt(), label: "Oversikt", icon: LayoutDashboard, exact: true },
   ];
@@ -262,7 +265,7 @@ export function RavarerNavView({ summary, hasInvoiceAccess, canManage, openQuest
   items.push(
     {
       kind: "link", to: paths.varer(), label: "Varer", icon: Wheat, matches: [paths.varer()],
-      badge: summary?.data_quality.datasheet_changes, badgeTone: "warning",
+      badge: counts?.datasheet_changes, badgeTone: "warning",
     },
   );
   if (hasInvoiceAccess) {
@@ -271,8 +274,8 @@ export function RavarerNavView({ summary, hasInvoiceAccess, canManage, openQuest
     // Ingen merke: `todo_total` blander varegrupper og fakturaer. Eksakte fakturatellere står på arbeidsflaten.
   }
   items.push(
-    { kind: "link", to: paths.leverandorer(), label: "Leverandører", icon: Truck, matches: [paths.leverandorer()], badge: summary?.other.agreements_expiring_30d, badgeTone: "warning" },
-    { kind: "link", to: paths.lager(), label: "Lager", icon: Warehouse, matches: [paths.lager()], badge: summary?.other.stock_below_min, badgeTone: "warning" },
+    { kind: "link", to: paths.leverandorer(), label: "Leverandører", icon: Truck, matches: [paths.leverandorer()], badge: counts?.agreements_expiring_30d, badgeTone: "warning" },
+    { kind: "link", to: paths.lager(), label: "Lager", icon: Warehouse, matches: [paths.lager()], badge: counts?.stock_below_min, badgeTone: "warning" },
   );
   if (canManage) {
     items.push({ kind: "link", to: paths.innstillinger(), label: "Innstillinger", icon: Settings, matches: [paths.innstillinger()], iconOnly: true });

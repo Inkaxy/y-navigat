@@ -150,12 +150,12 @@
 - [x] Kort «EHF-test» (godkjenner/admin), utvalg 1–3 per leverandør, «Kjør test», stopp, JSON-eksport
 - [x] Lesende funksjon `tripletex-ehf-test` i supabase/pending/functions (klar for utrulling – venter på ja)
 - [x] Tolking av EHF/Tripletex-linjer, side om side mot PDF, sammendrag per leverandør, råd ved 401/403
-- [ ] Kjøre testen med ekte data – venter på Henriks ja til utrulling av `tripletex-ehf-test`
+- [x] `tripletex-ehf-test` rullet ut (Henriks ja 18.11); kjøring med ekte data gjøres av Henrik innlogget
 
 # Ferdigstilling Råvarer/Fra faktura (18.11.2026, Henrik)
 - [x] 1 Utrulling: EHF-testfunksjon + ny fakturaleser (alle brytere av) etter at 20261122 er bekreftet kjørt; test lik prompt med alt av; tilbakerulling
 - [x] 2 Gjenlesing kan fjerne linjer (rm_apply_invoice_reread, PENDING md5), test at linjesum ikke øker av rester
-- [ ] 3 Raske lesefunksjoner for tellere/Prishopp/Ikke lest (<1 s), PENDING + check, målt før/etter
+- [x] 3 Raske lesefunksjoner: meny, Prishopp, Ikke lest + raskere fakturatilgang (20261124 del 1–2, ikke kjørt). Gjenstår: Oversikt og Varer-fanene bruker fortsatt rm_work_summary (pakkelisten er treg)
 - [ ] 4a Flytt siste Beslutninger-typer (Sjekk tallene under Ikke lest; merker på varen), fjern Beslutninger/Øvrige spørsmål
 - [ ] 4b Leverandørvare-visning beholdes som detaljside
 - [ ] 4c «Ny fra faktura»-merket på mobil
