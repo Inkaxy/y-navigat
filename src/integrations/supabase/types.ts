@@ -2916,11 +2916,15 @@ export type Database = {
           deactivated_by: string | null
           description_key: string | null
           id: string
+          invoice_id: string | null
+          invoice_line_id: string | null
           is_active: boolean
+          item_key: string | null
           legal_entity_id: string
           note: string | null
           original: Json
           source_correction_id: string | null
+          source_kind: string | null
           supplier_id: string
           supplier_sku_norm: string | null
         }
@@ -2933,11 +2937,15 @@ export type Database = {
           deactivated_by?: string | null
           description_key?: string | null
           id?: string
+          invoice_id?: string | null
+          invoice_line_id?: string | null
           is_active?: boolean
+          item_key?: string | null
           legal_entity_id: string
           note?: string | null
           original: Json
           source_correction_id?: string | null
+          source_kind?: string | null
           supplier_id: string
           supplier_sku_norm?: string | null
         }
@@ -2950,15 +2958,33 @@ export type Database = {
           deactivated_by?: string | null
           description_key?: string | null
           id?: string
+          invoice_id?: string | null
+          invoice_line_id?: string | null
           is_active?: boolean
+          item_key?: string | null
           legal_entity_id?: string
           note?: string | null
           original?: Json
           source_correction_id?: string | null
+          source_kind?: string | null
           supplier_id?: string
           supplier_sku_norm?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "invoice_extraction_examples_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_extraction_examples_invoice_line_id_fkey"
+            columns: ["invoice_line_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_lines"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "invoice_extraction_examples_legal_entity_id_fkey"
             columns: ["legal_entity_id"]
@@ -2975,6 +3001,73 @@ export type Database = {
           },
           {
             foreignKeyName: "invoice_extraction_examples_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_gold_invoices: {
+        Row: {
+          header: Json
+          invoice_id: string
+          is_active: boolean
+          legal_entity_id: string
+          line_count: number
+          lines: Json
+          marked_at: string
+          marked_by: string
+          note: string | null
+          supplier_id: string | null
+          unmarked_at: string | null
+          unmarked_by: string | null
+        }
+        Insert: {
+          header?: Json
+          invoice_id: string
+          is_active?: boolean
+          legal_entity_id: string
+          line_count: number
+          lines: Json
+          marked_at?: string
+          marked_by: string
+          note?: string | null
+          supplier_id?: string | null
+          unmarked_at?: string | null
+          unmarked_by?: string | null
+        }
+        Update: {
+          header?: Json
+          invoice_id?: string
+          is_active?: boolean
+          legal_entity_id?: string
+          line_count?: number
+          lines?: Json
+          marked_at?: string
+          marked_by?: string
+          note?: string | null
+          supplier_id?: string | null
+          unmarked_at?: string | null
+          unmarked_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_gold_invoices_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: true
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_gold_invoices_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_gold_invoices_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
@@ -3611,6 +3704,130 @@ export type Database = {
           },
         ]
       }
+      invoice_reading_log: {
+        Row: {
+          attempts: Json
+          catalog_items: number | null
+          chosen: string | null
+          created_at: string
+          examples_used: number | null
+          id: string
+          invoice_id: string | null
+          legal_entity_id: string
+          path: string[]
+          profile_used: boolean | null
+          settings_key: string | null
+          source: string
+          supplier_id: string | null
+        }
+        Insert: {
+          attempts?: Json
+          catalog_items?: number | null
+          chosen?: string | null
+          created_at?: string
+          examples_used?: number | null
+          id?: string
+          invoice_id?: string | null
+          legal_entity_id: string
+          path?: string[]
+          profile_used?: boolean | null
+          settings_key?: string | null
+          source: string
+          supplier_id?: string | null
+        }
+        Update: {
+          attempts?: Json
+          catalog_items?: number | null
+          chosen?: string | null
+          created_at?: string
+          examples_used?: number | null
+          id?: string
+          invoice_id?: string | null
+          legal_entity_id?: string
+          path?: string[]
+          profile_used?: boolean | null
+          settings_key?: string | null
+          source?: string
+          supplier_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_reading_log_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_reading_log_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_reading_log_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_reading_settings: {
+        Row: {
+          catalog_enabled: boolean
+          learning_enabled: boolean
+          legal_entity_id: string
+          max_examples: number
+          profile_enabled: boolean
+          revision: number
+          self_check_enabled: boolean
+          strong_config_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          catalog_enabled?: boolean
+          learning_enabled?: boolean
+          legal_entity_id: string
+          max_examples?: number
+          profile_enabled?: boolean
+          revision?: number
+          self_check_enabled?: boolean
+          strong_config_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          catalog_enabled?: boolean
+          learning_enabled?: boolean
+          legal_entity_id?: string
+          max_examples?: number
+          profile_enabled?: boolean
+          revision?: number
+          self_check_enabled?: boolean
+          strong_config_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_reading_settings_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: true
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_reading_settings_strong_config_id_fkey"
+            columns: ["strong_config_id"]
+            isOneToOne: false
+            referencedRelation: "ai_provider_config"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_reread_runs: {
         Row: {
           applied_at: string | null
@@ -3781,6 +3998,66 @@ export type Database = {
           vat_account_map?: Json
         }
         Relationships: []
+      }
+      invoice_supplier_profiles: {
+        Row: {
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          draft_source: Json
+          id: string
+          legal_entity_id: string
+          profile: Json
+          revision: number
+          status: string
+          supplier_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          draft_source?: Json
+          id?: string
+          legal_entity_id: string
+          profile?: Json
+          revision?: number
+          status?: string
+          supplier_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          draft_source?: Json
+          id?: string
+          legal_entity_id?: string
+          profile?: Json
+          revision?: number
+          status?: string
+          supplier_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_supplier_profiles_legal_entity_id_fkey"
+            columns: ["legal_entity_id"]
+            isOneToOne: false
+            referencedRelation: "legal_entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_supplier_profiles_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invoices: {
         Row: {
@@ -16836,6 +17113,14 @@ export type Database = {
         Args: { p_invoice_read_issue?: boolean; p_line_id: string }
         Returns: string
       }
+      _rm_reading_approve_guard: {
+        Args: { p_legal_entity_id: string }
+        Returns: string
+      }
+      _rm_reading_read_guard: {
+        Args: { p_legal_entity_id: string }
+        Returns: undefined
+      }
       _rm_reconcile_core: {
         Args: { p_invoice_id: string; p_mode: string; p_uid: string }
         Returns: Json
@@ -18813,6 +19098,7 @@ export type Database = {
       rm_can_write: { Args: { _rm_id: string }; Returns: boolean }
       rm_cancel_invoice_reread: { Args: { p_run_id: string }; Returns: Json }
       rm_cap_beslutninger_v1: { Args: never; Returns: boolean }
+      rm_cap_fakturalesing_v1: { Args: never; Returns: boolean }
       rm_cap_fra_faktura_v1: { Args: never; Returns: boolean }
       rm_cap_godta_sum_v1: { Args: never; Returns: boolean }
       rm_cap_kobling_godkjent_v1: { Args: never; Returns: boolean }
@@ -18976,6 +19262,22 @@ export type Database = {
           supplier_sku_norm: string
         }[]
       }
+      rm_extraction_examples_for_v2: {
+        Args: {
+          p_legal_entity_id: string
+          p_limit?: number
+          p_supplier_id: string
+        }
+        Returns: Json
+      }
+      rm_extraction_examples_list: {
+        Args: {
+          p_legal_entity_id: string
+          p_limit?: number
+          p_supplier_id?: string
+        }
+        Returns: Json
+      }
       rm_fail_invoice_line_extraction: {
         Args: { p_invoice_id: string; p_patch: Json; p_token: string }
         Returns: boolean
@@ -18997,6 +19299,7 @@ export type Database = {
         Args: { p_legal_entity_id: string }
         Returns: Json
       }
+      rm_gold_invoices: { Args: { p_legal_entity_id: string }; Returns: Json }
       rm_infer_package: {
         Args: { p_base_unit?: string; p_line_id: string }
         Returns: Json
@@ -19098,6 +19401,10 @@ export type Database = {
       }
       rm_list_price_evidence: {
         Args: { p_legal_entity_id: string; p_raw_material_ids: string[] }
+        Returns: Json
+      }
+      rm_mark_gold_invoice: {
+        Args: { p_invoice_id: string; p_note?: string }
         Returns: Json
       }
       rm_match_key: { Args: { p: string }; Returns: string }
@@ -19210,6 +19517,14 @@ export type Database = {
         Args: { p_from: string; p_to: string }
         Returns: number
       }
+      rm_reading_model_options: {
+        Args: { p_legal_entity_id: string }
+        Returns: Json
+      }
+      rm_reading_settings: {
+        Args: { p_legal_entity_id: string }
+        Returns: Json
+      }
       rm_receive_invoice_line: {
         Args: {
           p_best_before?: string
@@ -19220,6 +19535,15 @@ export type Database = {
         Returns: Json
       }
       rm_reconcile_invoice: { Args: { p_invoice_id: string }; Returns: Json }
+      rm_record_extraction_example: {
+        Args: {
+          p_corrected: Json
+          p_kind: string
+          p_line_id: string
+          p_note?: string
+        }
+        Returns: Json
+      }
       rm_refresh_cost_prices: {
         Args: { p_raw_material_ids: string[] }
         Returns: Json
@@ -19290,6 +19614,25 @@ export type Database = {
           p_legal_entity_id: string
           p_rows: Json
           p_supplier: Json
+        }
+        Returns: Json
+      }
+      rm_save_reading_settings: {
+        Args: {
+          p_expected_revision: number
+          p_legal_entity_id: string
+          p_settings: Json
+        }
+        Returns: Json
+      }
+      rm_save_supplier_profile: {
+        Args: {
+          p_draft_source?: Json
+          p_expected_revision: number
+          p_legal_entity_id: string
+          p_profile: Json
+          p_status: string
+          p_supplier_id: string
         }
         Returns: Json
       }
@@ -19470,6 +19813,26 @@ export type Database = {
         }[]
       }
       rm_supplier_link_snapshot: { Args: { p_rms_id: string }; Returns: string }
+      rm_supplier_profile_draft_stats: {
+        Args: { p_legal_entity_id: string; p_supplier_id: string }
+        Returns: Json
+      }
+      rm_supplier_profile_for_reading: {
+        Args: { p_legal_entity_id: string; p_supplier_id: string }
+        Returns: Json
+      }
+      rm_supplier_profiles: {
+        Args: { p_legal_entity_id: string }
+        Returns: Json
+      }
+      rm_supplier_reading_catalog: {
+        Args: {
+          p_legal_entity_id: string
+          p_limit?: number
+          p_supplier_id: string
+        }
+        Returns: Json
+      }
       rm_undo_accept_invoice_sum: {
         Args: { p_audit_id: string; p_op_id: string }
         Returns: Json
@@ -19522,6 +19885,7 @@ export type Database = {
         Args: { p_raw_material_id: string }
         Returns: undefined
       }
+      rm_unmark_gold_invoice: { Args: { p_invoice_id: string }; Returns: Json }
       rm_usable_cost: { Args: { p_raw_material_id: string }; Returns: number }
       rm_user_names: {
         Args: { p_legal_entity_id: string; p_user_ids: string[] }
