@@ -116,3 +116,15 @@ Lokal test: `bunx vitest run src/test/slaaSammenVarerSql.test.ts` (PGlite med fo
 | `20261121_kobling_godkjent_faktura.check.sql` | Bare SELECT: 13 kontroller med forventet verdi før (`for_ok`) og etter (`etter_ok`), inkl. «ingen rad i Nye varer med 0 linjer»; omfang og godkjenningsgrunnlag (samme tall før/etter). |
 
 `20261119_nye_varer_les.PENDING.sql` (ikke kjørt) er oppdatert 17.11: en linje med aktiv ført kostpris telles ikke som åpen, samme regel som koblingen. Oppdatert igjen 17.11 etter Henriks vedtak: «ukoblet» krever minst én åpen linje (samme som `rm_work_items` etter 20261121_kobling_godkjent_faktura); kontrollfilen godtar `rm_work_items` både før og etter den filen. `20261119_fra_faktura.PENDING.sql` (ikke kjørt): «Angre kobling» sperres ikke lenger av intern godkjenning. Forslag B (`20261121_ko_uten_godkjent`) er forkastet og slettet.
+
+## Ferdigstilling (18.11.2026)
+
+Samlet status, rekkefølge og brytere: `docs/ravarer-drift.md`. Utgåtte filer ligger i `utgaatt/`.
+
+| Fil | Status |
+|---|---|
+| `20261123_gjenlesing_fjern_linjer.PENDING.sql` | **VENTER PÅ ROOT.** Gjenlesing kan erstatte hele linjesettet når ingen beskyttet linje går tapt. md5-vakt. Test: `node scripts/test-gjenlesing-fjern-sql.mjs`. |
+| `20261124_raske_oppslag_del1.PENDING.sql` | **VENTER PÅ ROOT.** Raske lesefunksjoner for meny, Prishopp og Ikke lest. Test: `node scripts/test-raske-oppslag-sql.mjs`. |
+| `20261124_raske_oppslag_del2_rls.PENDING.sql` | **VENTER PÅ ROOT.** Lesepolicyer på fakturaer/linjer uten tilgangssjekk per rad; tilbakerulling i check-filen. |
+| `20261125_lesevarsel_stillstand.PENDING.sql` | **VENTER PÅ ROOT.** E-post ved stillstand/feilrate (krever malen fra 20261113). Cron kommentert ut. Test: `node scripts/test-lesevarsel-sql.mjs`. |
+| `20261120_slaa_sammen_varer/` | Den store filen delt i sju deler à høyst 15 kB med md5 per del. Se README i mappen. |

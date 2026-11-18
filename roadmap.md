@@ -155,14 +155,14 @@
 # Ferdigstilling Råvarer/Fra faktura (18.11.2026, Henrik)
 - [x] 1 Utrulling: EHF-testfunksjon + ny fakturaleser (alle brytere av) etter at 20261122 er bekreftet kjørt; test lik prompt med alt av; tilbakerulling
 - [x] 2 Gjenlesing kan fjerne linjer (rm_apply_invoice_reread, PENDING md5), test at linjesum ikke øker av rester
-- [x] 3 Raske lesefunksjoner: meny, Prishopp, Ikke lest + raskere fakturatilgang (20261124 del 1–2, ikke kjørt). Gjenstår: Oversikt og Varer-fanene bruker fortsatt rm_work_summary (pakkelisten er treg)
+- [~] 3 Raske lesefunksjoner: meny, Prishopp, Ikke lest + raskere fakturatilgang (20261124 del 1–2, ikke kjørt). Gjenstår: Oversikt og Varer-fanene bruker fortsatt rm_work_summary (pakkelisten er treg)
 - [x] 4a «Sjekk tallene»/«Sjekk koblingen» under Ikke lest, mindre prisendringer under Prishopp, merker på varen; Beslutninger fjernet (gamle lenker → Fra faktura)
 - [x] 4b Leverandørvare-visning beholdt som detaljside
 - [x] 4c «Ny fra faktura»-merket på mobil
 - [x] 4d Egen prisgrense på varens prisfane
 - [x] 4e Manglende databaseobjekter huskes i én time (nbhub.no får det først ved publisering)
-- [ ] 5a Helseside under Innstillinger
-- [ ] 5b Varsel stillstand/feilrate; vurder 20261113-filene
-- [ ] 5c Røyktester uten innlogging + sjekkliste innlogget
-- [ ] 6 docs/ravarer-drift.md + flytt utgåtte filer til supabase/pending/utgaatt/
-- [ ] 7 Del 20261120_slaa_sammen_varer i delfiler ≤15 kB med vakt + check (md5)
+- [x] 5a Helseside under Innstillinger › Fakturalesing
+- [x] 5b Varsel-banner + e-postvarsel som PENDING (20261125); mal og reserve vurdert
+- [x] 5c Røyktest uten innlogging + 15-punkts sjekkliste
+- [x] 6 docs/ravarer-drift.md; utgåtte filer flyttet
+- [x] 7 Sammenslåingsfilen delt i 7 deler + verktøy/test
