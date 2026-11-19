@@ -51,3 +51,21 @@ gjør: `getSessionToken` kan fornye og bufre sesjonsnøkkelen i `tripletex_crede
 `git mv supabase/pending/functions/tripletex-ehf-test supabase/functions/tripletex-ehf-test` – lagringen ruller ut
 funksjonen automatisk. Ingen andre endringer trengs: kortet oppdager selv om funksjonen finnes.
 Kontrollert lokalt: `deno check` gir ingen nye feil (bare den kjente feilen i `_shared/tripletex-crypto.ts`).
+
+---
+
+# Lesekø: ett forsøk per faktura per kjøring (19.11.2026) – `patches/20261119_lesekoe_ett_forsok_per_kjoring.patch`
+
+**Status: VENTER PÅ HENRIKS JA.** Gjelder bare `tripletex-import-invoice-lines/index.ts`. Ingen SQL.
+
+Feil: importen tar én faktura om gangen fra køen. En faktura som feiler av en ikke-systemisk grunn legges tilbake
+som `pending` uten ventetid, og køen (sortert på færrest forsøk) kan gi den tilbake i samme kjøring. Da kan alle
+tre forsøk brukes opp på sekunder, og fakturaen ender som «failed / needs_review».
+
+Rettelse: kjøringen husker fakturaer som feilet. Gir køen tilbake en av dem, kalles
+`rm_fail_invoice_line_extraction` med `release_attempt: true` (samme feiltekst, status `pending`) og kjøringen stopper.
+Forsøket telles dermed ikke, og neste planlagte kjøring prøver igjen – som før ombyggingen.
+
+Utrulling (etter ja): `patch -p1 < supabase/pending/functions/patches/20261119_lesekoe_ett_forsok_per_kjoring.patch`
+fra prosjektroten. Kontrollert lokalt: patchen gjelder rent mot dagens kode, og `deno check` gir de samme to kjente
+feilene som dagens kode, ingen nye.

@@ -98,6 +98,12 @@ Helsesiden (Innstillinger › Fakturalesing › Helse) viser hvilke brytere som 
 Lagring under `supabase/functions/` ruller ut automatisk. Ny serverkode legges derfor i
 `supabase/pending/functions/` og flyttes først etter ja til akkurat den utrullingen.
 
+### Venter på utrulling – `supabase/pending/functions/`
+
+| Laget | Funksjon | Hva | Status |
+|---|---|---|---|
+| 19.11.2026 | `tripletex-import-invoice-lines` (`patches/20261119_lesekoe_ett_forsok_per_kjoring.patch`) | En faktura som feiler, prøves ikke igjen i samme kjøring: køen tar én faktura om gangen og kunne ta samme faktura tilbake, slik at et forbigående problem (PDF ikke klar, tidsavbrudd) brukte opp alle tre forsøk på sekunder. Gis den tilbake, får den forsøket tilbake (`release_attempt`, allerede i produksjon) og kjøringen stopper. Ingen SQL. | Venter på Henriks ja. |
+
 ## D. Kjente begrensninger
 
 - Oversikt og Varer-fanene bruker fortsatt den tunge oppsummeringen (`rm_work_summary`, opptil 6–8 s). Menyen,
