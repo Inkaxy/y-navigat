@@ -7,7 +7,7 @@
 // hovednavn (før komma) mot søket, og kvalifikatoren (etter komma) mot det
 // råvarenavnet faktisk sier.
 
-import { normalizeForSearch, searchWords, trigramSimilarity } from "@/lib/textSimilarity";
+import { normalizeForSearch, searchWords, trigrams } from "@/lib/textSimilarity";
 import { suggestDeclarationNameLocal } from "@/ravarer/lib/declarationName";
 import { foodGroupFit, isNonFoodCategory } from "@/ravarer/lib/matvaretabellenGroups";
 
@@ -255,18 +255,121 @@ export const PERCENT_MISMATCH_SCORE = 0.86;
 
 type MatchKind = "exact" | "phrase" | "suffix" | null;
 
-function headMatch(query: string, foodHead: string): MatchKind {
-  if (!foodHead) return null;
-  if (query === foodHead) return "exact";
-  const words = query.split(" ");
-  // Hele hovednavnet som ordsekvens i søket («brunt sukker» → «sukker»).
-  if (new RegExp(`(^| )${escapeRe(foodHead)}( |$)`).test(query)) return "phrase";
-  // Sammensatt uten mellomrom: «lett melk» → «lettmelk».
-  for (let i = 0; i + 1 < words.length; i++) {
-    if (`${words[i]}${words[i + 1]}` === foodHead) return "phrase";
+/* ------------------------------------------------------------------ *
+ * Forhåndsindeks over Matvaretabellen
+ *
+ * Alt som bare avhenger av matvaren (normalisert navn, hode, kvalifikatorer,
+ * prosent, søkeord, ordmengde og trigrammer) regnes ut ÉN gang per lastet
+ * tabell og gjenbrukes for alle råvarer og søk. Poenggivningen er uendret —
+ * indeksen fjerner bare gjentatt arbeid. Indeksen holdes per tabell-objekt
+ * (WeakMap), så en ny innlasting gir ny indeks og ingen gamle forslag.
+ * ------------------------------------------------------------------ */
+
+interface PreparedFood {
+  food: FoodCandidate;
+  /** normalizeForSearch(food_name) */
+  full: string;
+  head: string;
+  /** ` ${head} ` — for ordsekvenstreff uten regex. */
+  paddedHead: string;
+  quals: string[];
+  percents: number[];
+  /** Normaliserte, ikke-tomme søkeord i opprinnelig rekkefølge. */
+  keywords: string[];
+  /** Ordene i navnet og i søkeordene. */
+  words: Set<string>;
+  /** Antall ulike trigrammer i det normaliserte navnet. */
+  trigramCount: number;
+}
+
+interface FoodIndex {
+  foods: PreparedFood[];
+  knownQualWords: Set<string>;
+  /** Trigram → matvarene (indekser) som har det. Gir delte trigrammer for alle matvarer i ett søk. */
+  trigramPostings: Map<string, number[]>;
+  /** Ferdige forslag per råvare (navn, deklarasjonsnavn, kategori, grenser). */
+  suggestions: Map<string, FoodSuggestion[]>;
+}
+
+const FOOD_INDEX = new WeakMap<readonly FoodCandidate[], FoodIndex>();
+
+function prepareFood(food: FoodCandidate, foodTrigrams: Set<string>): PreparedFood {
+  const full = normalizeForSearch(food.food_name);
+  const keywords: string[] = [];
+  for (const kw of food.search_keywords ?? []) {
+    const k = normalizeForSearch(kw);
+    if (k) keywords.push(k);
   }
-  // Norske sammensetninger er hodefinale: «meierismør» ER smør, «smøremyk» er det ikke.
-  if (foodHead.length >= 4 && words.some((w) => w !== foodHead && w.endsWith(foodHead))) return "suffix";
+  const words = new Set(full ? full.split(" ") : []);
+  for (const k of keywords) for (const w of k.split(" ")) words.add(w);
+  return {
+    food,
+    full,
+    head: head(food.food_name),
+    paddedHead: ` ${head(food.food_name)} `,
+    quals: qualifiers(food.food_name),
+    percents: percentValues(food.food_name),
+    keywords,
+    words,
+    trigramCount: foodTrigrams.size,
+  };
+}
+
+function foodIndex(foods: readonly FoodCandidate[]): FoodIndex {
+  const cached = FOOD_INDEX.get(foods);
+  if (cached) return cached;
+  const trigramPostings = new Map<string, number[]>();
+  const prepared = foods.map((food, i) => {
+    const t = trigrams(food.food_name);
+    for (const tri of t) {
+      const list = trigramPostings.get(tri);
+      if (list) list.push(i);
+      else trigramPostings.set(tri, [i]);
+    }
+    return prepareFood(food, t);
+  });
+  const knownQualWords = new Set<string>();
+  for (const f of prepared) for (const q of f.quals) for (const w of q.split(" ")) if (w) knownQualWords.add(w);
+  const index: FoodIndex = { foods: prepared, knownQualWords, trigramPostings, suggestions: new Map() };
+  FOOD_INDEX.set(foods, index);
+  return index;
+}
+
+/** Søket med ord og trigrammer regnet ut én gang. */
+interface PreparedQuery extends Query {
+  /** searchWords(text) */
+  words: string[];
+  wordSet: Set<string>;
+  /** Ord som teller i «udekkede ord»-sjekken (≥ 3 tegn, ikke rene tall). */
+  coverWords: string[];
+  trigrams: Set<string>;
+  /** ` ${text} ` */
+  padded: string;
+  /** To og to nabo-ord skrevet sammen: «lett melk» → «lettmelk». */
+  joinedPairs: Set<string>;
+}
+
+function prepareQuery(query: Query): PreparedQuery {
+  const words = query.text ? query.text.split(" ") : [];
+  return {
+    ...query,
+    words,
+    wordSet: new Set(words),
+    coverWords: words.filter((w) => w.length >= 3 && !isNumericToken(w)),
+    trigrams: trigrams(query.text),
+    padded: ` ${query.text} `,
+    joinedPairs: new Set(words.slice(0, -1).map((w, i) => `${w}${words[i + 1]}`)),
+  };
+}
+
+/** `headMatch` med søkets ord og matvarens hode ferdig regnet ut — samme svar. */
+function headMatchPrepared(query: PreparedQuery, food: PreparedFood): MatchKind {
+  const foodHead = food.head;
+  if (!foodHead) return null;
+  if (query.text === foodHead) return "exact";
+  if (query.padded.includes(food.paddedHead)) return "phrase";
+  if (query.joinedPairs.has(foodHead)) return "phrase";
+  if (foodHead.length >= 4 && query.words.some((w) => w !== foodHead && w.endsWith(foodHead))) return "suffix";
   return null;
 }
 
@@ -282,24 +385,21 @@ function isWeakSuffix(query: string, foodHead: string): boolean {
 }
 
 function keywordScore(
-  query: string,
-  food: FoodCandidate,
+  query: PreparedQuery,
+  food: PreparedFood,
   foodHasQualifier: boolean,
   keywordCertaintyAllowed: boolean,
 ): number {
-  const qWords = searchWords(query);
   let s = 0;
-  for (const kw of food.search_keywords ?? []) {
-    const k = normalizeForSearch(kw);
-    if (!k) continue;
-    if (k === query) {
+  for (const k of food.keywords) {
+    if (k === query.text) {
       // 1b: søkeordet ER hele søket, og navnet har ingen kvalifikator å ta feil
       // av — da er treffet like entydig som et navnetreff. Unntaket gjelder bare
       // når ingen matvare bærer søket som selve navnet: «sukker» er søkeord på
       // «Melis», men basen har «Sukker, hvitt», og da skal navnet vinne.
       if (!foodHasQualifier && keywordCertaintyAllowed) return 1;
       s = Math.max(s, foodHasQualifier ? KEYWORD_QUALIFIER_SCORE : KEYWORD_MAX);
-    } else if (k.length >= 4 && qWords.includes(k)) s = Math.max(s, 0.7);
+    } else if (k.length >= 4 && query.wordSet.has(k)) s = Math.max(s, 0.7);
   }
   return Math.min(s, KEYWORD_MAX);
 }
@@ -355,13 +455,10 @@ function hasUnknownPrefixWord(query: string, foodHead: string, knownQualWords: R
  * matvarenavnet i det hele tatt. «GRØNN TE SITRON TWINING» treffer «te» og
  * «grønn», men «sitron» og «twining» sier at det er en annen vare.
  */
-function hasUncoveredQueryWords(query: string, food: FoodCandidate): boolean {
-  const qWords = searchWords(query).filter((w) => w.length >= 3 && !isNumericToken(w));
-  if (qWords.length < 3) return false;
-  const foodWords = new Set(searchWords(food.food_name));
-  for (const kw of food.search_keywords ?? []) for (const w of searchWords(kw)) foodWords.add(w);
-  return qWords.some(
-    (w) => !foodWords.has(w) && !BRAND_WORDS_NORMALIZED.has(w) && !PACKAGING_WORDS_NORMALIZED.has(w),
+function hasUncoveredQueryWords(query: PreparedQuery, food: PreparedFood): boolean {
+  if (query.coverWords.length < 3) return false;
+  return query.coverWords.some(
+    (w) => !food.words.has(w) && !BRAND_WORDS_NORMALIZED.has(w) && !PACKAGING_WORDS_NORMALIZED.has(w),
   );
 }
 
@@ -380,23 +477,50 @@ function minPercentDiff(a: readonly number[], b: readonly number[]): number {
   return Number.isFinite(min) ? min : 0;
 }
 
+/** Tak og vekt for rene trigramtreff (siste utvei når verken hode eller søkeord treffer). */
+const TRIGRAM_WEIGHT = 0.9;
+const TRIGRAM_MAX = 0.75;
+
+const roundConfidence = (v: number): number => Math.round(v * 100) / 100;
+
+/**
+ * Jaccard-likhet fra ferdig talte trigrammer — samme tall som
+ * `trigramSimilarity` (delte / union), bare uten å bygge mengdene på nytt.
+ */
+function trigramJaccard(querySize: number, foodSize: number, shared: number): number {
+  if (querySize === 0 || foodSize === 0) return 0;
+  const union = querySize + foodSize - shared;
+  return union === 0 ? 0 : shared / union;
+}
+
+/** Delte trigrammer mellom søket og hver matvare, via indeksen. */
+function sharedTrigramCounts(query: PreparedQuery, index: FoodIndex): Int32Array {
+  const shared = new Int32Array(index.foods.length);
+  for (const t of query.trigrams) {
+    const list = index.trigramPostings.get(t);
+    if (!list) continue;
+    for (const i of list) shared[i]++;
+  }
+  return shared;
+}
+
 function scoreFood(
-  query: Query,
-  food: FoodCandidate,
+  query: PreparedQuery,
+  food: PreparedFood,
+  kind: MatchKind,
   variantSpecified: boolean,
   knownQualWords: ReadonlySet<string>,
-  keywordCertaintyAllowed = true,
+  keywordCertaintyAllowed: boolean,
+  sharedTrigrams: number,
 ): ScoreResult {
-  const full = normalizeForSearch(food.food_name);
-  const h = head(food.food_name);
-  const quals = qualifiers(food.food_name);
-  const kind = headMatch(query.text, h);
+  const h = food.head;
+  const quals = food.quals;
 
-  if (query.text === full) return { score: 1, percentMismatch: false };
+  if (query.text === food.full) return { score: 1, percentMismatch: false };
 
   // 1b gjelder også når hodet så vidt treffer som suffiks: «MEIERISMØR» er
   // basens eget søkeord for «Smør», og da er treffet entydig.
-  const kwCertain = keywordScore(query.text, food, quals.length > 0, keywordCertaintyAllowed);
+  const kwCertain = keywordScore(query, food, quals.length > 0, keywordCertaintyAllowed);
   if (kwCertain === 1) return { score: 1, percentMismatch: false };
 
   if (kind) {
@@ -404,7 +528,7 @@ function scoreFood(
     // «Jordbærsirup» er ikke «Sirup», og «grønn te sitron twining» er ikke te.
     let cap = 1;
     if (kind !== "suffix" && hasUnknownPrefixWord(query.text, h, knownQualWords)) cap = UNKNOWN_PREFIX_MAX;
-    if (hasUncoveredQueryWords(query.text, food)) cap = Math.min(cap, UNCOVERED_WORDS_MAX);
+    if (hasUncoveredQueryWords(query, food)) cap = Math.min(cap, UNCOVERED_WORDS_MAX);
     const capped = (score: number): ScoreResult => ({ score: Math.min(score, cap), percentMismatch: false });
 
     if (quals.length === 0) {
@@ -413,8 +537,8 @@ function scoreFood(
       return capped(isWeakSuffix(query.text, h) ? 0.79 : 0.9);
     }
     const base = kind === "suffix" ? 1 - QUALIFIER_PENALTY - 0.1 : 1 - QUALIFIER_PENALTY;
-    const foodPercents = percentValues(food.food_name);
-    const qWords = new Set(searchWords(query.text));
+    const foodPercents = food.percents;
+    const qWords = query.wordSet;
 
     // Prosent er den skarpeste varianten vi har: den avgjør alene.
     if (query.percents.length > 0 && foodPercents.length > 0) {
@@ -471,61 +595,69 @@ function scoreFood(
     if (qualHit) return { score: 0.92, percentMismatch: false };
   }
 
-  return { score: Math.min(trigramSimilarity(query.text, full) * 0.9, 0.75), percentMismatch: false };
+  return {
+    score: Math.min(trigramJaccard(query.trigrams.size, food.trigramCount, sharedTrigrams) * TRIGRAM_WEIGHT, TRIGRAM_MAX),
+    percentMismatch: false,
+  };
 }
 
 /**
  * Sier søket noe om variant? Da skal ingen «standardvariant» få tillegg.
  * Vi ser på ordene som faktisk skiller søsknene i basen fra hverandre.
  */
-function variantSpecifiedFor(query: Query, foods: readonly FoodCandidate[]): boolean {
+function variantSpecifiedFor(query: PreparedQuery, foods: readonly PreparedFood[], kinds: readonly MatchKind[]): boolean {
   if (query.percents.length > 0) return true;
-  const qWords = new Set(searchWords(query.text));
-  for (const food of foods) {
-    const h = head(food.food_name);
-    if (!headMatch(query.text, h)) continue;
-    for (const q of qualifiers(food.food_name)) {
+  for (let i = 0; i < foods.length; i++) {
+    if (!kinds[i]) continue;
+    for (const q of foods[i].quals) {
       if (q === UNIVERSAL_DEFAULT_QUALIFIER) continue;
-      if (q.split(" ").some((w) => w.length >= 3 && qWords.has(w))) return true;
+      if (q.split(" ").some((w) => w.length >= 3 && query.wordSet.has(w))) return true;
     }
   }
   return false;
 }
 
-/** Alle ord basen faktisk bruker som kvalifikator — «brunt», «siktet», «sammalt» … */
-function collectQualifierWords(foods: readonly FoodCandidate[]): Set<string> {
-  const out = new Set<string>();
-  for (const food of foods) {
-    for (const q of qualifiers(food.food_name)) for (const w of q.split(" ")) if (w) out.add(w);
-  }
-  return out;
-}
-
 function rankForQuery(
   rm: RawMaterialForSuggestion,
-  query: Query,
-  foods: readonly FoodCandidate[],
+  rawQuery: Query,
+  index: FoodIndex,
   minConfidence: number,
-  knownQualWords: ReadonlySet<string>,
 ): { food: FoodCandidate; confidence: number; len: number }[] {
-  const variantSpecified = variantSpecifiedFor(query, foods);
+  const query = prepareQuery(rawQuery);
+  const foods = index.foods;
+  // Hodetreffet avhenger bare av søk + matvare: regnes én gang og brukes både
+  // til variant-/søkeordsvurderingen og til poenggivningen.
+  const kinds = foods.map((f) => headMatchPrepared(query, f));
+  const variantSpecified = variantSpecifiedFor(query, foods, kinds);
   // Bærer en matvare søket som selve NAVNET, er søkeord bare en snarvei og skal
   // aldri gi full sikkerhet: «sukker» er søkeord på «Melis», men basen har
   // «Sukker, hvitt».
-  const keywordCertaintyAllowed = !foods.some((f) => {
-    const k = headMatch(query.text, head(f.food_name));
-    return k === "exact" || k === "phrase";
-  });
+  const keywordCertaintyAllowed = !kinds.some((k) => k === "exact" || k === "phrase");
+  const shared = sharedTrigramCounts(query, index);
+  // Samme kategori mot ~40 matvaregrupper: regn faktoren én gang per gruppe.
+  const fitByGroup = new Map<string | null, number>();
+  const groupFit = (group: string | null): number => {
+    let v = fitByGroup.get(group);
+    if (v === undefined) {
+      v = foodGroupFit(rm.category, group);
+      fitByGroup.set(group, v);
+    }
+    return v;
+  };
   const scored: { food: FoodCandidate; confidence: number; len: number }[] = [];
-  for (const food of foods) {
-    const { score } = scoreFood(query, food, variantSpecified, knownQualWords, keywordCertaintyAllowed);
+  for (let i = 0; i < foods.length; i++) {
+    const f = foods[i];
+    const { score } = scoreFood(query, f, kinds[i], variantSpecified, index.knownQualWords, keywordCertaintyAllowed, shared[i]);
     if (score <= 0) continue;
+    // Gruppefaktoren brukes bare som straff (≤ 1), så en kandidat som ikke når
+    // grensen uten den, når den aldri med den.
+    if (roundConfidence(score) < minConfidence) continue;
     // Gruppen brukes bare som straff. Som bonus løftet den alle søsken likt og
     // gjorde poengsummene ubrukelige til å skille dem.
-    const fit = foodGroupFit(rm.category, food.food_group_name);
-    const confidence = Math.round(score * (fit < 1 ? fit : 1) * 100) / 100;
+    const fit = groupFit(f.food.food_group_name);
+    const confidence = roundConfidence(score * (fit < 1 ? fit : 1));
     if (confidence < minConfidence) continue;
-    scored.push({ food, confidence, len: normalizeForSearch(food.food_name).length });
+    scored.push({ food: f.food, confidence, len: f.full.length });
   }
   scored.sort(
     (a, b) =>
@@ -536,7 +668,10 @@ function rankForQuery(
   return scored;
 }
 
-/** Topp-N forslag med tillit 0–1. Tom liste for ikke-mat-kategorier. */
+/**
+ * Topp-N forslag med tillit 0–1. Tom liste for ikke-mat-kategorier.
+ * Resultatet huskes per råvare så lenge samme Matvaretabell er lastet.
+ */
 export function suggestFoods(
   rm: RawMaterialForSuggestion,
   foods: readonly FoodCandidate[],
@@ -544,6 +679,22 @@ export function suggestFoods(
   minConfidence = 0.35,
 ): FoodSuggestion[] {
   if (isNonFoodCategory(rm.category)) return [];
+  const index = foodIndex(foods);
+  const key = JSON.stringify([rm.name, rm.declaration_name ?? null, rm.category ?? null, limit, minConfidence]);
+  const hit = index.suggestions.get(key);
+  if (hit) return hit.map((s) => ({ ...s }));
+
+  const result = computeSuggestions(rm, index, limit, minConfidence);
+  index.suggestions.set(key, result);
+  return result.map((s) => ({ ...s }));
+}
+
+function computeSuggestions(
+  rm: RawMaterialForSuggestion,
+  index: FoodIndex,
+  limit: number,
+  minConfidence: number,
+): FoodSuggestion[] {
   const queries = buildQueries(rm);
   if (queries.length === 0) return [];
 
@@ -551,9 +702,8 @@ export function suggestFoods(
   // overstyre at innkjøpsnavnet sier «Helmelk 3,5 %».
   let best: { food: FoodCandidate; confidence: number; len: number }[] = [];
   let bestTop = -1;
-  const knownQualWords = collectQualifierWords(foods);
   for (const q of queries) {
-    const ranked = rankForQuery(rm, q, foods, minConfidence, knownQualWords);
+    const ranked = rankForQuery(rm, q, index, minConfidence);
     const top = ranked[0]?.confidence ?? 0;
     if (top > bestTop + 1e-9) {
       best = ranked;
