@@ -38,6 +38,7 @@ export function useSuppliers() {
   return useQuery({
     queryKey: ["suppliers", legalEntityId],
     enabled: !!legalEntityId,
+    staleTime: 2 * 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("suppliers")

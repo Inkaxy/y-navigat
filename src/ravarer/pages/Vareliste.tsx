@@ -161,6 +161,11 @@ export default function VarelistePage({ liste, onActiveChange, activeId = null }
   const savedViewsPref = useUiPreference<SavedView[]>("ravarer:vareliste:views", EMPTY_VIEWS);
 
   const q = params.get("q") ?? "";
+  // Søkefeltet skriver lokalt og oppdaterer adressen (og dermed filtreringen) etter en kort pause.
+  const [qDraft, setQDraft] = useState(q);
+  const pushedQ = useRef(q);
+  // Bare endringer utenfra (tilbake-knapp, lagret visning) overskriver det som skrives.
+  useEffect(() => { if (q !== pushedQ.current) { pushedQ.current = q; setQDraft(q); } }, [q]);
   const kat = params.get("kat") ?? "all";
   const type = params.get("type") ?? "all";
   const status = params.get("status") ?? "active";
@@ -184,6 +189,12 @@ export default function VarelistePage({ liste, onActiveChange, activeId = null }
     },
     [setParams],
   );
+
+  useEffect(() => {
+    if (qDraft === q) return;
+    const t = setTimeout(() => { pushedQ.current = qDraft; setParam({ q: qDraft }); }, 200);
+    return () => clearTimeout(t);
+  }, [qDraft, q, setParam]);
 
   const existingCategories = useMemo(() => {
     const set = new Set<string>();
@@ -488,13 +499,13 @@ export default function VarelistePage({ liste, onActiveChange, activeId = null }
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 ref={searchRef}
-                value={q}
-                onChange={(e) => setParam({ q: e.target.value })}
+                value={qDraft}
+                onChange={(e) => setQDraft(e.target.value)}
                 placeholder="Søk navn, SKU, leverandørnummer eller alias…"
                 className="pl-9"
                 aria-label="Søk i varelisten"
                 onKeyDown={(e) => {
-                  if (e.key === "Escape") setParam({ q: null });
+                  if (e.key === "Escape") { setQDraft(""); pushedQ.current = ""; setParam({ q: null }); }
                 }}
               />
             </div>

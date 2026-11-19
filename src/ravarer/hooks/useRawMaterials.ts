@@ -58,6 +58,8 @@ export function useRawMaterials(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["raw_materials", legalEntityId],
     enabled,
+    // Skrivinger invaliderer nøkkelen; uten tak hentes hele listen ved hvert fane-/sidebytte.
+    staleTime: 2 * 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("raw_materials")
