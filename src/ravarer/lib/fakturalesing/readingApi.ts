@@ -26,13 +26,20 @@ export function unwrapPending(r: PendingResult): unknown {
   throw new Error("Utfallet er ukjent. Last siden på nytt og kontroller før du prøver igjen.");
 }
 
-export interface SettingsState { settings: ReadingSettings; revision: number; updatedAt: string | null }
+/**
+ * `ehfFirst`: bryteren «EHF først» (invoice_reading_settings.ehf_first). null = serveren sender ikke feltet ennå
+ * (databasefilen 1-kjor-na/02_ehf_bryter.sql er ikke kjørt), og bryteren kan ikke vises som verken av eller på.
+ */
+export interface SettingsState { settings: ReadingSettings; revision: number; updatedAt: string | null; ehfFirst: boolean | null }
 export function parseSettingsState(v: unknown): SettingsState | null {
   const r = rec(v);
   const revision = r ? int(r.revision) : null;
   if (!r || revision === null || revision < 0) return null;
-  return { settings: parseReadingSettings(r), revision, updatedAt: str(r.updated_at) };
+  const ehfFirst = typeof r.ehf_first === "boolean" ? r.ehf_first : null;
+  return { settings: parseReadingSettings(r), revision, updatedAt: str(r.updated_at), ehfFirst };
 }
+
+export const EHF_SWITCH_WAITING = "Bryteren kan lagres her når databasefilen «02_ehf_bryter.sql» er kjørt.";
 
 export type SaveOutcome = { ok: true; revision: number } | { ok: false; code: string };
 export function parseSaveOutcome(v: unknown): SaveOutcome | null {

@@ -1,6 +1,6 @@
 # Databasefiler – les meg først
 
-Oppdatert 18.11.2026. **To filer venter på Henriks ja:** `1-kjor-na/01_nullstill_koen.sql` («Nullstill køen») og `02_ehf_forst.sql` (EHF først, 19.11).
+Oppdatert 19.11.2026. **To filer venter på Henriks ja:** `1-kjor-na/01_nullstill_koen.sql` («Nullstill køen») og `02_ehf_bryter.sql` (bryter for EHF først i appen, 19.11). `02_ehf_forst.sql` ble kjørt 19.11 og ligger i `kjort/`.
 Henrik kjørte 00–07 i SQL Editor 18.11, alle med «Success», og root har kontrollert dem i produksjon. De er flyttet uendret til `kjort/`.
 Det som gjenstår, ligger i `2-endrer-data/` (eget ja per fil) og `3-valgfritt/`. Ingen fil kjøres automatisk.
 
@@ -16,8 +16,8 @@ Det som gjenstår, ligger i `2-endrer-data/` (eget ja per fil) og `3-valgfritt/`
 |---|---|---|---|---|
 | 01 | `01_nullstill_koen.sql` | «Nullstill køen»: egen kategori «Avsluttet ved nullstilling» for «Hold utenfor» (bare én linje), fire tabeller for kjøringen og funksjonene som styrer den (start, bolker, pause/stopp, kontroll av uavklarte steg, avslutning, angre-merking, status). Oppdatert 18.11 med Henriks romsligere regler: forhåndsvisningen leser lesevarslene på faktura og linje, og revisjonsloggen får hvilken forklaring/pakningskilde som ble brukt. | Nei. Ingen kjøring startes, ingen linjer, kostpriser eller innstillinger endres. Grensen 1 % settes først når en kjøring Henrik starter er ferdig uten feil. | «Nullstill køen …» øverst i Råvarer › Fra faktura (godkjenner/admin): forhåndsvisning, eksport, start, fremdrift, kvittering, angre. Helsesiden viser grensen og siste nullstilling. |
 
-| 02 | `02_ehf_forst.sql` | Bryteren «EHF først» (av som standard). Kjøres sammen med utrullingen av EHF-patchen. | Nei. Bare en ny av/på-kolonne. Nederst i filen står en egen, utkommentert linje som slår bryteren på. | Ingenting før bryteren slås på. Deretter får nye fakturaer fra Tripletex linjene fra EHF når den finnes og summene stemmer; fakturasiden viser «Linjekilde». |
-Kontroll før og etter: `kontroll/20261124_nullstill_koen.check.sql` og `kontroll/20261126_ehf_forst.check.sql` (alle rader `ok = true`). Tåler Windows-linjeskift.
+| 02 | `02_ehf_bryter.sql` | Bryteren «EHF først» under Råvarer › Innstillinger › Fakturalesing kan slås på og av i appen (godkjenner/admin). | Nei. Bryteren står AV til noen slår den på og trykker Lagre. De andre lesebryterne røres ikke. | Kortet «EHF først» øverst under Fakturalesing får en aktiv bryter. Når den er på, får nye fakturaer fra Tripletex linjene fra EHF når den finnes og summene stemmer; fakturasiden viser «Linjekilde». |
+Kontroll før og etter: `kontroll/20261124_nullstill_koen.check.sql` og `kontroll/20261127_ehf_bryter.check.sql` (alle rader `ok = true`). Tåler Windows-linjeskift.
 
 ## Kjørt 18.11 – nå i `kjort/`, kjør aldri på nytt
 

@@ -9,6 +9,7 @@ import { SupplierProfilesCard } from "./fakturalesing/SupplierProfilesCard";
 import { LearningExamplesCard } from "./fakturalesing/LearningExamplesCard";
 import { GoldInvoicesCard } from "./fakturalesing/GoldInvoicesCard";
 import { EhfTestCard } from "./fakturalesing/EhfTestCard";
+import { EhfFirstCard } from "./fakturalesing/EhfFirstCard";
 import { ReadingHealthCard } from "@/ravarer/components/drift/ReadingHealthCard";
 import { ReadingStallAlert } from "@/ravarer/components/drift/ReadingStallAlert";
 
@@ -45,6 +46,7 @@ export default function FakturalesingSettings() {
         </Card>
       ) : (
         <>
+          <EhfFirstCard key={company.id} legalEntityId={company.id} />
           <ReadingSwitchesCard legalEntityId={company.id} />
           <SupplierProfilesCard legalEntityId={company.id} />
           <LearningExamplesCard legalEntityId={company.id} />

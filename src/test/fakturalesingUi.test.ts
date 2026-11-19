@@ -19,6 +19,12 @@ describe("Fakturalesing-innstillinger: ukjent er aldri suksess", () => {
     expect(parseSettingsState({ catalog: "true", revision: 2 })?.settings.catalog).toBe(false);
     expect(parseSettingsState({ catalog: true })).toBeNull();
   });
+  it("EHF først: bare ekte true/false leses; mangler feltet, er bryteren ukjent (ikke av)", () => {
+    expect(parseSettingsState({ revision: 3, ehf_first: true })?.ehfFirst).toBe(true);
+    expect(parseSettingsState({ revision: 3, ehf_first: false })?.ehfFirst).toBe(false);
+    expect(parseSettingsState({ revision: 3 })?.ehfFirst).toBeNull();
+    expect(parseSettingsState({ revision: 3, ehf_first: "true" })?.ehfFirst).toBeNull();
+  });
 });
 
 describe("Læring: hva en avgjørelse lagres som", () => {
