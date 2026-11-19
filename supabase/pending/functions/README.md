@@ -96,3 +96,14 @@ og nettopris + trykt rabatt + GTIN hos ASKO.
    gjenlesing/ny import etter eget ja.
 
 `deno check`: samme tre kjente feil som dagens kode, ingen nye. Tester: `src/test/ehfLines.test.ts`.
+
+---
+
+# EHF-retting (19.11.2026) – venter på Henriks ja
+
+- `_shared/ehfLines.ts` (rettet kopi av `supabase/functions/_shared/ehfLines.ts`): `EHF_XML_OPTIONS` (alt som tekst), enhetspris med inntil 6 desimaler,
+  enhetskodene NMP→pakke, BE/XBE→bunt, CA/XCA→boks, trykt tillegg gir lesevarsel `tillegg` med beløpet.
+- `patches/20261119_ehf_tekst.patch`: `tripletex-import-invoice-lines` tolker XML med `EHF_XML_OPTIONS`.
+- Utrulling (etter ja): `cp supabase/pending/functions/_shared/ehfLines.ts supabase/functions/_shared/ehfLines.ts` og
+  `patch -p1 < supabase/pending/functions/patches/20261119_ehf_tekst.patch`, i samme endring.
+- Testet med `src/test/ehfTripletexUtvalg.test.ts` (11 ekte fakturaer fra EHF-testen) og med den ekte XML-tolkeren i Deno.

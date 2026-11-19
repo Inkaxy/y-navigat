@@ -3,6 +3,8 @@
 // Ren kode uten Deno-/nettleser-API-er; testes i src/test/ehfLines.test.ts.
 //
 // Treet er resultatet av en XML-tolker som gir objekter (navnerom-prefiks i nøkkel, «@attr», «#text»).
+// Tolkeren MÅ kjøres med reviveNumbers:false og reviveBooleans:false (EHF_XML_OPTIONS): ellers blir varenummer
+// «0023» til 23 og GTIN med ledende null kuttet (målt 19.11 med deno.land/x/xml 2.1.3).
 // Regler:
 //  - Bare trykte verdier: varenummer (SellersItemIdentification), GTIN, antall + enhetskode, nettopris
 //    (PriceAmount / BaseQuantity), rabatt/tillegg fra AllowanceCharge, linjesum og mva-sats.
@@ -12,6 +14,9 @@
 //    Ellers faller importen tilbake til PDF-lesing (ingen blanding på samme faktura).
 
 type Node = Record<string, unknown>;
+
+/** Valg til XML-tolkeren: alle verdier som tekst, slik de står i dokumentet. */
+export const EHF_XML_OPTIONS = Object.freeze({ reviveNumbers: false, reviveBooleans: false });
 
 const local = (k: string) => k.slice(k.lastIndexOf(":") + 1);
 const isNode = (v: unknown): v is Node => !!v && typeof v === "object" && !Array.isArray(v);
@@ -48,6 +53,8 @@ function num(n: unknown): number | null {
   return Number.isFinite(v) ? v : null;
 }
 const r2 = (v: number) => Math.round(v * 100) / 100;
+/** Enhetspris beholdes med inntil seks desimaler (Coca-Cola 15,948333; Bama 48,015), slik EHF trykker den. */
+const r6 = (v: number) => Math.round(v * 1e6) / 1e6;
 
 /** UN/ECE-enhetskoder (Rec 20/21) → våre kanoniske enheter. Ukjent kode = null (enheten avgjøres ikke). */
 export const UNIT_CODES: Readonly<Record<string, string>> = Object.freeze({
@@ -57,6 +64,8 @@ export const UNIT_CODES: Readonly<Record<string, string>> = Object.freeze({
   PK: "pakke", XPK: "pakke", PA: "pakke", XPA: "pakke",
   BG: "pose", XBG: "pose", SA: "sekk", XSA: "sekk", BO: "flaske", XBO: "flaske",
   PF: "pall", XPF: "pall", PX: "pall", XPX: "pall",
+  // Funnet i ekte EHF fra Tripletex 19.11: ASKO bruker NMP (antall pakker), Drammen Papir XBE (bunt) og XCA (boks/kanne).
+  NMP: "pakke", BE: "bunt", XBE: "bunt", CA: "boks", XCA: "boks",
 });
 
 const KIND_RULES: Array<[RegExp, string]> = [
@@ -111,12 +120,13 @@ function parseLine(el: unknown, credit: boolean, docUnknownUnits: Set<string>): 
   if (unitCode && !unit) docUnknownUnits.add(unitCode);
   const priceAmount = num(child(price, "PriceAmount"));
   const base = num(child(price, "BaseQuantity"));
-  const unitPrice = priceAmount == null ? null : r2(priceAmount / (base && base > 0 ? base : 1));
-  let allowance = 0, hasA = false;
+  const unitPrice = priceAmount == null ? null : r6(priceAmount / (base && base > 0 ? base : 1));
+  let allowance = 0, hasA = false, charge = 0, hasC = false;
   for (const ac of children(el, "AllowanceCharge")) {
     const isCharge = text(child(ac, "ChargeIndicator"))?.toLowerCase() === "true";
     const amount = num(child(ac, "Amount"));
-    if (!isCharge && amount != null) { allowance += amount; hasA = true; }
+    if (amount == null) continue;
+    if (isCharge) { charge += amount; hasC = true; } else { allowance += amount; hasA = true; }
   }
   const total = num(child(el, "LineExtensionAmount"));
   const description = [name, desc && desc !== name ? desc : null].filter(Boolean).join(" – ") || null;
@@ -124,6 +134,9 @@ function parseLine(el: unknown, credit: boolean, docUnknownUnits: Set<string>): 
   const gtin = text(gtinEl);
   const issues: Array<{ code: string; message: string }> = [];
   if (unitCode && !unit) issues.push({ code: "ukjent_enhet", message: `Ukjent enhetskode «${unitCode}» i EHF. Kontroller enheten.` });
+  // Trykt tillegg (f.eks. miljøavgift) har ikke eget felt på fakturalinjen. Det skjules aldri i rabatten; linjen
+  // får et lesevarsel med beløpet, slik at regnestykket mengde × pris − rabatt + tillegg kan kontrolleres.
+  if (hasC) issues.push({ code: "tillegg", message: `Linjen har et trykt tillegg på ${r2(charge).toFixed(2).replace(".", ",")} kr i EHF (f.eks. miljøavgift). Sum = mengde × pris − rabatt + tillegg.` });
   const kind = KIND_RULES.find(([re]) => re.test(description ?? ""))?.[1] ?? "vare";
   return {
     description,
@@ -137,7 +150,7 @@ function parseLine(el: unknown, credit: boolean, docUnknownUnits: Set<string>): 
     price_basis: "mengdeenhet",
     line_kind: kind,
     read_issues: issues,
-    number_evidence: [{ kilde: "ehf", enhetskode: unitCode, prisgrunnlag: base, gtin, gtin_skjema: attr(gtinEl, "schemeID") }],
+    number_evidence: [{ kilde: "ehf", enhetskode: unitCode, prisgrunnlag: base, gtin, gtin_skjema: attr(gtinEl, "schemeID"), tillegg: hasC ? r2(charge) : null }],
     confidence: 1,
   };
 }

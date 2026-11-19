@@ -107,6 +107,8 @@ Lagring under `supabase/functions/` ruller ut automatisk. Ny serverkode legges d
 |---|---|---|---|
 | – | – | Ingen serverendringer venter. | |
 
+**19.11.2026 – venter på ja (serverutrulling):** `supabase/pending/functions/_shared/ehfLines.ts` (rettet) + `patches/20261119_ehf_tekst.patch` (`tripletex-import-invoice-lines`). Funnet ved gjennomgang av 11 ekte EHF-fakturaer (119 linjer): XML-tolkeren kuttet ledende nuller i varenummer/fakturanummer, enhetspris ble rundet til 2 desimaler (48,015 → 48,02), ASKO-koden NMP og Drammen Papirs XBE/XCA var ukjente, og trykte tillegg ble oversett. Etter rettingen lander varenummer, mengde, enhetspris og sum riktig på alle 119; 19 Drammen-linjer med tillegg får lesevarsel. Utrulling: kopier `ehfLines.ts` til `supabase/functions/_shared/` og bruk patchen. Bryteren `ehf_first` er fortsatt AV.
+
 **19.11.2026:** `02_ehf_forst.sql` kjørt (bryter `ehf_first`, AV) og `tripletex-import-invoice-lines` rullet ut med EHF først etter Henriks ja. Bryteren slås på separat (i appen etter `02_ehf_bryter`). `02_ehf_forst.sql` ligger i `kjort/`.
 
 ## D. Kjente begrensninger
