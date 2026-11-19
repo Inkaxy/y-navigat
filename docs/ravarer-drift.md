@@ -42,7 +42,6 @@ viser hva utklippstavlen gjør. Test: `node scripts/test-innliming-crlf.mjs` (hv
 |---|---|---|
 | `01_nullstill_koen` (kontroll `20261124_nullstill_koen`) | «Nullstill køen» (`rm_cap_nullstill_koen_v1`): kategori `nullstilling` for «Hold utenfor» på linje, tabellene `rm_queue_reset_runs/_snapshot/_items/_item_lines`, funksjonene `rm_queue_reset_*`. Oppdatert 18.11 (romsligere regler A/B/C): forhåndsvisningen leser lesevarsler på faktura og alle linjekoder i stedet for prissikkerhetsstatusen, og `rm_queue_reset_finish` skriver `lesegrunnlag` i revisjonsloggen. | Venter på Henriks ja. Ingen utrulling av serverfunksjoner trengs (bruker `link-supplier-item` og `match-invoice-lines` som allerede er ute). Starter ingen kjøring; grensen 1 % settes av appen etter ferdig kjøring uten feil. |
 
-| `02_ehf_bryter` (kontroll `20261127_ehf_bryter`, test `scripts/test-ehf-bryter-sql.mjs`) | Bryteren «EHF først» kan lagres i appen (Innstillinger › Fakturalesing): `rm_reading_settings` sender `ehf_first`, ny `rm_save_ehf_first` (godkjenner/admin, revisjon, revisjonslogg). `rm_save_reading_settings` er uendret. | Venter på Henriks ja. Endrer ingen data; bryteren står AV til noen slår den på og lagrer. Ingen serverutrulling. |
 
 **Kontrollert av root i produksjon 18.11 etter 00–07:** `rm_cap_gjenlesing_fjern_v1`, `rm_cap_raske_oppslag_v1`,
 `rm_cap_prislinje_v1` og `rm_cap_slaa_sammen_v1` finnes; tabellene `rm_material_merges` (0 rader) og
@@ -109,7 +108,7 @@ Lagring under `supabase/functions/` ruller ut automatisk. Ny serverkode legges d
 
 **19.11.2026 – venter på ja (serverutrulling):** `supabase/pending/functions/_shared/ehfLines.ts` (rettet) + `patches/20261119_ehf_tekst.patch` (`tripletex-import-invoice-lines`). Funnet ved gjennomgang av 11 ekte EHF-fakturaer (119 linjer): XML-tolkeren kuttet ledende nuller i varenummer/fakturanummer, enhetspris ble rundet til 2 desimaler (48,015 → 48,02), ASKO-koden NMP og Drammen Papirs XBE/XCA var ukjente, og trykte tillegg ble oversett. Etter rettingen lander varenummer, mengde, enhetspris og sum riktig på alle 119; 19 Drammen-linjer med tillegg får lesevarsel. Utrulling: kopier `ehfLines.ts` til `supabase/functions/_shared/` og bruk patchen. Bryteren `ehf_first` er fortsatt AV.
 
-**19.11.2026:** `02_ehf_forst.sql` kjørt (bryter `ehf_first`, AV) og `tripletex-import-invoice-lines` rullet ut med EHF først etter Henriks ja. Bryteren slås på separat (i appen etter `02_ehf_bryter`). `02_ehf_forst.sql` ligger i `kjort/`.
+**19.11.2026:** `02_ehf_forst.sql` kjørt (bryter `ehf_first`, AV) og `tripletex-import-invoice-lines` rullet ut med EHF først etter Henriks ja. Bryteren slås på separat i appen. `02_ehf_bryter.sql` kjørt 19.11 etter Henriks ja (kontroll ok, bryteren AV); den gir bryteren under Innstillinger › Fakturalesing. `02_ehf_forst.sql` ligger i `kjort/`.
 
 ## D. Kjente begrensninger
 

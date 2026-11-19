@@ -19938,6 +19938,14 @@ export type Database = {
         Args: { p_correction_id: string; p_reason: string }
         Returns: Json
       }
+      rm_save_ehf_first: {
+        Args: {
+          p_enabled: boolean
+          p_expected_revision: number
+          p_legal_entity_id: string
+        }
+        Returns: Json
+      }
       rm_save_manual_pdf_invoice: {
         Args: {
           p_invoice: Json
