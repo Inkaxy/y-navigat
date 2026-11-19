@@ -121,6 +121,21 @@ export function baseUnitForNew(unit: ContentUnit): "kg" | "l" | "stk" {
   return unit === "kg" || unit === "g" ? "kg" : unit === "l" || unit === "ml" ? "l" : "stk";
 }
 
+/** Enhetsfamilie for innhold: vekt, volum eller antall. */
+export function unitFamily(u: string | null | undefined): "kg" | "l" | "stk" | null {
+  const n = (u ?? "").toLowerCase();
+  return n === "kg" || n === "g" ? "kg" : n === "l" || n === "ml" ? "l" : n === "stk" ? "stk" : null;
+}
+
+/**
+ * Innholdet på fakturaen er i en annen familie enn varens grunnenhet (f.eks. 249 g mot en stk-vare).
+ * Gir hvilken grunnenhet varen måtte hatt for å passe; null = ingen kollisjon.
+ */
+export function unitConflict(draftUnit: string, baseUnit: string | null): { from: "kg" | "l" | "stk"; to: "kg" | "l" | "stk" } | null {
+  const from = unitFamily(baseUnit), to = unitFamily(draftUnit);
+  return from && to && from !== to ? { from, to } : null;
+}
+
 export type PackageState =
   | { state: "empty" }
   | { state: "invalid"; reason: string }

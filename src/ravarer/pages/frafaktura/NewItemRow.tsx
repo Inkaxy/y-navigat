@@ -19,6 +19,9 @@ import type { NewItemReceipt, useNewItemActions } from "@/ravarer/hooks/useNewIt
 import { RowTarget } from "./RowTarget";
 import { RowPackage } from "./RowPackage";
 import { InvoiceSnippet } from "./InvoiceSnippet";
+import { TypeUnitCorrectionDialog } from "@/fakturaer/components/supplier-item/TypeUnitCorrectionDialog";
+import { useCompany } from "@/hooks/useCompany";
+import { ITEM_TYPES } from "@/ravarer/lib/itemTypes";
 
 export type RowEntry = { answer: RowAnswer | null; submit: () => Promise<boolean> };
 type Actions = ReturnType<typeof useNewItemActions>;
@@ -63,7 +66,7 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
     const s = suggestCandidate(text, candidates);
     return sameSku.length ? [...sameSku, ...(s && !sameSku.some((c) => c.id === s.id) ? [s] : [])] : s ? [s] : [];
   }, [row.kind, row.rm_id, byId, sameSku, text, candidates]);
-  const suggestionLabel = row.kind === "mangler_pakning" ? "Koblet i dag" : sameSku.length || collision ? "Samme varenummer" : "Forslag";
+  const suggestionLabel = row.kind === "mangler_pakning" ? "Koblet – mangler pakning" : sameSku.length || collision ? "Samme varenummer" : "Forslag";
 
   const [mode, setMode] = useState<RowMode>("opprett");
   const [pick, setPick] = useState<Candidate | null>(null);
@@ -95,13 +98,17 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
     setPick(suggestions[0] ?? null);
   }, [suggestions, lines.isLoading, isSku, skuIndex.isLoading]);
 
-  const baseUnit = mode === "koble" ? pick?.base_unit ?? null : null;
+  // Ferskt kandidatobjekt: etter retting av grunnenhet kommer ny enhet med neste henting av varene.
+  const pickNow = pick ? byId.get(pick.id) ?? pick : null;
+  const baseUnit = mode === "koble" ? pickNow?.base_unit ?? null : null;
+  const { data: company } = useCompany();
+  const [fixUnit, setFixUnit] = useState<"kg" | "l" | "stk" | null>(null);
   const state = readPackage(draft, baseUnit);
   const badge = packageBadge({ text, draft, state, mode, hasSuggestion: suggestions.length > 0 && !!pick && suggestions.some((s) => s.id === pick.id), numbersOk: math?.clean !== false });
   const price = pricePerBase(pkgLine, state, math ? math.units : undefined);
   const perUnit = pkgLine ? unitPrices(pkgLine, math) : [];
   // «Opprett som ny» når samme varenummer alt finnes: aldri med i «Opprett N sikre».
-  const answer: RowAnswer = { mode, type, name, pick, badge, state, existingMatch: sameSku.length > 0 };
+  const answer: RowAnswer = { mode, type, name, pick: pickNow, badge, state, existingMatch: sameSku.length > 0 };
   const lineIds = linkable.map((l) => l.id);
   const ready = !lines.isLoading && !lines.isError && lineIds.length > 0;
   const allLocked = !lines.isLoading && open.length > 0 && linkable.length === 0 && locked.length > 0;
@@ -115,7 +122,7 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
     try {
       const r = await actions.link({
         supplierId: row.supplier_id, supplierName: row.supplier_name, itemKey: row.item_key, text: text ?? row.title, lineIds,
-        target: mode === "koble" && pick ? { kind: "existing", id: pick.id, name: pick.name } : { kind: "new", name, type }, pkg: state,
+        target: mode === "koble" && pickNow ? { kind: "existing", id: pickNow.id, name: pickNow.name } : { kind: "new", name, type }, pkg: state,
       });
       onDone(row.key, r, sentAt);
       return true;
@@ -187,7 +194,14 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
                 )}
                 {skuIndex.isError && <p role="alert" className="text-caption text-destructive">Kunne ikke sjekke om varenummeret finnes fra før. Forslaget bygger bare på navnet.</p>}
                 <RowPackage draft={draft} onDraft={setDraft} state={state} badge={badge} price={price} baseUnit={baseUnit} disabled={disabled}
-                  unitPrices={perUnit} numbersNote={math && !math.clean ? math.note : null} />
+                  unitPrices={perUnit} numbersNote={math && !math.clean ? math.note : null} isNew={mode === "opprett"}
+                  onChangeBaseUnit={canWrite && company && mode === "koble" && pickNow ? setFixUnit : undefined} />
+                {fixUnit && company && pickNow && (
+                  <TypeUnitCorrectionDialog key={`${company.id}:${pickNow.id}`} companyId={company.id} rawMaterialId={pickNow.id} rawMaterialName={pickNow.name}
+                    open onOpenChange={(o) => { if (!o) setFixUnit(null); }} canWrite={canWrite} initialBaseUnit={fixUnit}
+                    initialItemType={ITEM_TYPES.find((t) => t.value === pickNow.item_type)?.value}
+                    onSaved={() => setFixUnit(null)} />
+                )}
                 {allLocked ? (
                   <p role="note" className="text-caption font-semibold text-warning">
                     {lockedApproved

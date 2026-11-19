@@ -44,7 +44,7 @@ export function RowTarget({ mode, onMode, pick, onPick, suggestions, suggestionL
                       className={cn("flex min-h-[44px] w-full items-center gap-2 rounded-lg border px-3 text-left text-sm", on ? "border-success/40 bg-success/10" : "border-line-subtle bg-card hover:bg-muted")}>
                       {on ? <Check className="h-4 w-4 shrink-0 text-success" aria-hidden /> : <span className="w-4" aria-hidden />}
                       <span className="font-semibold">{c.name}</span>
-                      <span className="text-ink-secondary">· {TYPE_LABEL[c.item_type ?? "ravare"] ?? "Vare"}</span>
+                      <span className="text-ink-secondary">· {TYPE_LABEL[c.item_type ?? "ravare"] ?? "Vare"}{c.base_unit ? ` · regnes i ${c.base_unit}` : ""}</span>
                       {isSug && <span className="rounded-full bg-warning/15 px-2 py-0.5 text-caption font-semibold text-warning">{suggestionLabel}</span>}
                       <span className="ml-auto tabular-nums text-ink-secondary">{kr(c.cost, c.base_unit)}</span>
                     </button>

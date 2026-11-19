@@ -65,3 +65,9 @@ describe("koblet vare med pakning og rest-årsak står ikke i Nye varer", () => 
     expect(rows.map((r) => r.item_key)).toEqual(["sku:1", "sku:4"]);
   });
 });
+
+import { unitConflict } from "./newItems";
+describe("unitConflict", () => {
+  it("249 g mot stk-vare er kollisjon som peker på kg", () => { expect(unitConflict("g", "stk")).toEqual({ from: "stk", to: "kg" }); });
+  it("g mot kg-vare er ingen kollisjon", () => { expect(unitConflict("g", "kg")).toBeNull(); });
+});
