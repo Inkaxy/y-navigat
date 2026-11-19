@@ -76,7 +76,7 @@ export function useNewItemActions() {
     refresh(rmId ?? undefined);
     void learn(i.lineIds[0], linkLearning(i.target.name, i.pkg));
     const what = i.target.kind === "existing" ? `«${i.target.name}»` : `ny ${NEW_ITEM_TYPE_LABEL[i.target.type].toLowerCase()} «${i.target.name.trim()}»`;
-    const open = r.still_open_lines > 0 ? ` ${r.still_open_lines} står fortsatt til kontroll.` : "";
+    const open = r.still_open_lines > 0 ? ` Pakning lagret. ${r.still_open_lines} av dem har en pris som venter på deg under Prishopp.` : " Pakning lagret og pris ført.";
     return {
       title: i.text, detail: `${what}. ${lines(r.lines_updated)} koblet.${open}`,
       undo: rmId ? { kind: "kobling", supplierId: i.supplierId, itemKey: i.itemKey, lineIds: i.lineIds, rawMaterialId: rmId, created: r.created_raw_material } : null,
