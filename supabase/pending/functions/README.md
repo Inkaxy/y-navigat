@@ -69,3 +69,30 @@ Forsøket telles dermed ikke, og neste planlagte kjøring prøver igjen – som 
 Utrulling (etter ja): `patch -p1 < supabase/pending/functions/patches/20261119_lesekoe_ett_forsok_per_kjoring.patch`
 fra prosjektroten. Kontrollert lokalt: patchen gjelder rent mot dagens kode, og `deno check` gir de samme to kjente
 feilene som dagens kode, ingen nye.
+
+---
+
+# EHF først (19.11.2026) – `_shared/ehfLines.ts` + `patches/20261119_ehf_forst.patch`
+
+**Status: venter på Henriks ja.** Ikke rullet ut.
+
+Grunnlag: EHF-testen 19.11 (12 leverandører): 10 har EHF i Tripletex, Baker Nilsen og Lantmännen har bare PDF.
+EHF ga varenummer der PDF manglet (Flemming Egg, TINE), riktig kollipris der PDF leste kilopris (Idun 374,30 mot 37,43),
+og nettopris + trykt rabatt + GTIN hos ASKO.
+
+## Hva patchen gjør i `tripletex-import-invoice-lines`
+1. Leser `invoice_reading_settings.ehf_first`. Mangler kolonnen/raden, eller feil = AV → nøyaktig som i dag.
+2. Når på: henter `supplierInvoice → voucher.ediDocument → /document/{id}/content` (bare GET). PDF hentes og lagres uansett.
+3. `ehfLinesFromTree` tolker UBL; `decideEhf` krever linjesum på alle linjer, linjesum = dokumentets sum og beløp eks. mva
+   = Tripletex-hodet (±1 kr). Ellers PDF-lesing som før (ingen blanding på samme faktura), og grunnen står i kjøringens svar.
+4. EHF-linjene går gjennom samme `toInvoiceLineRows` og `rm_finalize_invoice_line_extraction` som PDF-linjer
+   (samme lesekontroll, sumkontroll, matching). Fakturaen får `lines_source = 'ehf_attachment'`.
+
+## Utrulling (etter ja)
+1. Kjør `1-kjor-na/02_ehf_forst.sql` (+ kontrollfil).
+2. `git mv supabase/pending/functions/_shared/ehfLines.ts supabase/functions/_shared/ehfLines.ts`, oppdater importen i
+   `src/test/ehfLines.test.ts`, og `patch -p1 < supabase/pending/functions/patches/20261119_ehf_forst.patch`.
+3. Slå på med linjen nederst i 02-filen. Allerede leste fakturaer endres ikke; de leses på nytt bare via eksisterende
+   gjenlesing/ny import etter eget ja.
+
+`deno check`: samme tre kjente feil som dagens kode, ingen nye. Tester: `src/test/ehfLines.test.ts`.

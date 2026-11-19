@@ -1,0 +1,121 @@
+--- a/supabase/functions/tripletex-import-invoice-lines/index.ts	2026-11-19 13:28:49.364066686 +0000
++++ b/supabase/functions/tripletex-import-invoice-lines/index.ts	2026-11-19 13:29:11.360067473 +0000
+@@ -28,6 +28,9 @@
+ import { planLineExtractionFailure } from "./failure-plan.ts";
+ import { pickLedgerAccount, resolveHeaderVat, vatFromPostings } from "./ledger-account.ts";
+ import { toInvoiceLineRows } from "./rows.ts";
++import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
++import { decideEhf, ehfLinesFromTree } from "../_shared/ehfLines.ts";
++import { parse as parseXml } from "https://deno.land/x/xml@2.1.3/mod.ts";
+ 
+ const corsHeaders = {
+   "Access-Control-Allow-Origin": "*",
+@@ -35,6 +38,29 @@
+     "authorization, x-client-info, apikey, content-type, x-cron-secret",
+ };
+ 
++/** EHF først (19.11.2026): AV med mindre invoice_reading_settings.ehf_first = true. Feil/manglende kolonne = AV. */
++// deno-lint-ignore no-explicit-any
++async function ehfFirstEnabled(admin: SupabaseClient<any, any, any>, legalEntityId: string): Promise<boolean> {
++  const { data, error } = await admin.from("invoice_reading_settings").select("ehf_first").eq("legal_entity_id", legalEntityId).maybeSingle();
++  return !error && (data as { ehf_first?: unknown } | null)?.ehf_first === true;
++}
++
++/** Henter EHF-XML fra Tripletex-bilaget (bare GET). null = ingen EHF; feil gir aldri stopp, bare PDF-lesing. */
++async function fetchEhfXml(tt: string, ttId: string): Promise<{ xml: string; documentId: string } | null> {
++  const h = { Authorization: authHeader(tt), Accept: "application/json" };
++  const r = await fetch(`${baseUrl()}/v2/supplierInvoice/${ttId}?fields=voucher(id,ediDocument(id))`, { headers: h });
++  if (!r.ok) { await r.body?.cancel(); return null; }
++  const j = await r.json().catch(() => null);
++  const id = j?.value?.voucher?.ediDocument?.id;
++  if (id == null) return null;
++  const c = await fetch(`${baseUrl()}/v2/document/${id}/content`, { headers: { Authorization: authHeader(tt), Accept: "*/*" } });
++  if (!c.ok) { await c.body?.cancel(); return null; }
++  const len = Number(c.headers.get("content-length") ?? "");
++  if (Number.isFinite(len) && len > 15_000_000) { await c.body?.cancel(); return null; }
++  const text = await c.text();
++  return /<(\w+:)?(Invoice|CreditNote)[\s>]/.test(text) ? { xml: text, documentId: String(id) } : null;
++}
++
+ function json(body: unknown, status = 200) {
+   return new Response(JSON.stringify(body), {
+     status,
+@@ -185,6 +211,7 @@
+     // Første tjenestefeil (nøkkel/kvote/nede) stopper kjøringen: resten av køen tas ikke.
+     let stopped: AiFailure | null = null;
+     let sessionToken: string | null = null;
++    let ehfFirst: boolean | undefined;
+     const knownCache = new Map<string, Array<{ sku: string | null; name: string | null }>>();
+     // Fakturaer som feilet i denne kjøringen (id → feiltekst). Et nytt forsøk skal vente til neste planlagte
+     // kjøring, slik at et forbigående problem (PDF ikke klar, tidsavbrudd) ikke bruker opp alle forsøk på sekunder.
+@@ -288,15 +315,34 @@
+             ledgerAccount = null;
+           }
+ 
++          const isCredit = (head as any)?.is_credit_note === true;
++          const expectedExcl = expectedExclVat(totalAmount, totalVat, isCredit);
++
++          // 2c) EHF først: komplette EHF-linjer fra Tripletex brukes i stedet for AI-lesing av PDF-en.
++          //     Mangler EHF, eller stemmer ikke summene, leses PDF-en som før. PDF-en er lagret uansett (originalvisning).
++          let ehfRaw: unknown[] | null = null;
++          let ehfNote: string | null = null;
++          if (ehfFirst ??= await ehfFirstEnabled(admin, legalEntityId)) {
++            try {
++              const doc = await fetchEhfXml(tt, ttId);
++              if (doc) {
++                const parsed = ehfLinesFromTree(parseXml(doc.xml));
++                const d = decideEhf(parsed, expectedExcl);
++                if (d.use && parsed.ok) ehfRaw = parsed.lines;
++                else ehfNote = d.use ? null : d.reason;
++              }
++            } catch (ee) {
++              ehfNote = `EHF kunne ikke leses: ${ee instanceof Error ? ee.message : String(ee)}`;
++            }
++          }
++
+           // 3) Ekstraher linjer via AI, med kontrollfakta og kjente varer
+           let known: Array<{ sku: string | null; name: string | null }> = [];
+           if (supplierId) {
+             if (!knownCache.has(supplierId)) knownCache.set(supplierId, await knownItemsForSupplier(admin, supplierId));
+             known = knownCache.get(supplierId) ?? [];
+           }
+-          const isCredit = (head as any)?.is_credit_note === true;
+-          const expectedExcl = expectedExclVat(totalAmount, totalVat, isCredit);
+-          const extractRes = await fetch(`${SUPABASE_URL}/functions/v1/extract-invoice-from-pdf`, {
++          const extractRes = ehfRaw ? null : await fetch(`${SUPABASE_URL}/functions/v1/extract-invoice-from-pdf`, {
+             method: "POST",
+             headers: {
+               Authorization: `Bearer ${SERVICE_KEY}`,
+@@ -319,8 +365,10 @@
+               max_attempts: 2,
+             }),
+           });
+-          const extractJsonBody = await extractRes.json().catch(() => ({}));
+-          if (!extractRes.ok) {
++          const extractJsonBody = extractRes
++            ? await extractRes.json().catch(() => ({}))
++            : { ok: true, extracted: { lines: ehfRaw }, confidence: 1, warnings: ehfNote ? [ehfNote] : [] };
++          if (extractRes && !extractRes.ok) {
+             throw new Error(
+               `Uthenting feilet: ${extractJsonBody?.error ?? extractRes.status}`,
+             );
+@@ -361,6 +409,10 @@
+             },
+           });
+           if (finErr) throw new Error(`Lagring feilet: ${finErr.message}`);
++          if (ehfRaw) {
++            // Linjekilde vises på fakturasiden («Linjekilde»). Samme token-vakt som ferdigstillingen.
++            await admin.from("invoices").update({ lines_source: "ehf_attachment" }).eq("id", inv.id).eq("line_extraction_token", token);
++          }
+           const finRes = (fin ?? {}) as { ok?: boolean; code?: string; lines?: number };
+           if (!finRes.ok) {
+             // Utdatert kjøring eller manuell endring: ingenting lagret, ingenting overskrevet.
+@@ -400,6 +452,8 @@
+             vat_from_postings: vatInferred,
+             repaired,
+             warnings: extractJsonBody?.warnings ?? [],
++            kilde: ehfRaw ? "ehf" : "pdf",
++            ...(ehfNote ? { ehf_ikke_brukt: ehfNote } : {}),
+           });
+ 
+           // 5) Matching — feil her skal ikke velte fakturaen

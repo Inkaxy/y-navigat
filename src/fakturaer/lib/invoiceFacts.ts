@@ -35,6 +35,7 @@ export function readingReliability(i: {
 export function linesSourceLabel(s: string | null | undefined): string {
   switch (s) {
     case "pdf_extracted": return "Lest fra PDF";
+    case "ehf_attachment": return "Hentet fra EHF";
     case "manual": return "Registrert manuelt";
     case "pending_manual": return "Venter på manuell registrering";
     default: return "—";
