@@ -99,7 +99,7 @@ og nettopris + trykt rabatt + GTIN hos ASKO.
 
 ---
 
-# EHF-retting (19.11.2026) – venter på Henriks ja
+# EHF-retting (19.11.2026) – RULLET UT 19.11 (Henriks ja)
 
 - `_shared/ehfLines.ts` (rettet kopi av `supabase/functions/_shared/ehfLines.ts`): `EHF_XML_OPTIONS` (alt som tekst), enhetspris med inntil 6 desimaler,
   enhetskodene NMP→pakke, BE/XBE→bunt, CA/XCA→boks, trykt tillegg gir lesevarsel `tillegg` med beløpet.

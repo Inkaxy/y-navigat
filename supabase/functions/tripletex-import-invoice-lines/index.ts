@@ -29,7 +29,7 @@ import { planLineExtractionFailure } from "./failure-plan.ts";
 import { pickLedgerAccount, resolveHeaderVat, vatFromPostings } from "./ledger-account.ts";
 import { toInvoiceLineRows } from "./rows.ts";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { decideEhf, ehfLinesFromTree } from "../_shared/ehfLines.ts";
+import { decideEhf, EHF_XML_OPTIONS, ehfLinesFromTree } from "../_shared/ehfLines.ts";
 import { parse as parseXml } from "https://deno.land/x/xml@2.1.3/mod.ts";
 
 const corsHeaders = {
@@ -326,7 +326,7 @@ Deno.serve(async (req) => {
             try {
               const doc = await fetchEhfXml(tt, ttId);
               if (doc) {
-                const parsed = ehfLinesFromTree(parseXml(doc.xml));
+                const parsed = ehfLinesFromTree(parseXml(doc.xml, EHF_XML_OPTIONS));
                 const d = decideEhf(parsed, expectedExcl);
                 if (d.use && parsed.ok) ehfRaw = parsed.lines;
                 else ehfNote = d.use ? null : d.reason;

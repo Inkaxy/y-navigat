@@ -2,7 +2,7 @@
 // kjøres gjennom samme vei som importen (EHF-tolkning → radbygging → lesekontroll). Treet bygges slik XML-tolkeren gir det
 // med EHF_XML_OPTIONS: alle verdier er tekst.
 import { describe, expect, it } from "vitest";
-import { decideEhf, EHF_XML_OPTIONS, ehfLinesFromTree } from "../../supabase/pending/functions/_shared/ehfLines";
+import { decideEhf, EHF_XML_OPTIONS, ehfLinesFromTree } from "../../supabase/functions/_shared/ehfLines";
 import { toInvoiceLineRows } from "../../supabase/functions/tripletex-import-invoice-lines/rows";
 import { lineReadIssues } from "@/fakturaer/lib/invoiceReadCheck";
 import cases from "./fixtures/ehf-tripletex-2026-11-19.json";

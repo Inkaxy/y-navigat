@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decideEhf, ehfLinesFromTree } from "../../supabase/pending/functions/_shared/ehfLines";
+import { decideEhf, ehfLinesFromTree } from "../../supabase/functions/_shared/ehfLines";
 import { toInvoiceLineRows } from "../../supabase/functions/tripletex-import-invoice-lines/rows";
 
 // Formen deno.land/x/xml gir: prefiks i nøkler, «@attr», «#text», tall kan komme som number.
