@@ -186,6 +186,9 @@ Deno.serve(async (req) => {
     let stopped: AiFailure | null = null;
     let sessionToken: string | null = null;
     const knownCache = new Map<string, Array<{ sku: string | null; name: string | null }>>();
+    // Fakturaer som feilet i denne kjøringen (id → feiltekst). Et nytt forsøk skal vente til neste planlagte
+    // kjøring, slik at et forbigående problem (PDF ikke klar, tidsavbrudd) ikke bruker opp alle forsøk på sekunder.
+    const failedThisRun = new Map<string, string>();
 
     // Én faktura tas om gangen, slik at en tjenestefeil ikke bruker opp forsøk på fakturaer som aldri ble lest.
     const loopLimit = singleId ? 1 : limit;
@@ -198,6 +201,16 @@ Deno.serve(async (req) => {
         if (invErr) throw new Error(invErr.message);
         const inv = (claimed ?? [])[0];
         if (!inv) break;
+        if (failedThisRun.has(inv.id as string)) {
+          // Køen ga tilbake en faktura som nettopp feilet: gi forsøket tilbake og stopp. Køen sorterer på færrest
+          // forsøk, så det som eventuelt gjenstår tas av neste kjøring.
+          const { error: relErr } = await admin.rpc("rm_fail_invoice_line_extraction", {
+            p_invoice_id: inv.id, p_token: inv.claim_token,
+            p_patch: { line_extraction_status: "pending", line_extraction_error: failedThisRun.get(inv.id as string), release_attempt: true },
+          });
+          if (relErr) console.error("rm_fail_invoice_line_extraction (frigi)", relErr.message);
+          break;
+        }
         sessionToken ??= await getSessionToken(admin, legalEntityId);
         const tt: string = sessionToken;
         behandlet++;
@@ -430,6 +443,7 @@ Deno.serve(async (req) => {
             p_invoice_id: inv.id, p_token: (inv as any).claim_token, p_patch: patch,
           });
           if (failErr) console.error("rm_fail_invoice_line_extraction", failErr.message);
+          failedThisRun.set(inv.id as string, msg);
           detaljer.push({ invoice_id: inv.id, error: msg, ai_feil: aiFailure?.kind ?? null });
         }
     }

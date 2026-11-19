@@ -94,6 +94,7 @@ Helsesiden (Innstillinger › Fakturalesing › Helse) viser hvilke brytere som 
 | 17.11.2026 | `match-invoice-lines` (manuelle koblede linjer bak markør) | root | |
 | 18.11.2026 | `tripletex-ehf-test` (ny, bare lesing) | assistent, Henriks ja | EHF-testen. |
 | 18.11.2026 | `extract-invoice-from-pdf`, `invoice-model-eval`, `tripletex-import-invoice-lines` (ny leser) | assistent, Henriks ja | Alle nye brytere av; test viser samme tekst til AI-modellen som før. Tilbakerulling: forrige versjon i git (før kopiering fra `supabase/pending/functions/`). |
+| 19.11.2026 | `tripletex-import-invoice-lines` (lesekø: én faktura prøves ikke igjen i samme kjøring, `patches/20261119_lesekoe_ett_forsok_per_kjoring.patch`) | assistent, Henriks ja | Ingen SQL. Svarer på serveren etter utrulling. Tilbakerulling: forrige versjon i git (commit før utrullingen). |
 
 Lagring under `supabase/functions/` ruller ut automatisk. Ny serverkode legges derfor i
 `supabase/pending/functions/` og flyttes først etter ja til akkurat den utrullingen.
@@ -102,7 +103,7 @@ Lagring under `supabase/functions/` ruller ut automatisk. Ny serverkode legges d
 
 | Laget | Funksjon | Hva | Status |
 |---|---|---|---|
-| 19.11.2026 | `tripletex-import-invoice-lines` (`patches/20261119_lesekoe_ett_forsok_per_kjoring.patch`) | En faktura som feiler, prøves ikke igjen i samme kjøring: køen tar én faktura om gangen og kunne ta samme faktura tilbake, slik at et forbigående problem (PDF ikke klar, tidsavbrudd) brukte opp alle tre forsøk på sekunder. Gis den tilbake, får den forsøket tilbake (`release_attempt`, allerede i produksjon) og kjøringen stopper. Ingen SQL. | Venter på Henriks ja. |
+| – | – | Ingen serverendringer venter. | |
 
 ## D. Kjente begrensninger
 

@@ -56,7 +56,7 @@ Kontrollert lokalt: `deno check` gir ingen nye feil (bare den kjente feilen i `_
 
 # Lesekø: ett forsøk per faktura per kjøring (19.11.2026) – `patches/20261119_lesekoe_ett_forsok_per_kjoring.patch`
 
-**Status: VENTER PÅ HENRIKS JA.** Gjelder bare `tripletex-import-invoice-lines/index.ts`. Ingen SQL.
+**Status: RULLET UT 19.11.2026 (Henriks ja).** Patchen er brukt i `supabase/functions/`. Gjelder bare `tripletex-import-invoice-lines/index.ts`. Ingen SQL.
 
 Feil: importen tar én faktura om gangen fra køen. En faktura som feiler av en ikke-systemisk grunn legges tilbake
 som `pending` uten ventetid, og køen (sortert på færrest forsøk) kan gi den tilbake i samme kjøring. Da kan alle
