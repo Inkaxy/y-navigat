@@ -107,6 +107,8 @@ Lagring under `supabase/functions/` ruller ut automatisk. Ny serverkode legges d
 |---|---|---|---|
 | – | – | Ingen serverendringer venter. | |
 
+**19.11.2026:** `02_ehf_forst.sql` kjørt (bryter `ehf_first`, AV) og `tripletex-import-invoice-lines` rullet ut med EHF først etter Henriks ja. Bryteren slås på separat.
+
 ## D. Kjente begrensninger
 
 - Oversikt og Varer-fanene bruker fortsatt den tunge oppsummeringen (`rm_work_summary`, opptil 6–8 s). Menyen,

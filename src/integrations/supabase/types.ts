@@ -3783,6 +3783,7 @@ export type Database = {
       invoice_reading_settings: {
         Row: {
           catalog_enabled: boolean
+          ehf_first: boolean
           learning_enabled: boolean
           legal_entity_id: string
           max_examples: number
@@ -3795,6 +3796,7 @@ export type Database = {
         }
         Insert: {
           catalog_enabled?: boolean
+          ehf_first?: boolean
           learning_enabled?: boolean
           legal_entity_id: string
           max_examples?: number
@@ -3807,6 +3809,7 @@ export type Database = {
         }
         Update: {
           catalog_enabled?: boolean
+          ehf_first?: boolean
           learning_enabled?: boolean
           legal_entity_id?: string
           max_examples?: number
