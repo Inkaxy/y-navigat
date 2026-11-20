@@ -24,12 +24,13 @@ create table public._backup_price_history_20261120 as select * from public.raw_m
 create table public._backup_cost_postings_20261120 as select * from public.invoice_line_cost_postings;
 create table public._backup_line_corrections_20261120 as select * from public.invoice_line_corrections;
 create table public._backup_approvals_20261120 as select * from public.invoice_internal_approvals where revoked_at is null;
+create table public._backup_purchases_20261120 as select * from public.raw_material_purchases where invoice_line_id is not null;
 create table public._backup_invoices_20261120 as select * from public.invoices;
 create table public._backup_rm_cost_20261120 as
   select id, current_cost_price, price_source, price_updated_at, cost_source_history_id, cost_basis_status from public.raw_materials;
 revoke all on public._backup_invoice_lines_20261120, public._backup_price_history_20261120, public._backup_cost_postings_20261120,
   public._backup_line_corrections_20261120, public._backup_approvals_20261120, public._backup_invoices_20261120,
-  public._backup_rm_cost_20261120 from anon, authenticated;
+  public._backup_rm_cost_20261120, public._backup_purchases_20261120 from anon, authenticated;
 
 -- 1) Lås dagens kostpris som manuell pris (samme dato som dagens kilde, ellers i dag)
 insert into public.raw_material_price_history (raw_material_id, price, effective_date, source, notes)
