@@ -8,13 +8,21 @@
 -- Kostpris: dagens kostpris låses som manuell pris med SAMME dato som kilden før slettingen, så kalkyler
 -- ikke mister pris. Nyere EHF-priser tar over automatisk via vanlig prisvelger.
 -- Sikkerhetskopi: alt som slettes/endres kopieres til _backup_*_20261120 først.
--- Stopper hvis det finnes leverandørsaker (supplier_deviation_case_lines) – de må avklares først.
+-- Leverandørsak: Henrik valgte 20.11.2026 å lukke prisforespørselen MANDIFLAN SKÅLDET 12,5KG
+-- (sak 2139751c-2b9f-445f-b958-ef38b0a4ada4). Den kopieres og slettes. Stopper hvis det finnes ANDRE saker.
 -- =====================================================================================
 begin;
 
 do $$ begin
-  if exists (select 1 from public.supplier_deviation_case_lines) then
-    raise exception 'Stoppet: det finnes leverandørsaker koblet til fakturalinjer. Avklar dem først.';
+  if exists (select 1 from public.supplier_deviation_cases where id <> '2139751c-2b9f-445f-b958-ef38b0a4ada4') then
+    raise exception 'Stoppet: det finnes andre leverandørsaker enn MANDIFLAN-saken. Avklar dem først.';
+  end if;
+  if exists (select 1 from public.email_outbox o
+              where o.status = 'pending'
+                and (o.related_entity_id = '2139751c-2b9f-445f-b958-ef38b0a4ada4'
+                     or o.related_entity_id in (select d.id from public.supplier_case_email_drafts d
+                                                 where d.case_id = '2139751c-2b9f-445f-b958-ef38b0a4ada4'))) then
+    raise exception 'Stoppet: MANDIFLAN-saken har en e-post som venter på utsending.';
   end if;
 end $$;
 
@@ -26,11 +34,20 @@ create table public._backup_line_corrections_20261120 as select * from public.in
 create table public._backup_approvals_20261120 as select * from public.invoice_internal_approvals where revoked_at is null;
 create table public._backup_purchases_20261120 as select * from public.raw_material_purchases where invoice_line_id is not null;
 create table public._backup_invoices_20261120 as select * from public.invoices;
+create table public._backup_cases_20261120 as select * from public.supplier_deviation_cases;
+create table public._backup_case_lines_20261120 as select * from public.supplier_deviation_case_lines;
+create table public._backup_case_drafts_20261120 as select * from public.supplier_case_email_drafts;
+create table public._backup_case_credits_20261120 as select * from public.supplier_deviation_credits;
 create table public._backup_rm_cost_20261120 as
   select id, current_cost_price, price_source, price_updated_at, cost_source_history_id, cost_basis_status from public.raw_materials;
 revoke all on public._backup_invoice_lines_20261120, public._backup_price_history_20261120, public._backup_cost_postings_20261120,
   public._backup_line_corrections_20261120, public._backup_approvals_20261120, public._backup_invoices_20261120,
-  public._backup_rm_cost_20261120, public._backup_purchases_20261120 from anon, authenticated;
+  public._backup_rm_cost_20261120, public._backup_purchases_20261120, public._backup_cases_20261120,
+  public._backup_case_lines_20261120, public._backup_case_drafts_20261120, public._backup_case_credits_20261120
+  from anon, authenticated;
+
+-- 0b) Lukk MANDIFLAN-saken (linjer, kladd og kreditter følger med via ON DELETE CASCADE)
+delete from public.supplier_deviation_cases where id = '2139751c-2b9f-445f-b958-ef38b0a4ada4';
 
 -- 1) Lås dagens kostpris som manuell pris (samme dato som dagens kilde, ellers i dag)
 insert into public.raw_material_price_history (raw_material_id, price, effective_date, source, notes)
@@ -65,6 +82,7 @@ select count(public.rm_apply_derived_cost_price(id)) from public.raw_materials;
 -- Kontroll
 select
   (select count(*) from public.invoice_lines) as linjer_igjen,
+  (select count(*) from public.supplier_deviation_cases) as saker_igjen,
   (select count(*) from public.raw_material_price_history where source = 'invoice') as fakturapriser_igjen,
   (select count(*) from public.invoices where line_extraction_status = 'pending') as fakturaer_i_lesekoen,
   (select count(*) from public.raw_materials r join public._backup_rm_cost_20261120 b on b.id = r.id
