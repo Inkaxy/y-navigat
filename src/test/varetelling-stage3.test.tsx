@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -284,6 +284,11 @@ describe("rapport på e-post", () => {
 
 describe("tildeling og kalender", () => {
   it("Ta listen → Mine lister; kalender viser tellingen; avbrutt telling kan ikke endre tildeling", async () => {
+    // Fast klokke: demodataene er datert 12.10.2026 og kalenderen åpner på
+    // dagens måned. Bare Date fryses, så testbibliotekets ventetider går som før.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-12T10:00:00+02:00"));
+    onTestFinished(() => { vi.useRealTimers(); });
     const m = setup(); const id = await started(m.api);
     m.open(`/?telling=${id}&liste=${m.api._state.lists[0].id}`); await tab("Kontroll");
     fireEvent.click(await screen.findByRole("button", { name: "Ta listen" }));

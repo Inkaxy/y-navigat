@@ -9,17 +9,17 @@ Driftsplattformen til Nøtterø Bakeri: ordre, produksjon, varer, kunder, kasse 
 
 ## Kom i gang
 ```bash
-npm ci      # kun package-lock.json er gjeldende lockfil
-npm run dev # http://localhost:8080
+bun install --frozen-lockfile  # bun.lock er eneste låsefil
+bun run dev                    # http://localhost:8080
 ```
 
 ## Nyttige kommandoer
 | Kommando | Beskrivelse |
 | --- | --- |
-| `npm run dev` | Utviklingsserver |
-| `npm run build` | Produksjonsbygg |
-| `npm run lint` | ESLint |
-| `npm test` | Vitest (enhetstester) |
+| `bun run dev` | Utviklingsserver |
+| `bun run build` | Produksjonsbygg |
+| `bun run lint` | ESLint |
+| `bun run test` | Vitest (enhetstester) |
 
 ## Struktur
 `src/<app>/` er én mappe per app-modul (ordre, produksjon, varer, kunder, pos, pos_styring, fakturering, kundeportal, ravarer). Delte UI-komponenter ligger i `src/components/`, delte hjelpere i `src/lib/`.
