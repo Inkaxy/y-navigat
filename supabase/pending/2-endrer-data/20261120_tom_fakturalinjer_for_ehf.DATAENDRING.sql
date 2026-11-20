@@ -8,6 +8,8 @@
 -- Kostpris: dagens kostpris låses som manuell pris med SAMME dato som kilden før slettingen, så kalkyler
 -- ikke mister pris. Nyere EHF-priser tar over automatisk via vanlig prisvelger.
 -- Sikkerhetskopi: alt som slettes/endres kopieres til _backup_*_20261120 først.
+-- Lager: lagerbevegelser fra fakturalinjer (60 per 20.11) slettes med linjene og trekkes fra lagerbeholdningen;
+-- de kommer tilbake når fakturaene er lest og koblet på nytt. Kopi i _backup_stock_movements_20261120.
 -- Leverandørsak: Henrik valgte 20.11.2026 å lukke prisforespørselen MANDIFLAN SKÅLDET 12,5KG
 -- (sak 2139751c-2b9f-445f-b958-ef38b0a4ada4). Den kopieres og slettes. Stopper hvis det finnes ANDRE saker.
 -- =====================================================================================
@@ -38,12 +40,20 @@ create table public._backup_cases_20261120 as select * from public.supplier_devi
 create table public._backup_case_lines_20261120 as select * from public.supplier_deviation_case_lines;
 create table public._backup_case_drafts_20261120 as select * from public.supplier_case_email_drafts;
 create table public._backup_case_credits_20261120 as select * from public.supplier_deviation_credits;
+create table public._backup_match_suggestions_20261120 as select * from public.invoice_line_match_suggestions;
+create table public._backup_review_holds_20261120 as select h.* from public.raw_material_price_review_holds h
+  join public.raw_material_price_history p on p.id = h.history_id where p.source = 'invoice' or p.invoice_line_id is not null;
+create table public._backup_example_links_20261120 as select id, invoice_line_id, source_correction_id from public.invoice_extraction_examples
+  where invoice_line_id is not null or source_correction_id is not null;
+create table public._backup_stock_movements_20261120 as select * from public.stock_movements where source_table = 'invoice_lines';
 create table public._backup_rm_cost_20261120 as
-  select id, current_cost_price, price_source, price_updated_at, cost_source_history_id, cost_basis_status from public.raw_materials;
+  select id, current_cost_price, price_source, price_updated_at, cost_source_history_id, cost_basis_status, current_stock from public.raw_materials;
 revoke all on public._backup_invoice_lines_20261120, public._backup_price_history_20261120, public._backup_cost_postings_20261120,
   public._backup_line_corrections_20261120, public._backup_approvals_20261120, public._backup_invoices_20261120,
   public._backup_rm_cost_20261120, public._backup_purchases_20261120, public._backup_cases_20261120,
-  public._backup_case_lines_20261120, public._backup_case_drafts_20261120, public._backup_case_credits_20261120
+  public._backup_case_lines_20261120, public._backup_case_drafts_20261120, public._backup_case_credits_20261120,
+  public._backup_match_suggestions_20261120, public._backup_review_holds_20261120, public._backup_example_links_20261120,
+  public._backup_stock_movements_20261120
   from anon, authenticated;
 
 -- 0b) Lukk MANDIFLAN-saken (linjer, kladd og kreditter følger med via ON DELETE CASCADE)
@@ -67,7 +77,10 @@ delete from public.invoice_line_corrections;
 
 -- 3) Slett fakturaprishistorikk og fakturalinjer
 delete from public.raw_material_price_history where source = 'invoice' or invoice_line_id is not null;
+-- Linjer som er «holdt utenfor» kan ellers ikke slettes (vakt _rm_line_exclusion_guard). Gjelder bare denne transaksjonen.
+select set_config('rm.exclusion_write', 'on', true);
 delete from public.invoice_lines;
+select set_config('rm.exclusion_write', '', true);
 
 -- 4) Legg alle Tripletex-fakturaer i lesekøen på nytt
 update public.invoices set
@@ -83,6 +96,9 @@ select count(public.rm_apply_derived_cost_price(id)) from public.raw_materials;
 select
   (select count(*) from public.invoice_lines) as linjer_igjen,
   (select count(*) from public.supplier_deviation_cases) as saker_igjen,
+  (select count(*) from public.stock_movements where source_table = 'invoice_lines') as lagerbevegelser_fra_linjer_igjen,
+  (select count(*) from public.raw_materials r join public._backup_rm_cost_20261120 b on b.id = r.id
+     where r.current_stock is distinct from b.current_stock) as lagerbeholdning_endret,
   (select count(*) from public.raw_material_price_history where source = 'invoice') as fakturapriser_igjen,
   (select count(*) from public.invoices where line_extraction_status = 'pending') as fakturaer_i_lesekoen,
   (select count(*) from public.raw_materials r join public._backup_rm_cost_20261120 b on b.id = r.id
