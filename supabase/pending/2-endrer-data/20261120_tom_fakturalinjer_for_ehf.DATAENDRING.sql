@@ -1,0 +1,74 @@
+-- =====================================================================================
+-- DATAENDRING 20.11.2026 · Tøm gamle fakturalinjer og prishistorikk før ny innlesing med EHF
+-- Kjøres bare etter Henriks uttrykkelige ja. Filen slutter med ROLLBACK: første kjøring er alltid en
+-- prøvekjøring som viser tallene. Bytt siste linje til COMMIT først når tallene er kontrollert.
+--
+-- Beholdes urørt: råvarer, oppskrifter, deklarasjoner, produkter, leverandører, leverandørkoblinger,
+-- aliaser, pakningsvarianter, fakturahodene (invoices) og læringseksempler (invoice_extraction_examples).
+-- Kostpris: dagens kostpris låses som manuell pris med SAMME dato som kilden før slettingen, så kalkyler
+-- ikke mister pris. Nyere EHF-priser tar over automatisk via vanlig prisvelger.
+-- Sikkerhetskopi: alt som slettes/endres kopieres til _backup_*_20261120 først.
+-- Stopper hvis det finnes leverandørsaker (supplier_deviation_case_lines) – de må avklares først.
+-- =====================================================================================
+begin;
+
+do $$ begin
+  if exists (select 1 from public.supplier_deviation_case_lines) then
+    raise exception 'Stoppet: det finnes leverandørsaker koblet til fakturalinjer. Avklar dem først.';
+  end if;
+end $$;
+
+-- 0) Sikkerhetskopi
+create table public._backup_invoice_lines_20261120 as select * from public.invoice_lines;
+create table public._backup_price_history_20261120 as select * from public.raw_material_price_history where source = 'invoice' or invoice_line_id is not null;
+create table public._backup_cost_postings_20261120 as select * from public.invoice_line_cost_postings;
+create table public._backup_line_corrections_20261120 as select * from public.invoice_line_corrections;
+create table public._backup_approvals_20261120 as select * from public.invoice_internal_approvals where revoked_at is null;
+create table public._backup_invoices_20261120 as select * from public.invoices;
+create table public._backup_rm_cost_20261120 as
+  select id, current_cost_price, price_source, price_updated_at, cost_source_history_id, cost_basis_status from public.raw_materials;
+revoke all on public._backup_invoice_lines_20261120, public._backup_price_history_20261120, public._backup_cost_postings_20261120,
+  public._backup_line_corrections_20261120, public._backup_approvals_20261120, public._backup_invoices_20261120,
+  public._backup_rm_cost_20261120 from anon, authenticated;
+
+-- 1) Lås dagens kostpris som manuell pris (samme dato som dagens kilde, ellers i dag)
+insert into public.raw_material_price_history (raw_material_id, price, effective_date, source, notes)
+select rm.id, rm.current_cost_price,
+       coalesce(h.effective_date, (rm.price_updated_at at time zone 'Europe/Oslo')::date, public.rm_oslo_today()),
+       'manual', 'Låst før tømming av fakturalinjer 20.11.2026 (EHF-innlesing)'
+  from public.raw_materials rm
+  left join public.raw_material_price_history h on h.id = rm.cost_source_history_id
+ where rm.current_cost_price is not null and rm.current_cost_price > 0
+   and rm.cost_basis_status is distinct from 'mangler';
+
+-- 2) Fjern sperrene som hindrer ny lesing (godkjenning, rettelser, ført kost)
+update public.invoice_internal_approvals set revoked_at = now(), revoke_reason = 'Tømt før ny innlesing med EHF 20.11.2026'
+ where revoked_at is null;
+delete from public.invoice_line_cost_postings;
+delete from public.invoice_line_corrections;
+
+-- 3) Slett fakturaprishistorikk og fakturalinjer
+delete from public.raw_material_price_history where source = 'invoice' or invoice_line_id is not null;
+delete from public.invoice_lines;
+
+-- 4) Legg alle Tripletex-fakturaer i lesekøen på nytt
+update public.invoices set
+  status = 'imported', reconciled_at = null, flagged_at = null,
+  line_extraction_status = 'pending', line_extraction_attempts = 0, line_extraction_error = null,
+  line_extraction_token = null, line_extraction_at = null
+ where tripletex_supplier_invoice_id is not null and excluded_at is null;
+
+-- 5) Regn kostpris på nytt for alle råvarer (finner den låste prisen)
+select count(public.rm_apply_derived_cost_price(id)) from public.raw_materials;
+
+-- Kontroll
+select
+  (select count(*) from public.invoice_lines) as linjer_igjen,
+  (select count(*) from public.raw_material_price_history where source = 'invoice') as fakturapriser_igjen,
+  (select count(*) from public.invoices where line_extraction_status = 'pending') as fakturaer_i_lesekoen,
+  (select count(*) from public.raw_materials r join public._backup_rm_cost_20261120 b on b.id = r.id
+     where b.current_cost_price is not null and r.current_cost_price is distinct from b.current_cost_price) as kostpris_endret,
+  (select count(*) from public.raw_materials r join public._backup_rm_cost_20261120 b on b.id = r.id
+     where b.cost_basis_status = 'verifisert' and r.cost_basis_status is distinct from 'verifisert') as mistet_verifisert;
+
+rollback;  -- bytt til COMMIT etter kontroll av tallene over
