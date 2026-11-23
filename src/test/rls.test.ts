@@ -5,7 +5,7 @@
  * uinnloggede brukere. Testene hoppes ALDRI over: mangler konfigurasjonen,
  * kaster filen med en tydelig melding slik at kjøringen blir rød.
  *
- * Kjøres med `npm run test:rls` (krever VITE_SUPABASE_URL og
+ * Kjøres med `bun run test:rls` (krever VITE_SUPABASE_URL og
  * VITE_SUPABASE_PUBLISHABLE_KEY). Alle kall her er leseoperasjoner — ingen
  * innsetting, oppdatering, sletting eller opprydding.
  */
@@ -19,7 +19,7 @@ const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 if (!url || !key) {
   throw new Error(
     "RLS-testene krever VITE_SUPABASE_URL og VITE_SUPABASE_PUBLISHABLE_KEY. " +
-      "Sett dem som miljøvariabler (repository secrets i CI) før `npm run test:rls`.",
+      "Sett dem som miljøvariabler (repository secrets i CI) før `bun run test:rls`.",
   );
 }
 

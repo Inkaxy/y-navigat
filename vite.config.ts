@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => ({
     react(),
     svgr({ include: "**/*.svg?react" }),
     mode === "development" && componentTagger(),
-    // Bundle-analyse: kjør `ANALYZE=1 npm run build` for å generere stats.html
+    // Bundle-analyse: kjør `ANALYZE=1 bun run build` for å generere stats.html
     !!process.env.ANALYZE &&
       (visualizer({ filename: "dist/stats.html", template: "raw-data", gzipSize: true }) as PluginOption),
   ].filter(Boolean),
