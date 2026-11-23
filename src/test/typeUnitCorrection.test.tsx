@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
+import { MemoryRouter } from "react-router-dom";
 import { blockerText, parseTypeUnitApply, parseTypeUnitPreview } from "@/fakturaer/lib/typeUnitCorrection";
 
 const RM = "11111111-1111-4111-8111-111111111111";
@@ -97,5 +98,20 @@ describe("Rett varetype og måleenhet", () => {
     const t = blockerText({ code: "lager_finnes", count: 1 });
     expect(t).toMatch(/Lagergrunnlaget må avklares/);
     expect(t).not.toMatch(/Juster lageret til 0/);
+  });
+
+  it("typebytte fra Nye varer: råvare → handelsvare beholder grunnenheten og lagres med forhåndsutfylt begrunnelse", async () => {
+    previewData = { ...preview(), from: { item_type: "ravare", base_unit: "stk" }, unit_changes: false, type_changes: true, package_confirmations_to_reset: 0 };
+    applyImpl = async () => ({ data: { ok: true, already: false, raw_material_id: RM, updated_at: "y", item_type: "videresalg", base_unit: "stk", package_confirmations_reset: 0 }, error: null });
+    const routed = ({ children }: { children: ReactNode }) => <MemoryRouter>{wrap({ children })}</MemoryRouter>;
+    render(<TypeUnitCorrectionDialog companyId="le-a" rawMaterialId={RM} rawMaterialName="Scrocchiarella" open onOpenChange={() => {}} canWrite
+      initialItemType="videresalg" initialBaseUnit="stk" initialReason="Kjøpes inn og selges videre uten bearbeiding (handelsvare)." doneLabel="Ferdig" />, { wrapper: routed });
+    await waitFor(() => expect((screen.getByRole("button", { name: "Lagre retting" }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: "Lagre retting" }));
+    expect(await screen.findByRole("button", { name: "Ferdig" })).toBeTruthy();
+    const applies = calls.filter((c) => c.p_dry_run === false);
+    expect(applies).toHaveLength(1);
+    expect(applies[0]).toMatchObject({ p_item_type: "videresalg", p_base_unit: "stk" });
+    expect(screen.getByRole("link", { name: /Handelsvarer/ }).getAttribute("href")).toBe("/varer/priser?view=handelsvarer");
   });
 });

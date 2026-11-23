@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -33,6 +34,10 @@ interface Props {
   onSaved?: (r: Extract<TypeUnitApply, { kind: "saved" }>) => void;
   initialItemType?: ItemType;
   initialBaseUnit?: BaseUnit;
+  /** Forhåndsutfylt begrunnelse (kan endres). Serveren krever fortsatt minst 5 tegn. */
+  initialReason?: string;
+  /** Knappetekst etter lagring (standard «Fortsett til pakning»). */
+  doneLabel?: string;
 }
 
 /** «Rett varetype og måleenhet» — forhåndsvisning fra serveren, deretter én atomisk lagring. */
@@ -45,7 +50,7 @@ export function TypeUnitCorrectionDialog(props: Props) {
   const p = { ...props, ...frozen };
   const [itemType, setItemType] = useState<ItemType | null>(p.initialItemType ?? null);
   const [baseUnit, setBaseUnit] = useState<BaseUnit | null>(p.initialBaseUnit ?? null);
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState(p.initialReason ?? "");
   const [outcome, setOutcome] = useState<TypeUnitApply | null>(null);
   const [saving, setSaving] = useState(false);
   const lock = useRef(false);
@@ -107,6 +112,10 @@ export function TypeUnitCorrectionDialog(props: Props) {
       void qc.invalidateQueries({ queryKey: ["supplier-item-lines"] });
       void qc.invalidateQueries({ queryKey: ["material-choice"] });
       void qc.invalidateQueries({ queryKey: ["raw-materials"] });
+      // Varelistene (Fra faktura, Varer) og Handelsvarer bruker egne nøkler; uten dette vises gammel type/enhet til neste henting.
+      void qc.invalidateQueries({ queryKey: ["raw_materials"] });
+      void qc.invalidateQueries({ queryKey: ["raw_material", p.rawMaterialId] });
+      void qc.invalidateQueries({ queryKey: ["varer", "handelsvarer"] });
       p.onSaved?.(r);
     } else if (r.kind === "rejected" && r.error === "versjon_endret") {
       void preview.refetch();
@@ -132,7 +141,7 @@ export function TypeUnitCorrectionDialog(props: Props) {
             {ITEM_TYPES.map((t) => (
               <button key={t.value} type="button" aria-pressed={it === t.value} onClick={() => { setItemType(t.value); setOutcome(null); }}
                 className={cn("min-h-[44px] rounded-md border px-2 py-1.5 text-left text-sm", it === t.value ? "border-primary bg-primary/5" : "border-line-subtle hover:bg-muted/40")}>
-                {t.label}
+                {t.value === "videresalg" ? "Handelsvare (videresalg)" : t.label}
               </button>
             ))}
           </div>
@@ -184,6 +193,12 @@ export function TypeUnitCorrectionDialog(props: Props) {
             {outcome.openInvoicesRequeued != null && outcome.openInvoicesRequeued > 0 ? ` ${outcome.openInvoicesRequeued} faktura(er) kontrolleres på nytt.` : ""}
           </p>
         )}
+        {outcome?.kind === "saved" && outcome.itemType === "videresalg" && (
+          <p className="text-caption text-ink-secondary">
+            Varen er nå en handelsvare. Koble den til salgsvaren og sett utsalgspris under{" "}
+            <Link to="/varer/priser?view=handelsvarer" className="font-semibold text-primary hover:underline">Varer › Priser › Handelsvarer</Link>.
+          </p>
+        )}
         {outcome?.kind === "rejected" && <p role="alert" className="text-sm text-destructive">{REJECTION_TEXT[outcome.error] ?? "Avvist."}</p>}
         {unknown && <p role="alert" className="text-sm text-destructive">Utfallet er ukjent. Trykk «Prøv igjen» – samme forespørsel sendes, så den kan ikke lagres to ganger.</p>}
         {contextChanged && !unknown && <p role="alert" className="text-sm text-destructive">Valgt vare eller selskap er endret. Lukk og åpne rettingen på nytt for den nye varen.</p>}
@@ -192,7 +207,7 @@ export function TypeUnitCorrectionDialog(props: Props) {
 
         <DialogFooter>
           {outcome?.kind === "saved"
-            ? <Button onClick={() => p.onOpenChange(false)}>Fortsett til pakning</Button>
+            ? <Button onClick={() => p.onOpenChange(false)}>{p.doneLabel ?? "Fortsett til pakning"}</Button>
             : <>
                 <Button variant="outline" disabled={saving || unknown} onClick={() => p.onOpenChange(false)}>Avbryt</Button>
                 <Button onClick={() => void save(unknown ? "retry" : "new")} disabled={unknown ? saving : !canSave}>

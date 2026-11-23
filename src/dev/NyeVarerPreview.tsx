@@ -2,6 +2,7 @@
 // speiler mønsteret fra en feillest linje (1 flaske lest, 6 solgt). Ingen skriving: «Opprett/Koble» svarer som når
 // serveren ikke endret noen linjer, slik at feilmeldingen og «Prøv igjen» kan kontrolleres.
 import { useState } from "react";
+import type { Candidate } from "@/ravarer/lib/fraFaktura/newItems";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NewItemRow } from "@/ravarer/pages/frafaktura/NewItemRow";
 import type { useNewItemActions } from "@/ravarer/hooks/useNewItemActions";
@@ -35,6 +36,10 @@ function wi(itemKey: string, title: string, sku: string | null): WorkItem & { su
 const nothing = async (): Promise<never> => { await new Promise((r) => setTimeout(r, 300)); throw new NothingSavedError(NOTHING_LINKED); };
 const actions: ReturnType<typeof useNewItemActions> = { link: nothing, notItem: nothing, costPost: nothing, undo: async () => "Angret (simulert).", canUndo: () => false, capFra: false };
 
+/** Én eksisterende vare å koble til (for å vise «Feil varetype? Gjør til …»). */
+const DEMO_CANDIDATES: Candidate[] = [{ id: "demo-rm-1", name: "Iste chai the konsentrat 0,7 l", sku: null, declaration_name: null, item_type: "ravare", base_unit: "l", cost: null }];
+const DEMO_BY_ID = new Map(DEMO_CANDIDATES.map((c) => [c.id, c]));
+
 export default function NyeVarerPreview() {
   const [qc] = useState(() => {
     const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false, enabled: false } } });
@@ -51,7 +56,7 @@ export default function NyeVarerPreview() {
         {done && <p role="status">{done}</p>}
         <section aria-label="Nye varer" className="overflow-hidden rounded-2xl border border-line-subtle bg-card">
           <ul>
-            {rows.map((r) => <NewItemRow key={r.item.key} row={r.item} candidates={[]} byId={new Map()} supplierRule={null} actions={actions} canWrite retur="/forhandsvisning/nye-varer"
+            {rows.map((r) => <NewItemRow key={r.item.key} row={r.item} candidates={DEMO_CANDIDATES} byId={DEMO_BY_ID} supplierRule={null} actions={actions} canWrite retur="/forhandsvisning/nye-varer"
               onDone={(k) => setDone(`Kvittering for ${k} (skal aldri vises her)`)} register={() => undefined} />)}
           </ul>
         </section>

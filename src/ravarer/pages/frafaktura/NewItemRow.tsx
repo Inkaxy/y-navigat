@@ -26,6 +26,14 @@ import { useCostPostsAvailable } from "@/ravarer/hooks/useCostPosts";
 import { CostPostPicker, type PickedPost } from "@/ravarer/pages/priskontroll/kostnader/CostPostPicker";
 import { suggestedPostName } from "@/ravarer/pages/priskontroll/kostnader/costPostText";
 
+const asBaseUnit = (u: string | null): "kg" | "l" | "stk" | undefined => (u === "kg" || u === "l" || u === "stk" ? u : undefined);
+/** Forhåndsutfylt begrunnelse ved typebytte (kan endres; lagres i revisjonsloggen). */
+const TYPE_REASON: Record<NewItemType, string> = {
+  videresalg: "Kjøpes inn og selges videre uten bearbeiding (handelsvare).",
+  emballasje: "Emballasje som følger produktene ut, ikke råvare i oppskrifter.",
+  ravare: "Inngår i oppskrifter og produkter (råvare).",
+};
+
 export type RowEntry = { answer: RowAnswer | null; submit: () => Promise<boolean> };
 type Actions = ReturnType<typeof useNewItemActions>;
 
@@ -105,7 +113,8 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
   const pickNow = pick ? byId.get(pick.id) ?? pick : null;
   const baseUnit = mode === "koble" ? pickNow?.base_unit ?? null : null;
   const { data: company } = useCompany();
-  const [fixUnit, setFixUnit] = useState<"kg" | "l" | "stk" | null>(null);
+  // Retting av valgt vare: grunnenhet (fra pakningsfeltet) eller varetype (fra «Gjør til …»). Samme dialog og serverregel.
+  const [fix, setFix] = useState<{ unit: "kg" | "l" | "stk" | null; type: NewItemType | null } | null>(null);
   const state = readPackage(draft, baseUnit);
   const badge = packageBadge({ text, draft, state, mode, hasSuggestion: suggestions.length > 0 && !!pick && suggestions.some((s) => s.id === pick.id), numbersOk: math?.clean !== false });
   const price = pricePerBase(pkgLine, state, math ? math.units : undefined);
@@ -198,7 +207,8 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
             ) : (
               <>
                 <RowTarget mode={mode} onMode={setMode} pick={pick} onPick={setPick} suggestions={suggestions} suggestionLabel={suggestionLabel}
-                  candidates={candidates} name={name} onName={setName} type={type} onType={setType} disabled={disabled} />
+                  candidates={candidates} name={name} onName={setName} type={type} onType={setType} disabled={disabled}
+                  pickType={pickNow?.item_type ?? null} onChangeType={canWrite && company && pickNow ? (t) => setFix({ unit: null, type: t }) : undefined} />
                 {mode === "opprett" && sameSku.length > 0 && (
                   <p role="note" className="text-caption font-semibold text-warning">
                     Finnes kanskje fra før: {sameSku.map((c) => `«${c.name}»${c.base_unit ? ` (${c.base_unit})` : ""}`).join(", ")} har samme varenummer hos leverandøren. Koble heller til den, eller slå sammen i Varer etterpå.
@@ -207,12 +217,14 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
                 {skuIndex.isError && <p role="alert" className="text-caption text-destructive">Kunne ikke sjekke om varenummeret finnes fra før. Forslaget bygger bare på navnet.</p>}
                 <RowPackage draft={draft} onDraft={setDraft} state={state} badge={badge} price={price} baseUnit={baseUnit} disabled={disabled}
                   unitPrices={perUnit} numbersNote={math && !math.clean ? math.note : null} isNew={mode === "opprett"}
-                  onChangeBaseUnit={canWrite && company && mode === "koble" && pickNow ? setFixUnit : undefined} />
-                {fixUnit && company && pickNow && (
-                  <TypeUnitCorrectionDialog key={`${company.id}:${pickNow.id}`} companyId={company.id} rawMaterialId={pickNow.id} rawMaterialName={pickNow.name}
-                    open onOpenChange={(o) => { if (!o) setFixUnit(null); }} canWrite={canWrite} initialBaseUnit={fixUnit}
-                    initialItemType={ITEM_TYPES.find((t) => t.value === pickNow.item_type)?.value}
-                    onSaved={() => setFixUnit(null)} />
+                  onChangeBaseUnit={canWrite && company && mode === "koble" && pickNow ? (u) => setFix({ unit: u, type: null }) : undefined} />
+                {fix && company && pickNow && (
+                  <TypeUnitCorrectionDialog key={`${company.id}:${pickNow.id}:${fix.type ?? fix.unit}`} companyId={company.id} rawMaterialId={pickNow.id} rawMaterialName={pickNow.name}
+                    open onOpenChange={(o) => { if (!o) setFix(null); }} canWrite={canWrite}
+                    initialBaseUnit={fix.unit ?? asBaseUnit(pickNow.base_unit)}
+                    initialItemType={fix.type ?? ITEM_TYPES.find((t) => t.value === pickNow.item_type)?.value}
+                    initialReason={fix.type ? TYPE_REASON[fix.type] : undefined} doneLabel={fix.type ? "Ferdig" : undefined}
+                    onSaved={fix.type ? undefined : () => setFix(null)} />
                 )}
                 {allLocked ? (
                   <p role="note" className="text-caption font-semibold text-warning">

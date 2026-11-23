@@ -9,11 +9,15 @@ const TYPE_LABEL: Record<string, string> = { ravare: "Råvare", videresalg: "Han
 const kr = (v: number | null, unit: string | null) => (v == null ? null : `${v.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr/${unit ?? "enhet"}`);
 
 /** Todelt velger: «Koble til en vare jeg har» (søk, forslag øverst) eller «Opprett som ny» (navn + type). */
-export function RowTarget({ mode, onMode, pick, onPick, suggestions, suggestionLabel, candidates, name, onName, type, onType, disabled }: {
+export function RowTarget({ mode, onMode, pick, onPick, suggestions, suggestionLabel, candidates, name, onName, type, onType, disabled, pickType, onChangeType }: {
   mode: RowMode; onMode: (m: RowMode) => void;
   pick: Candidate | null; onPick: (c: Candidate | null) => void;
   suggestions: readonly Candidate[]; suggestionLabel: string; candidates: readonly Candidate[];
   name: string; onName: (v: string) => void; type: NewItemType; onType: (t: NewItemType) => void; disabled: boolean;
+  /** Valgt vares registrerte type (fersk). */
+  pickType?: string | null;
+  /** Bytt varetype på valgt vare (åpner rettingen med forhåndsvisning). Utelatt = ingen knapper. */
+  onChangeType?: (t: NewItemType) => void;
 }) {
   const id = useId();
   const [q, setQ] = useState("");
@@ -52,6 +56,16 @@ export function RowTarget({ mode, onMode, pick, onPick, suggestions, suggestionL
                 );
               })}
             </ul>
+          )}
+          {pick && onChangeType && !q.trim() && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-caption text-ink-secondary">Feil varetype?</span>
+              {NEW_ITEM_TYPES.filter((t) => t !== (pickType ?? "ravare")).map((t) => (
+                <Button key={t} type="button" variant="outline" size="sm" disabled={disabled} className="min-h-[44px]" onClick={() => onChangeType(t)}>
+                  Gjør til {NEW_ITEM_TYPE_LABEL[t].toLowerCase()}
+                </Button>
+              ))}
+            </div>
           )}
           {q.trim() && hits.length === 0 && <p className="text-caption text-ink-secondary">Ingen treff. Velg «Opprett som ny» hvis varen ikke finnes.</p>}
         </div>
