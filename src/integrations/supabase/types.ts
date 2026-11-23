@@ -14,6 +14,561 @@ export type Database = {
   }
   public: {
     Tables: {
+      _backup_approvals_20261120: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          basis: Json | null
+          created_at: string | null
+          id: string | null
+          invoice_id: string | null
+          legal_entity_id: string | null
+          note: string | null
+          revoke_reason: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          basis?: Json | null
+          created_at?: string | null
+          id?: string | null
+          invoice_id?: string | null
+          legal_entity_id?: string | null
+          note?: string | null
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          basis?: Json | null
+          created_at?: string | null
+          id?: string | null
+          invoice_id?: string | null
+          legal_entity_id?: string | null
+          note?: string | null
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      _backup_case_credits_20261120: {
+        Row: {
+          amount_excl_vat: number | null
+          case_id: string | null
+          client_ref: string | null
+          created_at: string | null
+          created_by: string | null
+          credit_invoice_id: string | null
+          id: string | null
+          invoice_id: string | null
+          note: string | null
+        }
+        Insert: {
+          amount_excl_vat?: number | null
+          case_id?: string | null
+          client_ref?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          credit_invoice_id?: string | null
+          id?: string | null
+          invoice_id?: string | null
+          note?: string | null
+        }
+        Update: {
+          amount_excl_vat?: number | null
+          case_id?: string | null
+          client_ref?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          credit_invoice_id?: string | null
+          id?: string | null
+          invoice_id?: string | null
+          note?: string | null
+        }
+        Relationships: []
+      }
+      _backup_case_drafts_20261120: {
+        Row: {
+          basis_snapshot: Json | null
+          body: string | null
+          case_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string | null
+          legal_entity_id: string | null
+          missing_basis: boolean | null
+          subject: string | null
+          version: number | null
+        }
+        Insert: {
+          basis_snapshot?: Json | null
+          body?: string | null
+          case_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string | null
+          legal_entity_id?: string | null
+          missing_basis?: boolean | null
+          subject?: string | null
+          version?: number | null
+        }
+        Update: {
+          basis_snapshot?: Json | null
+          body?: string | null
+          case_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string | null
+          legal_entity_id?: string | null
+          missing_basis?: boolean | null
+          subject?: string | null
+          version?: number | null
+        }
+        Relationships: []
+      }
+      _backup_case_lines_20261120: {
+        Row: {
+          amount_excl_vat: number | null
+          basis: Json | null
+          case_id: string | null
+          created_at: string | null
+          id: string | null
+          invoice_id: string | null
+          invoice_line_id: string | null
+        }
+        Insert: {
+          amount_excl_vat?: number | null
+          basis?: Json | null
+          case_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          invoice_id?: string | null
+          invoice_line_id?: string | null
+        }
+        Update: {
+          amount_excl_vat?: number | null
+          basis?: Json | null
+          case_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          invoice_id?: string | null
+          invoice_line_id?: string | null
+        }
+        Relationships: []
+      }
+      _backup_cases_20261120: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          follow_up_on: string | null
+          id: string | null
+          kind: string | null
+          legal_entity_id: string | null
+          reason: string | null
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          responsible_user_id: string | null
+          status: string | null
+          supplier_id: string | null
+          title: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          follow_up_on?: string | null
+          id?: string | null
+          kind?: string | null
+          legal_entity_id?: string | null
+          reason?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          responsible_user_id?: string | null
+          status?: string | null
+          supplier_id?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          follow_up_on?: string | null
+          id?: string | null
+          kind?: string | null
+          legal_entity_id?: string | null
+          reason?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          responsible_user_id?: string | null
+          status?: string | null
+          supplier_id?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      _backup_cost_postings_20261120: {
+        Row: {
+          first_cost: boolean | null
+          invoice_id: string | null
+          invoice_line_id: string | null
+          legal_entity_id: string | null
+          posted_at: string | null
+          posted_by: string | null
+          revoked_at: string | null
+        }
+        Insert: {
+          first_cost?: boolean | null
+          invoice_id?: string | null
+          invoice_line_id?: string | null
+          legal_entity_id?: string | null
+          posted_at?: string | null
+          posted_by?: string | null
+          revoked_at?: string | null
+        }
+        Update: {
+          first_cost?: boolean | null
+          invoice_id?: string | null
+          invoice_line_id?: string | null
+          legal_entity_id?: string | null
+          posted_at?: string | null
+          posted_by?: string | null
+          revoked_at?: string | null
+        }
+        Relationships: []
+      }
+      _backup_example_links_20261120: {
+        Row: {
+          id: string | null
+          invoice_line_id: string | null
+          source_correction_id: string | null
+        }
+        Insert: {
+          id?: string | null
+          invoice_line_id?: string | null
+          source_correction_id?: string | null
+        }
+        Update: {
+          id?: string | null
+          invoice_line_id?: string | null
+          source_correction_id?: string | null
+        }
+        Relationships: []
+      }
+      _backup_invoice_lines_20261120: {
+        Row: {
+          base_quantity: number | null
+          count_per_package: number | null
+          created_at: string | null
+          description: string | null
+          discount_amount: number | null
+          excluded_at: string | null
+          excluded_by: string | null
+          excluded_raw_material_id: string | null
+          exclusion_category: string | null
+          exclusion_prev: Json | null
+          exclusion_reason: string | null
+          expected_price_per_base_unit: number | null
+          extraction_evidence: Json | null
+          extraction_issues: Json | null
+          id: string | null
+          invoice_id: string | null
+          ledger_account: string | null
+          line_kind: string | null
+          line_number: number | null
+          match_confidence: string | null
+          package_size: number | null
+          package_source_rms_id: string | null
+          package_unit: string | null
+          price_acceptance: Json | null
+          price_per_base_unit: number | null
+          price_reference_date: string | null
+          price_reference_id: string | null
+          price_reference_source: string | null
+          price_variance_pct: number | null
+          quantity: number | null
+          raw_material_id: string | null
+          requires_review: boolean | null
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          review_reason: string | null
+          supplier_sku: string | null
+          total_amount: number | null
+          unit: string | null
+          unit_price: number | null
+          unit_price_basis: string | null
+          updated_at: string | null
+          variance_status: string | null
+          vat_rate: number | null
+        }
+        Insert: {
+          base_quantity?: number | null
+          count_per_package?: number | null
+          created_at?: string | null
+          description?: string | null
+          discount_amount?: number | null
+          excluded_at?: string | null
+          excluded_by?: string | null
+          excluded_raw_material_id?: string | null
+          exclusion_category?: string | null
+          exclusion_prev?: Json | null
+          exclusion_reason?: string | null
+          expected_price_per_base_unit?: number | null
+          extraction_evidence?: Json | null
+          extraction_issues?: Json | null
+          id?: string | null
+          invoice_id?: string | null
+          ledger_account?: string | null
+          line_kind?: string | null
+          line_number?: number | null
+          match_confidence?: string | null
+          package_size?: number | null
+          package_source_rms_id?: string | null
+          package_unit?: string | null
+          price_acceptance?: Json | null
+          price_per_base_unit?: number | null
+          price_reference_date?: string | null
+          price_reference_id?: string | null
+          price_reference_source?: string | null
+          price_variance_pct?: number | null
+          quantity?: number | null
+          raw_material_id?: string | null
+          requires_review?: boolean | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          review_reason?: string | null
+          supplier_sku?: string | null
+          total_amount?: number | null
+          unit?: string | null
+          unit_price?: number | null
+          unit_price_basis?: string | null
+          updated_at?: string | null
+          variance_status?: string | null
+          vat_rate?: number | null
+        }
+        Update: {
+          base_quantity?: number | null
+          count_per_package?: number | null
+          created_at?: string | null
+          description?: string | null
+          discount_amount?: number | null
+          excluded_at?: string | null
+          excluded_by?: string | null
+          excluded_raw_material_id?: string | null
+          exclusion_category?: string | null
+          exclusion_prev?: Json | null
+          exclusion_reason?: string | null
+          expected_price_per_base_unit?: number | null
+          extraction_evidence?: Json | null
+          extraction_issues?: Json | null
+          id?: string | null
+          invoice_id?: string | null
+          ledger_account?: string | null
+          line_kind?: string | null
+          line_number?: number | null
+          match_confidence?: string | null
+          package_size?: number | null
+          package_source_rms_id?: string | null
+          package_unit?: string | null
+          price_acceptance?: Json | null
+          price_per_base_unit?: number | null
+          price_reference_date?: string | null
+          price_reference_id?: string | null
+          price_reference_source?: string | null
+          price_variance_pct?: number | null
+          quantity?: number | null
+          raw_material_id?: string | null
+          requires_review?: boolean | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          review_reason?: string | null
+          supplier_sku?: string | null
+          total_amount?: number | null
+          unit?: string | null
+          unit_price?: number | null
+          unit_price_basis?: string | null
+          updated_at?: string | null
+          variance_status?: string | null
+          vat_rate?: number | null
+        }
+        Relationships: []
+      }
+      _backup_invoices_20261120: {
+        Row: {
+          created_at: string | null
+          currency: string | null
+          due_date: string | null
+          ehf_payload: Json | null
+          excluded_at: string | null
+          excluded_by: string | null
+          exclusion_category: string | null
+          exclusion_prev: Json | null
+          exclusion_reason: string | null
+          extraction_confidence: number | null
+          extraction_issues: Json | null
+          flag_action_type: string | null
+          flag_reason: string | null
+          flagged_at: string | null
+          flagged_by: string | null
+          id: string | null
+          imported_at: string | null
+          imported_from_tripletex_at: string | null
+          invoice_date: string | null
+          invoice_number: string | null
+          is_credit_note: boolean | null
+          legal_entity_id: string | null
+          line_extraction_at: string | null
+          line_extraction_attempts: number | null
+          line_extraction_error: string | null
+          line_extraction_status: string | null
+          line_extraction_token: string | null
+          lines_source: string | null
+          lines_sum_excl_vat: number | null
+          lines_sum_status: string | null
+          lines_sum_variance_pct: number | null
+          notes: string | null
+          paid_at: string | null
+          pdf_status: string | null
+          reconciled_at: string | null
+          reconciled_by: string | null
+          reconciled_mode: string | null
+          source: string | null
+          source_document_url: string | null
+          status: string | null
+          supplier_id: string | null
+          total_amount: number | null
+          total_vat: number | null
+          tripletex_is_paid: boolean | null
+          tripletex_supplier_id: string | null
+          tripletex_supplier_invoice_id: string | null
+          tripletex_voucher_id: string | null
+          tripletex_voucher_number: string | null
+          updated_at: string | null
+          vat_inferred: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string | null
+          due_date?: string | null
+          ehf_payload?: Json | null
+          excluded_at?: string | null
+          excluded_by?: string | null
+          exclusion_category?: string | null
+          exclusion_prev?: Json | null
+          exclusion_reason?: string | null
+          extraction_confidence?: number | null
+          extraction_issues?: Json | null
+          flag_action_type?: string | null
+          flag_reason?: string | null
+          flagged_at?: string | null
+          flagged_by?: string | null
+          id?: string | null
+          imported_at?: string | null
+          imported_from_tripletex_at?: string | null
+          invoice_date?: string | null
+          invoice_number?: string | null
+          is_credit_note?: boolean | null
+          legal_entity_id?: string | null
+          line_extraction_at?: string | null
+          line_extraction_attempts?: number | null
+          line_extraction_error?: string | null
+          line_extraction_status?: string | null
+          line_extraction_token?: string | null
+          lines_source?: string | null
+          lines_sum_excl_vat?: number | null
+          lines_sum_status?: string | null
+          lines_sum_variance_pct?: number | null
+          notes?: string | null
+          paid_at?: string | null
+          pdf_status?: string | null
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          reconciled_mode?: string | null
+          source?: string | null
+          source_document_url?: string | null
+          status?: string | null
+          supplier_id?: string | null
+          total_amount?: number | null
+          total_vat?: number | null
+          tripletex_is_paid?: boolean | null
+          tripletex_supplier_id?: string | null
+          tripletex_supplier_invoice_id?: string | null
+          tripletex_voucher_id?: string | null
+          tripletex_voucher_number?: string | null
+          updated_at?: string | null
+          vat_inferred?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string | null
+          due_date?: string | null
+          ehf_payload?: Json | null
+          excluded_at?: string | null
+          excluded_by?: string | null
+          exclusion_category?: string | null
+          exclusion_prev?: Json | null
+          exclusion_reason?: string | null
+          extraction_confidence?: number | null
+          extraction_issues?: Json | null
+          flag_action_type?: string | null
+          flag_reason?: string | null
+          flagged_at?: string | null
+          flagged_by?: string | null
+          id?: string | null
+          imported_at?: string | null
+          imported_from_tripletex_at?: string | null
+          invoice_date?: string | null
+          invoice_number?: string | null
+          is_credit_note?: boolean | null
+          legal_entity_id?: string | null
+          line_extraction_at?: string | null
+          line_extraction_attempts?: number | null
+          line_extraction_error?: string | null
+          line_extraction_status?: string | null
+          line_extraction_token?: string | null
+          lines_source?: string | null
+          lines_sum_excl_vat?: number | null
+          lines_sum_status?: string | null
+          lines_sum_variance_pct?: number | null
+          notes?: string | null
+          paid_at?: string | null
+          pdf_status?: string | null
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          reconciled_mode?: string | null
+          source?: string | null
+          source_document_url?: string | null
+          status?: string | null
+          supplier_id?: string | null
+          total_amount?: number | null
+          total_vat?: number | null
+          tripletex_is_paid?: boolean | null
+          tripletex_supplier_id?: string | null
+          tripletex_supplier_invoice_id?: string | null
+          tripletex_voucher_id?: string | null
+          tripletex_voucher_number?: string | null
+          updated_at?: string | null
+          vat_inferred?: boolean | null
+        }
+        Relationships: []
+      }
       _backup_legal_entities_20260903: {
         Row: {
           backed_up_at: string | null
@@ -140,6 +695,330 @@ export type Database = {
           backed_up_at?: string | null
           row?: Json | null
           tb?: string | null
+        }
+        Relationships: []
+      }
+      _backup_line_corrections_20261120: {
+        Row: {
+          accepted_issues: Json | null
+          changed_fields: string[] | null
+          corrected: Json | null
+          corrected_at: string | null
+          corrected_by: string | null
+          example_id: string | null
+          id: string | null
+          invoice_id: string | null
+          invoice_line_id: string | null
+          learn: boolean | null
+          legal_entity_id: string | null
+          original: Json | null
+          reason: string | null
+          supplier_id: string | null
+        }
+        Insert: {
+          accepted_issues?: Json | null
+          changed_fields?: string[] | null
+          corrected?: Json | null
+          corrected_at?: string | null
+          corrected_by?: string | null
+          example_id?: string | null
+          id?: string | null
+          invoice_id?: string | null
+          invoice_line_id?: string | null
+          learn?: boolean | null
+          legal_entity_id?: string | null
+          original?: Json | null
+          reason?: string | null
+          supplier_id?: string | null
+        }
+        Update: {
+          accepted_issues?: Json | null
+          changed_fields?: string[] | null
+          corrected?: Json | null
+          corrected_at?: string | null
+          corrected_by?: string | null
+          example_id?: string | null
+          id?: string | null
+          invoice_id?: string | null
+          invoice_line_id?: string | null
+          learn?: boolean | null
+          legal_entity_id?: string | null
+          original?: Json | null
+          reason?: string | null
+          supplier_id?: string | null
+        }
+        Relationships: []
+      }
+      _backup_match_suggestions_20261120: {
+        Row: {
+          confidence: number | null
+          created_at: string | null
+          id: string | null
+          invoice_line_id: string | null
+          match_reason: string | null
+          rank: number | null
+          raw_material_id: string | null
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string | null
+          id?: string | null
+          invoice_line_id?: string | null
+          match_reason?: string | null
+          rank?: number | null
+          raw_material_id?: string | null
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string | null
+          id?: string | null
+          invoice_line_id?: string | null
+          match_reason?: string | null
+          rank?: number | null
+          raw_material_id?: string | null
+        }
+        Relationships: []
+      }
+      _backup_price_history_20261120: {
+        Row: {
+          cost_eligible: boolean | null
+          created_at: string | null
+          created_by: string | null
+          currency: string | null
+          effective_date: string | null
+          id: string | null
+          invoice_id: string | null
+          invoice_line_id: string | null
+          invoice_line_ref: string | null
+          is_credit: boolean | null
+          is_legacy: boolean | null
+          notes: string | null
+          price: number | null
+          raw_material_id: string | null
+          snapshot_at: string | null
+          snapshot_currency: string | null
+          snapshot_package: Json | null
+          snapshot_source: string | null
+          snapshot_unit: string | null
+          source: string | null
+          source_reference: string | null
+          superseded_at: string | null
+          superseded_reason: string | null
+          supplier_id: string | null
+        }
+        Insert: {
+          cost_eligible?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          effective_date?: string | null
+          id?: string | null
+          invoice_id?: string | null
+          invoice_line_id?: string | null
+          invoice_line_ref?: string | null
+          is_credit?: boolean | null
+          is_legacy?: boolean | null
+          notes?: string | null
+          price?: number | null
+          raw_material_id?: string | null
+          snapshot_at?: string | null
+          snapshot_currency?: string | null
+          snapshot_package?: Json | null
+          snapshot_source?: string | null
+          snapshot_unit?: string | null
+          source?: string | null
+          source_reference?: string | null
+          superseded_at?: string | null
+          superseded_reason?: string | null
+          supplier_id?: string | null
+        }
+        Update: {
+          cost_eligible?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          effective_date?: string | null
+          id?: string | null
+          invoice_id?: string | null
+          invoice_line_id?: string | null
+          invoice_line_ref?: string | null
+          is_credit?: boolean | null
+          is_legacy?: boolean | null
+          notes?: string | null
+          price?: number | null
+          raw_material_id?: string | null
+          snapshot_at?: string | null
+          snapshot_currency?: string | null
+          snapshot_package?: Json | null
+          snapshot_source?: string | null
+          snapshot_unit?: string | null
+          source?: string | null
+          source_reference?: string | null
+          superseded_at?: string | null
+          superseded_reason?: string | null
+          supplier_id?: string | null
+        }
+        Relationships: []
+      }
+      _backup_purchases_20261120: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          invoice_id: string | null
+          invoice_line_id: string | null
+          legal_entity_id: string | null
+          price_per_base_unit: number | null
+          purchase_date: string | null
+          quantity: number | null
+          raw_material_id: string | null
+          supplier_id: string | null
+          total_amount: number | null
+          unit: string | null
+          unit_price: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          invoice_id?: string | null
+          invoice_line_id?: string | null
+          legal_entity_id?: string | null
+          price_per_base_unit?: number | null
+          purchase_date?: string | null
+          quantity?: number | null
+          raw_material_id?: string | null
+          supplier_id?: string | null
+          total_amount?: number | null
+          unit?: string | null
+          unit_price?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          invoice_id?: string | null
+          invoice_line_id?: string | null
+          legal_entity_id?: string | null
+          price_per_base_unit?: number | null
+          purchase_date?: string | null
+          quantity?: number | null
+          raw_material_id?: string | null
+          supplier_id?: string | null
+          total_amount?: number | null
+          unit?: string | null
+          unit_price?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      _backup_review_holds_20261120: {
+        Row: {
+          held_at: string | null
+          history_id: string | null
+          reason: string | null
+          release_reason: string | null
+          released_at: string | null
+          released_by: string | null
+        }
+        Insert: {
+          held_at?: string | null
+          history_id?: string | null
+          reason?: string | null
+          release_reason?: string | null
+          released_at?: string | null
+          released_by?: string | null
+        }
+        Update: {
+          held_at?: string | null
+          history_id?: string | null
+          reason?: string | null
+          release_reason?: string | null
+          released_at?: string | null
+          released_by?: string | null
+        }
+        Relationships: []
+      }
+      _backup_rm_cost_20261120: {
+        Row: {
+          cost_basis_status: string | null
+          cost_source_history_id: string | null
+          current_cost_price: number | null
+          current_stock: number | null
+          id: string | null
+          price_source: string | null
+          price_updated_at: string | null
+        }
+        Insert: {
+          cost_basis_status?: string | null
+          cost_source_history_id?: string | null
+          current_cost_price?: number | null
+          current_stock?: number | null
+          id?: string | null
+          price_source?: string | null
+          price_updated_at?: string | null
+        }
+        Update: {
+          cost_basis_status?: string | null
+          cost_source_history_id?: string | null
+          current_cost_price?: number | null
+          current_stock?: number | null
+          id?: string | null
+          price_source?: string | null
+          price_updated_at?: string | null
+        }
+        Relationships: []
+      }
+      _backup_stock_movements_20261120: {
+        Row: {
+          batch_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string | null
+          legal_entity_id: string | null
+          movement_type: string | null
+          note: string | null
+          occurred_at: string | null
+          product_id: string | null
+          quantity_base: number | null
+          raw_material_id: string | null
+          reason: string | null
+          source_id: string | null
+          source_table: string | null
+          stock_item_id: string | null
+        }
+        Insert: {
+          batch_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string | null
+          legal_entity_id?: string | null
+          movement_type?: string | null
+          note?: string | null
+          occurred_at?: string | null
+          product_id?: string | null
+          quantity_base?: number | null
+          raw_material_id?: string | null
+          reason?: string | null
+          source_id?: string | null
+          source_table?: string | null
+          stock_item_id?: string | null
+        }
+        Update: {
+          batch_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string | null
+          legal_entity_id?: string | null
+          movement_type?: string | null
+          note?: string | null
+          occurred_at?: string | null
+          product_id?: string | null
+          quantity_base?: number | null
+          raw_material_id?: string | null
+          reason?: string | null
+          source_id?: string | null
+          source_table?: string | null
+          stock_item_id?: string | null
         }
         Relationships: []
       }

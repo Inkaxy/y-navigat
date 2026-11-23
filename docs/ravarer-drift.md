@@ -36,6 +36,8 @@ viser hva utklippstavlen gjør. Test: `node scripts/test-innliming-crlf.mjs` (hv
 | `05_slaa_sammen_varer` (`20261120_slaa_sammen_varer`, 18.11) | «Slå sammen varer» med angre (`rm_cap_slaa_sammen_v1`, `rm_material_merges`). Delfilene i `delfiler/` skal ikke kjøres. |
 | `06_varselmal_lesing_stopper` (`20261113_invoice_reading_alert_template`, 18.11) | E-postmalen for «lesingen står stille». |
 | `07_lesevarsel_stillstand` (`20261125_lesevarsel_stillstand`, 18.11) | `rm_reading_stall_check`. Tidsplanen (cron) nederst i filen er ikke lagt inn; krever eget ja. |
+| `20261120_tom_fakturalinjer_for_ehf` (23.11, Henriks ja) | Tømte alle 5 744 fakturalinjer og 6 611 fakturapriser, linjerettinger og kostprisføringer, lukket MANDIFLAN-saken og la 788 Tripletex-fakturaer i lesekøen på nytt (leses av `tripletex-invoice-lines-5min` med «EHF først» på). Sikkerhetskopi i `_backup_*_20261120` (ingen tilgang for app-brukere). Lagerbeholdningen til COCA-COLA 330MLNRGB X24 gikk fra 1 132 til −4 172 fordi lagerbevegelsene fra fakturalinjene ble slettet; de kommer tilbake når fakturaene er lest og koblet på nytt. |
+| `20261123_tom_fakturalinjer_rett_kalkylemerke` (23.11) | Retting: de låste kostprisene manglet `cost_eligible`, så 200 verifiserte råvarer falt til «mangler». Etter rettingen er alle 200 verifisert igjen, og ingen kostpris er endret. |
 
 ### Venter – `1-kjor-na/`
 | Fil | Hva den slår på | Merknad |
@@ -58,6 +60,7 @@ tilgangsfeil eller tidsavbrudd i loggene etterpå.
 | `20261117_automatikk` | Pant som følgevare, automatisk ny lesing. **Delvis utgått:** tabellen `rm_key_material_limits` er erstattet av egen prisgrense per vare. | Bør strykes for tabelldelen før kjøring; avgjøres av Henrik/root. |
 
 ### Dataendringer – `2-endrer-data/`, venter på Henriks ja per fil (alle har dry-run)
+**Etter tømmingen 23.11** finnes ingen av de gamle fakturalinjene lenger. Filene under, og `01_nullstill_koen`, gjelder de gamle linjene og har trolig ikke noe å gjøre nå; Henrik avgjør om de skal til `utgaatt/`.
 `20261119_fra_faktura_opprydding` (funksjon med dry-run som standard), `20261119_sumkontroll_omregning` (+ `.dryrun.sql`),
 `20261121_varenummer_normalisering` (`.PENDING.sql` = forhåndsvisning uten dataendring, kjøres før `.DATAENDRING.sql`),
 `20261122_like_linjer` (+ `.dryrun.sql`, 41 mulige like linjegrupper).
