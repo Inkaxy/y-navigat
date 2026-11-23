@@ -23,22 +23,23 @@ export function varerTabs(s: WorkSummary | undefined, sp: URLSearchParams = new 
   ];
 }
 
-export const PRISKONTROLL_TABS = ["fakturaer", "godkjenning"] as const;
+export const PRISKONTROLL_TABS = ["fakturaer", "godkjenning", "kostnader"] as const;
 export type PriskontrollTabId = (typeof PRISKONTROLL_TABS)[number];
 
 /** Parametre som tilhører en enkelt Fakturaer-fane og fjernes ved fanebytte. */
 export const PRISKONTROLL_TAB_PARAMS = [
-  "visning", "modus", "innboks", "faktura", "filter", "kilde", "kreditnota", "lav", "status", "leverandor", "q", "selskap", "fra", "til", "avvik", "betalt", "sort", "dir", "side", "sak", "vis", "valgt", "rekkefolge", "linje", "fokus",
+  "visning", "modus", "innboks", "faktura", "filter", "kilde", "kreditnota", "lav", "status", "leverandor", "q", "selskap", "fra", "til", "avvik", "betalt", "sort", "dir", "side", "sak", "vis", "valgt", "rekkefolge", "linje", "fokus", "aar", "post", "lev",
 ];
 
 /**
- * Fakturaer er et arkiv (opprydding demo D): alle fakturaer, og Godkjenning (uendret).
+ * Fakturaer er et arkiv (opprydding demo D): alle fakturaer, Godkjenning (uendret) og Kostnader (kostnadsposter per år).
  * `rm_work_summary.approval.ready_to_approve` har samme regel som listens «Klare» (ikke kansellert, ikke godkjent, ingen blokkere).
  */
 export function priskontrollTabs(s: WorkSummary | undefined): SectionTab[] {
   return [
     { id: "fakturaer", label: "Fakturaer" },
     { id: "godkjenning", label: "Godkjenning", count: s?.approval?.ready_to_approve },
+    { id: "kostnader", label: "Kostnader" },
   ];
 }
 

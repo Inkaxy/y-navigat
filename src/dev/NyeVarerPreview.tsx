@@ -33,7 +33,7 @@ function wi(itemKey: string, title: string, sku: string | null): WorkItem & { su
 }
 
 const nothing = async (): Promise<never> => { await new Promise((r) => setTimeout(r, 300)); throw new NothingSavedError(NOTHING_LINKED); };
-const actions: ReturnType<typeof useNewItemActions> = { link: nothing, notItem: nothing, undo: async () => "Angret (simulert).", canUndo: () => false, capFra: false };
+const actions: ReturnType<typeof useNewItemActions> = { link: nothing, notItem: nothing, costPost: nothing, undo: async () => "Angret (simulert).", canUndo: () => false, capFra: false };
 
 export default function NyeVarerPreview() {
   const [qc] = useState(() => {

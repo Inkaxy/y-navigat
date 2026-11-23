@@ -21,7 +21,7 @@ type Id = string | null | undefined;
 const enc = (v: Id) => encodeURIComponent(v ?? "");
 export const RAVARER_ROOT = "/ravarer";
 
-export type PriskontrollFane = "fakturaer" | "godkjenning";
+export type PriskontrollFane = "fakturaer" | "godkjenning" | "kostnader";
 export type LeverandorFane = "leverandorer" | "avtaler" | "forhandlinger" | "saker";
 export type LagerFane = "beholdning" | "varemottak" | "telling";
 export type InnstillingSeksjon = "priskontroll" | "automatikk" | "tripletex" | "kategorier" | "ai" | "fakturalesing";
@@ -60,6 +60,8 @@ export const paths = {
     withQuery(`${RAVARER_ROOT}/priskontroll/varekort`, q),
   varekort: (supplierId: Id, itemKey: Id) => `${RAVARER_ROOT}/priskontroll/varekort/${enc(supplierId)}/${enc(itemKey)}`,
   godkjenning: () => withQuery(`${RAVARER_ROOT}/priskontroll`, { fane: "godkjenning" }),
+  /** Kostnadsposter per år (`aar`, `post`, `lev`). */
+  kostnader: (q?: { aar?: number; post?: string } & Q) => withQuery(`${RAVARER_ROOT}/priskontroll`, { fane: "kostnader", ...q }),
   /** Leverandørsaker ligger under Leverandører (opprydding demo D). */
   saker: (q?: { leverandor?: string } & Q) => withQuery(`${RAVARER_ROOT}/leverandorer`, { fane: "saker", ...q }),
   faktura: (id: Id, q?: Q) => withQuery(`${RAVARER_ROOT}/priskontroll/faktura/${enc(id)}`, q),

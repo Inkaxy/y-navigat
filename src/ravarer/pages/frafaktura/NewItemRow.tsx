@@ -22,6 +22,9 @@ import { InvoiceSnippet } from "./InvoiceSnippet";
 import { TypeUnitCorrectionDialog } from "@/fakturaer/components/supplier-item/TypeUnitCorrectionDialog";
 import { useCompany } from "@/hooks/useCompany";
 import { ITEM_TYPES } from "@/ravarer/lib/itemTypes";
+import { useCostPostsAvailable } from "@/ravarer/hooks/useCostPosts";
+import { CostPostPicker, type PickedPost } from "@/ravarer/pages/priskontroll/kostnader/CostPostPicker";
+import { suggestedPostName } from "@/ravarer/pages/priskontroll/kostnader/costPostText";
 
 export type RowEntry = { answer: RowAnswer | null; submit: () => Promise<boolean> };
 type Actions = ReturnType<typeof useNewItemActions>;
@@ -141,6 +144,15 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
     catch (e) { setError(e instanceof Error ? e.message : "Kunne ikke lagre."); setNothingSaved(e instanceof NothingSavedError); setRetry(() => () => void notItemRef.current()); }
     finally { lock.current = false; setBusy(false); }
   };
+  // Kostnadspost: feilen vises i velgeren (kastes videre), og raden forsvinner bare ved bekreftet lagring.
+  const costPost = async (post: PickedPost) => {
+    if (lock.current || !canWrite || !ready) throw new Error("Vent til linjene er hentet.");
+    lock.current = true; setBusy(true); setError(null); setRetry(null); setNothingSaved(false);
+    const sentAt = Date.now();
+    try { onDone(row.key, await actions.costPost({ supplierId: row.supplier_id, supplierName: row.supplier_name, itemKey: row.item_key, text: text ?? row.title, lineIds, post }), sentAt); }
+    finally { lock.current = false; setBusy(false); }
+  };
+  const costCap = useCostPostsAvailable();
   const submitRef = useRef(submit);
   submitRef.current = submit;
   const notItemRef = useRef(notItem);
@@ -227,6 +239,10 @@ export function NewItemRow({ row, candidates, byId, supplierRule, actions, canWr
           )}
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" className="min-h-[44px] min-w-[5.5rem] flex-1" disabled={disabled || !ready} onClick={() => void notItem()}>Ikke vare</Button>
+            {costCap === true && !credit && (
+              <CostPostPicker className="min-h-[44px] min-w-[7.5rem] flex-1" disabled={disabled || !ready} onPick={costPost}
+                suggestedName={suggestedPostName(text, latest?.line_kind ?? null)} />
+            )}
             {holdHref && canWrite
               ? <Button asChild variant="outline" className="min-h-[44px] min-w-[7.5rem] flex-1"><Link to={holdHref} title={credit ? "Hold hele kreditnotaen utenfor råvarebehandling" : "Hold den nyeste linjen (eller hele fakturaen) utenfor råvarebehandling"}>Hold utenfor …</Link></Button>
               : <Button variant="outline" className="min-h-[44px] min-w-[7.5rem] flex-1" disabled>Hold utenfor …</Button>}

@@ -15,10 +15,11 @@ import { legacyFakturaerRedirect } from "@/ravarer/lib/arkiv/legacyFane";
 import { PriskontrollToolsMenu } from "./PriskontrollToolsMenu";
 import { PRISKONTROLL_TAB_PARAMS, PRISKONTROLL_TABS, priskontrollTabs, RAVARER_EYEBROW } from "./hubTabs";
 
+const Kostnader = lazy(() => import("@/ravarer/pages/priskontroll/kostnader/KostnaderTab").then((m) => ({ default: m.KostnaderTab })));
 const Godkjenning = lazy(() => import("@/ravarer/pages/priskontroll/godkjenning/GodkjenningTab").then((m) => ({ default: m.GodkjenningTab })));
 
 /**
- * Fakturaer = arkiv (opprydding demo D): Fakturaer · Godkjenning. Arbeidet med linjene skjer i Fra faktura;
+ * Fakturaer = arkiv (opprydding demo D): Fakturaer · Godkjenning · Kostnader. Arbeidet med linjene skjer i Fra faktura;
  * gamle faner (arbeid, varegrupper, leverandørsaker) sendes videre dit innholdet nå ligger.
  */
 export default function PriskontrollPage() {
@@ -49,6 +50,7 @@ export default function PriskontrollPage() {
       <Suspense fallback={<QueryLoadingState rows={6} />}>
         {tab === "fakturaer" && <FakturaerTab />}
         {tab === "godkjenning" && <Godkjenning />}
+        {tab === "kostnader" && <Kostnader />}
       </Suspense>
       <ImportSheet />
     </ModulePage>

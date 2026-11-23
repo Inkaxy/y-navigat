@@ -10,10 +10,12 @@ import { parseUndoResult, undoSummary } from "@/ravarer/lib/quickAnswers";
 import { NEW_ITEM_TYPE_LABEL, packagePayload, type NewItemType, type PackageState } from "@/ravarer/lib/fraFaktura/newItems";
 import { assertLinesSaved } from "@/ravarer/lib/fraFaktura/linkOutcome";
 import { linkLearning, notItemLearning, type LearningExample } from "@/ravarer/lib/fakturalesing/learningExample";
+import { useCostPostWrites } from "@/ravarer/hooks/useCostPosts";
 
 export type NewItemUndo =
   | { kind: "kobling"; supplierId: string; itemKey: string; lineIds: string[]; rawMaterialId: string; created: boolean }
-  | { kind: "ikke_vare"; supplierId: string; itemKey: string; lineIds: string[] };
+  /** `costPost`: linjen ble også lagt i en kostnadspost; angre tar den ut av posten igjen. */
+  | { kind: "ikke_vare"; supplierId: string; itemKey: string; lineIds: string[]; costPost?: boolean };
 
 export interface NewItemReceipt { title: string; detail: string; undo: NewItemUndo | null; undone?: string | null }
 
@@ -31,6 +33,7 @@ export function useNewItemActions() {
   const capFra = useCapability("rm_cap_fra_faktura_v1");
   const capUndoNotItem = useCapability("rm_cap_beslutninger_v1");
   const capLearning = useCapability("rm_cap_fakturalesing_v1");
+  const costWrites = useCostPostWrites();
 
   /**
    * Læring (bestilling 18.11, C3): etter BEKREFTET lagring lagres avgjørelsen som eksempel for leverandør + vare.
@@ -94,6 +97,32 @@ export function useNewItemActions() {
     return { title: i.text, detail: `ikke en vare. Hoppes over på alle fakturaer fra ${i.supplierName ?? "leverandøren"}.`, undo: { kind: "ikke_vare", supplierId: i.supplierId, itemKey: i.itemKey, lineIds: i.lineIds } };
   };
 
+  /**
+   * «Kostnadspost»: legger leverandørlinjen i posten (regel som også gjelder nye fakturaer), og svarer «Ikke vare» på
+   * linjene via dagens vei, slik at de forlater køen. Posten lagres først; feiler «Ikke vare», står linjen i posten,
+   * men er fortsatt i køen (meldingen sier det).
+   */
+  const costPost = async (i: { supplierId: string; supplierName: string | null; itemKey: string; text: string; lineIds: string[]; post: { id: string | null; name: string } }): Promise<NewItemReceipt> => {
+    if (!company) throw new Error("Selskapet er ikke lastet ennå.");
+    if (i.lineIds.length === 0) throw new Error("Ingen åpne linjer. Last siden på nytt.");
+    const post = i.post.id ? { id: i.post.id, name: i.post.name } : await costWrites.savePost({ id: null, name: i.post.name });
+    await costWrites.setRule({ supplierId: i.supplierId, itemKey: i.itemKey, postId: post.id });
+    let r;
+    try {
+      r = await linkSupplierItem({ legal_entity_id: company.id, supplier_id: i.supplierId, item_key: i.itemKey, not_raw_material: true, reason: `Kostnadspost: ${post.name}`, line_ids: i.lineIds })
+        .finally(() => refresh());
+      assertLinesSaved(r);
+    } catch (e) {
+      const why = e instanceof Error ? e.message : "Utfallet er ukjent.";
+      throw new Error(`Linjen er lagt i posten «${post.name}», men står fortsatt i køen: ${why}`);
+    }
+    void learn(i.lineIds[0], notItemLearning());
+    return {
+      title: i.text, detail: `lagt i kostnadsposten «${post.name}». Telles med på alle fakturaer fra ${i.supplierName ?? "leverandøren"}, også nye.`,
+      undo: { kind: "ikke_vare", supplierId: i.supplierId, itemKey: i.itemKey, lineIds: i.lineIds, costPost: true },
+    };
+  };
+
   const canUndo = (u: NewItemUndo | null): boolean => !!u && (u.kind === "kobling" ? capFra === true : capUndoNotItem === true);
 
   /** Angre. Gir norsk kvitteringstekst; kaster ved ukjent utfall slik at knappen ikke lover noe. */
@@ -108,8 +137,13 @@ export function useNewItemActions() {
     const o = r.kind === "ok" ? parseUndoResult(r.data) : null;
     if (!o) throw new Error("Utfallet er ukjent. Kontroller fakturaen før du prøver igjen.");
     const deactivated = r.kind === "ok" && typeof r.data === "object" && r.data !== null && "deactivated" in r.data && r.data.deactivated === true;
-    return `${undoSummary(o)}${deactivated ? " Den nye varen er satt inaktiv." : ""}`;
+    let postNote = "";
+    if (u.kind === "ikke_vare" && u.costPost) {
+      try { await costWrites.setRule({ supplierId: u.supplierId, itemKey: u.itemKey, postId: null }); postNote = " Linjen er tatt ut av kostnadsposten."; }
+      catch { postNote = " Linjen ligger fortsatt i kostnadsposten – ta den ut under Fakturaer › Kostnader."; }
+    }
+    return `${undoSummary(o)}${deactivated ? " Den nye varen er satt inaktiv." : ""}${postNote}`;
   };
 
-  return { link, notItem, undo, canUndo, capFra };
+  return { link, notItem, costPost, undo, canUndo, capFra };
 }

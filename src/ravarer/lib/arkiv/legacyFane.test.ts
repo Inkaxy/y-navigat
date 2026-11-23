@@ -9,6 +9,7 @@ describe("gamle Fakturaer-faner etter oppryddingen (demo D)", () => {
   it("arkivets egne faner står", () => {
     expect(legacyFakturaerRedirect("?fane=fakturaer&visning=alle")).toBeNull();
     expect(legacyFakturaerRedirect("?fane=godkjenning")).toBeNull();
+    expect(legacyFakturaerRedirect("?fane=kostnader&aar=2026")).toBeNull();
     expect(legacyFakturaerRedirect("")).toBeNull();
   });
   it("Leverandørsaker flytter til Leverandører med filtrene", () => {
@@ -28,7 +29,7 @@ describe("gamle Fakturaer-faner etter oppryddingen (demo D)", () => {
 });
 
 describe("faneradene etter oppryddingen", () => {
-  it("Fakturaer har bare Fakturaer og Godkjenning", () => expect([...PRISKONTROLL_TABS]).toEqual(["fakturaer", "godkjenning"]));
+  it("Fakturaer har Fakturaer, Godkjenning og Kostnader", () => expect([...PRISKONTROLL_TABS]).toEqual(["fakturaer", "godkjenning", "kostnader"]));
   it("Leverandørsaker ligger under Leverandører og krever fakturatilgang", () => {
     expect(leverandorTabs(undefined, true).find((t) => t.id === "saker")?.hidden).toBe(false);
     expect(leverandorTabs(undefined, false).find((t) => t.id === "saker")?.hidden).toBe(true);

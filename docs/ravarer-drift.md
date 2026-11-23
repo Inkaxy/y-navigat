@@ -1,6 +1,6 @@
 # Råvarer – driftsliste
 
-Oppdatert 18.11.2026. Én samlet oversikt over databasefiler, brytere, utrullede serverfunksjoner og kjente
+Oppdatert 23.11.2026. Én samlet oversikt over databasefiler, brytere, utrullede serverfunksjoner og kjente
 begrensninger. Root kjører databasefiler; ingenting her kjøres automatisk. «Kjørt» betyr meldt kjørt av root.
 
 ## A. Databasefiler (`supabase/pending/`)
@@ -43,6 +43,7 @@ viser hva utklippstavlen gjør. Test: `node scripts/test-innliming-crlf.mjs` (hv
 | Fil | Hva den slår på | Merknad |
 |---|---|---|
 | `01_nullstill_koen` (kontroll `20261124_nullstill_koen`) | «Nullstill køen» (`rm_cap_nullstill_koen_v1`): kategori `nullstilling` for «Hold utenfor» på linje, tabellene `rm_queue_reset_runs/_snapshot/_items/_item_lines`, funksjonene `rm_queue_reset_*`. Oppdatert 18.11 (romsligere regler A/B/C): forhåndsvisningen leser lesevarsler på faktura og alle linjekoder i stedet for prissikkerhetsstatusen, og `rm_queue_reset_finish` skriver `lesegrunnlag` i revisjonsloggen. | Venter på Henriks ja. Ingen utrulling av serverfunksjoner trengs (bruker `link-supplier-item` og `match-invoice-lines` som allerede er ute). Starter ingen kjøring; grensen 1 % settes av appen etter ferdig kjøring uten feil. |
+| `02_kostnadsposter` (kontroll `20261128_kostnadsposter`) | Kostnadsposter (`rm_cap_kostnadsposter_v1`, 23.11): tabellene `rm_cost_posts` og `rm_cost_post_rules` (bare lesing fra klienten), funksjonene `rm_save_cost_post`, `rm_set_cost_post_rule`, `rm_cost_post_summary`, `rm_cost_post_lines`, `_rm_cost_item_key`. Fakturaer › Kostnader og «Kostnadspost …» i Fra faktura › Nye varer. | Venter på Henriks ja. Endrer ingen eksisterende data og krever ingen utrulling av serverfunksjoner. Test: `node scripts/test-kostnadsposter-sql.mjs`. |
 
 
 **Kontrollert av root i produksjon 18.11 etter 00–07:** `rm_cap_gjenlesing_fjern_v1`, `rm_cap_raske_oppslag_v1`,

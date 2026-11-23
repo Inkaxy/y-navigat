@@ -176,3 +176,9 @@
 - [x] Forhåndsvisning med CSV/JSON, start med én bekreftelse, bolker/pause/stopp/omlasting, kvittering, angre, helseside
 - [x] PENDING `1-kjor-na/01_nullstill_koen.sql` + kontrollfil, testet LF/CRLF
 - [ ] Kjøre SQL-filen (venter på Henriks ja) og prøve kjøringen innlogget i appen
+
+# Kostnadsposter (23.11.2026)
+- [x] PENDING `1-kjor-na/02_kostnadsposter.sql` + kontroll + lokal test (LF/CRLF)
+- [x] Fakturaer › Kostnader: årssum per post, leverandører, fakturalinjer, forslag, opprett/gi nytt navn/arkiver
+- [x] «Kostnadspost …» i Fra faktura › Nye varer (huskes per leverandørlinje, angre tar ut av posten)
+- [ ] Kjøre `02_kostnadsposter.sql` – venter på Henriks ja
