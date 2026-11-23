@@ -31,7 +31,9 @@ export function RowPackage({ draft, onDraft, state, badge, price, baseUnit, disa
   const extra = state.state === "valid" ? unitPrices.filter((u) => u.unit !== unitOut) : [];
   const priceText = price == null ? null : [...extra.map((u) => `${kr(u.amount)} kr/${u.unit}`), `${kr(price)} kr/${unitOut}`].join(" · ");
   const missing = state.state === "empty";
-  const conflict = draft.source !== "direkte" && baseUnit ? unitConflict(draft.unit, baseUnit) : null;
+  // Også fakturert direkte (kg på faktura mot stk-vare): da finnes ikke noe pakningsfelt, så valget må vises her.
+  const conflict = baseUnit ? unitConflict(draft.unit, baseUnit) : null;
+  const direct = draft.source === "direkte";
   const container = draft.container || "pakning";
   // Regnestykket i tre trinn: fakturapris → innhold → kalkylepris.
   const invoicePrice = state.state === "valid" ? unitPrices.find((u) => u.unit !== state.baseUnit) ?? null : null;
@@ -49,7 +51,7 @@ export function RowPackage({ draft, onDraft, state, badge, price, baseUnit, disa
     </p>
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
       {draft.source === "direkte" ? (
-        <span className="text-ink-secondary">Fakturert i {draft.unit} – ingen pakning trengs</span>
+        <span className="text-ink-secondary">Fakturert i {draft.unit}{conflict ? "" : " – ingen pakning trengs"}</span>
       ) : (
         <>
           <label htmlFor={`${id}-q`} className="text-ink-secondary">1 {draft.container || "pakning"} =</label>
@@ -68,7 +70,7 @@ export function RowPackage({ draft, onDraft, state, badge, price, baseUnit, disa
         </>
       )}
       {missing && <span className="font-semibold text-destructive">Mangler mengde</span>}
-      {state.state === "invalid" && <span className="text-destructive">{state.reason}</span>}
+      {state.state === "invalid" && !(direct && conflict) && <span className="text-destructive">{state.reason}</span>}
       {!steps && priceText && <span className="font-semibold tabular-nums">{priceText}</span>}
       <span className={cn("rounded-full px-2 py-0.5 text-caption font-semibold", TONE[badge])}>{PACKAGE_BADGE_LABEL[badge]}</span>
       {numbersNote && <p className="basis-full text-caption text-warning">Sjekk tallene: {numbersNote}</p>}
@@ -84,9 +86,12 @@ export function RowPackage({ draft, onDraft, state, badge, price, baseUnit, disa
     {conflict && (
       <div role="note" className="flex flex-wrap items-center gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-caption">
         <span className="min-w-0 basis-full sm:basis-auto sm:flex-1">
-          Fakturaen oppgir {conflict.to === "kg" ? "vekt" : conflict.to === "l" ? "volum" : "antall"}, men varen regnes i {conflict.from}. Velg hva som stemmer:
+          {direct
+            ? <>Fakturaen er i {draft.unit}, men varen regnes i {conflict.from}. Prisen regnes aldri om mellom {draft.unit} og {conflict.from}.{" "}
+                {onChangeBaseUnit ? `Endre varen til ${conflict.to}, eller velg «Opprett som ny».` : `Velg «Opprett som ny» for en vare som regnes i ${conflict.to}.`}</>
+            : <>Fakturaen oppgir {conflict.to === "kg" ? "vekt" : conflict.to === "l" ? "volum" : "antall"}, men varen regnes i {conflict.from}. Velg hva som stemmer:</>}
         </span>
-        {conflict.from === "stk" && (
+        {conflict.from === "stk" && !direct && (
           <button type="button" disabled={disabled} onClick={() => onDraft({ ...draft, qty: "1", unit: "stk", conflict: false })}
             className="min-h-[44px] rounded-md border border-input bg-background px-3 font-semibold hover:bg-muted">Bruk 1 {container} = 1 stk</button>
         )}
