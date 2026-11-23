@@ -24,6 +24,9 @@ import { GRAIN_CLASSIFICATION_OPTIONS } from "@/varer/lib/breadscale";
 import { CategorySelectItems } from "@/ravarer/components/CategorySelectItems";
 import { categoryOptions } from "@/ravarer/lib/categories";
 import { useRavarer } from "@/ravarer/context/RavarerContext";
+import { useCompany } from "@/hooks/useCompany";
+import { itemTypeLabel } from "@/ravarer/lib/itemTypes";
+import { TypeUnitCorrectionDialog } from "@/fakturaer/components/supplier-item/TypeUnitCorrectionDialog";
 import { RecalcHistory } from "@/ravarer/components/packages/RecalcHistory";
 import { PackageEditor } from "@/ravarer/editors/PackageEditor";
 import { fallbackPackageRow } from "@/ravarer/lib/packageRow";
@@ -91,6 +94,9 @@ interface Props {
 export function OverviewTab({ rm, registerSave, onEditLink }: Props) {
   const { canWrite } = useRavarer();
   const update = useUpdateRawMaterial();
+  const { data: company } = useCompany();
+  // Varetype byttes bare via dagens typeretting (forhåndsvisning + revisjonslogg), aldri via grunndata-lagringen.
+  const [typeOpen, setTypeOpen] = useState(false);
   const [draft, setDraft] = useState<RawMaterialRow>(rm);
   const patch = useMemo(() => changedFields(draft, rm), [draft, rm]);
   const dirty = Object.keys(patch).length > 0;
@@ -244,6 +250,21 @@ export function OverviewTab({ rm, registerSave, onEditLink }: Props) {
             bokstaver (f.eks. hvetemel). Tomt = bruk råvarenavnet. Lagres for
             seg.
           </p>
+        </div>
+        <div>
+          <Label>Varetype</Label>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold">{rm.item_type === "videresalg" ? "Handelsvare (videresalg)" : itemTypeLabel(rm.item_type)}</span>
+            {canWrite && company && (
+              <Button type="button" variant="outline" size="sm" className="min-h-[44px]" onClick={() => setTypeOpen(true)}>Endre varetype …</Button>
+            )}
+          </div>
+          {typeOpen && company && (
+            <TypeUnitCorrectionDialog key={`${company.id}:${rm.id}`} companyId={company.id} rawMaterialId={rm.id} rawMaterialName={rm.name}
+              open onOpenChange={(o) => { if (!o) setTypeOpen(false); }} canWrite={canWrite}
+              initialBaseUnit={rm.base_unit === "kg" || rm.base_unit === "l" || rm.base_unit === "stk" ? rm.base_unit : undefined}
+              doneLabel="Ferdig" />
+          )}
         </div>
         <div>
           <Label>Beskrivelse</Label>

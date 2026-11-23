@@ -116,6 +116,7 @@ export function TypeUnitCorrectionDialog(props: Props) {
       void qc.invalidateQueries({ queryKey: ["raw_materials"] });
       void qc.invalidateQueries({ queryKey: ["raw_material", p.rawMaterialId] });
       void qc.invalidateQueries({ queryKey: ["varer", "handelsvarer"] });
+      void qc.invalidateQueries({ queryKey: ["ravarer", "fra-faktura", "price-lines"] });
       p.onSaved?.(r);
     } else if (r.kind === "rejected" && r.error === "versjon_endret") {
       void preview.refetch();
