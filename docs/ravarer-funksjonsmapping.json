@@ -3036,7 +3036,7 @@
    "handler_or_render_evidence": [
     {
      "file": "src/ravarer/pages/priskontroll/gjore/VarekortPanel.tsx",
-     "evidence": "Ferdig — neste",
+     "evidence": "Godkjenn og gå til neste",
      "note": "Avslutt og neste",
      "reached_from_owner": true
     },
