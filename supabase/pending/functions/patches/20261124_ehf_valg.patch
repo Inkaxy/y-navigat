@@ -1,0 +1,112 @@
+diff -ruN a/supabase/functions/_shared/ehfLines.ts b/supabase/functions/_shared/ehfLines.ts
+--- a/supabase/functions/_shared/ehfLines.ts	2026-11-24 15:05:58.774731045 +0000
++++ b/supabase/functions/_shared/ehfLines.ts	2026-11-24 15:05:58.775731045 +0000
+@@ -188,8 +188,9 @@
+ export function decideEhf(p: EhfParse, expectedExclVat: number | null): EhfDecision {
+   if (!p.ok) return { use: false, reason: p.reason };
+   if (p.lines.some((l) => l.total_amount == null)) return { use: false, reason: "En EHF-linje mangler linjesum." };
+-  const sum = r2(p.lines.reduce((s, l) => s + Math.abs(l.total_amount ?? 0), 0));
+-  if (p.lineExtensionTotal != null && Math.abs(sum - Math.abs(p.lineExtensionTotal)) > 1) {
++  // Summen tar med fortegn: rabatt- og returlinjer med minus trekkes fra (kreditnota er negativ i sin helhet).
++  const sum = r2(p.lines.reduce((s, l) => s + (l.total_amount ?? 0), 0));
++  if (p.lineExtensionTotal != null && Math.abs(Math.abs(sum) - Math.abs(p.lineExtensionTotal)) > 1) {
+     return { use: false, reason: `Linjesummen i EHF (${sum}) stemmer ikke med dokumentets sum (${p.lineExtensionTotal}).` };
+   }
+   const docExcl = p.taxExclusiveTotal ?? p.lineExtensionTotal;
+diff -ruN a/supabase/functions/tripletex-import-invoice-lines/index.ts b/supabase/functions/tripletex-import-invoice-lines/index.ts
+--- a/supabase/functions/tripletex-import-invoice-lines/index.ts	2026-11-24 15:05:58.770731045 +0000
++++ b/supabase/functions/tripletex-import-invoice-lines/index.ts	2026-11-24 15:05:58.772731045 +0000
+@@ -46,19 +46,38 @@
+ }
+ 
+ /** Henter EHF-XML fra Tripletex-bilaget (bare GET). null = ingen EHF; feil gir aldri stopp, bare PDF-lesing. */
+-async function fetchEhfXml(tt: string, ttId: string): Promise<{ xml: string; documentId: string } | null> {
++type EhfFetch = { xml: string; documentId: string } | { none: string };
++
++/** Henter EHF-XML. Prøver leverandørfakturaens bilag, deretter bilaget direkte (samme vei som EHF-testen).
++ *  Returnerer alltid en grunn når ingen EHF finnes, slik at valget kan lagres på fakturaen. */
++async function fetchEhfXml(tt: string, ttId: string, voucherIdHint: string | null): Promise<EhfFetch> {
+   const h = { Authorization: authHeader(tt), Accept: "application/json" };
++  const ids: string[] = [];
++  let voucherId = voucherIdHint;
+   const r = await fetch(`${baseUrl()}/v2/supplierInvoice/${ttId}?fields=voucher(id,ediDocument(id))`, { headers: h });
+-  if (!r.ok) { await r.body?.cancel(); return null; }
+-  const j = await r.json().catch(() => null);
+-  const id = j?.value?.voucher?.ediDocument?.id;
+-  if (id == null) return null;
+-  const c = await fetch(`${baseUrl()}/v2/document/${id}/content`, { headers: { Authorization: authHeader(tt), Accept: "*/*" } });
+-  if (!c.ok) { await c.body?.cancel(); return null; }
+-  const len = Number(c.headers.get("content-length") ?? "");
+-  if (Number.isFinite(len) && len > 15_000_000) { await c.body?.cancel(); return null; }
+-  const text = await c.text();
+-  return /<(\w+:)?(Invoice|CreditNote)[\s>]/.test(text) ? { xml: text, documentId: String(id) } : null;
++  if (r.ok) {
++    const j = await r.json().catch(() => null);
++    const id = j?.value?.voucher?.ediDocument?.id;
++    if (id != null) ids.push(String(id));
++    if (j?.value?.voucher?.id != null) voucherId = String(j.value.voucher.id);
++  } else await r.body?.cancel();
++  if (voucherId) {
++    const v = await fetch(`${baseUrl()}/v2/ledger/voucher/${voucherId}?fields=ediDocument(id),attachment(id)`, { headers: h });
++    if (v.ok) {
++      const j = await v.json().catch(() => null);
++      for (const d of [j?.value?.ediDocument, j?.value?.attachment]) if (d?.id != null && !ids.includes(String(d.id))) ids.push(String(d.id));
++    } else await v.body?.cancel();
++  }
++  if (ids.length === 0) return { none: "Tripletex viser ikke noe EHF-dokument for fakturaen." };
++  for (const id of ids.slice(0, 3)) {
++    const c = await fetch(`${baseUrl()}/v2/document/${id}/content`, { headers: { Authorization: authHeader(tt), Accept: "*/*" } });
++    if (!c.ok) { await c.body?.cancel(); continue; }
++    const len = Number(c.headers.get("content-length") ?? "");
++    if (Number.isFinite(len) && len > 15_000_000) { await c.body?.cancel(); continue; }
++    const text = await c.text();
++    if (/<(\w+:)?(Invoice|CreditNote)[\s>]/.test(text)) return { xml: text, documentId: id };
++  }
++  return { none: "Dokumentet i Tripletex er ikke en EHF-faktura (XML)." };
+ }
+ 
+ function json(body: unknown, status = 200) {
+@@ -248,7 +267,7 @@
+           // 0) Fakturahode med leverandør (kontrollfakta til uthentingen)
+           const { data: head } = await admin
+             .from("invoices")
+-            .select("id, supplier_id, invoice_number, total_amount, total_vat, currency, is_credit_note, suppliers(name)")
++            .select("id, supplier_id, invoice_number, total_amount, total_vat, currency, is_credit_note, tripletex_voucher_id, suppliers(name)")
+             .eq("id", inv.id)
+             .maybeSingle();
+           const supplierId = (head as any)?.supplier_id as string | null;
+@@ -324,8 +343,9 @@
+           let ehfNote: string | null = null;
+           if (ehfFirst ??= await ehfFirstEnabled(admin, legalEntityId)) {
+             try {
+-              const doc = await fetchEhfXml(tt, ttId);
+-              if (doc) {
++              const doc = await fetchEhfXml(tt, ttId, (head as any)?.tripletex_voucher_id ?? null);
++              if ("none" in doc) ehfNote = doc.none;
++              else {
+                 const parsed = ehfLinesFromTree(parseXml(doc.xml, EHF_XML_OPTIONS));
+                 const d = decideEhf(parsed, expectedExcl);
+                 if (d.use && parsed.ok) ehfRaw = parsed.lines;
+@@ -409,11 +429,18 @@
+             },
+           });
+           if (finErr) throw new Error(`Lagring feilet: ${finErr.message}`);
+-          if (ehfRaw) {
+-            // Linjekilde vises på fakturasiden («Linjekilde»). Samme token-vakt som ferdigstillingen.
+-            await admin.from("invoices").update({ lines_source: "ehf_attachment" }).eq("id", inv.id).eq("line_extraction_token", token);
+-          }
+           const finRes = (fin ?? {}) as { ok?: boolean; code?: string; lines?: number };
++          if (finRes.ok && ehfFirst) {
++            // Ferdigstillingen nuller tokenet og setter «pdf_extracted». Kilde og EHF-valg lagres derfor rett etter,
++            // bare på denne fakturaen og bare mens ingen ny lesing har startet (token fortsatt null).
++            // ehf_payload er en ubrukt kolonne som nå holder valget: kilde, grunn (når PDF ble brukt) og tidspunkt.
++            const patch: Record<string, unknown> = {
++              ehf_payload: { kilde: ehfRaw ? "ehf" : "pdf", grunn: ehfRaw ? null : ehfNote ?? "Ukjent grunn.", sjekket: new Date().toISOString() },
++            };
++            if (ehfRaw && rows.length > 0) patch.lines_source = "ehf_attachment";
++            const { error: srcErr } = await admin.from("invoices").update(patch).eq("id", inv.id).is("line_extraction_token", null);
++            if (srcErr) console.warn(JSON.stringify({ fn: "tripletex-import-invoice-lines", invoice: inv.id, ehf_status_feil: srcErr.message }));
++          }
+           if (!finRes.ok) {
+             // Utdatert kjøring eller manuell endring: ingenting lagret, ingenting overskrevet.
+             detaljer.push({ invoice_id: inv.id, skipped: finRes.code ?? "ukjent" });

@@ -188,8 +188,9 @@ export type EhfDecision = { use: true } | { use: false; reason: string };
 export function decideEhf(p: EhfParse, expectedExclVat: number | null): EhfDecision {
   if (!p.ok) return { use: false, reason: p.reason };
   if (p.lines.some((l) => l.total_amount == null)) return { use: false, reason: "En EHF-linje mangler linjesum." };
-  const sum = r2(p.lines.reduce((s, l) => s + Math.abs(l.total_amount ?? 0), 0));
-  if (p.lineExtensionTotal != null && Math.abs(sum - Math.abs(p.lineExtensionTotal)) > 1) {
+  // Summen tar med fortegn: rabatt- og returlinjer med minus trekkes fra (kreditnota er negativ i sin helhet).
+  const sum = r2(p.lines.reduce((s, l) => s + (l.total_amount ?? 0), 0));
+  if (p.lineExtensionTotal != null && Math.abs(Math.abs(sum) - Math.abs(p.lineExtensionTotal)) > 1) {
     return { use: false, reason: `Linjesummen i EHF (${sum}) stemmer ikke med dokumentets sum (${p.lineExtensionTotal}).` };
   }
   const docExcl = p.taxExclusiveTotal ?? p.lineExtensionTotal;

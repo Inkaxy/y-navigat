@@ -146,3 +146,9 @@ Innlogget – klikk gjennom (Henrik):
 13. Innstillinger › Fakturalesing › Helse: siste lesing, kø og brytere vises; ingen bryter er på uten at det er bestemt.
 14. Innstillinger › Fakturalesing › EHF-test: kortet vises for godkjenner/admin.
 15. Gamle lenker (`/ravarer/beslutninger`) sender til Fra faktura.
+
+## Venter på ja: EHF-valg i Tripletex-importen (24.11.2026)
+- Patch `supabase/pending/functions/patches/20261124_ehf_valg.patch` (+ `_shared/ehfLines.ts`). Ingen SQL.
+- Retter: EHF-dokument hentes også via bilaget (samme vei som EHF-testen); summen tar med fortegn (rabatt/retur);
+  kilde «EHF» lagres riktig; valget og grunnen til PDF lagres i `invoices.ehf_payload`.
+- Utrulling: `patch -p1 < supabase/pending/functions/patches/20261124_ehf_valg.patch` fra prosjektroten. Deretter leses faktura 330716883 på nytt.
