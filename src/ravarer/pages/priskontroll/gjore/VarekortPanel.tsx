@@ -266,16 +266,6 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
   return (
     <div className="space-y-4">
       <VarekortHeaderView item={item} openInvoices={scope.invoices} lockedNote={locked?.badge ?? null} />
-      <ReviewPlanCard plan={plan} basis={basis}
-        onBasisAction={(k) => { if (k === "pakning") { setEditPkg(true); setEditForm(true); } else navigate(paths.reberegn()); }}
-        returnTo={typeof window !== "undefined" ? window.location.pathname + window.location.search : undefined}
-        onAction={(step) => { if (step === "pakning" || step === "vare") { setEditPkg(step === "pakning"); setEditForm(true); return true; } return false; }} />
-      {insightSrc && lines.length > 1 && (
-        <p className="text-sm font-medium" data-testid="valgt-faktura">Valgt faktura {insightSrc.invoice_number ?? "uten nummer"}{insightSrc.invoice_date ? ` · ${insightSrc.invoice_date.split("-").reverse().join(".")}` : ""}{insightSrc.is_credit_note ? " · kreditnota" : ""}</p>
-      )}
-      {insightSrc && discountArithmeticText(insightSrc) && <p className="rounded-md bg-muted/50 px-3 py-2 text-sm tabular-nums" data-testid="rabatt-regnestykke">Trykt på fakturaen: {discountArithmeticText(insightSrc)}</p>}
-      {insightLine && insightSrc && <LineInsightPanel line={insightLine} clarifications={lineClarifications(insightLine)} baseUnit={item.rm_base_unit} confirmedPackage={container.isSuccess ? confirmedPackageFor({ ...item, container_unit: container.data }, insightSrc) : null} />}
-
       {locked ? (
         <div role="status" className="space-y-1 rounded-md border border-line-subtle bg-muted/40 p-3 text-sm" data-testid="laast-varekort">
           <p className="font-medium">{locked.title}</p>
@@ -287,38 +277,35 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
           onCreateNew={() => setCreateOpen(true)} startEditingPackage={editPkg} onOwnMetadataSaved={onOwnMetadataSaved} />
       ) : (
         <>
-          <VBlock n={1} title="Råvare" done summary={
-            <span className="flex flex-wrap items-center gap-2">
+          <section aria-label="Vare og pakning" className="space-y-1 rounded-md border border-line-subtle p-3" data-testid="vare-pakning">
+            <h3 className="text-caption font-semibold text-ink-secondary">Vare og pakning</h3>
+            <p className="flex flex-wrap items-center gap-x-2 text-sm">
               <Link className="font-medium underline underline-offset-2" to={paths.raavare(item.rm_id)}>{item.rm_name ?? "Råvare"}</Link>
-              <Button size="sm" variant="ghost" disabled={!canWrite} onClick={() => (canMoveLink ? setChangeOpen(true) : setEditForm(true))}>Endre kobling</Button>
-            </span>
-          } />
-          <VBlock n={2} title="Pakning" done summary={
-            <span className="flex flex-wrap items-center gap-2 text-ink-secondary">
-              {packageLabel(item)}
-              {packageConflict(item) && <span className="text-caption text-warning">{packageConflict(item)}</span>}
-              <Button data-action="check-package" size="sm" variant="ghost" disabled={!canWrite} onClick={() => { setEditPkg(true); setEditForm(true); }}>Endre</Button>
-            </span>
-          } />
+              <span className="text-ink-secondary">· {packageLabel(item)}</span>
+              <button type="button" data-action="check-package" className="min-h-11 text-caption underline underline-offset-2 disabled:opacity-50" disabled={!canWrite} onClick={() => { setEditPkg(true); setEditForm(true); }}>Endre pakning</button>
+              <button type="button" className="min-h-11 text-caption underline underline-offset-2 disabled:opacity-50" disabled={!canWrite} onClick={() => (canMoveLink ? setChangeOpen(true) : setEditForm(true))}>Endre vare</button>
+            </p>
+            {packageConflict(item) && <p className="text-caption text-warning">{packageConflict(item)}</p>}
+          </section>
         </>
       )}
 
       {priceWork && linked && !readOnly && (
-        <VBlock n={3} title="Pris">
+        <VBlock n={2} title="Pris og avvik">
           <PriceBlock item={item} lines={lines} canWrite={canWrite} onDone={onDone} selectedInvoiceId={originalLineId ? insightSrc?.invoice_id ?? null : null} onCheckPackage={() => { setEditPkg(true); setEditForm(true); }} />
         </VBlock>
       )}
 
       {!editForm && !readOnly && (
-        <VBlock n={4} title="Gjelder">
-          <p className="text-sm">{scope.lines} åpne {scope.lines === 1 ? "linje" : "linjer"} på {scope.invoices} {scope.invoices === 1 ? "faktura" : "fakturaer"}</p>
+        <div className="space-y-2">
+          <p className="text-caption text-ink-secondary">Gjelder {scope.lines} åpne {scope.lines === 1 ? "linje" : "linjer"} på {scope.invoices} {scope.invoices === 1 ? "faktura" : "fakturaer"}</p>
           {!item.is_primary && (
             <label className="flex items-center gap-2 text-sm"><Checkbox checked={primary} onCheckedChange={(v) => setPrimary(v === true)} disabled={!canWrite} />Sett som primær leverandør for råvaren</label>
           )}
           {!item.is_primary && priceWork && primary && (
             <Button size="sm" variant="outline" disabled={!canWrite || primarySaving} onClick={() => { setError(null); void savePrimary(); }}>Lagre primær leverandør</Button>
           )}
-        </VBlock>
+        </div>
       )}
 
       {stale && <p className="text-caption text-ink-secondary">Handlinger gjelder linjene som vises. Trykk «Oppdater» for å ta med nye linjer.</p>}
@@ -329,7 +316,7 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
         // Med prisarbeid ligger hovedhandlingene i Pris-blokken; da skal ikke «Ikke vare …» være eneste klebrige handling.
         <div className={`${priceWork ? "" : "sticky bottom-0 z-10 "}-mx-4 flex flex-wrap items-center gap-2 border-t border-line-subtle bg-card px-4 py-3 [&>button]:min-h-11`}>
           {/* Én primærhandling: når planen har en neste handling står den i planen; da er «Ferdig» sekundær. */}
-          {!priceWork && <Button variant={plan.primary ? "outline" : "default"} {...(plan.primary ? {} : { "data-primary-action": true })} disabled={(!canWrite && primary) || primarySaving} onClick={() => void finish()}>Ferdig — neste</Button>}
+          {!priceWork && <Button variant={plan.primary ? "outline" : "default"} {...(plan.primary ? {} : { "data-primary-action": true })} disabled={(!canWrite && primary) || primarySaving} onClick={() => void finish()}>Godkjenn og gå til neste</Button>}
           {/* Hurtigtast X: Radix åpner ikke på .click(), så menyen styres direkte. */}
           <button type="button" hidden data-action="not-item" disabled={!canWrite || link.isPending} onClick={() => setMenuOpen(true)} />
           <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
@@ -342,6 +329,22 @@ function VarekortBody({ item, lines, canWrite, stale, onDone, onNext, onSkip, on
         </div>
       )}
       {editForm && onSkip && <button type="button" className="text-caption text-ink-secondary underline underline-offset-2" onClick={onSkip}>Hopp over</button>}
+
+      <details className="rounded-md border border-line-subtle p-3" data-testid="tekniske-detaljer">
+        <summary className="cursor-pointer text-sm font-semibold">Vis tekniske detaljer</summary>
+        <div className="mt-3 space-y-4">
+      <ReviewPlanCard plan={plan} basis={basis}
+        onBasisAction={(k) => { if (k === "pakning") { setEditPkg(true); setEditForm(true); } else navigate(paths.reberegn()); }}
+        returnTo={typeof window !== "undefined" ? window.location.pathname + window.location.search : undefined}
+        onAction={(step) => { if (step === "pakning" || step === "vare") { setEditPkg(step === "pakning"); setEditForm(true); return true; } return false; }} />
+      {insightSrc && lines.length > 1 && (
+        <p className="text-sm font-medium" data-testid="valgt-faktura">Valgt faktura {insightSrc.invoice_number ?? "uten nummer"}{insightSrc.invoice_date ? ` · ${insightSrc.invoice_date.split("-").reverse().join(".")}` : ""}{insightSrc.is_credit_note ? " · kreditnota" : ""}</p>
+      )}
+      {insightSrc && discountArithmeticText(insightSrc) && <p className="rounded-md bg-muted/50 px-3 py-2 text-sm tabular-nums" data-testid="rabatt-regnestykke">Trykt på fakturaen: {discountArithmeticText(insightSrc)}</p>}
+      {insightLine && insightSrc && <LineInsightPanel line={insightLine} clarifications={lineClarifications(insightLine)} baseUnit={item.rm_base_unit} confirmedPackage={container.isSuccess ? confirmedPackageFor({ ...item, container_unit: container.data }, insightSrc) : null} />}
+
+        </div>
+      </details>
 
       <details className="rounded-md border border-line-subtle p-3">
         <summary className="cursor-pointer text-sm font-semibold">Aliaser og historikk</summary>
