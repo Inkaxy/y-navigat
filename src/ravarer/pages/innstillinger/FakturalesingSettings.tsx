@@ -10,6 +10,7 @@ import { LearningExamplesCard } from "./fakturalesing/LearningExamplesCard";
 import { GoldInvoicesCard } from "./fakturalesing/GoldInvoicesCard";
 import { EhfTestCard } from "./fakturalesing/EhfTestCard";
 import { EhfFirstCard } from "./fakturalesing/EhfFirstCard";
+import { SupplierSourcesCard } from "./fakturalesing/SupplierSourcesCard";
 import { ReadingHealthCard } from "@/ravarer/components/drift/ReadingHealthCard";
 import { ReadingStallAlert } from "@/ravarer/components/drift/ReadingStallAlert";
 
@@ -53,6 +54,7 @@ export default function FakturalesingSettings() {
           <GoldInvoicesCard legalEntityId={company.id} />
         </>
       )}
+      <SupplierSourcesCard key={`kilder-${company.id}`} legalEntityId={company.id} />
       {/* EHF-test trenger ingen databaseendring; vises for godkjenner/admin uansett. */}
       <EhfTestCard key={company.id} legalEntityId={company.id} />
     </div>
